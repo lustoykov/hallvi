@@ -347,15 +347,34 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 
 ## High-leverage unresolved questions
 
-1. Does V1 fully support one application profile or both Next.js and FastAPI?
-2. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
-3. Which actions are pre-approved in normal operation, and which always require the user?
-4. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
-5. How should Pi authentication work in a self-hosted always-on installation?
-6. Does Temporal solve enough durable-workflow complexity to justify requiring it?
-7. What is the minimum telemetry and instrumentation contract for a conformant application?
-8. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
-9. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
+1. What is V1's autonomy posture: may any consequential action occur while the engineer is absent, and if so, through a deterministic reflex or through always-on Pi?
+2. Does V1 fully support one application profile or both Next.js and FastAPI?
+3. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
+4. Which actions are pre-approved in normal operation, and which always require the user?
+5. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
+6. How should Pi authentication work in a self-hosted always-on installation?
+7. Does Temporal solve enough durable-workflow complexity to justify requiring it?
+8. What is the minimum telemetry and instrumentation contract for a conformant application?
+9. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
+10. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
+
+## Independent review input
+
+Fable reviewed these notes read-only on 2026-08-30 through the dedicated `codex-collab-server-guy-review` session. This subsection records reviewer input, not settled product decisions.
+
+Verdict: proceed to specification after defining the authorization boundary precisely and resolving V1's autonomy posture.
+
+Material points to carry into the workshop:
+
+- **Policy inputs must be bounded.** A policy gate should evaluate capability, bound parameters and scope, environment, approval state, and deterministic preconditions computed from Observations. A Finding or Diagnosis should inform planning and the user but should not itself grant authority.
+- **Approval needs an explicit unit.** The reviewer recommends authorization bound to concrete capability invocations with parameters, checked again at execution. A revised adaptive plan must not inherit authority for newly added operations merely because an earlier plan was approved.
+- **External agent requests are not approvals.** An MCP client may request deployment or verification, but Codex or Claude tool approval must not substitute for approval inside Server Guy.
+- **Privilege isolation must be an environment property.** The Operational Reasoner should have evidence adapters rather than unrestricted shell/filesystem access. A Repository Executor may have a sandboxed shell but must not have infrastructure credentials or a network path to privileged provider operations.
+- **Recovery needs an asymmetry rule.** Mandatory checks must be necessary. Pi may veto, question, or escalate a recovery result, but it must not declare recovery over a failing mandatory check.
+- **V1 should visibly prove governance.** The V1 record should include at least one meaningful gate outcome: either a pre-declared operation runs without a per-action prompt, or policy blocks/downgrades a Pi proposal, with both proposal and result preserved as evidence.
+- **V1 capability and V1 proof may differ.** The specification must say whether MCP and the Remediation PR path are required parts of the demonstrated V1 loop or merely available capabilities.
+
+The review's most important product-owner question is whether Server Guy V1 performs any consequential operation while the engineer is absent. This choice affects topology, approval semantics, the always-on component, Pi authentication, and how clearly V1 differs from a general coding agent plus scripts.
 
 ## Canonical working terms
 
