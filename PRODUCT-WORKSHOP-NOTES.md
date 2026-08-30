@@ -99,24 +99,19 @@ Pi supplies general reasoning, but Server Guy supplies opinionated operational k
 
 This knowledge should not be dismissed as generic boilerplate. It is the reusable operational system that turns a general coding agent into Server Guy.
 
-## Core operational pipeline
+## Core operational model
 
-Current typed pipeline:
+Settled direction:
 
-```text
-Inspect
-  -> Resolve profile
-  -> Plan
-  -> Policy
-  -> Approval
-  -> Execute
-  -> Verify
-  -> Evidence
-```
+> The durable, resumable Operator Session is Server Guy's primary execution model. Pi controls the adaptive operational loop.
 
-The pipeline is adaptive rather than strictly linear. Execution may produce new observations that send Pi back to diagnosis or planning. The durable record must show each proposal, gate, action, result, and revision.
+Inspect, Resolve profile, Plan, Policy, Approval, Execute, Verify, and Evidence may remain useful classifications for Session Events and UI presentation. They are not a required sequence imposed on Pi. Pi may inspect, act, gather more evidence, revise its explanation, ask the user, or enter a bounded Guided Operation as the situation requires.
 
-Temporal is the current candidate for durable workflow state, waits, retries, and resumability, but its necessity is still being evaluated. The course stack is now general orientation rather than a requirement that should distort the product.
+Server Guy records Pi's visible intent, tool calls, commands, results, conclusions, approvals, and verification evidence. It does not expose or require private model reasoning.
+
+A Guided Operation is a bounded rigid subflow inside an Operator Session. It is appropriate when the operation itself has a stable ordered protocol, especially for an external transaction, a destructive or difficult-to-reverse sequence, or a process requiring specific user-supplied information. It should not become the default shape of deployment or incident response.
+
+Temporal is not planned for V1. It may be reconsidered only if the proven needs of durable Operator Sessions, long waits, retries, and recovery cannot be handled cleanly without it. The course stack is general orientation rather than a requirement that should distort the product.
 
 ## Product interfaces
 
@@ -127,15 +122,21 @@ Current V1 interface direction:
 
 No general-purpose public REST API or user-facing CLI is currently planned for V1. Internal service and transport boundaries may still use HTTP. A remotely hosted MCP endpoint also uses an HTTP transport underneath and therefore requires authentication, authorization, TLS, and application/incident scoping.
 
-The first UI should be thin but useful:
+The first UI should make the Operator Session inspectable without reducing the product to chat. Conversation is an input and collaboration surface; it is not the whole interface.
+
+The Operator View should include:
 
 - applications and current status;
 - per-application conversation with Server Guy;
+- Pi's current objective and visible intent;
+- live activity showing tools, commands, results, and status;
 - proposed plans and approval requests;
 - deployment and incident timelines;
 - evidence and explanations;
 - remediation and recovery progress;
 - a few predefined operational views.
+
+Structured cards, timelines, diffs, status indicators, and evidence views should be derived from the same Session Events that Pi produces while working. The UI should summarize noisy activity but always let the engineer inspect the underlying operational record.
 
 Custom dashboard generation and richer analytics views may come later. Pi should eventually be able to build an on-demand dashboard from Server Guy's telemetry when that is more useful than a fixed view.
 
@@ -294,7 +295,7 @@ Cloud coding tasks may later investigate or prepare fixes while the user's compu
 
 Current high-level direction:
 
-- Pi creates a visible plan before consequential action.
+- Pi records a visible current intent or short plan before consequential action. This is a model-authored part of the Operator Session, not a fixed workflow gate.
 - Read-only observation and evidence collection can generally run automatically.
 - **Full Autonomy**: Pi may perform state-changing operations without required user approval. Pi may still ask when it lacks information or genuinely cannot infer the user's intent.
 - **Pi Decides**: Pi decides whether a state-changing operation warrants user approval.
@@ -334,6 +335,10 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 - Product is for individual engineers and tinkerers first, not enterprises.
 - Open-source and useful in its own right; also a course capstone.
 - Pi is the only embedded Agent Runtime and is central to the product.
+- A durable, resumable Operator Session is the primary execution model; Pi controls the adaptive operational loop.
+- Inspect -> Resolve profile -> Plan -> Policy -> Approval -> Execute -> Verify -> Evidence is descriptive vocabulary for the record and UI, not an orchestrated sequence.
+- The UI must make Pi's visible intent, live actions, commands, results, evidence, approvals, and progress inspectable without exposing private model reasoning.
+- Rigid Guided Operations may exist as bounded subflows when the operation itself has a stable ordered protocol; they are not the default product architecture.
 - The user selects approval behavior from a small number of explicit modes; Pi may perform privileged work according to the selected mode.
 - UI is the first-class human interface; MCP is the first-class external-agent interface.
 - No general public REST API or user-facing CLI is planned for V1.
@@ -357,7 +362,7 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 
 ## High-leverage unresolved questions
 
-1. Is Pi's durable, resumable Operator Session the primary execution model, with Inspect -> Resolve profile -> Plan -> Policy -> Approval -> Execute -> Verify -> Evidence retained only as descriptive timeline vocabulary rather than an orchestrated pipeline?
+1. Is the primary UI an application workspace containing an Operator View and conversation, or a conversation-first interface with operational views attached?
 2. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
 3. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
 4. Does V1 fully support one application profile or both Next.js and FastAPI?
@@ -365,7 +370,7 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 6. Can Pi operate in Full Autonomy or Pi Decides mode while the engineer is absent, and what always-on runtime does that require?
 7. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
 8. How should Pi authentication work in a self-hosted always-on installation?
-9. Does Temporal fit a durable Operator Session with long waits without forcing the product back into a deterministic workflow shape?
+9. What evidence would justify reconsidering Temporal after V1?
 10. What is the minimum telemetry and instrumentation contract for a conformant application?
 11. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
 12. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
