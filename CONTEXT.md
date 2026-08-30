@@ -64,6 +64,14 @@ _Avoid_: Operator UI, dashboard
 A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside an Operator Session rather than controlling the overall session.
 _Avoid_: Main workflow, agent pipeline
 
+**Operation**:
+A durable record of one intended external effect, including its subject, actor, authority context, execution or reconciliation state, verification, evidence, and outcome.
+_Avoid_: Workflow run, agent step, tool call
+
+**Blocker**:
+A precise unresolved condition preventing an Operation or Exit Gate from advancing, including its affected scope, supporting evidence, owner, and possible resolutions.
+_Avoid_: Generic error, vague risk, failed task
+
 **Application Profile**:
 A supported stack-specific interpretation of the Application Contract, including the conventions Server Guy can inspect, establish, and operate.
 _Avoid_: Plugin, deployment template
