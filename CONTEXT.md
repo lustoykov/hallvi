@@ -37,7 +37,7 @@ A durable, revisable choice or constraint recognized from an Operator Session an
 _Avoid_: Chat message, Gate Check, permanent preference
 
 **Control Point**:
-A user-facing path from a Decision Record, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification.
+A user-facing path from a Decision Record, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.
 _Avoid_: Help tooltip, status override
 
 **Operator Takeover**:

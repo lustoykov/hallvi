@@ -24,8 +24,8 @@ Every mockup uses the same application workspace:
 5. **Chat with Pi** — the primary interaction surface containing Pi's intent, explanations, questions, decisions, and embedded tool/activity events. It always names the current Phase Deliverable Pi is working toward.
 6. **Operator Record** — a compact persistent summary containing only the current Phase Deliverable, its Exit Gate, and decisions recognized across Operator Sessions.
 7. **Current state details** — opened on demand from the Operator Record or chat activity; this contains authoritative facts, provenance, resource identities, approvals, waits, and evidence without duplicating them in the default workspace.
-8. **Control Point detail** — opened from a small Review link on every Decision Record, Gate Check, Phase Deliverable, and material fact. It explains the item, names its source, offers Pi-guided help and direct takeover, and can re-run verification without letting the user manually override a result.
-9. **Evidence Reference detail** — opened from a quiet Verify link on every Operational Claim or supporting evidence row. It separates the product definition from the current proof and exposes source identity, observation time, collection method, raw result, artifact, and refresh behavior.
+8. **Control Point detail** — opened from one small Details link on every Decision Record, Gate Check, Operational Claim, Phase Deliverable, and material fact. It separates Ask Pi, Verify with evidence, and Read contract or source, while retaining direct takeover and re-verification without allowing a manual result override.
+9. **Evidence Reference detail** — reached through Details for an Operational Claim or supporting evidence row. It exposes source identity, observation time, collection method, raw result, artifact, limits, and refresh behavior without confusing proof with either Pi's explanation or the product contract.
 
 Conversation is the primary surface but is not, by itself, the durable source of truth. When Pi recognizes a decision, correction, constraint, or operational fact in chat, it records the structured result in the Operator Record with provenance. The user can then track and correct it there. A chat claim does not change phase status, permission, resource identity, or verification state until the reflected record carries supporting evidence.
 
@@ -47,7 +47,7 @@ The prototype shows three levels deliberately: the map names the deliverable, Ch
 
 ### Universal Control Point behavior
 
-The compact Operator Record must not grow into a second dashboard. Each meaningful row gets only one quiet **Review** affordance; its detail opens on demand.
+The compact Operator Record must not grow into a second dashboard. Each meaningful row gets only one quiet **Details** affordance; its detail opens on demand.
 
 | Item opened | Detail must show | Guided path | Direct path | Result behavior |
 | --- | --- | --- | --- | --- |
@@ -58,9 +58,17 @@ The compact Operator Record must not grow into a second dashboard. Each meaningf
 
 The same Control Point must work for a first-time self-hoster and a senior engineer. Plain-language explanation is visible first; provenance, source, and direct takeover remain one action away. The product does not require a separate “expert mode.”
 
+Inside Details, the three comprehension paths remain explicit and distinct:
+
+1. **Ask Pi** provides contextual, model-authored explanation or help.
+2. **Verify with evidence** shows why the current result is believed.
+3. **Read contract or source** shows the governing Server Guy rule, application source, or authoritative third-party reference.
+
+Pi may explain a contract or evidence item, but its explanation does not replace either. Stable Server Guy concepts and contracts use Server Guy-owned documentation; provider-specific details may link to authoritative external documentation.
+
 ### Claim-to-evidence behavior
 
-Every visible Operational Claim has a quiet **Verify** affordance. Opening it first explains the claim in plain language, then shows the Evidence Reference that supports this particular result. The definition and the proof are separate links: **What this means** opens the governing product contract; **Verify** opens the captured Observation or receipt.
+Every visible Operational Claim has a quiet **Details** affordance. Opening it explains the claim in plain language and exposes the three standard paths. **Verify with evidence** opens the captured Observation or receipt; **Read contract or source** opens the governing definition or authoritative source; **Ask Pi** interprets either in the current application context.
 
 An Evidence Reference must show the observing source, observation time, collection method, raw result, artifact identity or original provider/log/probe output, and the parent claim it supports. It must say when the evidence proves only a point-in-time condition. A user can ask Pi to interpret or refresh it, while an experienced engineer can inspect the original artifact directly. Historical evidence is appended, not overwritten by a refresh.
 

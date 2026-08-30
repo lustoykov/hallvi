@@ -121,13 +121,21 @@ Server Guy may call the Application Launch complete only when:
 
 ## Operator control at every level
 
-The default workspace stays concise, but no meaningful product claim is a dead end. Each Decision Record, Gate Check, and material operational fact exposes a small **Review** path into the same control surface.
+The default workspace stays concise, but no meaningful product claim is a dead end. Each Decision Record, Gate Check, Operational Claim, and material operational fact exposes one quiet **Details** path into the same control surface.
 
 That surface must support two depths without splitting the product into beginner and expert modes:
 
 - **Guided control** — explain what the item means, why it matters now, and let the engineer ask Pi to investigate, propose a change, or handle the next bounded action.
 - **Direct control** — show the originating chat, specification, repository file, configuration, provider object, or Observation; let the engineer or an External Agent Client change the underlying source when permitted.
 - **Re-verification** — run the relevant check again against the current source and evidence. A Gate Check cannot be manually marked passed, and a stale result must not survive a material source change.
+
+For an Operational Claim, the Details surface always separates three paths:
+
+- **Ask Pi** — obtain a contextual explanation, investigation, or proposed next action. Pi's answer is model-authored interpretation; it is neither proof nor the governing rule.
+- **Verify with evidence** — inspect the current Observation or receipt, including its source, time, collection method, raw result, artifact, and limits.
+- **Read contract or source** — inspect Server Guy's governing product contract, the originating repository/configuration source, or authoritative third-party documentation. Server Guy owns documentation for its own contracts; provider-specific behavior may link to external provider documentation.
+
+The collapsed UI shows only the current status, a concise plain-language meaning, evidence age when relevant, and **Details**. It does not reproduce the whole manual.
 
 A Decision Record is revisable. A Gate Check is computed. An operational fact is source-attributed. All three can be inspected through the same Control Point, but their authority must not be blurred.
 

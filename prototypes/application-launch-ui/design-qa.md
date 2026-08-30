@@ -81,3 +81,16 @@ final result: passed
 - `npm run build` completed successfully after the interaction pass.
 
 No actionable P0, P1, or P2 issues were found in the tested desktop flow. The captured artifact remains simulated prototype data until Journey 01 implementation is connected to real probe and receipt stores.
+
+## Settled Details grammar — L3.1
+
+final result: passed
+
+- Replaced competing `Review`, `Verify`, and `What is this?` entry labels with one quiet `Details` affordance across Phase Deliverables, Gate Checks, Decision Records, operational facts, and activity Observations.
+- Opened `Conformance analysis recorded` from chat activity and confirmed the Details surface presents `Ask Pi`, `Read contract or source`, and `Verify with evidence` as separate paths.
+- Confirmed the inline explanation explicitly says Pi's answer is not proof or the governing rule.
+- Expanded the Journey 01 contract source and confirmed it remains distinct from the current captured Observation.
+- Confirmed direct takeover and fresh verification remain available below the comprehension paths.
+- `npm run build` completed successfully after the interaction pass.
+
+No actionable P0, P1, or P2 issues were found in the tested desktop flow.
