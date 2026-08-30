@@ -20,9 +20,53 @@ _Avoid_: Chain of thought, raw agent trace
 The structured UI projection of an Operator Session, combining conversation, current activity, timelines, evidence, approvals, and application status.
 _Avoid_: Chat window, agent transcript
 
+**Operator UI**:
+The engineer-facing interface for viewing and controlling Server Guy's applications, Operator Sessions, Releases, Incident Cases, integrations, and evidence.
+_Avoid_: Control plane, dashboard
+
+**Operational Control Plane**:
+The authoritative system of record and execution coordination for application state, Releases, Incident Cases, approvals, and operational actions, wherever its components run.
+_Avoid_: Operator UI, dashboard
+
 **Guided Operation**:
 A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside an Operator Session rather than controlling the overall session.
 _Avoid_: Main workflow, agent pipeline
+
+**Application Launch**:
+The end-to-end journey from repository through conformance, infrastructure setup, first Release, external verification, and minimum ongoing operations.
+_Avoid_: Initial deployment, setup
+
+**Release**:
+The versioned unit intended to be running in an environment, identified by an application revision and deployment configuration identity.
+_Avoid_: Deployment, server state
+
+**Deployment**:
+A transition that moves a specific Release into a target environment.
+_Avoid_: Application Launch, host change
+
+**Out-of-band Change**:
+A recorded mutation to a live environment that is not represented by its current Release and therefore remains visible as drift until reconciled.
+_Avoid_: Hotfix, invisible manual change
+
+**Incident Signal**:
+An Observation suggesting that an application may be unavailable or unhealthy; it does not by itself establish an Incident Case.
+_Avoid_: Alert, incident
+
+**Alert**:
+A notification sent to the engineer about a meaningful Incident Case or detection transition. It is a delivery event, not an operational state.
+_Avoid_: Incident, alarm state
+
+**Incident Case**:
+The durable record of suspected or confirmed service trouble, including its observations, conclusions, actions, approvals, artifacts, and outcome.
+_Avoid_: Alert, outage
+
+**Remediation**:
+A durable operational or repository change intended to correct an incident's cause or prevent recurrence.
+_Avoid_: Recovery, fix
+
+**Recovery**:
+A recorded outcome in which evidence supports that the application has returned to its contract-defined healthy condition.
+_Avoid_: Remediation, fix
 
 **Approval Mode**:
 The explicit user-selected rule governing whether Pi must request approval before state-changing operations.

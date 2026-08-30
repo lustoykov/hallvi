@@ -140,6 +140,18 @@ Structured cards, timelines, diffs, status indicators, and evidence views should
 
 Custom dashboard generation and richer analytics views may come later. Pi should eventually be able to build an on-demand dashboard from Server Guy's telemetry when that is more useful than a fixed view.
 
+## Grounding use cases
+
+The workshop is now grounded in [USE-CASES.md](./USE-CASES.md). Product and architecture choices should be tested against these journeys rather than discussed only in the abstract:
+
+1. Application Launch from repository to live, externally observed service.
+2. Detect application unavailability and Alert the engineer while the laptop may be offline.
+3. Investigate an Incident Case, remediate it, and verify Recovery.
+4. Connect Codex through MCP for evidence-backed investigation and repository remediation.
+5. Ship a new Release of an already-live application and either verify or transition back.
+
+The Operational Control Plane is the authoritative state and execution system. The Operator UI is how the engineer sees and controls it. The control plane must not be used as a synonym for a dashboard or application screen.
+
 ## Agent-neutral capabilities
 
 Capabilities must belong to Server Guy, not to the Pi integration. Pi tools and MCP tools are adapters over the same typed application capabilities.
@@ -362,18 +374,17 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 
 ## High-leverage unresolved questions
 
-1. Is the primary UI an application workspace containing an Operator View and conversation, or a conversation-first interface with operational views attached?
-2. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
-3. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
-4. Does V1 fully support one application profile or both Next.js and FastAPI?
-5. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
-6. Can Pi operate in Full Autonomy or Pi Decides mode while the engineer is absent, and what always-on runtime does that require?
-7. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
-8. How should Pi authentication work in a self-hosted always-on installation?
-9. What evidence would justify reconsidering Temporal after V1?
-10. What is the minimum telemetry and instrumentation contract for a conformant application?
-11. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
-12. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
+1. At 03:00 the sentinel sees the application is down and the engineer's computer is offline. What has happened by the time the engineer opens Server Guy at 08:00: Alert only, deterministic reflex, or always-on Pi investigation and action?
+2. Is the primary UI an application workspace containing an Operator View and conversation, or a conversation-first interface with operational views attached?
+3. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
+4. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
+5. Does V1 fully support one application profile or both Next.js and FastAPI?
+6. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
+7. How should Pi authentication work in a self-hosted always-on installation?
+8. What evidence would justify reconsidering Temporal after V1?
+9. What is the minimum telemetry and instrumentation contract for a conformant application?
+10. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
+11. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
 
 ## Independent review input
 
@@ -421,12 +432,29 @@ Codex synthesis:
 - Approval Records should remain audit evidence and should not be fed back to Pi by default as permission context. Explicit current user intent is a cleaner context channel.
 - Credential isolation and independent observations preserve a minimum reliable floor without forcing Pi into predetermined operations.
 
+## Use-case review input
+
+Fable performed a third read-only review on 2026-08-30 against the first concrete use-case draft. This subsection records the material review and resulting corrections, not answers to the remaining owner choices.
+
+Reviewer verdict: the requested journeys are sufficient to drive the specification after adding one routine journey and clarifying the always-on boundary.
+
+Material corrections incorporated into the draft:
+
+- Added shipping a new Release of an already-live application as a distinct use case. First Application Launch, routine Release deployment, and incident remediation are not the same journey.
+- Distinguished Deployment from an Out-of-band Change so direct host repairs remain visible as drift until reconciled with a Release.
+- Narrowed the initial alerting journey to detectable application unavailability based on the external Application Contract. Broader degradation depends on unresolved telemetry.
+- Added missing engineer/Pi handoffs for Application Contract provenance, guided DNS work, PR merge, deployment, and verification.
+- Distinguished the Operational Control Plane from the Operator UI.
+- Required redaction on every MCP read path, not only preassembled Evidence Bundles.
+
+The unresolved material issue is the sentinel boundary. Alerting with the laptop closed could be implemented as a prober that persists a detection event and sends a notification, as a small remote control-plane component that also creates Incident Cases, or as infrastructure capable of resuming Pi and acting. The 03:00-to-08:00 scenario is now the next product-owner question.
+
 ## Canonical working terms
 
 - **Agent Runtime**: Pi's model, session, tool-loop, and agent execution environment.
 - **Model Backend**: the model/provider accessed through Pi.
 - **Operational Knowledge**: Server Guy's profiles, contracts, runbooks, policies, and verification knowledge.
-- **Operational Control Plane**: authoritative state, evidence, approvals, and controlled execution.
+- **Operational Control Plane**: authoritative operational state and execution coordination wherever its components run; it is not the Operator UI.
 - **External Agent Client**: Codex, Claude, or another agent using Server Guy through MCP.
 - **Operational Plan**: Pi-authored proposed approach, expected effects, checks, and escalation conditions; its implementation details may change as evidence appears.
 - **Approval Mode**: the explicit user-selected rule governing whether Pi must request approval before state-changing operations: Full Autonomy, Pi Decides, or Always Ask.
@@ -434,13 +462,17 @@ Codex synthesis:
 - **Observation**: a captured operational fact.
 - **Evidence Selection**: observations selected as support for a claim.
 - **Finding**: an agent interpretation of evidence.
-- **Diagnosis**: the currently accepted explanation of an Incident Case.
+- **Diagnosis**: Pi's current model-authored explanation of an Incident Case, kept distinct from the Observations it cites.
 - **Evidence Bundle**: bounded, structured, redacted, source-attributed material for review or handoff.
 - **Candidate Fix**: an untrusted proposed repository change.
 - **Remediation PR**: the reviewable GitHub artifact for application-code remediation.
-- **Release**: a specific application revision and configuration being moved toward live service.
+- **Release**: the versioned unit intended to run in an environment, identified by an application revision and deployment configuration identity.
+- **Deployment**: a transition that moves a specific Release into an environment.
+- **Out-of-band Change**: a recorded live-environment mutation not represented by the current Release and therefore visible as drift until reconciled.
+- **Alert**: a notification sent to the engineer about a meaningful detection or Incident Case transition; it is not an operational state.
 - **Incident Case**: the durable record of a suspected or confirmed service degradation and its investigation, actions, and outcome.
-- **Recovery**: a recorded outcome supported by mandatory checks and, when necessary, Pi's semantic assessment.
+- **Remediation**: a durable operational or repository change intended to correct an incident's cause or prevent recurrence.
+- **Recovery**: a recorded outcome supported by evidence that the application has returned to its contract-defined healthy condition.
 
 ## Deferred or explicitly non-primary work
 
