@@ -28,9 +28,11 @@ The product should eventually feel like giving an application to a capable serve
 
 ## Central architecture principle
 
-Working principle under revision:
+Product-owner correction:
 
-> Server Guy is an AI-operated operational system with user-selected approval modes.
+> Server Guy is a model-native operations agent with user-selected approval modes.
+
+"Model-native" means Pi is the operator and primary adaptive control loop, not a proposal generator filling slots in a conventional workflow. Server Guy should give Pi a durable workplace: application context, operational memory, broad tools, credential-scoped environments, independent observations, resumability, and an operator UI. The surrounding software should provide a reliable floor without replacing Pi's capability ceiling.
 
 Pi supplies adaptive judgment and should be free to select actions, compose commands, and revise execution as new evidence appears. Server Guy should not require every useful operation to be represented as a predefined capability with fully bound parameters.
 
@@ -355,17 +357,18 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 
 ## High-leverage unresolved questions
 
-1. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
-2. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
-3. Does V1 fully support one application profile or both Next.js and FastAPI?
-4. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
-5. Can Pi operate in Full Autonomy or Pi Decides mode while the engineer is absent, and what always-on runtime does that require?
-6. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
-7. How should Pi authentication work in a self-hosted always-on installation?
-8. Does Temporal solve enough durable-workflow complexity to justify requiring it?
-9. What is the minimum telemetry and instrumentation contract for a conformant application?
-10. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
-11. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
+1. Is Pi's durable, resumable Operator Session the primary execution model, with Inspect -> Resolve profile -> Plan -> Policy -> Approval -> Execute -> Verify -> Evidence retained only as descriptive timeline vocabulary rather than an orchestrated pipeline?
+2. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
+3. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
+4. Does V1 fully support one application profile or both Next.js and FastAPI?
+5. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
+6. Can Pi operate in Full Autonomy or Pi Decides mode while the engineer is absent, and what always-on runtime does that require?
+7. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
+8. How should Pi authentication work in a self-hosted always-on installation?
+9. Does Temporal fit a durable Operator Session with long waits without forcing the product back into a deterministic workflow shape?
+10. What is the minimum telemetry and instrumentation contract for a conformant application?
+11. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
+12. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
 
 ## Independent review input
 
@@ -386,6 +389,32 @@ Material points to carry into the workshop:
 The review's most important product-owner question is whether Server Guy V1 performs any consequential operation while the engineer is absent. This choice affects topology, approval semantics, the always-on component, Pi authentication, and how clearly V1 differs from a general coding agent plus scripts.
 
 Workshop response: invocation-level authorization is considered too restrictive and has not been adopted. The current alternative is a small set of Approval Modes. In Pi Decides mode, Pi itself determines when to ask; Server Guy does not maintain a growing policy inferred from previous approvals.
+
+## Model-native review input
+
+Fable performed a second read-only review on 2026-08-30 after the Approval Mode correction. This subsection is reviewer input plus Codex synthesis, not a settled replacement architecture.
+
+Reviewer verdict: the authority model is now genuinely model-native, but the surrounding architecture still uses workflow-native shapes that subordinate Pi.
+
+Material corrections proposed by the reviewer:
+
+- **The Pi session is the loop.** Server Guy should host and resume a durable Operator Session rather than orchestrate Pi through a fixed Inspect -> Plan -> Execute pipeline. The current pipeline may remain useful as descriptive timeline vocabulary.
+- **Pi is the author of record.** Pi should write Findings, Diagnoses, Plans, and Assessments directly as versioned, disputable conclusions citing Observations. Proposal semantics remain useful for approval requests and External Agent Clients, not for every Pi action.
+- **Broad tools are scoped by environment and credential custody.** Pi should have a real application-host shell for novel operations. Provider credentials should remain outside that shell and be available through provider tools. Approval Modes govern tool classes without parsing or predefining every command parameter.
+- **Operational knowledge starts seeded and becomes model-grown.** Server Guy supplies application contracts and initial provider/stack skills, then preserves Pi-authored runbook notes, learned application quirks, topology, and explicit user intent.
+- **Durable user intent matters in addition to Approval Mode.** A short user-authored prose brief can tell Pi what the user values without compiling that intent into rules or learning permission from old approvals.
+
+The reviewer identifies the minimum non-model substrate as Approval Mode enforcement, credential custody, environment scoping, a durable resumable Operator Session, authoritative Release and Incident Case state, provenance-preserving Observations, independent sentinel checks, seed knowledge, model-grown memory, the operator UI, and authenticated MCP transport.
+
+The proposed V1 proof is a failure that no predefined capability anticipates: Pi resumes with application history, diagnoses a full disk through a real shell, composes a repair, decides whether to ask from the selected mode and explicit user intent, verifies recovery using independent sentinel evidence, records the incident, updates application memory, and prepares a durable remediation change.
+
+Codex synthesis:
+
+- The central correction is valid: Pi should be the operational control loop, not merely a proposer inside Server Guy's loop.
+- The typed pipeline, Temporal role, proposal language, and deterministic acceptance of a Diagnosis must be reconsidered against this principle.
+- The user's previous "plan before action" decision should not be silently discarded. A model-written visible plan may still precede action without becoming a fixed workflow gate; its exact role remains an owner choice.
+- Approval Records should remain audit evidence and should not be fed back to Pi by default as permission context. Explicit current user intent is a cleaner context channel.
+- Credential isolation and independent observations preserve a minimum reliable floor without forcing Pi into predetermined operations.
 
 ## Canonical working terms
 

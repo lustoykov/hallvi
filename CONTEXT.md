@@ -4,6 +4,10 @@ Canonical product language for Server Guy's deployment and operations domain.
 
 ## Language
 
+**Model-Native Operation**:
+An operating model in which Pi is the primary adaptive control loop and Server Guy supplies its durable context, memory, tools, observations, resumability, approval behavior, and operator interface.
+_Avoid_: AI-assisted workflow, model-powered pipeline
+
 **Approval Mode**:
 The explicit user-selected rule governing whether Pi must request approval before state-changing operations.
 _Avoid_: Permission template, Operational Mandate
