@@ -28,6 +28,22 @@ _Avoid_: Task list, phase goal
 The small set of observable conditions that must be satisfied before Application Launch advances to the next Launch Phase. An unmet condition remains visible as waiting or blocked rather than being treated as progress.
 _Avoid_: Vague completion, confidence score, checklist progress
 
+**Gate Check**:
+One observable condition inside an Exit Gate whose current result is recomputed from its source and supporting evidence. It is not a decision and cannot be manually marked as passed.
+_Avoid_: Decision, manual checkbox, confidence judgment
+
+**Decision Record**:
+A durable, revisable choice or constraint recognized from an Operator Session and stored with its origin and affected scope.
+_Avoid_: Chat message, Gate Check, permanent preference
+
+**Control Point**:
+A user-facing path from a Decision Record, Gate Check, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification.
+_Avoid_: Help tooltip, status override
+
+**Operator Takeover**:
+The engineer or an External Agent Client inspecting and changing the underlying decision, repository, configuration, or provider state before Server Guy re-verifies the result.
+_Avoid_: Manual pass, bypass, leaving Server Guy
+
 **Session Event**:
 A recorded item in an Operator Session, such as Pi's visible intent, a tool call, command result, Observation, conclusion, approval, or recovery assessment.
 _Avoid_: Chain of thought, raw agent trace

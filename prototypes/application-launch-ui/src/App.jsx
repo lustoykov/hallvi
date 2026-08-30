@@ -143,44 +143,149 @@ function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvi
   );
 }
 
-function RecordRow({ label, value, meta }) {
-  return <div className="record-row"><div><span>{label}</span><strong>{value}</strong></div><em>{meta}</em></div>;
+function RecordRow({ label, value, meta, onReview }) {
+  return <div className="record-row"><div><span>{label}</span><strong>{value}</strong></div><div className="record-row-actions"><em>{meta}</em>{onReview && <button type="button" className="control-link" onClick={onReview}>Review</button>}</div></div>;
 }
 
-function PhaseContract({ phase, gateProgress, current }) {
+function PhaseContract({ phase, gateProgress, current, onReviewDeliverable, onReviewGate }) {
   return (
     <section className="phase-contract-card">
-      <div className="deliverable-heading"><div><span>Phase deliverable</span><strong>{phase.deliverable}</strong></div><em>{gateProgress}/3 passed</em></div>
+      <div className="deliverable-heading"><div><span>Phase deliverable</span><strong>{phase.deliverable}</strong></div><div className="deliverable-actions"><button type="button" className="control-link" onClick={onReviewDeliverable}>What is this?</button><em>{gateProgress}/{phase.gate.length} passed</em></div></div>
       <p>{phase.outcome}</p>
       <div className="gate-heading"><span>Exit Gate</span><i><b style={{ width: `${(gateProgress / phase.gate.length) * 100}%` }} /></i></div>
       <div className="gate-list">{phase.gate.map((check, checkIndex) => {
         const passed = checkIndex < gateProgress;
         const currentBlocker = checkIndex === gateProgress && gateProgress < phase.gate.length;
         const markerState = passed ? "passed" : currentBlocker ? current.status : "required";
-        return <div key={check} className={`gate-item ${passed ? "passed" : ""}`}><span>{passed ? "Passed" : currentBlocker ? "Current" : "Required"}</span><strong>{check}</strong><em className={statusClass(markerState)}>{passed ? "pass" : currentBlocker ? "now" : "next"}</em></div>;
+        return <div key={check} className={`gate-item ${passed ? "passed" : ""}`}><span>{passed ? "Passed" : currentBlocker ? "Current" : "Required"}</span><strong>{check}</strong><button type="button" className="control-link" onClick={() => onReviewGate({ check, checkIndex, passed, currentBlocker })}>Review</button><em className={statusClass(markerState)}>{passed ? "pass" : currentBlocker ? "now" : "next"}</em></div>;
       })}</div>
     </section>
   );
 }
 
-function OperatorRecord({ current, phase, records, gateProgress, onEvidence }) {
+function OperatorRecord({ current, phase, records, gateProgress, onEvidence, onReviewDeliverable, onReviewGate, onReviewDecision }) {
   return (
     <aside className="operator-record" aria-label="Operator Record">
       <div className="record-header"><div><span>Operator Record</span><small>Shared across chats · reflected from decisions + evidence</small></div><button type="button" onClick={onEvidence}>View current state</button></div>
       <div className="record-scroll">
-        <PhaseContract phase={phase} gateProgress={gateProgress} current={current} />
-        {current.decision && <div className="decision-banner"><strong>Workshop choice unresolved</strong><p>{current.decision}</p></div>}
+        <PhaseContract phase={phase} gateProgress={gateProgress} current={current} onReviewDeliverable={onReviewDeliverable} onReviewGate={onReviewGate} />
+        {current.decision && <div className="decision-banner"><div><strong>Workshop choice unresolved</strong><button type="button" className="control-link" onClick={() => onReviewDecision({ label: "Workshop choice", value: current.decision, meta: "Product workshop" })}>Review</button></div><p>{current.decision}</p></div>}
         <section className="record-section">
           <div className="record-section-title"><h3>Decisions from chat</h3><span>{records.length}</span></div>
-          {records.length ? records.map((record, recordIndex) => <RecordRow key={`${record.label}-${recordIndex}`} {...record} />) : <p className="empty-record">No decisions have been recorded from any chat yet.</p>}
+          {records.length ? records.map((record, recordIndex) => <RecordRow key={`${record.label}-${recordIndex}`} {...record} onReview={() => onReviewDecision(record)} />) : <p className="empty-record">No decisions have been recorded from any chat yet.</p>}
         </section>
       </div>
     </aside>
   );
 }
 
-function EvidenceDrawer({ current, phase, gateProgress, onClose }) {
-  return <div className="drawer-backdrop" onMouseDown={onClose} role="presentation"><aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Current application state"><div className="drawer-header"><div><span>Current application state</span><strong>{current.name} · {current.status}</strong></div><button type="button" onClick={onClose}>Close</button></div><section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/3 passed.</p></section><section><span className="drawer-label">Specification source</span><p>{current.source}</p></section><section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} />)}</section><section><span className="drawer-label">Authoritative observations</span>{current.events.map(([title, detail, status]) => <div className="drawer-event" key={title}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section><section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>{current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}</aside></div>;
+function StateDrawer({ current, phase, gateProgress, onClose, onReviewFact }) {
+  return <div className="drawer-backdrop" onMouseDown={onClose} role="presentation"><aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Current application state"><div className="drawer-header"><div><span>Current application state</span><strong>{current.name} · {current.status}</strong></div><button type="button" onClick={onClose}>Close</button></div><section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/{phase.gate.length} passed.</p></section><section><span className="drawer-label">Specification source</span><p>{current.source}</p></section><section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} onReview={() => onReviewFact({ label, value, provenance })} />)}</section><section><span className="drawer-label">Authoritative observations</span>{current.events.map(([title, detail, status]) => <div className="drawer-event" key={title}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section><section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>{current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}</aside></div>;
+}
+
+function ControlDrawer({ control, onClose, onAskPi }) {
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const [takeoverOpen, setTakeoverOpen] = useState(false);
+  const [rerunState, setRerunState] = useState("idle");
+
+  useEffect(() => {
+    setSourceOpen(false);
+    setTakeoverOpen(false);
+    setRerunState("idle");
+  }, [control.key]);
+
+  function rerun() {
+    if (rerunState === "running") return;
+    setRerunState("running");
+    window.setTimeout(() => setRerunState("complete"), 650);
+  }
+
+  return (
+    <div className="drawer-backdrop" onMouseDown={onClose} role="presentation">
+      <aside className="evidence-drawer control-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label={`Review ${control.title}`}>
+        <div className="drawer-header"><div><span>{control.kind}</span><strong>{control.title}</strong></div><button type="button" onClick={onClose}>Close</button></div>
+        <section className="control-summary"><span className="drawer-label">What this means</span><p>{control.description}</p></section>
+        <section><span className="drawer-label">Current result</span><div className="control-result"><strong>{control.status}</strong><span className={`mini-status ${statusClass(control.statusLabel)}`}>{control.statusLabel}</span></div><p>{control.impact}</p></section>
+        <section><span className="drawer-label">Source and provenance</span><button type="button" className="source-link" onClick={() => setSourceOpen((value) => !value)}>{control.source}<span>{sourceOpen ? "Hide" : "Open"}</span></button>{sourceOpen && <div className="source-detail"><strong>Product definition</strong><code>{control.sourcePath}</code><p>This is the rule Server Guy is applying. The current result still comes from the cited application or provider source—not from this document alone.</p></div>}</section>
+        {control.evidence.length > 0 && <section><span className="drawer-label">Evidence used now</span>{control.evidence.map(([title, detail, status]) => <div className="drawer-event" key={`${title}-${detail}`}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section>}
+        <section className="control-path-section"><span className="drawer-label">Choose your level of control</span><button type="button" className="control-path primary-path" onClick={() => onAskPi(control)}><strong>Ask Pi to handle it</strong><small>Pi explains, investigates, and proposes or performs the next permitted action.</small></button><button type="button" className="control-path" onClick={() => setTakeoverOpen((value) => !value)}><strong>Take control</strong><small>Inspect and change the underlying source yourself or with another coding agent.</small></button>{takeoverOpen && <div className="takeover-detail"><span>Change this source</span><strong>{control.takeover}</strong><ol><li>Open the source and make the change.</li><li>Return here when the source is ready.</li><li>Re-run verification; do not override the result.</li></ol></div>}</section>
+        <section className="rerun-section"><span className="drawer-label">Verify the current source</span><p>{control.rerunHelp}</p><button type="button" className="rerun-button" onClick={rerun} disabled={rerunState === "running"}>{rerunState === "running" ? "Checking current source…" : "Re-run verification"}</button><div className={`rerun-result ${rerunState}`} aria-live="polite">{rerunState === "idle" && "No manual status override is available."}{rerunState === "running" && "Reading the current source and collecting fresh evidence."}{rerunState === "complete" && `Rechecked just now. Result remains “${control.status}” until the underlying source or evidence changes.`}</div></section>
+      </aside>
+    </div>
+  );
+}
+
+function deliverableControl(phase, gateProgress, current) {
+  return {
+    key: `deliverable-${phase.id}`,
+    kind: "Phase Deliverable",
+    title: phase.deliverable,
+    status: `${gateProgress}/${phase.gate.length} checks passed`,
+    statusLabel: "in progress",
+    description: phase.meaning,
+    impact: `${phase.outcome} The launch moves forward only when its Exit Gate is supported by current evidence.`,
+    source: phase.source,
+    sourcePath: "docs/user-journeys/01-application-launch.md#user-journey",
+    takeover: phase.takeover,
+    evidence: current.events,
+    rerunHelp: "Refresh all checks for this deliverable from their current sources and evidence.",
+    askPrompt: `Help me understand and complete the ${phase.deliverable}. Show me what remains and handle what you can.`,
+  };
+}
+
+function gateControl(phase, current, gateProgress, { check, checkIndex, passed, currentBlocker }) {
+  const status = passed ? "Passed" : currentBlocker ? current.status : "Required";
+  return {
+    key: `gate-${phase.id}-${checkIndex}`,
+    kind: "Gate Check",
+    title: check,
+    status,
+    statusLabel: passed ? "pass" : currentBlocker ? "current" : "next",
+    description: `This is one observable condition required for the ${phase.deliverable}. It is computed from the underlying source and evidence; it is not a user decision or a checkbox.`,
+    impact: passed ? "Current evidence supports this condition. A material source change can make it stale and trigger re-verification." : currentBlocker ? "This is the condition currently limiting progress in this phase." : `This condition becomes current after the preceding ${gateProgress === 0 ? "work" : "checks"} are resolved.`,
+    source: `${phase.source} · Exit Gate`,
+    sourcePath: "docs/user-journeys/01-application-launch-ui-map.md#phase-deliverables-and-exit-gates",
+    takeover: phase.takeover,
+    evidence: current.events,
+    rerunHelp: "Run this Gate Check again against the current repository, configuration, provider state, and observations that apply.",
+    askPrompt: `Investigate the Gate Check “${check}”. Explain what is missing, then resolve or propose the smallest credible change.`,
+  };
+}
+
+function decisionControl(record, phase) {
+  return {
+    key: `decision-${record.label}-${record.value}`,
+    kind: "Decision Record",
+    title: record.label,
+    status: record.value,
+    statusLabel: "recorded",
+    description: "This is a durable, revisable choice or constraint recognized from chat. It is shared across Operator Sessions, but it is not a Gate Check or permanent permission.",
+    impact: `This decision currently informs work toward the ${phase.deliverable}. Changing it may invalidate dependent checks or plans.`,
+    source: record.meta,
+    sourcePath: "Originating Operator Session and shared Operator Record",
+    takeover: `${record.meta}; revise the decision and review any affected launch checks`,
+    evidence: [],
+    rerunHelp: "After revising the decision, re-evaluate the checks and plans that depend on it.",
+    askPrompt: `Review the recorded decision “${record.label}: ${record.value}”. Explain its impact and help me revise it if needed.`,
+  };
+}
+
+function factControl(fact, phase, current) {
+  return {
+    key: `fact-${fact.label}-${fact.value}`,
+    kind: "Operational Fact",
+    title: fact.label,
+    status: fact.value,
+    statusLabel: "current",
+    description: "This value is reflected into the Operator Record from a cited repository, provider, user, or observation source. The displayed value is not independently editable.",
+    impact: `Pi may use this fact while working toward the ${phase.deliverable}; changing its source can alter downstream plans and checks.`,
+    source: fact.provenance,
+    sourcePath: current.source,
+    takeover: `The authoritative ${fact.provenance} source for “${fact.label}”`,
+    evidence: current.events,
+    rerunHelp: "Refresh this fact from its authoritative source and update any dependent checks.",
+    askPrompt: `Investigate the current fact “${fact.label}: ${fact.value}” and reconcile it with its ${fact.provenance} source.`,
+  };
 }
 
 function initialChatRecords(current) {
@@ -190,7 +295,7 @@ function initialChatRecords(current) {
 export function App() {
   const [index, setIndex] = useState(initialIndex);
   const [approvalMode, setApprovalMode] = useState("Pi Decides");
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawer, setDrawer] = useState(null);
   const [sessions, setSessions] = useState(starterSessions);
   const [activeSessionId, setActiveSessionId] = useState("launch");
   const [showArchived, setShowArchived] = useState(false);
@@ -208,13 +313,41 @@ export function App() {
   useEffect(() => {
     window.history.replaceState(null, "", `#${current.id}`);
     document.title = `${current.id} · ${current.name} · Server Guy`;
-    setDrawerOpen(false);
+    setDrawer(null);
   }, [current]);
 
   function submitChat(text) {
     const isDecision = !/[?？]\s*$/.test(text);
     setMessagesBySession((all) => ({ ...all, [activeSession.id]: [...(all[activeSession.id] || []), { actor: "You", text, recorded: isDecision }, { actor: "Pi", text: isDecision ? "I recorded that in the shared Operator Record so it remains visible from every chat." : "I treated that as a question, so I did not change the Operator Record. This storyboard does not simulate the full answer." }] }));
     if (isDecision) setApplicationDecisions((items) => [...items, { label: "Chat decision", value: text, meta: `From ${activeSession.title}` }]);
+  }
+
+  function askPiToHandle(control) {
+    setMessagesBySession((all) => ({
+      ...all,
+      [activeSession.id]: [
+        ...(all[activeSession.id] || []),
+        { actor: "You", text: control.askPrompt },
+        { actor: "Pi", text: `I’ll work from the cited source for “${control.title}”, show the evidence I use, and keep the result open for your review. I will not manually override a Gate Check.` },
+      ],
+    }));
+    setDrawer(null);
+  }
+
+  function openDeliverableControl() {
+    setDrawer({ type: "control", control: deliverableControl(phase, gateProgress, current) });
+  }
+
+  function openGateControl(gate) {
+    setDrawer({ type: "control", control: gateControl(phase, current, gateProgress, gate) });
+  }
+
+  function openDecisionControl(record) {
+    setDrawer({ type: "control", control: decisionControl(record, phase) });
+  }
+
+  function openFactControl(fact) {
+    setDrawer({ type: "control", control: factControl(fact, phase, current) });
   }
 
   function newSession() {
@@ -258,12 +391,13 @@ export function App() {
           <ApplicationHeader current={current} approvalMode={approvalMode} setApprovalMode={setApprovalMode} />
           <LaunchMap current={current} phase={phase} gateProgress={gateProgress} setIndex={setIndex} />
           <div className="workspace-body">
-            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawerOpen(true)} onArchive={archiveActiveSession} onRestore={restoreActiveSession} onNext={advance} phaseAdvanceBlocked={phaseAdvanceBlocked} />
-            <OperatorRecord current={current} phase={phase} records={records} gateProgress={gateProgress} onEvidence={() => setDrawerOpen(true)} />
+            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawer({ type: "state" })} onArchive={archiveActiveSession} onRestore={restoreActiveSession} onNext={advance} phaseAdvanceBlocked={phaseAdvanceBlocked} />
+            <OperatorRecord current={current} phase={phase} records={records} gateProgress={gateProgress} onEvidence={() => setDrawer({ type: "state" })} onReviewDeliverable={openDeliverableControl} onReviewGate={openGateControl} onReviewDecision={openDecisionControl} />
           </div>
         </div>
       </div>
-      {drawerOpen && <EvidenceDrawer current={current} phase={phase} gateProgress={gateProgress} onClose={() => setDrawerOpen(false)} />}
+      {drawer?.type === "state" && <StateDrawer current={current} phase={phase} gateProgress={gateProgress} onClose={() => setDrawer(null)} onReviewFact={openFactControl} />}
+      {drawer?.type === "control" && <ControlDrawer control={drawer.control} onClose={() => setDrawer(null)} onAskPi={askPiToHandle} />}
     </div>
   );
 }

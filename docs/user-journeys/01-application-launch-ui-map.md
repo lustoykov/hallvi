@@ -24,6 +24,7 @@ Every mockup uses the same application workspace:
 5. **Chat with Pi** — the primary interaction surface containing Pi's intent, explanations, questions, decisions, and embedded tool/activity events. It always names the current Phase Deliverable Pi is working toward.
 6. **Operator Record** — a compact persistent summary containing only the current Phase Deliverable, its Exit Gate, and decisions recognized across Operator Sessions.
 7. **Current state details** — opened on demand from the Operator Record or chat activity; this contains authoritative facts, provenance, resource identities, approvals, waits, and evidence without duplicating them in the default workspace.
+8. **Control Point detail** — opened from a small Review link on every Decision Record, Gate Check, Phase Deliverable, and material fact. It explains the item, names its source, offers Pi-guided help and direct takeover, and can re-run verification without letting the user manually override a result.
 
 Conversation is the primary surface but is not, by itself, the durable source of truth. When Pi recognizes a decision, correction, constraint, or operational fact in chat, it records the structured result in the Operator Record with provenance. The user can then track and correct it there. A chat claim does not change phase status, permission, resource identity, or verification state until the reflected record carries supporting evidence.
 
@@ -42,6 +43,19 @@ Conversation is the primary surface but is not, by itself, the durable source of
 | 9. Handoff | Operations Handoff | Evidence assembled; gaps and ownership visible; ongoing observation active. |
 
 The prototype shows three levels deliberately: the map names the deliverable, Chat with Pi says what Pi is doing and hosts the next action, and the Operator Record shows only the check-level Exit Gate and recorded decisions. Pi may still loop, investigate, or request input inside the phase. Detailed current state remains one click away instead of occupying the persistent right panel.
+
+### Universal Control Point behavior
+
+The compact Operator Record must not grow into a second dashboard. Each meaningful row gets only one quiet **Review** affordance; its detail opens on demand.
+
+| Item opened | Detail must show | Guided path | Direct path | Result behavior |
+| --- | --- | --- | --- | --- |
+| Phase Deliverable | Plain-language definition, completion meaning, specification source | Ask Pi to explain or work toward it | Inspect the source specification and affected application artifacts | Re-open the current checks; no manual completion |
+| Gate Check | Current result, why it matters, supporting or missing evidence, affected source | Ask Pi to resolve or investigate it | Open the repository/config/provider source and change it | Re-run the check; only new evidence changes pass/required/blocked |
+| Decision Record | Recorded value, originating Operator Session, affected scope | Ask Pi to explain or propose a revision | Return to the originating chat or edit the decision directly | Re-run affected checks after revision |
+| Material fact | Value, provenance, observation time, and downstream use | Ask Pi to investigate or reconcile it | Inspect or change the authoritative source where permitted | Refresh from source; do not edit an Observation in place |
+
+The same Control Point must work for a first-time self-hoster and a senior engineer. Plain-language explanation is visible first; provenance, source, and direct takeover remain one action away. The product does not require a separate “expert mode.”
 
 ## Predetermined UI versus free text
 

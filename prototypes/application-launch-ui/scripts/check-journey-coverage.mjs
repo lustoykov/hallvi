@@ -18,7 +18,7 @@ const incompleteStates = journeyStates.flatMap((item) => {
   return required.filter((field) => !item[field]).map((field) => `${item.id}:${field}`);
 });
 const underMappedPhases = phases.filter((phase) => statesByPhase[phase.id].length < 3).map((phase) => phase.id);
-const invalidPhaseContracts = phases.filter((phase) => !phase.deliverable || !phase.outcome || phase.gate?.length !== 3).map((phase) => phase.id);
+const invalidPhaseContracts = phases.filter((phase) => !phase.deliverable || !phase.outcome || !phase.meaning || !phase.source || !phase.takeover || phase.gate?.length !== 3).map((phase) => phase.id);
 const invalidGateProgress = journeyStates.filter((item) => !Number.isInteger(gateProgressByState[item.id]) || gateProgressByState[item.id] < 0 || gateProgressByState[item.id] > 3).map((item) => item.id);
 const incompletePhaseExits = phases.filter((phase) => {
   const states = statesByPhase[phase.id];

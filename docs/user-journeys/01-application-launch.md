@@ -111,11 +111,24 @@ Server Guy may call the Application Launch complete only when:
 
 - One narrow Application Profile must work end to end before multiple profiles are claimed.
 - The application workspace must survive interruptions and preserve provenance.
+- Every Decision Record, Gate Check, and material operational fact must expose a Control Point so an engineer can understand it, ask Pi to handle it, or take over and re-verify the result.
 - Every paid or account-level operation must expose expected effect and external cost before it occurs.
 - Domain Setup must be a resumable product state, not an instruction page the user leaves and manually reconciles later.
 - Public verification must use the intended HTTPS hostname, not only an IP address or localhost check.
 - The product must establish the observation path during launch, not treat monitoring as optional post-launch housekeeping.
 - Application Contract gaps must remain visible; Pi confidence must not silently erase an unknown.
+
+## Operator control at every level
+
+The default workspace stays concise, but no meaningful product claim is a dead end. Each Decision Record, Gate Check, and material operational fact exposes a small **Review** path into the same control surface.
+
+That surface must support two depths without splitting the product into beginner and expert modes:
+
+- **Guided control** — explain what the item means, why it matters now, and let the engineer ask Pi to investigate, propose a change, or handle the next bounded action.
+- **Direct control** — show the originating chat, specification, repository file, configuration, provider object, or Observation; let the engineer or an External Agent Client change the underlying source when permitted.
+- **Re-verification** — run the relevant check again against the current source and evidence. A Gate Check cannot be manually marked passed, and a stale result must not survive a material source change.
+
+A Decision Record is revisable. A Gate Check is computed. An operational fact is source-attributed. All three can be inspected through the same Control Point, but their authority must not be blurred.
 
 ## Outside this journey
 
