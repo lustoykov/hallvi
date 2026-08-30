@@ -30,17 +30,19 @@ The product should eventually feel like giving an application to a capable serve
 
 Working principle under revision:
 
-> Server Guy is an AI-operated, authority-bounded operational system.
+> Server Guy is an AI-operated operational system with user-selected approval modes.
 
 Pi supplies adaptive judgment and should be free to select actions, compose commands, and revise execution as new evidence appears. Server Guy should not require every useful operation to be represented as a predefined capability with fully bound parameters.
 
-The user grants authority, either interactively or through a standing Operational Mandate. Server Guy should enforce only the boundaries that remain valuable even with highly capable models: credential and identity scope, target application and environment, time or spend limits, explicitly excluded action classes, execution isolation, evidence capture, and escalation when the mandate is genuinely ambiguous. Reapproval should be required for a material Boundary Expansion, not for every ordinary plan or parameter revision.
+The user selects a small, explicit Approval Mode instead of constructing a detailed Operational Mandate or accumulating one-off approval rules. Depending on that mode, Pi may act without asking, decide for itself when approval is warranted, or be required to ask before every state-changing operation.
+
+Server Guy should not infer future authority from approval history. It should record the active Approval Mode and any explicit approval as evidence of why an action was allowed at the time, but that Approval Record is not permission or precedent for a later operation.
 
 Deterministic capability implementations remain useful for common, repeatable, or especially dangerous operations such as rollback, backup restoration, DNS mutation, and machine provisioning. They are trusted tools Pi may choose, not necessarily the exclusive route through which Pi can operate. A scoped shell or provider tool may be appropriate when novel work is required.
 
 This is not a mostly deterministic workflow with a small AI feature. Many important operational steps require contextual, non-deterministic judgment: selecting relevant evidence, interpreting logs and metrics, diagnosing unfamiliar failures, composing an appropriate plan, adapting that plan, and assessing semantic recovery.
 
-At the same time, Pi must not silently grant itself broader authority, credentials, targets, or budgets. This is narrower than saying deterministic code must own every privileged action.
+At the same time, Pi must not silently change the user-selected Approval Mode or the scope to which it applies. This is narrower than saying deterministic code must own every privileged action.
 
 ### Responsibility split
 
@@ -49,14 +51,14 @@ At the same time, Pi must not silently grant itself broader authority, credentia
 | Which observations are relevant? | Pi |
 | What is probably happening? | Pi |
 | Which action is operationally appropriate? | Pi |
-| Who grants operational authority? | The user, interactively or through an Operational Mandate |
-| Is the proposed work inside that authority? | Server Guy's enforcement boundary; deterministic where the boundary is crisp, escalated where it is genuinely ambiguous |
+| Who selects approval behavior? | The user, through an explicit Approval Mode |
+| When is an approval requested? | The selected Approval Mode; Pi itself makes the judgment in Pi Decides mode |
 | How is a privileged action performed? | Pi through a scoped shell/tool or a reusable deterministic capability |
 | Did mandatory checks pass? | Deterministic verification |
 | Do the results semantically indicate recovery? | Pi, constrained by mandatory checks |
 | What operational state is recorded? | Server Guy code |
 
-"Appropriate" and "authorized" are intentionally different. Pi may judge that restarting PostgreSQL is appropriate while the user's mandate may exclude database restarts or permit them only within a specific application and incident.
+"Appropriate" and "approved" are intentionally different. Pi judges whether restarting PostgreSQL is appropriate; the selected Approval Mode determines whether it must ask first.
 
 ## The role of Pi
 
@@ -169,7 +171,7 @@ Submitting a proposal does not authorize or perform its privileged action.
 
 ### Privileged capabilities
 
-Examples include deployment, rollback, restart, DNS mutation, machine provisioning, backup restoration, credential rotation, and release promotion. These remain behind Server Guy's policy and approval pipeline rather than being offered as unrestricted agent tools.
+Examples include deployment, rollback, restart, DNS mutation, machine provisioning, backup restoration, credential rotation, and release promotion. Pi may use these according to the selected Approval Mode. Reusable capabilities provide a reliable route for common operations without excluding scoped shell or provider tools for novel work.
 
 ## Evidence model
 
@@ -192,7 +194,7 @@ Codex and Claude should be optional External Agent Clients rather than additiona
 Two distinct flows are intended:
 
 ```text
-Engineer -> Server Guy UI -> Pi -> proposed operation -> policy/approval -> execution
+Engineer -> Server Guy UI -> Pi -> proposed operation -> Approval Mode -> execution
 ```
 
 ```text
@@ -292,16 +294,15 @@ Current high-level direction:
 
 - Pi creates a visible plan before consequential action.
 - Read-only observation and evidence collection can generally run automatically.
-- Approval may grant an intent-level Operational Mandate rather than bind every individual command or capability invocation.
-- Pi may revise plans and execution details inside that mandate without repeated approval.
-- A material Boundary Expansion requires a new approval. Candidate expansions include changing the target application or environment, obtaining broader credentials, entering an excluded destructive action class, exceeding a spending limit, or extending beyond the mandate's duration.
-- Deterministic, explicitly pre-approved reflexes may still run without per-action approval where they offer clear value, but they are not the only possible form of autonomous operation.
-- Purchases, domain actions, machine provisioning, destructive operations, credential changes, and actions outside the configured safety envelope require separate gates.
-- Broader emergency authority may eventually be pre-approved, but incident-specific rollback and emergency rules should be designed after the core flow is clear.
+- **Full Autonomy**: Pi may perform state-changing operations without required user approval. Pi may still ask when it lacks information or genuinely cannot infer the user's intent.
+- **Pi Decides**: Pi decides whether a state-changing operation warrants user approval.
+- **Always Ask**: Server Guy requires approval before every state-changing operation; read-only observation remains automatic.
+- The active mode and explicit approvals are recorded in the Release or Incident Case as evidence, but past approvals never grant future permission.
+- The scope at which a mode is selected, and whether any actions remain user-only even in Full Autonomy, are unresolved.
 
 The product should prefer the smallest set of guardrails that preserves user intent without unnecessarily lowering Pi's capability ceiling. "Safe" must eventually be defined through explicit properties such as authorization, bounded scope, evidence, and escalation. Not every action needs to be predefined, reversible, idempotent, or reducible to deterministic parameters before Pi may perform it.
 
-"Autonomous" must always specify the operational goal, target, environment, granted authority, limits, and duration under which Server Guy may act.
+"Autonomous" refers specifically to Full Autonomy mode and must still identify the application, environment, and operational context in which Pi is acting.
 
 ## Course and evaluation direction
 
@@ -320,7 +321,7 @@ Evaluation should combine:
 
 Settled:
 
-> Server Guy takes a supported application from repository to live on Hetzner and Cloudflare, continuously observes it, detects a representative failure, uses Pi to diagnose and plan recovery, performs the approved remediation, and verifies recovery with evidence.
+> Server Guy takes a supported application from repository to live on Hetzner and Cloudflare, continuously observes it, detects a representative failure, uses Pi to diagnose and plan recovery, performs the remediation according to the selected Approval Mode, and verifies recovery with evidence.
 
 This favors one narrow, complete deployment-to-recovery lifecycle over many partially supported stacks and incident types.
 
@@ -331,7 +332,7 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 - Product is for individual engineers and tinkerers first, not enterprises.
 - Open-source and useful in its own right; also a course capstone.
 - Pi is the only embedded Agent Runtime and is central to the product.
-- The user owns operational authority. Server Guy owns the authority record, scoped access boundary, operational state, evidence, and verification record; Pi may perform privileged work within that granted scope.
+- The user selects approval behavior from a small number of explicit modes; Pi may perform privileged work according to the selected mode.
 - UI is the first-class human interface; MCP is the first-class external-agent interface.
 - No general public REST API or user-facing CLI is planned for V1.
 - External agents receive evidence and submit proposals/candidates through Server Guy rather than bypassing it.
@@ -354,11 +355,11 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 
 ## High-leverage unresolved questions
 
-1. Should V1 authorize Pi through an intent-level Operational Mandate, with reapproval only for material Boundary Expansion, rather than approve exact capability invocations and parameters?
-2. What is V1's autonomy posture: may any consequential action occur while the engineer is absent, and if so, through a deterministic reflex or through always-on Pi?
+1. In Full Autonomy mode, are purchases, destructive data operations, backup restoration, machine deletion, and similarly consequential actions also ungated, or does a very small user-only category remain?
+2. At what scope is an Approval Mode selected: application default, individual Release or Incident Case, or both through an explicit override?
 3. Does V1 fully support one application profile or both Next.js and FastAPI?
 4. What is the minimum useful always-on behavior when the local control plane and Pi are offline?
-5. Which operations or boundary expansions always require the user?
+5. Can Pi operate in Full Autonomy or Pi Decides mode while the engineer is absent, and what always-on runtime does that require?
 6. What exact evidence and state must exist for Server Guy to declare a Release healthy or an Incident Case recovered?
 7. How should Pi authentication work in a self-hosted always-on installation?
 8. Does Temporal solve enough durable-workflow complexity to justify requiring it?
@@ -384,7 +385,7 @@ Material points to carry into the workshop:
 
 The review's most important product-owner question is whether Server Guy V1 performs any consequential operation while the engineer is absent. This choice affects topology, approval semantics, the always-on component, Pi authentication, and how clearly V1 differs from a general coding agent plus scripts.
 
-Workshop response: invocation-level authorization is considered potentially too restrictive and has not been adopted. The current alternative is an intent-level Operational Mandate that gives Pi freedom to choose and revise implementation details while requiring reapproval only when it materially expands its granted authority.
+Workshop response: invocation-level authorization is considered too restrictive and has not been adopted. The current alternative is a small set of Approval Modes. In Pi Decides mode, Pi itself determines when to ask; Server Guy does not maintain a growing policy inferred from previous approvals.
 
 ## Canonical working terms
 
@@ -394,10 +395,8 @@ Workshop response: invocation-level authorization is considered potentially too 
 - **Operational Control Plane**: authoritative state, evidence, approvals, and controlled execution.
 - **External Agent Client**: Codex, Claude, or another agent using Server Guy through MCP.
 - **Operational Plan**: Pi-authored proposed approach, expected effects, checks, and escalation conditions; its implementation details may change as evidence appears.
-- **Operational Mandate**: user-granted authority for Pi to pursue an operational goal for a defined application and environment within stated limits and exclusions, without approval for every implementation detail.
-- **Boundary Expansion**: proposed work that exceeds an Operational Mandate's target, credentials, excluded action classes, budget, duration, or other material limit.
-- **Enforcement Boundary**: the part of Server Guy that scopes access to operational resources, detects clear Boundary Expansions, preserves evidence, and escalates genuinely ambiguous authority questions to the user.
-- **Safety Envelope**: explicit limits on the scope within which Server Guy may pursue an operational goal without further approval.
+- **Approval Mode**: the explicit user-selected rule governing whether Pi must request approval before state-changing operations: Full Autonomy, Pi Decides, or Always Ask.
+- **Approval Record**: historical evidence of the Approval Mode and any explicit approval applicable when an operation occurred; it does not grant authority to future operations.
 - **Observation**: a captured operational fact.
 - **Evidence Selection**: observations selected as support for a claim.
 - **Finding**: an agent interpretation of evidence.
