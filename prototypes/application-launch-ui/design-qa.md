@@ -94,3 +94,39 @@ final result: passed
 - `npm run build` completed successfully after the interaction pass.
 
 No actionable P0, P1, or P2 issues were found in the tested desktop flow.
+
+# Design QA — Journey 1 Component Catalog
+
+- Status: passed
+- Reference: `/Users/aiwithlyubomir/.codex/generated_images/01a04f0f-98ee-70b0-bb79-2b5167b1139e/exec-f5485f65-30a6-4604-8856-6aa49e4e7c8a.png`
+- Implementation: `qa/component-catalog-handoff.png`
+- Side-by-side comparison: `qa/component-catalog-comparison.png`
+- Comparison state: Agent Handoff with the Changes inspector open
+- Captured browser viewport: 1352 × 962; reference was proportionally normalized to the same size for comparison
+
+## Reference comparison
+
+The implementation preserves the selected direction's load-bearing hierarchy: stable application/session rail, application and phase context, chat as the dominant surface, and a fixed Inspector with Record, Changes, and Evidence destinations. The Handoff state exposes pull-request metadata, changed files, CI status, a line-oriented diff, and the remaining environment check without allowing Pi to rearrange the workspace.
+
+The catalog-only family switcher is intentionally outside product chrome. It does not appear in the reference because it is a throwaway prototype control, not a Server Guy product surface.
+
+## Interaction checks
+
+- All seven family controls switch to the correct typed presentation and update the URL.
+- Record, Changes, and Evidence tabs switch the fixed Inspector and update the URL.
+- Recording the recommended hostname creates a visible Operator Record confirmation and selected state.
+- The application launch map updates phase, state, deliverable, and status per presentation family.
+- Source, Details, Changes, Evidence, Review, and Take control affordances are semantic buttons.
+- Browser console: no errors or warnings.
+
+## Verification history
+
+1. Initial render compiled and matched the fixed-workspace reference at the correct density and hierarchy.
+2. Added per-claim Evidence/Diff controls to Outcome and Handoff rows and safe callback defaults.
+3. `npm run check:journey`, `npm run build`, and `npm run test:sites` passed.
+
+## Known intentional differences
+
+- The dark top bar is prototype chrome for switching presentation families.
+- The catalog uses representative Journey 1 data rather than reproducing a single reference state verbatim.
+- Existing source-map coverage remains 36 selectable states; the three `L3.W1–W3` working-environment states are represented through the Handoff family rather than changing the existing journey data in this isolated prototype.

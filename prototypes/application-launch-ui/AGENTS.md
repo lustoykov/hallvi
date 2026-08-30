@@ -11,6 +11,9 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 ## Server Guy prototype decisions
 
 - The selected visual direction is a chat-primary Operator Workspace: application sidebar, persistent launch map, primary Chat with Pi, and a compact structured Operator Record beside it.
+- Keep the workspace permanently placed and predictable. Pi may choose what to investigate, propose, execute, or explain, but it must not rearrange navigation, panes, or invent a new screen structure per situation. Use fixed Record, Changes, and Evidence Inspector destinations.
+- Compose dynamic operational situations from a small typed presentation grammar inside Chat. Journey 01 currently prototypes seven families: Input / Decision, Review / Proposal, Approval, Operation, Intervention, Outcome, and Agent Handoff.
+- Server Guy is for developers who understand code and logs but do not want infrastructure drudgery. Surface concrete PRs, diffs, commands, CI checks, logs, provider receipts, probes, and immutable evidence; do not reduce these to unsupported Pi claims.
 - Chat is where collaboration and decisions happen. Pi prose and embedded tool/activity evidence appear there, while recognized decisions and resulting operational state are reflected into the Operator Record with provenance.
 - Every launch phase has one named deliverable and a three-condition Exit Gate. Pi's visible intent must be framed as work toward that deliverable, and the primary advance action must not imply completion while a gate condition is unmet.
 - Operator Sessions are application-scoped chats. Users can start, switch, archive, and resume them; all sessions contribute durable outcomes to the same Operator Record.
