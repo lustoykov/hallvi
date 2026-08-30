@@ -32,8 +32,8 @@ The engineer connects or selects a repository and asks Server Guy to launch it.
 3. Pi inspects the repository and determines whether it matches a supported Application Profile.
 4. Pi drafts or updates the Application Contract and identifies changes needed for conformance. The contract's provenance and confirmation status remain visible; repository changes become a reviewable pull request when appropriate.
 5. Pi records a visible launch plan covering the target environment, expected infrastructure, estimated external cost, domain work, and verification approach.
-6. Server Guy collects provider access and required user-owned information. VPS provisioning and domain/DNS work remain separate operations.
-7. Where domain setup is guided manual work, the engineer completes the presented provider steps and returns the result to the Operator Session.
+6. Server Guy collects provider access and required user-owned information. VPS provisioning and Domain Setup remain separate operations.
+7. Domain Setup runs as a bounded Guided Operation: the engineer chooses the intended hostname; when control is not established, the engineer completes guided acquisition, zone, or nameserver steps; Pi then configures the Cloudflare route and HTTPS and verifies the public hostname externally.
 8. Pi provisions through Hetzner tools and configures the application host through a real scoped shell. It may use reusable Guided Operations where the provider or transaction has a stable required protocol.
 9. Pi establishes the runtime, PostgreSQL when required, secrets, backups, telemetry, logs, and the external sentinel needed by the Application Contract.
 10. Pi deploys the first Release.
@@ -42,7 +42,7 @@ The engineer connects or selects a repository and asks Server Guy to launch it.
 
 ### Successful outcome
 
-- A specific Release is reachable through the intended domain.
+- A specific Release is reachable through the intended hostname with valid HTTPS.
 - Contract-defined health and smoke checks pass.
 - The external sentinel is observing the application.
 - Required backup and telemetry responsibilities are visibly configured or explicitly incomplete.
@@ -55,6 +55,7 @@ The engineer connects or selects a repository and asks Server Guy to launch it.
 - Whether initial application-conformance changes are part of the required V1 proof.
 - Whether user confirmation of Pi's initial Application Contract is required before first launch or merely reflected as provenance.
 - What minimum backup and telemetry setup is required before Server Guy calls the application live.
+- Whether V1 supports both an already-owned domain and guided acquisition of a new Cloudflare domain.
 
 ## UC2: Detect unavailability and alert the engineer
 

@@ -44,6 +44,10 @@ _Avoid_: Inferred setup, runbook
 The end-to-end journey from repository through conformance, infrastructure setup, first Release, external verification, and minimum ongoing operations.
 _Avoid_: Initial deployment, setup
 
+**Domain Setup**:
+The user-visible operation that makes an intended hostname authoritative for an application, including domain control, DNS routing, HTTPS, and external verification.
+_Avoid_: DNS configuration, domain purchase
+
 **Release**:
 The versioned unit intended to be running in an environment, identified by an application revision and deployment configuration identity.
 _Avoid_: Deployment, server state
