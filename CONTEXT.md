@@ -32,6 +32,14 @@ _Avoid_: Operator UI, dashboard
 A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside an Operator Session rather than controlling the overall session.
 _Avoid_: Main workflow, agent pipeline
 
+**Application Profile**:
+A supported stack-specific interpretation of the Application Contract, including the conventions Server Guy can inspect, establish, and operate.
+_Avoid_: Plugin, deployment template
+
+**Application Contract**:
+The explicit operational agreement describing how an application is built, configured, checked, observed, backed up, migrated, and verified, including the provenance of each field.
+_Avoid_: Inferred setup, runbook
+
 **Application Launch**:
 The end-to-end journey from repository through conformance, infrastructure setup, first Release, external verification, and minimum ongoing operations.
 _Avoid_: Initial deployment, setup
@@ -60,6 +68,22 @@ _Avoid_: Incident, alarm state
 The durable record of suspected or confirmed service trouble, including its observations, conclusions, actions, approvals, artifacts, and outcome.
 _Avoid_: Alert, outage
 
+**Observation**:
+A source-attributed, timestamped operational fact such as a probe result, log event, metric sample, trace, command result, revision, configuration value, or provider response.
+_Avoid_: Finding, Diagnosis, evidence claim
+
+**Finding**:
+A model-authored interpretation of selected Observations, kept revisable and distinct from the facts it cites.
+_Avoid_: Observation, confirmed fact
+
+**Diagnosis**:
+Pi's current model-authored explanation of an Incident Case, supported by cited Observations and open to revision as evidence changes.
+_Avoid_: Root-cause fact, Observation
+
+**Evidence Bundle**:
+A bounded, structured, redacted, timestamped, and source-attributed package assembled for a Release, Incident Case, engineer review, or External Agent Client.
+_Avoid_: Log dump, context paste
+
 **Remediation**:
 A durable operational or repository change intended to correct an incident's cause or prevent recurrence.
 _Avoid_: Recovery, fix
@@ -67,6 +91,18 @@ _Avoid_: Recovery, fix
 **Recovery**:
 A recorded outcome in which evidence supports that the application has returned to its contract-defined healthy condition.
 _Avoid_: Remediation, fix
+
+**Candidate Fix**:
+An untrusted proposed repository change intended to address an Incident Case or operational requirement; it has not earned acceptance merely by existing or passing local tests.
+_Avoid_: Fix, Recovery
+
+**Remediation PR**:
+The reviewable GitHub pull request that carries an application-code Candidate Fix and links it to its expected operational outcome and verification.
+_Avoid_: Fix PR, automatic repair
+
+**External Agent Client**:
+Codex, Claude, or another independent agent that uses Server Guy through MCP while retaining its own reasoning and repository tools.
+_Avoid_: Embedded runtime, Pi worker
 
 **Approval Mode**:
 The explicit user-selected rule governing whether Pi must request approval before state-changing operations.

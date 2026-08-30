@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Guy · Application Launch journey</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper: #f5f5f5;
+      --paper-2: #ececec;
+      --ink: #2d3142;
+      --muted: #4f5d75;
+      --soft: #7a8399;
+      --rule: rgba(45, 49, 66, 0.12);
+      --rule-strong: rgba(45, 49, 66, 0.24);
+      --accent: #eb6c36;
+      --accent-tint: rgba(235, 108, 54, 0.08);
+      --link: #2e5aa8;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      min-height: 100vh;
+      padding: 48px 32px 80px;
+    }
+    main { margin: 0 auto; max-width: 1280px; }
+    header { margin-bottom: 48px; max-width: 760px; }
+    .eyebrow {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    h1, h2 {
+      color: var(--ink);
+      font-family: var(--serif);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    h1 { font-size: 40px; margin-bottom: 12px; }
+    h2 { font-size: 28px; margin-bottom: 20px; }
+    .lede { color: var(--muted); font-size: 16px; line-height: 1.6; }
+    figure { margin-top: 64px; }
+    .diagram-shell { overflow-x: auto; padding-bottom: 8px; }
+    svg { display: block; min-width: 1100px; width: 100%; }
+    figcaption {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      margin-top: 16px;
+      max-width: 880px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Journey 01 · Application Launch</p>
+      <h1>From repository to an externally verified application</h1>
+      <p class="lede">The engineer collaborates with Pi, but Server Guy preserves the durable operational record. The phases make the experience understandable without imposing a fixed reasoning pipeline on Pi.</p>
+    </header>
+
+    <figure>
+      <p class="eyebrow">Swimlane · user and system handoffs</p>
+      <h2>Who carries the launch at each moment</h2>
+      <div class="diagram-shell">
+        <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="launch-swimlane-title launch-swimlane-desc">
+          <title id="launch-swimlane-title">Application Launch handoffs</title>
+          <desc id="launch-swimlane-desc">Swimlane diagram showing an engineer starting a launch, Pi establishing the application contract and launch intent, providers and the application host being configured, and Server Guy recording an externally verified first Release.</desc>
+          <defs>
+            <marker id="launch-swimlane-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="#4f5d75"/></marker>
+            <marker id="launch-swimlane-arrow-accent" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="#eb6c36"/></marker>
+          </defs>
+
+          <rect width="1280" height="720" fill="#f5f5f5"/>
+
+          <!-- Lane structure -->
+          <line x1="40" y1="80" x2="1240" y2="80" stroke="rgba(45,49,66,0.24)" stroke-width="1"/>
+          <line x1="40" y1="184" x2="1240" y2="184" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <line x1="40" y1="288" x2="1240" y2="288" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <line x1="40" y1="392" x2="1240" y2="392" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <line x1="40" y1="496" x2="1240" y2="496" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <line x1="40" y1="600" x2="1240" y2="600" stroke="rgba(45,49,66,0.24)" stroke-width="1"/>
+          <line x1="160" y1="80" x2="160" y2="600" stroke="rgba(45,49,66,0.24)" stroke-width="1"/>
+
+          <text x="64" y="136" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">ENGINEER</text>
+          <text x="64" y="240" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">PI</text>
+          <text x="64" y="344" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">CONTROL PLANE</text>
+          <text x="64" y="448" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">PROVIDERS</text>
+          <text x="64" y="552" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">HOST + SENTINEL</text>
+
+          <!-- Connectors, drawn before nodes -->
+          <line x1="160" y1="236" x2="176" y2="236" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 320 236 H 384 Q 392 236 392 228 V 160" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 456 160 V 176 Q 456 184 464 184 H 592 Q 600 184 600 192 V 208" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 672 236 H 728 Q 736 236 736 228 V 160" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <line x1="816" y1="160" x2="816" y2="408" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 848 436 H 904 Q 912 436 912 428 V 160" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <line x1="992" y1="160" x2="992" y2="408" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 1024 436 H 1032 Q 1040 436 1040 444 V 532 Q 1040 540 1048 540" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <path d="M 1192 540 H 1200 Q 1208 540 1208 532 V 376 Q 1208 368 1200 368" fill="none" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#launch-swimlane-arrow-accent)"/>
+
+          <!-- Connector labels -->
+          <rect x="160" y="212" width="72" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="196" y="224" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CONNECT REPO</text>
+          <rect x="784" y="276" width="64" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="816" y="288" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">VPS GATE</text>
+          <rect x="960" y="276" width="64" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="992" y="288" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DNS GATE</text>
+          <rect x="1172" y="448" width="72" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="1208" y="460" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EVIDENCE</text>
+
+          <!-- Nodes -->
+          <rect x="176" y="208" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="248" y="232" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Inspect + contract</text>
+          <text x="248" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SESSION · PROFILE · GAPS</text>
+
+          <rect x="352" y="104" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="424" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Review contract</text>
+          <text x="424" y="144" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">MODE · INTENT · PR</text>
+
+          <rect x="528" y="208" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="600" y="232" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Show launch intent</text>
+          <text x="600" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">COST · ACTIONS · CHECKS</text>
+
+          <rect x="704" y="104" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="776" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Approve VPS work</text>
+          <text x="776" y="144" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">COST · MACHINE</text>
+
+          <rect x="704" y="408" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="776" y="432" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Provision Hetzner</text>
+          <text x="776" y="448" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">VPS · NETWORK</text>
+
+          <rect x="880" y="104" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="952" y="128" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Approve domain work</text>
+          <text x="952" y="144" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DNS · USER ACTION</text>
+
+          <rect x="880" y="408" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="952" y="432" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Configure Cloudflare</text>
+          <text x="952" y="448" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DOMAIN · DNS · SENTINEL</text>
+
+          <rect x="1048" y="512" width="144" height="56" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="1120" y="536" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Launch + verify</text>
+          <text x="1120" y="552" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">RUNTIME · RELEASE · CHECKS</text>
+
+          <rect x="1128" y="312" width="144" height="56" rx="8" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+          <text x="1200" y="336" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Record operational</text>
+          <text x="1200" y="352" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">RELEASE · TOPOLOGY</text>
+
+          <!-- Legend -->
+          <line x1="40" y1="632" x2="1240" y2="632" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <text x="40" y="652" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+          <rect x="40" y="672" width="16" height="12" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="64" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Actor-owned step</text>
+          <line x1="224" y1="680" x2="264" y2="680" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-swimlane-arrow)"/>
+          <text x="276" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Handoff</text>
+          <line x1="384" y1="680" x2="424" y2="680" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#launch-swimlane-arrow-accent)"/>
+          <text x="436" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Consequential handoff</text>
+          <rect x="616" y="672" width="16" height="12" rx="4" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="640" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Product outcome</text>
+        </svg>
+      </div>
+      <figcaption>The diagram compresses provider-specific details, repository-conformance loops, and exact commands. It preserves the product-level requirement that VPS work and domain/DNS work are separate operations with separate gates.</figcaption>
+    </figure>
+
+    <figure>
+      <p class="eyebrow">State machine · product status</p>
+      <h2>What “launching” means in the product</h2>
+      <div class="diagram-shell">
+        <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="launch-state-title launch-state-desc">
+          <title id="launch-state-title">Application Launch product states</title>
+          <desc id="launch-state-desc">State machine showing an application moving from added through contracting, ready, establishing, and verifying to operational, with explicit loops for engineer input and failed verification.</desc>
+          <defs>
+            <marker id="launch-state-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="#4f5d75"/></marker>
+            <marker id="launch-state-arrow-accent" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0 0, 8 4, 0 8" fill="#eb6c36"/></marker>
+          </defs>
+
+          <rect width="1280" height="720" fill="#f5f5f5"/>
+
+          <!-- Transitions, drawn before states -->
+          <line x1="64" y1="256" x2="96" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <line x1="240" y1="256" x2="288" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <line x1="432" y1="256" x2="480" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <line x1="624" y1="256" x2="672" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <line x1="816" y1="256" x2="864" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <line x1="1008" y1="256" x2="1056" y2="256" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#launch-state-arrow-accent)"/>
+          <line x1="1200" y1="256" x2="1232" y2="256" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+
+          <!-- Contracting <-> Needs engineer -->
+          <path d="M 368 292 V 324 Q 368 332 376 332 H 480 Q 488 332 488 340 V 380" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <path d="M 560 380 V 348 Q 560 340 552 340 H 448 Q 440 340 440 332 V 292" fill="none" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#launch-state-arrow)"/>
+
+          <!-- Verifying -> correction -> establishing -->
+          <line x1="944" y1="292" x2="944" y2="380" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#launch-state-arrow)"/>
+          <path d="M 864 416 H 752 Q 744 416 744 408 V 292" fill="none" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#launch-state-arrow)"/>
+
+          <!-- Transition labels -->
+          <rect x="244" y="236" width="40" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="264" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">INSPECT</text>
+          <rect x="436" y="236" width="40" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="456" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">READY</text>
+          <rect x="628" y="236" width="40" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="648" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">BEGIN</text>
+          <rect x="820" y="236" width="40" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="840" y="248" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DEPLOYED</text>
+          <rect x="1012" y="236" width="40" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="1032" y="248" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PASS</text>
+          <rect x="368" y="316" width="120" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="428" y="328" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">INPUT OR CHANGE NEEDED</text>
+          <rect x="448" y="344" width="112" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="504" y="356" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SUPPLIED · RESUME</text>
+          <rect x="900" y="324" width="88" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="944" y="336" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CHECKS FAIL</text>
+          <rect x="748" y="396" width="112" height="16" rx="4" fill="#f5f5f5"/>
+          <text x="804" y="408" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">ADAPT · RETRY</text>
+
+          <!-- Start dot -->
+          <circle cx="56" cy="256" r="8" fill="#2d3142"/>
+
+          <!-- Main states -->
+          <rect x="96" y="220" width="144" height="72" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="168" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Application added</text>
+          <text x="168" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">REPOSITORY SELECTED</text>
+
+          <rect x="288" y="220" width="144" height="72" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="360" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Contracting</text>
+          <text x="360" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PROFILE · PROVENANCE</text>
+
+          <rect x="480" y="220" width="144" height="72" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="552" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Launch ready</text>
+          <text x="552" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PLAN · ACCESS READY</text>
+
+          <rect x="672" y="220" width="144" height="72" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="744" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Establishing</text>
+          <text x="744" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PROVIDERS · RUNTIME</text>
+
+          <rect x="864" y="220" width="144" height="72" rx="8" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="936" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Verifying</text>
+          <text x="936" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">FIRST RELEASE</text>
+
+          <rect x="1056" y="220" width="144" height="72" rx="8" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+          <text x="1128" y="252" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Operational</text>
+          <text x="1128" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">VERIFIED · OBSERVED</text>
+
+          <!-- Branch states -->
+          <rect x="480" y="380" width="160" height="72" rx="8" fill="rgba(45,49,66,0.03)" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="560" y="412" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Needs engineer</text>
+          <text x="560" y="432" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">INPUT · PR · ACCOUNT</text>
+
+          <rect x="864" y="380" width="160" height="72" rx="8" fill="rgba(45,49,66,0.03)" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="944" y="412" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Correction needed</text>
+          <text x="944" y="432" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">NOT YET HEALTHY</text>
+
+          <!-- End ring -->
+          <circle cx="1240" cy="256" r="12" fill="none" stroke="#2d3142" stroke-width="1"/>
+          <circle cx="1240" cy="256" r="8" fill="#2d3142"/>
+
+          <!-- Definition callout -->
+          <rect x="1040" y="500" width="200" height="84" rx="8" fill="#ffffff" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <text x="1056" y="524" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.12em">OPERATIONAL REQUIRES</text>
+          <text x="1056" y="548" fill="#2d3142" font-size="12" font-family="'Geist', sans-serif">Verified Release</text>
+          <text x="1056" y="568" fill="#2d3142" font-size="12" font-family="'Geist', sans-serif">+ ongoing observation baseline</text>
+
+          <!-- Legend -->
+          <line x1="40" y1="632" x2="1240" y2="632" stroke="rgba(45,49,66,0.12)" stroke-width="1"/>
+          <text x="40" y="652" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+          <rect x="40" y="672" width="16" height="12" rx="4" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="64" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Product state</text>
+          <rect x="176" y="672" width="16" height="12" rx="4" fill="rgba(45,49,66,0.03)" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="200" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Paused or corrective state</text>
+          <line x1="400" y1="680" x2="440" y2="680" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#launch-state-arrow)"/>
+          <text x="452" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Return loop</text>
+          <rect x="560" y="672" width="16" height="12" rx="4" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="584" y="684" fill="#4f5d75" font-size="8" font-family="'Geist', sans-serif">Launch outcome</text>
+        </svg>
+      </div>
+      <figcaption>These are product states, not Pi reasoning stages. “Operational” is deliberately stricter than “deployed”: the first Release has passed required verification and an ongoing observation baseline exists. The exact baseline remains a product-owner decision.</figcaption>
+    </figure>
+  </main>
+</body>
+</html>

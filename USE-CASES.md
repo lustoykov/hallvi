@@ -2,6 +2,8 @@
 
 Status: workshop draft, not a finished specification and not evidence of implementation.
 
+Detailed product journeys and companion diagrams now live in [`docs/user-journeys/`](./docs/user-journeys/README.md). This file remains the compact cross-journey summary.
+
 These concrete journeys should drive product and architecture decisions. Each use case intentionally leaves consequential product-owner choices explicit.
 
 Canonical distinctions used by the journeys:
