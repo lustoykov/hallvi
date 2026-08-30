@@ -14,6 +14,8 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Chat is where collaboration and decisions happen. Pi prose and embedded tool/activity evidence appear there, while recognized decisions and resulting operational state are reflected into the Operator Record with provenance.
 - Every launch phase has one named deliverable and a three-condition Exit Gate. Pi's visible intent must be framed as work toward that deliverable, and the primary advance action must not imply completion while a gate condition is unmet.
 - Operator Sessions are application-scoped chats. Users can start, switch, archive, and resume them; all sessions contribute durable outcomes to the same Operator Record.
+- Keep the default Operator Record minimal: current deliverable, Exit Gate, and decisions from chat only. Show one concise application status in the header; move detailed structured state, provenance, resources, and evidence into the on-demand current-state drawer.
+- Product actions belong in Chat with Pi, not in the Operator Record. Storyboard state IDs and counts are prototype controls and must not appear inside product chrome.
 - The launch map must always make the current phase and current mockup state obvious. Default screens should be low-text; detailed evidence is opened on demand.
 - Every Journey 01 phase needs multiple inspectable mockup states. The canonical state inventory is `docs/user-journeys/01-application-launch-ui-map.md`.
 - UI copy and product behavior must stay aligned with the journey Markdown. Unresolved workshop choices must remain visibly unresolved instead of becoming prototype defaults.

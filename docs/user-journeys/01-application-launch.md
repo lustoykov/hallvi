@@ -57,7 +57,7 @@ The phases are a user-facing progression, not a mandatory Pi call sequence. Pi m
 - Whether the application is reachable, verified, or blocked; these are not synonyms.
 - What Pi is doing now, what requires the engineer, and what is paused without changing state.
 
-Conversation with Pi is the primary interaction surface throughout Application Launch. A persistent structured Operator Record sits beside it and reflects the current phase, decisions, facts, approvals, resources, blockers, and evidence produced through the conversation. Chat drives collaboration; the Operator Record prevents that collaboration from hiding or losing operational state.
+Conversation with Pi is the primary interaction surface throughout Application Launch. A persistent Operator Record sits beside it and shows only the current Phase Deliverable, its Exit Gate, and decisions recognized through conversation. The header carries the concise application status. Detailed facts, approvals, resources, blockers, provenance, and evidence remain available in an on-demand current-state view instead of being duplicated in the default workspace.
 
 An application may have multiple Operator Sessions. The engineer can start, switch, resume, and archive them. Each session keeps its own conversation and activity history while reading from and contributing recognized outcomes to the same application-scoped Operator Record. Archiving a session removes it from the active chat list; it does not erase decisions, evidence, or operational state already recorded.
 

@@ -18,12 +18,12 @@ This document prevents two forms of drift:
 Every mockup uses the same application workspace:
 
 1. **Application sidebar** — one workspace per application, with launch or health state.
-2. **Application header** — application identity, environment, Approval Mode, and current phase.
-3. **Launch map** — an always-visible, low-text map of the nine user-facing phases with an explicit “you are here” phase and state. It communicates progress but does not pretend Pi follows a rigid internal call sequence.
+2. **Application header** — application identity, environment, Approval Mode, and one concise current application status.
+3. **Launch map** — an always-visible, low-text map of the nine user-facing phases with an explicit “you are here” phase, current Phase Deliverable, and Exit Gate progress. Storyboard state IDs and counts are prototype coordinates and do not belong in product chrome.
 4. **Operator Sessions** — an application-scoped list of active and archived chats, with controls to start, switch, archive, and resume a session.
 5. **Chat with Pi** — the primary interaction surface containing Pi's intent, explanations, questions, decisions, and embedded tool/activity events. It always names the current Phase Deliverable Pi is working toward.
-6. **Operator Record** — a compact structured dashboard reflecting decisions made or inferred across Operator Sessions, plus the current Phase Deliverable, Exit Gate, authoritative state, actions, provenance, approvals, waits, and evidence for the selected phase.
-7. **Evidence details** — opened from structured facts or chat activity when the engineer needs provenance or raw observations.
+6. **Operator Record** — a compact persistent summary containing only the current Phase Deliverable, its Exit Gate, and decisions recognized across Operator Sessions.
+7. **Current state details** — opened on demand from the Operator Record or chat activity; this contains authoritative facts, provenance, resource identities, approvals, waits, and evidence without duplicating them in the default workspace.
 
 Conversation is the primary surface but is not, by itself, the durable source of truth. When Pi recognizes a decision, correction, constraint, or operational fact in chat, it records the structured result in the Operator Record with provenance. The user can then track and correct it there. A chat claim does not change phase status, permission, resource identity, or verification state until the reflected record carries supporting evidence.
 
@@ -41,7 +41,7 @@ Conversation is the primary surface but is not, by itself, the durable source of
 | 8. Go live | Verified Release | Exact candidate deployed; contract checks pass publicly; semantic checks pass and Release is current. |
 | 9. Handoff | Operations Handoff | Evidence assembled; gaps and ownership visible; ongoing observation active. |
 
-The prototype shows three levels deliberately: the map names the deliverable, Chat with Pi says what Pi is doing toward it, and the Operator Record shows the check-level Exit Gate. The primary advance control is disabled whenever the gate is not satisfied; Pi may still loop, investigate, or request input inside the phase.
+The prototype shows three levels deliberately: the map names the deliverable, Chat with Pi says what Pi is doing and hosts the next action, and the Operator Record shows only the check-level Exit Gate and recorded decisions. Pi may still loop, investigate, or request input inside the phase. Detailed current state remains one click away instead of occupying the persistent right panel.
 
 ## Predetermined UI versus free text
 

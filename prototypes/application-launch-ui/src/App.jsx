@@ -81,18 +81,18 @@ function ApplicationHeader({ current, approvalMode, setApprovalMode }) {
       <div className="application-identity"><span className="large-avatar">N</span><div><h1>northstar</h1><p>Production · <strong>Application Launch</strong></p></div></div>
       <div className="header-controls">
         <label><span>Approval Mode</span><select value={approvalMode} onChange={(event) => setApprovalMode(event.target.value)}><option>Pi Decides</option><option>Full Autonomy</option><option>Always Ask</option></select></label>
-        <div className="health-control"><span>Current state</span><strong><i className={`dot ${current.tone === "success" ? "green" : "blue"}`} />{current.status}</strong></div>
+        <div className="health-control"><span>Application status</span><strong><i className={`dot ${current.tone === "success" ? "green" : "blue"}`} />{current.status}</strong></div>
       </div>
     </header>
   );
 }
 
-function LaunchMap({ current, phase, phasePosition, gateProgress, setIndex }) {
+function LaunchMap({ current, phase, gateProgress, setIndex }) {
   return (
     <section className="launch-map" aria-label="Current position in Application Launch">
       <div className="map-position">
-        <span>You are here</span><strong>Phase {current.phase} of 9 · {phase.name}</strong><small>{current.id} · {current.name} · state {phasePosition}</small>
-        <div className="map-deliverable"><em>Working toward</em><b>{phase.deliverable}</b><i>{gateProgress}/3 exit checks</i></div>
+        <span>You are here</span><strong>Phase {current.phase} · {phase.name}</strong>
+        <div className="map-deliverable"><em>Working toward</em><b>{phase.deliverable}</b><i>{gateProgress}/3 checks</i></div>
       </div>
       <nav className="phase-rail" aria-label="Application Launch phases">
         {phases.map((item) => {
@@ -116,7 +116,7 @@ function ChatMessage({ actor, text, recorded }) {
   );
 }
 
-function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvidence, onArchive, onRestore }) {
+function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvidence, onArchive, onRestore, onNext, phaseAdvanceBlocked }) {
   const [draft, setDraft] = useState("");
   useEffect(() => setDraft(""), [current.id, session.id]);
   function submit(event) { event.preventDefault(); const text = draft.trim(); if (!text) return; onSubmit(text); setDraft(""); }
@@ -128,12 +128,13 @@ function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvi
         <div className="chat-header-actions"><button type="button" onClick={onEvidence}>Evidence</button><button type="button" onClick={session.archived ? onRestore : onArchive}>{session.archived ? "Restore" : "Archive"}</button></div>
       </div>
       <div className="chat-scroll">
-        <div className="chat-stage-label"><span>{current.id}</span><strong>{current.name}</strong><em className={statusClass(current.status)}>{current.status}</em></div>
+        <div className="chat-stage-label"><strong>{current.name}</strong><em className={statusClass(current.status)}>{current.status}</em></div>
         <section className="intent-card"><span>Pi is working toward · {phase.deliverable}</span><p>{current.intent}</p></section>
         {isLaunchSession && <ChatMessage actor="Pi" text={current.pi} />}
         {isLaunchSession && current.question && <ChatMessage actor="You" text={current.question} recorded={!/[?？]\s*$/.test(current.question) && records.length > 0} />}
         {!isLaunchSession && !messages.length && <ChatMessage actor="Pi" text={`This chat shares northstar's Operator Record. I can help with a focused question while the launch continues toward the ${phase.deliverable}.`} />}
         <section className="activity-block"><div className="activity-label"><span>Live activity toward {phase.deliverable}</span><small>Evidence-backed</small></div>{current.events.map(([title, detail, status]) => <button className="activity-event" key={`${title}-${detail}`} type="button" onClick={onEvidence}><span className={`event-marker ${statusClass(status)}`} /><span><strong>{title}</strong><small>{detail}</small></span><em className={statusClass(status)}>{status}</em></button>)}</section>
+        <div className="chat-primary-action"><button type="button" disabled={phaseAdvanceBlocked} onClick={onNext}>{phaseAdvanceBlocked ? "Complete the exit checks first" : current.primary}</button></div>
         {messages.map((message, messageIndex) => <ChatMessage key={`${message.actor}-${messageIndex}`} {...message} />)}
         <div className="quick-actions">{current.quickActions.map((label) => <button type="button" key={label}>{label}</button>)}</div>
       </div>
@@ -162,35 +163,24 @@ function PhaseContract({ phase, gateProgress, current }) {
   );
 }
 
-function OperatorRecord({ current, phase, records, phasePosition, gateProgress, onNext, onEvidence, phaseAdvanceBlocked }) {
-  const groupItems = current.groups.flatMap((group) => group.items.map((item) => ({ group: group.title, item }))).slice(0, 4);
+function OperatorRecord({ current, phase, records, gateProgress, onEvidence }) {
   return (
     <aside className="operator-record" aria-label="Operator Record">
-      <div className="record-header"><div><span>Operator Record</span><small>Shared across chats · reflected from decisions + evidence</small></div><button type="button" onClick={onEvidence}>Full detail</button></div>
+      <div className="record-header"><div><span>Operator Record</span><small>Shared across chats · reflected from decisions + evidence</small></div><button type="button" onClick={onEvidence}>View current state</button></div>
       <div className="record-scroll">
-        <section className="position-card"><span>Current position</span><strong>{current.id} · {current.name}</strong><small>Phase {current.phase} of 9 · state {phasePosition}</small><div><i style={{ width: `${(current.phase / 9) * 100}%` }} /></div></section>
         <PhaseContract phase={phase} gateProgress={gateProgress} current={current} />
         {current.decision && <div className="decision-banner"><strong>Workshop choice unresolved</strong><p>{current.decision}</p></div>}
         <section className="record-section">
           <div className="record-section-title"><h3>Decisions from chat</h3><span>{records.length}</span></div>
           {records.length ? records.map((record, recordIndex) => <RecordRow key={`${record.label}-${recordIndex}`} {...record} />) : <p className="empty-record">No decisions have been recorded from any chat yet.</p>}
         </section>
-        <section className="record-section">
-          <div className="record-section-title"><h3>Current structured state</h3><span>{current.facts.length}</span></div>
-          {current.facts.slice(0, 4).map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} />)}
-        </section>
-        <section className="record-section compact-section">
-          <div className="record-section-title"><h3>What matters now</h3><span>{groupItems.length}</span></div>
-          {groupItems.map(({ group, item: [title, detail, status] }) => <div className="compact-item" key={`${group}-${title}`}><div><small>{group}</small><strong>{title}</strong><p>{detail}</p></div><em className={statusClass(status)}>{status}</em></div>)}
-        </section>
       </div>
-      <footer className="record-action"><span>Next action toward {phase.deliverable}</span><button type="button" disabled={phaseAdvanceBlocked} onClick={onNext}>{phaseAdvanceBlocked ? "Exit Gate is not passed" : current.primary}</button><small className={gateProgress === 3 ? "gate-passed" : "gate-open"}>Exit Gate · {gateProgress}/3 conditions passed</small></footer>
     </aside>
   );
 }
 
 function EvidenceDrawer({ current, phase, gateProgress, onClose }) {
-  return <div className="drawer-backdrop" onMouseDown={onClose} role="presentation"><aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Evidence details"><div className="drawer-header"><div><span>Full structured detail</span><strong>{current.id} · {current.name}</strong></div><button type="button" onClick={onClose}>Close</button></div><section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/3 passed.</p></section><section><span className="drawer-label">Specification source</span><p>{current.source}</p></section><section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} />)}</section><section><span className="drawer-label">Authoritative observations</span>{current.events.map(([title, detail, status]) => <div className="drawer-event" key={title}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section><section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>{current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}</aside></div>;
+  return <div className="drawer-backdrop" onMouseDown={onClose} role="presentation"><aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Current application state"><div className="drawer-header"><div><span>Current application state</span><strong>{current.name} · {current.status}</strong></div><button type="button" onClick={onClose}>Close</button></div><section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/3 passed.</p></section><section><span className="drawer-label">Specification source</span><p>{current.source}</p></section><section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} />)}</section><section><span className="drawer-label">Authoritative observations</span>{current.events.map(([title, detail, status]) => <div className="drawer-event" key={title}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section><section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>{current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}</aside></div>;
 }
 
 function initialChatRecords(current) {
@@ -211,7 +201,6 @@ export function App() {
   const gateProgress = gateProgressByState[current.id] ?? 0;
   const activeSession = sessions.find((session) => session.id === activeSessionId) || sessions[0];
   const messages = messagesBySession[activeSession.id] || [];
-  const phasePosition = useMemo(() => { const states = statesByPhase[current.phase]; return `${states.findIndex((item) => item.id === current.id) + 1} of ${states.length}`; }, [current]);
   const records = useMemo(() => [...initialChatRecords(current), ...applicationDecisions], [current, applicationDecisions]);
   const nextState = journeyStates[index + 1];
   const phaseAdvanceBlocked = Boolean(nextState && nextState.phase > current.phase && gateProgress < phase.gate.length);
@@ -267,10 +256,10 @@ export function App() {
         <AppSidebar sessions={sessions} activeSessionId={activeSession.id} showArchived={showArchived} onToggleArchived={() => setShowArchived((value) => !value)} onNewSession={newSession} onSelectSession={setActiveSessionId} />
         <div className="workspace">
           <ApplicationHeader current={current} approvalMode={approvalMode} setApprovalMode={setApprovalMode} />
-          <LaunchMap current={current} phase={phase} phasePosition={phasePosition} gateProgress={gateProgress} setIndex={setIndex} />
+          <LaunchMap current={current} phase={phase} gateProgress={gateProgress} setIndex={setIndex} />
           <div className="workspace-body">
-            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawerOpen(true)} onArchive={archiveActiveSession} onRestore={restoreActiveSession} />
-            <OperatorRecord current={current} phase={phase} records={records} phasePosition={phasePosition} gateProgress={gateProgress} onNext={advance} onEvidence={() => setDrawerOpen(true)} phaseAdvanceBlocked={phaseAdvanceBlocked} />
+            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawerOpen(true)} onArchive={archiveActiveSession} onRestore={restoreActiveSession} onNext={advance} phaseAdvanceBlocked={phaseAdvanceBlocked} />
+            <OperatorRecord current={current} phase={phase} records={records} gateProgress={gateProgress} onEvidence={() => setDrawerOpen(true)} />
           </div>
         </div>
       </div>
