@@ -55,7 +55,6 @@ The engineer connects or selects a repository and asks Server Guy to launch it.
 - Whether initial application-conformance changes are part of the required V1 proof.
 - Whether user confirmation of Pi's initial Application Contract is required before first launch or merely reflected as provenance.
 - What minimum backup and telemetry setup is required before Server Guy calls the application live.
-- Whether V1 supports both an already-owned domain and guided acquisition of a new Cloudflare domain.
 
 ## UC2: Detect unavailability and alert the engineer
 

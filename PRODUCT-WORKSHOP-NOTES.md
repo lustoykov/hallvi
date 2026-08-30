@@ -246,6 +246,8 @@ The VPS and domain are separate user-owned actions with separate plans and appro
 
 Domain onboarding should initially be guided manual setup. Browser-based domain automation can be an experimental course exercise and possibly a later product capability, with explicit user approval before external account actions.
 
+V1 Domain Setup should support both an already-owned domain and no-domain-yet starting paths. Server Guy guides purchase, zone addition, and nameserver delegation where needed; Pi begins automated Cloudflare DNS routing, HTTPS setup, and external verification only after domain control is observable.
+
 The provider should eventually be replaceable through a contract, but a provider marketplace is not an initial objective. Hetzner and Cloudflare should be implemented deeply enough to discover the real abstraction before generalizing.
 
 ## Application contracts and profiles
@@ -358,6 +360,7 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 - Application-code fixes use reviewable Remediation PRs.
 - Hetzner and Cloudflare form the first provider spine.
 - Domain and VPS operations have separate plans and approval gates.
+- V1 Domain Setup supports both existing-domain and no-domain-yet starting paths as guided flows; automated routing and verification begin after control is observed.
 - Start with a precise application/provider contract; generalize only after proving it.
 - Database backups belong in the product responsibility; dependency updates come later.
 - Cost management should be lightweight and threshold-oriented.

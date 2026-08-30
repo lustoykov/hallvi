@@ -115,13 +115,19 @@ Server Guy may call the Application Launch complete only when:
 - Browser-controlled domain purchasing as a required V1 capability.
 - Dependency updates, capacity optimization, or complete product analytics.
 
+## Settled decisions for this journey
+
+- V1 Domain Setup supports both starting paths: the engineer already owns a domain, or the engineer needs to acquire one.
+- An existing domain may remain registered elsewhere; Server Guy guides adding the Cloudflare zone and nameserver delegation when Cloudflare is not yet authoritative.
+- When no domain is owned, Server Guy guides the user through the Cloudflare acquisition/account step.
+- Pi begins automated DNS routing, HTTPS setup, and external verification only after Server Guy can observe domain control.
+
 ## Consequential unresolved choices
 
 1. **What is the minimum operational baseline required before Server Guy says “live”?** In particular: external sentinel, database backup, structured logs, traces/metrics, and restore verification.
 2. Does V1 fully launch one Application Profile or both initial Next.js and FastAPI profiles?
 3. Must the engineer confirm the initial Application Contract before paid infrastructure work begins, or is visible provenance enough in Full Autonomy and Pi Decides modes?
 4. Which account actions, if any, remain user-only even in Full Autonomy?
-5. Must V1 support both an already-owned domain and guided acquisition of a new Cloudflare domain, or only one starting path?
 
 ## V1 acceptance scenario
 
