@@ -112,6 +112,7 @@ Server Guy may call the Application Launch complete only when:
 - One narrow Application Profile must work end to end before multiple profiles are claimed.
 - The application workspace must survive interruptions and preserve provenance.
 - Every Decision Record, Gate Check, and material operational fact must expose a Control Point so an engineer can understand it, ask Pi to handle it, or take over and re-verify the result.
+- Every user-visible Operational Claim must cite at least one inspectable Evidence Reference. A product-definition link explains what a claim means; it does not substitute for the current Observation or receipt that supports the claim.
 - Every paid or account-level operation must expose expected effect and external cost before it occurs.
 - Domain Setup must be a resumable product state, not an instruction page the user leaves and manually reconciles later.
 - Public verification must use the intended HTTPS hostname, not only an IP address or localhost check.
@@ -129,6 +130,8 @@ That surface must support two depths without splitting the product into beginner
 - **Re-verification** — run the relevant check again against the current source and evidence. A Gate Check cannot be manually marked passed, and a stale result must not survive a material source change.
 
 A Decision Record is revisable. A Gate Check is computed. An operational fact is source-attributed. All three can be inspected through the same Control Point, but their authority must not be blurred.
+
+Every Operational Claim follows the same proof path: **Claim → Evidence Reference → Observation or receipt**. The evidence detail shows who or what observed the result, when it was observed, how it was collected, the raw result, and the immutable artifact identity when one exists. If that evidence is unavailable, stale, or redacted, the claim says so instead of presenting an unexplained pass. One successful probe supports one point-in-time result; it does not prove continuing health.
 
 ## Outside this journey
 

@@ -116,7 +116,7 @@ function ChatMessage({ actor, text, recorded }) {
   );
 }
 
-function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvidence, onArchive, onRestore, onNext, phaseAdvanceBlocked }) {
+function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvidence, onReviewEvidence, onArchive, onRestore, onNext, phaseAdvanceBlocked }) {
   const [draft, setDraft] = useState("");
   useEffect(() => setDraft(""), [current.id, session.id]);
   function submit(event) { event.preventDefault(); const text = draft.trim(); if (!text) return; onSubmit(text); setDraft(""); }
@@ -133,7 +133,10 @@ function ChatPanel({ current, phase, session, messages, records, onSubmit, onEvi
         {isLaunchSession && <ChatMessage actor="Pi" text={current.pi} />}
         {isLaunchSession && current.question && <ChatMessage actor="You" text={current.question} recorded={!/[?？]\s*$/.test(current.question) && records.length > 0} />}
         {!isLaunchSession && !messages.length && <ChatMessage actor="Pi" text={`This chat shares northstar's Operator Record. I can help with a focused question while the launch continues toward the ${phase.deliverable}.`} />}
-        <section className="activity-block"><div className="activity-label"><span>Live activity toward {phase.deliverable}</span><small>Evidence-backed</small></div>{current.events.map(([title, detail, status]) => <button className="activity-event" key={`${title}-${detail}`} type="button" onClick={onEvidence}><span className={`event-marker ${statusClass(status)}`} /><span><strong>{title}</strong><small>{detail}</small></span><em className={statusClass(status)}>{status}</em></button>)}</section>
+        <section className="activity-block"><div className="activity-label"><span>Live activity toward {phase.deliverable}</span><small>Evidence-backed</small></div>{current.events.map((event) => {
+          const [title, detail, status] = event;
+          return <button className="activity-event" key={`${title}-${detail}`} type="button" onClick={() => onReviewEvidence(event, `${phase.deliverable} activity`)}><span className={`event-marker ${statusClass(status)}`} /><span><strong>{title}</strong><small>{detail}</small></span><em className={statusClass(status)}>Verify · {status}</em></button>;
+        })}</section>
         <div className="chat-primary-action"><button type="button" disabled={phaseAdvanceBlocked} onClick={onNext}>{phaseAdvanceBlocked ? "Complete the exit checks first" : current.primary}</button></div>
         {messages.map((message, messageIndex) => <ChatMessage key={`${message.actor}-${messageIndex}`} {...message} />)}
         <div className="quick-actions">{current.quickActions.map((label) => <button type="button" key={label}>{label}</button>)}</div>
@@ -179,18 +182,42 @@ function OperatorRecord({ current, phase, records, gateProgress, onEvidence, onR
   );
 }
 
-function StateDrawer({ current, phase, gateProgress, onClose, onReviewFact }) {
-  return <div className="drawer-backdrop" onMouseDown={onClose} role="presentation"><aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Current application state"><div className="drawer-header"><div><span>Current application state</span><strong>{current.name} · {current.status}</strong></div><button type="button" onClick={onClose}>Close</button></div><section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/{phase.gate.length} passed.</p></section><section><span className="drawer-label">Specification source</span><p>{current.source}</p></section><section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} onReview={() => onReviewFact({ label, value, provenance })} />)}</section><section><span className="drawer-label">Authoritative observations</span>{current.events.map(([title, detail, status]) => <div className="drawer-event" key={title}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section><section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>{current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}</aside></div>;
+function EvidenceRow({ event, parentTitle, onReviewEvidence }) {
+  const [title, detail, status] = event;
+  return (
+    <div className="drawer-event">
+      <div className="drawer-event-copy"><strong>{title}</strong><p>{detail}</p></div>
+      <div className="drawer-event-actions"><button type="button" className="control-link" onClick={() => onReviewEvidence(event, parentTitle)}>Verify</button><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>
+    </div>
+  );
 }
 
-function ControlDrawer({ control, onClose, onAskPi }) {
+function StateDrawer({ current, phase, gateProgress, onClose, onReviewFact, onReviewEvidence }) {
+  return (
+    <div className="drawer-backdrop" onMouseDown={onClose} role="presentation">
+      <aside className="evidence-drawer" onMouseDown={(event) => event.stopPropagation()} aria-label="Current application state">
+        <div className="drawer-header"><div><span>Current application state</span><strong>{current.name} · {current.status}</strong></div><button type="button" onClick={onClose}>Close</button></div>
+        <section><span className="drawer-label">Phase contract</span><p><strong>{phase.deliverable}</strong> · Exit Gate {gateProgress}/{phase.gate.length} passed.</p></section>
+        <section><span className="drawer-label">Specification source</span><p>{current.source}</p></section>
+        <section><span className="drawer-label">All facts and provenance</span>{current.facts.map(([label, value, provenance]) => <RecordRow key={`${label}-${value}`} label={label} value={value} meta={provenance} onReview={() => onReviewFact({ label, value, provenance })} />)}</section>
+        <section><span className="drawer-label">Authoritative observations</span>{current.events.map((event) => <EvidenceRow key={`${event[0]}-${event[1]}`} event={event} parentTitle={`${current.name} current state`} onReviewEvidence={onReviewEvidence} />)}</section>
+        <section><span className="drawer-label">Record rule</span><p>Pi's prose is collaboration. Decisions and facts become durable only when they are reflected into the shared Operator Record with provenance and, where required, supporting evidence.</p></section>
+        {current.decision && <section className="drawer-decision"><span className="drawer-label">Workshop boundary</span><p>{current.decision}</p></section>}
+      </aside>
+    </div>
+  );
+}
+
+function ControlDrawer({ control, onClose, onAskPi, onReviewEvidence }) {
   const [sourceOpen, setSourceOpen] = useState(false);
   const [takeoverOpen, setTakeoverOpen] = useState(false);
+  const [rawOpen, setRawOpen] = useState(false);
   const [rerunState, setRerunState] = useState("idle");
 
   useEffect(() => {
     setSourceOpen(false);
     setTakeoverOpen(false);
+    setRawOpen(false);
     setRerunState("idle");
   }, [control.key]);
 
@@ -207,7 +234,8 @@ function ControlDrawer({ control, onClose, onAskPi }) {
         <section className="control-summary"><span className="drawer-label">What this means</span><p>{control.description}</p></section>
         <section><span className="drawer-label">Current result</span><div className="control-result"><strong>{control.status}</strong><span className={`mini-status ${statusClass(control.statusLabel)}`}>{control.statusLabel}</span></div><p>{control.impact}</p></section>
         <section><span className="drawer-label">Source and provenance</span><button type="button" className="source-link" onClick={() => setSourceOpen((value) => !value)}>{control.source}<span>{sourceOpen ? "Hide" : "Open"}</span></button>{sourceOpen && <div className="source-detail"><strong>Product definition</strong><code>{control.sourcePath}</code><p>This is the rule Server Guy is applying. The current result still comes from the cited application or provider source—not from this document alone.</p></div>}</section>
-        {control.evidence.length > 0 && <section><span className="drawer-label">Evidence used now</span>{control.evidence.map(([title, detail, status]) => <div className="drawer-event" key={`${title}-${detail}`}><strong>{title}</strong><p>{detail}</p><span className={`mini-status ${statusClass(status)}`}>{status}</span></div>)}</section>}
+        {control.evidenceDetails && <section className="evidence-reference-section"><span className="drawer-label">Evidence behind this result</span><dl className="evidence-metadata"><div><dt>Observed by</dt><dd>{control.evidenceDetails.source}</dd></div><div><dt>Observed at</dt><dd>{control.evidenceDetails.observedAt}</dd></div><div><dt>Method</dt><dd>{control.evidenceDetails.method}</dd></div><div><dt>Raw result</dt><dd>{control.evidenceDetails.rawResult}</dd></div></dl><button type="button" className="source-link evidence-artifact-link" onClick={() => setRawOpen((value) => !value)}><span className="source-link-copy"><small>Captured artifact</small><strong>{control.evidenceDetails.artifactId}</strong></span><span>{rawOpen ? "Hide raw" : "Open raw"}</span></button>{rawOpen && <pre className="raw-evidence">{control.evidenceDetails.rawEvidence}</pre>}<p className="evidence-scope">This evidence supports <strong>{control.evidenceDetails.parentTitle}</strong>. It establishes only what this observation measured at the recorded time.</p></section>}
+        {control.evidence.length > 0 && <section><span className="drawer-label">Evidence used now</span>{control.evidence.map((event) => <EvidenceRow key={`${event[0]}-${event[1]}`} event={event} parentTitle={control.title} onReviewEvidence={onReviewEvidence} />)}</section>}
         <section className="control-path-section"><span className="drawer-label">Choose your level of control</span><button type="button" className="control-path primary-path" onClick={() => onAskPi(control)}><strong>Ask Pi to handle it</strong><small>Pi explains, investigates, and proposes or performs the next permitted action.</small></button><button type="button" className="control-path" onClick={() => setTakeoverOpen((value) => !value)}><strong>Take control</strong><small>Inspect and change the underlying source yourself or with another coding agent.</small></button>{takeoverOpen && <div className="takeover-detail"><span>Change this source</span><strong>{control.takeover}</strong><ol><li>Open the source and make the change.</li><li>Return here when the source is ready.</li><li>Re-run verification; do not override the result.</li></ol></div>}</section>
         <section className="rerun-section"><span className="drawer-label">Verify the current source</span><p>{control.rerunHelp}</p><button type="button" className="rerun-button" onClick={rerun} disabled={rerunState === "running"}>{rerunState === "running" ? "Checking current source…" : "Re-run verification"}</button><div className={`rerun-result ${rerunState}`} aria-live="polite">{rerunState === "idle" && "No manual status override is available."}{rerunState === "running" && "Reading the current source and collecting fresh evidence."}{rerunState === "complete" && `Rechecked just now. Result remains “${control.status}” until the underlying source or evidence changes.`}</div></section>
       </aside>
@@ -288,6 +316,75 @@ function factControl(fact, phase, current) {
   };
 }
 
+function observationDetails(event, current) {
+  const [title, detail, status] = event;
+  const normalized = title.toLowerCase();
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const details = {
+    source: "Server Guy activity collector",
+    observedAt: "30 Aug 2026 · 16:58:42 EEST",
+    method: `Captured during ${current.id} · ${current.name}`,
+    rawResult: `${detail} · ${status}`,
+    artifactId: `evidence://${current.id.toLowerCase()}/${slug}`,
+  };
+
+  if (normalized.includes("sentinel")) {
+    Object.assign(details, {
+      source: "Sentinel · external public probe",
+      method: "HTTPS GET /api/health through northstar.dev from outside the VPS",
+      rawResult: "HTTP 200 · 184 ms · body matched {\"status\":\"ok\"} · release 8c14d72",
+      artifactId: "observation://sentinel/northstar/obs_01J8M7N4Q9",
+    });
+  } else if (normalized.includes("launch") && normalized.includes("completed")) {
+    Object.assign(details, {
+      source: "Server Guy · launch completion receipt",
+      method: "Assembled from the current Release, Domain Route, and Operations Handoff records",
+      rawResult: "Release 8c14d72 · Domain Route verified · Operations Handoff assembled",
+      artifactId: "receipt://launch/northstar/launch_01J8M7H2A7",
+    });
+  } else if (/(repository|revision|github|pull request)/.test(normalized)) {
+    details.source = "GitHub · repository observation";
+  } else if (/(hetzner|server|host|vps)/.test(normalized)) {
+    details.source = "Hetzner · provider response";
+  } else if (/(domain|dns|https|hostname)/.test(normalized)) {
+    details.source = "External DNS and HTTPS observation";
+  }
+
+  return {
+    ...details,
+    rawEvidence: JSON.stringify({
+      artifact: details.artifactId,
+      source: details.source,
+      observed_at: "2026-08-30T16:58:42+03:00",
+      method: details.method,
+      result: details.rawResult,
+      status,
+    }, null, 2),
+  };
+}
+
+function evidenceControl(event, current, parentTitle) {
+  const [title, detail, status] = event;
+  const details = observationDetails(event, current);
+  const isSentinel = title.toLowerCase().includes("sentinel");
+  return {
+    key: `evidence-${current.id}-${title}-${parentTitle}`,
+    kind: "Evidence Reference",
+    title,
+    status: detail,
+    statusLabel: status,
+    description: isSentinel ? "A Sentinel observation is one external probe result at a specific time. A passed probe means the public health endpoint answered as expected for that check; it does not promise future health." : "This is a source-attributed Observation captured during the current journey state. It records what a named source returned at a specific time and supports only the cited claim.",
+    impact: `This Observation is cited by “${parentTitle}”. Its source, collection method, timestamp, and raw result remain independently inspectable below.`,
+    source: "Journey 01 · Operational Claims and Evidence References",
+    sourcePath: "docs/user-journeys/01-application-launch-ui-map.md#claim-to-evidence-behavior",
+    takeover: details.source,
+    evidence: [],
+    evidenceDetails: { ...details, parentTitle },
+    rerunHelp: "Collect a fresh Observation from the same source. The new result is appended; the historical artifact remains unchanged.",
+    askPrompt: `Explain the Observation “${title}: ${detail}”, inspect its raw evidence, and tell me exactly what it does and does not establish.`,
+  };
+}
+
 function initialChatRecords(current) {
   return current.facts.filter(([, , provenance]) => /(user|engineer)/i.test(provenance)).map(([label, value]) => ({ label, value, meta: "From chat" }));
 }
@@ -350,6 +447,10 @@ export function App() {
     setDrawer({ type: "control", control: factControl(fact, phase, current) });
   }
 
+  function openEvidenceControl(event, parentTitle) {
+    setDrawer({ type: "control", control: evidenceControl(event, current, parentTitle) });
+  }
+
   function newSession() {
     const id = `chat-${sessions.length + 1}`;
     const session = { id, title: "New chat", detail: `Started during Phase ${current.phase}`, archived: false };
@@ -391,13 +492,13 @@ export function App() {
           <ApplicationHeader current={current} approvalMode={approvalMode} setApprovalMode={setApprovalMode} />
           <LaunchMap current={current} phase={phase} gateProgress={gateProgress} setIndex={setIndex} />
           <div className="workspace-body">
-            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawer({ type: "state" })} onArchive={archiveActiveSession} onRestore={restoreActiveSession} onNext={advance} phaseAdvanceBlocked={phaseAdvanceBlocked} />
+            <ChatPanel current={current} phase={phase} session={activeSession} messages={messages} records={records} onSubmit={submitChat} onEvidence={() => setDrawer({ type: "state" })} onReviewEvidence={openEvidenceControl} onArchive={archiveActiveSession} onRestore={restoreActiveSession} onNext={advance} phaseAdvanceBlocked={phaseAdvanceBlocked} />
             <OperatorRecord current={current} phase={phase} records={records} gateProgress={gateProgress} onEvidence={() => setDrawer({ type: "state" })} onReviewDeliverable={openDeliverableControl} onReviewGate={openGateControl} onReviewDecision={openDecisionControl} />
           </div>
         </div>
       </div>
-      {drawer?.type === "state" && <StateDrawer current={current} phase={phase} gateProgress={gateProgress} onClose={() => setDrawer(null)} onReviewFact={openFactControl} />}
-      {drawer?.type === "control" && <ControlDrawer control={drawer.control} onClose={() => setDrawer(null)} onAskPi={askPiToHandle} />}
+      {drawer?.type === "state" && <StateDrawer current={current} phase={phase} gateProgress={gateProgress} onClose={() => setDrawer(null)} onReviewFact={openFactControl} onReviewEvidence={openEvidenceControl} />}
+      {drawer?.type === "control" && <ControlDrawer control={drawer.control} onClose={() => setDrawer(null)} onAskPi={askPiToHandle} onReviewEvidence={openEvidenceControl} />}
     </div>
   );
 }

@@ -67,3 +67,17 @@ No actionable P0, P1, or P2 issues remain in the tested desktop states.
 
 - [P3] The prototype simulates opening repository/provider sources rather than integrating a real editor, MCP client, or provider console.
 - [P3] The dark storyboard control bar remains prototype-only and should not become Server Guy product chrome.
+
+## Claim-to-evidence verification — L9.1
+
+final result: passed
+
+- Opened `Launch evidence assembled`, then followed the `Verify` link on `Sentinel observation` instead of treating the green `Passed` badge as sufficient proof.
+- Confirmed that the Evidence Reference names the observing source, exact observation time, collection method, raw result, artifact identity, parent Operational Claim, and point-in-time scope.
+- Expanded the captured artifact and inspected the underlying structured probe result.
+- Confirmed that the product-definition source and current evidence are separate controls: the former explains the rule; the latter supports this result.
+- Confirmed that the same Observation is directly inspectable from chat activity, the Gate Check's evidence list, and the current-state drawer.
+- Confirmed that refresh appends a new Observation and does not offer a manual status override.
+- `npm run build` completed successfully after the interaction pass.
+
+No actionable P0, P1, or P2 issues were found in the tested desktop flow. The captured artifact remains simulated prototype data until Journey 01 implementation is connected to real probe and receipt stores.

@@ -37,7 +37,7 @@ A durable, revisable choice or constraint recognized from an Operator Session an
 _Avoid_: Chat message, Gate Check, permanent preference
 
 **Control Point**:
-A user-facing path from a Decision Record, Gate Check, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification.
+A user-facing path from a Decision Record, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification.
 _Avoid_: Help tooltip, status override
 
 **Operator Takeover**:
@@ -107,6 +107,14 @@ _Avoid_: Alert, outage
 **Observation**:
 A source-attributed, timestamped operational fact such as a probe result, log event, metric sample, trace, command result, revision, configuration value, or provider response.
 _Avoid_: Finding, Diagnosis, evidence claim
+
+**Operational Claim**:
+A user-visible assertion about an application's current or past operational state, such as “public health check passed” or “Release verified.” It must cite the Observations, Decision Records, or receipts that support it and must not imply more certainty or duration than those sources establish.
+_Avoid_: Observation, source fact, unsupported status
+
+**Evidence Reference**:
+An inspectable link from an Operational Claim to a supporting Observation or receipt, including source identity, observation time, collection method, raw result, and artifact identity when available.
+_Avoid_: Product definition link, confidence score, explanation without proof
 
 **Finding**:
 A model-authored interpretation of selected Observations, kept revisable and distinct from the facts it cites.
