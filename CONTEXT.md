@@ -5,7 +5,7 @@ Canonical product language for Server Guy's deployment and operations domain.
 ## Language
 
 **Model-Native Operation**:
-An operating model in which Pi is the primary adaptive control loop and Server Guy supplies its durable context, memory, tools, observations, resumability, approval behavior, and operator interface.
+An operating model in which Pi handles interpretation, ambiguity, diagnosis, and plan revision while Server Guy supplies durable context, tools, observations, resumability, approval behavior, and inspectable execution. A model-native product may still use deterministic procedures wherever the next valid operation follows from explicit desired state and fresh observations.
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
 **Operator Session**:
@@ -63,6 +63,18 @@ _Avoid_: Operator UI, dashboard
 **Guided Operation**:
 A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside an Operator Session rather than controlling the overall session.
 _Avoid_: Main workflow, agent pipeline
+
+**Launch Reconciliation**:
+The repeated comparison of an Application Contract's desired state with fresh repository, provider, host, and public Observations, followed by a dependency-ordered plan that brings actual state toward the contract. Supported launch paths are deterministic until the evidence cannot identify one valid resolution.
+_Avoid_: Deployment wizard, opaque agent run, one-shot setup
+
+**Operation Graph**:
+The inspectable, dependency-ordered set of Operations currently required by Launch Reconciliation. It is recomputed when desired state or material Observations change rather than treated as a permanent script.
+_Avoid_: Agent plan, hidden tool sequence, checklist
+
+**Judgment Point**:
+An explicit condition where current evidence and rules do not determine one valid next state. Pi investigates, explains, recommends, or asks for user intent; the resulting desired state is then re-planned through Launch Reconciliation.
+_Avoid_: Every model call, silent guess, generic approval
 
 **Operation**:
 A durable record of one intended external effect, including its subject, actor, authority context, execution or reconciliation state, verification, evidence, and outcome.

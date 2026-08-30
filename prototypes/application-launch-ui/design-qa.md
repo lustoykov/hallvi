@@ -130,3 +130,39 @@ The catalog-only family switcher is intentionally outside product chrome. It doe
 - The dark top bar is prototype chrome for switching presentation families.
 - The catalog uses representative Journey 1 data rather than reproducing a single reference state verbatim.
 - Existing source-map coverage remains 36 selectable states; the three `L3.W1–W3` working-environment states are represented through the Handoff family rather than changing the existing journey data in this isolated prototype.
+
+# Design QA — Deterministic Launch Reconciliation
+
+- Status: passed
+- Source before this change: `qa/reconciliation-source.png`
+- Implementation: `qa/reconciliation-implementation.png`
+- Same-viewport comparison: `qa/reconciliation-comparison.png`
+- Operation Graph detail: `qa/reconciliation-operation-graph.png`
+- Handoff composition detail: `qa/reconciliation-deep-state.png`
+- Browser screenshot size: 1164 × 655 pixels for both source and implementation
+
+## Product-model check
+
+- The fixed application rail, launch map, chat-primary workspace, and Record / Changes / Evidence Inspector remain stable.
+- The seven top-level examples now compose one granular library rather than each owning a different large smart card.
+- Desired Application Contract facts, fresh observed facts, and their computed delta are visibly distinct.
+- The selectable Operation Graph exposes eight dependency-ordered nodes: Inspect, Contract, VPS, Domain, Runtime, Release, Verify, and Evidence.
+- Normal provider and host nodes are labeled as deterministic rule nodes. Pi appears only at visible Judgment Points, while application-code gaps become bounded external-agent handoffs.
+- Selecting a graph node updates the fixed Inspector with its actor, external effect, dependencies, operation detail, developer renderer, and evidence target.
+- Provider receipts, commands, diffs, logs, checks, pull requests, and immutable evidence remain directly inspectable instead of being summarized as unsupported Pi claims.
+
+## Interaction verification
+
+- All seven composition examples switch successfully and expose the expected current status and selected graph node.
+- Selecting `VPS` changes the Inspector from the hostname Judgment Point to the deterministic compute Operation.
+- Recording `Use app.northstar.dev` creates a visible Operator Record event and leaves the plan ready to be recomputed.
+- `New` creates an application-scoped Operator Session; archived sessions can be revealed again.
+- Approval Mode switches between `Pi Decides`, `Always Ask`, and `Full Autonomy` without changing the fixed layout.
+- Record, Changes, and Evidence continue to be stable Inspector destinations.
+- Browser console warning/error log after the interaction pass: empty.
+
+## Visible comparison findings
+
+The side-by-side comparison preserves the accepted information hierarchy, typography, density, colors, borders, and technical character. The material visual change is inside Chat and the Inspector: the old decision card is replaced by a reconciliation summary and the Inspector is driven by the selected Operation. At the tested short viewport the Chat surface correctly scrolls; the operation graph and handoff detail were separately inspected at interaction depth.
+
+No actionable P0, P1, or P2 visual or interaction issues remain in the tested desktop states.

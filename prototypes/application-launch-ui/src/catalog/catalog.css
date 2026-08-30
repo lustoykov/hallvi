@@ -212,10 +212,103 @@ button { color: inherit; }
 .log-line .ok { color: #75d8ad; }
 .artifact-hash { overflow-wrap: anywhere; color: #34435e; font: 8.5px/1.5 "Geist Mono", monospace; }
 
+/* Deterministic reconciliation component library */
+.source-link { border: 0; background: transparent; color: var(--blue); padding: 0; cursor: pointer; font-size: 8.5px; white-space: nowrap; }
+.reconciliation-presentation { margin: 14px 0 0 41px; border: 1px solid var(--line-dark); border-radius: 8px; background: white; overflow: hidden; }
+.reconciliation-presentation > header { min-height: 48px; padding: 0 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+.reconciliation-presentation > header > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.reconciliation-presentation > header small, .operation-graph > header small, .selected-operation > header small { color: var(--blue); font: 8px "Geist Mono", monospace; letter-spacing: .065em; text-transform: uppercase; }
+.reconciliation-presentation > header strong { font-size: 12px; }
+.reconciliation-presentation > header > span:last-child { margin-left: auto; }
+.reconciliation-body { padding: 11px; display: grid; gap: 10px; }
+.reconciliation-objective { min-height: 34px; border: 1px solid #bfd0f6; background: var(--blue-soft); border-radius: 6px; padding: 7px 9px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.reconciliation-objective > span { color: var(--blue); font: 8px "Geist Mono", monospace; text-transform: uppercase; }
+.reconciliation-objective strong { font-size: 9.5px; font-weight: 600; line-height: 1.35; }
+.reconciliation-summary { display: grid; gap: 8px; }
+.state-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.state-column, .delta-column { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fcfdff; }
+.state-column > header, .delta-column > header { min-height: 35px; padding: 6px 9px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
+.state-column > header span, .delta-column > header span { color: var(--muted); font: 7.5px "Geist Mono", monospace; text-transform: uppercase; }
+.state-column > header strong, .delta-column > header strong { font-size: 9.5px; }
+.state-column-desired > header { background: #f4f7ff; }
+.state-column-observed > header { background: #f4faf7; }
+.state-fact { min-height: 43px; padding: 7px 9px; border-bottom: 1px solid #edf0f5; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.state-fact:last-child { border-bottom: 0; }
+.state-fact > span { display: grid; gap: 2px; min-width: 0; }
+.state-fact > span:last-child { justify-items: end; }
+.state-fact small { color: var(--muted); font-size: 7.5px; }
+.state-fact strong { font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; }
+.state-fact em { color: #758099; font: 7px "Geist Mono", monospace; font-style: normal; text-align: right; }
+.delta-column > div { display: grid; }
+.plan-delta { min-height: 34px; padding: 6px 9px; display: grid; grid-template-columns: 58px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; border-bottom: 1px solid #edf0f5; }
+.plan-delta:last-child { border-bottom: 0; }
+.plan-delta > span { border-radius: 999px; padding: 3px 6px; background: #eef1f6; color: #526078; font: 7px "Geist Mono", monospace; text-transform: uppercase; text-align: center; }
+.plan-delta-create > span, .plan-delta-write > span, .plan-delta-apply > span { color: #1748bc; background: #e7efff; }
+.plan-delta-blocked > span, .plan-delta-decision > span { color: #b9470e; background: var(--orange-soft); }
+.plan-delta-none > span { color: var(--green); background: var(--green-soft); }
+.plan-delta strong { font-size: 8.5px; }
+.plan-delta small { color: var(--muted); font-size: 7.5px; }
+
+.operation-graph { border: 1px solid var(--line-dark); border-radius: 6px; overflow: hidden; }
+.operation-graph > header { min-height: 40px; display: flex; align-items: center; padding: 6px 9px; border-bottom: 1px solid var(--line); background: #f7f9fc; }
+.operation-graph > header > span:first-child { display: grid; gap: 2px; }
+.operation-graph > header strong { font-size: 9.5px; }
+.graph-legend { margin-left: auto; color: var(--muted); font-size: 7.5px; display: flex; align-items: center; gap: 5px; }
+.graph-legend i { width: 7px; height: 7px; border-radius: 2px; background: #ccd4e2; }
+.graph-legend .legend-pi { background: var(--orange); }
+.operation-node-list { padding: 8px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; background: white; }
+.operation-node { min-width: 0; min-height: 45px; position: relative; border: 1px solid var(--line); background: white; border-radius: 5px; padding: 6px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 5px; align-items: center; text-align: left; cursor: pointer; }
+.operation-node:hover { border-color: #91ace9; }
+.operation-node.is-selected { border-color: var(--blue); box-shadow: 0 0 0 2px #dfe8ff; }
+.operation-node-done { background: #f7fcf9; border-color: #c7e6d9; }
+.operation-node-running { background: #f5f8ff; border-color: #9eb8f0; }
+.operation-node-blocked, .operation-node-needs-input, .operation-node-approval { background: #fff8f3; border-color: #efbea5; }
+.operation-number { width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: #edf0f5; color: #526078; font: 7px "Geist Mono", monospace; }
+.operation-node-done .operation-number { color: var(--green); background: var(--green-soft); }
+.operation-node-running .operation-number, .operation-node.is-selected .operation-number { color: white; background: var(--blue); }
+.operation-node-blocked .operation-number, .operation-node-needs-input .operation-number, .operation-node-approval .operation-number { color: white; background: var(--orange); }
+.operation-copy { display: grid; gap: 2px; min-width: 0; }
+.operation-copy strong { font-size: 8.5px; overflow: hidden; text-overflow: ellipsis; }
+.operation-copy small { color: var(--muted); font-size: 7px; }
+.operation-owner { position: absolute; top: 3px; right: 4px; font: 6px "Geist Mono", monospace; color: #7c879e; text-transform: uppercase; }
+.operation-owner-judgment { color: #c34d13; }
+.operation-owner-external-agent { color: #5b3cc4; }
+
+.selected-operation, .judgment-point, .approval-boundary, .operational-claims, .agent-handoff { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.selected-operation > header, .judgment-point > header, .approval-boundary > header, .operational-claims > header, .agent-handoff > header { min-height: 39px; padding: 6px 9px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); background: #fafbfe; }
+.selected-operation > header > span:first-child { display: grid; gap: 2px; }
+.selected-operation > header > span:last-child { margin-left: auto; }
+.selected-operation > header strong, .judgment-point > header strong, .approval-boundary > header strong, .operational-claims > header strong, .agent-handoff > header strong { font-size: 9.5px; }
+.judgment-point > header, .approval-boundary > header { background: var(--orange-soft); }
+.judgment-point > header span, .approval-boundary > header span, .operational-claims > header span, .agent-handoff > header span { color: var(--orange); font: 7.5px "Geist Mono", monospace; text-transform: uppercase; }
+.operational-claims > header span { color: var(--green); }
+.agent-handoff > header span { color: #5b3cc4; }
+.selected-operation > p, .judgment-point > p { margin: 0; padding: 9px; color: #455169; font-size: 8.5px; line-height: 1.45; }
+.selected-operation dl, .approval-boundary dl, .agent-handoff dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.selected-operation dl div, .approval-boundary dl div, .agent-handoff dl div { padding: 7px 9px; border-top: 1px solid #edf0f5; display: grid; gap: 2px; }
+.selected-operation dt, .approval-boundary dt, .agent-handoff dt { color: var(--muted); font-size: 7.5px; }
+.selected-operation dd, .approval-boundary dd, .agent-handoff dd { margin: 0; font-size: 8.5px; font-weight: 600; line-height: 1.35; }
+.selected-operation > footer, .judgment-point > footer, .approval-boundary > footer, .agent-handoff > footer { padding: 8px 9px; border-top: 1px solid #edf0f5; display: flex; align-items: center; gap: 7px; }
+.selected-operation > footer button, .judgment-point > footer button, .approval-boundary > footer button, .agent-handoff > footer button { border: 1px solid #c7d5f0; color: var(--blue); background: white; border-radius: 5px; padding: 5px 8px; cursor: pointer; font-size: 8px; }
+.approval-boundary > footer button.primary-button, .agent-handoff > footer button.primary-button { color: white; background: var(--blue); border-color: var(--blue); }
+.judgment-point .choice-list { padding: 0 9px 9px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.judgment-point .choice-card { padding: 8px; }
+.judgment-point .choice-card strong { font-size: 9px; }
+.judgment-point .choice-card small { font-size: 7.5px; }
+.claim-row { min-height: 38px; padding: 7px 9px; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 7px; align-items: center; border-bottom: 1px solid #edf0f5; }
+.claim-row:last-child { border-bottom: 0; }
+.claim-row > span:nth-child(2) { display: grid; gap: 2px; }
+.claim-row strong { font-size: 8.5px; }
+.claim-row small { color: var(--muted); font-size: 7.5px; }
+.operation-plan-card .source-link { border: 1px solid #c7d5f0; border-radius: 5px; padding: 6px 8px; }
+
 @media (max-width: 1300px) {
   .server-guy-shell { grid-template-columns: 205px minmax(0, 1fr); }
   .launch-map { grid-template-columns: 210px minmax(0, 1fr); }
   .workspace-body { grid-template-columns: minmax(500px, 1.06fr) minmax(390px, .94fr); }
   .prototype-title { min-width: 220px; }
   .prototype-family { padding-inline: 7px; }
+  .operation-node-list { grid-template-columns: repeat(4, minmax(94px, 1fr)); }
+  .plan-delta { grid-template-columns: 50px minmax(0, 1fr) auto; }
+  .plan-delta small { display: none; }
 }
