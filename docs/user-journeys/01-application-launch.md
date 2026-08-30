@@ -4,6 +4,10 @@ Status: workshop draft. This is a product-level journey, not an implementation p
 
 [Open the three-diagram visual](./diagrams/01-application-launch.html)
 
+[Open the source-linked Operator UI state map](./01-application-launch-ui-map.md)
+
+[Open the interactive 36-state UI storyboard](../../prototypes/application-launch-ui/README.md)
+
 ## Product promise
 
 > Give Server Guy a supported repository. Collaborate where necessary. Finish with the application live on infrastructure you own, externally observed, and ready for routine operations.
@@ -24,23 +28,26 @@ An individual engineer or technically capable tinkerer who wants to self-host bu
 
 ## User journey
 
-| Phase | Engineer experience | Pi and Server Guy behavior | Phase exit |
-| --- | --- | --- | --- |
-| 1. Start | Selects a repository, target environment, Approval Mode, and a short intent brief such as cost sensitivity or data importance. | Creates the application workspace and a durable Operator Session. Makes missing prerequisites visible. | The application and authority context are explicit. |
-| 2. Understand | Watches Pi inspect the repository and explain what it believes the application needs. Corrects wrong assumptions. | Resolves a supported Application Profile, drafts the Application Contract, and marks inferred, repository-declared, user-confirmed, and unknown fields distinctly. | A credible contract and a bounded list of conformance gaps exist. |
-| 3. Conform | Reviews repository changes when the application needs health endpoints, configuration, logging, or deployment files. | Prepares a reviewable repository change when conformance requires source-controlled work. It does not call an unsupported application deployable. | Required conformance work is merged or explicitly unresolved. |
-| 4. See the launch | Reviews Pi's visible launch intent: target topology, expected costs, provider actions, user actions, verification, and meaningful risks. | Adapts the plan as evidence changes. VPS provisioning and domain/DNS work remain separate visible operations. | The engineer understands what will be created and what participation is needed. |
-| 5. Establish the VPS | Connects Hetzner access and handles the VPS approval required by the selected mode. | Validates provider access, creates the planned machine, and records its identity and cost separately from domain work. | The owned host exists and is ready for application configuration. |
-| 6. Establish the domain | Chooses the intended hostname. Uses an existing Cloudflare-controlled domain or follows a guided manual path to acquire, add, or delegate one. | Runs Domain Setup as a bounded Guided Operation: confirms control, configures DNS routing and HTTPS through Cloudflare, waits through propagation, and verifies the public hostname from outside the host. | The intended HTTPS hostname is verified or visibly waiting/blocked. |
-| 7. Establish operations | Watches host, database, runtime, secrets, backup, telemetry, logs, and sentinel work appear as inspectable activity rather than a spinner. | Configures the owned environment, using broad scoped tools and reusable capabilities as appropriate. | The environment can accept the first Release and expose operational evidence. |
-| 8. Go live | Sees the exact revision being deployed and whether it is merely reachable or actually verified through the intended hostname. | Creates and deploys the first Release, then runs contract-defined external checks and Pi-selected semantic checks through the public route. | Verification supports or rejects the live claim. |
-| 9. Handoff | Lands in an application workspace showing current Release, domain, health, costs, backups, telemetry, recent work, and ongoing observation. | Records topology, domain state, Release identity, evidence, outstanding gaps, and Pi-authored operational notes. | The application has entered ongoing operations. |
+Each phase is organized around a named **Phase Deliverable**. Pi may reason and act adaptively, but its visible intent must say which deliverable it is working toward. Application Launch advances only when the phase's **Exit Gate** is satisfied. A blocked or waiting gate remains visible; the UI must not imply that clicking “next” completes it.
+
+| Phase | Phase Deliverable | Engineer experience | Pi and Server Guy behavior | Exit Gate |
+| --- | --- | --- | --- | --- |
+| 1. Start | **Launch Brief** — application identity, repository, environment, Approval Mode, operating intent, and known prerequisites. | Selects a repository, target environment, Approval Mode, and a short intent brief such as cost sensitivity or data importance. | Creates the application workspace and a durable Operator Session. Makes missing prerequisites visible. | Application identity is recorded; the repository is readable; environment, authority, and operating intent are explicit. |
+| 2. Understand | **Application Contract** — profile resolution, operational contract, provenance, and bounded gaps. | Watches Pi inspect the repository and explain what it believes the application needs. Corrects wrong assumptions. | Resolves an Application Profile match or explicit mismatch, drafts the Application Contract, and marks inferred, repository-declared, user-confirmed, and unknown fields distinctly. | Profile resolution is recorded; material contract fields have provenance; every material unknown is resolved or named as a conformance blocker. |
+| 3. Conform | **Conformance Result** — exact eligible revision plus evidence that required profile checks pass. | Reviews repository changes when the application needs health endpoints, configuration, logging, or deployment files. | Prepares a reviewable repository change when conformance requires source-controlled work. It does not call an unsupported application deployable. | Required changes are merged; profile checks pass for the exact revision; unresolved required gaps stop the launch. |
+| 4. See the launch | **Launch Plan** — topology, cost, actions, participation, verification, and material risks. | Reviews Pi's visible launch intent: target topology, expected costs, provider actions, user actions, verification, and meaningful risks. | Adapts the plan as evidence changes. VPS provisioning and domain/DNS work remain separate visible operations. | Target topology and expected cost are explicit; provider and engineer actions are separated; verification and material risks are named. |
+| 5. Establish the VPS | **Host Record** — owned machine identity, cost, reachability, and readiness evidence. | Connects Hetzner access and handles the VPS approval required by the selected mode. | Validates provider access, creates the planned machine, and records its identity and cost separately from domain work. | The intended host exists; its identity and actual cost are recorded; readiness checks show it can accept operational setup. |
+| 6. Establish the domain | **Domain Route** — authoritative hostname, DNS route, HTTPS state, and external observations. | Chooses the intended hostname. Uses an existing Cloudflare-controlled domain or follows a guided manual path to acquire, add, or delegate one. | Runs Domain Setup as a bounded Guided Operation: confirms control, configures DNS routing and HTTPS through Cloudflare, waits through propagation, and verifies the public hostname from outside the host. | Domain control is observed; intended DNS and valid HTTPS are observed externally; unresolved propagation or conflicts block advancement. |
+| 7. Establish operations | **Operational Baseline** — runtime, database, secrets, backup, logs, telemetry, and sentinel responsibilities with evidence. | Watches host, database, runtime, secrets, backup, telemetry, logs, and sentinel work appear as inspectable activity rather than a spinner. | Configures the owned environment, using broad scoped tools and reusable capabilities as appropriate. | Required baseline responsibilities are explicit; required services are ready; operational evidence channels are reporting. |
+| 8. Go live | **Verified Release** — exact revision and configuration supported as live by external contract and semantic checks. | Sees the exact revision being deployed and whether it is merely reachable or actually verified through the intended hostname. | Creates and deploys the first Release, then runs contract-defined external checks and Pi-selected semantic checks through the public route. | The exact candidate is deployed; contract checks pass through the intended hostname; required semantic checks pass and the Release is recorded as current. |
+| 9. Handoff | **Operations Handoff** — current topology, Release, health, cost, evidence, gaps, and active observation. | Lands in an application workspace showing current Release, domain, health, costs, backups, telemetry, recent work, and ongoing observation. | Records topology, domain state, Release identity, evidence, outstanding gaps, and Pi-authored operational notes. | Launch evidence is assembled; accepted gaps and ownership are visible; ongoing observation is active in the normal application workspace. |
 
 The phases are a user-facing progression, not a mandatory Pi call sequence. Pi may loop between inspection, conformance, provisioning, and verification when new facts invalidate an earlier assumption.
 
 ## What the Operator UI must make clear
 
 - The current objective and Pi's visible intent.
+- The current Phase Deliverable, the Exit Gate conditions, and which condition blocks advancement.
 - What Server Guy inferred versus what the repository or engineer declared.
 - Which Application Profile matched and where conformance is incomplete.
 - Estimated provider cost before paid resources are created.
@@ -50,7 +57,9 @@ The phases are a user-facing progression, not a mandatory Pi call sequence. Pi m
 - Whether the application is reachable, verified, or blocked; these are not synonyms.
 - What Pi is doing now, what requires the engineer, and what is paused without changing state.
 
-Conversation is available throughout, but the primary surface is a structured application workspace with an Operator View—not a chat transcript that hides state.
+Conversation with Pi is the primary interaction surface throughout Application Launch. A persistent structured Operator Record sits beside it and reflects the current phase, decisions, facts, approvals, resources, blockers, and evidence produced through the conversation. Chat drives collaboration; the Operator Record prevents that collaboration from hiding or losing operational state.
+
+An application may have multiple Operator Sessions. The engineer can start, switch, resume, and archive them. Each session keeps its own conversation and activity history while reading from and contributing recognized outcomes to the same application-scoped Operator Record. Archiving a session removes it from the active chat list; it does not erase decisions, evidence, or operational state already recorded.
 
 ## Approval and trust behavior
 

@@ -9,8 +9,24 @@ An operating model in which Pi is the primary adaptive control loop and Server G
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
 **Operator Session**:
-A durable, resumable unit of Pi-led operational work that preserves application context, activity, conclusions, approvals, and evidence across interruptions.
-_Avoid_: Workflow run, pipeline execution
+A durable, application-scoped chat and activity thread between the engineer and Pi. It can be started, resumed, or archived without losing the shared operational state of the application.
+_Avoid_: Chat session, workflow run, pipeline execution
+
+**Operator Record**:
+The shared, structured operational state of an application, including recognized decisions, current resources, approvals, blockers, and evidence. Operator Sessions may update it, but archiving a session does not remove its recorded outcomes.
+_Avoid_: Chat transcript, dashboard state
+
+**Launch Phase**:
+A user-visible segment of Application Launch organized around one Phase Deliverable and one Exit Gate. It describes progress for the engineer without prescribing Pi's internal reasoning sequence.
+_Avoid_: Agent step, pipeline stage
+
+**Phase Deliverable**:
+The named, durable outcome a Launch Phase must produce, such as an Application Contract, Host Record, or Verified Release.
+_Avoid_: Task list, phase goal
+
+**Exit Gate**:
+The small set of observable conditions that must be satisfied before Application Launch advances to the next Launch Phase. An unmet condition remains visible as waiting or blocked rather than being treated as progress.
+_Avoid_: Vague completion, confidence score, checklist progress
 
 **Session Event**:
 A recorded item in an Operator Session, such as Pi's visible intent, a tool call, command result, Observation, conclusion, approval, or recovery assessment.
