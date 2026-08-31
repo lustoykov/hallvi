@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PR #1 architecture — Journey 1 Phase 1</title>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -18,9 +17,9 @@
       --rule-solid: #cbd5e5;
       --accent: #285ad8;
       --accent-tint: rgba(40, 90, 216, 0.08);
-      --sans: 'Geist', system-ui, sans-serif;
-      --serif: 'Instrument Serif', serif;
-      --mono: 'Geist Mono', ui-monospace, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --serif: ui-serif, Georgia, serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     body {
@@ -60,6 +59,54 @@
       gap: 16px;
       margin-top: 24px;
     }
+    .flows {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .flow {
+      padding: 20px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .flow h2 { margin-bottom: 6px; font-size: 16px; }
+    .flow > p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .flow-track {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+    .flow-step {
+      position: relative;
+      display: grid;
+      align-content: start;
+      gap: 5px;
+      min-width: 116px;
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--rule-solid);
+      border-radius: 7px;
+      background: var(--paper);
+    }
+    .flow-step:not(:last-child)::after {
+      content: '→';
+      position: absolute;
+      right: -11px;
+      top: 50%;
+      z-index: 2;
+      width: 14px;
+      color: var(--accent);
+      background: #fff;
+      font-weight: 600;
+      text-align: center;
+      transform: translateY(-50%);
+    }
+    .flow-step b { font-size: 12px; line-height: 1.25; }
+    .flow-step span { color: var(--muted); font: 500 9px/1.35 var(--mono); }
     .card {
       min-height: 168px;
       padding: 20px;
@@ -88,7 +135,7 @@
 
     @media (max-width: 820px) {
       body { padding: 32px 16px; }
-      .summary { grid-template-columns: 1fr; }
+      .summary, .flows { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -97,7 +144,7 @@
     <p class="eyebrow">Architecture · PR #1 · Journey 1 Phase 1</p>
     <h1>One Next.js process owns the launch brief</h1>
     <p class="subtitle">
-      Phase 1 is a full-stack Next.js modular monolith. The operator UI sends commands to Route Handlers; deterministic domain logic validates them, records durable operational truth in SQLite, and calls GitHub or Pi through narrow adapters.
+      Phase 1 is a full-stack Next.js modular monolith. The operator UI sends commands to Route Handlers; domain logic validates them, records the Operator Record in SQLite, and calls GitHub or a deliberately isolated Pi session through narrow adapters.
     </p>
 
     <div class="diagram">
@@ -198,7 +245,7 @@
         <rect x="996" y="412" width="56" height="16" rx="4" fill="transparent" stroke="rgba(25,35,56,0.24)" stroke-width="0.8"/>
         <text x="1024" y="424" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MODEL</text>
         <text x="1076" y="452" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Pi SDK</text>
-        <text x="1076" y="472" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">no tools · bounded JSON reply</text>
+        <text x="1076" y="472" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">no tools/resources · strict reply</text>
 
         <!-- Legend strip -->
         <line x1="40" y1="632" x2="1240" y2="632" stroke="rgba(25,35,56,0.12)" stroke-width="0.8"/>
@@ -211,6 +258,31 @@
         <text x="632" y="660" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace">MODULE BOUNDARY</text>
       </svg>
     </div>
+
+    <section class="flows" aria-label="Important control flows">
+      <article class="flow">
+        <p class="card-kicker">Flow 01 · Create launch workspace</p>
+        <h2>A fixed command creates the record, then observes GitHub</h2>
+        <p>A repeat with the same permission policy is idempotent. A conflicting policy returns an explicit conflict instead of silently changing authority.</p>
+        <div class="flow-track">
+          <div class="flow-step"><b>Validate input</b><span>GitHub repo · Production · permission policy</span></div>
+          <div class="flow-step"><b>Write transaction</b><span>Application · phase · chat · defaults · prerequisites</span></div>
+          <div class="flow-step"><b>Observe GitHub</b><span>Repo · branch · SHA · access or exact failure</span></div>
+          <div class="flow-step"><b>Compute gate</b><span>Five checks derived from the current record</span></div>
+        </div>
+      </article>
+      <article class="flow">
+        <p class="card-kicker">Flow 02 · Collaborate with Pi</p>
+        <h2>Pi proposes record changes; Server Guy validates the reply</h2>
+        <p>Approval Mode remains user-owned. Each additional launch priority is appended with its own origin and timestamp rather than replacing an earlier priority.</p>
+        <div class="flow-track">
+          <div class="flow-step"><b>Record message</b><span>Selected phase-chat transcript only</span></div>
+          <div class="flow-step"><b>Ask isolated Pi</b><span>No tools · extensions · skills · project context</span></div>
+          <div class="flow-step"><b>Validate JSON</b><span>Two decision keys · strict values · complete stop</span></div>
+          <div class="flow-step"><b>Commit reply</b><span>Message + decisions in one transaction</span></div>
+        </div>
+      </article>
+    </section>
 
     <section class="summary" aria-label="Architecture decisions">
       <article class="card">
@@ -225,16 +297,16 @@
       </article>
       <article class="card">
         <p class="card-kicker">Narrow intelligence</p>
-        <h2>Pi judges; adapters expose facts</h2>
+        <h2>Pi is isolated; adapters expose facts</h2>
         <ul>
           <li>GitHub identity comes from `gh api`.</li>
-          <li>Pi receives the record and chat context with tools disabled.</li>
-          <li>Adapter errors remain visible to the engineer.</li>
+          <li>Pi receives only the supplied record and chat, with tools and project resources disabled.</li>
+          <li>Incomplete model output and adapter errors remain visible.</li>
         </ul>
       </article>
     </section>
 
-    <footer>SERVER GUY · PR #1 · 7 NODES · 6 CONNECTIONS · DOC-WIDE · ENGINEER AUDIENCE</footer>
+    <footer>SERVER GUY · PR #1 · SYSTEM TOPOLOGY + 2 CONTROL FLOWS · ENGINEER REVIEW</footer>
   </main>
 </body>
 </html>
