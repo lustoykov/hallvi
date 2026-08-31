@@ -38,7 +38,7 @@ _Avoid_: Decision, manual checkbox, confidence judgment, internal reference as t
 
 **Decision Record**:
 A durable, revisable choice or constraint recognized from an Operator Session and stored with its origin and affected scope.
-_Avoid_: Chat message, Gate Check, permanent preference
+_Avoid_: Chat message, Gate Check, application configuration, product rule, permanent preference
 
 **Control Point**:
 A user-facing path from a Decision Record, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.

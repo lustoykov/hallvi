@@ -23,7 +23,7 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { PHASE_ONE_CHECKS, PHASES } from "@/server/phase-one-spec";
-import type { ApprovalMode, GateCheck, PhaseOneView } from "@/server/types";
+import type { ApprovalMode, GateCheck, PhaseOneOperatorView } from "@/server/types";
 
 type InspectorTab = "record" | "activity" | "changes" | "receipts";
 
@@ -89,7 +89,7 @@ function formatTimestamp(value: string) {
   }).format(new Date(value))} UTC`;
 }
 
-export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
+export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorView }) {
   const [view, setView] = useState(initialView);
   const [repositoryUrl, setRepositoryUrl] = useState(
     initialView.application?.repositoryUrl ?? "https://github.com/lustoykov/todo-fastapi",
@@ -106,9 +106,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   const checks = view.checks.length ? view.checks : initialChecks();
   const passed = checks.filter((check) => check.status === "passed").length;
   const activeSession = view.sessions.find((session) => session.id === view.activeSessionId) ?? null;
-  const displayedDecisions = view.decisions.filter(
-    (decision) => decision.source !== "product-default" && decision.key !== "approval_scope",
-  );
+  const displayedDecisions = view.decisions;
   const effectiveApprovalMode = view.application?.approvalMode ?? approvalMode;
   const selectedPermission = permissionOptions.find(
     (option) => option.value === effectiveApprovalMode,
@@ -133,7 +131,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     setBusy("create");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>("/api/applications", {
+      const next = await jsonRequest<PhaseOneOperatorView>("/api/applications", {
         method: "POST",
         body: JSON.stringify({ repositoryUrl, approvalMode }),
       });
@@ -150,7 +148,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     setBusy("session");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>(
+      const next = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}?session=${encodeURIComponent(sessionId)}`,
       );
       setView(next);
@@ -161,12 +159,12 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     }
   }
 
-  async function createChat() {
+  async function createOperatorSession() {
     if (!view.application || busy) return;
     setBusy("new-chat");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>(
+      const next = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}/sessions`,
         { method: "POST", body: "{}" },
       );
@@ -178,12 +176,12 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     }
   }
 
-  async function archiveActiveChat() {
+  async function archiveActiveOperatorSession() {
     if (!view.application || !activeSession || activeSession.isPrimary || busy) return;
     setBusy("archive");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>(
+      const next = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}/sessions/${activeSession.id}/archive`,
         { method: "POST", body: "{}" },
       );
@@ -203,14 +201,14 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     setBusy("message");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>(
+      const next = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}/sessions/${activeSession.id}/messages`,
         { method: "POST", body: JSON.stringify({ message }) },
       );
       setView(next);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Pi could not respond.");
-      const refreshed = await jsonRequest<PhaseOneView>(
+      const refreshed = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}?session=${encodeURIComponent(activeSession.id)}`,
       ).catch(() => null);
       if (refreshed) setView(refreshed);
@@ -224,7 +222,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     setBusy("rerun");
     setError(null);
     try {
-      const next = await jsonRequest<PhaseOneView>(
+      const next = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}/checks/repository-readable/rerun`,
         { method: "POST", body: "{}" },
       );
@@ -301,7 +299,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
               aria-label="Start a new phase chat"
               className="sg-icon-button primary"
               disabled={!view.application || busy !== null}
-              onClick={createChat}
+              onClick={createOperatorSession}
               type="button"
             >
               <Plus weight="bold" />
@@ -337,7 +335,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
             )}
           </div>
           <div className="sg-chat-list-footer">
-            <button disabled={!view.application || busy !== null} onClick={createChat} type="button">
+            <button disabled={!view.application || busy !== null} onClick={createOperatorSession} type="button">
               <Plus /> New phase chat
             </button>
             <p>Chats share this phase’s Record. Their transcripts stay separate.</p>
@@ -351,7 +349,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
               <strong>Launch Brief</strong>
             </div>
             {activeSession && !activeSession.isPrimary && activeSession.status === "active" && (
-              <button className="sg-text-button" disabled={busy !== null} onClick={archiveActiveChat} type="button">
+              <button className="sg-text-button" disabled={busy !== null} onClick={archiveActiveOperatorSession} type="button">
                 <Archive /> Archive chat
               </button>
             )}

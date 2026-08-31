@@ -27,7 +27,7 @@ export interface PhaseWorkspace {
   updatedAt: string;
 }
 
-export interface ChatSession {
+export interface OperatorSession {
   id: string;
   workspaceId: string;
   title: string;
@@ -37,9 +37,9 @@ export interface ChatSession {
   resolvedAt: string | null;
 }
 
-export interface ChatMessage {
+export interface OperatorMessage {
   id: string;
-  sessionId: string;
+  operatorSessionId: string;
   role: "user" | "assistant" | "system";
   body: string;
   source: "user" | "pi" | "server-guy";
@@ -49,11 +49,10 @@ export interface ChatMessage {
 export interface DecisionRecord {
   id: string;
   workspaceId: string;
-  sessionId: string | null;
-  key: string;
+  operatorSessionId: string;
+  kind: "launch-priority";
   label: string;
   value: string;
-  source: "launch-form" | "chat" | "product-default";
   createdAt: string;
   updatedAt: string;
 }
@@ -106,12 +105,12 @@ export interface GateCheck {
   canRerun: boolean;
 }
 
-export interface PhaseOneView {
+export interface PhaseOneOperatorView {
   application: ApplicationRecord | null;
   workspace: PhaseWorkspace | null;
-  sessions: ChatSession[];
+  sessions: OperatorSession[];
   activeSessionId: string | null;
-  messages: ChatMessage[];
+  messages: OperatorMessage[];
   checks: GateCheck[];
   decisions: DecisionRecord[];
   observations: ObservationRecord[];
@@ -132,7 +131,7 @@ export interface CreateApplicationInput {
 }
 
 export interface PiDecision {
-  key: "launch_priority" | "domain_starting_state";
+  kind: "launch-priority";
   value: string;
 }
 

@@ -79,6 +79,7 @@ describe("Phase 1 application workspace", () => {
     );
     expect(result.view.application?.approvalMode).toBe("pi-decides");
     expect(result.view.application?.status).toBe("phase-1-ready");
+    expect(result.view.decisions).toEqual([]);
   });
 
   it("is idempotent for the same policy and rejects a conflicting policy", async () => {
@@ -92,22 +93,22 @@ describe("Phase 1 application workspace", () => {
     );
   });
 
-  it("preserves each chat priority without allowing Pi to change Approval Mode", async () => {
+  it("preserves each Operator Session priority without treating application policy as a decision", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
     const sessionId = created.view.activeSessionId!;
     mocks.askPi
       .mockResolvedValueOnce({
         message: "I recorded fast recovery.",
-        decisions: [{ key: "launch_priority", value: "Recover quickly" }],
+        decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
       })
       .mockResolvedValueOnce({
         message: "I recorded predictable cost.",
-        decisions: [{ key: "launch_priority", value: "Keep spend predictable" }],
+        decisions: [{ kind: "launch-priority", value: "Keep spend predictable" }],
       });
 
-    await phaseOne.sendChatMessage(applicationId, sessionId, "Recovery matters.");
-    const view = await phaseOne.sendChatMessage(applicationId, sessionId, "Keep spend predictable.");
+    await phaseOne.sendOperatorMessage(applicationId, sessionId, "Recovery matters.");
+    const view = await phaseOne.sendOperatorMessage(applicationId, sessionId, "Keep spend predictable.");
     const priorities = view.decisions.filter(
       (decision) => decision.label === "Additional launch priority",
     );

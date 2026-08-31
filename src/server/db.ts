@@ -7,10 +7,10 @@ import type {
   ActivityEvent,
   ApplicationRecord,
   BlockerRecord,
-  ChatMessage,
-  ChatSession,
   DecisionRecord,
   ObservationRecord,
+  OperatorMessage,
+  OperatorSession,
   PhaseWorkspace,
 } from "./types";
 
@@ -39,7 +39,50 @@ export function db(): Sqlite {
   return (globalThis.__serverGuyDb ??= createDatabase());
 }
 
+function tableExists(database: Sqlite, table: string) {
+  return Boolean(
+    database
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(table),
+  );
+}
+
+function columnExists(database: Sqlite, table: string, column: string) {
+  return (
+    database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  ).some((item) => item.name === column);
+}
+
+function migrateLegacySessionNames(database: Sqlite) {
+  if (tableExists(database, "sessions") && !tableExists(database, "operator_sessions")) {
+    database.exec("ALTER TABLE sessions RENAME TO operator_sessions");
+  }
+  if (
+    tableExists(database, "messages") &&
+    columnExists(database, "messages", "session_id") &&
+    !columnExists(database, "messages", "operator_session_id")
+  ) {
+    database.exec("ALTER TABLE messages RENAME COLUMN session_id TO operator_session_id");
+  }
+}
+
+function migrateLegacyDecisions(database: Sqlite) {
+  if (!tableExists(database, "decisions")) return;
+  database.exec(`
+    INSERT OR IGNORE INTO decision_records
+      (id, workspace_id, operator_session_id, kind, label, value, created_at, updated_at)
+    SELECT id, workspace_id, session_id, 'launch-priority', label, value, created_at, updated_at
+    FROM decisions
+    WHERE session_id IS NOT NULL
+      AND source = 'chat'
+      AND key LIKE 'launch_priority%';
+
+    DROP TABLE decisions;
+  `);
+}
+
 function migrate(database: Sqlite) {
+  migrateLegacySessionNames(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
@@ -68,7 +111,7 @@ function migrate(database: Sqlite) {
       FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS sessions (
+    CREATE TABLE IF NOT EXISTS operator_sessions (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -81,27 +124,25 @@ function migrate(database: Sqlite) {
 
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
+      operator_session_id TEXT NOT NULL,
       role TEXT NOT NULL,
       body TEXT NOT NULL,
       source TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+      FOREIGN KEY(operator_session_id) REFERENCES operator_sessions(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS decisions (
+    CREATE TABLE IF NOT EXISTS decision_records (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
-      session_id TEXT,
-      key TEXT NOT NULL,
+      operator_session_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
       label TEXT NOT NULL,
       value TEXT NOT NULL,
-      source TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      UNIQUE(workspace_id, key),
       FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE,
-      FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE SET NULL
+      FOREIGN KEY(operator_session_id) REFERENCES operator_sessions(id) ON DELETE RESTRICT
     );
 
     CREATE TABLE IF NOT EXISTS observations (
@@ -144,10 +185,12 @@ function migrate(database: Sqlite) {
       FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
     );
 
-    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(operator_session_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_decision_records_workspace ON decision_records(workspace_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_observations_workspace ON observations(workspace_id, observed_at DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_workspace ON activity_events(workspace_id, created_at DESC);
   `);
+  migrateLegacyDecisions(database);
 }
 
 function mapApplication(row: Record<string, unknown>): ApplicationRecord {
@@ -179,25 +222,25 @@ function mapWorkspace(row: Record<string, unknown>): PhaseWorkspace {
   };
 }
 
-function mapSession(row: Record<string, unknown>): ChatSession {
+function mapSession(row: Record<string, unknown>): OperatorSession {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
     title: row.title as string,
     isPrimary: Boolean(row.is_primary),
-    status: row.status as ChatSession["status"],
+    status: row.status as OperatorSession["status"],
     createdAt: row.created_at as string,
     resolvedAt: (row.resolved_at as string | null) ?? null,
   };
 }
 
-function mapMessage(row: Record<string, unknown>): ChatMessage {
+function mapMessage(row: Record<string, unknown>): OperatorMessage {
   return {
     id: row.id as string,
-    sessionId: row.session_id as string,
-    role: row.role as ChatMessage["role"],
+    operatorSessionId: row.operator_session_id as string,
+    role: row.role as OperatorMessage["role"],
     body: row.body as string,
-    source: row.source as ChatMessage["source"],
+    source: row.source as OperatorMessage["source"],
     createdAt: row.created_at as string,
   };
 }
@@ -206,11 +249,10 @@ function mapDecision(row: Record<string, unknown>): DecisionRecord {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
-    sessionId: (row.session_id as string | null) ?? null,
-    key: row.key as string,
+    operatorSessionId: row.operator_session_id as string,
+    kind: row.kind as DecisionRecord["kind"],
     label: row.label as string,
     value: row.value as string,
-    source: row.source as DecisionRecord["source"],
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -348,139 +390,102 @@ export function updateWorkspaceStatus(id: string, status: PhaseWorkspace["status
   );
 }
 
-export function insertSession(
+export function insertOperatorSession(
   workspaceId: string,
   title: string,
   isPrimary = false,
-): ChatSession {
+): OperatorSession {
   const id = randomUUID();
   const now = new Date().toISOString();
   db().prepare(
-    `INSERT INTO sessions (id, workspace_id, title, is_primary, status, created_at)
+    `INSERT INTO operator_sessions (id, workspace_id, title, is_primary, status, created_at)
      VALUES (?, ?, ?, ?, 'active', ?)`,
   ).run(id, workspaceId, title, isPrimary ? 1 : 0, now);
-  return getSession(id)!;
+  return getOperatorSession(id)!;
 }
 
-export function getSession(id: string): ChatSession | null {
-  const row = db().prepare("SELECT * FROM sessions WHERE id = ?").get(id) as
+export function getOperatorSession(id: string): OperatorSession | null {
+  const row = db().prepare("SELECT * FROM operator_sessions WHERE id = ?").get(id) as
     | Record<string, unknown>
     | undefined;
   return row ? mapSession(row) : null;
 }
 
-export function listSessions(workspaceId: string): ChatSession[] {
+export function listOperatorSessions(workspaceId: string): OperatorSession[] {
   return (
     db()
-      .prepare("SELECT * FROM sessions WHERE workspace_id = ? ORDER BY created_at ASC")
+      .prepare("SELECT * FROM operator_sessions WHERE workspace_id = ? ORDER BY created_at ASC")
       .all(workspaceId) as Record<string, unknown>[]
   ).map(mapSession);
 }
 
-export function resolveSession(id: string) {
-  db().prepare("UPDATE sessions SET status = 'resolved', resolved_at = ? WHERE id = ?").run(
+export function resolveOperatorSession(id: string) {
+  db().prepare("UPDATE operator_sessions SET status = 'resolved', resolved_at = ? WHERE id = ?").run(
     new Date().toISOString(),
     id,
   );
 }
 
 export function insertMessage(
-  sessionId: string,
-  role: ChatMessage["role"],
+  operatorSessionId: string,
+  role: OperatorMessage["role"],
   body: string,
-  source: ChatMessage["source"],
-): ChatMessage {
+  source: OperatorMessage["source"],
+): OperatorMessage {
   const id = randomUUID();
   const now = new Date().toISOString();
   db().prepare(
-    "INSERT INTO messages (id, session_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(id, sessionId, role, body, source, now);
+    "INSERT INTO messages (id, operator_session_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(id, operatorSessionId, role, body, source, now);
   return mapMessage(
     db().prepare("SELECT * FROM messages WHERE id = ?").get(id) as Record<string, unknown>,
   );
 }
 
-export function listMessages(sessionId: string): ChatMessage[] {
+export function listMessages(operatorSessionId: string): OperatorMessage[] {
   return (
     db()
-      .prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC")
-      .all(sessionId) as Record<string, unknown>[]
+      .prepare("SELECT * FROM messages WHERE operator_session_id = ? ORDER BY created_at ASC, rowid ASC")
+      .all(operatorSessionId) as Record<string, unknown>[]
   ).map(mapMessage);
 }
 
-export function upsertDecision(input: {
+export function insertDecision(input: {
   workspaceId: string;
-  sessionId?: string | null;
-  key: string;
+  operatorSessionId: string;
+  kind: DecisionRecord["kind"];
   label: string;
   value: string;
-  source: DecisionRecord["source"];
-}) {
-  const existing = db()
-    .prepare("SELECT id, created_at FROM decisions WHERE workspace_id = ? AND key = ?")
-    .get(input.workspaceId, input.key) as { id: string; created_at: string } | undefined;
-  const now = new Date().toISOString();
-  if (existing) {
-    db().prepare(
-      `UPDATE decisions SET session_id = ?, label = ?, value = ?, source = ?, updated_at = ?
-       WHERE id = ?`,
-    ).run(input.sessionId ?? null, input.label, input.value, input.source, now, existing.id);
-    return;
-  }
-  db().prepare(
-    `INSERT INTO decisions
-      (id, workspace_id, session_id, key, label, value, source, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    randomUUID(),
-    input.workspaceId,
-    input.sessionId ?? null,
-    input.key,
-    input.label,
-    input.value,
-    input.source,
-    now,
-    now,
-  );
-}
-
-export function appendDecision(input: {
-  workspaceId: string;
-  sessionId?: string | null;
-  key: string;
-  label: string;
-  value: string;
-  source: DecisionRecord["source"];
 }) {
   const id = randomUUID();
   const now = new Date().toISOString();
   db().prepare(
-    `INSERT INTO decisions
-      (id, workspace_id, session_id, key, label, value, source, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO decision_records
+      (id, workspace_id, operator_session_id, kind, label, value, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.workspaceId,
-    input.sessionId ?? null,
-    `${input.key}:${id}`,
+    input.operatorSessionId,
+    input.kind,
     input.label,
     input.value,
-    input.source,
     now,
     now,
   );
+  return getDecision(id)!;
 }
 
 export function listDecisions(workspaceId: string): DecisionRecord[] {
   return (
     db()
-      .prepare("SELECT * FROM decisions WHERE workspace_id = ? ORDER BY created_at ASC")
+      .prepare("SELECT * FROM decision_records WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC")
       .all(workspaceId) as Record<string, unknown>[]
   ).map(mapDecision);
 }
 
 export function getDecision(id: string): DecisionRecord | null {
-  const row = db().prepare("SELECT * FROM decisions WHERE id = ?").get(id) as
+  const row = db().prepare("SELECT * FROM decision_records WHERE id = ?").get(id) as
     | Record<string, unknown>
     | undefined;
   return row ? mapDecision(row) : null;
@@ -565,12 +570,6 @@ export function listBlockers(workspaceId: string): BlockerRecord[] {
       .prepare("SELECT * FROM blockers WHERE workspace_id = ? ORDER BY required_before_phase, created_at")
       .all(workspaceId) as Record<string, unknown>[]
   ).map(mapBlocker);
-}
-
-export function resolveBlocker(workspaceId: string, key: string) {
-  db().prepare(
-    "UPDATE blockers SET status = 'resolved', resolved_at = ? WHERE workspace_id = ? AND key = ?",
-  ).run(new Date().toISOString(), workspaceId, key);
 }
 
 export function insertActivity(

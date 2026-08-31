@@ -39,16 +39,16 @@ export const PHASE_ONE_CHECKS = [
   },
   {
     key: "intent-prerequisites",
-    label: "Launch priorities and prerequisites recorded",
+    label: "Launch baseline and prerequisites recorded",
     definition:
-      "The product defaults and known provider/domain prerequisites are recorded with owners and resolution paths.",
+      "Server Guy's production baseline and the known provider/domain prerequisites are explicit, with owners and resolution paths.",
   },
 ] as const;
 
-export const PRODUCT_DEFAULTS = [
-  ["protect_database", "Protect database data", "Required for every production launch"],
-  ["minimize_downtime", "Minimize downtime", "Prefer changes that preserve availability"],
-  ["keep_cost_low", "Keep infrastructure cost low", "Use the smallest credible infrastructure"],
+export const PRODUCTION_BASELINE = [
+  { key: "protect-database", label: "Protect database data", rule: "Required for every production launch" },
+  { key: "minimize-downtime", label: "Minimize downtime", rule: "Prefer changes that preserve availability" },
+  { key: "keep-cost-low", label: "Keep infrastructure cost low", rule: "Use the smallest credible infrastructure" },
 ] as const;
 
 export const PREREQUISITES = [

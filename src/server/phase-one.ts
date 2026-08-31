@@ -1,16 +1,16 @@
 import {
-  appendDecision,
   getApplication,
   getApplicationByRepository,
   getLatestApplication,
   getObservation,
-  getSession,
+  getOperatorSession,
   getWorkspace,
   insertActivity,
   insertApplication,
+  insertDecision,
   insertMessage,
   insertObservation,
-  insertSession,
+  insertOperatorSession,
   insertWorkspace,
   latestObservation,
   listActivity,
@@ -18,13 +18,11 @@ import {
   listDecisions,
   listMessages,
   listObservations,
-  listSessions,
-  resolveBlocker,
-  resolveSession,
+  listOperatorSessions,
+  resolveOperatorSession,
   updateApplicationStatus,
   updateWorkspaceStatus,
   upsertBlocker,
-  upsertDecision,
   withTransaction,
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
@@ -33,12 +31,12 @@ import {
   APPROVAL_MODE_LABELS,
   PHASE_ONE_CHECKS,
   PREREQUISITES,
-  PRODUCT_DEFAULTS,
+  PRODUCTION_BASELINE,
 } from "./phase-one-spec";
 import type {
   CreateApplicationInput,
   GateCheck,
-  PhaseOneView,
+  PhaseOneOperatorView,
   PiDecision,
 } from "./types";
 
@@ -64,7 +62,7 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
         `A launch workspace already exists for this repository with ${APPROVAL_MODE_LABELS[existing.approvalMode]}. Open that workspace instead of replacing its permission policy.`,
       );
     }
-    return { view: getPhaseOneView(existing.id), created: false };
+    return { view: getPhaseOneOperatorView(existing.id), created: false };
   }
 
   const application = withTransaction(() => {
@@ -80,42 +78,7 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
       status: "phase-1",
     });
     const workspace = insertWorkspace(application.id);
-    const session = insertSession(workspace.id, "Launch Brief", true);
-
-    upsertDecision({
-      workspaceId: workspace.id,
-      sessionId: session.id,
-      key: "target_environment",
-      label: "Target environment",
-      value: "Production",
-      source: "launch-form",
-    });
-    upsertDecision({
-      workspaceId: workspace.id,
-      sessionId: session.id,
-      key: "approval_mode",
-      label: "Permission policy",
-      value: APPROVAL_MODE_LABELS[input.approvalMode],
-      source: "launch-form",
-    });
-    upsertDecision({
-      workspaceId: workspace.id,
-      sessionId: session.id,
-      key: "approval_scope",
-      label: "Permission scope",
-      value: "Current application launch",
-      source: "launch-form",
-    });
-
-    for (const [key, label, value] of PRODUCT_DEFAULTS) {
-      upsertDecision({
-        workspaceId: workspace.id,
-        key,
-        label,
-        value,
-        source: "product-default",
-      });
-    }
+    const session = insertOperatorSession(workspace.id, "Launch Brief", true);
 
     for (const prerequisite of PREREQUISITES) {
       upsertBlocker({
@@ -141,7 +104,7 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
   });
 
   await observeRepository(application.id);
-  return { view: getPhaseOneView(application.id), created: true };
+  return { view: getPhaseOneOperatorView(application.id), created: true };
 }
 
 export async function observeRepository(applicationId: string) {
@@ -206,16 +169,13 @@ function computeChecks(applicationId: string): GateCheck[] {
   if (!application) return [];
   const workspace = getWorkspace(application.id);
   if (!workspace) return [];
-  const decisions = listDecisions(workspace.id);
-  const decisionByKey = new Map(decisions.map((decision) => [decision.key, decision]));
   const repository = latestObservation(workspace.id, "github-repository-identity");
   const authority = latestObservation(workspace.id, "authority-context");
   const blockers = listBlockers(workspace.id);
-  const prioritiesRecorded = PRODUCT_DEFAULTS.every(([key]) => decisionByKey.has(key));
   const prerequisitesRecorded = PREREQUISITES.every(({ key }) => blockers.some((item) => item.key === key));
 
   const intentSources = [
-    ...PRODUCT_DEFAULTS.map(([key]) => decisionByKey.get(key)?.updatedAt ?? null),
+    application.createdAt,
     ...PREREQUISITES.map(({ key }) => blockers.find((blocker) => blocker.key === key)?.createdAt ?? null),
   ].filter((value): value is string => Boolean(value));
   const intentRecordedAt = intentSources.sort().at(-1) ?? null;
@@ -239,39 +199,32 @@ function computeChecks(applicationId: string): GateCheck[] {
       canRerun: true,
     },
     "target-environment": {
-      status: decisionByKey.has("target_environment") ? "passed" : "not-yet",
-      result: decisionByKey.get("target_environment")?.value ?? "Choose a target environment.",
-      sourceLabel: "Launch decision",
-      sourceUrl: decisionByKey.get("target_environment")
-        ? `/api/decisions/${decisionByKey.get("target_environment")!.id}`
-        : null,
+      status: "passed",
+      result: "Production",
+      sourceLabel: "Application record",
+      sourceUrl: `/api/applications/${application.id}`,
       observationId: null,
-      observedAt: decisionByKey.get("target_environment")?.updatedAt ?? null,
+      observedAt: application.createdAt,
       canRerun: false,
     },
     "approval-authority": {
-      status:
-        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope") && authority
-          ? "passed"
-          : "not-yet",
+      status: authority ? "passed" : "not-yet",
       result:
-        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope") && authority
-          ? `${decisionByKey.get("approval_mode")!.value} · ${decisionByKey.get("approval_scope")!.value}. ${authority.summary}`
+        authority
+          ? `${APPROVAL_MODE_LABELS[application.approvalMode]} · ${application.approvalScope}. ${authority.summary}`
           : "Choose how Pi should ask for permission and record the access currently available.",
-      sourceLabel: "Permission decision",
-      sourceUrl: decisionByKey.get("approval_mode")
-        ? `/api/decisions/${decisionByKey.get("approval_mode")!.id}`
-        : null,
+      sourceLabel: "Application permission policy",
+      sourceUrl: `/api/applications/${application.id}`,
       observationId: authority?.id ?? null,
-      observedAt: authority?.observedAt ?? decisionByKey.get("approval_mode")?.updatedAt ?? null,
+      observedAt: authority?.observedAt ?? application.createdAt,
       canRerun: false,
     },
     "intent-prerequisites": {
-      status: prioritiesRecorded && prerequisitesRecorded ? "passed" : "not-yet",
+      status: prerequisitesRecorded ? "passed" : "not-yet",
       result:
-        prioritiesRecorded && prerequisitesRecorded
-          ? `${PRODUCT_DEFAULTS.map(([, label]) => label).join(", ")}. ${PREREQUISITES.length} later prerequisites are recorded with owners and resolution paths.`
-          : "Launch priorities or prerequisites are incomplete.",
+        prerequisitesRecorded
+          ? `${PRODUCTION_BASELINE.map(({ label }) => label).join(", ")}. ${PREREQUISITES.length} later prerequisites are recorded with owners and resolution paths.`
+          : "The production baseline or later prerequisites are incomplete.",
       sourceLabel: "Launch record",
       sourceUrl: `/api/applications/${application.id}`,
       observationId: null,
@@ -294,7 +247,10 @@ function refreshCompletion(applicationId: string) {
   updateApplicationStatus(applicationId, complete ? "phase-1-ready" : "phase-1");
 }
 
-export function getPhaseOneView(applicationId?: string, sessionId?: string): PhaseOneView {
+export function getPhaseOneOperatorView(
+  applicationId?: string,
+  sessionId?: string,
+): PhaseOneOperatorView {
   const application = applicationId ? getApplication(applicationId) : getLatestApplication();
   if (!application) {
     return {
@@ -314,7 +270,7 @@ export function getPhaseOneView(applicationId?: string, sessionId?: string): Pha
 
   const workspace = getWorkspace(application.id);
   if (!workspace) throw new Error("Phase 1 workspace not found.");
-  const sessions = listSessions(workspace.id);
+  const sessions = listOperatorSessions(workspace.id);
   const requested = sessionId ? sessions.find((session) => session.id === sessionId) : null;
   const active =
     requested ??
@@ -338,60 +294,49 @@ export function getPhaseOneView(applicationId?: string, sessionId?: string): Pha
   };
 }
 
-export function createChat(applicationId: string, title?: string) {
+export function createOperatorSession(applicationId: string, title?: string) {
   const application = getApplication(applicationId);
   if (!application) throw new Error("Application not found.");
   const workspace = getWorkspace(application.id);
   if (!workspace) throw new Error("Phase 1 workspace not found.");
-  const chatNumber = listSessions(workspace.id).length + 1;
-  const session = insertSession(workspace.id, title?.trim() || `Launch question ${chatNumber}`);
+  const sessionNumber = listOperatorSessions(workspace.id).length + 1;
+  const session = insertOperatorSession(
+    workspace.id,
+    title?.trim() || `Launch question ${sessionNumber}`,
+  );
   insertMessage(
     session.id,
     "assistant",
-    "This is a separate chat for the same Launch Brief. I can see the shared record and checks, but this transcript starts fresh.",
+    "This is a separate conversation for the same Launch Brief. I can see the shared record and checks, but this transcript starts fresh.",
     "server-guy",
   );
-  insertActivity(workspace.id, "chat-created", "Phase chat created", session.title);
-  return getPhaseOneView(application.id, session.id);
+  insertActivity(workspace.id, "operator-session-created", "Operator Session created", session.title);
+  return getPhaseOneOperatorView(application.id, session.id);
 }
 
-export function archiveChat(applicationId: string, sessionId: string) {
+export function archiveOperatorSession(applicationId: string, sessionId: string) {
   const application = getApplication(applicationId);
-  const session = getSession(sessionId);
+  const session = getOperatorSession(sessionId);
   const workspace = application ? getWorkspace(application.id) : null;
   if (!application || !session || !workspace || session.workspaceId !== workspace.id) {
-    throw new Error("Chat not found.");
+    throw new Error("Operator Session not found.");
   }
   if (session.isPrimary) throw new Error("The main Launch Brief chat stays with Phase 1.");
-  resolveSession(session.id);
-  insertActivity(workspace.id, "chat-archived", "Phase chat archived", session.title);
-  return getPhaseOneView(application.id);
+  resolveOperatorSession(session.id);
+  insertActivity(workspace.id, "operator-session-archived", "Operator Session archived", session.title);
+  return getPhaseOneOperatorView(application.id);
 }
 
 function decisionLabel(decision: PiDecision) {
-  return {
-    launch_priority: "Additional launch priority",
-    domain_starting_state: "Domain starting state",
-  }[decision.key];
+  return { "launch-priority": "Additional launch priority" }[decision.kind];
 }
 
-function displayDecisionValue(decision: PiDecision) {
-  if (decision.key === "domain_starting_state") {
-    return ({
-      "already-owned": "Domain already owned",
-      "needs-acquisition": "Domain needs acquisition",
-      unknown: "Unknown",
-    } as Record<string, string>)[decision.value] ?? decision.value;
-  }
-  return decision.value;
-}
-
-export async function sendChatMessage(applicationId: string, sessionId: string, body: string) {
+export async function sendOperatorMessage(applicationId: string, sessionId: string, body: string) {
   const application = getApplication(applicationId);
   const workspace = application ? getWorkspace(application.id) : null;
-  const session = getSession(sessionId);
+  const session = getOperatorSession(sessionId);
   if (!application || !workspace || !session || session.workspaceId !== workspace.id) {
-    throw new Error("Chat not found.");
+    throw new Error("Operator Session not found.");
   }
   if (session.status !== "active") throw new Error("This chat is archived.");
   const userMessage = body.trim();
@@ -425,28 +370,23 @@ export async function sendChatMessage(applicationId: string, sessionId: string, 
     for (const decision of reply.decisions) {
       const input = {
         workspaceId: workspace.id,
-        sessionId: session.id,
-        key: decision.key,
+        operatorSessionId: session.id,
+        kind: decision.kind,
         label: decisionLabel(decision),
-        value: displayDecisionValue(decision),
-        source: "chat" as const,
+        value: decision.value,
       };
-      if (decision.key === "launch_priority") appendDecision(input);
-      else upsertDecision(input);
-      if (decision.key === "domain_starting_state" && decision.value !== "unknown") {
-        resolveBlocker(workspace.id, "domain-starting-state");
-      }
+      insertDecision(input);
       insertActivity(
         workspace.id,
         "decision-recorded",
-        "Decision recorded from chat",
-        `${decisionLabel(decision)}: ${displayDecisionValue(decision)}`,
+        "Decision recorded from Operator Session",
+        `${decisionLabel(decision)}: ${decision.value}`,
       );
     }
   });
 
   refreshCompletion(application.id);
-  return getPhaseOneView(application.id, session.id);
+  return getPhaseOneOperatorView(application.id, session.id);
 }
 
 export function getObservationForApplication(applicationId: string, observationId: string) {

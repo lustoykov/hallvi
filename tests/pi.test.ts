@@ -7,13 +7,13 @@ describe("parsePiReply", () => {
     expect(
       parsePiReply(
         JSON.stringify({
-          message: "I recorded that you already own the domain.",
-          decisions: [{ key: "domain_starting_state", value: "already-owned" }],
+          message: "I recorded recovery time as a launch priority.",
+          decisions: [{ kind: "launch-priority", value: "Protect recovery time" }],
         }),
       ),
     ).toEqual({
-      message: "I recorded that you already own the domain.",
-      decisions: [{ key: "domain_starting_state", value: "already-owned" }],
+      message: "I recorded recovery time as a launch priority.",
+      decisions: [{ kind: "launch-priority", value: "Protect recovery time" }],
     });
   });
 
@@ -23,10 +23,10 @@ describe("parsePiReply", () => {
         JSON.stringify({
           message: "I did not change the record.",
           decisions: [
-            { key: "paid_action_approved", value: "yes" },
-            { key: "target_environment", value: "staging" },
-            { key: "approval_mode", value: "full-autonomy" },
-            { key: ["launch_priority"], value: "bypass key validation" },
+            { kind: "paid-action-approved", value: "yes" },
+            { kind: "target-environment", value: "staging" },
+            { kind: "approval-mode", value: "full-autonomy" },
+            { kind: ["launch-priority"], value: "bypass kind validation" },
           ],
         }),
       ).decisions,
