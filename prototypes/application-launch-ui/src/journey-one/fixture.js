@@ -181,11 +181,11 @@ export function buildScript({ mode, choices, outcomes }) {
       kind: "input",
       status: "Needs input",
       gate: ["current", "required", "required"],
-      pi: "Welcome. Before I touch anything I need the repository, the target environment, how you want me to ask for permission, and anything you care about. Read-only inspection is all I will do until those are explicit.",
+      pi: "Before I inspect anything, confirm the repository and target environment, choose when I should ask for approval, and select any launch priorities. I will only read the repository until this brief is complete.",
       card: {
         repo: identity.repo,
         environment: "Production",
-        intent: "Cost-sensitive · database data matters",
+        priorities: ["cost", "data"],
       },
       actions: [{ label: "Create application workspace", form: "start" }],
       resolvedLine: `Launch Brief recorded — ${identity.repo} · Production`,
@@ -193,7 +193,7 @@ export function buildScript({ mode, choices, outcomes }) {
         record: [
           fact("Repository", identity.repo, "Engineer input"),
           fact("Environment", "Production", "Engineer input"),
-          fact("Operating intent", "Cost-sensitive · database data matters", "Engineer brief"),
+          fact("Launch priorities", "Keep costs low · protect database data", "Engineer brief"),
         ],
       },
       detailsTab: "record",
