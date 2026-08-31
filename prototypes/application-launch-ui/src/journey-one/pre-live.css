@@ -40,3 +40,16 @@
   border-left: 2px solid var(--green);
   opacity: .5;
 }
+
+/* the setup group's left boundary: a dashed divider between phases 4 and 5,
+   matching the band's dash vocabulary (the green solid divider before phase 8
+   stays reserved for the live threshold) */
+.phase-rail .rail-phase:nth-child(5) { position: relative; }
+.phase-rail .rail-phase:nth-child(5)::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 6px;
+  bottom: 6px;
+  border-left: 2px dashed var(--line-strong);
+}
