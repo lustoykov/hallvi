@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  InputDecisionPresentation,
+  ReviewProposalPresentation,
+} from "./InputReviewPresentations.jsx";
+import {
+  ApprovalPresentation,
+  InterventionPresentation,
+  OperationPresentation,
+} from "./ApprovalOperationInterventionPresentations.jsx";
+import {
+  HandoffPresentation,
+  OutcomePresentation,
+} from "./OutcomeHandoffPresentations.jsx";
+import {
   CheckList,
   CommandResult,
   ConfigDiff,
@@ -9,10 +22,24 @@ import {
   ProviderReceipt,
   PullRequestCard,
 } from "./DeveloperRenderers.jsx";
-import { ReconciliationPresentation, SourceLink } from "./ReconciliationPrimitives.jsx";
+import {
+  OperationGraph,
+  ReconciliationSummary,
+  SourceLink,
+} from "./ReconciliationPrimitives.jsx";
 import { families, getScenario } from "./reconciliationScenarios.js";
 
 const phases = ["Start", "Understand", "Conform", "See launch", "VPS", "Domain", "Operations", "Go live", "Handoff"];
+
+const familyComponents = {
+  input: InputDecisionPresentation,
+  review: ReviewProposalPresentation,
+  approval: ApprovalPresentation,
+  operation: OperationPresentation,
+  intervention: InterventionPresentation,
+  outcome: OutcomePresentation,
+  handoff: HandoffPresentation,
+};
 
 function readInitialState() {
   const params = new URLSearchParams(window.location.search);
@@ -29,12 +56,12 @@ function StatusDot({ tone = "blue" }) {
 
 function PrototypeBar({ familyId, onChange }) {
   return (
-    <div className="prototype-bar" aria-label="Prototype reconciliation state selector">
+    <div className="prototype-bar" aria-label="Prototype component selector">
       <div className="prototype-title">
-        <strong>Journey 01 reconciliation catalog</strong>
-        <span>7 composition examples · granular primitives · fixed workspace</span>
+        <strong>Journey 01 component catalog</strong>
+        <span>7 task-specific cards · granular under-the-hood inspector</span>
       </div>
-      <div className="prototype-family-list" role="tablist" aria-label="Reconciliation state">
+      <div className="prototype-family-list" role="tablist" aria-label="Presentation family">
         {families.map((family) => (
           <button
             className={family.id === familyId ? "prototype-family is-selected" : "prototype-family"}
@@ -107,18 +134,19 @@ function AppHeader({ current, approvalMode, onModeChange }) {
   );
 }
 
-function ChatSurface({ current, selectedNodeId, onSelectNode, selectedSession, records, onOpenInspector, onRecord, selectedChoice }) {
+function ChatSurface({ current, selectedSession, records, onOpenInspector, onRecord, selectedChoice }) {
+  const Presentation = familyComponents[current.id];
   const sessionTitle = selectedSession === "launch" ? "Launch northstar.dev" : selectedSession === "cost" ? "Cost and ownership" : "Untitled session";
   return (
     <main className="chat-surface">
       <div className="chat-header"><span><strong>{sessionTitle}</strong><small>Chat with Pi · primary collaboration surface</small></span><div><button onClick={() => onOpenInspector("evidence")}>Evidence</button><button>Archive</button></div></div>
-      <div className="work-target"><span>Reconciling toward</span><strong>{current.deliverable}</strong><em>{current.status}</em></div>
+      <div className="work-target"><span>Pi is working toward</span><strong>{current.deliverable}</strong><em>{current.status}</em></div>
       <div className="conversation-scroll">
         <article className="message-row">
           <span className="avatar pi-avatar">Pi</span>
           <div className="message-content"><header><strong>Pi</strong><time>just now</time></header><p>{current.piCopy}</p></div>
         </article>
-        <ReconciliationPresentation scenario={current} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} onOpenInspector={onOpenInspector} onRecord={onRecord} selectedChoice={selectedChoice} />
+        <Presentation onOpenInspector={onOpenInspector} onRecord={onRecord} selectedChoice={selectedChoice} />
         {records.map((record, index) => (
           <div className="recorded-message" key={`${record}-${index}`}><StatusDot tone="green" /><span><strong>Recorded in Operator Record</strong>{record}</span><button onClick={() => onOpenInspector("record")}>Details</button></div>
         ))}
@@ -132,29 +160,29 @@ function ChatSurface({ current, selectedNodeId, onSelectNode, selectedSession, r
   );
 }
 
-function Inspector({ current, selectedNode, tab, onTabChange, onRecord }) {
+function Inspector({ current, selectedNode, selectedNodeId, onSelectNode, tab, onTabChange, onRecord }) {
   return (
     <aside className="inspector">
       <div className="inspector-header"><strong>Inspector</strong><nav>{["record", "changes", "evidence"].map((item) => <button key={item} className={tab === item ? "is-active" : ""} onClick={() => onTabChange(item)}>{item}</button>)}</nav></div>
       <div className="inspector-scroll">
-        {tab === "record" && <RecordPanel current={current} selectedNode={selectedNode} onRecord={onRecord} />}
-        {tab === "changes" && <ChangesPanel current={current} selectedNode={selectedNode} onTabChange={onTabChange} onRecord={onRecord} />}
+        {tab === "record" && <RecordPanel current={current} onRecord={onRecord} />}
+        {tab === "changes" && <ChangesPanel current={current} selectedNode={selectedNode} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} onTabChange={onTabChange} onRecord={onRecord} />}
         {tab === "evidence" && <EvidencePanel current={current} selectedNode={selectedNode} onRecord={onRecord} />}
       </div>
     </aside>
   );
 }
 
-function RecordPanel({ current, selectedNode, onRecord }) {
+function RecordPanel({ current, onRecord }) {
   return (
     <>
-      <section className="record-summary"><div><StatusDot tone={current.status === "Healthy" ? "green" : current.status === "Blocked" ? "orange" : "blue"} /><strong>{current.deliverable}</strong></div><p>{current.headline}</p><small>{current.state} · current state is recomputed from desired state and fresh observations.</small></section>
+      <section className="record-summary"><div><StatusDot tone={current.status === "Healthy" ? "green" : current.status === "Blocked" ? "orange" : "blue"} /><strong>{current.deliverable}</strong></div><p>{current.state} · {current.label}</p><small>Current result is recomputed from the linked source and evidence.</small></section>
       <section className="inspector-card">
-        <header><strong>Selected graph node</strong><span>{selectedNode.number} / 08</span></header>
-        <dl className="record-list"><div><dt>Operation</dt><dd>{selectedNode.title}</dd></div><div><dt>Control</dt><dd>{selectedNode.kind === "deterministic" ? "Deterministic rule" : selectedNode.kind === "judgment" ? "Pi judgment point" : "External coding agent"}</dd></div><div><dt>Actor</dt><dd>{selectedNode.owner}</dd></div><div><dt>External effect</dt><dd>{selectedNode.effect}</dd></div><div><dt>Depends on</dt><dd>{selectedNode.dependencies}</dd></div></dl>
-        <footer><button onClick={() => onRecord(`Ask Pi to explain ${selectedNode.title}.`)}>Ask Pi to explain</button><button onClick={() => onRecord(`Take engineer control of ${selectedNode.title}.`)}>Take control</button></footer>
+        <header><strong>Decision record</strong><span>From chat</span></header>
+        <dl className="record-list"><div><dt>Environment</dt><dd>Production</dd></div><div><dt>Approval mode</dt><dd>Pi Decides</dd></div><div><dt>Infrastructure</dt><dd>Hetzner + Cloudflare</dd></div><div><dt>Operating intent</dt><dd>Cost-sensitive · preserve data</dd></div></dl>
+        <footer><button onClick={() => onRecord("The operator asked Pi to revise the current decision.")}>Ask Pi to revise</button><button>Open source</button></footer>
       </section>
-      <section className="inspector-card compact"><header><strong>Reconciliation rule</strong><span>Why this node exists</span></header><p>{selectedNode.summary}</p><div className="control-grid"><button onClick={() => onRecord(`Change desired state affecting ${selectedNode.title}.`)}>Change intent</button><button onClick={() => onRecord(`Refresh observations for ${selectedNode.title}.`)}>Refresh state</button><button onClick={() => onRecord(`Re-plan from ${selectedNode.title}.`)}>Re-plan</button></div></section>
+      <section className="inspector-card compact"><header><strong>Current control point</strong><span>{current.state}</span></header><p>You can let Pi continue, inspect the underlying source, or take over and re-run verification.</p><div className="control-grid"><button>Ask Pi</button><button>Take control</button><button>Re-verify</button></div></section>
     </>
   );
 }
@@ -169,7 +197,7 @@ function OperationPlanCard({ node, onOpenEvidence }) {
   );
 }
 
-function ChangesPanel({ current, selectedNode, onTabChange, onRecord }) {
+function ChangesPanel({ current, selectedNode, selectedNodeId, onSelectNode, onTabChange, onRecord }) {
   const openPullRequest = () => onRecord("Opened Pull Request #42 in the external repository review surface.");
   const openDiff = () => onRecord("Opened the complete configuration diff from the selected operation.");
   const openEvidence = () => onTabChange("evidence");
@@ -183,7 +211,18 @@ function ChangesPanel({ current, selectedNode, onTabChange, onRecord }) {
   } else {
     renderers = <><ConfigDiff onOpen={openDiff} /><ProviderReceipt status={current.id === "outcome" ? "Applied" : "Observed"} onOpen={openEvidence} /><CommandResult status={current.id === "outcome" ? "Verified" : "Ready"} onOpen={openEvidence} /></>;
   }
-  return <><OperationPlanCard node={selectedNode} onOpenEvidence={openEvidence} />{renderers}</>;
+  return (
+    <>
+      <section className="inspector-card under-the-hood-intro">
+        <header><strong>Under the hood</strong><span>Secondary operational detail</span></header>
+        <p>The task-specific card stays primary. Open this layer to inspect how desired state, fresh observations, and deterministic operations support it.</p>
+      </section>
+      <ReconciliationSummary desired={current.desired} observed={current.observed} deltas={current.deltas} onOpen={onTabChange} />
+      <OperationGraph nodes={current.nodes} selectedNodeId={selectedNodeId} onSelect={onSelectNode} />
+      <OperationPlanCard node={selectedNode} onOpenEvidence={openEvidence} />
+      {renderers}
+    </>
+  );
 }
 
 function EvidencePanel({ current, selectedNode, onRecord }) {
@@ -241,8 +280,8 @@ export function CatalogPrototype() {
         <section className="workspace">
           <AppHeader current={current} approvalMode={approvalMode} onModeChange={setApprovalMode} />
           <div className="workspace-body">
-            <ChatSurface current={current} selectedNodeId={selectedNode.id} onSelectNode={setSelectedNodeId} selectedSession={selectedSession} records={records} onOpenInspector={setTab} onRecord={record} selectedChoice={selectedChoice} />
-            <Inspector current={current} selectedNode={selectedNode} tab={tab} onTabChange={setTab} onRecord={record} />
+            <ChatSurface current={current} selectedSession={selectedSession} records={records} onOpenInspector={setTab} onRecord={record} selectedChoice={selectedChoice} />
+            <Inspector current={current} selectedNode={selectedNode} selectedNodeId={selectedNode.id} onSelectNode={setSelectedNodeId} tab={tab} onTabChange={setTab} onRecord={record} />
           </div>
         </section>
       </div>
