@@ -5,7 +5,7 @@ final result: passed
 ## Comparison target
 
 - Last accepted simplified UI: `qa/implementation-deliverables-L6.3.jpg`
-- Product-state source: `../../docs/user-journeys/01-application-launch-ui-map.md`
+- Product-state source: `../../docs/user-journeys/01-application-launch.md`
 - Updated default UI: `qa/implementation-control-links-L6.3.png`
 - Control Point detail: `qa/implementation-control-point-L2.2.png`
 - Same-state comparison: `qa/comparison-control-links-L6.3.jpg`

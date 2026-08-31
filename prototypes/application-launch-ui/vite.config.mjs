@@ -9,6 +9,7 @@ export default defineConfig({
         main: "index.html",
         componentCatalog: "prototype-building-blocks.html",
         journeyV2: "journey-v2.html",
+        journeyOne: "journey-1.html",
       },
     },
   },

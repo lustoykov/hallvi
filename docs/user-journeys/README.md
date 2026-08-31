@@ -12,11 +12,7 @@ The five journeys are deliberately separate because **Application Launch**, rout
 | [04 — Collaborate through Codex](./04-codex-mcp-remediation.md) | Placeholder | Give Codex operational evidence and receive a reviewable Candidate Fix without copy-paste. |
 | [05 — Ship a routine Release](./05-routine-release.md) | Placeholder | Move an exact revision into production and verify it or return to the predecessor. |
 
-Journey 01 supporting artifacts:
-
-- [Operator UI state map](./01-application-launch-ui-map.md) — the 39 representative user-facing states.
-- [UI building-block catalog](./01-application-launch-ui-building-blocks.md) — the stable workspace, seven presentation families, technical renderers, and state coverage.
-- [Journey and UI diagrams](./diagrams/01-application-launch.html) — current Journey 01 flow visuals.
+Journey 1 is consolidated in the linked canonical document: product journey, 39-state presentation inventory, UI grammar, 40 Gate Checks, observability paths, phase-session behavior, and unresolved decision matrix. Its [journey and UI diagrams](./diagrams/01-application-launch.html) remain a visual companion.
 
 ## How to read these documents
 

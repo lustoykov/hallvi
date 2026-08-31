@@ -1,0 +1,479 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildScript, defaultChoices, defaultOutcomes, identity, outcomeSwitches } from "./fixture.js";
+import { Inspector, HeroOverlay } from "./Inspector.jsx";
+import {
+  blockingDecisionByBeat,
+  gateForBeat,
+  isGateSatisfied,
+  journeyOnePhases,
+  productDecisionsForPhase,
+  unresolvedProductDecisions,
+} from "./journeyOneModel.js";
+
+const MODES = ["Pi Decides", "Always Ask", "Full Autonomy"];
+
+function statusTone(status) {
+  if (!status) return "calm";
+  if (/verified/i.test(status)) return "verified";
+  if (/complete with gaps/i.test(status)) return "gaps";
+  if (/blocked/i.test(status)) return "blocked";
+  if (/reachable/i.test(status)) return "reachable";
+  if (/waiting/i.test(status)) return "waiting";
+  if (/approval/i.test(status)) return "approval";
+  if (/acting/i.test(status)) return "acting";
+  return "input";
+}
+
+function GateDots({ gate }) {
+  return (
+    <span className="gate-dots" aria-label="Exit gate checks">
+      {gate.map((state, index) => (
+        <i key={index} className={`gate-dot gate-${state}`} title={state} />
+      ))}
+    </span>
+  );
+}
+
+function PhaseRail({ current, gate, onOpenSession, journeyComplete }) {
+  return (
+    <nav className="phase-rail" aria-label="Application Launch phases">
+      {journeyOnePhases.map((phase) => {
+        const done = phase.id < current.id || (journeyComplete && phase.id === current.id);
+        const active = !journeyComplete && phase.id === current.id;
+        return (
+          <button key={phase.id} type="button" className={`rail-phase ${active ? "active" : ""} ${done ? "done" : ""}`} onClick={() => done && onOpenSession(phase.id)} disabled={!done && !active}>
+            <span className="rail-num">{done ? "✓" : phase.id}</span>
+            <span className="rail-copy">
+              <strong>{phase.short}</strong>
+              {active && <small>{phase.deliverable}</small>}
+            </span>
+            {active && <GateDots gate={gate} />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function StartCard({ card, mode, setMode }) {
+  const [intent, setIntent] = useState(card.intent);
+  return (
+    <div className="typed-card">
+      <div className="card-title">Launch Brief</div>
+      <div className="card-grid">
+        <label><span>Repository</span><input value={card.repo} readOnly /></label>
+        <label><span>Environment</span><input value={card.environment} readOnly /></label>
+        <label>
+          <span>Approval Mode</span>
+          <select value={mode} onChange={(event) => setMode(event.target.value)}>
+            {MODES.map((m) => <option key={m}>{m}</option>)}
+          </select>
+        </label>
+        <label><span>What matters to you</span><input value={intent} onChange={(event) => setIntent(event.target.value)} /></label>
+      </div>
+    </div>
+  );
+}
+
+function RowsCard({ card, onHero }) {
+  return (
+    <div className="typed-card">
+      <div className="card-title">{card.title}</div>
+      {card.cost && <div className="card-cost">{card.cost}</div>}
+      <dl className="card-rows">
+        {card.rows.map(([label, value]) => (
+          <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+        ))}
+      </dl>
+      {card.secondary && (
+        <button type="button" className="card-secondary-link" onClick={() => onHero(card.secondary.hero)}>
+          {card.secondary.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function OptionsCard({ card, onPick }) {
+  return (
+    <div className="typed-card">
+      <div className="card-title">{card.title}</div>
+      {card.brief && <p className="card-brief">{card.brief}</p>}
+      {card.rows && (
+        <dl className="card-rows">
+          {card.rows.map(([label, value]) => (
+            <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+          ))}
+        </dl>
+      )}
+      <div className="card-options">
+        {card.options.map((option) => (
+          <button key={option.label} type="button" className="option-button" onClick={() => onPick(option)}>
+            <strong>{option.label}</strong>
+            <small>{option.sub}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BeatBlock({ beat, isCurrent, rejected, mode, setMode, onAction, onPick, onReconsider, onDetails, onHero }) {
+  const tone = statusTone(beat.status);
+  const showCard = isCurrent && beat.card;
+  return (
+    <article className={`beat ${isCurrent ? "current" : "past"}`}>
+      <div className="beat-meta">
+        <span className="pi-avatar">Pi</span>
+        <strong>Pi</strong>
+        {beat.status && isCurrent && <em className={`status-chip tone-${tone}`}>{beat.status}</em>}
+        <button type="button" className="details-link" onClick={() => onDetails(beat)}>Details</button>
+      </div>
+      <p className="beat-text">{beat.pi}</p>
+
+      {showCard && beat.kind === "input" && <StartCard card={beat.card} mode={mode} setMode={setMode} />}
+      {showCard && (beat.kind === "task" || beat.kind === "approval") && !rejected && <RowsCard card={beat.card} onHero={onHero} />}
+      {showCard && (beat.kind === "choice" || beat.kind === "blocker") && beat.card.options && <OptionsCard card={beat.card} onPick={onPick} />}
+      {showCard && beat.kind === "blocker" && !beat.card.options && <RowsCard card={beat.card} onHero={onHero} />}
+
+      {isCurrent && rejected && (
+        <div className="rejected-note">
+          <strong>Rejected — no state changed.</strong> The proposal is preserved and nothing was executed.
+          <button type="button" onClick={onReconsider}>Reconsider proposal</button>
+        </div>
+      )}
+
+      {isCurrent && !rejected && beat.actions && (
+        <div className="beat-actions">
+          {beat.actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className={action.tone === "reject" ? "action-reject" : "action-primary"}
+              onClick={() => onAction(action)}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {isCurrent && !rejected && !beat.actions && !["final", "choice", "blocker"].includes(beat.kind) && (
+        <div className="beat-actions">
+          <button type="button" className="action-primary" onClick={() => onAction({ label: "Next" })}>Next</button>
+        </div>
+      )}
+
+      {!isCurrent && <div className="resolved-line"><i>✓</i>{beat.resolvedLine}</div>}
+    </article>
+  );
+}
+
+function ProductDecisionsOverlay({ relevant, onClose }) {
+  const relevantIds = new Set(relevant.map((decision) => decision.id));
+  return (
+    <div className="hero-backdrop" onMouseDown={onClose} role="presentation">
+      <section className="decision-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Unresolved product decisions">
+        <div className="hero-head">
+          <div><strong>Unresolved product decisions</strong><small>Preserved from the V1 acceptance pack · this UI does not choose them</small></div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <p className="decision-intro">Highlighted decisions can affect the phase you are viewing. All sixteen remain product-owner decisions.</p>
+        <div className="decision-list">
+          {Object.entries(unresolvedProductDecisions).map(([id, text]) => (
+            <div key={id} className={relevantIds.has(id) ? "relevant" : ""}>
+              <strong>{id}</strong><span>{text}</span>{relevantIds.has(id) && <em>Relevant now</em>}
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function JourneyOnePrototype() {
+  const [mode, setModeState] = useState("Pi Decides");
+  const [choices, setChoices] = useState(defaultChoices);
+  const [outcomes, setOutcomes] = useState(defaultOutcomes);
+  const [cursorId, setCursorId] = useState("start-input");
+  const [clicks, setClicks] = useState(0);
+  const [rejected, setRejected] = useState({});
+  const [extras, setExtras] = useState([]);
+  const [sidebar, setSidebar] = useState({ open: true, tab: "record", highlight: null });
+  const [hero, setHero] = useState(null);
+  const [showProductDecisions, setShowProductDecisions] = useState(false);
+  const [viewedPhaseId, setViewedPhaseId] = useState(null);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const chatRef = useRef(null);
+
+  const script = useMemo(() => buildScript({ mode, choices, outcomes }), [mode, choices, outcomes]);
+  const idx = Math.max(0, script.findIndex((b) => b.id === cursorId));
+  const allVisible = script.slice(0, idx + 1);
+  const current = script[idx];
+  const journeyComplete = current.id === "workspace";
+  const currentPhase = journeyOnePhases[current.phase - 1];
+  const currentGate = gateForBeat(current.id, current.phase, outcomes);
+  const displayPhaseId = viewedPhaseId && (viewedPhaseId < current.phase || journeyComplete) ? viewedPhaseId : current.phase;
+  const phase = journeyOnePhases[displayPhaseId - 1];
+  const visible = journeyComplete && !viewedPhaseId
+    ? [current]
+    : allVisible.filter((beat) => beat.phase === displayPhaseId && !(journeyComplete && viewedPhaseId === 9 && beat.id === "workspace"));
+  const displayBeat = visible.at(-1) || current;
+  const displayGate = gateForBeat(displayBeat.id, displayBeat.phase, outcomes);
+  const viewingArchived = Boolean(viewedPhaseId) && (displayPhaseId !== current.phase || journeyComplete);
+  const completedPhases = journeyOnePhases.filter((item) => item.id < current.phase || (journeyComplete && item.id === current.phase));
+  const relevantProductDecisions = [
+    ...productDecisionsForPhase(displayPhaseId),
+    ...visible.flatMap((beat) => beat.openDecisions),
+  ].filter((decision, index, all) => all.findIndex((item) => item.id === decision.id) === index);
+
+  useEffect(() => {
+    const el = chatRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+  }, [cursorId, extras.length, viewedPhaseId]);
+
+  function relocate(nextParams, preferredId) {
+    const nextScript = buildScript(nextParams);
+    const target = preferredId && nextScript.some((b) => b.id === preferredId) ? preferredId : null;
+    if (target) return setCursorId(target);
+    for (let i = idx; i >= 0; i -= 1) {
+      if (nextScript.some((b) => b.id === script[i].id)) return setCursorId(script[i].id);
+    }
+    setCursorId(nextScript[0].id);
+  }
+
+  function setMode(nextMode) {
+    relocate({ mode: nextMode, choices, outcomes }, cursorId);
+    setModeState(nextMode);
+  }
+
+  function resetPrototype() {
+    setChoices({ ...defaultChoices });
+    setOutcomes({ ...defaultOutcomes });
+    setCursorId("start-input");
+    setClicks(0);
+    setRejected({});
+    setExtras([]);
+    setModeState("Pi Decides");
+    setViewedPhaseId(null);
+    setSessionMenuOpen(false);
+    setShowProductDecisions(false);
+    setHero(null);
+    setSidebar({ open: true, tab: "record", highlight: null });
+  }
+
+  function setOutcome(key, raw) {
+    const value = raw === "true" ? true : raw === "false" ? false : raw;
+    const nextOutcomes = { ...outcomes, [key]: value };
+    const clear = { conformance: { worker: null }, dnsConflict: { conflictResolution: null }, restore: { restoreDecision: null } }[key] || {};
+    const nextChoices = { ...choices, ...clear };
+    const sw = outcomeSwitches.find((s) => s.key === key);
+    const rewindIdx = script.findIndex((b) => b.id === sw.rewindTo);
+    const preferred = idx >= rewindIdx && rewindIdx >= 0 ? sw.rewindTo : cursorId;
+    setOutcomes(nextOutcomes);
+    setChoices(nextChoices);
+    relocate({ mode, choices: nextChoices, outcomes: nextOutcomes }, preferred);
+  }
+
+  function advanceFrom(params) {
+    const nextScript = buildScript(params);
+    const here = nextScript.findIndex((b) => b.id === current.id);
+    const next = nextScript[Math.min(here + 1, nextScript.length - 1)];
+    if (next.phase > current.phase && !isGateSatisfied(currentGate)) {
+      const decisionId = blockingDecisionByBeat[current.id];
+      const reason = decisionId
+        ? `${decisionId} is still unresolved: ${unresolvedProductDecisions[decisionId]}`
+        : "The current Exit Gate is not satisfied.";
+      setExtras((all) => [
+        ...all,
+        { phase: current.phase, after: current.id, actor: "Pi", text: `${reason} I will not open the next phase session yet.` },
+      ]);
+      return;
+    }
+    setViewedPhaseId(null);
+    setSessionMenuOpen(false);
+    setCursorId(next.id);
+  }
+
+  function doAction(action) {
+    setClicks((n) => n + 1);
+    if (action.tone === "reject") {
+      setRejected((r) => ({ ...r, [current.id]: true }));
+      return;
+    }
+    advanceFrom({ mode, choices, outcomes });
+  }
+
+  function pickOption(option) {
+    setClicks((n) => n + 1);
+    const nextChoices = { ...choices, ...option.set };
+    setChoices(nextChoices);
+    advanceFrom({ mode, choices: nextChoices, outcomes });
+  }
+
+  function reconsider() {
+    setRejected((r) => ({ ...r, [current.id]: false }));
+  }
+
+  function openDetails(beat) {
+    setSidebar({ open: true, tab: beat.detailsTab || "record", highlight: beat.id });
+  }
+
+  function askPiAboutCheck(check) {
+    setViewedPhaseId(null);
+    setExtras((all) => [
+      ...all,
+      { phase: current.phase, after: current.id, actor: "You", text: `Explain ${check.id} and help me satisfy it.`, isDecision: false },
+      { phase: current.phase, after: current.id, actor: "Pi", text: `${check.label}: ${check.satisfies} I would now inspect the linked source and evidence, then propose the smallest next action.` },
+    ]);
+  }
+
+  function submitChat(event) {
+    event.preventDefault();
+    const field = event.target.elements.msg;
+    const text = field.value.trim();
+    if (!text) return;
+    const isQuestion = /[?？]\s*$/.test(text);
+    setExtras((all) => [
+      ...all,
+      { phase: current.phase, after: current.id, actor: "You", text, isDecision: !isQuestion },
+      {
+        phase: current.phase,
+        after: current.id,
+        actor: "Pi",
+        text: isQuestion
+          ? "Good question — this mock can’t reason, but the real Pi would answer from the record. The relevant evidence is in the sidebar."
+          : "Noted. In the product this becomes a Decision Record with provenance; here I’ve reflected it into the sidebar record.",
+        recorded: !isQuestion,
+      },
+    ]);
+    field.value = "";
+  }
+
+  const userDecisions = extras
+    .filter((message) => message.phase === displayPhaseId && message.actor === "You" && message.isDecision)
+    .map((message) => message.text);
+
+  return (
+    <div className="vertical-shell">
+      <div className="chrome-bar" aria-label="Prototype-only controls">
+        <strong>Journey 1 · canonical UI</strong>
+        {outcomeSwitches.map((sw) => (
+          <label key={sw.key}>
+            <span>{sw.label}</span>
+            <select value={String(outcomes[sw.key])} onChange={(event) => setOutcome(sw.key, event.target.value)}>
+              {sw.values.map(([value, label]) => <option key={String(value)} value={String(value)}>{label}</option>)}
+            </select>
+          </label>
+        ))}
+        <span className="click-counter">clicks {clicks}</span>
+        <button type="button" onClick={resetPrototype}>Reset</button>
+      </div>
+
+      <header className="vertical-header">
+        <div className="app-identity">
+          <span className="brand-mark">SG</span>
+          <div><h1>{identity.application}</h1><p>Production · <strong>Application Launch</strong></p></div>
+        </div>
+        <div className="header-right">
+          <button type="button" className="open-decisions-badge" onClick={() => setShowProductDecisions(true)}>
+            16 unresolved product decisions
+          </button>
+          <label className="mode-select">
+            <span>Approval Mode</span>
+            <select value={mode} onChange={(event) => setMode(event.target.value)}>
+              {MODES.map((m) => <option key={m}>{m}</option>)}
+            </select>
+          </label>
+          <div className={`app-status tone-${statusTone(current.status)}`}>
+            {current.status || "In progress"} · Gate {currentGate.filter((state) => state === "pass").length}/{currentGate.length}
+          </div>
+        </div>
+      </header>
+
+      <PhaseRail current={currentPhase} gate={currentGate} journeyComplete={journeyComplete} onOpenSession={(phaseId) => { setViewedPhaseId(phaseId); setSessionMenuOpen(false); }} />
+
+      <div className="vertical-body">
+        <main className="chat-column" aria-label="Chat with Pi">
+          <div className="session-bar">
+            <div>
+              <span>{viewingArchived ? "Archived phase session" : journeyComplete ? "Normal application workspace" : "Current phase session"}</span>
+              <strong>{journeyComplete && !viewingArchived ? "Launch complete · 9 phase chats archived" : `Phase ${phase.id} · ${phase.deliverable}`}</strong>
+            </div>
+            <div className="session-actions">
+              {viewingArchived && <button type="button" onClick={() => setViewedPhaseId(null)}>Return to current session</button>}
+              <button type="button" onClick={() => setSessionMenuOpen((open) => !open)}>
+                {completedPhases.length} archived
+              </button>
+            </div>
+            {sessionMenuOpen && (
+              <div className="session-menu">
+                {completedPhases.length === 0 && <p>No archived phase sessions yet.</p>}
+                {completedPhases.map((item) => (
+                  <button key={item.id} type="button" onClick={() => { setViewedPhaseId(item.id); setSessionMenuOpen(false); }}>
+                    <span>Phase {item.id}</span><strong>{item.deliverable}</strong><em>Archived · Gate passed</em>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="chat-scroll" ref={chatRef}>
+            {!viewingArchived && !journeyComplete && current.phase > 1 && visible.length > 0 && (
+              <div className="session-handoff">
+                <strong>Fresh phase chat</strong>
+                <span>Seeded from the Operator Record · Phase {current.phase - 1} chat archived</span>
+              </div>
+            )}
+            {visible.map((beat) => (
+              <div key={beat.id}>
+                <BeatBlock
+                  beat={beat}
+                  isCurrent={!viewingArchived && beat.id === current.id}
+                  rejected={Boolean(rejected[beat.id])}
+                  mode={mode}
+                  setMode={setMode}
+                  onAction={doAction}
+                  onPick={pickOption}
+                  onReconsider={reconsider}
+                  onDetails={openDetails}
+                  onHero={setHero}
+                />
+                {extras.filter((message) => message.phase === displayPhaseId && message.after === beat.id).map((m, i) => (
+                  <div key={`${beat.id}-x-${i}`} className={`extra-message ${m.actor === "Pi" ? "from-pi" : "from-you"}`}>
+                    <strong>{m.actor}</strong>
+                    <p>{m.text}</p>
+                    {m.recorded && <span className="recorded-chip">Reflected in the record</span>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <form className="composer" onSubmit={submitChat}>
+            <input name="msg" placeholder={viewingArchived ? "This phase chat is archived" : "Ask Pi, or tell it something that matters…"} aria-label="Message Pi" disabled={viewingArchived} />
+            <div className="composer-row">
+              <span>Answers point at evidence · decisions are reflected into the record</span>
+              <button type="submit" disabled={viewingArchived}>Send</button>
+            </div>
+          </form>
+        </main>
+
+        <Inspector
+          open={sidebar.open}
+          tab={sidebar.tab}
+          highlight={sidebar.highlight}
+          onTab={(tab) => setSidebar((s) => ({ ...s, tab }))}
+          onToggle={() => setSidebar((s) => ({ ...s, open: !s.open }))}
+          visible={visible}
+          phase={phase}
+          gate={displayGate}
+          userDecisions={userDecisions}
+          mode={mode}
+          onHero={setHero}
+          onAskPi={askPiAboutCheck}
+        />
+      </div>
+
+      {hero && <HeroOverlay heroKey={hero} onClose={() => setHero(null)} />}
+      {showProductDecisions && <ProductDecisionsOverlay relevant={relevantProductDecisions} onClose={() => setShowProductDecisions(false)} />}
+    </div>
+  );
+}
