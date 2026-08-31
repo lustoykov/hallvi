@@ -61,20 +61,6 @@ function StartCard({ card, mode, setMode }) {
     "Always Ask": "Pi asks before every state-changing action.",
     "Full Autonomy": "Pi acts without asking, within connected permissions.",
   };
-  const launchPriorities = [
-    { id: "cost", label: "Keep costs low" },
-    { id: "data", label: "Protect database data" },
-    { id: "downtime", label: "Minimize downtime" },
-  ];
-  const [priorities, setPriorities] = useState(card.priorities || []);
-
-  function togglePriority(priorityId) {
-    setPriorities((current) =>
-      current.includes(priorityId)
-        ? current.filter((item) => item !== priorityId)
-        : [...current, priorityId],
-    );
-  }
 
   return (
     <div className="typed-card launch-brief-card">
@@ -95,19 +81,6 @@ function StartCard({ card, mode, setMode }) {
           ))}
         </div>
         <p className="setting-help">{approvalModeHelp[mode]}</p>
-      </fieldset>
-
-      <fieldset className="launch-setting priorities-setting">
-        <legend>Launch priorities <small>Optional</small></legend>
-        <p className="setting-help">Pi uses these when choosing server size, backups, and recovery trade-offs.</p>
-        <div className="priority-options">
-          {launchPriorities.map((priority) => (
-            <label key={priority.id} className={`priority-option ${priorities.includes(priority.id) ? "selected" : ""}`}>
-              <input type="checkbox" checked={priorities.includes(priority.id)} onChange={() => togglePriority(priority.id)} />
-              <span>{priority.label}</span>
-            </label>
-          ))}
-        </div>
       </fieldset>
     </div>
   );

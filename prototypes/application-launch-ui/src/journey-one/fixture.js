@@ -181,11 +181,10 @@ export function buildScript({ mode, choices, outcomes }) {
       kind: "input",
       status: "Needs input",
       gate: ["current", "required", "required"],
-      pi: "Before I inspect anything, confirm the repository and target environment, choose when I should ask for approval, and select any launch priorities. I will only read the repository until this brief is complete.",
+      pi: "Before I inspect anything, confirm the repository and target environment, then choose when I should ask for approval. I will only read the repository until this brief is complete.",
       card: {
         repo: identity.repo,
         environment: "Production",
-        priorities: ["cost", "data"],
       },
       actions: [{ label: "Create application workspace", form: "start" }],
       resolvedLine: `Launch Brief recorded — ${identity.repo} · Production`,
@@ -193,7 +192,6 @@ export function buildScript({ mode, choices, outcomes }) {
         record: [
           fact("Repository", identity.repo, "Engineer input"),
           fact("Environment", "Production", "Engineer input"),
-          fact("Launch priorities", "Keep costs low · protect database data", "Engineer brief"),
         ],
       },
       detailsTab: "record",
