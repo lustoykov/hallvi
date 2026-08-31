@@ -35,7 +35,7 @@ export const journeyOnePhases = [
   },
   {
     id: 3,
-    short: "Make launch-ready",
+    short: "Prepare app",
     deliverable: "Conformance Result",
     meaning: "One exact eligible repository revision passes every required profile check.",
     checks: [
@@ -46,7 +46,7 @@ export const journeyOnePhases = [
   },
   {
     id: 4,
-    short: "Review launch plan",
+    short: "Review plan",
     deliverable: "Launch Plan",
     meaning: "Topology, cost, actors, effects, verification, and material risks are visible before external effects.",
     checks: [
@@ -58,7 +58,7 @@ export const journeyOnePhases = [
   },
   {
     id: 5,
-    short: "Set up server",
+    short: "Create server",
     deliverable: "Host Record",
     meaning: "Exactly one intended Hetzner host exists with recorded identity, cost, access, and readiness evidence.",
     checks: [
@@ -70,7 +70,7 @@ export const journeyOnePhases = [
   },
   {
     id: 6,
-    short: "Connect domain",
+    short: "Claim domain",
     deliverable: "Domain Route",
     meaning: "The intended hostname is under observed control, resolves correctly, serves valid HTTPS, and has no unresolved wait or conflict.",
     checks: [
@@ -83,7 +83,7 @@ export const journeyOnePhases = [
   },
   {
     id: 7,
-    short: "Configure and protect",
+    short: "Add safeguards",
     deliverable: "Operational Baseline",
     meaning: "Runtime, configuration, persistence, logs/telemetry, and external observation responsibilities are established and inspectable.",
     checks: [
@@ -110,7 +110,7 @@ export const journeyOnePhases = [
   },
   {
     id: 9,
-    short: "Handoff",
+    short: "Operate",
     deliverable: "Operations Handoff",
     meaning: "Topology, Release, evidence, gaps, ownership, costs, drift, and ongoing observation are durable and current.",
     checks: [
