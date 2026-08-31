@@ -7,8 +7,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: "index.html",
-        componentCatalog: "prototype-building-blocks.html",
-        journeyV2: "journey-v2.html",
         journeyOne: "journey-1.html",
       },
     },
@@ -20,7 +18,7 @@ export default defineConfig({
     host: "0.0.0.0",
     allowedHosts: ["terminal.local"],
     warmup: {
-      clientFiles: ["./src/main.jsx"],
+      clientFiles: ["./src/journey-one/main.jsx"],
     },
   },
   plugins: [react()],
