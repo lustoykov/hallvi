@@ -69,19 +69,19 @@ body { margin: 0; min-width: 1180px; min-height: 100vh; background: #e9edf4; -we
 .tone-calm { background: var(--wash); color: var(--muted); }
 
 /* ---- phase rail ----------------------------------------------------------- */
-.phase-rail { display: flex; align-items: stretch; gap: 6px; padding: 10px 22px; border-bottom: 1px solid var(--line); background: var(--wash); overflow-x: auto; }
-.rail-phase { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid transparent; color: var(--soft); white-space: nowrap; background: transparent; text-align: left; }
+.phase-rail { display: flex; align-items: stretch; justify-content: space-between; gap: 3px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--wash); overflow-x: hidden; }
+.rail-phase { display: flex; align-items: center; gap: 5px; padding: 6px; border-radius: 8px; border: 1px solid transparent; color: var(--soft); white-space: nowrap; background: transparent; text-align: left; }
 .rail-phase:disabled { cursor: default; opacity: 1; }
 .rail-phase.done:hover { border-color: var(--line-strong); background: white; }
-.rail-phase .rail-num { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-strong); font-family: var(--mono); font-size: 10px; background: white; }
-.rail-phase strong { font-size: 12px; font-weight: 600; }
-.rail-phase small { display: block; font-size: 10.5px; color: var(--muted); }
+.rail-phase .rail-num { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-strong); font-family: var(--mono); font-size: 9px; background: white; }
+.rail-phase strong { font-size: 11px; font-weight: 600; }
+.rail-phase small { display: block; font-size: 9.5px; color: var(--muted); }
 .rail-phase.done { color: var(--muted); }
 .rail-phase.done .rail-num { background: var(--green-soft); border-color: #bfe6d4; color: var(--green); }
 .rail-phase.active { border-color: var(--line-strong); background: white; color: var(--ink); box-shadow: 0 1px 2px rgba(23, 32, 51, .05); }
 .rail-phase.active .rail-num { background: #172033; border-color: #172033; color: white; }
-.gate-dots { display: inline-flex; gap: 4px; margin-left: 4px; }
-.gate-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: white; border: 1.5px solid var(--line-strong); }
+.gate-dots { display: inline-flex; gap: 3px; margin-left: 2px; }
+.gate-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: white; border: 1.5px solid var(--line-strong); }
 .gate-pass { background: var(--green); border-color: var(--green); }
 .gate-current { background: white; border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }
 .gate-blocked { background: var(--red); border-color: var(--red); }

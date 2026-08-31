@@ -16,7 +16,7 @@ The dark top bar is prototype-only: branch outcome switches, click count, and Re
 
 ## Product model rendered here
 
-- One fixed journey: Start → Understand → Conform → See launch → VPS → Domain → Operations → Go live → Handoff.
+- One fixed journey: Start → Inspect app → Make launch-ready → Review launch plan → Set up server → Connect domain → Configure and protect → Go live → Handoff.
 - One named Phase Deliverable and one variable-size Exit Gate per phase.
 - Forty Gate Checks total, distributed 5/4/3/4/4/5/5/6/4.
 - One chat per phase. Passing a Gate archives that phase chat and starts a fresh next-phase chat seeded from the Operator Record, not the transcript.

@@ -214,7 +214,7 @@ export function buildScript({ mode, choices, outcomes }) {
     }),
   );
 
-  // ---------------- Phase 2 · Understand ------------------------------------
+  // ---------------- Phase 2 · Inspect app -----------------------------------
   beats.push(
     beat({
       id: "contract",
@@ -244,7 +244,7 @@ export function buildScript({ mode, choices, outcomes }) {
     }),
   );
 
-  // ---------------- Phase 3 · Conform ---------------------------------------
+  // ---------------- Phase 3 · Make launch-ready -----------------------------
   if (outcomes.conformance === "clean") {
     beats.push(
       beat({
@@ -342,7 +342,7 @@ export function buildScript({ mode, choices, outcomes }) {
     );
   }
 
-  // ---------------- Phase 4 · See the launch --------------------------------
+  // ---------------- Phase 4 · Review launch plan ----------------------------
   beats.push(
     beat({
       id: "plan",
@@ -363,7 +363,7 @@ export function buildScript({ mode, choices, outcomes }) {
     }),
   );
 
-  // ---------------- Phase 5 · Establish the VPS -----------------------------
+  // ---------------- Phase 5 · Set up server ---------------------------------
   beats.push(
     beat({
       id: "hetzner-connect",
@@ -471,7 +471,7 @@ export function buildScript({ mode, choices, outcomes }) {
     }),
   );
 
-  // ---------------- Phase 6 · Establish the domain --------------------------
+  // ---------------- Phase 6 · Connect domain -------------------------------
   beats.push(
     beat({
       id: "domain-choose",
@@ -684,7 +684,7 @@ export function buildScript({ mode, choices, outcomes }) {
     }),
   );
 
-  // ---------------- Phase 7 · Establish operations --------------------------
+  // ---------------- Phase 7 · Configure and protect ------------------------
   if (alwaysAsk) {
     beats.push(
       beat({
@@ -1002,7 +1002,7 @@ export const defaultOutcomes = {
 };
 
 export const outcomeSwitches = [
-  { key: "conformance", label: "Conformance", values: [["clean", "clean"], ["needs-code", "needs code"]], rewindTo: "contract" },
+  { key: "conformance", label: "Profile checks", values: [["clean", "clean"], ["needs-code", "needs code"]], rewindTo: "contract" },
   { key: "dnsConflict", label: "DNS conflict", values: [[false, "none"], [true, "apex conflict"]], rewindTo: "domain-choose" },
   { key: "propagation", label: "Propagation", values: [["fast", "fast"], ["slow", "slow"]], rewindTo: "domain-choose" },
   { key: "verification", label: "Verification", values: [["pass", "passes"], ["fail", "fails"]], rewindTo: "candidate" },

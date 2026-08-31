@@ -11,12 +11,12 @@ Status: canonical workshop draft. This document is the single product and UI spe
 Application Launch always moves through the same nine **Launch Phases**:
 
 1. Start
-2. Understand
-3. Conform
-4. See the launch
-5. VPS
-6. Domain
-7. Operations
+2. Inspect app
+3. Make launch-ready
+4. Review launch plan
+5. Set up server
+6. Connect domain
+7. Configure and protect
 8. Go live
 9. Handoff
 
@@ -81,12 +81,12 @@ current Launch Phase
 | Phase | Phase Deliverable | Engineer experience | Pi and Server Guy behavior |
 | --- | --- | --- | --- |
 | **1. Start** | **Launch Brief** | Selects the repository, Environment, Approval Mode, and material operating intent; sees prerequisites without being overwhelmed. | Creates the Application record and phase session, validates read access, records decisions, and makes blockers explicit. |
-| **2. Understand** | **Application Contract** | Watches Pi inspect the repository, sees provenance, and corrects unsupported assumptions. | Resolves an Application Profile, constructs the app-level contract, and keeps unknowns and incompatibilities visible. |
-| **3. Conform** | **Conformance Result** | Reviews required repository work and can use Pi, Codex, Claude, another harness, or manual work under the same bounded brief. | Tracks one exact candidate revision, preserves worker evidence separately, and runs profile checks against the returned result. |
-| **4. See the launch** | **Launch Plan** | Reviews topology, cost, actors, effects, verification, and material risks before paid or account-level work. | Revises the plan when evidence changes and keeps VPS and domain operations separate. |
-| **5. VPS** | **Host Record** | Connects Hetzner, sees the exact paid effect when relevant, and can inspect the resulting machine directly. | Reconciles provider access and host creation/adoption, records actual identity and cost, and verifies readiness. |
-| **6. Domain** | **Domain Route** | Chooses a hostname and follows the applicable controlled, delegated, acquisition, waiting, or conflict path. | Observes authority, configures permitted DNS/HTTPS work, waits honestly, refuses silent overwrites, and verifies externally. |
-| **7. Operations** | **Operational Baseline** | Sees runtime, secrets, persistence, logs/telemetry, and external-observation responsibilities with evidence and unresolved policy clearly named. | Establishes the profile-interpreted responsibilities and records missing or accepted gaps without hiding them. |
+| **2. Inspect app** | **Application Contract** | Watches Pi inspect the repository, sees provenance, and corrects unsupported assumptions. | Resolves an Application Profile, constructs the app-level contract, and keeps unknowns and incompatibilities visible. |
+| **3. Make launch-ready** | **Conformance Result** | Reviews required repository work and can use Pi, Codex, Claude, another harness, or manual work under the same bounded brief. | Tracks one exact candidate revision, preserves worker evidence separately, and runs profile checks against the returned result. |
+| **4. Review launch plan** | **Launch Plan** | Reviews topology, cost, actors, effects, verification, and material risks before paid or account-level work. | Revises the plan when evidence changes and keeps VPS and domain operations separate. |
+| **5. Set up server** | **Host Record** | Connects Hetzner, sees the exact paid effect when relevant, and can inspect the resulting machine directly. | Reconciles provider access and host creation/adoption, records actual identity and cost, and verifies readiness. |
+| **6. Connect domain** | **Domain Route** | Chooses a hostname and follows the applicable controlled, delegated, acquisition, waiting, or conflict path. | Observes authority, configures permitted DNS/HTTPS work, waits honestly, refuses silent overwrites, and verifies externally. |
+| **7. Configure and protect** | **Operational Baseline** | Sees runtime, secrets, persistence, logs/telemetry, and external-observation responsibilities with evidence and unresolved policy clearly named. | Establishes the profile-interpreted responsibilities and records missing or accepted gaps without hiding them. |
 | **8. Go live** | **Verified Release** | Sees the exact candidate, deployment activity, public checks, semantic checks, failures, remediation, and drift. | Deploys/reconciles the candidate, verifies through the intended HTTPS hostname, and records a current Release only when the required bar passes. |
 | **9. Handoff** | **Operations Handoff** | Lands in a normal application workspace with topology, Release, health evidence, cost, responsibilities, gaps, and ongoing observation. | Assembles the evidence and ownership record, archives the Handoff session, and transitions out of Application Launch. |
 
@@ -322,12 +322,12 @@ The proposed gates contain between three and six checks. Only the current phase'
 | Phase | Deliverable | Proposed checks |
 | --- | --- | ---: |
 | 1. Start | Launch Brief | 5 |
-| 2. Understand | Application Contract | 4 |
-| 3. Conform | Conformance Result | 3 |
-| 4. See the launch | Launch Plan | 4 |
-| 5. VPS | Host Record | 4 |
-| 6. Domain | Domain Route | 5 |
-| 7. Operations | Operational Baseline | 5 |
+| 2. Inspect app | Application Contract | 4 |
+| 3. Make launch-ready | Conformance Result | 3 |
+| 4. Review launch plan | Launch Plan | 4 |
+| 5. Set up server | Host Record | 4 |
+| 6. Connect domain | Domain Route | 5 |
+| 7. Configure and protect | Operational Baseline | 5 |
 | 8. Go live | Verified Release | 6 |
 | 9. Handoff | Operations Handoff | 4 |
 
@@ -409,7 +409,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Human observability:** Open the Launch Brief; jump to each originating chat decision; open the affected integration or source for each prerequisite.
 - **Invalidated by:** Revising operating intent, discovering a new material prerequisite, or resolving/invalidating a prerequisite Observation.
 
-## Phase 2 — Understand
+## Phase 2 — Inspect app
 
 **Phase Deliverable:** **Application Contract** — the app-level agreement describing build, runtime, health, persistence, configuration, observability, and verification requirements with provenance and explicit gaps.
 
@@ -444,7 +444,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Open dependency:** **U3** determines whether explicit engineer confirmation of the initial Application Contract is additionally required before paid work. This check does not treat silence as confirmation or choose mode-specific confirmation behavior.
 - **Invalidated by:** Application Contract, profile, repository revision, or a gap-resolution source changing.
 
-## Phase 3 — Conform
+## Phase 3 — Make launch-ready
 
 **Phase Deliverable:** **Conformance Result** — one exact eligible repository revision and evidence that all required profile checks pass for it.
 
@@ -470,7 +470,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Human observability:** Open the GitHub check run or Server Guy check artifact; inspect raw output for every check; open the exact source lines involved.
 - **Invalidated by:** Candidate revision, profile version, check definition, or relevant configuration changing.
 
-## Phase 4 — See the launch
+## Phase 4 — Review launch plan
 
 **Phase Deliverable:** **Launch Plan** — visible intended topology, expected cost, responsibilities and actions, verification bar, and material risks before external effects begin.
 
@@ -504,7 +504,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Open dependencies:** **U15** determines mandatory versus Pi-selected verification; **G-STOP-LAUNCH** leaves first-launch failure disposition undefined. Naming these dependencies satisfies transparency but does not resolve them.
 - **Invalidated by:** Verification requirements, risk evidence, Application Contract, or candidate topology changing.
 
-## Phase 5 — VPS
+## Phase 5 — Set up server
 
 **Phase Deliverable:** **Host Record** — the intended owned machine's identity, actual cost, reachability, and readiness evidence.
 
@@ -538,7 +538,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Human observability:** Open the live or recorded server session; inspect raw readiness commands and outputs; open the Hetzner networking view.
 - **Invalidated by:** Host replacement, host image, network identity, readiness requirements, or fresh readiness result changing.
 
-## Phase 6 — Domain
+## Phase 6 — Connect domain
 
 **Phase Deliverable:** **Domain Route** — authoritative hostname, DNS route, HTTPS state, and external observations.
 
@@ -578,7 +578,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Human observability:** Open the Cloudflare DNS table and change history; open conflicting record targets; inspect the sequence of appended public observations.
 - **Invalidated by:** DNS records, conflict resolution, delegation, certificate state, or fresh public observations changing.
 
-## Phase 7 — Operations
+## Phase 7 — Configure and protect
 
 **Phase Deliverable:** **Operational Baseline** — runtime, configuration/secrets, persistence protection, observability, and external observation responsibilities with evidence.
 
