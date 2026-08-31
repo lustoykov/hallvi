@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyGithubFailure, parseGithubRepository } from "./github";
+import { classifyGithubFailure, parseGithubRepository } from "../src/server/github";
 
 describe("parseGithubRepository", () => {
   it("normalizes an HTTPS GitHub URL", () => {

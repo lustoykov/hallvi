@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parsePiReply } from "./pi";
+import { parsePiReply } from "../src/server/pi";
 
 describe("parsePiReply", () => {
   it("accepts a concise response with supported decisions", () => {

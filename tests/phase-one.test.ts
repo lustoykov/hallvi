@@ -9,25 +9,27 @@ const mocks = vi.hoisted(() => ({
   inspectGithubRepository: vi.fn(),
 }));
 
-vi.mock("./github", async () => {
-  const actual = await vi.importActual<typeof import("./github")>("./github");
+vi.mock("../src/server/github", async () => {
+  const actual = await vi.importActual<typeof import("../src/server/github")>(
+    "../src/server/github",
+  );
   return { ...actual, inspectGithubRepository: mocks.inspectGithubRepository };
 });
 
-vi.mock("./pi", () => ({ askPi: mocks.askPi }));
+vi.mock("../src/server/pi", () => ({ askPi: mocks.askPi }));
 
 let databaseDirectory: string;
 let databasePath: string;
-let database: typeof import("./db");
-let phaseOne: typeof import("./phase-one");
+let database: typeof import("../src/server/db");
+let phaseOne: typeof import("../src/server/phase-one");
 
 beforeAll(async () => {
   databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-phase-one-"));
   databasePath = join(databaseDirectory, "test.db");
   process.env.SERVER_GUY_DB_PATH = databasePath;
   delete globalThis.__serverGuyDb;
-  database = await import("./db");
-  phaseOne = await import("./phase-one");
+  database = await import("../src/server/db");
+  phaseOne = await import("../src/server/phase-one");
 });
 
 beforeEach(() => {
