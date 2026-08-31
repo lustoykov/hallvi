@@ -138,7 +138,7 @@ function BeatBlock({ beat, isCurrent, rejected, mode, setMode, onAction, onPick,
 
       {isCurrent && rejected && (
         <div className="rejected-note">
-          <strong>Rejected — no state changed.</strong> The proposal is preserved and nothing was executed.
+          <strong>Rejected. No state changed.</strong> The proposal is preserved and nothing was executed.
           <button type="button" onClick={onReconsider}>Reconsider proposal</button>
         </div>
       )}
@@ -202,6 +202,7 @@ export function JourneyOnePrototype() {
   const [hero, setHero] = useState(null);
   const [showProductDecisions, setShowProductDecisions] = useState(false);
   const [prototypeMenuOpen, setPrototypeMenuOpen] = useState(false);
+  const [generalChat, setGeneralChat] = useState({ open: false, messages: [] });
   const [viewedPhaseId, setViewedPhaseId] = useState(null);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const chatRef = useRef(null);
@@ -230,7 +231,7 @@ export function JourneyOnePrototype() {
   useEffect(() => {
     const el = chatRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-  }, [cursorId, extras.length, viewedPhaseId]);
+  }, [cursorId, extras.length, viewedPhaseId, generalChat.open, generalChat.messages.length]);
 
   function relocate(nextParams, preferredId) {
     const nextScript = buildScript(nextParams);
@@ -258,6 +259,7 @@ export function JourneyOnePrototype() {
     setViewedPhaseId(null);
     setSessionMenuOpen(false);
     setPrototypeMenuOpen(false);
+    setGeneralChat({ open: false, messages: [] });
     setShowProductDecisions(false);
     setHero(null);
     setSidebar({ open: true, tab: "record", highlight: null });
@@ -325,8 +327,14 @@ export function JourneyOnePrototype() {
     setExtras((all) => [
       ...all,
       { phase: current.phase, after: current.id, actor: "You", text: `Explain ${check.id} and help me satisfy it.`, isDecision: false },
-      { phase: current.phase, after: current.id, actor: "Pi", text: `${check.label}: ${check.satisfies} I would now inspect the linked source and evidence, then propose the smallest next action.` },
+      { phase: current.phase, after: current.id, actor: "Pi", text: `${check.label}: ${check.satisfies} I’ll inspect the linked source and receipts, then propose the next action.` },
     ]);
+  }
+
+  function startGeneralChat() {
+    setViewedPhaseId(null);
+    setSessionMenuOpen(false);
+    setGeneralChat({ open: true, messages: [] });
   }
 
   function submitChat(event) {
@@ -334,6 +342,18 @@ export function JourneyOnePrototype() {
     const field = event.target.elements.msg;
     const text = field.value.trim();
     if (!text) return;
+    if (generalChat.open) {
+      setGeneralChat((chat) => ({
+        ...chat,
+        messages: [
+          ...chat.messages,
+          { actor: "You", text },
+          { actor: "Pi", text: "This prototype does not run Pi. In Server Guy, Pi would read the application record, inspect current sources when needed, and link factual claims to their receipts." },
+        ],
+      }));
+      field.value = "";
+      return;
+    }
     const isQuestion = /[?？]\s*$/.test(text);
     setExtras((all) => [
       ...all,
@@ -343,8 +363,8 @@ export function JourneyOnePrototype() {
         after: current.id,
         actor: "Pi",
         text: isQuestion
-          ? "Good question — this mock can’t reason, but the real Pi would answer from the record. The relevant evidence is in the sidebar."
-          : "Noted. In the product this becomes a Decision Record with provenance; here I’ve reflected it into the sidebar record.",
+          ? "This prototype cannot reason. Server Guy would answer from the Operator Record and link each factual claim to a receipt."
+          : "Recorded. Server Guy would save this as a Decision Record and show its source in the Record tab.",
         recorded: !isQuestion,
       },
     ]);
@@ -405,22 +425,26 @@ export function JourneyOnePrototype() {
         </div>
       </header>
 
-      <PhaseRail current={currentPhase} gate={currentGate} journeyComplete={journeyComplete} onOpenSession={(phaseId) => { setViewedPhaseId(phaseId); setSessionMenuOpen(false); }} />
+      <PhaseRail current={currentPhase} gate={currentGate} journeyComplete={journeyComplete} onOpenSession={(phaseId) => { setViewedPhaseId(phaseId); setSessionMenuOpen(false); setGeneralChat((chat) => ({ ...chat, open: false })); }} />
 
       <div className="vertical-body">
         <main className="chat-column" aria-label="Chat with Pi">
           <div className="session-bar">
             <div>
-              <span>{viewingArchived ? "Archived phase session" : journeyComplete ? "Normal application workspace" : "Current phase session"}</span>
-              <strong>{journeyComplete && !viewingArchived ? "Launch complete · 9 phase chats archived" : `Phase ${phase.id} · ${phase.deliverable}`}</strong>
+              <span>{generalChat.open ? "General application chat" : viewingArchived ? "Archived phase session" : journeyComplete ? "Application workspace" : "Current phase session"}</span>
+              <strong>{generalChat.open ? "New chat" : journeyComplete && !viewingArchived ? "Launch complete · 9 phase chats archived" : `Phase ${phase.id} · ${phase.deliverable}`}</strong>
             </div>
             <div className="session-actions">
-              {viewingArchived && <button type="button" onClick={() => setViewedPhaseId(null)}>Return to current session</button>}
-              <button type="button" onClick={() => setSessionMenuOpen((open) => !open)}>
-                {completedPhases.length} archived
-              </button>
+              {generalChat.open && <button type="button" onClick={() => setGeneralChat((chat) => ({ ...chat, open: false }))}>Return to launch</button>}
+              {!generalChat.open && viewingArchived && <button type="button" onClick={() => setViewedPhaseId(null)}>Return to current session</button>}
+              {!generalChat.open && (
+                <button type="button" onClick={() => setSessionMenuOpen((open) => !open)}>
+                  {completedPhases.length} archived
+                </button>
+              )}
+              <button type="button" className="new-chat-button" onClick={startGeneralChat}>New chat</button>
             </div>
-            {sessionMenuOpen && (
+            {!generalChat.open && sessionMenuOpen && (
               <div className="session-menu">
                 {completedPhases.length === 0 && <p>No archived phase sessions yet.</p>}
                 {completedPhases.map((item) => (
@@ -432,41 +456,57 @@ export function JourneyOnePrototype() {
             )}
           </div>
           <div className="chat-scroll" ref={chatRef}>
-            {!viewingArchived && !journeyComplete && current.phase > 1 && visible.length > 0 && (
-              <div className="session-handoff">
-                <strong>Fresh phase chat</strong>
-                <span>Seeded from the Operator Record · Phase {current.phase - 1} chat archived</span>
-              </div>
-            )}
-            {visible.map((beat) => (
-              <div key={beat.id}>
-                <BeatBlock
-                  beat={beat}
-                  isCurrent={!viewingArchived && beat.id === current.id}
-                  rejected={Boolean(rejected[beat.id])}
-                  mode={mode}
-                  setMode={setMode}
-                  onAction={doAction}
-                  onPick={pickOption}
-                  onReconsider={reconsider}
-                  onDetails={openDetails}
-                  onHero={setHero}
-                />
-                {extras.filter((message) => message.phase === displayPhaseId && message.after === beat.id).map((m, i) => (
-                  <div key={`${beat.id}-x-${i}`} className={`extra-message ${m.actor === "Pi" ? "from-pi" : "from-you"}`}>
-                    <strong>{m.actor}</strong>
-                    <p>{m.text}</p>
-                    {m.recorded && <span className="recorded-chip">Reflected in the record</span>}
+            {generalChat.open ? (
+              <>
+                <article className="beat current general-chat-intro">
+                  <div className="beat-meta"><span className="pi-avatar">Pi</span><strong>Pi</strong></div>
+                  <p className="beat-text">Ask about the application, its server, recent changes, or a receipt. This chat is separate from the launch. The current phase chat stays open.</p>
+                </article>
+                {generalChat.messages.map((message, index) => (
+                  <div key={`${message.actor}-${index}`} className={`extra-message ${message.actor === "Pi" ? "from-pi" : "from-you"}`}>
+                    <strong>{message.actor}</strong><p>{message.text}</p>
                   </div>
                 ))}
-              </div>
-            ))}
+              </>
+            ) : (
+              <>
+                {!viewingArchived && !journeyComplete && current.phase > 1 && visible.length > 0 && (
+                  <div className="session-handoff">
+                    <strong>Fresh phase chat</strong>
+                    <span>Seeded from the Operator Record · Phase {current.phase - 1} chat archived</span>
+                  </div>
+                )}
+                {visible.map((beat) => (
+                  <div key={beat.id}>
+                    <BeatBlock
+                      beat={beat}
+                      isCurrent={!viewingArchived && beat.id === current.id}
+                      rejected={Boolean(rejected[beat.id])}
+                      mode={mode}
+                      setMode={setMode}
+                      onAction={doAction}
+                      onPick={pickOption}
+                      onReconsider={reconsider}
+                      onDetails={openDetails}
+                      onHero={setHero}
+                    />
+                    {extras.filter((message) => message.phase === displayPhaseId && message.after === beat.id).map((m, i) => (
+                      <div key={`${beat.id}-x-${i}`} className={`extra-message ${m.actor === "Pi" ? "from-pi" : "from-you"}`}>
+                        <strong>{m.actor}</strong>
+                        <p>{m.text}</p>
+                        {m.recorded && <span className="recorded-chip">Saved to Record</span>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
           <form className="composer" onSubmit={submitChat}>
-            <input name="msg" placeholder={viewingArchived ? "This phase chat is archived" : "Ask Pi, or tell it something that matters…"} aria-label="Message Pi" disabled={viewingArchived} />
+            <input name="msg" placeholder={generalChat.open ? `Ask Pi about ${identity.application}…` : viewingArchived ? "This phase chat is archived" : "Ask Pi, or tell it something that matters…"} aria-label="Message Pi" disabled={!generalChat.open && viewingArchived} />
             <div className="composer-row">
-              <span>Answers point at evidence · decisions are reflected into the record</span>
-              <button type="submit" disabled={viewingArchived}>Send</button>
+              <span>{generalChat.open ? "Separate from the launch. The current phase chat stays open." : "Answers link to receipts · decisions are saved to Record"}</span>
+              <button type="submit" disabled={!generalChat.open && viewingArchived}>Send</button>
             </div>
           </form>
         </main>

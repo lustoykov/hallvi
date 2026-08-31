@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { heroes } from "./fixture.js";
 
-const INSPECT_DESTINATIONS = [
-  ["activity", "Activity", "What Pi did"],
-  ["changes", "Changes", "External effects"],
-  ["evidence", "Evidence", "Proof and sources"],
+const TABS = [
+  ["record", "Record"],
+  ["activity", "Activity"],
+  ["changes", "Changes"],
+  ["evidence", "Receipts"],
 ];
-
-const destinationTitle = Object.fromEntries(INSPECT_DESTINATIONS.map(([key, label]) => [key, label]));
 
 function collect(visible, key) {
   return visible.flatMap((beat) => (beat.hood[key] || []).map((item) => ({ ...item, beatId: beat.id })));
@@ -39,8 +38,8 @@ function GateCheckRow({ check, state, mode, onHero, onAskPi }) {
         <div className="takeover">
           <dl className="check-definition">
             <div><dt>Satisfied when</dt><dd>{check.satisfies}</dd></div>
-            <div><dt>Evidence</dt><dd>{check.evidence}</dd></div>
-            <div><dt>Verify yourself</dt><dd>{check.observe}</dd></div>
+            <div><dt>Required proof</dt><dd>{check.evidence}</dd></div>
+            <div><dt>Check it yourself</dt><dd>{check.observe}</dd></div>
           </dl>
           <div className="check-actions">
             <button type="button" onClick={() => onAskPi(check)}>Ask Pi</button>
@@ -50,8 +49,8 @@ function GateCheckRow({ check, state, mode, onHero, onAskPi }) {
             <button type="button" onClick={() => setRerun("done")}>Re-run check</button>
           </div>
           {sourceOpen && <pre className="source-record">{JSON.stringify({ check: check.id, source: check.observe, evidence_required: check.evidence }, null, 2)}</pre>}
-          {rerun && <p className="rerun-result">Re-checked just now — result unchanged: “{word}”. In this mock only the outcome switches change underlying state; in the product, only fresh evidence would.</p>}
-          <p className="no-override">Computed from evidence · no manual pass control · Approval Mode: {mode}</p>
+          {rerun && <p className="rerun-result">Checked again just now. The result is still {word}. In this prototype, only the scenario controls change it. In Server Guy, fresh provider or runtime data can change it.</p>}
+          <p className="no-override">Computed from current receipts · you cannot mark this check as passed · Approval Mode: {mode}</p>
         </div>
       )}
     </div>
@@ -84,7 +83,7 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
   if (!open) {
     return (
       <aside className="inspector collapsed">
-        <button type="button" className="inspector-toggle" onClick={onToggle}>Open the hood</button>
+        <button type="button" className="inspector-toggle" onClick={onToggle}>Open inspector</button>
       </aside>
     );
   }
@@ -98,20 +97,17 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
   const evidence = collect(visible, "evidence");
 
   return (
-    <aside className="inspector" aria-label="Under the hood">
+    <aside className="inspector" aria-label="Application inspector">
       <div className="inspector-head">
-        <div className="inspector-location">
-          {tab !== "record" && (
-            <button type="button" className="inspector-back" onClick={() => onTab("record")} aria-label="Back to Record">
-              <span aria-hidden="true">←</span> Record
-            </button>
-          )}
-          <strong>{tab === "record" ? "Record" : destinationTitle[tab]}</strong>
-        </div>
-        <button type="button" className="inspector-toggle" onClick={onToggle} aria-label="Hide the record" title="Hide the record">‹</button>
+        <nav aria-label="Application inspector views" role="tablist">
+          {TABS.map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>
+          ))}
+        </nav>
+        <button type="button" className="inspector-toggle" onClick={onToggle}>Hide</button>
       </div>
 
-      <div className="inspector-scroll">
+      <div className="inspector-scroll" role="tabpanel">
         {tab === "record" && (
           <>
             <section className="hood-section">
@@ -134,29 +130,14 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
                 </div>
               ))}
             </section>
-            <section className="hood-section inspect-section">
-              <h3>Inspect</h3>
-              <div className="inspect-destinations">
-                {INSPECT_DESTINATIONS.map(([key, label, description]) => {
-                  const count = key === "activity" ? activity.length : key === "changes" ? changes.length : evidence.length;
-                  return (
-                    <button key={key} type="button" onClick={() => onTab(key)}>
-                      <span className="inspect-destination-copy"><strong>{label}</strong><small>{description}</small></span>
-                      <span className="inspect-count" aria-label={`${count} ${label.toLowerCase()} items`}>{count}</span>
-                      <span className="inspect-arrow" aria-hidden="true">→</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
           </>
         )}
 
         {tab === "activity" && (
           <section className="hood-section">
-            <h3>What Pi did</h3>
-            <p className="hood-quiet">The phase timeline of tool calls, provider operations, and verification work.</p>
-            {activity.length === 0 && <p className="hood-quiet">Nothing yet.</p>}
+            <h3>Pi activity</h3>
+            <p className="hood-quiet">Tool calls, provider actions, and checks from this phase.</p>
+            {activity.length === 0 && <p className="hood-quiet">Pi has not run anything in this phase.</p>}
             {activity.map((item) => (
               <div key={item.id} className={`activity-row ${item.beatId === highlight ? "flash" : ""}`}>
                 <time>{item.time}</time>
@@ -170,9 +151,9 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
 
         {tab === "changes" && (
           <section className="hood-section">
-            <h3>Net changes</h3>
-            <p className="hood-quiet">Durable external effects produced during this phase.</p>
-            {changes.length === 0 && <p className="hood-quiet">No external effect yet — nothing has been created or changed.</p>}
+            <h3>Changes in this phase</h3>
+            <p className="hood-quiet">Files, configuration, and infrastructure changed by Server Guy.</p>
+            {changes.length === 0 && <p className="hood-quiet">Server Guy has not changed anything in this phase.</p>}
             {changes.map((item) => (
               <div key={item.id} className={`hood-item ${item.beatId === highlight ? "flash" : ""}`}>
                 <div className="hood-item-head">
@@ -193,9 +174,9 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
 
         {tab === "evidence" && (
           <section className="hood-section">
-            <h3>Evidence</h3>
-            <p className="hood-quiet">Every claim in chat traces to one of these. Each is a point-in-time observation with its own source, method, and timestamp.</p>
-            {evidence.length === 0 && <p className="hood-quiet">No observations yet.</p>}
+            <h3>Receipts</h3>
+            <p className="hood-quiet">Provider responses, probe results, and other sources behind Pi's claims.</p>
+            {evidence.length === 0 && <p className="hood-quiet">No receipts yet.</p>}
             {evidence.map((item) => (
               <EvidenceRow key={item.id} item={item} highlighted={item.beatId === highlight} onHero={onHero} />
             ))}
@@ -249,7 +230,7 @@ export function HeroOverlay({ heroKey, onClose }) {
           </div>
         )}
         {heroKey === "probe" && <pre className="hero-terminal">{hero.raw}</pre>}
-        <p className="hero-footer">Mocked destination — in the product this is the real console, session, or artifact.</p>
+        <p className="hero-footer">This prototype shows sample data. Server Guy opens the actual console, session, or artifact.</p>
       </div>
     </div>
   );
