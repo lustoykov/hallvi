@@ -24,15 +24,14 @@ function GateCheckRow({ check, state, mode, onHero, onAskPi }) {
   const [open, setOpen] = useState(false);
   const [rerun, setRerun] = useState(null);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const word = state === "pass" ? "Passed" : state === "current" ? "Current" : state === "blocked" ? "Blocked" : "Not yet";
+  const word = state === "pass" ? "Complete" : state === "current" ? "In progress" : state === "blocked" ? "Blocked" : "Not started";
   return (
     <div className={`gate-check gate-${state}`}>
       <div className="gate-check-row">
         <i className={`gate-dot gate-${state}`} />
-        <span className="gate-id">{check.id}</span>
         <strong>{check.label}</strong>
         <em>{word}</em>
-        <button type="button" className="details-link" aria-expanded={open} aria-label={`${open ? "Close" : "Details for"} ${check.id} ${check.label}`} onClick={() => setOpen((value) => !value)}>{open ? "Close" : "Details"}</button>
+        <button type="button" className="details-link" aria-expanded={open} aria-label={`${open ? "Close details for" : "Details for"} ${check.label}`} onClick={() => setOpen((value) => !value)}>{open ? "Close" : "Details"}</button>
       </div>
       {open && (
         <div className="takeover">
@@ -48,7 +47,7 @@ function GateCheckRow({ check, state, mode, onHero, onAskPi }) {
             </button>
             <button type="button" onClick={() => setRerun("done")}>Re-run check</button>
           </div>
-          {sourceOpen && <pre className="source-record">{JSON.stringify({ check: check.id, source: check.observe, evidence_required: check.evidence }, null, 2)}</pre>}
+          {sourceOpen && <pre className="source-record">{JSON.stringify({ check: check.label, internal_reference: check.id, source: check.observe, evidence_required: check.evidence }, null, 2)}</pre>}
           {rerun && <p className="rerun-result">Checked again just now. The result is still {word}. In this prototype, only the scenario controls change it. In Server Guy, fresh provider or runtime data can change it.</p>}
           <p className="no-override">Computed from current receipts · you cannot mark this check as passed · Approval Mode: {mode}</p>
         </div>
@@ -95,6 +94,12 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
   const activity = collect(visible, "activity");
   const changes = collect(visible, "changes");
   const evidence = collect(visible, "evidence");
+  const completedChecks = gate.filter((state) => state === "pass").length;
+  const totalChecks = phase.checks.length;
+  const progressPercent = totalChecks ? (completedChecks / totalChecks) * 100 : 0;
+  const progressLabel = completedChecks === totalChecks
+    ? `All ${totalChecks} checks complete`
+    : `${completedChecks} of ${totalChecks} checks complete`;
 
   return (
     <aside className="inspector" aria-label="Application inspector">
@@ -111,8 +116,24 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
         {tab === "record" && (
           <>
             <section className="hood-section">
-              <h3>{phase.deliverable}</h3>
-              <p className="hood-quiet">{phase.meaning}</p>
+              <div className="deliverable-summary">
+                <div className="deliverable-heading">
+                  <h3>{phase.deliverable}</h3>
+                  <span>{progressLabel}</span>
+                </div>
+                <div
+                  className={`gate-progress ${completedChecks === totalChecks ? "complete" : ""}`}
+                  role="progressbar"
+                  aria-label={`${phase.deliverable} progress`}
+                  aria-valuemin="0"
+                  aria-valuemax={totalChecks}
+                  aria-valuenow={completedChecks}
+                  aria-valuetext={progressLabel}
+                >
+                  <span style={{ transform: `scaleX(${progressPercent / 100})` }} />
+                </div>
+                <p className="hood-quiet">{phase.meaning}</p>
+              </div>
               <div className="gate-checks">
                 {phase.checks.map((check, index) => (
                   <GateCheckRow key={check.id} check={check} state={gate[index]} mode={mode} onHero={onHero} onAskPi={onAskPi} />

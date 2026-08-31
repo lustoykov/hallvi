@@ -29,8 +29,8 @@ The small set of observable conditions that must be satisfied before Application
 _Avoid_: Vague completion, confidence score, checklist progress
 
 **Gate Check**:
-One observable condition inside an Exit Gate whose current result is recomputed from its source and supporting evidence. It is not a decision and cannot be manually marked as passed.
-_Avoid_: Decision, manual checkbox, confidence judgment
+One observable condition inside an Exit Gate whose current result is recomputed from its source and supporting evidence. Its human-readable condition is its name; any stable identifier is only a reference for records and evidence. It is not a decision and cannot be manually marked as passed.
+_Avoid_: Decision, manual checkbox, confidence judgment, internal reference as the name
 
 **Decision Record**:
 A durable, revisable choice or constraint recognized from an Operator Session and stored with its origin and affected scope.

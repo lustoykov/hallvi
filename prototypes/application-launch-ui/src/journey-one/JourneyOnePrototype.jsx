@@ -337,7 +337,7 @@ export function JourneyOnePrototype() {
     setViewedPhaseId(null);
     setExtras((all) => [
       ...all,
-      { phase: current.phase, after: current.id, actor: "You", text: `Explain ${check.id} and help me satisfy it.`, isDecision: false },
+      { phase: current.phase, after: current.id, actor: "You", text: `Explain “${check.label}” and help me satisfy it.`, isDecision: false },
       { phase: current.phase, after: current.id, actor: "Pi", text: `${check.label}: ${check.satisfies} I’ll inspect the linked source and receipts, then propose the next action.` },
     ]);
   }

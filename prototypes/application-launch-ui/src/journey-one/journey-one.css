@@ -197,13 +197,20 @@ body { margin: 0; min-width: 1180px; min-height: 100vh; background: #e9edf4; -we
 .inspector-scroll { flex: 1; overflow-y: auto; padding: 14px 14px 20px; display: flex; flex-direction: column; gap: 16px; }
 .hood-section h3 { margin: 0 0 8px; font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--soft); font-weight: 600; }
 .hood-quiet { margin: 0 0 10px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.deliverable-summary { margin-bottom: 12px; }
+.deliverable-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.hood-section .deliverable-heading h3 { margin: 0; }
+.deliverable-heading span { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.gate-progress { height: 5px; margin: 8px 0 9px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.gate-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--blue); transform-origin: left; transition: transform 220ms ease-out; }
+.gate-progress.complete > span { background: var(--green); }
+.deliverable-summary .hood-quiet { margin-bottom: 0; }
 
 .gate-checks { display: flex; flex-direction: column; gap: 6px; }
 .gate-check { border: 1px solid var(--line); border-radius: 8px; background: white; padding: 8px 10px; }
 .gate-check-row { display: flex; align-items: center; gap: 8px; }
 .gate-check-row strong { flex: 1; font-size: 12px; font-weight: 550; }
-.gate-id { font-family: var(--mono); font-size: 9px; color: var(--soft); }
-.gate-check-row em { font-style: normal; font-size: 11px; font-family: var(--mono); color: var(--muted); }
+.gate-check-row em { flex: 0 0 auto; font-style: normal; font-size: 10.5px; color: var(--muted); }
 .gate-check.gate-pass .gate-check-row em { color: var(--green); }
 .gate-check.gate-blocked .gate-check-row em { color: var(--red); }
 .gate-check.gate-current .gate-check-row em { color: var(--blue); }
