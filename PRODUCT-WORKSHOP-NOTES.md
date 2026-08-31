@@ -2,7 +2,7 @@
 
 Status: living planning notes, not a finished specification and not evidence of implementation.
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 These notes preserve decisions, hypotheses, and unresolved questions from the product workshop. They should later be distilled into a tight product specification. Unresolved choices must not be presented as settled in that specification.
 
@@ -25,6 +25,14 @@ The initial user is an engineer or technically capable tinkerer who:
 - prefers using an existing Codex, Claude, Copilot, or similar subscription where practical instead of accumulating large API bills.
 
 The product should eventually feel like giving an application to a capable server operator who can deploy it, observe it, diagnose it, collaborate when necessary, and produce reviewable evidence.
+
+## Product positioning
+
+Settled positioning:
+
+> PaaS-like deployment and recovery on infrastructure the customer owns, with predictable VPS economics.
+
+Server Guy should not compete merely as the cheapest hosting option. Its value is the managed-platform experience it creates on user-owned infrastructure: application deployment, observation, recovery, and operational evidence without surrendering infrastructure ownership or accepting opaque usage-based pricing. Hetzner remains the V1 reference infrastructure rather than the product's identity or permanent provider boundary.
 
 ## Central architecture principle
 
