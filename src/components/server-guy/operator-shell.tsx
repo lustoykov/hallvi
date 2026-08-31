@@ -59,8 +59,19 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  const body = (await response.json()) as T & { error?: string };
-  if (!response.ok) throw new Error(body.error ?? "Server Guy could not complete that request.");
+  const text = await response.text();
+  let body: (T & { error?: string }) | null = null;
+  if (text) {
+    try {
+      body = JSON.parse(text) as T & { error?: string };
+    } catch {
+      if (response.ok) throw new Error("Server Guy returned an unreadable response.");
+    }
+  }
+  if (!response.ok) {
+    throw new Error(body?.error ?? (text || "Server Guy could not complete that request."));
+  }
+  if (!body) throw new Error("Server Guy returned an empty response.");
   return body;
 }
 
@@ -70,14 +81,12 @@ function statusLabel(status: GateCheck["status"]) {
   return "Not yet";
 }
 
-function relativeTime(value: string) {
-  const milliseconds = Date.now() - new Date(value).getTime();
-  if (milliseconds < 60_000) return "just now";
-  const minutes = Math.floor(milliseconds / 60_000);
-  if (minutes < 60) return `${minutes}m ago`;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
-  );
+function formatTimestamp(value: string) {
+  return `${new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value))} UTC`;
 }
 
 export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
@@ -89,7 +98,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     initialView.application?.approvalMode ?? "pi-decides",
   );
   const [activeTab, setActiveTab] = useState<InspectorTab>("record");
-  const [selectedCheck, setSelectedCheck] = useState<GateCheck | null>(null);
+  const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,18 +116,20 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   const phaseDots = checks.map((check) =>
     check.status === "passed" ? "passed" : check.status,
   );
+  const selectedCheck = checks.find((check) => check.key === selectedCheckKey) ?? null;
 
   useEffect(() => {
-    if (!selectedCheck) return;
+    if (!selectedCheckKey) return;
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelectedCheck(null);
+      if (event.key === "Escape") setSelectedCheckKey(null);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedCheck]);
+  }, [selectedCheckKey]);
 
   async function createApplication(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy("create");
     setError(null);
     try {
@@ -135,12 +146,12 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   }
 
   async function selectSession(sessionId: string) {
-    if (!view.application || sessionId === view.activeSessionId) return;
+    if (!view.application || sessionId === view.activeSessionId || busy) return;
     setBusy("session");
     setError(null);
     try {
       const next = await jsonRequest<PhaseOneView>(
-        `/api/bootstrap?session=${encodeURIComponent(sessionId)}`,
+        `/api/applications/${view.application.id}?session=${encodeURIComponent(sessionId)}`,
       );
       setView(next);
     } catch (caught) {
@@ -151,7 +162,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   }
 
   async function createChat() {
-    if (!view.application) return;
+    if (!view.application || busy) return;
     setBusy("new-chat");
     setError(null);
     try {
@@ -168,7 +179,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   }
 
   async function archiveActiveChat() {
-    if (!view.application || !activeSession || activeSession.isPrimary) return;
+    if (!view.application || !activeSession || activeSession.isPrimary || busy) return;
     setBusy("archive");
     setError(null);
     try {
@@ -186,7 +197,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
-    if (!view.application || !activeSession || !composer.trim()) return;
+    if (!view.application || !activeSession || !composer.trim() || busy) return;
     const message = composer.trim();
     setComposer("");
     setBusy("message");
@@ -200,7 +211,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Pi could not respond.");
       const refreshed = await jsonRequest<PhaseOneView>(
-        `/api/bootstrap?session=${encodeURIComponent(activeSession.id)}`,
+        `/api/applications/${view.application.id}?session=${encodeURIComponent(activeSession.id)}`,
       ).catch(() => null);
       if (refreshed) setView(refreshed);
     } finally {
@@ -209,7 +220,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   }
 
   async function rerunRepositoryCheck() {
-    if (!view.application) return;
+    if (!view.application || busy) return;
     setBusy("rerun");
     setError(null);
     try {
@@ -218,7 +229,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
         { method: "POST", body: "{}" },
       );
       setView(next);
-      setSelectedCheck(next.checks.find((check) => check.key === "repository-readable") ?? null);
+      setSelectedCheckKey("repository-readable");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not rerun the check.");
     } finally {
@@ -227,7 +238,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
   }
 
   function askAboutCheck(check: GateCheck) {
-    setSelectedCheck(null);
+    setSelectedCheckKey(null);
     setComposer(`Explain “${check.label}”, its current result, and what I can verify myself.`);
     requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus());
   }
@@ -301,6 +312,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
               view.sessions.map((session) => (
                 <button
                   className={`sg-session ${session.id === view.activeSessionId ? "selected" : ""}`}
+                  disabled={busy !== null}
                   key={session.id}
                   onClick={() => selectSession(session.id)}
                   type="button"
@@ -370,7 +382,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                     </span>
                     <strong>{message.role === "user" ? "You" : "Pi"}</strong>
                     {message.source === "server-guy" && <span className="sg-source-tag">Recorded event</span>}
-                    <time>{relativeTime(message.createdAt)}</time>
+                    <time dateTime={message.createdAt}>{formatTimestamp(message.createdAt)}</time>
                   </div>
                   <MessageContent>
                     <MessageResponse>{message.body}</MessageResponse>
@@ -458,7 +470,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
+                  if (!busy) event.currentTarget.form?.requestSubmit();
                 }
               }}
               placeholder={view.application ? "Ask Pi, correct a decision, or add context…" : "Create the application workspace to start chatting"}
@@ -505,7 +517,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                 </div>
                 <div className="sg-check-list">
                   {checks.map((check, index) => (
-                    <button className="sg-check" key={check.key} onClick={() => setSelectedCheck(check)} type="button">
+                    <button className="sg-check" key={check.key} onClick={() => setSelectedCheckKey(check.key)} type="button">
                       <span className={`sg-check-icon ${check.status}`}>
                         {check.status === "passed" ? <Check weight="bold" /> : <Circle weight="bold" />}
                       </span>
@@ -534,6 +546,22 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                     <p>No decisions recorded yet.</p>
                   )}
                 </section>
+                <section className="sg-record-section">
+                  <span className="sg-eyebrow">Later prerequisites</span>
+                  {view.blockers.length ? (
+                    <div className="sg-prerequisite-list">
+                      {view.blockers.map((blocker) => (
+                        <article key={blocker.id}>
+                          <span className={blocker.status}>{blocker.status}</span>
+                          <strong>{blocker.label}</strong>
+                          <small>{blocker.resolutionPath} Owner: {blocker.owner}.</small>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Prerequisites are recorded when the workspace is created.</p>
+                  )}
+                </section>
               </>
             )}
 
@@ -544,7 +572,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                   view.activity.map((event) => (
                     <article className="sg-event" key={event.id}>
                       <span className="sg-event-dot" />
-                      <div><strong>{event.summary}</strong><p>{event.detail}</p><time>{relativeTime(event.createdAt)}</time></div>
+                      <div><strong>{event.summary}</strong><p>{event.detail}</p><time dateTime={event.createdAt}>{formatTimestamp(event.createdAt)}</time></div>
                     </article>
                   ))
                 ) : (
@@ -569,7 +597,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                     <article className="sg-receipt" key={observation.id}>
                       <div>
                         <GithubLogo weight="fill" />
-                        <span><strong>{observation.sourceLabel}</strong><small>{relativeTime(observation.observedAt)}</small></span>
+                        <span><strong>{observation.sourceLabel}</strong><small>{formatTimestamp(observation.observedAt)}</small></span>
                         <em className={observation.status}>{observation.status}</em>
                       </div>
                       <p>{observation.summary}</p>
@@ -589,7 +617,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
       </section>
 
       {selectedCheck && (
-        <div className="sg-drawer-layer" role="presentation" onMouseDown={() => setSelectedCheck(null)}>
+        <div className="sg-drawer-layer" role="presentation" onMouseDown={() => setSelectedCheckKey(null)}>
           <aside
             aria-label={`${selectedCheck.label} details`}
             aria-modal="true"
@@ -599,7 +627,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
           >
             <header>
               <div><span className="sg-eyebrow">Launch Brief check</span><h2>{selectedCheck.label}</h2></div>
-              <button aria-label="Close details" className="sg-icon-button" onClick={() => setSelectedCheck(null)} type="button"><X /></button>
+              <button aria-label="Close details" className="sg-icon-button" onClick={() => setSelectedCheckKey(null)} type="button"><X /></button>
             </header>
             <section className="sg-drawer-summary">
               <span className={`sg-check-icon ${selectedCheck.status}`}>
@@ -626,7 +654,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneView }) {
                   </a>
                 )}
               </div>
-              {selectedCheck.observedAt && <small>Observed {relativeTime(selectedCheck.observedAt)}</small>}
+              {selectedCheck.observedAt && <small>Recorded {formatTimestamp(selectedCheck.observedAt)}</small>}
             </section>
             <section>
               <span className="sg-eyebrow">Take control</span>

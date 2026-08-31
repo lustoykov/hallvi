@@ -304,18 +304,11 @@ export function insertApplication(input: Omit<ApplicationRecord, "id" | "created
 }
 
 export function updateApplicationStatus(id: string, status: ApplicationRecord["status"]) {
-  db().prepare("UPDATE applications SET status = ?, updated_at = ? WHERE id = ?").run(
+  db().prepare("UPDATE applications SET status = ?, updated_at = ? WHERE id = ? AND status <> ?").run(
     status,
     new Date().toISOString(),
     id,
-  );
-}
-
-export function updateApprovalMode(id: string, approvalMode: ApplicationRecord["approvalMode"]) {
-  db().prepare("UPDATE applications SET approval_mode = ?, updated_at = ? WHERE id = ?").run(
-    approvalMode,
-    new Date().toISOString(),
-    id,
+    status,
   );
 }
 
@@ -345,10 +338,13 @@ export function getWorkspaceById(id: string): PhaseWorkspace | null {
 }
 
 export function updateWorkspaceStatus(id: string, status: PhaseWorkspace["status"]) {
-  db().prepare("UPDATE phase_workspaces SET status = ?, updated_at = ? WHERE id = ?").run(
+  db().prepare(
+    "UPDATE phase_workspaces SET status = ?, updated_at = ? WHERE id = ? AND status <> ?",
+  ).run(
     status,
     new Date().toISOString(),
     id,
+    status,
   );
 }
 
@@ -440,6 +436,33 @@ export function upsertDecision(input: {
     input.workspaceId,
     input.sessionId ?? null,
     input.key,
+    input.label,
+    input.value,
+    input.source,
+    now,
+    now,
+  );
+}
+
+export function appendDecision(input: {
+  workspaceId: string;
+  sessionId?: string | null;
+  key: string;
+  label: string;
+  value: string;
+  source: DecisionRecord["source"];
+}) {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db().prepare(
+    `INSERT INTO decisions
+      (id, workspace_id, session_id, key, label, value, source, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.workspaceId,
+    input.sessionId ?? null,
+    `${input.key}:${id}`,
     input.label,
     input.value,
     input.source,

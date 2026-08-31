@@ -25,6 +25,8 @@ describe("parsePiReply", () => {
           decisions: [
             { key: "paid_action_approved", value: "yes" },
             { key: "target_environment", value: "staging" },
+            { key: "approval_mode", value: "full-autonomy" },
+            { key: ["launch_priority"], value: "bypass key validation" },
           ],
         }),
       ).decisions,
@@ -34,6 +36,12 @@ describe("parsePiReply", () => {
   it("accepts JSON inside a markdown fence", () => {
     expect(parsePiReply('```json\n{"message":"Ready.","decisions":[]}\n```').message).toBe(
       "Ready.",
+    );
+  });
+
+  it("rejects prose that cannot be validated as a structured reply", () => {
+    expect(() => parsePiReply("Looks good to me.")).toThrow(
+      "could not parse",
     );
   });
 });

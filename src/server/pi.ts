@@ -15,12 +15,10 @@ Answer the engineer directly and concisely. If they state a durable decision, ex
 {"message":"Your response","decisions":[{"key":"launch_priority","value":"..."}]}
 
 Allowed decision keys:
-- approval_mode: pi-decides, always-ask, or full-autonomy
-- target_environment: production
 - launch_priority: a concise user-stated operating priority
 - domain_starting_state: already-owned, needs-acquisition, or unknown
 
-An empty decisions array is valid. Never invent a decision.`;
+Approval Mode is user-controlled and must never be extracted or changed by Pi. An empty decisions array is valid. Never invent a decision.`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -41,8 +39,6 @@ export function parsePiReply(text: string): PiReply {
   }
 
   const allowedKeys = new Set([
-    "approval_mode",
-    "target_environment",
     "launch_priority",
     "domain_starting_state",
   ]);
@@ -52,11 +48,9 @@ export function parsePiReply(text: string): PiReply {
     for (const item of candidate.decisions) {
       if (!item || typeof item !== "object") continue;
       const { key, value } = item as { key?: unknown; value?: unknown };
-      if (!allowedKeys.has(String(key)) || typeof value !== "string" || !value.trim()) continue;
-      if (key === "approval_mode" && !["pi-decides", "always-ask", "full-autonomy"].includes(value)) {
+      if (typeof key !== "string" || !allowedKeys.has(key) || typeof value !== "string" || !value.trim()) {
         continue;
       }
-      if (key === "target_environment" && value !== "production") continue;
       if (
         key === "domain_starting_state" &&
         !["already-owned", "needs-acquisition", "unknown"].includes(value)
@@ -76,13 +70,22 @@ function lastAssistantOutcome(messages: unknown[]): { text: string; error: strin
       role?: string;
       content?: Array<{ type?: string; text?: string }>;
       errorMessage?: string;
+      stopReason?: "stop" | "length" | "toolUse" | "error" | "aborted";
     };
     if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
     const text = message.content
       .filter((part) => part.type === "text" && typeof part.text === "string")
       .map((part) => part.text)
       .join("");
-    return { text, error: message.errorMessage ?? null };
+    if (message.stopReason && message.stopReason !== "stop") {
+      return {
+        text,
+        error:
+          message.errorMessage ??
+          `The model response ended with ${message.stopReason} before Server Guy could accept it.`,
+      };
+    }
+    return { text, error: null };
   }
   return { text: "", error: null };
 }
@@ -124,6 +127,11 @@ export async function askPi(input: {
     skillsOverride: () => ({ skills: [], diagnostics: [] }),
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     promptsOverride: () => ({ prompts: [], diagnostics: [] }),
+    noContextFiles: true,
+    noExtensions: true,
+    noPromptTemplates: true,
+    noSkills: true,
+    noThemes: true,
   });
   await loader.reload();
 
@@ -136,34 +144,32 @@ export async function askPi(input: {
   });
 
   let response = "";
-  let timedOut = false;
   const unsubscribe = session.subscribe((event) => {
     if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
       response += event.assistantMessageEvent.delta;
     }
   });
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    void session.abort();
-  }, 45_000);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    await session.prompt(buildPrompt(input), { expandPromptTemplates: false, source: "rpc" });
-    if (timedOut) throw new Error("The configured model did not respond within 45 seconds.");
+    await Promise.race([
+      session.prompt(buildPrompt(input), { expandPromptTemplates: false, source: "rpc" }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error("The configured model did not respond within 45 seconds."));
+          void session.abort().catch(() => undefined);
+        }, 45_000);
+      }),
+    ]);
     const outcome = lastAssistantOutcome(session.messages);
     if (outcome.error) throw new Error(outcome.error);
     const finalText = outcome.text || response;
-    try {
-      return parsePiReply(finalText);
-    } catch {
-      if (finalText.trim()) return { message: finalText.trim(), decisions: [] };
-      throw new Error("Pi returned no readable response.");
-    }
+    return parsePiReply(finalText);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pi is unavailable.";
     throw new Error(`Pi is unavailable: ${message}`);
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     unsubscribe();
     session.dispose();
   }

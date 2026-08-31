@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseGithubRepository } from "./github";
+import { classifyGithubFailure, parseGithubRepository } from "./github";
 
 describe("parseGithubRepository", () => {
   it("normalizes an HTTPS GitHub URL", () => {
@@ -19,9 +19,45 @@ describe("parseGithubRepository", () => {
     });
   });
 
+  it("canonicalizes case, a trailing slash, and URL metadata", () => {
+    expect(
+      parseGithubRepository("https://github.com/LusToykov/Todo-FastAPI.git/?tab=readme"),
+    ).toEqual({
+      owner: "lustoykov",
+      name: "todo-fastapi",
+      canonicalUrl: "https://github.com/lustoykov/todo-fastapi",
+    });
+  });
+
   it("rejects a non-GitHub repository", () => {
     expect(() => parseGithubRepository("https://gitlab.com/example/app")).toThrow(
       "currently accepts GitHub repositories only",
     );
+  });
+
+  it("rejects paths that do not identify exactly one repository", () => {
+    expect(() => parseGithubRepository("https://github.com/example/app/issues/1")).toThrow(
+      "only an owner and repository name",
+    );
+  });
+});
+
+describe("classifyGithubFailure", () => {
+  it("marks missing or unauthenticated GitHub tooling as unavailable", () => {
+    expect(classifyGithubFailure({ code: "ENOENT", message: "spawn gh ENOENT" })).toEqual({
+      status: "unavailable",
+      reason: "spawn gh ENOENT",
+    });
+    expect(classifyGithubFailure({ stderr: "gh: not logged into any GitHub hosts" })).toEqual({
+      status: "unavailable",
+      reason: "gh: not logged into any GitHub hosts",
+    });
+  });
+
+  it("preserves provider errors that mean the repository check failed", () => {
+    expect(classifyGithubFailure({ stderr: "gh: Not Found (HTTP 404)" })).toEqual({
+      status: "failed",
+      reason: "gh: Not Found (HTTP 404)",
+    });
   });
 });

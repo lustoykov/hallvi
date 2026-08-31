@@ -3,13 +3,13 @@ import type { ApprovalMode } from "./types";
 export const PHASES = [
   { number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
   { number: 2, name: "Inspect app", deliverable: "Application Contract", group: "plan" },
-  { number: 3, name: "Prepare app", deliverable: "Conformance Result", group: "plan" },
-  { number: 4, name: "Review plan", deliverable: "Launch Plan", group: "plan" },
-  { number: 5, name: "Create server", deliverable: "Host Record", group: "setup" },
-  { number: 6, name: "Claim domain", deliverable: "Domain Route", group: "setup" },
-  { number: 7, name: "Add safeguards", deliverable: "Operational Baseline", group: "setup" },
+  { number: 3, name: "Make launch-ready", deliverable: "Conformance Result", group: "plan" },
+  { number: 4, name: "Review launch plan", deliverable: "Launch Plan", group: "plan" },
+  { number: 5, name: "Set up server", deliverable: "Host Record", group: "setup" },
+  { number: 6, name: "Connect domain", deliverable: "Domain Route", group: "setup" },
+  { number: 7, name: "Configure and protect", deliverable: "Operational Baseline", group: "setup" },
   { number: 8, name: "Go live", deliverable: "Verified Release", group: "live" },
-  { number: 9, name: "Operate", deliverable: "Operations Handoff", group: "live" },
+  { number: 9, name: "Handoff", deliverable: "Operations Handoff", group: "live" },
 ] as const;
 
 export const PHASE_ONE_CHECKS = [
@@ -35,7 +35,7 @@ export const PHASE_ONE_CHECKS = [
     key: "approval-authority",
     label: "Permission policy is explicit",
     definition:
-      "The user has chosen how Pi should decide when to ask, and the current launch scope is recorded.",
+      "The user has chosen how Pi should decide when to ask, and the launch scope plus currently available access are recorded.",
   },
   {
     key: "intent-prerequisites",

@@ -1,4 +1,5 @@
 import {
+  appendDecision,
   getApplication,
   getApplicationByRepository,
   getLatestApplication,
@@ -21,7 +22,6 @@ import {
   resolveBlocker,
   resolveSession,
   updateApplicationStatus,
-  updateApprovalMode,
   updateWorkspaceStatus,
   upsertBlocker,
   upsertDecision,
@@ -36,12 +36,13 @@ import {
   PRODUCT_DEFAULTS,
 } from "./phase-one-spec";
 import type {
-  ApprovalMode,
   CreateApplicationInput,
   GateCheck,
   PhaseOneView,
   PiDecision,
 } from "./types";
+
+export class ExistingApplicationConflictError extends Error {}
 
 function normalizeCreateInput(input: CreateApplicationInput): CreateApplicationInput {
   if (input.environment !== "production") {
@@ -57,7 +58,14 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
   const input = normalizeCreateInput(rawInput);
   const repository = parseGithubRepository(input.repositoryUrl);
   const existing = getApplicationByRepository(repository.canonicalUrl);
-  if (existing) return getPhaseOneView(existing.id);
+  if (existing) {
+    if (existing.approvalMode !== input.approvalMode) {
+      throw new ExistingApplicationConflictError(
+        `A launch workspace already exists for this repository with ${APPROVAL_MODE_LABELS[existing.approvalMode]}. Open that workspace instead of replacing its permission policy.`,
+      );
+    }
+    return { view: getPhaseOneView(existing.id), created: false };
+  }
 
   const application = withTransaction(() => {
     const application = insertApplication({
@@ -133,8 +141,7 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
   });
 
   await observeRepository(application.id);
-  refreshCompletion(application.id);
-  return getPhaseOneView(application.id);
+  return { view: getPhaseOneView(application.id), created: true };
 }
 
 export async function observeRepository(applicationId: string) {
@@ -153,18 +160,43 @@ export async function observeRepository(applicationId: string) {
     applicationId: application.id,
     workspaceId: workspace.id,
     kind: "github-repository-identity",
-    status: result.ok ? "passed" : "failed",
+    status: result.status,
     summary: result.summary,
-    sourceLabel: result.ok ? "GitHub commit" : "GitHub repository",
+    sourceLabel: result.status === "passed" ? "GitHub commit" : "GitHub repository check",
     sourceUrl: result.sourceUrl,
     raw: result.raw,
   });
   insertActivity(
     workspace.id,
-    result.ok ? "repository-observed" : "repository-unavailable",
-    result.ok ? "Repository identity recorded" : "Repository check failed",
+    result.status === "passed" ? "repository-observed" : "repository-unavailable",
+    result.status === "passed" ? "Repository identity recorded" : "Repository check did not pass",
     observation.summary,
   );
+
+  insertObservation({
+    applicationId: application.id,
+    workspaceId: workspace.id,
+    kind: "authority-context",
+    status: "passed",
+    summary:
+      result.status === "passed"
+        ? "GitHub repository access is recorded. Hetzner and Cloudflare are not configured yet."
+        : "GitHub repository access is not currently available. Hetzner and Cloudflare are not configured yet.",
+    sourceLabel: "Server Guy authority snapshot",
+    sourceUrl: null,
+    raw: {
+      approvalMode: application.approvalMode,
+      approvalScope: application.approvalScope,
+      github: {
+        status: result.status,
+        repository: result.raw.repository,
+        authenticatedAs: result.raw.authenticatedAs ?? null,
+        permissions: result.raw.permissions ?? null,
+      },
+      hetzner: "not-configured",
+      cloudflare: "not-configured",
+    },
+  });
   refreshCompletion(application.id);
   return observation;
 }
@@ -177,11 +209,17 @@ function computeChecks(applicationId: string): GateCheck[] {
   const decisions = listDecisions(workspace.id);
   const decisionByKey = new Map(decisions.map((decision) => [decision.key, decision]));
   const repository = latestObservation(workspace.id, "github-repository-identity");
+  const authority = latestObservation(workspace.id, "authority-context");
   const blockers = listBlockers(workspace.id);
   const prioritiesRecorded = PRODUCT_DEFAULTS.every(([key]) => decisionByKey.has(key));
   const prerequisitesRecorded = PREREQUISITES.every(({ key }) => blockers.some((item) => item.key === key));
 
-  const values: Record<string, Omit<GateCheck, "key" | "label" | "definition">> = {
+  const intentSources = [
+    ...PRODUCT_DEFAULTS.map(([key]) => decisionByKey.get(key)?.updatedAt ?? null),
+    ...PREREQUISITES.map(({ key }) => blockers.find((blocker) => blocker.key === key)?.createdAt ?? null),
+  ].filter((value): value is string => Boolean(value));
+  const intentRecordedAt = intentSources.sort().at(-1) ?? null;
+  const values = {
     "application-identity": {
       status: "passed",
       result: `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`,
@@ -213,34 +251,37 @@ function computeChecks(applicationId: string): GateCheck[] {
     },
     "approval-authority": {
       status:
-        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope")
+        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope") && authority
           ? "passed"
           : "not-yet",
       result:
-        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope")
-          ? `${decisionByKey.get("approval_mode")!.value} · ${decisionByKey.get("approval_scope")!.value}`
-          : "Choose how Pi should ask for permission.",
+        decisionByKey.has("approval_mode") && decisionByKey.has("approval_scope") && authority
+          ? `${decisionByKey.get("approval_mode")!.value} · ${decisionByKey.get("approval_scope")!.value}. ${authority.summary}`
+          : "Choose how Pi should ask for permission and record the access currently available.",
       sourceLabel: "Permission decision",
       sourceUrl: decisionByKey.get("approval_mode")
         ? `/api/decisions/${decisionByKey.get("approval_mode")!.id}`
         : null,
-      observationId: null,
-      observedAt: decisionByKey.get("approval_mode")?.updatedAt ?? null,
+      observationId: authority?.id ?? null,
+      observedAt: authority?.observedAt ?? decisionByKey.get("approval_mode")?.updatedAt ?? null,
       canRerun: false,
     },
     "intent-prerequisites": {
       status: prioritiesRecorded && prerequisitesRecorded ? "passed" : "not-yet",
       result:
         prioritiesRecorded && prerequisitesRecorded
-          ? "Database protection, low downtime, low cost, and three later prerequisites are recorded."
+          ? `${PRODUCT_DEFAULTS.map(([, label]) => label).join(", ")}. ${PREREQUISITES.length} later prerequisites are recorded with owners and resolution paths.`
           : "Launch priorities or prerequisites are incomplete.",
       sourceLabel: "Launch record",
       sourceUrl: `/api/applications/${application.id}`,
       observationId: null,
-      observedAt: workspace.updatedAt,
+      observedAt: intentRecordedAt,
       canRerun: false,
     },
-  };
+  } satisfies Record<
+    (typeof PHASE_ONE_CHECKS)[number]["key"],
+    Omit<GateCheck, "key" | "label" | "definition">
+  >;
 
   return PHASE_ONE_CHECKS.map((check) => ({ ...check, ...values[check.key] }));
 }
@@ -329,18 +370,12 @@ export function archiveChat(applicationId: string, sessionId: string) {
 
 function decisionLabel(decision: PiDecision) {
   return {
-    approval_mode: "Permission policy",
-    target_environment: "Target environment",
     launch_priority: "Additional launch priority",
     domain_starting_state: "Domain starting state",
   }[decision.key];
 }
 
 function displayDecisionValue(decision: PiDecision) {
-  if (decision.key === "approval_mode") {
-    return APPROVAL_MODE_LABELS[decision.value as ApprovalMode];
-  }
-  if (decision.key === "target_environment") return "Production";
   if (decision.key === "domain_starting_state") {
     return ({
       "already-owned": "Domain already owned",
@@ -385,30 +420,30 @@ export async function sendChatMessage(applicationId: string, sessionId: string, 
     decisions: listDecisions(workspace.id),
     recordSummary,
   });
-  insertMessage(session.id, "assistant", reply.message, "pi");
-
-  for (const decision of reply.decisions) {
-    upsertDecision({
-      workspaceId: workspace.id,
-      sessionId: session.id,
-      key: decision.key,
-      label: decisionLabel(decision),
-      value: displayDecisionValue(decision),
-      source: "chat",
-    });
-    if (decision.key === "approval_mode") {
-      updateApprovalMode(application.id, decision.value as ApprovalMode);
+  withTransaction(() => {
+    insertMessage(session.id, "assistant", reply.message, "pi");
+    for (const decision of reply.decisions) {
+      const input = {
+        workspaceId: workspace.id,
+        sessionId: session.id,
+        key: decision.key,
+        label: decisionLabel(decision),
+        value: displayDecisionValue(decision),
+        source: "chat" as const,
+      };
+      if (decision.key === "launch_priority") appendDecision(input);
+      else upsertDecision(input);
+      if (decision.key === "domain_starting_state" && decision.value !== "unknown") {
+        resolveBlocker(workspace.id, "domain-starting-state");
+      }
+      insertActivity(
+        workspace.id,
+        "decision-recorded",
+        "Decision recorded from chat",
+        `${decisionLabel(decision)}: ${displayDecisionValue(decision)}`,
+      );
     }
-    if (decision.key === "domain_starting_state" && decision.value !== "unknown") {
-      resolveBlocker(workspace.id, "domain-starting-state");
-    }
-    insertActivity(
-      workspace.id,
-      "decision-recorded",
-      "Decision recorded from chat",
-      `${decisionLabel(decision)}: ${displayDecisionValue(decision)}`,
-    );
-  }
+  });
 
   refreshCompletion(application.id);
   return getPhaseOneView(application.id, session.id);

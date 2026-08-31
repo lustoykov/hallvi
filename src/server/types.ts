@@ -132,7 +132,7 @@ export interface CreateApplicationInput {
 }
 
 export interface PiDecision {
-  key: "approval_mode" | "target_environment" | "launch_priority" | "domain_starting_state";
+  key: "launch_priority" | "domain_starting_state";
   value: string;
 }
 

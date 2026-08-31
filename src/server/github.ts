@@ -10,7 +10,7 @@ export interface RepositoryIdentity {
 }
 
 export interface GithubInspection {
-  ok: boolean;
+  status: "passed" | "failed" | "unavailable";
   summary: string;
   sourceUrl: string;
   raw: {
@@ -26,12 +26,16 @@ export interface GithubInspection {
 }
 
 export function parseGithubRepository(value: string): RepositoryIdentity {
-  const input = value.trim().replace(/\.git$/, "");
+  const input = value.trim();
   let owner = "";
   let name = "";
 
   if (input.startsWith("git@github.com:")) {
-    [owner, name] = input.slice("git@github.com:".length).split("/");
+    const parts = input.slice("git@github.com:".length).split("/").filter(Boolean);
+    if (parts.length !== 2) {
+      throw new Error("Enter a GitHub repository with only an owner and repository name.");
+    }
+    [owner, name] = parts;
   } else {
     let url: URL;
     try {
@@ -42,18 +46,40 @@ export function parseGithubRepository(value: string): RepositoryIdentity {
     if (url.hostname.toLowerCase() !== "github.com") {
       throw new Error("Phase 1 currently accepts GitHub repositories only.");
     }
-    [owner, name] = url.pathname.split("/").filter(Boolean);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length !== 2) {
+      throw new Error("Enter a GitHub repository with only an owner and repository name.");
+    }
+    [owner, name] = parts;
   }
+
+  name = name.replace(/\.git$/i, "");
 
   if (!owner || !name || !/^[A-Za-z0-9_.-]+$/.test(owner) || !/^[A-Za-z0-9_.-]+$/.test(name)) {
     throw new Error("Enter a GitHub repository URL with both an owner and repository name.");
   }
 
+  const canonicalOwner = owner.toLowerCase();
+  const canonicalName = name.toLowerCase();
   return {
-    owner,
-    name,
-    canonicalUrl: `https://github.com/${owner}/${name}`,
+    owner: canonicalOwner,
+    name: canonicalName,
+    canonicalUrl: `https://github.com/${canonicalOwner}/${canonicalName}`,
   };
+}
+
+export function classifyGithubFailure(error: unknown): {
+  status: "failed" | "unavailable";
+  reason: string;
+} {
+  const details = error as { code?: unknown; stderr?: unknown; message?: unknown };
+  const stderr = typeof details?.stderr === "string" ? details.stderr.trim() : "";
+  const message = typeof details?.message === "string" ? details.message.trim() : "";
+  const reason = stderr || message || "GitHub inspection failed.";
+  const unavailable =
+    details?.code === "ENOENT" ||
+    /not logged|auth|rate limit|timed? ?out|network|connect|spawn|not found.*command/i.test(reason);
+  return { status: unavailable ? "unavailable" : "failed", reason };
 }
 
 async function ghJson<T>(args: string[]): Promise<T> {
@@ -80,16 +106,14 @@ export async function inspectGithubRepository(
       permissions?: Record<string, boolean>;
     }>(["api", `repos/${repository.owner}/${repository.name}`]);
 
-    const [commit, user] = await Promise.all([
-      ghJson<{ sha: string; html_url: string }>([
-        "api",
-        `repos/${repository.owner}/${repository.name}/commits/${repo.default_branch}`,
-      ]),
-      ghJson<{ login: string }>(["api", "user"]),
+    const commit = await ghJson<{ sha: string; html_url: string }>([
+      "api",
+      `repos/${repository.owner}/${repository.name}/commits/${repo.default_branch}`,
     ]);
+    const user = await ghJson<{ login: string }>(["api", "user"]).catch(() => null);
 
     return {
-      ok: true,
+      status: "passed",
       summary: `${repo.full_name} is readable at ${repo.default_branch} · ${commit.sha.slice(0, 8)}.`,
       sourceUrl: commit.html_url,
       raw: {
@@ -98,19 +122,22 @@ export async function inspectGithubRepository(
         defaultBranch: repo.default_branch,
         commitSha: commit.sha,
         commitUrl: commit.html_url,
-        authenticatedAs: user.login,
+        authenticatedAs: user?.login,
         permissions: repo.permissions,
       },
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message.split("\n")[0] : "GitHub inspection failed.";
+    const failure = classifyGithubFailure(error);
     return {
-      ok: false,
-      summary: `Server Guy could not read ${repository.owner}/${repository.name}.`,
+      status: failure.status,
+      summary:
+        failure.status === "unavailable"
+          ? `GitHub inspection is unavailable: ${failure.reason}`
+          : `${repository.owner}/${repository.name} is not readable with the current GitHub access: ${failure.reason}`,
       sourceUrl,
       raw: {
         repository: `${repository.owner}/${repository.name}`,
-        error: message,
+        error: failure.reason,
       },
     };
   }
