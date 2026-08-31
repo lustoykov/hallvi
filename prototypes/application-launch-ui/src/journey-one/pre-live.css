@@ -1,45 +1,56 @@
-/* Not-live-yet treatment for setup phases 5-7 and the live threshold before 8.
-   Equal phase columns give the band a stable center at every supported width. */
+/* Not-live-yet treatment for the phase rail: phases 5-7 sit on one continuous
+   dashed band with a centered caption, and a divider marks the live threshold
+   before phase 8. Kept in its own stylesheet, keyed by rail position, so it
+   composes with journey-one.css without touching it.
 
-.phase-rail {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  grid-template-rows: auto 18px;
-  column-gap: 0;
-  row-gap: 4px;
-  padding-bottom: 8px;
+   The band uses CSS anchor positioning to span exactly from the left edge of
+   phase 5 to the right edge of phase 7, whatever justify-content does with the
+   gaps. In a browser without anchor support the band and caption simply do not
+   render; the labels still tell the story. */
+
+.phase-rail { position: relative; padding: 12px 16px 34px; }
+
+/* roomier items: labels stop crowding the number badges */
+.phase-rail .rail-phase { padding: 7px 10px; gap: 7px; }
+
+.phase-rail .rail-phase:nth-child(5) { anchor-name: --setup-first; }
+.phase-rail .rail-phase:nth-child(7) { anchor-name: --setup-last; }
+
+@supports (left: anchor(left)) {
+  /* one continuous dashed band under Create server -> Add safeguards */
+  .phase-rail::before {
+    content: "";
+    position: absolute;
+    left: anchor(--setup-first left);
+    right: anchor(--setup-last right);
+    bottom: 24px;
+    border-bottom: 2px dashed var(--line-strong);
+  }
+  /* caption centered on the band itself, not on any one phase */
+  .phase-rail::after {
+    content: "setup only · not live yet";
+    position: absolute;
+    left: anchor(--setup-first left);
+    right: anchor(--setup-last right);
+    bottom: 7px;
+    width: max-content;
+    margin-inline: auto;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
 }
 
-.phase-rail .rail-phase {
-  grid-row: 1;
-  justify-self: center;
-}
-
-/* One continuous, centered band under Create server through Add safeguards. */
-.phase-rail::before {
-  content: "setup only · not live yet";
-  grid-column: 5 / 8;
-  grid-row: 2;
-  align-self: start;
-  margin: 0 14px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--line-strong);
-  color: var(--soft);
-  font: 9px/1.1 var(--mono);
-  letter-spacing: .06em;
-  text-align: center;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* Exact grid boundary between setup and the first potentially live phase. */
-.phase-rail::after {
+/* the live threshold: a quiet divider in the gap before Go live */
+.phase-rail .rail-phase:nth-child(8) { position: relative; }
+.phase-rail .rail-phase:nth-child(8)::before {
   content: "";
   position: absolute;
-  top: 10px;
-  bottom: 8px;
-  left: calc(77.777777% - 9px);
-  border-left: 1px solid var(--green);
-  opacity: .65;
+  left: -14px;
+  top: 6px;
+  bottom: 6px;
+  border-left: 2px solid var(--green);
+  opacity: .5;
 }
