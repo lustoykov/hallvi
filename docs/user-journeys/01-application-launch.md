@@ -4,7 +4,7 @@ Status: canonical workshop draft. This document is the single product and UI spe
 
 [Open the Journey 1 diagrams](./diagrams/01-application-launch.html)
 
-[Open the Journey 1 interactive UI](../../prototypes/application-launch-ui/README.md)
+[Run the implemented Journey 1 Phase 1 UI](../../README.md)
 
 ## Purpose
 
