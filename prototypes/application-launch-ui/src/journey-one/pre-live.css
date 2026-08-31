@@ -1,47 +1,32 @@
-/* Not-live-yet treatment for the phase rail: one dashed line under phases 5-7
-   with the caption embedded at its center (the line breaks around the text),
-   plus a divider marking the live threshold before phase 8. Kept in its own
-   stylesheet, keyed by rail position, so it composes with journey-one.css
-   without touching it. Uses CSS anchor positioning to span exactly from the
-   left edge of phase 5 to the right edge of phase 7; without anchor support
-   the treatment simply does not render. */
+/* Not-live-yet treatment for the phase rail. The band itself is a measured DOM
+   element created by preLiveBand.js (see the note there for why CSS anchor
+   positioning was abandoned); this file only styles it. The caption sits
+   between two flexible dashed rules, so it is centered by flex layout. */
 
-.phase-rail { position: relative; padding: 12px 16px 24px; }
+.phase-rail { position: relative; padding: 12px 16px 26px; }
 
 .phase-rail .rail-phase { padding: 7px 10px; gap: 7px; }
 
-.phase-rail .rail-phase:nth-child(5) { anchor-name: --setup-first; }
-.phase-rail .rail-phase:nth-child(7) { anchor-name: --setup-last; }
-
-@supports (left: anchor(left)) {
-  /* the dashed line, tight under phases 5-7 */
-  .phase-rail::before {
-    content: "";
-    position: absolute;
-    left: anchor(--setup-first left);
-    right: anchor(--setup-last right);
-    bottom: 11px;
-    border-bottom: 2px dashed var(--line-strong);
-  }
-  /* the caption sits ON the line, dead center of the span; its background
-     masks the dashes so the line visually breaks around the words */
-  .phase-rail::after {
-    content: "setup only · not live yet";
-    position: absolute;
-    left: anchor(--setup-first left);
-    right: anchor(--setup-last right);
-    bottom: 5px;
-    width: max-content;
-    margin-inline: auto;
-    padding-inline: 10px;
-    background: var(--wash);
-    font-family: var(--mono);
-    font-size: 9px;
-    line-height: 12px;
-    letter-spacing: .07em;
-    text-transform: uppercase;
-    color: var(--soft);
-  }
+.pre-live-band {
+  position: absolute;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.pre-live-band i {
+  flex: 1;
+  border-bottom: 2px dashed var(--line-strong);
+}
+.pre-live-band span {
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--soft);
+  white-space: nowrap;
 }
 
 /* the live threshold: a quiet divider in the gap before Go live */
