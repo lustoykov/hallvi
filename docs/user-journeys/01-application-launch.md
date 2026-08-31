@@ -49,7 +49,7 @@ Application Launch is broader than a Deployment. It includes:
 - the engineer may already own a domain or may need the guided acquisition path;
 - the repository may or may not conform to a supported Application Profile.
 
-**Completion condition:** Phase 9's Exit Gate is satisfied, its Operator Session is archived, and the normal application workspace can show the current Release, public route, operational responsibilities, ongoing observation, evidence, costs, gaps, and ownership from the Operator Record without importing the archived transcript.
+**Completion condition:** Phase 9's Exit Gate is satisfied, its Phase Workspace and Operator Sessions are read-only, and the normal application workspace can show the current Release, public route, operational responsibilities, ongoing observation, evidence, costs, gaps, and ownership from the Operator Record without importing completed chat transcripts.
 
 “The container is running” is not completion. “The Deployment command returned success” is not completion. Reachable, Verified, and ongoing observation are distinct claims.
 
@@ -58,10 +58,11 @@ Application Launch is broader than a Deployment. It includes:
 ```text
 Application Launch
 └── 9 fixed Launch Phases
-    ├── 1 Phase Deliverable
-    ├── 1 Exit Gate
-    │   └── N fixed Gate Checks
-    └── exactly 1 Operator Session for the phase
+    └── 1 Phase Workspace
+        ├── 1 Phase Deliverable
+        ├── 1 Exit Gate
+        │   └── N fixed Gate Checks
+        └── 1..N Operator Sessions presented as chats
 ```
 
 The 39 `L*` rows in the earlier UI map are retained as **presentation and alternate-path inventory**, not as a second progression model. For example, `L6.3` domain delegation, `L6.5` propagation waiting, and `L6.6` DNS conflict are different interaction states inside Phase 6. They do not add phases or redefine its Gate Checks. Likewise, `L3.W1-L3.W3` are repository-handoff presentations inside the Phase 3 session, not hidden Launch substeps.
@@ -71,7 +72,7 @@ The current UI state is therefore a projection of:
 ```text
 current Launch Phase
 + Gate Check results and blockers
-+ current Operator Session and recognized decisions
++ selected Operator Session and phase-wide recognized decisions
 + current presentation family
 + selected detail destination
 ```
@@ -80,7 +81,7 @@ current Launch Phase
 
 | Phase | Phase Deliverable | Engineer experience | Pi and Server Guy behavior |
 | --- | --- | --- | --- |
-| **1. Start** | **Launch Brief** | Selects the repository, Environment, Approval Mode, and material operating intent; sees prerequisites without being overwhelmed. | Creates the Application record and phase session, validates read access, records decisions, and makes blockers explicit. |
+| **1. Start** | **Launch Brief** | Selects the repository, Environment, Approval Mode, and material operating intent; sees prerequisites without being overwhelmed. | Creates the Application record and Phase Workspace, validates read access, records decisions, and makes blockers explicit. |
 | **2. Inspect app** | **Application Contract** | Watches Pi inspect the repository, sees provenance, and corrects unsupported assumptions. | Resolves an Application Profile, constructs the app-level contract, and keeps unknowns and incompatibilities visible. |
 | **3. Make launch-ready** | **Conformance Result** | Reviews required repository work and can use Pi, Codex, Claude, another harness, or manual work under the same bounded brief. | Tracks one exact candidate revision, preserves worker evidence separately, and runs profile checks against the returned result. |
 | **4. Review launch plan** | **Launch Plan** | Reviews topology, cost, actors, effects, verification, and material risks before paid or account-level work. | Revises the plan when evidence changes and keeps VPS and domain operations separate. |
@@ -121,10 +122,10 @@ The selected environment returns its change and evidence without becoming author
 
 The Operator UI uses a stable shell. Pi may choose suitable typed content and explanations but may not generate arbitrary layout regions or visual meanings.
 
-1. **Application and phase-session navigation** — the current phase session is active; completed phase sessions are archived and inspectable; future phase sessions do not exist yet.
+1. **Application and phase-chat navigation** — the selected phase exposes a clear list of its chats; the current phase may create many; completed-phase chats are read-only and inspectable; future Phase Workspaces do not exist yet.
 2. **Application header** — application, Environment, Approval Mode, concise status, and always-visible nine-phase position.
 3. **Chat with Pi** — the primary flow and collaboration surface; Pi names the current Phase Deliverable and works toward the current Gate Checks.
-4. **Compact Operator Record** — current Phase Deliverable, every current Gate Check, unsatisfied reasons, evidence age when material, and Decision Records recognized from the current phase chat.
+4. **Compact Operator Record** — current Phase Deliverable, every current Gate Check, unsatisfied reasons, evidence age when material, and Decision Records recognized across the current phase's chats.
 5. **Deeper Inspector** — Activity, Changes, and Evidence opened on demand; it does not crowd the default view.
 6. **Control Point** — every Gate Check, Decision Record, material fact, Operational Claim, and Phase Deliverable has one Details path to explanation, proof, source/takeover, and re-verification.
 7. **Persistent composer** — free-text collaboration remains available even when structured input, approval, waiting, intervention, or outcome cards are present.
@@ -302,7 +303,7 @@ The following inputs are treated as fixed for this draft:
 
 - the nine Launch Phases and their Phase Deliverables;
 - Chat with Pi as the primary completion surface;
-- one Operator Session per Launch Phase;
+- one Phase Workspace with one or more Operator Sessions per Launch Phase;
 - the compact default sidebar shows the current Exit Gate and Decision Records recognized from chat;
 - Activity, Changes, and Evidence are opened on demand;
 - every Gate Check has a human-verifiable Control Point;
@@ -706,23 +707,27 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Open dependencies:** **U1**, **U6**, and **G-SENTINEL-WATCHDOG** determine the mandatory observer, owner, staleness bound, and consequence of silence.
 - **Invalidated by:** Observer configuration/owner, hostname, public contract, freshness policy, liveness evidence, or latest observation changing.
 
-## One Operator Session per phase
+## Multiple Operator Sessions per phase
 
-Each Launch Phase has exactly one Launch Operator Session. Chat is where the engineer and Pi work toward the current Gate Checks; it is not the durable source of truth for completed work. Other application conversations are outside this journey and do not become additional chats for the phase.
+Each Launch Phase has one Phase Workspace and may contain many Operator Sessions, presented as chats. The main chat begins with the phase. The engineer may create focused chats for separate questions or workstreams without creating another Phase Deliverable, Exit Gate, or Operator Record.
+
+All chats in the phase can read the shared Phase Workspace and contribute recognized decisions, facts, Operations, Blockers, and Evidence References to the Operator Record. Their conversation histories remain separate: one chat does not automatically import every sibling transcript. The chat list shows title, current status, and last activity so the engineer can switch context without losing phase position.
+
+Chat is where the engineer and Pi collaborate toward the current Gate Checks; no chat is the durable source of truth for phase progress. Other application conversations remain outside Journey 1.
 
 When every Gate Check in the current Exit Gate becomes Satisfied, Server Guy performs one visible phase transition:
 
 1. finalize the Phase Deliverable and its version/identity;
 2. persist the Gate Check results and their Evidence References in the Operator Record;
 3. persist recognized Decision Records, current facts, Blockers, Operations, and unresolved product dependencies;
-4. archive the completed phase's Operator Session without deleting its conversation or Session Events;
-5. open a fresh Operator Session for the next Launch Phase;
-6. seed Pi from the Operator Record, not from the archived conversation transcript;
+4. mark every Operator Session in the completed Phase Workspace read-only without deleting its conversation or Session Events;
+5. open the next Phase Workspace with its main Operator Session;
+6. seed Pi from the Operator Record, not from completed chat transcripts;
 7. let Pi's first message name the new Phase Deliverable, summarize inherited facts/decisions, and identify the first unsatisfied Gate Checks.
 
-The archived session remains available for provenance. Its transcript is not injected wholesale into the next phase. Phase 9 ends by archiving the Handoff session and entering the normal application workspace rather than creating a tenth Launch Phase.
+Completed chats remain available for provenance. Their transcripts are not injected wholesale into the next phase. Phase 9 ends by making the Handoff Phase Workspace read-only and entering the normal application workspace rather than creating a tenth Launch Phase.
 
-If durable recording or new-session creation fails, the phase transition must not present the next phase as active. The current completed session remains resumable until the transition is reconciled.
+If durable recording or next-workspace creation fails, the phase transition must not present the next phase as active. The completed Phase Workspace remains resumable until the transition is reconciled.
 
 ## Default sidebar and deeper inspection
 
@@ -731,12 +736,12 @@ The default sidebar for the current phase contains only:
 - the Phase Deliverable name and concise meaning;
 - every current Gate Check with Satisfied/Unsatisfied status and unsatisfied reason;
 - evidence age when it materially affects the result;
-- Decision Records recognized from the current phase chat;
+- Decision Records recognized across the current phase's chats;
 - one **Details** link on every check and decision.
 
 One level deeper:
 
-- **Activity** shows what happened in this Operator Session, including Pi's visible intent, tool calls, observations, waits, approvals, and outcomes;
+- **Activity** shows what happened across the Phase Workspace, including the originating chat for Pi's visible intent, tool calls, observations, waits, approvals, and outcomes;
 - **Changes** shows proposed and actual external/repository changes, including rejected effects and Out-of-band Changes;
 - **Evidence** shows the source-attributed proof behind claims and Gate Checks, with raw results and observability targets.
 

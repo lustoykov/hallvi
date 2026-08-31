@@ -12,6 +12,27 @@ import {
 
 const MODES = ["Pi Decides", "Always Ask", "Full Autonomy"];
 
+function primaryChatForPhase(phaseId) {
+  const phase = journeyOnePhases[phaseId - 1];
+  return {
+    id: `phase-${phaseId}-primary`,
+    title: phase.deliverable,
+    status: "Active",
+    primary: true,
+    messages: [],
+  };
+}
+
+function initialPhaseChats() {
+  return { 1: [primaryChatForPhase(1)] };
+}
+
+function titleFromMessage(message) {
+  const clean = message.replace(/[?!.]+$/g, "").trim();
+  if (!clean) return "New chat";
+  return clean.length > 34 ? `${clean.slice(0, 33)}…` : clean;
+}
+
 function statusTone(status) {
   if (!status) return "calm";
   if (/verified/i.test(status)) return "verified";
@@ -213,9 +234,9 @@ export function JourneyOnePrototype() {
   const [hero, setHero] = useState(null);
   const [showProductDecisions, setShowProductDecisions] = useState(false);
   const [prototypeMenuOpen, setPrototypeMenuOpen] = useState(false);
-  const [generalChat, setGeneralChat] = useState({ open: false, messages: [] });
+  const [phaseChats, setPhaseChats] = useState(initialPhaseChats);
+  const [activeChatByPhase, setActiveChatByPhase] = useState({ 1: "phase-1-primary" });
   const [viewedPhaseId, setViewedPhaseId] = useState(null);
-  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const chatRef = useRef(null);
 
   const script = useMemo(() => buildScript({ mode, choices, outcomes }), [mode, choices, outcomes]);
@@ -233,7 +254,10 @@ export function JourneyOnePrototype() {
   const displayBeat = visible.at(-1) || current;
   const displayGate = gateForBeat(displayBeat.id, displayBeat.phase, outcomes);
   const viewingArchived = Boolean(viewedPhaseId) && (displayPhaseId !== current.phase || journeyComplete);
-  const completedPhases = journeyOnePhases.filter((item) => item.id < current.phase || (journeyComplete && item.id === current.phase));
+  const displayChats = phaseChats[displayPhaseId] || [primaryChatForPhase(displayPhaseId)];
+  const activeChatId = activeChatByPhase[displayPhaseId] || displayChats[0].id;
+  const activeChat = displayChats.find((chat) => chat.id === activeChatId) || displayChats[0];
+  const showingPrimaryChat = Boolean(activeChat?.primary);
   const relevantProductDecisions = [
     ...productDecisionsForPhase(displayPhaseId),
     ...visible.flatMap((beat) => beat.openDecisions),
@@ -242,7 +266,7 @@ export function JourneyOnePrototype() {
   useEffect(() => {
     const el = chatRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
-  }, [cursorId, extras.length, viewedPhaseId, generalChat.open, generalChat.messages.length]);
+  }, [cursorId, extras.length, viewedPhaseId, activeChatId, activeChat?.messages.length]);
 
   function relocate(nextParams, preferredId) {
     const nextScript = buildScript(nextParams);
@@ -267,10 +291,10 @@ export function JourneyOnePrototype() {
     setRejected({});
     setExtras([]);
     setModeState("Pi Decides");
+    setPhaseChats(initialPhaseChats());
+    setActiveChatByPhase({ 1: "phase-1-primary" });
     setViewedPhaseId(null);
-    setSessionMenuOpen(false);
     setPrototypeMenuOpen(false);
-    setGeneralChat({ open: false, messages: [] });
     setShowProductDecisions(false);
     setHero(null);
     setSidebar({ open: true, tab: "record", highlight: null });
@@ -300,12 +324,25 @@ export function JourneyOnePrototype() {
         : "The current Exit Gate is not satisfied.";
       setExtras((all) => [
         ...all,
-        { phase: current.phase, after: current.id, actor: "Pi", text: `${reason} I will not open the next phase session yet.` },
+        { phase: current.phase, after: current.id, chatId: `phase-${current.phase}-primary`, actor: "Pi", text: `${reason} I will not complete this phase yet.` },
       ]);
       return;
     }
+    if (next.phase > current.phase) {
+      const nextPrimary = primaryChatForPhase(next.phase);
+      setPhaseChats((all) => ({
+        ...all,
+        [current.phase]: (all[current.phase] || []).map((chat) => ({ ...chat, status: "Resolved" })),
+        [next.phase]: all[next.phase] || [nextPrimary],
+      }));
+      setActiveChatByPhase((all) => ({ ...all, [next.phase]: all[next.phase] || nextPrimary.id }));
+    } else if (next.id === "workspace") {
+      setPhaseChats((all) => ({
+        ...all,
+        [current.phase]: (all[current.phase] || []).map((chat) => ({ ...chat, status: "Resolved" })),
+      }));
+    }
     setViewedPhaseId(null);
-    setSessionMenuOpen(false);
     setCursorId(next.id);
   }
 
@@ -337,15 +374,29 @@ export function JourneyOnePrototype() {
     setViewedPhaseId(null);
     setExtras((all) => [
       ...all,
-      { phase: current.phase, after: current.id, actor: "You", text: `Explain “${check.label}” and help me satisfy it.`, isDecision: false },
-      { phase: current.phase, after: current.id, actor: "Pi", text: `${check.label}: ${check.satisfies} I’ll inspect the linked source and receipts, then propose the next action.` },
+      { phase: current.phase, after: current.id, chatId: `phase-${current.phase}-primary`, actor: "You", text: `Explain “${check.label}” and help me satisfy it.`, isDecision: false },
+      { phase: current.phase, after: current.id, chatId: `phase-${current.phase}-primary`, actor: "Pi", text: `${check.label}: ${check.satisfies} I’ll inspect the linked source and receipts, then propose the next action.` },
     ]);
   }
 
-  function startGeneralChat() {
+  function createPhaseChat() {
+    if (viewingArchived || journeyComplete) return;
+    const phaseId = current.phase;
+    const id = `phase-${phaseId}-chat-${Date.now()}`;
+    const chat = { id, title: "New chat", status: "Active", primary: false, messages: [] };
+    setPhaseChats((all) => ({ ...all, [phaseId]: [...(all[phaseId] || [primaryChatForPhase(phaseId)]), chat] }));
+    setActiveChatByPhase((all) => ({ ...all, [phaseId]: id }));
+  }
+
+  function openPhaseChat(phaseId, chatId) {
+    setViewedPhaseId(phaseId === current.phase && !journeyComplete ? null : phaseId);
+    setActiveChatByPhase((all) => ({ ...all, [phaseId]: chatId }));
+  }
+
+  function returnToCurrentPhase() {
     setViewedPhaseId(null);
-    setSessionMenuOpen(false);
-    setGeneralChat({ open: true, messages: [] });
+    const currentChats = phaseChats[current.phase] || [primaryChatForPhase(current.phase)];
+    setActiveChatByPhase((all) => ({ ...all, [current.phase]: all[current.phase] || currentChats[0].id }));
   }
 
   function submitChat(event) {
@@ -353,25 +404,40 @@ export function JourneyOnePrototype() {
     const field = event.target.elements.msg;
     const text = field.value.trim();
     if (!text) return;
-    if (generalChat.open) {
-      setGeneralChat((chat) => ({
-        ...chat,
-        messages: [
-          ...chat.messages,
-          { actor: "You", text },
-          { actor: "Pi", text: "This prototype does not run Pi. In Server Guy, Pi would read the application record, inspect current sources when needed, and link factual claims to their receipts." },
-        ],
+    const isQuestion = /[?？]\s*$/.test(text);
+    if (!showingPrimaryChat) {
+      setPhaseChats((all) => ({
+        ...all,
+        [displayPhaseId]: (all[displayPhaseId] || []).map((chat) => {
+          if (chat.id !== activeChatId) return chat;
+          const title = chat.messages.length === 0 ? titleFromMessage(text) : chat.title;
+          return {
+            ...chat,
+            title,
+            messages: [
+              ...chat.messages,
+              { actor: "You", text, isDecision: !isQuestion },
+              {
+                actor: "Pi",
+                text: isQuestion
+                  ? "This prototype cannot reason. Server Guy would answer from the shared Phase Workspace and link factual claims to receipts."
+                  : "Recorded in the shared Phase Workspace. Other chats in this phase can use the decision without importing this transcript.",
+                recorded: !isQuestion,
+              },
+            ],
+          };
+        }),
       }));
       field.value = "";
       return;
     }
-    const isQuestion = /[?？]\s*$/.test(text);
     setExtras((all) => [
       ...all,
-      { phase: current.phase, after: current.id, actor: "You", text, isDecision: !isQuestion },
+      { phase: current.phase, after: current.id, chatId: activeChatId, actor: "You", text, isDecision: !isQuestion },
       {
         phase: current.phase,
         after: current.id,
+        chatId: activeChatId,
         actor: "Pi",
         text: isQuestion
           ? "This prototype cannot reason. Server Guy would answer from the Operator Record and link each factual claim to a receipt."
@@ -382,9 +448,14 @@ export function JourneyOnePrototype() {
     field.value = "";
   }
 
-  const userDecisions = extras
+  const primaryDecisions = extras
     .filter((message) => message.phase === displayPhaseId && message.actor === "You" && message.isDecision)
     .map((message) => message.text);
+  const focusedChatDecisions = displayChats
+    .flatMap((chat) => chat.messages)
+    .filter((message) => message.actor === "You" && message.isDecision)
+    .map((message) => message.text);
+  const userDecisions = [...primaryDecisions, ...focusedChatDecisions];
 
   return (
     <div className="vertical-shell">
@@ -400,9 +471,6 @@ export function JourneyOnePrototype() {
               {MODES.map((m) => <option key={m}>{m}</option>)}
             </select>
           </label>
-          <div className={`app-status tone-${statusTone(current.status)}`}>
-            {current.status || (isGateSatisfied(currentGate) ? "Ready to advance" : "Working")}
-          </div>
           <div className="prototype-menu-wrap">
             <button type="button" className="prototype-menu-trigger" aria-expanded={prototypeMenuOpen} onClick={() => setPrototypeMenuOpen((open) => !open)}>
               Prototype <span>16</span>
@@ -436,46 +504,46 @@ export function JourneyOnePrototype() {
         </div>
       </header>
 
-      <PhaseRail current={currentPhase} gate={currentGate} journeyComplete={journeyComplete} onOpenSession={(phaseId) => { setViewedPhaseId(phaseId); setSessionMenuOpen(false); setGeneralChat((chat) => ({ ...chat, open: false })); }} />
+      <PhaseRail current={currentPhase} gate={currentGate} journeyComplete={journeyComplete} onOpenSession={(phaseId) => setViewedPhaseId(phaseId)} />
 
       <div className="vertical-body">
+        <aside className="phase-chat-sidebar" aria-label={`Phase ${phase.id} chats`}>
+          <div className="phase-chat-head">
+            <div><span>Phase {phase.id} chats</span><strong>{phase.short}</strong></div>
+            {!viewingArchived && !journeyComplete && <button type="button" onClick={createPhaseChat}>New chat</button>}
+          </div>
+          <div className="phase-chat-list">
+            {displayChats.map((chat) => (
+              <button key={chat.id} type="button" className={`phase-chat-item ${chat.id === activeChatId ? "active" : ""}`} onClick={() => openPhaseChat(displayPhaseId, chat.id)}>
+                <span className="phase-chat-icon">{chat.primary ? "Pi" : "#"}</span>
+                <span className="phase-chat-copy"><strong>{chat.title}</strong><small>{chat.primary ? "Main phase chat" : "Focused chat"}</small></span>
+                <em className={`chat-status status-${chat.status.toLowerCase()}`}>{chat.status}</em>
+              </button>
+            ))}
+          </div>
+          {(viewingArchived || journeyComplete) && <p className="phase-chat-readonly">Gate passed · chats are read-only</p>}
+          <p className="phase-chat-footnote">Chats share this phase’s Record and Exit Gate. Their transcripts stay separate.</p>
+        </aside>
         <main className="chat-column" aria-label="Chat with Pi">
           <div className="session-bar">
             <div>
-              <span>{generalChat.open ? "General application chat" : viewingArchived ? "Archived phase session" : journeyComplete ? "Application workspace" : "Current phase session"}</span>
-              <strong>{generalChat.open ? "New chat" : journeyComplete && !viewingArchived ? "Launch complete · 9 phase chats archived" : `Phase ${phase.id} · ${phase.deliverable}`}</strong>
+              <span>{viewingArchived ? "Read-only phase chat" : journeyComplete ? "Application workspace" : `Working toward ${phase.deliverable}`}</span>
+              <strong>{journeyComplete && !viewingArchived ? "Launch complete" : activeChat.title}</strong>
             </div>
             <div className="session-actions">
-              {generalChat.open && <button type="button" onClick={() => setGeneralChat((chat) => ({ ...chat, open: false }))}>Return to launch</button>}
-              {!generalChat.open && viewingArchived && <button type="button" onClick={() => setViewedPhaseId(null)}>Return to current session</button>}
-              {!generalChat.open && (
-                <button type="button" onClick={() => setSessionMenuOpen((open) => !open)}>
-                  {completedPhases.length} archived
-                </button>
-              )}
-              <button type="button" className="new-chat-button" onClick={startGeneralChat}>New chat</button>
+              {viewingArchived && <button type="button" onClick={returnToCurrentPhase}>Return to current phase</button>}
             </div>
-            {!generalChat.open && sessionMenuOpen && (
-              <div className="session-menu">
-                {completedPhases.length === 0 && <p>No archived phase sessions yet.</p>}
-                {completedPhases.map((item) => (
-                  <button key={item.id} type="button" onClick={() => { setViewedPhaseId(item.id); setSessionMenuOpen(false); }}>
-                    <span>Phase {item.id}</span><strong>{item.deliverable}</strong><em>Archived · Gate passed</em>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <div className="chat-scroll" ref={chatRef}>
-            {generalChat.open ? (
+            {!showingPrimaryChat ? (
               <>
                 <article className="beat current general-chat-intro">
                   <div className="beat-meta"><span className="pi-avatar">Pi</span><strong>Pi</strong></div>
-                  <p className="beat-text">Ask about the application, its server, recent changes, or a receipt. This chat is separate from the launch. The current phase chat stays open.</p>
+                  <p className="beat-text">This is a focused chat for Phase {phase.id}. I can use the shared Phase Workspace, but I do not import sibling chat transcripts. What should we focus on?</p>
                 </article>
-                {generalChat.messages.map((message, index) => (
+                {activeChat.messages.map((message, index) => (
                   <div key={`${message.actor}-${index}`} className={`extra-message ${message.actor === "Pi" ? "from-pi" : "from-you"}`}>
-                    <strong>{message.actor}</strong><p>{message.text}</p>
+                    <strong>{message.actor}</strong><p>{message.text}</p>{message.recorded && <span className="recorded-chip">Saved to shared Record</span>}
                   </div>
                 ))}
               </>
@@ -483,8 +551,8 @@ export function JourneyOnePrototype() {
               <>
                 {!viewingArchived && !journeyComplete && current.phase > 1 && visible.length > 0 && (
                   <div className="session-handoff">
-                    <strong>Fresh phase chat</strong>
-                    <span>Seeded from the Operator Record · Phase {current.phase - 1} chat archived</span>
+                    <strong>New Phase Workspace</strong>
+                    <span>Seeded from the Operator Record · previous phase chats are read-only</span>
                   </div>
                 )}
                 {visible.map((beat) => (
@@ -501,7 +569,7 @@ export function JourneyOnePrototype() {
                       onDetails={openDetails}
                       onHero={setHero}
                     />
-                    {extras.filter((message) => message.phase === displayPhaseId && message.after === beat.id).map((m, i) => (
+                    {extras.filter((message) => message.phase === displayPhaseId && message.after === beat.id && (!message.chatId || message.chatId === activeChatId)).map((m, i) => (
                       <div key={`${beat.id}-x-${i}`} className={`extra-message ${m.actor === "Pi" ? "from-pi" : "from-you"}`}>
                         <strong>{m.actor}</strong>
                         <p>{m.text}</p>
@@ -514,10 +582,10 @@ export function JourneyOnePrototype() {
             )}
           </div>
           <form className="composer" onSubmit={submitChat}>
-            <input name="msg" placeholder={generalChat.open ? `Ask Pi about ${identity.application}…` : viewingArchived ? "This phase chat is archived" : "Ask Pi, or tell it something that matters…"} aria-label="Message Pi" disabled={!generalChat.open && viewingArchived} />
+            <input name="msg" placeholder={viewingArchived || journeyComplete ? "This phase chat is read-only" : "Ask Pi, or tell it something that matters…"} aria-label="Message Pi" disabled={viewingArchived || journeyComplete} />
             <div className="composer-row">
-              <span>{generalChat.open ? "Separate from the launch. The current phase chat stays open." : "Answers link to receipts · decisions are saved to Record"}</span>
-              <button type="submit" disabled={!generalChat.open && viewingArchived}>Send</button>
+              <span>Answers link to receipts · decisions are saved to the shared Record</span>
+              <button type="submit" disabled={viewingArchived || journeyComplete}>Send</button>
             </div>
           </form>
         </main>

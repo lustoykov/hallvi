@@ -10,6 +10,20 @@ This is the canonical nine-phase UI experiment. Chat with Pi is primary, each ph
 
 The original 36-state storyboard and its alternative layouts remain available for comparison.
 
+## Alternative Journey 1 layouts
+
+The throwaway alternative UI prototype reuses the same 36 states and exposes three structurally different layouts. Open:
+
+```text
+http://127.0.0.1:4173/?prototype=journey-1-alternative&variant=A&state=L6.5
+```
+
+- `variant=A`: operation-centered desk with Pi in a dedicated conversation rail;
+- `variant=B`: evidence-first operational ledger;
+- `variant=C`: spatial launch map with the current gate beside the topology.
+
+Use the floating arrows or the left and right keyboard arrows to compare variants. The scenario selector changes the Journey 1 state without changing the selected layout. Prototype controls appear only in the local development build.
+
 ## Run locally
 
 ```bash

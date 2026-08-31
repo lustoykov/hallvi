@@ -9,15 +9,19 @@ An operating model in which Pi handles interpretation, ambiguity, diagnosis, and
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
 **Operator Session**:
-A durable, application-scoped chat and activity thread between the engineer and Pi. It can be started, resumed, or archived without losing the shared operational state of the application.
+A durable, application-scoped chat and activity thread between the engineer and Pi. A Launch Phase may contain many Operator Sessions, all contributing to the same Phase Workspace and Operator Record. A session can be started, resumed, resolved, or made read-only without losing its recorded outcomes.
 _Avoid_: Chat session, workflow run, pipeline execution
+
+**Phase Workspace**:
+The durable collaboration boundary for one Launch Phase, containing its Phase Deliverable, Exit Gate, shared operational context, and every Operator Session created to complete that phase. Completing the phase makes its sessions read-only together; no single session owns phase progress.
+_Avoid_: Phase chat, workflow run, second Operator Record
 
 **Operator Record**:
 The shared, structured operational state of an application, including recognized decisions, current resources, approvals, blockers, and evidence. Operator Sessions may update it, but archiving a session does not remove its recorded outcomes.
 _Avoid_: Chat transcript, dashboard state
 
 **Launch Phase**:
-A user-visible segment of Application Launch organized around one Phase Deliverable and one Exit Gate. It describes progress for the engineer without prescribing Pi's internal reasoning sequence.
+A user-visible segment of Application Launch organized around one Phase Workspace, one Phase Deliverable, and one Exit Gate. It describes progress for the engineer without prescribing Pi's internal reasoning sequence.
 _Avoid_: Agent step, pipeline stage
 
 **Phase Deliverable**:

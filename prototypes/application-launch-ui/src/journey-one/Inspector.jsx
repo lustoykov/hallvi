@@ -141,7 +141,7 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
               </div>
             </section>
             <section className="hood-section">
-              <h3>Decisions from this phase chat</h3>
+              <h3>Decisions from phase chats</h3>
               {decisions.length === 0 && <p className="hood-quiet">No phase decisions recorded yet.</p>}
               {decisions.map((d) => (
                 <div key={d.id} className="fact-row">
