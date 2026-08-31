@@ -1,7 +1,9 @@
-/* Not-live-yet treatment for the phase rail. The band itself is a measured DOM
-   element created by preLiveBand.js (see the note there for why CSS anchor
-   positioning was abandoned); this file only styles it. The caption sits
-   between two flexible dashed rules, so it is centered by flex layout. */
+/* Phase-zone treatment for the rail: three named acts — PLAN (1-4),
+   SETUP · NOT LIVE YET (5-7), LIVE (8-9) — rendered as measured DOM bands by
+   preLiveBand.js (see the note there for why CSS anchor positioning was
+   abandoned). Each caption sits between two flex-grown rules, so centering is
+   structural. The setup zone keeps its dashed warning texture and entry
+   divider; the solid green divider before phase 8 marks the live threshold. */
 
 .phase-rail { position: relative; padding: 12px 16px 26px; }
 
@@ -15,10 +17,7 @@
   gap: 10px;
   pointer-events: none;
 }
-.pre-live-band i {
-  flex: 1;
-  border-bottom: 2px dashed var(--line-strong);
-}
+.pre-live-band i { flex: 1; border-bottom: 2px solid var(--line); }
 .pre-live-band span {
   font-family: var(--mono);
   font-size: 9px;
@@ -28,8 +27,22 @@
   color: var(--soft);
   white-space: nowrap;
 }
+.pre-live-band.zone-setup i { border-bottom-style: dashed; border-bottom-color: var(--line-strong); }
+.pre-live-band.zone-live i { border-bottom-color: #a7d8c0; }
+.pre-live-band.zone-live span { color: var(--green); font-weight: 600; }
 
-/* the live threshold: a quiet divider in the gap before Go live */
+/* the setup zone's entry divider between phases 4 and 5 (dashed, grouping) */
+.phase-rail .rail-phase:nth-child(5) { position: relative; }
+.phase-rail .rail-phase:nth-child(5)::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 6px;
+  bottom: 6px;
+  border-left: 2px dashed var(--line-strong);
+}
+
+/* the live threshold: solid green divider before Go live */
 .phase-rail .rail-phase:nth-child(8) { position: relative; }
 .phase-rail .rail-phase:nth-child(8)::before {
   content: "";
@@ -39,17 +52,4 @@
   bottom: 6px;
   border-left: 2px solid var(--green);
   opacity: .5;
-}
-
-/* the setup group's left boundary: a dashed divider between phases 4 and 5,
-   matching the band's dash vocabulary (the green solid divider before phase 8
-   stays reserved for the live threshold) */
-.phase-rail .rail-phase:nth-child(5) { position: relative; }
-.phase-rail .rail-phase:nth-child(5)::before {
-  content: "";
-  position: absolute;
-  left: -14px;
-  top: 6px;
-  bottom: 6px;
-  border-left: 2px dashed var(--line-strong);
 }
