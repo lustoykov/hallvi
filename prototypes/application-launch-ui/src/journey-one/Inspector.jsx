@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { heroes } from "./fixture.js";
 
-const TABS = [
-  ["record", "Record"],
-  ["activity", "Activity"],
-  ["changes", "Changes"],
-  ["evidence", "Evidence"],
+const INSPECT_DESTINATIONS = [
+  ["activity", "Activity", "What Pi did"],
+  ["changes", "Changes", "External effects"],
+  ["evidence", "Evidence", "Proof and sources"],
 ];
+
+const destinationTitle = Object.fromEntries(INSPECT_DESTINATIONS.map(([key, label]) => [key, label]));
 
 function collect(visible, key) {
   return visible.flatMap((beat) => (beat.hood[key] || []).map((item) => ({ ...item, beatId: beat.id })));
@@ -99,12 +100,15 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
   return (
     <aside className="inspector" aria-label="Under the hood">
       <div className="inspector-head">
-        <nav>
-          {TABS.map(([key, label]) => (
-            <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>
-          ))}
-        </nav>
-        <button type="button" className="inspector-toggle" onClick={onToggle}>Hide</button>
+        <div className="inspector-location">
+          {tab !== "record" && (
+            <button type="button" className="inspector-back" onClick={() => onTab("record")} aria-label="Back to Record">
+              <span aria-hidden="true">←</span> Record
+            </button>
+          )}
+          <strong>{tab === "record" ? "Record" : destinationTitle[tab]}</strong>
+        </div>
+        <button type="button" className="inspector-toggle" onClick={onToggle} aria-label="Hide the record" title="Hide the record">‹</button>
       </div>
 
       <div className="inspector-scroll">
@@ -130,12 +134,28 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
                 </div>
               ))}
             </section>
+            <section className="hood-section inspect-section">
+              <h3>Inspect</h3>
+              <div className="inspect-destinations">
+                {INSPECT_DESTINATIONS.map(([key, label, description]) => {
+                  const count = key === "activity" ? activity.length : key === "changes" ? changes.length : evidence.length;
+                  return (
+                    <button key={key} type="button" onClick={() => onTab(key)}>
+                      <span className="inspect-destination-copy"><strong>{label}</strong><small>{description}</small></span>
+                      <span className="inspect-count" aria-label={`${count} ${label.toLowerCase()} items`}>{count}</span>
+                      <span className="inspect-arrow" aria-hidden="true">→</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           </>
         )}
 
         {tab === "activity" && (
           <section className="hood-section">
             <h3>What Pi did</h3>
+            <p className="hood-quiet">The phase timeline of tool calls, provider operations, and verification work.</p>
             {activity.length === 0 && <p className="hood-quiet">Nothing yet.</p>}
             {activity.map((item) => (
               <div key={item.id} className={`activity-row ${item.beatId === highlight ? "flash" : ""}`}>
@@ -151,6 +171,7 @@ export function Inspector({ open, tab, highlight, onTab, onToggle, visible, phas
         {tab === "changes" && (
           <section className="hood-section">
             <h3>Net changes</h3>
+            <p className="hood-quiet">Durable external effects produced during this phase.</p>
             {changes.length === 0 && <p className="hood-quiet">No external effect yet — nothing has been created or changed.</p>}
             {changes.map((item) => (
               <div key={item.id} className={`hood-item ${item.beatId === highlight ? "flash" : ""}`}>

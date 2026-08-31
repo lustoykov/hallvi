@@ -201,6 +201,7 @@ export function JourneyOnePrototype() {
   const [sidebar, setSidebar] = useState({ open: true, tab: "record", highlight: null });
   const [hero, setHero] = useState(null);
   const [showProductDecisions, setShowProductDecisions] = useState(false);
+  const [prototypeMenuOpen, setPrototypeMenuOpen] = useState(false);
   const [viewedPhaseId, setViewedPhaseId] = useState(null);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
   const chatRef = useRef(null);
@@ -256,6 +257,7 @@ export function JourneyOnePrototype() {
     setModeState("Pi Decides");
     setViewedPhaseId(null);
     setSessionMenuOpen(false);
+    setPrototypeMenuOpen(false);
     setShowProductDecisions(false);
     setHero(null);
     setSidebar({ open: true, tab: "record", highlight: null });
@@ -355,29 +357,12 @@ export function JourneyOnePrototype() {
 
   return (
     <div className="vertical-shell">
-      <div className="chrome-bar" aria-label="Prototype-only controls">
-        <strong>Journey 1 · canonical UI</strong>
-        {outcomeSwitches.map((sw) => (
-          <label key={sw.key}>
-            <span>{sw.label}</span>
-            <select value={String(outcomes[sw.key])} onChange={(event) => setOutcome(sw.key, event.target.value)}>
-              {sw.values.map(([value, label]) => <option key={String(value)} value={String(value)}>{label}</option>)}
-            </select>
-          </label>
-        ))}
-        <span className="click-counter">clicks {clicks}</span>
-        <button type="button" onClick={resetPrototype}>Reset</button>
-      </div>
-
       <header className="vertical-header">
         <div className="app-identity">
           <span className="brand-mark">SG</span>
           <div><h1>{identity.application}</h1><p>Production · <strong>Application Launch</strong></p></div>
         </div>
         <div className="header-right">
-          <button type="button" className="open-decisions-badge" onClick={() => setShowProductDecisions(true)}>
-            16 unresolved product decisions
-          </button>
           <label className="mode-select">
             <span>Approval Mode</span>
             <select value={mode} onChange={(event) => setMode(event.target.value)}>
@@ -385,7 +370,37 @@ export function JourneyOnePrototype() {
             </select>
           </label>
           <div className={`app-status tone-${statusTone(current.status)}`}>
-            {current.status || "In progress"} · Gate {currentGate.filter((state) => state === "pass").length}/{currentGate.length}
+            {current.status || (isGateSatisfied(currentGate) ? "Ready to advance" : "Working")}
+          </div>
+          <div className="prototype-menu-wrap">
+            <button type="button" className="prototype-menu-trigger" aria-expanded={prototypeMenuOpen} onClick={() => setPrototypeMenuOpen((open) => !open)}>
+              Prototype <span>16</span>
+            </button>
+            {prototypeMenuOpen && (
+              <section className="prototype-menu" aria-label="Prototype controls">
+                <div className="prototype-menu-head">
+                  <div><strong>Prototype controls</strong><small>Scenario branches and unresolved choices</small></div>
+                  <button type="button" onClick={() => setPrototypeMenuOpen(false)}>Close</button>
+                </div>
+                <button type="button" className="prototype-decisions-action" onClick={() => { setShowProductDecisions(true); setPrototypeMenuOpen(false); }}>
+                  <span>Unresolved product decisions</span><strong>16</strong>
+                </button>
+                <div className="prototype-switches">
+                  {outcomeSwitches.map((sw) => (
+                    <label key={sw.key}>
+                      <span>{sw.label}</span>
+                      <select value={String(outcomes[sw.key])} onChange={(event) => setOutcome(sw.key, event.target.value)}>
+                        {sw.values.map(([value, label]) => <option key={String(value)} value={String(value)}>{label}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <div className="prototype-menu-foot">
+                  <span>{clicks} prototype clicks</span>
+                  <button type="button" onClick={resetPrototype}>Reset prototype</button>
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </header>
