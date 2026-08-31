@@ -56,21 +56,59 @@ function PhaseRail({ current, gate, onOpenSession, journeyComplete }) {
 }
 
 function StartCard({ card, mode, setMode }) {
-  const [intent, setIntent] = useState(card.intent);
+  const approvalModeHelp = {
+    "Pi Decides": "Pi chooses when approval is needed and explains why.",
+    "Always Ask": "Pi asks before every state-changing action.",
+    "Full Autonomy": "Pi acts without asking, within connected permissions.",
+  };
+  const launchPriorities = [
+    { id: "cost", label: "Keep costs low" },
+    { id: "data", label: "Protect database data" },
+    { id: "downtime", label: "Minimize downtime" },
+  ];
+  const [priorities, setPriorities] = useState(card.priorities || []);
+
+  function togglePriority(priorityId) {
+    setPriorities((current) =>
+      current.includes(priorityId)
+        ? current.filter((item) => item !== priorityId)
+        : [...current, priorityId],
+    );
+  }
+
   return (
-    <div className="typed-card">
+    <div className="typed-card launch-brief-card">
       <div className="card-title">Launch Brief</div>
-      <div className="card-grid">
+      <div className="card-grid launch-basics">
         <label><span>Repository</span><input value={card.repo} readOnly /></label>
         <label><span>Environment</span><input value={card.environment} readOnly /></label>
-        <label>
-          <span>Approval Mode</span>
-          <select value={mode} onChange={(event) => setMode(event.target.value)}>
-            {MODES.map((m) => <option key={m}>{m}</option>)}
-          </select>
-        </label>
-        <label><span>What matters to you</span><input value={intent} onChange={(event) => setIntent(event.target.value)} /></label>
       </div>
+
+      <fieldset className="launch-setting approval-setting">
+        <legend>When should Pi ask?</legend>
+        <div className="approval-mode-options">
+          {MODES.map((option) => (
+            <label key={option} className="approval-mode-option">
+              <input type="radio" name="approval-mode" value={option} checked={mode === option} onChange={() => setMode(option)} />
+              <span>{option}</span>
+            </label>
+          ))}
+        </div>
+        <p className="setting-help">{approvalModeHelp[mode]}</p>
+      </fieldset>
+
+      <fieldset className="launch-setting priorities-setting">
+        <legend>Launch priorities <small>Optional</small></legend>
+        <p className="setting-help">Pi uses these when choosing server size, backups, and recovery trade-offs.</p>
+        <div className="priority-options">
+          {launchPriorities.map((priority) => (
+            <label key={priority.id} className={`priority-option ${priorities.includes(priority.id) ? "selected" : ""}`}>
+              <input type="checkbox" checked={priorities.includes(priority.id)} onChange={() => togglePriority(priority.id)} />
+              <span>{priority.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
     </div>
   );
 }
