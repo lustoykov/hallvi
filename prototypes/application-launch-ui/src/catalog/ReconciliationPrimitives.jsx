@@ -49,12 +49,19 @@ export function PlanDelta({ action, title, note, onOpen = noop }) {
   );
 }
 
-export function ReconciliationSummary({ desired, observed, deltas, onOpen = noop }) {
+export function ReconciliationSummary({
+  desired,
+  observed,
+  deltas,
+  desiredTitle = "Application Contract",
+  observedTitle = "Fresh observations",
+  onOpen = noop,
+}) {
   return (
     <section className="reconciliation-summary" aria-label="Desired state compared with observed state">
       <div className="state-comparison">
-        <StateColumn title="Application Contract" eyebrow="Desired" rows={desired} tone="desired" onOpen={() => onOpen("record")} />
-        <StateColumn title="Fresh observations" eyebrow="Observed" rows={observed} tone="observed" onOpen={() => onOpen("evidence")} />
+        <StateColumn title={desiredTitle} eyebrow="Desired" rows={desired} tone="desired" onOpen={() => onOpen("record")} />
+        <StateColumn title={observedTitle} eyebrow="Observed" rows={observed} tone="observed" onOpen={() => onOpen("evidence")} />
       </div>
       <section className="delta-column">
         <header><span>Computed delta</span><strong>{deltas.length} {deltas.length === 1 ? "change" : "changes"}</strong></header>
@@ -79,11 +86,17 @@ export function OperationNode({ node, selected, onSelect = noop }) {
   );
 }
 
-export function OperationGraph({ nodes, selectedNodeId, onSelect = noop }) {
+export function OperationGraph({
+  nodes,
+  selectedNodeId,
+  eyebrow = "Deterministic launch procedure",
+  title = "Dependency-ordered operation graph",
+  onSelect = noop,
+}) {
   return (
     <section className="operation-graph" aria-label="Launch reconciliation graph">
       <header>
-        <span><small>Deterministic launch procedure</small><strong>Dependency-ordered operation graph</strong></span>
+        <span><small>{eyebrow}</small><strong>{title}</strong></span>
         <span className="graph-legend"><i className="legend-rule" />Rule node <i className="legend-pi" />Judgment point</span>
       </header>
       <div className="operation-node-list">

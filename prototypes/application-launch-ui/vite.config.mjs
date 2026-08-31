@@ -8,6 +8,7 @@ export default defineConfig({
       input: {
         main: "index.html",
         componentCatalog: "prototype-building-blocks.html",
+        journeyV2: "journey-v2.html",
       },
     },
   },
