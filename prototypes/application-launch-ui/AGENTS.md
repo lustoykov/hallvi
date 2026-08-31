@@ -24,6 +24,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Product actions belong in Chat with Pi, not in the Operator Record. Storyboard state IDs and counts are prototype controls and must not appear inside product chrome.
 - Use one compact dark application header. Keep prototype branch controls behind a single clearly labeled prototype menu, and show the current application status only once rather than repeating generic “in progress” labels across stacked bars.
 - The launch map must always make the current phase and current mockup state obvious. Default screens should be low-text; detailed evidence is opened on demand.
+- Preserve the “Setup only · not live yet” band across phases 5–7 and the threshold before Go live. Render it as one centered group rather than separate decoration under each phase.
 - Use these user-facing phase labels everywhere: Start, Inspect app, Make launch-ready, Review launch plan, Set up server, Connect domain, Configure and protect, Go live, Handoff. Keep Application Contract, Conformance Result, Launch Plan, Host Record, Domain Route, Operational Baseline, Verified Release, and Operations Handoff as the precise deliverable names.
 - Every Journey 1 phase needs multiple inspectable mockup states. The canonical state inventory is inside `docs/user-journeys/01-application-launch.md`.
 - UI copy and product behavior must stay aligned with the journey Markdown. Unresolved workshop choices must remain visibly unresolved instead of becoming prototype defaults.

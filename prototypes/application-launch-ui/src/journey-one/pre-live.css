@@ -1,33 +1,45 @@
-/* Not-live-yet treatment for the phase rail (phases 5-7) and the live threshold (8).
-   Deliberately a separate stylesheet keyed by rail position, so it composes with
-   journey-one.css without touching it. If the rail gains non-phase children,
-   revisit the nth-child anchors. */
+/* Not-live-yet treatment for setup phases 5-7 and the live threshold before 8.
+   Equal phase columns give the band a stable center at every supported width. */
 
-.phase-rail { position: relative; padding-bottom: 22px; }
-
-/* shared dashed band under Create server / Claim domain / Add safeguards */
-.phase-rail .rail-phase:nth-child(5),
-.phase-rail .rail-phase:nth-child(6),
-.phase-rail .rail-phase:nth-child(7) { position: relative; }
-.phase-rail .rail-phase:nth-child(5)::after,
-.phase-rail .rail-phase:nth-child(6)::after,
-.phase-rail .rail-phase:nth-child(7)::after {
-  content: ""; position: absolute; left: 6px; right: 6px; bottom: -9px;
-  border-bottom: 2px dashed var(--line-strong);
+.phase-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: auto 18px;
+  column-gap: 0;
+  row-gap: 4px;
+  padding-bottom: 8px;
 }
 
-/* one caption, centered under the band */
-.phase-rail .rail-phase:nth-child(6)::before {
+.phase-rail .rail-phase {
+  grid-row: 1;
+  justify-self: center;
+}
+
+/* One continuous, centered band under Create server through Add safeguards. */
+.phase-rail::before {
   content: "setup only · not live yet";
-  position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
-  font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--soft); white-space: nowrap;
+  grid-column: 5 / 8;
+  grid-row: 2;
+  align-self: start;
+  margin: 0 14px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line-strong);
+  color: var(--soft);
+  font: 9px/1.1 var(--mono);
+  letter-spacing: .06em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-/* the live threshold: a divider before Go live */
-.phase-rail .rail-phase:nth-child(8) { position: relative; margin-left: 14px; }
-.phase-rail .rail-phase:nth-child(8)::before {
-  content: ""; position: absolute; left: -10px; top: 4px; bottom: 4px;
-  border-left: 2px solid var(--green);
-  opacity: .55;
+/* Exact grid boundary between setup and the first potentially live phase. */
+.phase-rail::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 8px;
+  left: calc(77.777777% - 9px);
+  border-left: 1px solid var(--green);
+  opacity: .65;
 }
