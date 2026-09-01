@@ -96,6 +96,10 @@ _Avoid_: Plugin, deployment template
 The explicit operational agreement describing how an application is built, configured, checked, observed, backed up, migrated, and verified, including the provenance of each field.
 _Avoid_: Inferred setup, runbook
 
+**Deployment Host**:
+The provider-independent Linux machine accepted by Server Guy as the place where application Releases run, whether the machine was adopted or provisioned. Its provider identity, capabilities, reachability, cost, and readiness are captured in a Host Record.
+_Avoid_: Hetzner server, EC2 instance, managed application platform
+
 **Application Launch**:
 The end-to-end journey from repository through conformance, infrastructure setup, first Release, external verification, and minimum ongoing operations.
 _Avoid_: Initial deployment, setup
