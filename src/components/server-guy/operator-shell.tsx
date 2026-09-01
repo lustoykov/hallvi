@@ -208,6 +208,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
       setView(next);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Pi could not respond.");
+      setComposer((current) => current || message);
       const refreshed = await jsonRequest<PhaseOneOperatorView>(
         `/api/applications/${view.application.id}?session=${encodeURIComponent(activeSession.id)}`,
       ).catch(() => null);

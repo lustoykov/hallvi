@@ -344,8 +344,6 @@ export async function sendOperatorMessage(applicationId: string, sessionId: stri
   if (userMessage.length > 5_000) throw new Error("Keep this message under 5,000 characters.");
 
   const priorMessages = listMessages(session.id);
-  insertMessage(session.id, "user", userMessage, "user");
-
   const checks = computeChecks(application.id);
   const recordSummary = [
     `Application: ${application.name}`,
@@ -366,6 +364,7 @@ export async function sendOperatorMessage(applicationId: string, sessionId: stri
     recordSummary,
   });
   withTransaction(() => {
+    insertMessage(session.id, "user", userMessage, "user");
     insertMessage(session.id, "assistant", reply.message, "pi");
     for (const decision of reply.decisions) {
       const input = {

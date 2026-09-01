@@ -120,6 +120,20 @@ describe("Phase 1 application workspace", () => {
     expect(view.application?.approvalMode).toBe("pi-decides");
   });
 
+  it("keeps a failed Pi turn out of the transcript", async () => {
+    const created = await createApplication();
+    const applicationId = created.view.application!.id;
+    const sessionId = created.view.activeSessionId!;
+    mocks.askPi.mockRejectedValueOnce(new Error("Pi is unavailable: no model is configured."));
+
+    await expect(
+      phaseOne.sendOperatorMessage(applicationId, sessionId, "Recovery matters."),
+    ).rejects.toThrow("Pi is unavailable");
+
+    const view = phaseOne.getPhaseOneOperatorView(applicationId, sessionId);
+    expect(view.messages.map((message) => message.role)).toEqual(["assistant"]);
+  });
+
   it("does not rewrite provenance timestamps when completion is recomputed", async () => {
     const created = await createApplication();
     const application = created.view.application!;

@@ -72,7 +72,16 @@ export function classifyGithubFailure(error: unknown): {
   status: "failed" | "unavailable";
   reason: string;
 } {
-  const details = error as { code?: unknown; stderr?: unknown; message?: unknown };
+  const details = error as {
+    code?: unknown;
+    killed?: unknown;
+    signal?: unknown;
+    stderr?: unknown;
+    message?: unknown;
+  };
+  if (details?.killed === true || typeof details?.signal === "string") {
+    return { status: "unavailable", reason: "gh did not respond in time." };
+  }
   const stderr = typeof details?.stderr === "string" ? details.stderr.trim() : "";
   const message = typeof details?.message === "string" ? details.message.trim() : "";
   const reason = stderr || message || "GitHub inspection failed.";

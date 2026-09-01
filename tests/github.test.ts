@@ -54,6 +54,17 @@ describe("classifyGithubFailure", () => {
     });
   });
 
+  it("marks a killed gh process as unavailable rather than a failed repository check", () => {
+    expect(
+      classifyGithubFailure({
+        killed: true,
+        signal: "SIGTERM",
+        code: null,
+        message: "Command failed: gh api repos/lustoykov/todo-fastapi\n",
+      }),
+    ).toEqual({ status: "unavailable", reason: "gh did not respond in time." });
+  });
+
   it("preserves provider errors that mean the repository check failed", () => {
     expect(classifyGithubFailure({ stderr: "gh: Not Found (HTTP 404)" })).toEqual({
       status: "failed",
