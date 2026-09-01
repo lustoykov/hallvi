@@ -1,4 +1,10 @@
-import type { ApprovalMode } from "./types";
+import type {
+  ApplicationRecord,
+  ApprovalMode,
+  BlockerRecord,
+  GateCheck,
+  ObservationRecord,
+} from "./types";
 
 export const PHASES = [
   { number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
@@ -80,3 +86,83 @@ export const APPROVAL_MODE_LABELS: Record<ApprovalMode, string> = {
   "always-ask": "Always ask",
   "full-autonomy": "Full autonomy",
 };
+
+/**
+ * Evaluates the Phase 1 exit gate from durable records only. Statuses come from the
+ * application record, the latest GitHub observation, and the recorded prerequisites,
+ * never from chat prose.
+ */
+export function computeChecks(
+  application: ApplicationRecord,
+  repository: ObservationRecord | null,
+  blockers: BlockerRecord[],
+): GateCheck[] {
+  const recordUrl = `/api/applications/${application.id}`;
+  const prerequisitesRecorded = PREREQUISITES.every(({ key }) =>
+    blockers.some((blocker) => blocker.key === key),
+  );
+  const intentRecordedAt =
+    [application.createdAt, ...blockers.map((blocker) => blocker.createdAt)].sort().at(-1) ??
+    application.createdAt;
+  const githubAccess =
+    repository?.status === "passed"
+      ? "GitHub repository access is recorded."
+      : "GitHub repository access is not currently available.";
+
+  const values = {
+    "application-identity": {
+      status: "passed",
+      result: `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`,
+      sourceLabel: "Application record",
+      sourceUrl: recordUrl,
+      observationId: null,
+      observedAt: application.createdAt,
+      canRerun: false,
+    },
+    "repository-readable": {
+      status: repository ? (repository.status === "passed" ? "passed" : "blocked") : "not-yet",
+      result: repository?.summary ?? "The repository has not been checked yet.",
+      sourceLabel: repository?.sourceLabel ?? "GitHub",
+      sourceUrl: repository?.sourceUrl ?? application.repositoryUrl,
+      observationId: repository?.id ?? null,
+      observedAt: repository?.observedAt ?? null,
+      canRerun: true,
+    },
+    "target-environment": {
+      status: "passed",
+      result: "Production",
+      sourceLabel: "Application record",
+      sourceUrl: recordUrl,
+      observationId: null,
+      observedAt: application.createdAt,
+      canRerun: false,
+    },
+    "approval-authority": {
+      status: repository ? "passed" : "not-yet",
+      result: repository
+        ? `${APPROVAL_MODE_LABELS[application.approvalMode]} · ${application.approvalScope}. ${githubAccess} Hetzner and Cloudflare are not configured yet.`
+        : "Choose how Pi should ask for permission and record the access currently available.",
+      sourceLabel: "Application permission policy",
+      sourceUrl: recordUrl,
+      observationId: repository?.id ?? null,
+      observedAt: repository?.observedAt ?? application.createdAt,
+      canRerun: false,
+    },
+    "intent-prerequisites": {
+      status: prerequisitesRecorded ? "passed" : "not-yet",
+      result: prerequisitesRecorded
+        ? `${PRODUCTION_BASELINE.map(({ label }) => label).join(", ")}. ${PREREQUISITES.length} later prerequisites are recorded with owners and resolution paths.`
+        : "The production baseline or later prerequisites are incomplete.",
+      sourceLabel: "Launch record",
+      sourceUrl: recordUrl,
+      observationId: null,
+      observedAt: intentRecordedAt,
+      canRerun: false,
+    },
+  } satisfies Record<
+    (typeof PHASE_ONE_CHECKS)[number]["key"],
+    Omit<GateCheck, "key" | "label" | "definition">
+  >;
+
+  return PHASE_ONE_CHECKS.map((check) => ({ ...check, ...values[check.key] }));
+}

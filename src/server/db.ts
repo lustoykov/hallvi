@@ -15,28 +15,47 @@ import type {
 } from "./types";
 
 type Sqlite = InstanceType<typeof Database>;
+type Row = Record<string, unknown>;
 
 declare global {
   var __serverGuyDb: Sqlite | undefined;
 }
 
+const SCHEMA_VERSION = 2;
 const defaultDbPath = join(process.cwd(), ".server-guy", "server-guy.db");
-
-function createDatabase(): Sqlite {
-  const databasePath = process.env.SERVER_GUY_DB_PATH ?? defaultDbPath;
-  mkdirSync(dirname(databasePath), { recursive: true });
-  const database = new Database(databasePath);
-  database.pragma("journal_mode = WAL");
-  database.pragma("foreign_keys = ON");
-  migrate(database);
-  return database;
-}
 
 export function db(): Sqlite {
   return (globalThis.__serverGuyDb ??= createDatabase());
 }
 
-function migrate(database: Sqlite) {
+function createDatabase(): Sqlite {
+  const databasePath = process.env.SERVER_GUY_DB_PATH ?? defaultDbPath;
+  mkdirSync(dirname(databasePath), { recursive: true });
+  const database = new Database(databasePath);
+  try {
+    database.pragma("journal_mode = WAL");
+    database.pragma("foreign_keys = ON");
+    migrate(database, databasePath);
+    return database;
+  } catch (error) {
+    database.close();
+    throw error;
+  }
+}
+
+function migrate(database: Sqlite, databasePath: string) {
+  const version = database.pragma("user_version", { simple: true }) as number;
+  const initialized = Boolean(
+    database
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'applications'")
+      .get(),
+  );
+  if (initialized && version !== SCHEMA_VERSION) {
+    throw new Error(
+      `${databasePath} was created by an older Server Guy schema. Delete it to start with a fresh Operator Record.`,
+    );
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
@@ -47,7 +66,6 @@ function migrate(database: Sqlite) {
       environment TEXT NOT NULL,
       approval_mode TEXT NOT NULL,
       approval_scope TEXT NOT NULL,
-      status TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -143,142 +161,61 @@ function migrate(database: Sqlite) {
     CREATE INDEX IF NOT EXISTS idx_observations_workspace ON observations(workspace_id, observed_at DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_workspace ON activity_events(workspace_id, created_at DESC);
   `);
+  database.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
-function mapApplication(row: Record<string, unknown>): ApplicationRecord {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    repositoryUrl: row.repository_url as string,
-    repositoryOwner: row.repository_owner as string,
-    repositoryName: row.repository_name as string,
-    environment: row.environment as "production",
-    approvalMode: row.approval_mode as ApplicationRecord["approvalMode"],
-    approvalScope: row.approval_scope as string,
-    status: row.status as ApplicationRecord["status"],
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
+// Rows are snake_case columns; records are the camelCase types in ./types.
+function fromRow<T>(row: Row): T {
+  const record: Row = {};
+  for (const [column, value] of Object.entries(row)) {
+    record[column.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())] = value;
+  }
+  return record as T;
 }
 
-function mapWorkspace(row: Record<string, unknown>): PhaseWorkspace {
-  return {
-    id: row.id as string,
-    applicationId: row.application_id as string,
-    phaseNumber: 1,
-    deliverable: "Launch Brief",
-    status: row.status as PhaseWorkspace["status"],
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
+const toSession = (row: Row) =>
+  fromRow<OperatorSession>({ ...row, is_primary: Boolean(row.is_primary) });
+
+const toObservation = ({ raw_json, ...row }: Row) =>
+  fromRow<ObservationRecord>({ ...row, raw: JSON.parse(raw_json as string) });
+
+function one<T>(sql: string, params: unknown[], map: (row: Row) => T = fromRow): T | null {
+  const row = db().prepare(sql).get(...params) as Row | undefined;
+  return row ? map(row) : null;
 }
 
-function mapSession(row: Record<string, unknown>): OperatorSession {
-  return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    title: row.title as string,
-    isPrimary: Boolean(row.is_primary),
-    status: row.status as OperatorSession["status"],
-    createdAt: row.created_at as string,
-    resolvedAt: (row.resolved_at as string | null) ?? null,
-  };
+function many<T>(sql: string, params: unknown[], map: (row: Row) => T = fromRow): T[] {
+  return (db().prepare(sql).all(...params) as Row[]).map(map);
 }
 
-function mapMessage(row: Record<string, unknown>): OperatorMessage {
-  return {
-    id: row.id as string,
-    operatorSessionId: row.operator_session_id as string,
-    role: row.role as OperatorMessage["role"],
-    body: row.body as string,
-    source: row.source as OperatorMessage["source"],
-    createdAt: row.created_at as string,
-  };
+function now() {
+  return new Date().toISOString();
 }
 
-function mapDecision(row: Record<string, unknown>): DecisionRecord {
-  return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    operatorSessionId: row.operator_session_id as string,
-    kind: row.kind as DecisionRecord["kind"],
-    label: row.label as string,
-    value: row.value as string,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
+// Applications
+
+export function getLatestApplication() {
+  return one<ApplicationRecord>("SELECT * FROM applications ORDER BY created_at DESC LIMIT 1", []);
 }
 
-function mapObservation(row: Record<string, unknown>): ObservationRecord {
-  return {
-    id: row.id as string,
-    applicationId: row.application_id as string,
-    workspaceId: row.workspace_id as string,
-    kind: row.kind as string,
-    status: row.status as ObservationRecord["status"],
-    summary: row.summary as string,
-    sourceLabel: row.source_label as string,
-    sourceUrl: (row.source_url as string | null) ?? null,
-    raw: JSON.parse(row.raw_json as string),
-    observedAt: row.observed_at as string,
-  };
+export function getApplication(id: string) {
+  return one<ApplicationRecord>("SELECT * FROM applications WHERE id = ?", [id]);
 }
 
-function mapBlocker(row: Record<string, unknown>): BlockerRecord {
-  return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    key: row.key as string,
-    label: row.label as string,
-    status: row.status as BlockerRecord["status"],
-    owner: row.owner as BlockerRecord["owner"],
-    resolutionPath: row.resolution_path as string,
-    requiredBeforePhase: row.required_before_phase as number,
-    createdAt: row.created_at as string,
-    resolvedAt: (row.resolved_at as string | null) ?? null,
-  };
-}
-
-function mapActivity(row: Record<string, unknown>): ActivityEvent {
-  return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    kind: row.kind as string,
-    summary: row.summary as string,
-    detail: row.detail as string,
-    createdAt: row.created_at as string,
-  };
-}
-
-export function getLatestApplication(): ApplicationRecord | null {
-  const row = db().prepare("SELECT * FROM applications ORDER BY created_at DESC LIMIT 1").get() as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapApplication(row) : null;
-}
-
-export function getApplication(id: string): ApplicationRecord | null {
-  const row = db().prepare("SELECT * FROM applications WHERE id = ?").get(id) as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapApplication(row) : null;
-}
-
-export function getApplicationByRepository(repositoryUrl: string): ApplicationRecord | null {
-  const row = db().prepare("SELECT * FROM applications WHERE repository_url = ?").get(repositoryUrl) as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapApplication(row) : null;
+export function getApplicationByRepository(repositoryUrl: string) {
+  return one<ApplicationRecord>("SELECT * FROM applications WHERE repository_url = ?", [
+    repositoryUrl,
+  ]);
 }
 
 export function insertApplication(input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">) {
   const id = randomUUID();
-  const now = new Date().toISOString();
+  const timestamp = now();
   db().prepare(
     `INSERT INTO applications
       (id, name, repository_url, repository_owner, repository_name, environment,
-       approval_mode, approval_scope, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       approval_mode, approval_scope, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.name,
@@ -288,83 +225,63 @@ export function insertApplication(input: Omit<ApplicationRecord, "id" | "created
     input.environment,
     input.approvalMode,
     input.approvalScope,
-    input.status,
-    now,
-    now,
+    timestamp,
+    timestamp,
   );
   return getApplication(id)!;
 }
 
-export function updateApplicationStatus(id: string, status: ApplicationRecord["status"]) {
-  db().prepare("UPDATE applications SET status = ?, updated_at = ? WHERE id = ? AND status <> ?").run(
-    status,
-    new Date().toISOString(),
-    id,
-    status,
-  );
-}
+// Phase workspaces
 
-export function insertWorkspace(applicationId: string): PhaseWorkspace {
-  const id = randomUUID();
-  const now = new Date().toISOString();
+export function insertWorkspace(applicationId: string) {
+  const timestamp = now();
   db().prepare(
     `INSERT INTO phase_workspaces
       (id, application_id, phase_number, deliverable, status, created_at, updated_at)
      VALUES (?, ?, 1, 'Launch Brief', 'in-progress', ?, ?)`,
-  ).run(id, applicationId, now, now);
+  ).run(randomUUID(), applicationId, timestamp, timestamp);
   return getWorkspace(applicationId)!;
 }
 
-export function getWorkspace(applicationId: string): PhaseWorkspace | null {
-  const row = db()
-    .prepare("SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_number = 1")
-    .get(applicationId) as Record<string, unknown> | undefined;
-  return row ? mapWorkspace(row) : null;
+export function getWorkspace(applicationId: string) {
+  return one<PhaseWorkspace>(
+    "SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_number = 1",
+    [applicationId],
+  );
 }
 
 export function updateWorkspaceStatus(id: string, status: PhaseWorkspace["status"]) {
   db().prepare(
     "UPDATE phase_workspaces SET status = ?, updated_at = ? WHERE id = ? AND status <> ?",
-  ).run(
-    status,
-    new Date().toISOString(),
-    id,
-    status,
-  );
+  ).run(status, now(), id, status);
 }
 
-export function insertOperatorSession(
-  workspaceId: string,
-  title: string,
-  isPrimary = false,
-): OperatorSession {
+// Operator sessions and messages
+
+export function insertOperatorSession(workspaceId: string, title: string, isPrimary = false) {
   const id = randomUUID();
-  const now = new Date().toISOString();
   db().prepare(
     `INSERT INTO operator_sessions (id, workspace_id, title, is_primary, status, created_at)
      VALUES (?, ?, ?, ?, 'active', ?)`,
-  ).run(id, workspaceId, title, isPrimary ? 1 : 0, now);
+  ).run(id, workspaceId, title, isPrimary ? 1 : 0, now());
   return getOperatorSession(id)!;
 }
 
-export function getOperatorSession(id: string): OperatorSession | null {
-  const row = db().prepare("SELECT * FROM operator_sessions WHERE id = ?").get(id) as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapSession(row) : null;
+export function getOperatorSession(id: string) {
+  return one("SELECT * FROM operator_sessions WHERE id = ?", [id], toSession);
 }
 
-export function listOperatorSessions(workspaceId: string): OperatorSession[] {
-  return (
-    db()
-      .prepare("SELECT * FROM operator_sessions WHERE workspace_id = ? ORDER BY created_at ASC")
-      .all(workspaceId) as Record<string, unknown>[]
-  ).map(mapSession);
+export function listOperatorSessions(workspaceId: string) {
+  return many(
+    "SELECT * FROM operator_sessions WHERE workspace_id = ? ORDER BY created_at ASC",
+    [workspaceId],
+    toSession,
+  );
 }
 
 export function resolveOperatorSession(id: string) {
   db().prepare("UPDATE operator_sessions SET status = 'resolved', resolved_at = ? WHERE id = ?").run(
-    new Date().toISOString(),
+    now(),
     id,
   );
 }
@@ -374,24 +291,22 @@ export function insertMessage(
   role: OperatorMessage["role"],
   body: string,
   source: OperatorMessage["source"],
-): OperatorMessage {
+) {
   const id = randomUUID();
-  const now = new Date().toISOString();
   db().prepare(
     "INSERT INTO messages (id, operator_session_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(id, operatorSessionId, role, body, source, now);
-  return mapMessage(
-    db().prepare("SELECT * FROM messages WHERE id = ?").get(id) as Record<string, unknown>,
+  ).run(id, operatorSessionId, role, body, source, now());
+  return one<OperatorMessage>("SELECT * FROM messages WHERE id = ?", [id])!;
+}
+
+export function listMessages(operatorSessionId: string) {
+  return many<OperatorMessage>(
+    "SELECT * FROM messages WHERE operator_session_id = ? ORDER BY created_at ASC, rowid ASC",
+    [operatorSessionId],
   );
 }
 
-export function listMessages(operatorSessionId: string): OperatorMessage[] {
-  return (
-    db()
-      .prepare("SELECT * FROM messages WHERE operator_session_id = ? ORDER BY created_at ASC, rowid ASC")
-      .all(operatorSessionId) as Record<string, unknown>[]
-  ).map(mapMessage);
-}
+// Decisions
 
 export function insertDecision(input: {
   workspaceId: string;
@@ -401,7 +316,7 @@ export function insertDecision(input: {
   value: string;
 }) {
   const id = randomUUID();
-  const now = new Date().toISOString();
+  const timestamp = now();
   db().prepare(
     `INSERT INTO decision_records
       (id, workspace_id, operator_session_id, kind, label, value, created_at, updated_at)
@@ -413,30 +328,27 @@ export function insertDecision(input: {
     input.kind,
     input.label,
     input.value,
-    now,
-    now,
+    timestamp,
+    timestamp,
   );
   return getDecision(id)!;
 }
 
-export function listDecisions(workspaceId: string): DecisionRecord[] {
-  return (
-    db()
-      .prepare("SELECT * FROM decision_records WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC")
-      .all(workspaceId) as Record<string, unknown>[]
-  ).map(mapDecision);
+export function getDecision(id: string) {
+  return one<DecisionRecord>("SELECT * FROM decision_records WHERE id = ?", [id]);
 }
 
-export function getDecision(id: string): DecisionRecord | null {
-  const row = db().prepare("SELECT * FROM decision_records WHERE id = ?").get(id) as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapDecision(row) : null;
+export function listDecisions(workspaceId: string) {
+  return many<DecisionRecord>(
+    "SELECT * FROM decision_records WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC",
+    [workspaceId],
+  );
 }
+
+// Observations
 
 export function insertObservation(input: Omit<ObservationRecord, "id" | "observedAt">) {
   const id = randomUUID();
-  const observedAt = new Date().toISOString();
   db().prepare(
     `INSERT INTO observations
       (id, application_id, workspace_id, kind, status, summary, source_label, source_url, raw_json, observed_at)
@@ -451,37 +363,35 @@ export function insertObservation(input: Omit<ObservationRecord, "id" | "observe
     input.sourceLabel,
     input.sourceUrl,
     JSON.stringify(input.raw),
-    observedAt,
+    now(),
   );
   return getObservation(id)!;
 }
 
-export function getObservation(id: string): ObservationRecord | null {
-  const row = db().prepare("SELECT * FROM observations WHERE id = ?").get(id) as
-    | Record<string, unknown>
-    | undefined;
-  return row ? mapObservation(row) : null;
+export function getObservation(id: string) {
+  return one("SELECT * FROM observations WHERE id = ?", [id], toObservation);
 }
 
-export function latestObservation(workspaceId: string, kind: string): ObservationRecord | null {
-  const row = db()
-    .prepare(
-      "SELECT * FROM observations WHERE workspace_id = ? AND kind = ? ORDER BY observed_at DESC LIMIT 1",
-    )
-    .get(workspaceId, kind) as Record<string, unknown> | undefined;
-  return row ? mapObservation(row) : null;
+export function latestObservation(workspaceId: string, kind: string) {
+  return one(
+    "SELECT * FROM observations WHERE workspace_id = ? AND kind = ? ORDER BY observed_at DESC, rowid DESC LIMIT 1",
+    [workspaceId, kind],
+    toObservation,
+  );
 }
 
-export function listObservations(workspaceId: string): ObservationRecord[] {
-  return (
-    db()
-      .prepare("SELECT * FROM observations WHERE workspace_id = ? ORDER BY observed_at DESC")
-      .all(workspaceId) as Record<string, unknown>[]
-  ).map(mapObservation);
+export function listObservations(workspaceId: string) {
+  return many(
+    "SELECT * FROM observations WHERE workspace_id = ? ORDER BY observed_at DESC, rowid DESC",
+    [workspaceId],
+    toObservation,
+  );
 }
+
+// Blockers and activity
 
 export function upsertBlocker(input: Omit<BlockerRecord, "id" | "createdAt" | "resolvedAt">) {
-  const now = new Date().toISOString();
+  const timestamp = now();
   db().prepare(
     `INSERT INTO blockers
       (id, workspace_id, key, label, status, owner, resolution_path, required_before_phase, created_at, resolved_at)
@@ -502,36 +412,29 @@ export function upsertBlocker(input: Omit<BlockerRecord, "id" | "createdAt" | "r
     input.owner,
     input.resolutionPath,
     input.requiredBeforePhase,
-    now,
-    now,
+    timestamp,
+    timestamp,
   );
 }
 
-export function listBlockers(workspaceId: string): BlockerRecord[] {
-  return (
-    db()
-      .prepare("SELECT * FROM blockers WHERE workspace_id = ? ORDER BY required_before_phase, created_at")
-      .all(workspaceId) as Record<string, unknown>[]
-  ).map(mapBlocker);
+export function listBlockers(workspaceId: string) {
+  return many<BlockerRecord>(
+    "SELECT * FROM blockers WHERE workspace_id = ? ORDER BY required_before_phase, created_at",
+    [workspaceId],
+  );
 }
 
-export function insertActivity(
-  workspaceId: string,
-  kind: string,
-  summary: string,
-  detail: string,
-) {
+export function insertActivity(workspaceId: string, kind: string, summary: string, detail: string) {
   db().prepare(
     "INSERT INTO activity_events (id, workspace_id, kind, summary, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(randomUUID(), workspaceId, kind, summary, detail, new Date().toISOString());
+  ).run(randomUUID(), workspaceId, kind, summary, detail, now());
 }
 
-export function listActivity(workspaceId: string): ActivityEvent[] {
-  return (
-    db()
-      .prepare("SELECT * FROM activity_events WHERE workspace_id = ? ORDER BY created_at DESC")
-      .all(workspaceId) as Record<string, unknown>[]
-  ).map(mapActivity);
+export function listActivity(workspaceId: string) {
+  return many<ActivityEvent>(
+    "SELECT * FROM activity_events WHERE workspace_id = ? ORDER BY created_at DESC",
+    [workspaceId],
+  );
 }
 
 export function withTransaction<T>(work: () => T): T {

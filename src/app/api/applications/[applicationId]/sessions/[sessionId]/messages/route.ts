@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
+import { handle } from "@/server/http";
 import { sendOperatorMessage } from "@/server/phase-one";
 
 export const runtime = "nodejs";
@@ -8,12 +9,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ applicationId: string; sessionId: string }> },
 ) {
-  try {
+  return handle(async () => {
     const { applicationId, sessionId } = await context.params;
     const body = (await request.json()) as { message?: string };
-    return NextResponse.json(await sendOperatorMessage(applicationId, sessionId, body.message ?? ""));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Pi could not respond.";
-    return NextResponse.json({ error: message }, { status: message.startsWith("Pi is unavailable") ? 503 : 400 });
-  }
+    return sendOperatorMessage(applicationId, sessionId, body.message ?? "");
+  });
 }

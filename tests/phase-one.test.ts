@@ -74,11 +74,11 @@ describe("Phase 1 application workspace", () => {
     expect(result.view.checks).toHaveLength(5);
     expect(result.view.checks.every((check) => check.status === "passed")).toBe(true);
     expect(result.view.blockers).toHaveLength(3);
-    expect(result.view.observations.map((observation) => observation.kind)).toEqual(
-      expect.arrayContaining(["github-repository-identity", "authority-context"]),
-    );
+    expect(result.view.observations.map((observation) => observation.kind)).toEqual([
+      "github-repository-identity",
+    ]);
     expect(result.view.application?.approvalMode).toBe("pi-decides");
-    expect(result.view.application?.status).toBe("phase-1-ready");
+    expect(result.view.workspace?.status).toBe("ready");
     expect(result.view.decisions).toEqual([]);
   });
 
@@ -139,10 +139,8 @@ describe("Phase 1 application workspace", () => {
     const application = created.view.application!;
     const workspace = created.view.workspace!;
 
-    database.updateApplicationStatus(application.id, "phase-1-ready");
     database.updateWorkspaceStatus(workspace.id, "ready");
 
-    expect(database.getApplication(application.id)?.updatedAt).toBe(application.updatedAt);
     expect(database.getWorkspace(application.id)?.updatedAt).toBe(workspace.updatedAt);
   });
 });

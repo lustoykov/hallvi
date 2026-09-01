@@ -1,5 +1,7 @@
 import type { DecisionRecord, OperatorMessage, PiDecision, PiReply } from "./types";
 
+export class PiUnavailableError extends Error {}
+
 const SYSTEM_PROMPT = `You are Pi inside Server Guy, an operator product for individual engineers.
 
 You are collaborating on Phase 1, Start. The deliverable is a Launch Brief. The checks are:
@@ -155,7 +157,7 @@ export async function askPi(input: {
     return parsePiReply(finalText);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pi is unavailable.";
-    throw new Error(`Pi is unavailable: ${message}`);
+    throw new PiUnavailableError(`Pi is unavailable: ${message}`);
   } finally {
     if (timeout) clearTimeout(timeout);
     unsubscribe();

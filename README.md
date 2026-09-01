@@ -33,7 +33,7 @@ npm run dev
 
 Open <http://127.0.0.1:3000>.
 
-The Operator Record is stored in `.server-guy/server-guy.db`. Delete that file only when you intentionally want a fresh local product state.
+The Operator Record is stored in `.server-guy/server-guy.db`. Delete that file only when you intentionally want a fresh local product state. Before the first release the schema can still change; Server Guy refuses to open a record written by an older schema and asks you to delete it.
 
 ## Verify
 

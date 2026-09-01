@@ -11,7 +11,6 @@ export interface ApplicationRecord {
   environment: "production";
   approvalMode: ApprovalMode;
   approvalScope: string;
-  status: "phase-1" | "phase-1-ready";
   createdAt: string;
   updatedAt: string;
 }

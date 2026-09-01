@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
+import { handle } from "@/server/http";
 import { getPhaseOneOperatorView } from "@/server/phase-one";
 
 export const runtime = "nodejs";
@@ -9,14 +10,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ applicationId: string }> },
 ) {
-  try {
+  return handle(async () => {
     const { applicationId } = await context.params;
     const sessionId = request.nextUrl.searchParams.get("session") ?? undefined;
-    return NextResponse.json(getPhaseOneOperatorView(applicationId, sessionId));
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Application not found." },
-      { status: 404 },
-    );
-  }
+    return getPhaseOneOperatorView(applicationId, sessionId);
+  });
 }
