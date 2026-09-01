@@ -2,6 +2,8 @@
 
 Server Guy provides PaaS-like deployment and recovery on infrastructure the engineer owns. The current implementation covers Phase 1 of Journey 1: **Start**.
 
+[Learn the agent-engineering stack through Server Guy](docs/learning/stack-with-server-guy.md).
+
 ## Architecture
 
 Phase 1 is one full-stack Next.js modular monolith:
