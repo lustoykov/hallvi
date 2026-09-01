@@ -106,14 +106,10 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
   const checks = view.checks.length ? view.checks : initialChecks();
   const passed = checks.filter((check) => check.status === "passed").length;
   const activeSession = view.sessions.find((session) => session.id === view.activeSessionId) ?? null;
-  const displayedDecisions = view.decisions;
   const effectiveApprovalMode = view.application?.approvalMode ?? approvalMode;
   const selectedPermission = permissionOptions.find(
     (option) => option.value === effectiveApprovalMode,
   )!;
-  const phaseDots = checks.map((check) =>
-    check.status === "passed" ? "passed" : check.status,
-  );
   const selectedCheck = checks.find((check) => check.key === selectedCheckKey) ?? null;
 
   useEffect(() => {
@@ -274,8 +270,8 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
               </span>
               {phase.number === 1 && (
                 <span className="sg-phase-dots" aria-label={`${passed} of ${checks.length} checks complete`}>
-                  {phaseDots.map((status, index) => (
-                    <i className={status} key={checks[index].key} />
+                  {checks.map((check) => (
+                    <i className={check.status} key={check.key} />
                   ))}
                 </span>
               )}
@@ -531,9 +527,9 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
                 </div>
                 <section className="sg-record-section">
                   <span className="sg-eyebrow">Recorded decisions</span>
-                  {displayedDecisions.length ? (
+                  {view.decisions.length ? (
                     <div className="sg-decision-list">
-                      {displayedDecisions.map((decision) => (
+                      {view.decisions.map((decision) => (
                         <a href={`/api/decisions/${decision.id}`} key={decision.id} rel="noreferrer" target="_blank">
                           <span>{decision.label}</span>
                           <strong>{decision.value}</strong>

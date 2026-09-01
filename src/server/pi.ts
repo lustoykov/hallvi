@@ -86,7 +86,6 @@ function buildPrompt(input: {
   recordSummary: string;
 }) {
   const transcript = input.messages
-    .filter((message) => message.role !== "system")
     .map((message) => `${message.role.toUpperCase()}: ${message.body}`)
     .join("\n");
   const decisions = input.decisions.map((decision) => `${decision.label}: ${decision.value}`).join("\n");

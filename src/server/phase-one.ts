@@ -2,7 +2,6 @@ import {
   getApplication,
   getApplicationByRepository,
   getLatestApplication,
-  getObservation,
   getOperatorSession,
   getWorkspace,
   insertActivity,
@@ -68,7 +67,6 @@ export async function createPhaseOneApplication(rawInput: CreateApplicationInput
   const application = withTransaction(() => {
     const application = insertApplication({
       name: repository.name,
-      slug: `${repository.owner}-${repository.name}`.toLowerCase(),
       repositoryUrl: repository.canonicalUrl,
       repositoryOwner: repository.owner,
       repositoryName: repository.name,
@@ -264,7 +262,6 @@ export function getPhaseOneOperatorView(
       observations: [],
       blockers: [],
       activity: [],
-      changes: [],
     };
   }
 
@@ -290,7 +287,6 @@ export function getPhaseOneOperatorView(
     observations: listObservations(workspace.id),
     blockers: listBlockers(workspace.id),
     activity: listActivity(workspace.id),
-    changes: [],
   };
 }
 
@@ -386,12 +382,4 @@ export async function sendOperatorMessage(applicationId: string, sessionId: stri
 
   refreshCompletion(application.id);
   return getPhaseOneOperatorView(application.id, session.id);
-}
-
-export function getObservationForApplication(applicationId: string, observationId: string) {
-  const observation = getObservation(observationId);
-  if (!observation || observation.applicationId !== applicationId) {
-    throw new Error("Observation not found.");
-  }
-  return observation;
 }

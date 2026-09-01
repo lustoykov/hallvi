@@ -5,7 +5,6 @@ export type GateStatus = "passed" | "blocked" | "not-yet";
 export interface ApplicationRecord {
   id: string;
   name: string;
-  slug: string;
   repositoryUrl: string;
   repositoryOwner: string;
   repositoryName: string;
@@ -40,7 +39,7 @@ export interface OperatorSession {
 export interface OperatorMessage {
   id: string;
   operatorSessionId: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   body: string;
   source: "user" | "pi" | "server-guy";
   createdAt: string;
@@ -116,12 +115,6 @@ export interface PhaseOneOperatorView {
   observations: ObservationRecord[];
   blockers: BlockerRecord[];
   activity: ActivityEvent[];
-  changes: Array<{
-    id: string;
-    label: string;
-    summary: string;
-    createdAt: string;
-  }>;
 }
 
 export interface CreateApplicationInput {

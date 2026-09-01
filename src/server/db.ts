@@ -33,61 +33,14 @@ function createDatabase(): Sqlite {
 }
 
 export function db(): Sqlite {
-  if (process.env.NODE_ENV === "production") {
-    return (globalThis.__serverGuyDb ??= createDatabase());
-  }
   return (globalThis.__serverGuyDb ??= createDatabase());
 }
 
-function tableExists(database: Sqlite, table: string) {
-  return Boolean(
-    database
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
-      .get(table),
-  );
-}
-
-function columnExists(database: Sqlite, table: string, column: string) {
-  return (
-    database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-  ).some((item) => item.name === column);
-}
-
-function migrateLegacySessionNames(database: Sqlite) {
-  if (tableExists(database, "sessions") && !tableExists(database, "operator_sessions")) {
-    database.exec("ALTER TABLE sessions RENAME TO operator_sessions");
-  }
-  if (
-    tableExists(database, "messages") &&
-    columnExists(database, "messages", "session_id") &&
-    !columnExists(database, "messages", "operator_session_id")
-  ) {
-    database.exec("ALTER TABLE messages RENAME COLUMN session_id TO operator_session_id");
-  }
-}
-
-function migrateLegacyDecisions(database: Sqlite) {
-  if (!tableExists(database, "decisions")) return;
-  database.exec(`
-    INSERT OR IGNORE INTO decision_records
-      (id, workspace_id, operator_session_id, kind, label, value, created_at, updated_at)
-    SELECT id, workspace_id, session_id, 'launch-priority', label, value, created_at, updated_at
-    FROM decisions
-    WHERE session_id IS NOT NULL
-      AND source = 'chat'
-      AND key LIKE 'launch_priority%';
-
-    DROP TABLE decisions;
-  `);
-}
-
 function migrate(database: Sqlite) {
-  migrateLegacySessionNames(database);
   database.exec(`
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
       repository_url TEXT NOT NULL UNIQUE,
       repository_owner TEXT NOT NULL,
       repository_name TEXT NOT NULL,
@@ -190,14 +143,12 @@ function migrate(database: Sqlite) {
     CREATE INDEX IF NOT EXISTS idx_observations_workspace ON observations(workspace_id, observed_at DESC);
     CREATE INDEX IF NOT EXISTS idx_activity_workspace ON activity_events(workspace_id, created_at DESC);
   `);
-  migrateLegacyDecisions(database);
 }
 
 function mapApplication(row: Record<string, unknown>): ApplicationRecord {
   return {
     id: row.id as string,
     name: row.name as string,
-    slug: row.slug as string,
     repositoryUrl: row.repository_url as string,
     repositoryOwner: row.repository_owner as string,
     repositoryName: row.repository_name as string,
@@ -325,13 +276,12 @@ export function insertApplication(input: Omit<ApplicationRecord, "id" | "created
   const now = new Date().toISOString();
   db().prepare(
     `INSERT INTO applications
-      (id, name, slug, repository_url, repository_owner, repository_name, environment,
+      (id, name, repository_url, repository_owner, repository_name, environment,
        approval_mode, approval_scope, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.name,
-    input.slug,
     input.repositoryUrl,
     input.repositoryOwner,
     input.repositoryName,
@@ -369,13 +319,6 @@ export function getWorkspace(applicationId: string): PhaseWorkspace | null {
   const row = db()
     .prepare("SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_number = 1")
     .get(applicationId) as Record<string, unknown> | undefined;
-  return row ? mapWorkspace(row) : null;
-}
-
-export function getWorkspaceById(id: string): PhaseWorkspace | null {
-  const row = db().prepare("SELECT * FROM phase_workspaces WHERE id = ?").get(id) as
-    | Record<string, unknown>
-    | undefined;
   return row ? mapWorkspace(row) : null;
 }
 
