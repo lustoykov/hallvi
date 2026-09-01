@@ -1,6 +1,6 @@
 # Architecture explanations
 
-Every Server Guy pull request includes a small architecture explanation generated with `diagram-design`.
+Medium and large Server Guy pull requests include a small architecture explanation generated with `diagram-design`. Small pull requests such as bug fixes and cleanup do not need one.
 
 Each explanation answers three questions:
 

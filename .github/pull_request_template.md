@@ -4,9 +4,9 @@
 
 ## Architecture
 
-Every Server Guy PR includes a `diagram-design` architecture explanation.
+Medium and large PRs include a `diagram-design` architecture explanation: anything that adds or moves a boundary, data flow, durable state, or external integration. Small PRs such as bug fixes, cleanup, copy, and dependency bumps skip this section and say so in one line.
 
-- Diagram: <!-- Link to the self-contained HTML file under docs/architecture/. -->
+- Diagram: <!-- Link to the self-contained HTML file under docs/architecture/, or "Small change, no diagram". -->
 - Changed boundary or data flow: <!-- What moved, called, stored, or became authoritative? -->
 - Deliberately unchanged: <!-- Name adjacent components this PR does not alter. -->
 
