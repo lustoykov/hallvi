@@ -150,7 +150,6 @@ describe("askPi", () => {
       customTools?: Array<{
         name: string;
         constrainedSampling?: unknown;
-        prepareArguments?: (args: unknown) => unknown;
         execute: (id: string, params: unknown) => Promise<unknown>;
       }>;
     } = {};
@@ -172,8 +171,7 @@ describe("askPi", () => {
             kind: "launch-priority",
             value: "  Recover quickly  ",
           };
-          const proposal = tool?.prepareArguments?.(rawProposal) ?? rawProposal;
-          await tool?.execute("tool-call-1", proposal);
+          await tool?.execute("tool-call-1", rawProposal);
         },
         async abort() {},
         dispose() {},

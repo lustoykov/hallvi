@@ -126,7 +126,6 @@ export async function askPi(input: {
     ],
     parameters: proposeDecisionParameters,
     constrainedSampling: { type: "json_schema", strict: "require" },
-    prepareArguments: (args) => parsePiDecisionValue(args),
     async execute(_toolCallId, params) {
       const proposal = collectPiDecisionProposal(decisionProposals, params);
       return {
