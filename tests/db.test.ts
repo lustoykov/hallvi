@@ -1,0 +1,117 @@
+import Database from "better-sqlite3";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+let databaseDirectory: string | null = null;
+
+afterEach(() => {
+  globalThis.__serverGuyDb?.close();
+  delete globalThis.__serverGuyDb;
+  delete process.env.SERVER_GUY_DB_PATH;
+  if (databaseDirectory) rmSync(databaseDirectory, { recursive: true, force: true });
+  databaseDirectory = null;
+});
+
+async function loadFreshDatabase() {
+  databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+  process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "test.db");
+  vi.resetModules();
+  return import("../src/server/db");
+}
+
+function applicationInput(name: string) {
+  return {
+    name,
+    repositoryUrl: `https://github.com/lustoykov/${name}`,
+    repositoryOwner: "lustoykov",
+    repositoryName: name,
+    environment: "production" as const,
+    approvalMode: "pi-decides" as const,
+    approvalScope: "Current application launch",
+  };
+}
+
+describe("Phase 1 schema", () => {
+  it("refuses to open a record written by an older schema", async () => {
+    databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+    const databasePath = join(databaseDirectory, "old.db");
+    const older = new Database(databasePath);
+    older.exec("CREATE TABLE applications (id TEXT PRIMARY KEY)");
+    older.close();
+
+    process.env.SERVER_GUY_DB_PATH = databasePath;
+    vi.resetModules();
+    const database = await import("../src/server/db");
+
+    expect(() => database.db()).toThrow("older prototype schema");
+  });
+
+  it("stores seven durable record types without persisted blockers or Gate Checks", async () => {
+    const database = await loadFreshDatabase();
+    const tables = database
+      .db()
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    const workspaceColumns = database
+      .db()
+      .prepare("PRAGMA table_info(phase_workspaces)")
+      .all()
+      .map((row) => (row as { name: string }).name);
+
+    expect(tables).toEqual([
+      "activity_events",
+      "applications",
+      "chats",
+      "decisions",
+      "messages",
+      "observations",
+      "phase_workspaces",
+    ]);
+    expect(workspaceColumns).toEqual(["id", "application_id", "phase_key", "created_at"]);
+  });
+
+  it("selects the newest Observation deterministically within one Application", async () => {
+    const database = await loadFreshDatabase();
+    const firstApplication = database.insertApplication(applicationInput("first-app"));
+    const secondApplication = database.insertApplication(applicationInput("second-app"));
+    const first = database.insertObservation({
+      applicationId: firstApplication.id,
+      kind: "github-repository-identity",
+      status: "passed",
+      summary: "older pass",
+      sourceLabel: "GitHub",
+      sourceUrl: null,
+      raw: {},
+    });
+    const second = database.insertObservation({
+      applicationId: firstApplication.id,
+      kind: "github-repository-identity",
+      status: "failed",
+      summary: "newer failure",
+      sourceLabel: "GitHub",
+      sourceUrl: null,
+      raw: {},
+    });
+    database.insertObservation({
+      applicationId: secondApplication.id,
+      kind: "github-repository-identity",
+      status: "passed",
+      summary: "other application",
+      sourceLabel: "GitHub",
+      sourceUrl: null,
+      raw: {},
+    });
+    database
+      .db()
+      .prepare("UPDATE observations SET observed_at = ? WHERE id IN (?, ?)")
+      .run("2026-09-03T00:00:00.000Z", first.id, second.id);
+
+    expect(
+      database.latestObservation(firstApplication.id, "github-repository-identity")?.id,
+    ).toBe(second.id);
+  });
+});
