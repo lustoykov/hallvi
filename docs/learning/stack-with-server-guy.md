@@ -69,7 +69,7 @@ Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.
 
 It does **not** yet provide direct practice with PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#3-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. Add [Drizzle over the existing SQLite database](../../TODO.md#3-add-drizzle-over-the-existing-sqlite-database) as a bounded, behavior-preserving persistence refactor before adding worker state. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
@@ -115,7 +115,7 @@ Test at least these cases:
 
 Server Guy calls Pi directly. Application code supplies a bounded prompt, validates Pi's structured reply, and commits only accepted messages and Decisions. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
-Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed run and event records, a Node worker, and a reconnectable HTTP stream. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
+Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 
 ## The central reliability exercise: one durable Operation
 
@@ -208,7 +208,7 @@ Build or select one small but real agent application using:
 
 - React and Next.js App Router;
 - Pi as the direct agent runtime, with its provider and model selected through explicit configuration;
-- streaming that returns a run ID, reconnects from the last event, and recovers state from PostgreSQL rather than from the stream;
+- streaming that returns a run ID, reloads the latest message revision, reconnects to SSE, and recovers state from PostgreSQL rather than from the stream;
 - Zod tool and output contracts;
 - a plain durable worker first; add a Workflow DevKit loop only after a concrete trigger proves it reduces operational complexity;
 - PostgreSQL and Drizzle, with `supabase-js` only on the managed path;
@@ -232,10 +232,11 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 
 | Capability or tool | Trigger |
 | --- | --- |
-| **PostgreSQL + Drizzle** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same domain invariants and rerun the same tests. |
-| **SQLite + Node worker** | Introduce when a Pi turn outlives one request: persist runs and events, claim work idempotently, and recover after disconnects or process restarts. |
+| **Drizzle over SQLite** | Introduce before durable Pi state because the existing persistence layer already has enough handwritten queries and unchecked row casts to justify one typed schema/query layer. Preserve SQLite, current behavior, and the prototype reset policy; decide separately whether `drizzle-kit push` or application bootstrap owns schema application. |
+| **PostgreSQL** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same Drizzle domain schema and invariants where the database differences allow it, and rerun the same tests. |
+| **SQLite + Node worker** | Introduce when a Pi turn outlives one request: persist Pi Run and assistant-message state, schedule work through one local worker process, and recover after disconnects or process restarts. Start without leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
 | **Workflow DevKit** | Re-evaluate when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate. Durable application records remain authoritative. |
-| **Run-ID streaming** | Introduce with the durable Pi worker: the request returns a run ID, the UI reconnects from its last event, and state is recovered from durable run records rather than from the stream. |
+| **Run-ID streaming** | Introduce with the durable Pi worker: the request returns a run ID, the UI reloads the current message revision and reconnects to SSE, and state is recovered from SQLite rather than from the stream. |
 | **Structured logs + OpenTelemetry** | Add before the first multi-component operation; propagate one trace ID through model, domain, provider, and verification boundaries. |
 | **Langfuse** | Add for model and agent traces/evaluations after telemetry is instrumented. Installation alone does not produce useful traces. |
 | **Sentry** | Add when external users receive releases and application exceptions need release-aware grouping. |
@@ -247,6 +248,8 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | **pnpm and Biome** | Practice through the managed TypeScript application; do not churn Server Guy's npm and ESLint setup without a concrete reason. |
 | **Temporal** | Add only when a client already runs it or cross-service orchestration with in-flight versioning needs a workflow platform beyond Workflow DevKit. |
 | **Inngest, Braintrust, OpenTofu, Vault, Kubernetes, PostHog, deeper AWS** | Keep on demand until a current product or client requirement justifies them, as `STACK.md` defines. |
+
+Horizontal worker scaling is deliberately deferred, not solved by the table above. When a release or client design genuinely needs independent workers, use the [horizontal worker scaling study](../../TODO.md#later-architecture-study--horizontal-workers-and-durable-queues) to reproduce claim and crash failures, compare database queues, message queues, and durable workflows, and choose from measured requirements. The result should be an ADR and runnable failure scenarios, not an assumed default technology.
 
 ## Observability learning target
 
@@ -298,16 +301,17 @@ Record learning evidence in the PR:
 
 1. Harden Phase 1 inputs and Pi output with Zod and adversarial tests.
 2. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
-3. Make Pi requests durable with SQLite, a Node worker, run IDs, reconnectable events, a bounded transcript window, and a durable summary.
-4. Implement the Phase 2 Application Contract as a read-only vertical slice.
-5. Specify and test the durable Operation lifecycle without a provider mutation.
-6. Reconcile the first real Hetzner host effect through approval and verification.
-7. Containerize and deploy the first exact application Release to a VPS.
-8. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
-9. Revisit Workflow DevKit only when its durability trigger is present.
-10. Break, recover, roll back, and externally re-verify a deployed application.
-11. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
-12. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
+3. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
+4. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.
+5. Implement the Phase 2 Application Contract as a read-only vertical slice.
+6. Specify and test the durable Operation lifecycle without a provider mutation.
+7. Reconcile the first real Hetzner host effect through approval and verification.
+8. Containerize and deploy the first exact application Release to a VPS.
+9. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
+10. Revisit Workflow DevKit only when its durability trigger is present.
+11. Break, recover, roll back, and externally re-verify a deployed application.
+12. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
+13. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
 
 ## Guardrails
 
