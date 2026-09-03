@@ -4,14 +4,15 @@
 
 These are separate follow-up PRs after the current Phase 1 implementation. Complete items 1–4 before starting Phase 2. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
 
-### 1. Connect GitHub explicitly
+### 1. Add Drizzle over the existing SQLite database
 
-- [ ] Add a user-visible GitHub authentication and connection flow.
-- [ ] Detect and explain any reusable local credentials instead of silently assuming access.
-- [ ] Verify access to the exact selected repository and record the credential source, repository identity, permissions, and observation time.
-- [ ] Test successful authorization, cancelled or denied authorization, missing scope, revoked or expired credentials, and an inaccessible private repository.
+- [ ] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
+- [ ] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
+- [ ] Keep `better-sqlite3`, foreign-key enforcement, WAL mode, transactions, and the prototype reset/nuke policy.
+- [ ] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
+- [ ] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
 
-Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reuse machine credentials or must keep its own isolated connection.
+Open decision: choose one schema-application path before implementation. `drizzle-kit push` can make the TypeScript Drizzle schema the prototype source of truth by applying it directly to a disposable local database. Application-owned bootstrap can keep first-run setup inside Server Guy, but retaining handwritten `CREATE TABLE` statements beside a Drizzle schema would create two schema definitions that can drift. Do not adopt both as equal sources of truth.
 
 ### 2. Configure Pi explicitly
 
@@ -22,15 +23,14 @@ Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reus
 
 Open decision: confirm whether the packaged Pi SDK is sufficient on every supported machine or whether Server Guy must also distribute or require a separate Pi/Codex runtime. Also choose between a Server Guy-owned credential store and an explicitly shared machine-level credential store.
 
-### 3. Add Drizzle over the existing SQLite database
+### 3. Connect GitHub explicitly
 
-- [ ] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
-- [ ] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
-- [ ] Keep `better-sqlite3`, foreign-key enforcement, WAL mode, transactions, and the prototype reset/nuke policy.
-- [ ] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
-- [ ] Keep this PR mechanical: do not add Pi Run, worker, streaming, or Phase 2 tables yet.
+- [ ] Add a user-visible GitHub authentication and connection flow.
+- [ ] Detect and explain any reusable local credentials instead of silently assuming access.
+- [ ] Verify access to the exact selected repository and record the credential source, repository identity, permissions, and observation time.
+- [ ] Test successful authorization, cancelled or denied authorization, missing scope, revoked or expired credentials, and an inaccessible private repository.
 
-Open decision: choose one schema-application path before implementation. `drizzle-kit push` can make the TypeScript Drizzle schema the prototype source of truth by applying it directly to a disposable local database. Application-owned bootstrap can keep first-run setup inside Server Guy, but retaining handwritten `CREATE TABLE` statements beside a Drizzle schema would create two schema definitions that can drift. Do not adopt both as equal sources of truth.
+Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reuse machine credentials or must keep its own isolated connection.
 
 ### 4. Make Pi requests durable
 

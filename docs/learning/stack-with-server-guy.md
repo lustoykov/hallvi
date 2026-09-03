@@ -69,7 +69,7 @@ Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.
 
 It does **not** yet provide direct practice with PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. Add [Drizzle over the existing SQLite database](../../TODO.md#3-add-drizzle-over-the-existing-sqlite-database) as a bounded, behavior-preserving persistence refactor before adding worker state. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. Add [Drizzle over the existing SQLite database](../../TODO.md#1-add-drizzle-over-the-existing-sqlite-database) as a bounded, behavior-preserving persistence refactor before adding setup or worker state. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
@@ -88,7 +88,7 @@ The current modular monolith is the right product architecture. Keep the UI, API
 
 ## The first learning slice: Phase 2 Application Contract
 
-Implement Phase 2 as a read-only vertical slice after the explicit GitHub/Pi setup and durable Pi request follow-ups, and before performing infrastructure mutations.
+Implement Phase 2 as a read-only vertical slice after the Drizzle refactor, explicit Pi and GitHub setup, and durable Pi request follow-ups, and before performing infrastructure mutations.
 
 ### Build
 
@@ -300,18 +300,19 @@ Record learning evidence in the PR:
 ## Recommended milestone order
 
 1. Harden Phase 1 HTTP input with Zod, Decision tool arguments with TypeBox, final Pi text in the adapter, and all three with adversarial tests.
-2. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
-3. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
-4. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.
-5. Implement the Phase 2 Application Contract as a read-only vertical slice.
-6. Specify and test the durable Operation lifecycle without a provider mutation.
-7. Reconcile the first real Hetzner host effect through approval and verification.
-8. Containerize and deploy the first exact application Release to a VPS.
-9. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
-10. Revisit Workflow DevKit only when its durability trigger is present.
-11. Break, recover, roll back, and externally re-verify a deployed application.
-12. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
-13. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
+2. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
+3. Add explicit Pi setup, with runtime, credential, quota, and model happy and unhappy path tests.
+4. Add explicit GitHub connection, with authorization, scope, revocation, and repository-access happy and unhappy path tests.
+5. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.
+6. Implement the Phase 2 Application Contract as a read-only vertical slice.
+7. Specify and test the durable Operation lifecycle without a provider mutation.
+8. Reconcile the first real Hetzner host effect through approval and verification.
+9. Containerize and deploy the first exact application Release to a VPS.
+10. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
+11. Revisit Workflow DevKit only when its durability trigger is present.
+12. Break, recover, roll back, and externally re-verify a deployed application.
+13. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
+14. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
 
 ## Guardrails
 
