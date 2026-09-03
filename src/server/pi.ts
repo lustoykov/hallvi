@@ -1,6 +1,7 @@
 import { Type } from "typebox";
 
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
+import { PI_MODEL_ID, PI_PROVIDER_ID, PI_REASONING_EFFORT } from "./pi-settings";
 import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
@@ -70,6 +71,30 @@ export function normalizePiAssistantMessage(input: string): string {
   return message;
 }
 
+export function describePiFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Pi did not return an error message.";
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("usage limit") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("quota") ||
+    normalized.includes("status 429") ||
+    normalized.includes("status: 429")
+  ) {
+    return "Pi cannot run because the connected ChatGPT account has reached its current usage limit. Wait for the limit to reset, then retry.";
+  }
+  if (
+    normalized.includes("invalid_grant") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("status 401") ||
+    normalized.includes("status: 401") ||
+    normalized.includes("provider is not configured")
+  ) {
+    return "Pi authentication is missing or expired. Open Pi setup and connect ChatGPT again.";
+  }
+  return `Pi is unavailable: ${message}`;
+}
+
 function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index] as {
@@ -123,6 +148,7 @@ export async function askPi(input: {
     defineTool,
     DefaultResourceLoader,
     getAgentDir,
+    ModelRuntime,
     SessionManager,
   } = await import("@earendil-works/pi-coding-agent");
 
@@ -171,8 +197,29 @@ export async function askPi(input: {
   });
   await loader.reload();
 
+  const { modelRuntime, model } = await (async () => {
+    const runtime = await ModelRuntime.create({ refreshOnCreate: false });
+    const selectedModel = runtime.getModel(PI_PROVIDER_ID, PI_MODEL_ID);
+    if (!selectedModel) {
+      throw new PiUnavailableError(
+        `Pi is unavailable: ${PI_PROVIDER_ID}/${PI_MODEL_ID} is not present in the bundled model catalog.`,
+      );
+    }
+    const auth = await runtime.getAuth(selectedModel);
+    if (!auth) {
+      throw new Error("Provider is not configured");
+    }
+    return { modelRuntime: runtime, model: selectedModel };
+  })().catch((error) => {
+    if (error instanceof PiUnavailableError) throw error;
+    throw new PiUnavailableError(describePiFailure(error));
+  });
+
   const { session } = await createAgentSession({
     cwd,
+    model,
+    modelRuntime,
+    thinkingLevel: PI_REASONING_EFFORT,
     tools: ["propose_decision"],
     customTools: [proposeDecisionTool],
     resourceLoader: loader,
@@ -205,8 +252,8 @@ export async function askPi(input: {
       decisionProposals,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Pi is unavailable.";
-    throw new PiUnavailableError(`Pi is unavailable: ${message}`);
+    if (error instanceof PiUnavailableError) throw error;
+    throw new PiUnavailableError(describePiFailure(error));
   } finally {
     if (timeout) clearTimeout(timeout);
     unsubscribe();

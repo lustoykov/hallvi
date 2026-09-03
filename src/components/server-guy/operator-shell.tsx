@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import { PHASE_ONE_CHECKS } from "@/server/phase-one-spec";
+import type { PiSetupStatus } from "@/server/pi-setup";
 import { APPROVAL_MODES } from "@/server/types";
 import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
 
@@ -24,7 +26,13 @@ function initialChecks(): GateCheck[] {
   }));
 }
 
-export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorView }) {
+export function OperatorShell({
+  initialView,
+  initialPiSetup,
+}: {
+  initialView: PhaseOneOperatorView;
+  initialPiSetup: PiSetupStatus;
+}) {
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -77,7 +85,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
 
   function sendMessage() {
     const message = composer.trim();
-    if (busy || !application || !activeChat || !message) return;
+    if (busy || !initialPiSetup.ready || !application || !activeChat || !message) return;
     setComposer("");
     void run(
       "message",
@@ -116,6 +124,13 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
           </div>
         </div>
         <div className="sg-topbar-meta">
+          <Link
+            className={`sg-pi-status ${initialPiSetup.ready ? "ready" : "attention"}`}
+            href="/setup/pi"
+          >
+            <span aria-hidden="true" />
+            {initialPiSetup.ready ? "Pi ready" : "Set up Pi"}
+          </Link>
           <span className="sg-eyebrow">Permission policy</span>
           <strong>{application ? APPROVAL_MODES[application.approvalMode].label : "Set during Start"}</strong>
           <span className={`sg-status ${view.workspace?.status === "ready" ? "ready" : "working"}`}>
@@ -141,6 +156,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
           checks={checks}
           composer={composer}
           error={error}
+          piReady={initialPiSetup.ready}
           onArchive={archiveActiveChat}
           onComposerChange={setComposer}
           onCreateApplication={createApplication}

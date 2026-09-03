@@ -65,7 +65,7 @@ It already provides direct practice with:
 - GitHub integration and source-attributed Observations;
 - schema-validated request and model boundaries, idempotent intake, policy conflicts, provenance stability, and adversarial malformed-model-output tests.
 
-Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) is a Phase 1 follow-up that must land before Phase 2; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
+Pi is Server Guy's only model and agent runtime. The [explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) shows the bundled runtime, ChatGPT OAuth state, Pi-owned credential source, and fixed `openai-codex` / `gpt-5.6-sol` / `high` configuration before chat. Server Guy does not copy Codex CLI credentials or fall back to API-key billing.
 
 It now provides direct practice with Drizzle over SQLite, but it does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 

@@ -16,12 +16,12 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 
 ### 2. Configure Pi explicitly
 
-- [ ] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
-- [ ] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
-- [ ] Reuse existing Codex credentials only when the source is visible to the user; otherwise start an explicit OAuth flow.
-- [ ] Test existing credentials, first-time login, cancelled login, expired credentials, exhausted quota, missing runtime, and unavailable model.
+- [x] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
+- [x] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
+- [x] Keep Codex CLI credentials separate, show Pi's exact credential source, and start an explicit ChatGPT device-code OAuth flow.
+- [x] Test existing credentials, first-time login, cancelled login, expired credentials, exhausted quota, missing runtime, and unavailable model.
 
-Open decision: confirm whether the packaged Pi SDK is sufficient on every supported machine or whether Server Guy must also distribute or require a separate Pi/Codex runtime. Also choose between a Server Guy-owned credential store and an explicitly shared machine-level credential store.
+Decision: the packaged Pi SDK is the Server Guy runtime, so users do not install a separate Pi or Codex CLI. Pi owns the shared machine-level credential store at `~/.pi/agent/auth.json`; Server Guy shows that source, never exposes its secrets, and does not read or copy `~/.codex/auth.json`. The `openai-codex` OAuth provider uses ChatGPT subscription access and Server Guy never falls back to API-key billing.
 
 ### 3. Connect GitHub explicitly
 

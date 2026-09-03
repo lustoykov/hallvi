@@ -1,6 +1,7 @@
 "use client";
 
-import { Archive, Check, GithubLogo, SpinnerGap } from "@phosphor-icons/react";
+import { Archive, Check, GithubLogo, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -120,6 +121,7 @@ export function ChatPane({
   checks,
   busy,
   error,
+  piReady,
   composer,
   onComposerChange,
   onSend,
@@ -131,6 +133,7 @@ export function ChatPane({
   checks: GateCheck[];
   busy: string | null;
   error: string | null;
+  piReady: boolean;
   composer: string;
   onComposerChange: (value: string) => void;
   onSend: () => void;
@@ -199,6 +202,16 @@ export function ChatPane({
               </div>
             </div>
           )}
+          {application && !piReady && (
+            <div className="sg-pi-required">
+              <WarningCircle weight="bold" />
+              <div>
+                <strong>Connect Pi before chatting</strong>
+                <p>The application workspace still works, but model turns are disabled.</p>
+              </div>
+              <Link href="/setup/pi">Open Pi setup</Link>
+            </div>
+          )}
           {error && application && <div className="sg-error" role="alert">{error}</div>}
         </ConversationContent>
         <ConversationScrollButton />
@@ -212,7 +225,7 @@ export function ChatPane({
         }}
       >
         <textarea
-          disabled={!application || !activeChat || Boolean(activeChat.archivedAt)}
+          disabled={!piReady || !application || !activeChat || Boolean(activeChat.archivedAt)}
           id="pi-composer"
           onChange={(event) => onComposerChange(event.target.value)}
           onKeyDown={(event) => {
@@ -221,7 +234,13 @@ export function ChatPane({
               if (!busy) event.currentTarget.form?.requestSubmit();
             }
           }}
-          placeholder={application ? "Ask Pi, correct a decision, or add context…" : "Create the application workspace to start chatting"}
+          placeholder={
+            !piReady
+              ? "Connect Pi to ChatGPT before chatting"
+              : application
+                ? "Ask Pi, correct a decision, or add context…"
+                : "Create the application workspace to start chatting"
+          }
           rows={2}
           value={composer}
         />
@@ -230,6 +249,7 @@ export function ChatPane({
           <button
             disabled={
               !composer.trim() ||
+              !piReady ||
               busy !== null ||
               !application ||
               !activeChat ||

@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sdkMocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
+  createModelRuntime: vi.fn(),
 }));
+
+const configuredModel = {
+  provider: "openai-codex",
+  id: "gpt-5.6-sol",
+  name: "GPT-5.6 Sol",
+};
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: sdkMocks.createAgentSession,
@@ -12,12 +19,16 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
     async reload() {}
   },
   getAgentDir: () => "/tmp/pi-agent",
+  ModelRuntime: {
+    create: sdkMocks.createModelRuntime,
+  },
   SessionManager: { inMemory: () => ({}) },
 }));
 
 import {
   askPi,
   collectPiDecisionProposal,
+  describePiFailure,
   MAX_PI_DECISION_PROPOSALS,
   normalizePiAssistantMessage,
   proposeDecisionParameters,
@@ -26,6 +37,11 @@ import type { PiDecision } from "../src/server/types";
 
 beforeEach(() => {
   sdkMocks.createAgentSession.mockReset();
+  sdkMocks.createModelRuntime.mockReset();
+  sdkMocks.createModelRuntime.mockResolvedValue({
+    getModel: () => configuredModel,
+    getAuth: async () => ({ auth: { apiKey: "test-token" }, source: "OAuth" }),
+  });
 });
 
 describe("Pi assistant messages", () => {
@@ -41,6 +57,20 @@ describe("Pi assistant messages", () => {
     );
     expect(() => normalizePiAssistantMessage("x".repeat(10_001))).toThrow(
       "longer than 10,000 characters",
+    );
+  });
+});
+
+describe("Pi failures", () => {
+  it("turns exhausted subscription usage into a retryable explanation", () => {
+    expect(describePiFailure(new Error("Request failed with status 429: usage limit reached"))).toBe(
+      "Pi cannot run because the connected ChatGPT account has reached its current usage limit. Wait for the limit to reset, then retry.",
+    );
+  });
+
+  it("points missing or expired authentication back to setup", () => {
+    expect(describePiFailure(new Error("Provider is not configured"))).toBe(
+      "Pi authentication is missing or expired. Open Pi setup and connect ChatGPT again.",
     );
   });
 });
@@ -167,6 +197,12 @@ describe("askPi", () => {
     });
 
     expect(sessionOptions.tools).toEqual(["propose_decision"]);
+    expect(sessionOptions).toEqual(
+      expect.objectContaining({
+        model: configuredModel,
+        thinkingLevel: "high",
+      }),
+    );
     expect(sessionOptions.customTools).toHaveLength(1);
     expect(sessionOptions.customTools?.[0]).toEqual(
       expect.objectContaining({
