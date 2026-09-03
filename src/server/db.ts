@@ -14,6 +14,7 @@ import {
   observations,
   phaseWorkspaces,
 } from "./db-schema";
+import schemaVersion from "./schema-version.json";
 import type {
   ActivityEvent,
   ApplicationRecord,
@@ -37,7 +38,6 @@ declare global {
   var __serverGuyDb: ServerGuyDatabase | undefined;
 }
 
-const SCHEMA_VERSION = 3;
 const defaultDbPath = join(process.cwd(), ".server-guy", "server-guy.db");
 
 export function db(): ServerGuyDatabase {
@@ -69,9 +69,9 @@ function assertCurrentSchema(client: InstanceType<typeof Database>, databasePath
   if (!initialized) {
     throw new Error(`${databasePath} is not initialized. Run npm run db:push.`);
   }
-  if (version !== SCHEMA_VERSION) {
+  if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} uses an older prototype schema. Delete it and run npm run db:push.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Run npm run db:push, or delete the disposable database and push a fresh one.`,
     );
   }
 }
@@ -102,8 +102,8 @@ export function getApplicationByRepository(repositoryUrl: string) {
 export function insertApplication(input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">) {
   const timestamp = now();
   const application: ApplicationRecord = {
-    id: randomUUID(),
     ...input,
+    id: randomUUID(),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -212,8 +212,8 @@ export function insertDecision(input: {
   value: string;
 }) {
   const decision: Decision = {
-    id: randomUUID(),
     ...input,
+    id: randomUUID(),
     supersededById: null,
     createdAt: now(),
   };
@@ -259,8 +259,8 @@ export function supersedeDecision(applicationId: string, previousId: string, rep
 
 export function insertObservation(input: Omit<Observation, "id" | "observedAt">) {
   const observation: Observation = {
-    id: randomUUID(),
     ...input,
+    id: randomUUID(),
     observedAt: now(),
   };
   db().insert(observations).values(observation).run();

@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 import type {
+  ActivityEvent,
   ApplicationRecord,
   Chat,
   ChatMessage,
@@ -102,7 +103,7 @@ export const observations = sqliteTable(
     summary: text("summary").notNull(),
     sourceLabel: text("source_label").notNull(),
     sourceUrl: text("source_url"),
-    raw: text("raw_json", { mode: "json" }).$type<unknown>().notNull(),
+    raw: text("raw_json", { mode: "json" }).notNull(),
     observedAt: text("observed_at").notNull(),
   },
   (table) => [
@@ -131,18 +132,15 @@ export const activityEvents = sqliteTable(
   ],
 );
 
-// These assignments fail compilation if a selected row drifts from its domain record.
-const _applicationRecord: ApplicationRecord = {} as typeof applications.$inferSelect;
-const _workspaceRecord: PhaseWorkspaceRecord = {} as typeof phaseWorkspaces.$inferSelect;
-const _chatRecord: Chat = {} as typeof chats.$inferSelect;
-const _messageRecord: ChatMessage = {} as typeof messages.$inferSelect;
-const _decisionRecord: Decision = {} as typeof decisions.$inferSelect;
-const _observationRecord: Observation = {} as typeof observations.$inferSelect;
-void [
-  _applicationRecord,
-  _workspaceRecord,
-  _chatRecord,
-  _messageRecord,
-  _decisionRecord,
-  _observationRecord,
-];
+type AssertExtends<Expected, Actual extends Expected> = Actual;
+
+// This type fails compilation if any selected row drifts from its domain record.
+export type DatabaseRowTypes = {
+  application: AssertExtends<ApplicationRecord, typeof applications.$inferSelect>;
+  workspace: AssertExtends<PhaseWorkspaceRecord, typeof phaseWorkspaces.$inferSelect>;
+  chat: AssertExtends<Chat, typeof chats.$inferSelect>;
+  message: AssertExtends<ChatMessage, typeof messages.$inferSelect>;
+  decision: AssertExtends<Decision, typeof decisions.$inferSelect>;
+  observation: AssertExtends<Observation, typeof observations.$inferSelect>;
+  activity: AssertExtends<ActivityEvent, typeof activityEvents.$inferSelect>;
+};

@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import schemaVersion from "../src/server/schema-version.json";
 import { pushTestDatabase } from "./test-database";
 
 let databaseDirectory: string | null = null;
@@ -58,7 +59,9 @@ describe("Phase 1 schema", () => {
     vi.resetModules();
     const database = await import("../src/server/db");
 
-    expect(() => database.db()).toThrow("older prototype schema");
+    expect(() => database.db()).toThrow(
+      `prototype schema version 0; expected ${schemaVersion.version}`,
+    );
   });
 
   it("stores seven durable record types without persisted blockers or Gate Checks", async () => {
@@ -93,7 +96,7 @@ describe("Phase 1 schema", () => {
       "idx_messages_chat",
       "idx_observations_application_kind",
     ]);
-    expect(client.pragma("user_version", { simple: true })).toBe(3);
+    expect(client.pragma("user_version", { simple: true })).toBe(schemaVersion.version);
     expect(client.pragma("foreign_keys", { simple: true })).toBe(1);
     expect(client.pragma("journal_mode", { simple: true })).toBe("wal");
   });
