@@ -1,7 +1,6 @@
 import { Type } from "typebox";
 
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
-import { parsePiAssistantMessageValue } from "./schemas";
 import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
@@ -58,6 +57,17 @@ export function collectPiDecisionProposal(
   const proposal = { ...input, value };
   proposals.push(proposal);
   return proposal;
+}
+
+export function normalizePiAssistantMessage(input: string): string {
+  const message = input.trim();
+  if (!message) {
+    throw new Error("Pi returned no user-facing message.");
+  }
+  if (message.length > 10_000) {
+    throw new Error("Pi returned a message longer than 10,000 characters.");
+  }
+  return message;
 }
 
 function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {
@@ -191,7 +201,7 @@ export async function askPi(input: {
     if (outcome.error) throw new Error(outcome.error);
     const finalText = outcome.text || response;
     return {
-      message: parsePiAssistantMessageValue(finalText),
+      message: normalizePiAssistantMessage(finalText),
       decisionProposals,
     };
   } catch (error) {

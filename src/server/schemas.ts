@@ -32,12 +32,6 @@ export const sendChatMessageRequestSchema = z.strictObject({
     .max(5_000, "Keep this message under 5,000 characters."),
 });
 
-export const piAssistantMessageSchema = z
-  .string({ error: "Pi returned no user-facing message." })
-  .trim()
-  .min(1, "Pi returned no user-facing message.")
-  .max(10_000, "Pi returned a message longer than 10,000 characters.");
-
 export class RequestValidationError extends Error {}
 
 const MAX_JSON_REQUEST_CHARACTERS = 16_384;
@@ -70,14 +64,6 @@ export async function parseJsonRequest<T extends z.ZodType>(
   const result = schema.safeParse(input);
   if (!result.success) {
     throw new RequestValidationError(firstIssue(result.error));
-  }
-  return result.data;
-}
-
-export function parsePiAssistantMessageValue(input: unknown): string {
-  const result = piAssistantMessageSchema.safeParse(input);
-  if (!result.success) {
-    throw new Error(`Pi returned an invalid assistant message: ${firstIssue(result.error)}`);
   }
   return result.data;
 }

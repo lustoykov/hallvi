@@ -19,9 +19,9 @@ import {
   askPi,
   collectPiDecisionProposal,
   MAX_PI_DECISION_PROPOSALS,
+  normalizePiAssistantMessage,
   proposeDecisionParameters,
 } from "../src/server/pi";
-import { parsePiAssistantMessageValue } from "../src/server/schemas";
 import type { PiDecision } from "../src/server/types";
 
 beforeEach(() => {
@@ -30,16 +30,16 @@ beforeEach(() => {
 
 describe("Pi assistant messages", () => {
   it("accepts normal conversational text", () => {
-    expect(parsePiAssistantMessageValue("  Looks good to me.  ")).toBe(
+    expect(normalizePiAssistantMessage("  Looks good to me.  ")).toBe(
       "Looks good to me.",
     );
   });
 
   it("rejects empty and oversized messages", () => {
-    expect(() => parsePiAssistantMessageValue("   ")).toThrow(
+    expect(() => normalizePiAssistantMessage("   ")).toThrow(
       "no user-facing message",
     );
-    expect(() => parsePiAssistantMessageValue("x".repeat(10_001))).toThrow(
+    expect(() => normalizePiAssistantMessage("x".repeat(10_001))).toThrow(
       "longer than 10,000 characters",
     );
   });

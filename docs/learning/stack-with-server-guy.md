@@ -75,7 +75,7 @@ The current modular monolith is the right product architecture. Keep the UI, API
 
 | Server Guy milestone | Primary learning | Required proof |
 | --- | --- | --- |
-| **Phase 1 hardening — Start** | TypeScript boundaries, Zod, TypeBox, adversarial tests | Validate API input and final Pi text with Zod, and Pi Decision tool arguments with TypeBox; reject malformed, unsupported, oversized, or fabricated decisions. |
+| **Phase 1 hardening — Start** | TypeScript boundaries, Zod, TypeBox, adversarial tests | Validate API input with Zod, Pi Decision tool arguments with TypeBox, and final Pi text in the adapter; reject malformed, unsupported, oversized, or fabricated decisions. |
 | **Phase 2 — Inspect app** | Typed tools, agent boundaries, Application Contracts, evals, provenance | Every material contract field is schema-valid and cites a repository fact, profile rule, Observation, or explicit decision. Unsupported claims become visible gaps. |
 | **Phase 3 — Make launch-ready** | GitHub integration, CI, repository mutation safety, Docker contracts | One exact candidate revision passes profile checks; every required change maps to a reviewed diff and independent evidence. |
 | **Phase 4 — Review launch plan** | Deterministic planning, responsibility boundaries, current provider facts | The plan separates provider, Pi, and engineer actions and includes sourced cost, risks, effects, verification, and rollback. |
@@ -299,7 +299,7 @@ Record learning evidence in the PR:
 
 ## Recommended milestone order
 
-1. Harden Phase 1 HTTP input and final Pi text with Zod, Decision tool arguments with TypeBox, and both with adversarial tests.
+1. Harden Phase 1 HTTP input with Zod, Decision tool arguments with TypeBox, final Pi text in the adapter, and all three with adversarial tests.
 2. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
 3. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
 4. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.
