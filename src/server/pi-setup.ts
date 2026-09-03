@@ -1,20 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
-import {
-  PI_MODEL_ID,
-  PI_MODEL_LABEL,
-  PI_PROVIDER_ID,
-  PI_PROVIDER_LABEL,
-  PI_REASONING_EFFORT,
-} from "./pi-settings";
-
-type PiSdk = typeof import("@earendil-works/pi-coding-agent");
-type PiSdkLoader = () => Promise<PiSdk>;
-
-const loadPiSdk: PiSdkLoader = () => import("@earendil-works/pi-coding-agent");
+import { createPiCatalog, defaultPiSelection, detectPiSetup, loadPiSdk, piConfigDir, readPiConfiguration, readPiCredential } from "./pi-configuration";
+import type { DetectedPiSetup, PiSdkLoader, PiSelection } from "./pi-configuration";
+import { PI_MODEL_ID, PI_PROVIDER_ID } from "./pi-settings";
 
 export type PiSetupState =
+  | "needs-choice"
   | "ready"
   | "needs-auth"
   | "auth-error"
@@ -24,6 +16,10 @@ export type PiSetupState =
 export interface PiSetupStatus {
   state: PiSetupState;
   ready: boolean;
+  mode: "shared" | "separate" | null;
+  billing: "subscription" | "api";
+  detected: DetectedPiSetup | null;
+  hasSavedConfiguration: boolean;
   runtime: {
     label: string;
     detail: string;
@@ -33,18 +29,21 @@ export interface PiSetupStatus {
     label: string;
     source: string;
   };
-  selection: {
+  selection: PiSelection & {
     provider: string;
-    providerId: string;
     model: string;
-    modelId: string;
-    reasoningEffort: typeof PI_REASONING_EFFORT;
   };
   issue: string | null;
 }
 
-function baseStatus(credentialSource: string): Omit<PiSetupStatus, "state" | "ready"> {
+function baseStatus(): PiSetupStatus {
   return {
+    state: "needs-choice",
+    ready: false,
+    mode: null,
+    billing: "subscription",
+    detected: null,
+    hasSavedConfiguration: false,
     runtime: {
       label: "Bundled Pi SDK",
       detail: "No separate Pi or Codex CLI installation is required.",
@@ -52,14 +51,12 @@ function baseStatus(credentialSource: string): Omit<PiSetupStatus, "state" | "re
     authentication: {
       configured: false,
       label: "Not connected",
-      source: credentialSource,
+      source: join(piConfigDir(), "pi-auth.json"),
     },
     selection: {
-      provider: PI_PROVIDER_LABEL,
-      providerId: PI_PROVIDER_ID,
-      model: PI_MODEL_LABEL,
-      modelId: PI_MODEL_ID,
-      reasoningEffort: PI_REASONING_EFFORT,
+      ...defaultPiSelection,
+      provider: "OpenAI Codex",
+      model: "GPT-5.6 Sol",
     },
     issue: null,
   };
@@ -71,44 +68,48 @@ function errorMessage(error: unknown) {
 
 export async function getPiSetupStatus(
   sdkLoader: PiSdkLoader = loadPiSdk,
+  preview = false,
 ): Promise<PiSetupStatus> {
-  let sdk: PiSdk;
+  const status = baseStatus();
   try {
-    sdk = await sdkLoader();
-  } catch (error) {
-    return {
-      ...baseStatus("Unavailable until the bundled runtime loads"),
-      state: "runtime-unavailable",
-      ready: false,
-      runtime: {
-        label: "Pi runtime unavailable",
-        detail: "Server Guy could not load its bundled Pi SDK.",
-      },
-      issue: errorMessage(error),
-    };
-  }
-
-  const credentialSource = join(sdk.getAgentDir(), "auth.json");
-  const status = baseStatus(credentialSource);
-
-  try {
-    const modelRuntime = await sdk.ModelRuntime.create({ refreshOnCreate: false });
-    const model = modelRuntime.getModel(PI_PROVIDER_ID, PI_MODEL_ID);
+    const sdk = await sdkLoader();
+    let configuration;
+    try { configuration = readPiConfiguration(); } catch (error) { if (!preview) throw error; }
+    status.hasSavedConfiguration = Boolean(configuration);
+    if (!configuration || preview) {
+      const detected = await detectPiSetup(sdk);
+      return {
+        ...status,
+        detected,
+        billing: detected.billing,
+        selection: { ...detected.selection, provider: detected.selection.providerId, model: detected.selection.modelId },
+        authentication: {
+          configured: Boolean(detected.credentialType),
+          label: detected.credentialType ? `${detected.credentialType === "oauth" ? "OAuth" : "API key"} found — not used yet` : "No matching credential",
+          source: detected.authPath,
+        },
+      };
+    }
+    status.mode = configuration.mode;
+    status.selection = { providerId: configuration.providerId, modelId: configuration.modelId, reasoningEffort: configuration.reasoningEffort, provider: configuration.providerId, model: configuration.modelId };
+    status.authentication.source = configuration.authPath;
+    const catalog = await createPiCatalog(sdk);
+    const model = catalog.getModel(configuration.providerId, configuration.modelId);
     if (!model) {
       return {
         ...status,
         state: "model-unavailable",
         ready: false,
-        issue: `${PI_PROVIDER_ID}/${PI_MODEL_ID} is not present in the bundled Pi model catalog.`,
+        issue: "The chosen model is not present in the bundled Pi catalog. Choose a setup again.",
       };
     }
 
-    const credentials = await modelRuntime.listCredentials();
-    const credential = credentials.find((entry) => entry.providerId === PI_PROVIDER_ID);
+    status.selection.model = model.name;
+    const credential = readPiCredential(configuration.authPath, configuration.providerId);
     if (!credential) {
       return { ...status, state: "needs-auth", ready: false };
     }
-    if (credential.type !== "oauth") {
+    if (credential.type !== configuration.credentialType) {
       return {
         ...status,
         state: "auth-error",
@@ -118,28 +119,11 @@ export async function getPiSetupStatus(
           configured: true,
           label: "Unsupported credential type",
         },
-        issue: "Server Guy requires ChatGPT OAuth for the openai-codex provider.",
+        issue: "The credential type changed. Choose a setup again to confirm its billing method.",
       };
     }
-
-    try {
-      const resolved = await modelRuntime.getAuth(model);
-      if (!resolved) {
-        return { ...status, state: "needs-auth", ready: false };
-      }
-    } catch (error) {
-      return {
-        ...status,
-        state: "auth-error",
-        ready: false,
-        authentication: {
-          ...status.authentication,
-          configured: true,
-          label: "ChatGPT OAuth needs attention",
-        },
-        issue: `Pi could not refresh the stored credential: ${errorMessage(error)}`,
-      };
-    }
+    status.billing = credential.type === "oauth" && catalog.getProvider(configuration.providerId)?.auth.oauth?.isSubscription
+      ? "subscription" : "api";
 
     return {
       ...status,
@@ -148,18 +132,14 @@ export async function getPiSetupStatus(
       authentication: {
         ...status.authentication,
         configured: true,
-        label: "Connected with ChatGPT OAuth",
+        label: `${credential.type === "oauth" ? "OAuth" : "API key"} present — checked with provider on send`,
       },
     };
   } catch (error) {
     return {
       ...status,
-      state: "runtime-unavailable",
+      state: status.mode ? "auth-error" : "runtime-unavailable",
       ready: false,
-      runtime: {
-        label: "Pi runtime unavailable",
-        detail: "Server Guy loaded Pi but could not initialize its model runtime.",
-      },
       issue: errorMessage(error),
     };
   }
@@ -242,8 +222,12 @@ export class PiLoginCoordinator {
 
   private async run(record: PiLoginAttemptRecord) {
     try {
+      const configuration = readPiConfiguration();
+      if (configuration?.mode !== "separate") {
+        throw new Error("Choose Configure separately before connecting ChatGPT. Shared Pi credentials are not overwritten here.");
+      }
       const sdk = await this.sdkLoader();
-      const modelRuntime = await sdk.ModelRuntime.create({ refreshOnCreate: false });
+      const modelRuntime = await sdk.ModelRuntime.create({ authPath: configuration.authPath, modelsPath: null, refreshOnCreate: false });
       if (!modelRuntime.getModel(PI_PROVIDER_ID, PI_MODEL_ID)) {
         throw new Error(`${PI_PROVIDER_ID}/${PI_MODEL_ID} is unavailable.`);
       }
@@ -277,7 +261,7 @@ export class PiLoginCoordinator {
       if (!record.controller.signal.aborted) {
         this.update(record, {
           state: "complete",
-          message: "ChatGPT OAuth is connected and stored by Pi.",
+          message: "ChatGPT OAuth is connected in Server Guy’s separate credential file.",
         });
       }
     } catch (error) {

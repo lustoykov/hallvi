@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sdkMocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
-  createModelRuntime: vi.fn(),
+  configuredPiRuntime: vi.fn(),
+  resourceLoader: vi.fn(),
 }));
 
 const configuredModel = {
@@ -16,14 +17,15 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: sdkMocks.createAgentSession,
   defineTool: <T>(tool: T) => tool,
   DefaultResourceLoader: class {
+    constructor(options: unknown) { sdkMocks.resourceLoader(options); }
     async reload() {}
   },
   getAgentDir: () => "/tmp/pi-agent",
-  ModelRuntime: {
-    create: sdkMocks.createModelRuntime,
-  },
   SessionManager: { inMemory: () => ({}) },
+  SettingsManager: { inMemory: () => ({ isolated: true }) },
 }));
+
+vi.mock("../src/server/pi-configuration", () => ({ configuredPiRuntime: sdkMocks.configuredPiRuntime }));
 
 import {
   askPi,
@@ -37,11 +39,9 @@ import type { PiDecision } from "../src/server/types";
 
 beforeEach(() => {
   sdkMocks.createAgentSession.mockReset();
-  sdkMocks.createModelRuntime.mockReset();
-  sdkMocks.createModelRuntime.mockResolvedValue({
-    getModel: () => configuredModel,
-    getAuth: async () => ({ auth: { apiKey: "test-token" }, source: "OAuth" }),
-  });
+  sdkMocks.resourceLoader.mockReset();
+  sdkMocks.configuredPiRuntime.mockReset();
+  sdkMocks.configuredPiRuntime.mockResolvedValue({ configuration: { reasoningEffort: "high" }, model: configuredModel, modelRuntime: {} });
 });
 
 describe("Pi assistant messages", () => {
@@ -64,13 +64,13 @@ describe("Pi assistant messages", () => {
 describe("Pi failures", () => {
   it("turns exhausted subscription usage into a retryable explanation", () => {
     expect(describePiFailure(new Error("Request failed with status 429: usage limit reached"))).toBe(
-      "Pi cannot run because the connected ChatGPT account has reached its current usage limit. Wait for the limit to reset, then retry.",
+      "Pi cannot run because the selected provider reports a usage or rate limit. Check the account’s allowance, then retry.",
     );
   });
 
   it("points missing or expired authentication back to setup", () => {
     expect(describePiFailure(new Error("Provider is not configured"))).toBe(
-      "Pi authentication is missing or expired. Open Pi setup and connect ChatGPT again.",
+      "Pi authentication is missing or expired. Open Pi setup and reconnect or choose a setup again.",
     );
   });
 });
@@ -201,8 +201,12 @@ describe("askPi", () => {
       expect.objectContaining({
         model: configuredModel,
         thinkingLevel: "high",
+        settingsManager: { isolated: true },
       }),
     );
+    expect(sdkMocks.resourceLoader).toHaveBeenCalledWith(expect.objectContaining({
+      settingsManager: { isolated: true }, noExtensions: true, noContextFiles: true, noSkills: true, noPromptTemplates: true,
+    }));
     expect(sessionOptions.customTools).toHaveLength(1);
     expect(sessionOptions.customTools?.[0]).toEqual(
       expect.objectContaining({
@@ -217,6 +221,7 @@ describe("askPi", () => {
   });
 
   it("returns an empty proposal list when Pi only replies with text", async () => {
+    sdkMocks.configuredPiRuntime.mockResolvedValue({ configuration: { reasoningEffort: "medium" }, model: configuredModel, modelRuntime: {} });
     sdkMocks.createAgentSession.mockResolvedValue({
       session: {
         messages: [
@@ -244,5 +249,12 @@ describe("askPi", () => {
       message: "Let us inspect the repository first.",
       decisionProposals: [],
     });
+    expect(sdkMocks.createAgentSession).toHaveBeenCalledWith(expect.objectContaining({ thinkingLevel: "medium" }));
+  });
+
+  it("never starts a session when the setup choice is missing", async () => {
+    sdkMocks.configuredPiRuntime.mockRejectedValue(new Error("Choose a Pi setup first"));
+    await expect(askPi({ userMessage: "Hello", messages: [], decisions: [], viewSummary: "Example" })).rejects.toThrow("Choose a Pi setup first");
+    expect(sdkMocks.createAgentSession).not.toHaveBeenCalled();
   });
 });

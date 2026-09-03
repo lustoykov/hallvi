@@ -612,6 +612,14 @@
 .sg-setup-error { width: 100%; margin-top: 18px; padding: 10px; border: 1px solid #774d54; border-radius: 7px; display: grid; grid-template-columns: 16px 1fr; gap: 7px; color: #f4c4c0; background: #332b39; font-size: 10px; line-height: 1.45; }
 .sg-setup-error svg { width: 14px; }
 .sg-setup-footnote { max-width: 76ch; margin: 26px 0 0; color: #737f94; font-size: 10px; line-height: 1.6; }
+.sg-settings-source-label { margin-top: 16px; }
+.sg-billing-consent { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 20px; color: #ffe1ac; font-size: 12px; line-height: 1.5; cursor: pointer; }
+.sg-billing-consent input { flex: 0 0 auto; margin-top: 3px; accent-color: var(--blue); }
+.sg-secondary-setup-button { width: 100%; min-height: 42px; margin-top: 12px; padding: 9px 12px; border: 1px solid #8494b0; border-radius: 7px; color: #fff; background: transparent; cursor: pointer; font: inherit; font-size: 12px; }
+.sg-secondary-setup-button:hover { background: #283952; }
+.sg-connect-panel > .sg-separate-copy { min-height: 0; margin: 14px 0 0; }
+.sg-setup-shell button:disabled { opacity: .55; cursor: not-allowed; }
+.sg-setup-shell :focus-visible { outline: 2px solid #5d92ff; outline-offset: 4px; }
 
 @media (max-width: 820px) {
   .sg-setup-page { width: min(100% - 30px, 620px); padding-top: 42px; }

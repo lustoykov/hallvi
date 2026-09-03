@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
-import { PI_MODEL_ID, PI_PROVIDER_ID, PI_REASONING_EFFORT } from "./pi-settings";
+import { configuredPiRuntime } from "./pi-configuration";
 import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
@@ -81,7 +81,7 @@ export function describePiFailure(error: unknown): string {
     normalized.includes("status 429") ||
     normalized.includes("status: 429")
   ) {
-    return "Pi cannot run because the connected ChatGPT account has reached its current usage limit. Wait for the limit to reset, then retry.";
+    return "Pi cannot run because the selected provider reports a usage or rate limit. Check the account’s allowance, then retry.";
   }
   if (
     normalized.includes("invalid_grant") ||
@@ -90,7 +90,7 @@ export function describePiFailure(error: unknown): string {
     normalized.includes("status: 401") ||
     normalized.includes("provider is not configured")
   ) {
-    return "Pi authentication is missing or expired. Open Pi setup and connect ChatGPT again.";
+    return "Pi authentication is missing or expired. Open Pi setup and reconnect or choose a setup again.";
   }
   return `Pi is unavailable: ${message}`;
 }
@@ -143,14 +143,19 @@ export async function askPi(input: {
   decisions: Decision[];
   viewSummary: string;
 }): Promise<PiTurnResult> {
+  const sdk = await import("@earendil-works/pi-coding-agent");
   const {
     createAgentSession,
     defineTool,
     DefaultResourceLoader,
     getAgentDir,
-    ModelRuntime,
+    SettingsManager,
     SessionManager,
-  } = await import("@earendil-works/pi-coding-agent");
+  } = sdk;
+
+  const { configuration, modelRuntime, model } = await configuredPiRuntime(sdk).catch((error) => {
+    throw new PiUnavailableError(describePiFailure(error));
+  });
 
   const decisionProposals: PiDecision[] = [];
   const proposeDecisionTool = defineTool({
@@ -181,9 +186,11 @@ export async function askPi(input: {
   });
 
   const cwd = process.cwd();
+  const settingsManager = SettingsManager.inMemory();
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: getAgentDir(),
+    settingsManager,
     systemPromptOverride: () => SYSTEM_PROMPT,
     appendSystemPromptOverride: () => [],
     skillsOverride: () => ({ skills: [], diagnostics: [] }),
@@ -197,29 +204,12 @@ export async function askPi(input: {
   });
   await loader.reload();
 
-  const { modelRuntime, model } = await (async () => {
-    const runtime = await ModelRuntime.create({ refreshOnCreate: false });
-    const selectedModel = runtime.getModel(PI_PROVIDER_ID, PI_MODEL_ID);
-    if (!selectedModel) {
-      throw new PiUnavailableError(
-        `Pi is unavailable: ${PI_PROVIDER_ID}/${PI_MODEL_ID} is not present in the bundled model catalog.`,
-      );
-    }
-    const auth = await runtime.getAuth(selectedModel);
-    if (!auth) {
-      throw new Error("Provider is not configured");
-    }
-    return { modelRuntime: runtime, model: selectedModel };
-  })().catch((error) => {
-    if (error instanceof PiUnavailableError) throw error;
-    throw new PiUnavailableError(describePiFailure(error));
-  });
-
   const { session } = await createAgentSession({
     cwd,
     model,
     modelRuntime,
-    thinkingLevel: PI_REASONING_EFFORT,
+    thinkingLevel: configuration.reasoningEffort,
+    settingsManager,
     tools: ["propose_decision"],
     customTools: [proposeDecisionTool],
     resourceLoader: loader,

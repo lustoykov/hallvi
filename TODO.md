@@ -19,9 +19,12 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 - [x] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
 - [x] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
 - [x] Keep Codex CLI credentials separate, show Pi's exact credential source, and start an explicit ChatGPT device-code OAuth flow.
-- [x] Test existing credentials, first-time login, cancelled login, expired credentials, exhausted quota, missing runtime, and unavailable model.
+- [x] Cover existing credentials, first-time login, cancellation, expiry/refresh failures, quota errors, missing runtime, and unavailable models with isolated automated tests; live account acceptance remains below.
+- [x] Detect existing Pi provider/model/effort and credential presence read-only; require **Use existing setup** or **Configure separately** before chat.
+- [x] Snapshot the adopted preferences in Server Guy’s own config; never import machine tools, extensions, instructions, or custom model/provider definitions.
+- [x] Require an explicit API-billing acknowledgment before reusing an API-backed setup. Never switch billing methods automatically.
 
-Decision: the packaged Pi SDK is the Server Guy runtime, so users do not install a separate Pi or Codex CLI. Pi owns the shared machine-level credential store at `~/.pi/agent/auth.json`; Server Guy shows that source, never exposes its secrets, and does not read or copy `~/.codex/auth.json`. The `openai-codex` OAuth provider uses ChatGPT subscription access and Server Guy never falls back to API-key billing.
+Decision: the packaged Pi SDK is the runtime, so users do not install a separate Pi or Codex CLI. **Use existing setup** snapshots the displayed provider/model/effort and reuses Pi’s shared `auth.json`; Pi may refresh tokens there after consent, but global model preferences are not overwritten. **Configure separately** uses `openai-codex` / `gpt-5.6-sol` / `high`, with device-code OAuth saved to `.server-guy/pi-auth.json`. The choice lives in `.server-guy/pi-settings.json` (`SERVER_GUY_CONFIG_DIR` overrides this directory). Detection does not refresh tokens, resolve key commands, contact providers, expose secrets, or read Codex CLI auth. Only built-in Pi models and stored OAuth or literal API-key credentials are reusable; unsupported setup is reported with a separate-setup recovery path. Readiness means a saved choice and local credential are present; provider access and limits are checked on send. Live OAuth completion and a real model response still require a user-approved account test.
 
 ### 3. Connect GitHub explicitly
 
