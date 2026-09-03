@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PR 7 — Phase 1 boundary hardening</title>
-  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&amp;family=Geist:wght@400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PR 7 — Pi contract evolution</title>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Geist:wght@400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
     :root {
       --paper: #f7f9fc;
       --paper-2: #edf3ff;
@@ -20,229 +20,256 @@
       --sans: 'Geist', sans-serif;
       --serif: 'Instrument Serif', serif;
       --mono: 'Geist Mono', monospace;
+      --hand: 'Caveat', cursive;
     }
     body {
       min-height: 100vh;
+      margin: 0;
       padding: 48px 32px;
       background: var(--paper);
       color: var(--ink);
       font-family: var(--sans);
     }
-    main { width: min(1280px, 100%); margin: 0 auto; }
-    .eyebrow {
-      margin-bottom: 8px;
-      color: var(--muted);
-      font: 500 12px/1.4 var(--mono);
-      letter-spacing: 0.16em;
+    main { width: min(1360px, 100%); margin: 0 auto; }
+    .eyebrow, .stage-tag, th, footer {
+      font-family: var(--mono);
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
-    h1 {
-      margin-bottom: 12px;
-      font: 400 clamp(32px, 4vw, 48px)/1.04 var(--serif);
-      letter-spacing: -0.02em;
-    }
-    .subtitle {
-      max-width: 840px;
-      margin-bottom: 32px;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.6;
-    }
-    .diagram { overflow-x: auto; }
-    svg { display: block; width: 100%; min-width: 960px; }
-    .summary {
+    .eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+    h1 { margin: 0 0 12px; font: 400 clamp(36px, 4vw, 52px)/1.02 var(--serif); }
+    .subtitle { max-width: 900px; margin: 0 0 32px; color: var(--muted); font-size: 16px; line-height: 1.6; }
+    .progression {
       display: grid;
-      grid-template-columns: 1.12fr 1fr 0.88fr;
-      gap: 16px;
-      margin-top: 24px;
+      grid-template-columns: 0.9fr 0.9fr 1.35fr;
+      gap: 20px;
+      align-items: stretch;
     }
-    .card {
-      min-height: 180px;
+    .stage {
+      position: relative;
+      min-width: 0;
       padding: 20px;
       border: 1px solid var(--rule);
       border-radius: 8px;
       background: #fff;
     }
-    .card:nth-child(2) { background: var(--paper-2); }
-    .card-kicker {
-      margin-bottom: 12px;
-      color: var(--muted);
-      font: 500 12px/1.4 var(--mono);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+    .stage.final { border-color: rgba(40, 90, 216, 0.48); background: var(--accent-tint); }
+    .stage-tag { margin: 0 0 4px; color: var(--muted); font-size: 10px; }
+    .stage.final .stage-tag { color: var(--accent); }
+    .stage h2 { margin: 0 0 4px; font: 600 28px/1.1 var(--hand); }
+    .stage > p { min-height: 44px; margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .stage svg { display: block; width: 100%; height: auto; }
+    .stage ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .request-bar {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 20px;
+      align-items: center;
+      margin-top: 20px;
+      padding: 20px 24px;
+      border: 1px dashed rgba(40, 90, 216, 0.48);
+      border-radius: 8px;
+      background: var(--paper-2);
     }
-    .card h2 { margin-bottom: 8px; font-size: 16px; line-height: 1.3; }
-    .card p, .card li { color: var(--muted); font-size: 14px; line-height: 1.55; }
-    .card ul { padding-left: 18px; }
-    footer {
-      margin-top: 28px;
-      padding-top: 16px;
-      border-top: 1px solid var(--rule);
-      color: var(--muted);
-      font: 500 12px/1.5 var(--mono);
-    }
-    @media (max-width: 820px) {
+    .request-bar h2 { margin: 0; font: 600 24px/1 var(--hand); }
+    .request-bar p { margin: 0; color: var(--muted); font: 500 13px/1.6 var(--mono); }
+    .contract { margin-top: 24px; overflow-x: auto; }
+    .contract h2 { margin: 0 0 12px; font: 400 28px/1.1 var(--serif); }
+    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 14px; }
+    th, td { padding: 14px 16px; border: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: var(--paper-2); font-size: 9px; }
+    td { line-height: 1.5; }
+    code { color: var(--accent); font-family: var(--mono); font-size: 0.92em; }
+    footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 10px; }
+    @media (max-width: 980px) {
       body { padding: 32px 16px; }
-      .summary { grid-template-columns: 1fr; }
+      .progression { grid-template-columns: 1fr; }
+      .stage > p { min-height: 0; }
+      .request-bar { grid-template-columns: 1fr; gap: 4px; }
     }
   </style>
 </head>
 <body>
   <main>
-    <p class="eyebrow">Architecture · PR 7 · Phase 1</p>
-    <h1>Untrusted data stops at a schema</h1>
+    <p class="eyebrow">Architecture · PR 7 · three snapshots</p>
+    <h1>How the Pi boundary got simpler</h1>
     <p class="subtitle">
-      Browser requests and Pi replies enter through separate Zod schemas. Only fully validated, size-bounded values reach the Phase 1 domain; invalid input stops before any durable write.
+      PR 7 first made one large JSON reply strict. The final version keeps chat conversational and makes only the durable Decision machine-readable.
     </p>
 
-    <div class="diagram">
-      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr-007-boundary-title pr-007-boundary-desc">
-        <title id="pr-007-boundary-title">Phase 1 request and Pi validation boundaries</title>
-        <desc id="pr-007-boundary-desc">Browser request JSON and Pi response JSON pass through strict Zod schemas before typed commands and replies can reach the Phase 1 domain and SQLite.</desc>
-        <defs>
-          <marker id="pr-007-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#59667b"/>
-          </marker>
-          <marker id="pr-007-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#285ad8"/>
-          </marker>
-          <marker id="pr-007-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#285ad8"/>
-          </marker>
-        </defs>
-
-        <rect width="1280" height="720" fill="#f7f9fc"/>
-
-        <!-- Lanes and validation boundary -->
-        <rect x="40" y="120" width="1200" height="192" rx="8" fill="rgba(25,35,56,0.018)"/>
-        <rect x="40" y="360" width="1200" height="192" rx="8" fill="rgba(25,35,56,0.018)"/>
-        <rect x="296" y="104" width="248" height="464" rx="8" fill="rgba(40,90,216,0.04)" stroke="rgba(40,90,216,0.50)" stroke-width="0.8" stroke-dasharray="4,4"/>
-        <rect x="320" y="96" width="200" height="16" rx="4" fill="#f7f9fc"/>
-        <text x="420" y="108" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">VALIDATION BOUNDARY</text>
-
-        <!-- Step headings -->
-        <rect x="96" y="64" width="32" height="16" rx="8" fill="rgba(25,35,56,0.12)"/>
-        <text x="112" y="76" fill="#192338" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">01</text>
-        <text x="112" y="96" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RECEIVE</text>
-        <rect x="400" y="64" width="32" height="16" rx="8" fill="rgba(40,90,216,0.20)"/>
-        <text x="416" y="76" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">02</text>
-        <text x="416" y="96" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">VALIDATE</text>
-        <rect x="688" y="64" width="32" height="16" rx="8" fill="rgba(25,35,56,0.12)"/>
-        <text x="704" y="76" fill="#192338" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">03</text>
-        <text x="704" y="96" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ACCEPT</text>
-        <rect x="984" y="64" width="32" height="16" rx="8" fill="rgba(25,35,56,0.12)"/>
-        <text x="1000" y="76" fill="#192338" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">04</text>
-        <text x="1000" y="96" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">COMMIT</text>
-
-        <!-- Connectors first -->
-        <line x1="232" y1="216" x2="320" y2="216" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <line x1="520" y1="216" x2="616" y2="216" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <path d="M 792 216 H 824 Q 832 216 832 224 V 280 Q 832 288 840 288 H 888" fill="none" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <line x1="232" y1="456" x2="320" y2="456" stroke="#285ad8" stroke-width="1.2" marker-end="url(#pr-007-arrow-accent)"/>
-        <line x1="520" y1="456" x2="616" y2="456" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <path d="M 792 456 H 824 Q 832 456 832 448 V 344 Q 832 336 840 336 H 888" fill="none" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <line x1="1064" y1="312" x2="1112" y2="312" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-
-        <!-- Accent arrow label with clear connector gap -->
-        <rect x="244" y="424" width="64" height="16" rx="4" fill="#f7f9fc"/>
-        <text x="276" y="436" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MODEL JSON</text>
-
-        <!-- HTTP lane nodes -->
-        <rect x="56" y="168" width="176" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="56" y="168" width="176" height="96" rx="8" fill="rgba(89,102,123,0.10)" stroke="#667389" stroke-width="1"/>
-        <rect x="68" y="180" width="48" height="16" rx="4" fill="transparent" stroke="rgba(102,115,137,0.40)" stroke-width="0.8"/>
-        <text x="92" y="192" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">INPUT</text>
-        <text x="144" y="220" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">HTTP request</text>
-        <text x="144" y="240" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">unknown JSON body</text>
-
-        <rect x="320" y="168" width="200" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="320" y="168" width="200" height="96" rx="8" fill="#fff" stroke="#192338" stroke-width="1"/>
-        <rect x="332" y="180" width="56" height="16" rx="4" fill="transparent" stroke="rgba(25,35,56,0.40)" stroke-width="0.8"/>
-        <text x="360" y="192" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SCHEMA</text>
-        <text x="420" y="220" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Request schemas</text>
-        <text x="420" y="240" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">strict fields · limits · trim</text>
-        <text x="420" y="252" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">invalid → HTTP 400</text>
-
-        <rect x="616" y="168" width="176" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="616" y="168" width="176" height="96" rx="8" fill="#fff" stroke="#192338" stroke-width="1"/>
-        <rect x="628" y="180" width="48" height="16" rx="4" fill="transparent" stroke="rgba(25,35,56,0.40)" stroke-width="0.8"/>
-        <text x="652" y="192" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">TYPED</text>
-        <text x="704" y="220" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Validated command</text>
-        <text x="704" y="240" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">application · Chat · message</text>
-
-        <!-- Pi lane nodes -->
-        <rect x="56" y="408" width="176" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="56" y="408" width="176" height="96" rx="8" fill="rgba(89,102,123,0.10)" stroke="#667389" stroke-width="1"/>
-        <rect x="68" y="420" width="48" height="16" rx="4" fill="transparent" stroke="rgba(102,115,137,0.40)" stroke-width="0.8"/>
-        <text x="92" y="432" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">MODEL</text>
-        <text x="144" y="460" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Pi response</text>
-        <text x="144" y="480" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">untrusted response text</text>
-
-        <rect x="320" y="408" width="200" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="320" y="408" width="200" height="96" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8" stroke-width="1.2"/>
-        <rect x="332" y="420" width="56" height="16" rx="4" fill="transparent" stroke="rgba(40,90,216,0.48)" stroke-width="0.8"/>
-        <text x="360" y="432" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SCHEMA</text>
-        <text x="420" y="460" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Pi reply schema</text>
-        <text x="420" y="480" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">kind · value · UUID · limits</text>
-        <text x="420" y="492" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">one invalid field → reject turn</text>
-
-        <rect x="616" y="408" width="176" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="616" y="408" width="176" height="96" rx="8" fill="#fff" stroke="#192338" stroke-width="1"/>
-        <rect x="628" y="420" width="48" height="16" rx="4" fill="transparent" stroke="rgba(25,35,56,0.40)" stroke-width="0.8"/>
-        <text x="652" y="432" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">TYPED</text>
-        <text x="704" y="460" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Validated Pi reply</text>
-        <text x="704" y="480" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">message + Decisions</text>
-
-        <!-- Trusted core -->
-        <rect x="888" y="264" width="176" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="888" y="264" width="176" height="96" rx="8" fill="#fff" stroke="#192338" stroke-width="1"/>
-        <rect x="900" y="276" width="56" height="16" rx="4" fill="transparent" stroke="rgba(25,35,56,0.40)" stroke-width="0.8"/>
-        <text x="928" y="288" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DOMAIN</text>
-        <text x="976" y="316" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Phase 1 rules</text>
-        <text x="976" y="336" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">identity · authority · provenance</text>
-
-        <rect x="1112" y="264" width="120" height="96" rx="8" fill="#f7f9fc"/>
-        <rect x="1112" y="264" width="120" height="96" rx="8" fill="rgba(25,35,56,0.05)" stroke="#59667b" stroke-width="1"/>
-        <rect x="1124" y="276" width="48" height="16" rx="4" fill="transparent" stroke="rgba(89,102,123,0.40)" stroke-width="0.8"/>
-        <text x="1148" y="288" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">STORE</text>
-        <text x="1172" y="316" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SQLite</text>
-        <text x="1172" y="336" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">accepted data only</text>
-
-        <!-- Legend strip -->
-        <line x1="40" y1="632" x2="1240" y2="632" stroke="rgba(25,35,56,0.12)" stroke-width="0.8"/>
-        <text x="40" y="660" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
-        <line x1="128" y1="656" x2="168" y2="656" stroke="#59667b" stroke-width="1" marker-end="url(#pr-007-arrow)"/>
-        <text x="180" y="660" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace">VALID DATA FLOW</text>
-        <rect x="352" y="644" width="40" height="24" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8" stroke-width="1"/>
-        <text x="404" y="660" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace">FOCAL MODEL BOUNDARY</text>
-        <rect x="600" y="644" width="40" height="24" rx="8" fill="rgba(40,90,216,0.04)" stroke="rgba(40,90,216,0.50)" stroke-width="0.8" stroke-dasharray="4,4"/>
-        <text x="652" y="660" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace">SCHEMA ENFORCEMENT</text>
-      </svg>
-    </div>
-
-    <section class="summary" aria-label="Boundary decisions">
-      <article class="card">
-        <p class="card-kicker">Changed boundary</p>
-        <h2>Routes parse unknown data once</h2>
-        <p>Application, Chat, and message bodies use strict schemas. Missing fields, wrong types, unknown fields, malformed JSON, and oversized values return HTTP 400 before a domain function runs.</p>
-      </article>
-      <article class="card">
-        <p class="card-kicker">Model contract</p>
-        <h2>Pi replies fail as one unit</h2>
-        <p>Server Guy no longer silently drops malformed Decisions or truncates their values. Unsupported kinds, invalid replacement IDs, unexpected fields, and size violations reject the turn without writing a partial transcript.</p>
-      </article>
-      <article class="card">
-        <p class="card-kicker">Unchanged</p>
-        <h2>No new product machinery</h2>
+    <section class="progression" aria-label="PR 7 evolution">
+      <article class="stage">
+        <p class="stage-tag">Before PR 7</p>
+        <h2>Hand-parse everything</h2>
+        <p>Pi was asked for JSON, but Server Guy repaired and filtered it by hand.</p>
+        <svg viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr7-before-title pr7-before-desc">
+          <title id="pr7-before-title">Pi response handling before PR 7</title>
+          <desc id="pr7-before-desc">Pi returns JSON-like text to a permissive hand-written parser, which silently drops malformed Decisions and returns a message and Decision list.</desc>
+          <defs>
+            <filter id="pr7-before-sketch" x="-2%" y="-2%" width="104%" height="104%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="4"/>
+              <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+            </filter>
+            <marker id="pr7-before-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b"/></marker>
+            <marker id="pr7-before-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+            <marker id="pr7-before-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+          </defs>
+          <g filter="url(#pr7-before-sketch)" fill="none" stroke="#59667b" stroke-width="1.2">
+            <line x1="108" y1="116" x2="132" y2="116" marker-end="url(#pr7-before-arrow)"/>
+            <line x1="228" y1="116" x2="252" y2="116" marker-end="url(#pr7-before-arrow)"/>
+            <rect x="12" y="76" width="96" height="80" rx="8" fill="#f7f9fc"/>
+            <rect x="132" y="76" width="96" height="80" rx="8" fill="#fff" stroke="#192338"/>
+            <rect x="252" y="76" width="96" height="80" rx="8" fill="rgba(25,35,56,0.05)"/>
+            <path d="M 144 188 Q 180 176 216 188" stroke="#285ad8"/>
+            <path d="M 152 216 Q 180 204 208 216"/>
+            <path d="M 148 244 Q 180 232 212 244"/>
+          </g>
+          <g fill="#192338" text-anchor="middle">
+            <text x="60" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">Pi JSON-ish</text>
+            <text x="60" y="132" font-family="'Geist Mono', monospace" font-size="8">untrusted text</text>
+            <text x="180" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">Hand parser</text>
+            <text x="180" y="132" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">repair · skip · slice</text>
+            <text x="300" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">PiReply</text>
+            <text x="300" y="132" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">message + decisions</text>
+            <text x="180" y="184" fill="#285ad8" font-family="'Caveat', cursive" font-size="17">bad Decision? silently drop it</text>
+            <text x="180" y="212" fill="#59667b" font-family="'Caveat', cursive" font-size="17">long value? silently cut it</text>
+            <text x="180" y="240" fill="#59667b" font-family="'Caveat', cursive" font-size="17">extra prose? try to salvage JSON</text>
+          </g>
+        </svg>
         <ul>
-          <li>Pi remains the only agent runtime.</li>
-          <li>SQLite remains authoritative.</li>
-          <li>No OAuth, worker, streaming, or Phase 2 behavior is added.</li>
+          <li>Invalid model data could disappear silently.</li>
+          <li>The stored reply could differ from what Pi tried to return.</li>
+        </ul>
+      </article>
+
+      <article class="stage">
+        <p class="stage-tag">PR 7 · version 1</p>
+        <h2>Validate one big envelope</h2>
+        <p>The first hardening pass rejected the entire reply unless all JSON was valid.</p>
+        <svg viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr7-v1-title pr7-v1-desc">
+          <title id="pr7-v1-title">First version of the PR 7 Pi contract</title>
+          <desc id="pr7-v1-desc">Pi returns a strict JSON envelope containing message and Decisions, and one Zod schema accepts or rejects the whole response.</desc>
+          <defs>
+            <filter id="pr7-v1-sketch" x="-2%" y="-2%" width="104%" height="104%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="7"/>
+              <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+            </filter>
+            <marker id="pr7-v1-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b"/></marker>
+            <marker id="pr7-v1-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+            <marker id="pr7-v1-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+          </defs>
+          <g filter="url(#pr7-v1-sketch)" fill="none" stroke="#59667b" stroke-width="1.2">
+            <line x1="108" y1="116" x2="132" y2="116" marker-end="url(#pr7-v1-arrow)"/>
+            <line x1="228" y1="116" x2="252" y2="116" marker-end="url(#pr7-v1-arrow)"/>
+            <rect x="12" y="76" width="96" height="80" rx="8" fill="#f7f9fc"/>
+            <rect x="132" y="76" width="96" height="80" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8"/>
+            <rect x="252" y="76" width="96" height="80" rx="8" fill="rgba(25,35,56,0.05)"/>
+            <path d="M 132 192 Q 180 180 228 192" stroke="#285ad8"/>
+            <path d="M 124 244 Q 180 232 236 244"/>
+          </g>
+          <g fill="#192338" text-anchor="middle">
+            <text x="60" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">Pi JSON</text>
+            <text x="60" y="132" font-family="'Geist Mono', monospace" font-size="8">message + decisions</text>
+            <text x="180" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">Zod PiReply</text>
+            <text x="180" y="132" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8">strict · bounded</text>
+            <text x="300" y="108" font-family="'Caveat', cursive" font-size="20" font-weight="600">Accepted</text>
+            <text x="300" y="132" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">all or nothing</text>
+            <text x="180" y="188" fill="#285ad8" font-family="'Caveat', cursive" font-size="17">safer: malformed data fails closed</text>
+            <text x="180" y="240" fill="#59667b" font-family="'Caveat', cursive" font-size="17">awkward: normal chat must be JSON too</text>
+          </g>
+        </svg>
+        <ul>
+          <li>No silent dropping or truncation.</li>
+          <li>But human-facing text and machine data were unnecessarily coupled.</li>
+        </ul>
+      </article>
+
+      <article class="stage final">
+        <p class="stage-tag">PR 7 · version 2 · final</p>
+        <h2>Type only the machine action</h2>
+        <p>Pi speaks normally and optionally calls one narrow typed tool for a durable Decision.</p>
+        <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr7-final-title pr7-final-desc">
+          <title id="pr7-final-title">Final PR 7 Pi contract</title>
+          <desc id="pr7-final-desc">A Pi turn splits into normal assistant text and optional propose-decision tool arguments. Each lane is validated, combined by Server Guy, and stored in one transaction.</desc>
+          <defs>
+            <filter id="pr7-final-sketch" x="-2%" y="-2%" width="104%" height="104%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="11"/>
+              <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+            </filter>
+            <marker id="pr7-final-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b"/></marker>
+            <marker id="pr7-final-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+            <marker id="pr7-final-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
+          </defs>
+          <g filter="url(#pr7-final-sketch)" fill="none" stroke="#59667b" stroke-width="1.2">
+            <path d="M 104 128 H 116 Q 124 128 124 120 V 88 Q 124 80 132 80" marker-end="url(#pr7-final-arrow)"/>
+            <path d="M 104 152 H 116 Q 124 152 124 160 V 192 Q 124 200 132 200" marker-end="url(#pr7-final-arrow-accent)" stroke="#285ad8"/>
+            <line x1="244" y1="80" x2="272" y2="80" marker-end="url(#pr7-final-arrow)"/>
+            <line x1="244" y1="200" x2="272" y2="200" marker-end="url(#pr7-final-arrow-accent)" stroke="#285ad8"/>
+            <path d="M 384 80 H 396 Q 404 80 404 88 V 120 Q 404 128 412 128" marker-end="url(#pr7-final-arrow)"/>
+            <path d="M 384 200 H 396 Q 404 200 404 192 V 160 Q 404 152 412 152" marker-end="url(#pr7-final-arrow-accent)" stroke="#285ad8"/>
+            <line x1="472" y1="176" x2="472" y2="216" marker-end="url(#pr7-final-arrow)"/>
+            <rect x="16" y="104" width="88" height="72" rx="8" fill="#fff" stroke="#192338"/>
+            <rect x="132" y="48" width="112" height="64" rx="8" fill="#fff"/>
+            <rect x="132" y="168" width="112" height="64" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8"/>
+            <rect x="272" y="48" width="112" height="64" rx="8" fill="#fff"/>
+            <rect x="272" y="168" width="112" height="64" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8"/>
+            <rect x="412" y="104" width="120" height="72" rx="8" fill="#fff" stroke="#192338"/>
+            <rect x="412" y="216" width="120" height="64" rx="8" fill="rgba(25,35,56,0.05)"/>
+          </g>
+          <g fill="#192338" text-anchor="middle">
+            <text x="60" y="136" font-family="'Caveat', cursive" font-size="20" font-weight="600">One Pi turn</text>
+            <text x="60" y="156" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">two output lanes</text>
+            <text x="188" y="76" font-family="'Caveat', cursive" font-size="19" font-weight="600">Normal reply</text>
+            <text x="188" y="96" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">plain text</text>
+            <text x="188" y="196" font-family="'Caveat', cursive" font-size="19" font-weight="600">propose_decision</text>
+            <text x="188" y="216" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8">typed tool args</text>
+            <text x="328" y="76" font-family="'Caveat', cursive" font-size="19" font-weight="600">Message check</text>
+            <text x="328" y="96" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">nonempty · ≤10k</text>
+            <text x="328" y="196" font-family="'Caveat', cursive" font-size="19" font-weight="600">TypeBox + Zod</text>
+            <text x="328" y="216" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8">kind · value · UUID</text>
+            <text x="472" y="132" font-family="'Caveat', cursive" font-size="19" font-weight="600">PiTurnResult</text>
+            <text x="472" y="152" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">text + proposals</text>
+            <text x="472" y="244" font-family="'Caveat', cursive" font-size="19" font-weight="600">One transaction</text>
+            <text x="472" y="264" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">messages + Decisions</text>
+          </g>
+        </svg>
+        <ul>
+          <li>No Decision tool call means no Decision is recorded.</li>
+          <li>A bad tool call is rejected before it can be collected as a proposal.</li>
+          <li>Server Guy validates again and owns the database write.</li>
         </ul>
       </article>
     </section>
 
-    <footer>SERVER GUY · PR 7 · STRICT INPUT + MODEL CONTRACTS · ENGINEER REVIEW</footer>
+    <aside class="request-bar">
+      <h2>The other half of PR 7 stays unchanged</h2>
+      <p>HTTP request JSON → strict Zod request schema → typed command · malformed or oversized input → HTTP 400</p>
+    </aside>
+
+    <section class="contract">
+      <h2>What is typed in the final version?</h2>
+      <table>
+        <thead>
+          <tr><th>Pi output</th><th>Shape</th><th>Validation</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Assistant reply</td>
+            <td>Normal text</td>
+            <td>Trimmed, nonempty, at most 10,000 characters</td>
+            <td>Displayed and persisted as the Chat message</td>
+          </tr>
+          <tr>
+            <td><code>propose_decision</code></td>
+            <td><code>kind</code>, <code>value</code>, optional <code>replaces</code></td>
+            <td>Strict TypeBox schema, then Zod and domain checks; at most 20 per turn</td>
+            <td>The only path that can create or revise a durable Decision</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>SERVER GUY · PR 7 · PI CONTRACT EVOLUTION · HAND-DRAWN REVIEW MAP</footer>
   </main>
 </body>
 </html>

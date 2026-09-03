@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { isApprovalMode } from "./types";
-import type { ApprovalMode, PiReply } from "./types";
+import type { ApprovalMode, PiDecision } from "./types";
 
 const approvalModeSchema = z.custom<ApprovalMode>(isApprovalMode, {
   error: "Choose a valid permission policy.",
@@ -32,7 +32,7 @@ export const sendChatMessageRequestSchema = z.strictObject({
     .max(5_000, "Keep this message under 5,000 characters."),
 });
 
-const piDecisionSchema = z.strictObject({
+export const piDecisionSchema: z.ZodType<PiDecision> = z.strictObject({
   kind: z.literal("launch-priority", {
     error: "Pi returned an unsupported Decision kind.",
   }),
@@ -46,16 +46,11 @@ const piDecisionSchema = z.strictObject({
     .optional(),
 });
 
-export const piReplySchema: z.ZodType<PiReply> = z.strictObject({
-  message: z
-    .string({ error: "Pi returned no user-facing message." })
-    .trim()
-    .min(1, "Pi returned no user-facing message.")
-    .max(10_000, "Pi returned a message longer than 10,000 characters."),
-  decisions: z
-    .array(piDecisionSchema, { error: "Pi returned no valid Decisions array." })
-    .max(20, "Pi returned more than 20 Decisions in one turn."),
-});
+export const piAssistantMessageSchema = z
+  .string({ error: "Pi returned no user-facing message." })
+  .trim()
+  .min(1, "Pi returned no user-facing message.")
+  .max(10_000, "Pi returned a message longer than 10,000 characters.");
 
 export class RequestValidationError extends Error {}
 
@@ -93,10 +88,18 @@ export async function parseJsonRequest<T extends z.ZodType>(
   return result.data;
 }
 
-export function parsePiReplyValue(input: unknown): PiReply {
-  const result = piReplySchema.safeParse(input);
+export function parsePiDecisionValue(input: unknown): PiDecision {
+  const result = piDecisionSchema.safeParse(input);
   if (!result.success) {
-    throw new Error(`Pi returned an invalid structured reply: ${firstIssue(result.error)}`);
+    throw new Error(`Pi returned an invalid Decision proposal: ${firstIssue(result.error)}`);
+  }
+  return result.data;
+}
+
+export function parsePiAssistantMessageValue(input: unknown): string {
+  const result = piAssistantMessageSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error(`Pi returned an invalid assistant message: ${firstIssue(result.error)}`);
   }
   return result.data;
 }

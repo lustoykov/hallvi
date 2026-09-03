@@ -109,11 +109,11 @@ Test at least these cases:
 - undeclared durable SQLite data inside disposable container storage;
 - a malicious README that instructs the agent to ignore policy;
 - model output containing invented repository facts;
-- a model timeout or malformed structured response.
+- a model timeout, missing assistant message, or malformed Decision tool call.
 
 ### Pi runtime boundary
 
-Server Guy calls Pi directly. Application code supplies a bounded prompt, validates Pi's structured reply, and commits only accepted messages and Decisions. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
+Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. Application code validates the final message and every Decision proposal, then commits accepted messages and Decisions together. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
 Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 

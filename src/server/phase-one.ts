@@ -260,7 +260,7 @@ export async function sendChatMessage(applicationId: string, chatId: string, bod
     const sourceMessage = insertMessage(chat.id, "user", userMessage, "user");
     insertMessage(chat.id, "assistant", reply.message, "pi");
 
-    for (const proposed of reply.decisions) {
+    for (const proposed of reply.decisionProposals) {
       const previous = proposed.replaces ? getDecision(proposed.replaces) : null;
       if (
         proposed.replaces &&

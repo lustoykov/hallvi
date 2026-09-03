@@ -1,10 +1,32 @@
+import { Type } from "typebox";
+
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
-import { parsePiReplyValue } from "./schemas";
-import type { ChatMessage, Decision, PiReply } from "./types";
+import { parsePiAssistantMessageValue, parsePiDecisionValue } from "./schemas";
+import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
 
-const MAX_PI_REPLY_CHARACTERS = 20_000;
+export const MAX_PI_DECISION_PROPOSALS = 20;
+
+export const proposeDecisionParameters = Type.Object(
+  {
+    kind: Type.Literal("launch-priority", {
+      description: "The only Decision kind supported in Phase 1.",
+    }),
+    value: Type.String({
+      description: "A concise operating priority explicitly stated by the engineer.",
+      minLength: 1,
+      maxLength: 300,
+    }),
+    replaces: Type.Optional(
+      Type.String({
+        description: "The exact UUID of a current Decision this one replaces.",
+        format: "uuid",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 const SYSTEM_PROMPT = `You are Pi inside Server Guy, an operator product for individual engineers.
 
@@ -13,28 +35,25 @@ ${phaseOneCheckListForPrompt()}
 
 The current Operator View in the user prompt is authoritative. Do not claim that an external system was checked unless its Observation says so. Do not claim to have changed code, infrastructure, DNS, or accounts. Phase 1 is read-only apart from Server Guy's local records.
 
-Answer the engineer directly and concisely. If they state a durable decision, extract only supported decisions. Return strict JSON with this shape and no markdown fence:
-{"message":"Your response","decisions":[{"kind":"launch-priority","value":"...","replaces":"optional exact Decision ID"}]}
+Answer the engineer directly and concisely in normal text.
+
+If the engineer explicitly states a durable launch priority, call propose_decision. A Decision proposal exists only when that tool call succeeds; conversational text alone never records one. Server Guy decides whether the proposal can be persisted. After any tool call, finish with a normal user-facing response. Do not claim a Decision was recorded when the tool call failed.
 
 The only Phase 1 decision kind is:
 - launch-priority: a concise user-stated operating priority
 
-To correct a current Decision, copy its exact ID from CURRENT DECISIONS into replaces. Omit replaces for an additional Decision. Application configuration, product rules, future-phase facts, and Approval Mode are not Decisions. An empty decisions array is valid. Never invent a Decision or Decision ID.`;
+To correct a current Decision, copy its exact ID from CURRENT DECISIONS into replaces. Omit replaces for an additional Decision. Application configuration, product rules, future-phase facts, and Approval Mode are not Decisions. Never invent a Decision or Decision ID.`;
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    throw new Error("Pi returned a response Server Guy could not parse.");
+export function collectPiDecisionProposal(
+  proposals: PiDecision[],
+  input: unknown,
+): PiDecision {
+  if (proposals.length >= MAX_PI_DECISION_PROPOSALS) {
+    throw new Error("Pi proposed more than 20 Decisions in one turn.");
   }
-}
-
-export function parsePiReply(text: string): PiReply {
-  if (text.length > MAX_PI_REPLY_CHARACTERS) {
-    throw new Error("Pi returned a response longer than 20,000 characters.");
-  }
-  return parsePiReplyValue(extractJson(text));
+  const proposal = parsePiDecisionValue(input);
+  proposals.push(proposal);
+  return proposal;
 }
 
 function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {
@@ -84,13 +103,43 @@ export async function askPi(input: {
   messages: ChatMessage[];
   decisions: Decision[];
   viewSummary: string;
-}): Promise<PiReply> {
+}): Promise<PiTurnResult> {
   const {
     createAgentSession,
+    defineTool,
     DefaultResourceLoader,
     getAgentDir,
     SessionManager,
   } = await import("@earendil-works/pi-coding-agent");
+
+  const decisionProposals: PiDecision[] = [];
+  const proposeDecisionTool = defineTool({
+    name: "propose_decision",
+    label: "Propose Decision",
+    description:
+      "Propose one durable launch-priority Decision explicitly stated by the engineer. This is the only machine-readable path for a Decision proposal.",
+    promptSnippet: "Propose a typed Phase 1 Decision",
+    promptGuidelines: [
+      "Call propose_decision only for an explicit, durable launch priority stated by the engineer.",
+      "Use replaces only with an exact UUID from CURRENT DECISIONS.",
+      "After a successful call, finish the turn with a normal conversational response.",
+    ],
+    parameters: proposeDecisionParameters,
+    constrainedSampling: { type: "json_schema", strict: "require" },
+    prepareArguments: (args) => parsePiDecisionValue(args),
+    async execute(_toolCallId, params) {
+      const proposal = collectPiDecisionProposal(decisionProposals, params);
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Decision proposal accepted for this turn. Continue with the user-facing response.",
+          },
+        ],
+        details: proposal,
+      };
+    },
+  });
 
   const cwd = process.cwd();
   const loader = new DefaultResourceLoader({
@@ -111,8 +160,8 @@ export async function askPi(input: {
 
   const { session } = await createAgentSession({
     cwd,
-    noTools: "all",
-    tools: [],
+    tools: ["propose_decision"],
+    customTools: [proposeDecisionTool],
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(cwd),
   });
@@ -138,7 +187,10 @@ export async function askPi(input: {
     const outcome = lastAssistantOutcome(session.messages);
     if (outcome.error) throw new Error(outcome.error);
     const finalText = outcome.text || response;
-    return parsePiReply(finalText);
+    return {
+      message: parsePiAssistantMessageValue(finalText),
+      decisionProposals,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pi is unavailable.";
     throw new PiUnavailableError(`Pi is unavailable: ${message}`);
