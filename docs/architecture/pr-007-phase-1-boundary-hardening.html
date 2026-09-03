@@ -225,7 +225,7 @@
             <text x="188" y="216" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8">typed tool args</text>
             <text x="328" y="76" font-family="'Caveat', cursive" font-size="19" font-weight="600">Message check</text>
             <text x="328" y="96" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">nonempty · ≤10k</text>
-            <text x="328" y="196" font-family="'Caveat', cursive" font-size="19" font-weight="600">TypeBox + Zod</text>
+            <text x="328" y="196" font-family="'Caveat', cursive" font-size="19" font-weight="600">TypeBox + normalize</text>
             <text x="328" y="216" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8">kind · value · UUID</text>
             <text x="472" y="132" font-family="'Caveat', cursive" font-size="19" font-weight="600">PiTurnResult</text>
             <text x="472" y="152" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8">text + proposals</text>
@@ -236,7 +236,7 @@
         <ul>
           <li>No Decision tool call means no Decision is recorded.</li>
           <li>A bad tool call is rejected before it can be collected as a proposal.</li>
-          <li>Server Guy validates again and owns the database write.</li>
+          <li>Server Guy normalizes the accepted value and owns the database write.</li>
         </ul>
       </article>
     </section>
@@ -262,7 +262,7 @@
           <tr>
             <td><code>propose_decision</code></td>
             <td><code>kind</code>, <code>value</code>, optional <code>replaces</code></td>
-            <td>Strict TypeBox schema, then Zod and domain checks; at most 20 per turn</td>
+            <td>Strict TypeBox schema, then value normalization and domain checks; at most 20 per turn</td>
             <td>The only path that can create or revise a durable Decision</td>
           </tr>
         </tbody>

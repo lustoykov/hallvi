@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
-import { parsePiAssistantMessageValue, parsePiDecisionValue } from "./schemas";
+import { parsePiAssistantMessageValue } from "./schemas";
 import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
@@ -46,12 +46,16 @@ To correct a current Decision, copy its exact ID from CURRENT DECISIONS into rep
 
 export function collectPiDecisionProposal(
   proposals: PiDecision[],
-  input: unknown,
+  input: PiDecision,
 ): PiDecision {
   if (proposals.length >= MAX_PI_DECISION_PROPOSALS) {
     throw new Error("Pi proposed more than 20 Decisions in one turn.");
   }
-  const proposal = parsePiDecisionValue(input);
+  const value = input.value.trim();
+  if (!value) {
+    throw new Error("Pi returned an empty Decision value.");
+  }
+  const proposal = { ...input, value };
   proposals.push(proposal);
   return proposal;
 }

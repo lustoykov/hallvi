@@ -75,7 +75,7 @@ The current modular monolith is the right product architecture. Keep the UI, API
 
 | Server Guy milestone | Primary learning | Required proof |
 | --- | --- | --- |
-| **Phase 1 hardening — Start** | TypeScript boundaries, Zod, adversarial tests | Schema-validate API input and Pi output; reject malformed, unsupported, oversized, or fabricated decisions. |
+| **Phase 1 hardening — Start** | TypeScript boundaries, Zod, TypeBox, adversarial tests | Validate API input and final Pi text with Zod, and Pi Decision tool arguments with TypeBox; reject malformed, unsupported, oversized, or fabricated decisions. |
 | **Phase 2 — Inspect app** | Typed tools, agent boundaries, Application Contracts, evals, provenance | Every material contract field is schema-valid and cites a repository fact, profile rule, Observation, or explicit decision. Unsupported claims become visible gaps. |
 | **Phase 3 — Make launch-ready** | GitHub integration, CI, repository mutation safety, Docker contracts | One exact candidate revision passes profile checks; every required change maps to a reviewed diff and independent evidence. |
 | **Phase 4 — Review launch plan** | Deterministic planning, responsibility boundaries, current provider facts | The plan separates provider, Pi, and engineer actions and includes sourced cost, risks, effects, verification, and rollback. |
@@ -113,7 +113,7 @@ Test at least these cases:
 
 ### Pi runtime boundary
 
-Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. Application code validates the final message and every Decision proposal, then commits accepted messages and Decisions together. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
+Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. The Pi SDK validates Decision arguments with TypeBox; application code normalizes accepted values, validates the final message, checks Decision domain rules, and commits accepted messages and Decisions together. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
 Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 
@@ -209,7 +209,7 @@ Build or select one small but real agent application using:
 - React and Next.js App Router;
 - Pi as the direct agent runtime, with its provider and model selected through explicit configuration;
 - streaming that returns a run ID, reloads the latest message revision, reconnects to SSE, and recovers state from PostgreSQL rather than from the stream;
-- Zod tool and output contracts;
+- typed tool and output contracts;
 - a plain durable worker first; add a Workflow DevKit loop only after a concrete trigger proves it reduces operational complexity;
 - PostgreSQL and Drizzle, with `supabase-js` only on the managed path;
 - Vitest plus repository-owned evals, Promptfoo matrices gating CI, and Playwright for the streaming and approval flows;
@@ -299,7 +299,7 @@ Record learning evidence in the PR:
 
 ## Recommended milestone order
 
-1. Harden Phase 1 inputs and Pi output with Zod and adversarial tests.
+1. Harden Phase 1 HTTP input and final Pi text with Zod, Decision tool arguments with TypeBox, and both with adversarial tests.
 2. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
 3. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
 4. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.

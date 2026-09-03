@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { isApprovalMode } from "./types";
-import type { ApprovalMode, PiDecision } from "./types";
+import type { ApprovalMode } from "./types";
 
 const approvalModeSchema = z.custom<ApprovalMode>(isApprovalMode, {
   error: "Choose a valid permission policy.",
@@ -30,20 +30,6 @@ export const sendChatMessageRequestSchema = z.strictObject({
     .trim()
     .min(1, "Write a message first.")
     .max(5_000, "Keep this message under 5,000 characters."),
-});
-
-export const piDecisionSchema: z.ZodType<PiDecision> = z.strictObject({
-  kind: z.literal("launch-priority", {
-    error: "Pi returned an unsupported Decision kind.",
-  }),
-  value: z
-    .string({ error: "Pi returned a Decision without a text value." })
-    .trim()
-    .min(1, "Pi returned an empty Decision value.")
-    .max(300, "Pi returned a Decision value longer than 300 characters."),
-  replaces: z
-    .uuid({ error: "Pi returned an invalid Decision replacement ID." })
-    .optional(),
 });
 
 export const piAssistantMessageSchema = z
@@ -84,14 +70,6 @@ export async function parseJsonRequest<T extends z.ZodType>(
   const result = schema.safeParse(input);
   if (!result.success) {
     throw new RequestValidationError(firstIssue(result.error));
-  }
-  return result.data;
-}
-
-export function parsePiDecisionValue(input: unknown): PiDecision {
-  const result = piDecisionSchema.safeParse(input);
-  if (!result.success) {
-    throw new Error(`Pi returned an invalid Decision proposal: ${firstIssue(result.error)}`);
   }
   return result.data;
 }

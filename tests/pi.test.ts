@@ -21,10 +21,7 @@ import {
   MAX_PI_DECISION_PROPOSALS,
   proposeDecisionParameters,
 } from "../src/server/pi";
-import {
-  parsePiAssistantMessageValue,
-  parsePiDecisionValue,
-} from "../src/server/schemas";
+import { parsePiAssistantMessageValue } from "../src/server/schemas";
 import type { PiDecision } from "../src/server/types";
 
 beforeEach(() => {
@@ -49,10 +46,21 @@ describe("Pi assistant messages", () => {
 });
 
 describe("Pi Decision proposals", () => {
-  it("accepts the supported Decision kind and an exact replacement UUID", () => {
-    const replaces = "18b38547-0f1b-4d78-a5a2-f0f0adab02d1";
+  it("accepts valid tool arguments through TypeBox", () => {
     expect(
-      parsePiDecisionValue({
+      Value.Check(proposeDecisionParameters, {
+        kind: "launch-priority",
+        value: "Recover quickly",
+        replaces: "18b38547-0f1b-4d78-a5a2-f0f0adab02d1",
+      }),
+    ).toBe(true);
+  });
+
+  it("normalizes a valid proposal before collecting it", () => {
+    const replaces = "18b38547-0f1b-4d78-a5a2-f0f0adab02d1";
+    const proposals: PiDecision[] = [];
+    expect(
+      collectPiDecisionProposal(proposals, {
         kind: "launch-priority",
         value: "  Prefer predictable cost  ",
         replaces,
@@ -62,55 +70,27 @@ describe("Pi Decision proposals", () => {
       value: "Prefer predictable cost",
       replaces,
     });
+    expect(proposals).toEqual([
+      {
+        kind: "launch-priority",
+        value: "Prefer predictable cost",
+        replaces,
+      },
+    ]);
   });
 
   it.each([
-    [{ kind: "paid-action-approved", value: "yes" }, "unsupported Decision kind"],
-    [{ kind: "target-environment", value: "staging" }, "unsupported Decision kind"],
-    [{ kind: "approval-mode", value: "full-autonomy" }, "unsupported Decision kind"],
-    [{ kind: ["launch-priority"], value: "bypass kind validation" }, "unsupported Decision kind"],
-    [{ kind: "launch-priority", value: "bad replacement", replaces: 42 }, "replacement ID"],
-    [
-      { kind: "launch-priority", value: "bad replacement", replaces: "invented" },
-      "replacement ID",
-    ],
-    [
-      { kind: "launch-priority", value: "Ready", approvedPaidAction: true },
-      "Unrecognized key",
-    ],
-  ])("rejects a malformed or unsupported proposal %#", (proposal, message) => {
-    expect(() => parsePiDecisionValue(proposal)).toThrow(message);
-  });
-
-  it("rejects an oversized value instead of truncating it", () => {
-    expect(() =>
-      parsePiDecisionValue({
-        kind: "launch-priority",
-        value: "x".repeat(301),
-      }),
-    ).toThrow("longer than 300 characters");
-  });
-
-  it("exposes the same narrow contract to Pi through TypeBox", () => {
-    expect(
-      Value.Check(proposeDecisionParameters, {
-        kind: "launch-priority",
-        value: "Recover quickly",
-      }),
-    ).toBe(true);
-    expect(
-      Value.Check(proposeDecisionParameters, {
-        kind: "launch-priority",
-        value: "Recover quickly",
-        approvedPaidAction: true,
-      }),
-    ).toBe(false);
-    expect(
-      Value.Check(proposeDecisionParameters, {
-        kind: "paid-action-approved",
-        value: "yes",
-      }),
-    ).toBe(false);
+    { kind: "paid-action-approved", value: "yes" },
+    { kind: "target-environment", value: "staging" },
+    { kind: "approval-mode", value: "full-autonomy" },
+    { kind: ["launch-priority"], value: "bypass kind validation" },
+    { kind: "launch-priority", value: "bad replacement", replaces: 42 },
+    { kind: "launch-priority", value: "bad replacement", replaces: "invented" },
+    { kind: "launch-priority", value: "Ready", approvedPaidAction: true },
+    { kind: "launch-priority", value: "" },
+    { kind: "launch-priority", value: "x".repeat(301) },
+  ])("rejects malformed tool arguments through TypeBox %#", (proposal) => {
+    expect(Value.Check(proposeDecisionParameters, proposal)).toBe(false);
   });
 
   it("caps successfully collected proposals per turn", () => {
