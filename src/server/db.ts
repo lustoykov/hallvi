@@ -18,9 +18,11 @@ import schemaVersion from "./schema-version.json";
 import type {
   ActivityEvent,
   ApplicationRecord,
+  Chat,
   ChatMessage,
   Decision,
   Observation,
+  PhaseWorkspaceRecord,
 } from "./types";
 
 const schema = {
@@ -114,10 +116,10 @@ export function insertApplication(input: Omit<ApplicationRecord, "id" | "created
 // Phase workspaces
 
 export function insertWorkspace(applicationId: string) {
-  const workspace = {
+  const workspace: PhaseWorkspaceRecord = {
     id: randomUUID(),
     applicationId,
-    phaseKey: "start" as const,
+    phaseKey: "start",
     createdAt: now(),
   };
   db().insert(phaseWorkspaces).values(workspace).run();
@@ -142,7 +144,7 @@ export function getWorkspace(applicationId: string) {
 // Chats and messages
 
 export function insertChat(workspaceId: string, title: string, isPrimary = false) {
-  const chat = {
+  const chat: Chat = {
     id: randomUUID(),
     workspaceId,
     title,
