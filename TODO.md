@@ -6,13 +6,13 @@ These are separate follow-up PRs after the current Phase 1 implementation. Compl
 
 ### 1. Add Drizzle over the existing SQLite database
 
-- [ ] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
-- [ ] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
-- [ ] Keep `better-sqlite3`, foreign-key enforcement, WAL mode, transactions, and the prototype reset/nuke policy.
-- [ ] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
-- [ ] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
+- [x] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
+- [x] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
+- [x] Keep `better-sqlite3`, foreign-key enforcement, WAL mode, transactions, and the prototype reset/nuke policy.
+- [x] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
+- [x] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
 
-Open decision: choose one schema-application path before implementation. `drizzle-kit push` can make the TypeScript Drizzle schema the prototype source of truth by applying it directly to a disposable local database. Application-owned bootstrap can keep first-run setup inside Server Guy, but retaining handwritten `CREATE TABLE` statements beside a Drizzle schema would create two schema definitions that can drift. Do not adopt both as equal sources of truth.
+Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or intentionally nuking the local database.
 
 ### 2. Configure Pi explicitly
 

@@ -67,9 +67,9 @@ It already provides direct practice with:
 
 Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) is a Phase 1 follow-up that must land before Phase 2; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
 
-It does **not** yet provide direct practice with PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
+It now provides direct practice with Drizzle over SQLite, but it does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. Add [Drizzle over the existing SQLite database](../../TODO.md#1-add-drizzle-over-the-existing-sqlite-database) as a bounded, behavior-preserving persistence refactor before adding setup or worker state. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../TODO.md#1-add-drizzle-over-the-existing-sqlite-database) without changing the domain model. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
@@ -232,7 +232,7 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 
 | Capability or tool | Trigger |
 | --- | --- |
-| **Drizzle over SQLite** | Introduce before durable Pi state because the existing persistence layer already has enough handwritten queries and unchecked row casts to justify one typed schema/query layer. Preserve SQLite, current behavior, and the prototype reset policy; decide separately whether `drizzle-kit push` or application bootstrap owns schema application. |
+| **Drizzle over SQLite** | Introduced as the typed schema/query layer before durable Pi state. SQLite, `better-sqlite3`, WAL, foreign keys, transactions, and the prototype reset policy remain; `drizzle-kit push` explicitly applies the TypeScript schema. |
 | **PostgreSQL** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same Drizzle domain schema and invariants where the database differences allow it, and rerun the same tests. |
 | **SQLite + Node worker** | Introduce when a Pi turn outlives one request: persist Pi Run and assistant-message state, schedule work through one local worker process, and recover after disconnects or process restarts. Start without leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
 | **Workflow DevKit** | Re-evaluate when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate. Durable application records remain authoritative. |
@@ -300,7 +300,7 @@ Record learning evidence in the PR:
 ## Recommended milestone order
 
 1. Harden Phase 1 HTTP input with Zod, Decision tool arguments with TypeBox, final Pi text in the adapter, and all three with adversarial tests.
-2. Add Drizzle over the existing SQLite database as a behavior-preserving persistence refactor; settle one schema-application path before implementation.
+2. Use the completed Drizzle-over-SQLite layer as the persistence baseline; `drizzle-kit push` owns prototype schema application.
 3. Add explicit Pi setup, with runtime, credential, quota, and model happy and unhappy path tests.
 4. Add explicit GitHub connection, with authorization, scope, revocation, and repository-access happy and unhappy path tests.
 5. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.

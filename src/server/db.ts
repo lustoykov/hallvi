@@ -1,8 +1,20 @@
 import Database from "better-sqlite3";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import {
+  activityEvents,
+  applications,
+  chats,
+  decisions,
+  messages,
+  observations,
+  phaseWorkspaces,
+} from "./db-schema";
+import schemaVersion from "./schema-version.json";
 import type {
   ActivityEvent,
   ApplicationRecord,
@@ -13,247 +25,156 @@ import type {
   PhaseWorkspaceRecord,
 } from "./types";
 
-type Sqlite = InstanceType<typeof Database>;
-type Row = Record<string, unknown>;
+const schema = {
+  activityEvents,
+  applications,
+  chats,
+  decisions,
+  messages,
+  observations,
+  phaseWorkspaces,
+};
+type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
-  var __serverGuyDb: Sqlite | undefined;
+  var __serverGuyDb: ServerGuyDatabase | undefined;
 }
 
-const SCHEMA_VERSION = 3;
 const defaultDbPath = join(process.cwd(), ".server-guy", "server-guy.db");
 
-export function db(): Sqlite {
+export function db(): ServerGuyDatabase {
   return (globalThis.__serverGuyDb ??= createDatabase());
 }
 
-function createDatabase(): Sqlite {
+function createDatabase(): ServerGuyDatabase {
   const databasePath = process.env.SERVER_GUY_DB_PATH ?? defaultDbPath;
   mkdirSync(dirname(databasePath), { recursive: true });
-  const database = new Database(databasePath);
+  const client = new Database(databasePath);
   try {
-    database.pragma("journal_mode = WAL");
-    database.pragma("foreign_keys = ON");
-    initializeSchema(database, databasePath);
-    return database;
+    client.pragma("journal_mode = WAL");
+    client.pragma("foreign_keys = ON");
+    assertCurrentSchema(client, databasePath);
+    return drizzle({ client, schema });
   } catch (error) {
-    database.close();
+    client.close();
     throw error;
   }
 }
 
-function initializeSchema(database: Sqlite, databasePath: string) {
-  const version = database.pragma("user_version", { simple: true }) as number;
+function assertCurrentSchema(client: InstanceType<typeof Database>, databasePath: string) {
+  const version = client.pragma("user_version", { simple: true }) as number;
   const initialized = Boolean(
-    database
+    client
       .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'applications'")
       .get(),
   );
-  if (initialized && version !== SCHEMA_VERSION) {
+  if (!initialized) {
+    throw new Error(`${databasePath} is not initialized. Run npm run db:push.`);
+  }
+  if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} uses an older prototype schema. Delete it and restart Server Guy.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Run npm run db:push, or delete the disposable database and push a fresh one.`,
     );
   }
-
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS applications (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      repository_url TEXT NOT NULL UNIQUE,
-      repository_owner TEXT NOT NULL,
-      repository_name TEXT NOT NULL,
-      environment TEXT NOT NULL,
-      approval_mode TEXT NOT NULL,
-      approval_scope TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS phase_workspaces (
-      id TEXT PRIMARY KEY,
-      application_id TEXT NOT NULL,
-      phase_key TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      UNIQUE(application_id, phase_key),
-      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS chats (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      is_primary INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL,
-      archived_at TEXT,
-      FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      chat_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      body TEXT NOT NULL,
-      source TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS decisions (
-      id TEXT PRIMARY KEY,
-      application_id TEXT NOT NULL,
-      source_message_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      label TEXT NOT NULL,
-      value TEXT NOT NULL,
-      superseded_by_id TEXT,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE,
-      FOREIGN KEY(source_message_id) REFERENCES messages(id) ON DELETE CASCADE,
-      FOREIGN KEY(superseded_by_id) REFERENCES decisions(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS observations (
-      id TEXT PRIMARY KEY,
-      application_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      status TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      source_label TEXT NOT NULL,
-      source_url TEXT,
-      raw_json TEXT NOT NULL,
-      observed_at TEXT NOT NULL,
-      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS activity_events (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      detail TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_messages_chat
-      ON messages(chat_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_decisions_application
-      ON decisions(application_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_observations_application_kind
-      ON observations(application_id, kind, observed_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_activity_workspace
-      ON activity_events(workspace_id, created_at DESC);
-  `);
-  database.pragma(`user_version = ${SCHEMA_VERSION}`);
-}
-
-// Rows are snake_case columns; records are the camelCase types in ./types.
-function fromRow<T>(row: Row): T {
-  const record: Row = {};
-  for (const [column, value] of Object.entries(row)) {
-    record[column.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())] = value;
-  }
-  return record as T;
-}
-
-const toChat = (row: Row) => fromRow<Chat>({ ...row, is_primary: Boolean(row.is_primary) });
-
-const toObservation = ({ raw_json, ...row }: Row) =>
-  fromRow<Observation>({ ...row, raw: JSON.parse(raw_json as string) });
-
-function one<T>(sql: string, params: unknown[], map: (row: Row) => T = fromRow): T | null {
-  const row = db().prepare(sql).get(...params) as Row | undefined;
-  return row ? map(row) : null;
-}
-
-function many<T>(sql: string, params: unknown[], map: (row: Row) => T = fromRow): T[] {
-  return (db().prepare(sql).all(...params) as Row[]).map(map);
 }
 
 function now() {
   return new Date().toISOString();
 }
 
+const rowId = sql<number>`rowid`;
+
 // Applications
 
 export function getLatestApplication() {
-  return one<ApplicationRecord>("SELECT * FROM applications ORDER BY created_at DESC LIMIT 1", []);
+  return db().select().from(applications).orderBy(desc(applications.createdAt)).limit(1).get() ?? null;
 }
 
 export function getApplication(id: string) {
-  return one<ApplicationRecord>("SELECT * FROM applications WHERE id = ?", [id]);
+  return db().select().from(applications).where(eq(applications.id, id)).get() ?? null;
 }
 
 export function getApplicationByRepository(repositoryUrl: string) {
-  return one<ApplicationRecord>("SELECT * FROM applications WHERE repository_url = ?", [
-    repositoryUrl,
-  ]);
+  return (
+    db().select().from(applications).where(eq(applications.repositoryUrl, repositoryUrl)).get() ??
+    null
+  );
 }
 
 export function insertApplication(input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">) {
-  const id = randomUUID();
   const timestamp = now();
-  db().prepare(
-    `INSERT INTO applications
-      (id, name, repository_url, repository_owner, repository_name, environment,
-       approval_mode, approval_scope, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    input.name,
-    input.repositoryUrl,
-    input.repositoryOwner,
-    input.repositoryName,
-    input.environment,
-    input.approvalMode,
-    input.approvalScope,
-    timestamp,
-    timestamp,
-  );
-  return getApplication(id)!;
+  const application: ApplicationRecord = {
+    ...input,
+    id: randomUUID(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  db().insert(applications).values(application).run();
+  return application;
 }
 
 // Phase workspaces
 
 export function insertWorkspace(applicationId: string) {
-  const id = randomUUID();
-  db().prepare(
-    "INSERT INTO phase_workspaces (id, application_id, phase_key, created_at) VALUES (?, ?, 'start', ?)",
-  ).run(id, applicationId, now());
-  return getWorkspace(applicationId)!;
+  const workspace: PhaseWorkspaceRecord = {
+    id: randomUUID(),
+    applicationId,
+    phaseKey: "start",
+    createdAt: now(),
+  };
+  db().insert(phaseWorkspaces).values(workspace).run();
+  return workspace;
 }
 
 export function getWorkspace(applicationId: string) {
-  return one<PhaseWorkspaceRecord>(
-    "SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_key = 'start'",
-    [applicationId],
+  return (
+    db()
+      .select()
+      .from(phaseWorkspaces)
+      .where(
+        and(
+          eq(phaseWorkspaces.applicationId, applicationId),
+          eq(phaseWorkspaces.phaseKey, "start"),
+        ),
+      )
+      .get() ?? null
   );
 }
 
 // Chats and messages
 
 export function insertChat(workspaceId: string, title: string, isPrimary = false) {
-  const id = randomUUID();
-  db().prepare(
-    "INSERT INTO chats (id, workspace_id, title, is_primary, created_at) VALUES (?, ?, ?, ?, ?)",
-  ).run(id, workspaceId, title, isPrimary ? 1 : 0, now());
-  return getChat(id)!;
+  const chat: Chat = {
+    id: randomUUID(),
+    workspaceId,
+    title,
+    isPrimary,
+    createdAt: now(),
+    archivedAt: null,
+  };
+  db().insert(chats).values(chat).run();
+  return chat;
 }
 
 export function getChat(id: string) {
-  return one("SELECT * FROM chats WHERE id = ?", [id], toChat);
+  return db().select().from(chats).where(eq(chats.id, id)).get() ?? null;
 }
 
 export function listChats(workspaceId: string) {
-  return many(
-    "SELECT * FROM chats WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC",
-    [workspaceId],
-    toChat,
-  );
+  return db()
+    .select()
+    .from(chats)
+    .where(eq(chats.workspaceId, workspaceId))
+    .orderBy(asc(chats.createdAt), asc(rowId))
+    .all();
 }
 
 export function archiveChat(id: string) {
-  db().prepare("UPDATE chats SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(now(), id);
+  db()
+    .update(chats)
+    .set({ archivedAt: now() })
+    .where(and(eq(chats.id, id), isNull(chats.archivedAt)))
+    .run();
 }
 
 export function insertMessage(
@@ -262,18 +183,25 @@ export function insertMessage(
   body: string,
   source: ChatMessage["source"],
 ) {
-  const id = randomUUID();
-  db().prepare(
-    "INSERT INTO messages (id, chat_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(id, chatId, role, body, source, now());
-  return one<ChatMessage>("SELECT * FROM messages WHERE id = ?", [id])!;
+  const message: ChatMessage = {
+    id: randomUUID(),
+    chatId,
+    role,
+    body,
+    source,
+    createdAt: now(),
+  };
+  db().insert(messages).values(message).run();
+  return message;
 }
 
 export function listMessages(chatId: string) {
-  return many<ChatMessage>(
-    "SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC, rowid ASC",
-    [chatId],
-  );
+  return db()
+    .select()
+    .from(messages)
+    .where(eq(messages.chatId, chatId))
+    .orderBy(asc(messages.createdAt), asc(rowId))
+    .all();
 }
 
 // Decisions
@@ -285,105 +213,110 @@ export function insertDecision(input: {
   label: string;
   value: string;
 }) {
-  const id = randomUUID();
-  db().prepare(
-    `INSERT INTO decisions
-      (id, application_id, source_message_id, kind, label, value, superseded_by_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
-  ).run(
-    id,
-    input.applicationId,
-    input.sourceMessageId,
-    input.kind,
-    input.label,
-    input.value,
-    now(),
-  );
-  return getDecision(id)!;
+  const decision: Decision = {
+    ...input,
+    id: randomUUID(),
+    supersededById: null,
+    createdAt: now(),
+  };
+  db().insert(decisions).values(decision).run();
+  return decision;
 }
 
 export function getDecision(id: string) {
-  return one<Decision>("SELECT * FROM decisions WHERE id = ?", [id]);
+  return db().select().from(decisions).where(eq(decisions.id, id)).get() ?? null;
 }
 
 export function listActiveDecisions(applicationId: string) {
-  return many<Decision>(
-    `SELECT * FROM decisions
-     WHERE application_id = ? AND superseded_by_id IS NULL
-     ORDER BY created_at ASC, rowid ASC`,
-    [applicationId],
-  );
+  return db()
+    .select()
+    .from(decisions)
+    .where(
+      and(eq(decisions.applicationId, applicationId), isNull(decisions.supersededById)),
+    )
+    .orderBy(asc(decisions.createdAt), asc(rowId))
+    .all();
 }
 
 export function supersedeDecision(applicationId: string, previousId: string, replacementId: string) {
-  const result = db().prepare(
-    `UPDATE decisions SET superseded_by_id = ?
-     WHERE id = ? AND application_id = ? AND superseded_by_id IS NULL`,
-  ).run(replacementId, previousId, applicationId);
+  const result = db()
+    .update(decisions)
+    .set({ supersededById: replacementId })
+    .where(
+      and(
+        eq(decisions.id, previousId),
+        eq(decisions.applicationId, applicationId),
+        isNull(decisions.supersededById),
+      ),
+    )
+    .run();
   if (result.changes !== 1) {
-    throw new Error("The Decision being corrected is missing, already replaced, or belongs to another application.");
+    throw new Error(
+      "The Decision being corrected is missing, already replaced, or belongs to another application.",
+    );
   }
 }
 
 // Observations
 
 export function insertObservation(input: Omit<Observation, "id" | "observedAt">) {
-  const id = randomUUID();
-  db().prepare(
-    `INSERT INTO observations
-      (id, application_id, kind, status, summary, source_label, source_url, raw_json, observed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    input.applicationId,
-    input.kind,
-    input.status,
-    input.summary,
-    input.sourceLabel,
-    input.sourceUrl,
-    JSON.stringify(input.raw),
-    now(),
-  );
-  return getObservation(id)!;
+  const observation: Observation = {
+    ...input,
+    id: randomUUID(),
+    observedAt: now(),
+  };
+  db().insert(observations).values(observation).run();
+  return observation;
 }
 
 export function getObservation(id: string) {
-  return one("SELECT * FROM observations WHERE id = ?", [id], toObservation);
+  return db().select().from(observations).where(eq(observations.id, id)).get() ?? null;
 }
 
 export function latestObservation(applicationId: string, kind: string) {
-  return one(
-    `SELECT * FROM observations
-     WHERE application_id = ? AND kind = ?
-     ORDER BY observed_at DESC, rowid DESC LIMIT 1`,
-    [applicationId, kind],
-    toObservation,
+  return (
+    db()
+      .select()
+      .from(observations)
+      .where(and(eq(observations.applicationId, applicationId), eq(observations.kind, kind)))
+      .orderBy(desc(observations.observedAt), desc(rowId))
+      .limit(1)
+      .get() ?? null
   );
 }
 
 export function listObservations(applicationId: string) {
-  return many(
-    "SELECT * FROM observations WHERE application_id = ? ORDER BY observed_at DESC, rowid DESC",
-    [applicationId],
-    toObservation,
-  );
+  return db()
+    .select()
+    .from(observations)
+    .where(eq(observations.applicationId, applicationId))
+    .orderBy(desc(observations.observedAt), desc(rowId))
+    .all();
 }
 
 // Activity
 
 export function insertActivity(workspaceId: string, kind: string, summary: string, detail: string) {
-  db().prepare(
-    "INSERT INTO activity_events (id, workspace_id, kind, summary, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(randomUUID(), workspaceId, kind, summary, detail, now());
+  const activity: ActivityEvent = {
+    id: randomUUID(),
+    workspaceId,
+    kind,
+    summary,
+    detail,
+    createdAt: now(),
+  };
+  db().insert(activityEvents).values(activity).run();
 }
 
 export function listActivity(workspaceId: string) {
-  return many<ActivityEvent>(
-    "SELECT * FROM activity_events WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC",
-    [workspaceId],
-  );
+  return db()
+    .select()
+    .from(activityEvents)
+    .where(eq(activityEvents.workspaceId, workspaceId))
+    .orderBy(desc(activityEvents.createdAt), desc(rowId))
+    .all();
 }
 
 export function withTransaction<T>(work: () => T): T {
-  return db().transaction(work)();
+  return db().transaction(() => work());
 }
