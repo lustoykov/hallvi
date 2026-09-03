@@ -59,15 +59,15 @@ Next.js
 
 It already provides direct practice with:
 
-- React, Next.js App Router, TypeScript, Node, and Vitest;
+- React, Next.js App Router, TypeScript, Node, Zod, and Vitest;
 - relational modeling, constraints, indexes, and transactions through SQLite;
 - deterministic application state around a probabilistic model;
 - GitHub integration and source-attributed Observations;
-- idempotent intake, policy conflicts, provenance stability, and malformed-model-output tests.
+- schema-validated request and model boundaries, idempotent intake, policy conflicts, provenance stability, and adversarial malformed-model-output tests.
 
 Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) is a Phase 1 follow-up that must land before Phase 2; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
 
-It does **not** yet provide direct practice with Zod, PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
+It does **not** yet provide direct practice with PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
 The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#3-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 

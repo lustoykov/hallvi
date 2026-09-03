@@ -1,7 +1,10 @@
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
-import type { ChatMessage, Decision, PiDecision, PiReply } from "./types";
+import { parsePiReplyValue } from "./schemas";
+import type { ChatMessage, Decision, PiReply } from "./types";
 
 export class PiUnavailableError extends Error {}
+
+const MAX_PI_REPLY_CHARACTERS = 20_000;
 
 const SYSTEM_PROMPT = `You are Pi inside Server Guy, an operator product for individual engineers.
 
@@ -23,44 +26,15 @@ function extractJson(text: string): unknown {
   try {
     return JSON.parse(trimmed);
   } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
     throw new Error("Pi returned a response Server Guy could not parse.");
   }
 }
 
 export function parsePiReply(text: string): PiReply {
-  const candidate = extractJson(text) as { message?: unknown; decisions?: unknown };
-  if (typeof candidate.message !== "string" || !candidate.message.trim()) {
-    throw new Error("Pi returned no user-facing message.");
+  if (text.length > MAX_PI_REPLY_CHARACTERS) {
+    throw new Error("Pi returned a response longer than 20,000 characters.");
   }
-
-  const decisions: PiDecision[] = [];
-
-  if (Array.isArray(candidate.decisions)) {
-    for (const item of candidate.decisions) {
-      if (!item || typeof item !== "object") continue;
-      const { kind, value, replaces } = item as {
-        kind?: unknown;
-        value?: unknown;
-        replaces?: unknown;
-      };
-      if (kind !== "launch-priority" || typeof value !== "string" || !value.trim()) {
-        continue;
-      }
-      if (replaces !== undefined && (typeof replaces !== "string" || !replaces.trim())) {
-        continue;
-      }
-      decisions.push({
-        kind,
-        value: value.trim().slice(0, 300),
-        ...(typeof replaces === "string" ? { replaces: replaces.trim() } : {}),
-      });
-    }
-  }
-
-  return { message: candidate.message.trim(), decisions };
+  return parsePiReplyValue(extractJson(text));
 }
 
 function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {

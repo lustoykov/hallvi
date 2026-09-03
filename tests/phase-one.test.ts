@@ -167,7 +167,11 @@ describe("Phase 1 application workspace", () => {
     mocks.askPi.mockResolvedValueOnce({
       message: "I changed the decision.",
       decisions: [
-        { kind: "launch-priority", value: "Invented replacement", replaces: "missing" },
+        {
+          kind: "launch-priority",
+          value: "Invented replacement",
+          replaces: "00000000-0000-4000-8000-000000000000",
+        },
       ],
     });
 

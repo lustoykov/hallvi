@@ -21,6 +21,14 @@ function request(body: unknown) {
   });
 }
 
+function rawRequest(body: string) {
+  return new NextRequest("http://localhost/api/applications", {
+    method: "POST",
+    body,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 describe("POST /api/applications", () => {
   beforeEach(() => {
     mocks.createPhaseOneApplication.mockReset();
@@ -61,6 +69,67 @@ describe("POST /api/applications", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: "Choose a valid permission policy.",
+    });
+    expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "missing repository URL",
+      { approvalMode: "pi-decides" },
+      "Enter a GitHub repository URL.",
+    ],
+    [
+      "non-text repository URL",
+      { repositoryUrl: 42, approvalMode: "pi-decides" },
+      "Enter a GitHub repository URL.",
+    ],
+    [
+      "oversized repository URL",
+      { repositoryUrl: "x".repeat(2_049), approvalMode: "pi-decides" },
+      "under 2,048 characters",
+    ],
+    [
+      "unknown field",
+      {
+        repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
+        approvalMode: "pi-decides",
+        environment: "staging",
+      },
+      "Unrecognized key",
+    ],
+  ])("rejects a %s", async (_label, body, message) => {
+    const response = await POST(request(body));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: expect.stringContaining(message) });
+    expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed JSON", async () => {
+    const response = await POST(rawRequest("{"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Request body must be valid JSON.",
+    });
+    expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized JSON body before parsing fields", async () => {
+    const response = await POST(
+      rawRequest(
+        JSON.stringify({
+          repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
+          approvalMode: "pi-decides",
+          padding: "x".repeat(16_384),
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Keep the request body under 16,384 characters.",
     });
     expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
   });
