@@ -1,12 +1,12 @@
 import type {
   ApplicationRecord,
-  ApprovalMode,
   EvidenceReference,
   GateCheck,
   GateStatus,
   Observation,
   UpcomingRequirement,
 } from "./types";
+import { APPROVAL_MODES } from "./types";
 
 export const PHASES = [
   { key: "start", number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
@@ -79,12 +79,6 @@ export const UPCOMING_REQUIREMENTS = [
   },
 ] as const;
 
-export const APPROVAL_MODE_LABELS: Record<ApprovalMode, string> = {
-  "pi-decides": "Pi decides",
-  "always-ask": "Always ask",
-  "full-autonomy": "Full autonomy",
-};
-
 export function phaseOneCheckListForPrompt() {
   return PHASE_ONE_CHECKS.map((check, index) => `${index + 1}. ${check.label}.`).join("\n");
 }
@@ -135,7 +129,7 @@ export function computeChecks(
       application.repositoryName,
   );
   const environmentExplicit = application.environment === "production";
-  const approvalExplicit = Object.hasOwn(APPROVAL_MODE_LABELS, application.approvalMode);
+  const approvalExplicit = Object.hasOwn(APPROVAL_MODES, application.approvalMode);
 
   const values = {
     "application-identity": {
@@ -163,7 +157,7 @@ export function computeChecks(
     "approval-authority": {
       status: approvalExplicit ? "passed" : "not-yet",
       result: approvalExplicit
-        ? `${APPROVAL_MODE_LABELS[application.approvalMode]} · ${application.approvalScope}`
+        ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
         : "Choose how Pi should ask before external changes.",
       evidence: [applicationEvidence(application, "Selected permission policy")],
       canRerun: false,

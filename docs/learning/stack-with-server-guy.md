@@ -65,11 +65,11 @@ It already provides direct practice with:
 - GitHub integration and source-attributed Observations;
 - idempotent intake, policy conflicts, provenance stability, and malformed-model-output tests.
 
-Pi is Server Guy's only model and agent runtime. Explicit Pi setup is a Phase 1 follow-up; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
+Pi is Server Guy's only model and agent runtime. [Explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) is a Phase 1 follow-up that must land before Phase 2; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
 
 It does **not** yet provide direct practice with Zod, PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Do not add a separate API service or worker until a real request-lifetime, retry, timer, concurrency, or crash-survival requirement demands one.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#3-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
@@ -88,7 +88,7 @@ The current modular monolith is the right product architecture. Do not add a sep
 
 ## The first learning slice: Phase 2 Application Contract
 
-Implement Phase 2 as a read-only vertical slice before performing infrastructure mutations.
+Implement Phase 2 as a read-only vertical slice after the explicit GitHub/Pi setup and durable Pi request follow-ups, and before performing infrastructure mutations.
 
 ### Build
 
@@ -297,9 +297,9 @@ Record learning evidence in the PR:
 ## Recommended milestone order
 
 1. Harden Phase 1 inputs and Pi output with Zod and adversarial tests.
-2. Implement the Phase 2 Application Contract as a read-only vertical slice.
-3. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
-4. Make Pi requests durable with SQLite, a Node worker, run IDs, and reconnectable events.
+2. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
+3. Make Pi requests durable with SQLite, a Node worker, run IDs, reconnectable events, a bounded transcript window, and a durable summary.
+4. Implement the Phase 2 Application Contract as a read-only vertical slice.
 5. Specify and test the durable Operation lifecycle without a provider mutation.
 6. Reconcile the first real Hetzner host effect through approval and verification.
 7. Containerize and deploy the first exact application Release to a VPS.

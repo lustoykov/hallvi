@@ -1,4 +1,23 @@
-export type ApprovalMode = "pi-decides" | "always-ask" | "full-autonomy";
+export const APPROVAL_MODES = {
+  "pi-decides": {
+    label: "Pi decides",
+    hint: "Pi asks when the consequence warrants it.",
+  },
+  "always-ask": {
+    label: "Always ask",
+    hint: "Ask before every external change.",
+  },
+  "full-autonomy": {
+    label: "Full autonomy",
+    hint: "Act within the launch scope without asking.",
+  },
+} as const;
+
+export type ApprovalMode = keyof typeof APPROVAL_MODES;
+
+export function isApprovalMode(value: unknown): value is ApprovalMode {
+  return typeof value === "string" && Object.hasOwn(APPROVAL_MODES, value);
+}
 
 export type GateStatus = "passed" | "blocked" | "not-yet";
 export type ObservationStatus = "passed" | "failed" | "unavailable";

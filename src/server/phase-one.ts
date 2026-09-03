@@ -24,12 +24,12 @@ import {
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
 import {
-  APPROVAL_MODE_LABELS,
   PHASE_ONE,
   computeChecks,
   deriveUpcomingRequirements,
 } from "./phase-one-spec";
 import { askPi } from "./pi";
+import { APPROVAL_MODES, isApprovalMode } from "./types";
 import type {
   ApplicationRecord,
   CreateApplicationInput,
@@ -84,7 +84,7 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   if (input.environment !== "production") {
     throw new Error("Phase 1 currently supports the production launch environment only.");
   }
-  if (!Object.hasOwn(APPROVAL_MODE_LABELS, input.approvalMode)) {
+  if (!isApprovalMode(input.approvalMode)) {
     throw new Error("Choose a valid permission policy.");
   }
   const repository = parseGithubRepository(input.repositoryUrl);
@@ -92,7 +92,7 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   if (existing) {
     if (existing.approvalMode !== input.approvalMode) {
       throw new ExistingApplicationConflictError(
-        `An application already exists for this repository with ${APPROVAL_MODE_LABELS[existing.approvalMode]}. Open it instead of replacing its permission policy.`,
+        `An application already exists for this repository with ${APPROVAL_MODES[existing.approvalMode].label}. Open it instead of replacing its permission policy.`,
       );
     }
     return { view: getPhaseOneOperatorView(existing.id), created: false };
@@ -121,7 +121,7 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
       workspace.id,
       "workspace-created",
       "Application workspace created",
-      `Recorded ${repository.canonicalUrl} as a production launch with ${APPROVAL_MODE_LABELS[input.approvalMode]}.`,
+      `Recorded ${repository.canonicalUrl} as a production launch with ${APPROVAL_MODES[input.approvalMode].label}.`,
     );
     return application;
   });
@@ -233,7 +233,7 @@ function buildViewSummary(application: ApplicationRecord) {
     `Application: ${application.name}`,
     `Repository: ${application.repositoryUrl}`,
     "Environment: Production",
-    `Permission policy: ${APPROVAL_MODE_LABELS[application.approvalMode]}`,
+    `Permission policy: ${APPROVAL_MODES[application.approvalMode].label}`,
     `Checks: ${checks.map((check) => `${check.label}=${check.status}`).join("; ")}`,
     `Upcoming requirements: ${upcoming
       .map((requirement) => `${requirement.label} before Phase ${requirement.requiredBeforePhase}`)

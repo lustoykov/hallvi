@@ -19,6 +19,14 @@ describe("parseGithubRepository", () => {
     });
   });
 
+  it("normalizes a scheme-less GitHub URL", () => {
+    expect(parseGithubRepository("github.com/lustoykov/todo-fastapi")).toEqual({
+      owner: "lustoykov",
+      name: "todo-fastapi",
+      canonicalUrl: "https://github.com/lustoykov/todo-fastapi",
+    });
+  });
+
   it("canonicalizes case, a trailing slash, and URL metadata", () => {
     expect(
       parseGithubRepository("https://github.com/LusToykov/Todo-FastAPI.git/?tab=readme"),
@@ -32,6 +40,12 @@ describe("parseGithubRepository", () => {
   it("rejects a non-GitHub repository", () => {
     expect(() => parseGithubRepository("https://gitlab.com/example/app")).toThrow(
       "currently accepts GitHub repositories only",
+    );
+  });
+
+  it("rejects unsupported URL protocols", () => {
+    expect(() => parseGithubRepository("ftp://github.com/example/app")).toThrow(
+      "GitHub HTTPS or SSH repository URL",
     );
   });
 

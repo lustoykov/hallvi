@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from "react";
 
-import { APPROVAL_MODE_LABELS, PHASE_ONE_CHECKS } from "@/server/phase-one-spec";
+import { PHASE_ONE_CHECKS } from "@/server/phase-one-spec";
+import { APPROVAL_MODES } from "@/server/types";
 import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
 
 import { api } from "./api";
@@ -116,7 +117,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
         </div>
         <div className="sg-topbar-meta">
           <span className="sg-eyebrow">Permission policy</span>
-          <strong>{application ? APPROVAL_MODE_LABELS[application.approvalMode] : "Set during Start"}</strong>
+          <strong>{application ? APPROVAL_MODES[application.approvalMode].label : "Set during Start"}</strong>
           <span className={`sg-status ${view.workspace?.status === "ready" ? "ready" : "working"}`}>
             {view.workspace?.status === "ready" ? "Launch Brief ready" : "Phase 1"}
           </span>

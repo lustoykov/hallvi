@@ -27,33 +27,27 @@ export interface GithubInspection {
 
 export function parseGithubRepository(value: string): RepositoryIdentity {
   const input = value.trim();
-  let owner = "";
-  let name = "";
+  const normalized = input.replace(/^git@github\.com:/i, "https://github.com/");
 
-  if (input.startsWith("git@github.com:")) {
-    const parts = input.slice("git@github.com:".length).split("/").filter(Boolean);
-    if (parts.length !== 2) {
-      throw new Error("Enter a GitHub repository with only an owner and repository name.");
-    }
-    [owner, name] = parts;
-  } else {
-    let url: URL;
-    try {
-      url = new URL(input.includes("://") ? input : `https://${input}`);
-    } catch {
-      throw new Error("Enter a GitHub repository URL such as https://github.com/owner/repository.");
-    }
-    if (url.hostname.toLowerCase() !== "github.com") {
-      throw new Error("Phase 1 currently accepts GitHub repositories only.");
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length !== 2) {
-      throw new Error("Enter a GitHub repository with only an owner and repository name.");
-    }
-    [owner, name] = parts;
+  let url: URL;
+  try {
+    url = new URL(normalized.includes("://") ? normalized : `https://${normalized}`);
+  } catch {
+    throw new Error("Enter a GitHub repository URL such as https://github.com/owner/repository.");
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("Enter a GitHub HTTPS or SSH repository URL.");
+  }
+  if (url.hostname.toLowerCase() !== "github.com") {
+    throw new Error("Phase 1 currently accepts GitHub repositories only.");
+  }
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length !== 2) {
+    throw new Error("Enter a GitHub repository with only an owner and repository name.");
   }
 
-  name = name.replace(/\.git$/i, "");
+  const [owner, repositoryName] = parts;
+  const name = repositoryName.replace(/\.git$/i, "");
 
   if (!owner || !name || !/^[A-Za-z0-9_.-]+$/.test(owner) || !/^[A-Za-z0-9_.-]+$/.test(name)) {
     throw new Error("Enter a GitHub repository URL with both an owner and repository name.");

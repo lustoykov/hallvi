@@ -2,7 +2,7 @@
 
 ## Phase 1 follow-ups — Start
 
-These are separate follow-up PRs after the current Phase 1 implementation. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
+These are separate follow-up PRs after the current Phase 1 implementation. Complete items 1–3 before starting Phase 2. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
 
 ### 1. Connect GitHub explicitly
 
@@ -24,13 +24,15 @@ Open decision: confirm whether the packaged Pi SDK is sufficient on every suppor
 
 ### 3. Make Pi requests durable
 
+- [ ] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
+- [ ] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
 - [ ] Replace the request-bound, in-memory Pi turn with a SQLite-backed run and event record.
 - [ ] Add a Node worker that claims and executes pending runs with idempotent restart behavior.
 - [ ] Return a run ID immediately, stream persisted updates over a long-lived HTTP connection, and reconnect from the last observed event after reload.
 - [ ] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
 - [ ] Test duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and replay after reconnect.
 
-The database is authoritative. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+The current Pi session is created and disposed inside one HTTP request, while the full Chat transcript is copied into every prompt. That request lifetime and unbounded context are the concrete trigger for this work. The database is authoritative: the durable summary, messages, Decisions, run, and events live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 ### 4. Revisit Workflow DevKit only at its trigger
 

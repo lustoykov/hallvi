@@ -10,6 +10,7 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { PRODUCTION_BASELINE } from "@/server/phase-one-spec";
+import { APPROVAL_MODES } from "@/server/types";
 import type {
   ApprovalMode,
   Chat,
@@ -24,11 +25,9 @@ export interface CreateApplicationInput {
   approvalMode: ApprovalMode;
 }
 
-const permissionOptions: Array<{ value: ApprovalMode; label: string; hint: string }> = [
-  { value: "pi-decides", label: "Pi decides", hint: "Pi asks when the consequence warrants it." },
-  { value: "always-ask", label: "Always ask", hint: "Ask before every external change." },
-  { value: "full-autonomy", label: "Full autonomy", hint: "Act within the launch scope without asking." },
-];
+const permissionOptions = Object.entries(APPROVAL_MODES) as Array<
+  [ApprovalMode, (typeof APPROVAL_MODES)[ApprovalMode]]
+>;
 
 function LaunchForm({
   checks,
@@ -44,7 +43,7 @@ function LaunchForm({
   const [repositoryUrl, setRepositoryUrl] = useState("https://github.com/lustoykov/todo-fastapi");
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("pi-decides");
   const passed = checks.filter((check) => check.status === "passed").length;
-  const selectedPermission = permissionOptions.find((option) => option.value === approvalMode)!;
+  const selectedPermission = APPROVAL_MODES[approvalMode];
 
   return (
     <form
@@ -67,9 +66,11 @@ function LaunchForm({
           <GithubLogo weight="fill" />
           <input
             autoComplete="url"
+            inputMode="url"
             onChange={(event) => setRepositoryUrl(event.target.value)}
+            placeholder="https://github.com/owner/repository or git@github.com:owner/repository.git"
             required
-            type="url"
+            type="text"
             value={repositoryUrl}
           />
         </span>
@@ -82,12 +83,12 @@ function LaunchForm({
       <fieldset className="sg-permission-field">
         <legend>How should Pi ask for permission?</legend>
         <div className="sg-segmented-control">
-          {permissionOptions.map((option) => (
+          {permissionOptions.map(([value, option]) => (
             <button
-              aria-pressed={approvalMode === option.value}
-              className={approvalMode === option.value ? "selected" : ""}
-              key={option.value}
-              onClick={() => setApprovalMode(option.value)}
+              aria-pressed={approvalMode === value}
+              className={approvalMode === value ? "selected" : ""}
+              key={value}
+              onClick={() => setApprovalMode(value)}
               type="button"
             >
               {option.label}
