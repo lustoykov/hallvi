@@ -145,4 +145,35 @@ describe("Phase 1 schema", () => {
       database.latestObservation(firstApplication.id, "github-repository-identity")?.raw,
     ).toEqual({ attempt: 2, reason: "private" });
   });
+
+  it("preserves superseded Decision history until its Application is deleted", async () => {
+    const database = await loadFreshDatabase();
+    const application = database.insertApplication(applicationInput("decision-history"));
+    const workspace = database.insertWorkspace(application.id);
+    const chat = database.insertChat(workspace.id, "Decision history", true);
+    const sourceMessage = database.insertMessage(chat.id, "user", "Reliability comes first.", "user");
+    const previous = database.insertDecision({
+      applicationId: application.id,
+      sourceMessageId: sourceMessage.id,
+      kind: "launch-priority",
+      label: "Launch priority",
+      value: "Ship quickly",
+    });
+    const replacement = database.insertDecision({
+      applicationId: application.id,
+      sourceMessageId: sourceMessage.id,
+      kind: "launch-priority",
+      label: "Launch priority",
+      value: "Prioritize reliability",
+    });
+    database.supersedeDecision(application.id, previous.id, replacement.id);
+
+    expect(() =>
+      database.db().$client.prepare("DELETE FROM decisions WHERE id = ?").run(replacement.id),
+    ).toThrow("FOREIGN KEY constraint failed");
+    expect(database.listActiveDecisions(application.id)).toEqual([replacement]);
+
+    database.db().$client.prepare("DELETE FROM applications WHERE id = ?").run(application.id);
+    expect(database.db().$client.prepare("SELECT id FROM decisions").all()).toEqual([]);
+  });
 });

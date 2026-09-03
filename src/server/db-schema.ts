@@ -84,7 +84,6 @@ export const decisions = sqliteTable(
     value: text("value").notNull(),
     supersededById: text("superseded_by_id").references(
       (): AnySQLiteColumn => decisions.id,
-      { onDelete: "set null" },
     ),
     createdAt: text("created_at").notNull(),
   },
