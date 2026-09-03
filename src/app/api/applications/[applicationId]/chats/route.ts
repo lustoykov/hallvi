@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { handle } from "@/server/http";
 import { createChat } from "@/server/phase-one";
+import { createChatRequestSchema, parseJsonRequest } from "@/server/schemas";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function POST(
 ) {
   return handle(async () => {
     const { applicationId } = await context.params;
-    const body = (await request.json().catch(() => ({}))) as { title?: string };
+    const body = await parseJsonRequest(request, createChatRequestSchema);
     return NextResponse.json(createChat(applicationId, body.title), { status: 201 });
   });
 }

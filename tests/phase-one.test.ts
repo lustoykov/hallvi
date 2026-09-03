@@ -109,7 +109,7 @@ describe("Phase 1 application workspace", () => {
     const primaryChatId = created.view.selectedChatId!;
     mocks.askPi.mockResolvedValueOnce({
       message: "I recorded fast recovery.",
-      decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
+      decisionProposals: [{ kind: "launch-priority", value: "Recover quickly" }],
     });
 
     await phaseOne.sendChatMessage(applicationId, primaryChatId, "Recovery matters.");
@@ -126,13 +126,13 @@ describe("Phase 1 application workspace", () => {
     const chatId = created.view.selectedChatId!;
     mocks.askPi.mockResolvedValueOnce({
       message: "I recorded fast recovery.",
-      decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
+      decisionProposals: [{ kind: "launch-priority", value: "Recover quickly" }],
     });
     const firstView = await phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters.");
     const first = firstView.decisions[0];
     mocks.askPi.mockResolvedValueOnce({
       message: "I replaced that priority.",
-      decisions: [
+      decisionProposals: [
         {
           kind: "launch-priority",
           value: "Prefer predictable cost",
@@ -166,8 +166,12 @@ describe("Phase 1 application workspace", () => {
     const before = created.view.messages;
     mocks.askPi.mockResolvedValueOnce({
       message: "I changed the decision.",
-      decisions: [
-        { kind: "launch-priority", value: "Invented replacement", replaces: "missing" },
+      decisionProposals: [
+        {
+          kind: "launch-priority",
+          value: "Invented replacement",
+          replaces: "00000000-0000-4000-8000-000000000000",
+        },
       ],
     });
 

@@ -152,7 +152,7 @@ export interface PiDecision {
   replaces?: string;
 }
 
-export interface PiReply {
+export interface PiTurnResult {
   message: string;
-  decisions: PiDecision[];
+  decisionProposals: PiDecision[];
 }
