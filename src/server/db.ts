@@ -6,12 +6,11 @@ import { dirname, join } from "node:path";
 import type {
   ActivityEvent,
   ApplicationRecord,
-  BlockerRecord,
-  DecisionRecord,
-  ObservationRecord,
-  OperatorMessage,
-  OperatorSession,
-  PhaseWorkspace,
+  Chat,
+  ChatMessage,
+  Decision,
+  Observation,
+  PhaseWorkspaceRecord,
 } from "./types";
 
 type Sqlite = InstanceType<typeof Database>;
@@ -21,7 +20,7 @@ declare global {
   var __serverGuyDb: Sqlite | undefined;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const defaultDbPath = join(process.cwd(), ".server-guy", "server-guy.db");
 
 export function db(): Sqlite {
@@ -35,7 +34,7 @@ function createDatabase(): Sqlite {
   try {
     database.pragma("journal_mode = WAL");
     database.pragma("foreign_keys = ON");
-    migrate(database, databasePath);
+    initializeSchema(database, databasePath);
     return database;
   } catch (error) {
     database.close();
@@ -43,7 +42,7 @@ function createDatabase(): Sqlite {
   }
 }
 
-function migrate(database: Sqlite, databasePath: string) {
+function initializeSchema(database: Sqlite, databasePath: string) {
   const version = database.pragma("user_version", { simple: true }) as number;
   const initialized = Boolean(
     database
@@ -52,7 +51,7 @@ function migrate(database: Sqlite, databasePath: string) {
   );
   if (initialized && version !== SCHEMA_VERSION) {
     throw new Error(
-      `${databasePath} was created by an older Server Guy schema. Delete it to start with a fresh Operator Record.`,
+      `${databasePath} uses an older prototype schema. Delete it and restart Server Guy.`,
     );
   }
 
@@ -73,53 +72,49 @@ function migrate(database: Sqlite, databasePath: string) {
     CREATE TABLE IF NOT EXISTS phase_workspaces (
       id TEXT PRIMARY KEY,
       application_id TEXT NOT NULL,
-      phase_number INTEGER NOT NULL,
-      deliverable TEXT NOT NULL,
-      status TEXT NOT NULL,
+      phase_key TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      UNIQUE(application_id, phase_number),
+      UNIQUE(application_id, phase_key),
       FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS operator_sessions (
+    CREATE TABLE IF NOT EXISTS chats (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
       title TEXT NOT NULL,
       is_primary INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      resolved_at TEXT,
+      archived_at TEXT,
       FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
-      operator_session_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
       role TEXT NOT NULL,
       body TEXT NOT NULL,
       source TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      FOREIGN KEY(operator_session_id) REFERENCES operator_sessions(id) ON DELETE CASCADE
+      FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS decision_records (
+    CREATE TABLE IF NOT EXISTS decisions (
       id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      operator_session_id TEXT NOT NULL,
+      application_id TEXT NOT NULL,
+      source_message_id TEXT NOT NULL,
       kind TEXT NOT NULL,
       label TEXT NOT NULL,
       value TEXT NOT NULL,
+      superseded_by_id TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE,
-      FOREIGN KEY(operator_session_id) REFERENCES operator_sessions(id) ON DELETE RESTRICT
+      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE,
+      FOREIGN KEY(source_message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY(superseded_by_id) REFERENCES decisions(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS observations (
       id TEXT PRIMARY KEY,
       application_id TEXT NOT NULL,
-      workspace_id TEXT NOT NULL,
       kind TEXT NOT NULL,
       status TEXT NOT NULL,
       summary TEXT NOT NULL,
@@ -127,23 +122,7 @@ function migrate(database: Sqlite, databasePath: string) {
       source_url TEXT,
       raw_json TEXT NOT NULL,
       observed_at TEXT NOT NULL,
-      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE,
-      FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS blockers (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      key TEXT NOT NULL,
-      label TEXT NOT NULL,
-      status TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      resolution_path TEXT NOT NULL,
-      required_before_phase INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      resolved_at TEXT,
-      UNIQUE(workspace_id, key),
-      FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
+      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS activity_events (
@@ -156,10 +135,14 @@ function migrate(database: Sqlite, databasePath: string) {
       FOREIGN KEY(workspace_id) REFERENCES phase_workspaces(id) ON DELETE CASCADE
     );
 
-    CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(operator_session_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_decision_records_workspace ON decision_records(workspace_id, created_at);
-    CREATE INDEX IF NOT EXISTS idx_observations_workspace ON observations(workspace_id, observed_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_activity_workspace ON activity_events(workspace_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_messages_chat
+      ON messages(chat_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_decisions_application
+      ON decisions(application_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_observations_application_kind
+      ON observations(application_id, kind, observed_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_activity_workspace
+      ON activity_events(workspace_id, created_at DESC);
   `);
   database.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
@@ -173,11 +156,10 @@ function fromRow<T>(row: Row): T {
   return record as T;
 }
 
-const toSession = (row: Row) =>
-  fromRow<OperatorSession>({ ...row, is_primary: Boolean(row.is_primary) });
+const toChat = (row: Row) => fromRow<Chat>({ ...row, is_primary: Boolean(row.is_primary) });
 
 const toObservation = ({ raw_json, ...row }: Row) =>
-  fromRow<ObservationRecord>({ ...row, raw: JSON.parse(raw_json as string) });
+  fromRow<Observation>({ ...row, raw: JSON.parse(raw_json as string) });
 
 function one<T>(sql: string, params: unknown[], map: (row: Row) => T = fromRow): T | null {
   const row = db().prepare(sql).get(...params) as Row | undefined;
@@ -234,129 +216,126 @@ export function insertApplication(input: Omit<ApplicationRecord, "id" | "created
 // Phase workspaces
 
 export function insertWorkspace(applicationId: string) {
-  const timestamp = now();
+  const id = randomUUID();
   db().prepare(
-    `INSERT INTO phase_workspaces
-      (id, application_id, phase_number, deliverable, status, created_at, updated_at)
-     VALUES (?, ?, 1, 'Launch Brief', 'in-progress', ?, ?)`,
-  ).run(randomUUID(), applicationId, timestamp, timestamp);
+    "INSERT INTO phase_workspaces (id, application_id, phase_key, created_at) VALUES (?, ?, 'start', ?)",
+  ).run(id, applicationId, now());
   return getWorkspace(applicationId)!;
 }
 
 export function getWorkspace(applicationId: string) {
-  return one<PhaseWorkspace>(
-    "SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_number = 1",
+  return one<PhaseWorkspaceRecord>(
+    "SELECT * FROM phase_workspaces WHERE application_id = ? AND phase_key = 'start'",
     [applicationId],
   );
 }
 
-export function updateWorkspaceStatus(id: string, status: PhaseWorkspace["status"]) {
-  db().prepare(
-    "UPDATE phase_workspaces SET status = ?, updated_at = ? WHERE id = ? AND status <> ?",
-  ).run(status, now(), id, status);
-}
+// Chats and messages
 
-// Operator sessions and messages
-
-export function insertOperatorSession(workspaceId: string, title: string, isPrimary = false) {
+export function insertChat(workspaceId: string, title: string, isPrimary = false) {
   const id = randomUUID();
   db().prepare(
-    `INSERT INTO operator_sessions (id, workspace_id, title, is_primary, status, created_at)
-     VALUES (?, ?, ?, ?, 'active', ?)`,
+    "INSERT INTO chats (id, workspace_id, title, is_primary, created_at) VALUES (?, ?, ?, ?, ?)",
   ).run(id, workspaceId, title, isPrimary ? 1 : 0, now());
-  return getOperatorSession(id)!;
+  return getChat(id)!;
 }
 
-export function getOperatorSession(id: string) {
-  return one("SELECT * FROM operator_sessions WHERE id = ?", [id], toSession);
+export function getChat(id: string) {
+  return one("SELECT * FROM chats WHERE id = ?", [id], toChat);
 }
 
-export function listOperatorSessions(workspaceId: string) {
+export function listChats(workspaceId: string) {
   return many(
-    "SELECT * FROM operator_sessions WHERE workspace_id = ? ORDER BY created_at ASC",
+    "SELECT * FROM chats WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC",
     [workspaceId],
-    toSession,
+    toChat,
   );
 }
 
-export function resolveOperatorSession(id: string) {
-  db().prepare("UPDATE operator_sessions SET status = 'resolved', resolved_at = ? WHERE id = ?").run(
-    now(),
-    id,
-  );
+export function archiveChat(id: string) {
+  db().prepare("UPDATE chats SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(now(), id);
 }
 
 export function insertMessage(
-  operatorSessionId: string,
-  role: OperatorMessage["role"],
+  chatId: string,
+  role: ChatMessage["role"],
   body: string,
-  source: OperatorMessage["source"],
+  source: ChatMessage["source"],
 ) {
   const id = randomUUID();
   db().prepare(
-    "INSERT INTO messages (id, operator_session_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(id, operatorSessionId, role, body, source, now());
-  return one<OperatorMessage>("SELECT * FROM messages WHERE id = ?", [id])!;
+    "INSERT INTO messages (id, chat_id, role, body, source, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(id, chatId, role, body, source, now());
+  return one<ChatMessage>("SELECT * FROM messages WHERE id = ?", [id])!;
 }
 
-export function listMessages(operatorSessionId: string) {
-  return many<OperatorMessage>(
-    "SELECT * FROM messages WHERE operator_session_id = ? ORDER BY created_at ASC, rowid ASC",
-    [operatorSessionId],
+export function listMessages(chatId: string) {
+  return many<ChatMessage>(
+    "SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC, rowid ASC",
+    [chatId],
   );
 }
 
 // Decisions
 
 export function insertDecision(input: {
-  workspaceId: string;
-  operatorSessionId: string;
-  kind: DecisionRecord["kind"];
+  applicationId: string;
+  sourceMessageId: string;
+  kind: Decision["kind"];
   label: string;
   value: string;
 }) {
   const id = randomUUID();
-  const timestamp = now();
   db().prepare(
-    `INSERT INTO decision_records
-      (id, workspace_id, operator_session_id, kind, label, value, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO decisions
+      (id, application_id, source_message_id, kind, label, value, superseded_by_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
   ).run(
     id,
-    input.workspaceId,
-    input.operatorSessionId,
+    input.applicationId,
+    input.sourceMessageId,
     input.kind,
     input.label,
     input.value,
-    timestamp,
-    timestamp,
+    now(),
   );
   return getDecision(id)!;
 }
 
 export function getDecision(id: string) {
-  return one<DecisionRecord>("SELECT * FROM decision_records WHERE id = ?", [id]);
+  return one<Decision>("SELECT * FROM decisions WHERE id = ?", [id]);
 }
 
-export function listDecisions(workspaceId: string) {
-  return many<DecisionRecord>(
-    "SELECT * FROM decision_records WHERE workspace_id = ? ORDER BY created_at ASC, rowid ASC",
-    [workspaceId],
+export function listActiveDecisions(applicationId: string) {
+  return many<Decision>(
+    `SELECT * FROM decisions
+     WHERE application_id = ? AND superseded_by_id IS NULL
+     ORDER BY created_at ASC, rowid ASC`,
+    [applicationId],
   );
+}
+
+export function supersedeDecision(applicationId: string, previousId: string, replacementId: string) {
+  const result = db().prepare(
+    `UPDATE decisions SET superseded_by_id = ?
+     WHERE id = ? AND application_id = ? AND superseded_by_id IS NULL`,
+  ).run(replacementId, previousId, applicationId);
+  if (result.changes !== 1) {
+    throw new Error("The Decision being corrected is missing, already replaced, or belongs to another application.");
+  }
 }
 
 // Observations
 
-export function insertObservation(input: Omit<ObservationRecord, "id" | "observedAt">) {
+export function insertObservation(input: Omit<Observation, "id" | "observedAt">) {
   const id = randomUUID();
   db().prepare(
     `INSERT INTO observations
-      (id, application_id, workspace_id, kind, status, summary, source_label, source_url, raw_json, observed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, application_id, kind, status, summary, source_label, source_url, raw_json, observed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.applicationId,
-    input.workspaceId,
     input.kind,
     input.status,
     input.summary,
@@ -372,57 +351,25 @@ export function getObservation(id: string) {
   return one("SELECT * FROM observations WHERE id = ?", [id], toObservation);
 }
 
-export function latestObservation(workspaceId: string, kind: string) {
+export function latestObservation(applicationId: string, kind: string) {
   return one(
-    "SELECT * FROM observations WHERE workspace_id = ? AND kind = ? ORDER BY observed_at DESC, rowid DESC LIMIT 1",
-    [workspaceId, kind],
+    `SELECT * FROM observations
+     WHERE application_id = ? AND kind = ?
+     ORDER BY observed_at DESC, rowid DESC LIMIT 1`,
+    [applicationId, kind],
     toObservation,
   );
 }
 
-export function listObservations(workspaceId: string) {
+export function listObservations(applicationId: string) {
   return many(
-    "SELECT * FROM observations WHERE workspace_id = ? ORDER BY observed_at DESC, rowid DESC",
-    [workspaceId],
+    "SELECT * FROM observations WHERE application_id = ? ORDER BY observed_at DESC, rowid DESC",
+    [applicationId],
     toObservation,
   );
 }
 
-// Blockers and activity
-
-export function upsertBlocker(input: Omit<BlockerRecord, "id" | "createdAt" | "resolvedAt">) {
-  const timestamp = now();
-  db().prepare(
-    `INSERT INTO blockers
-      (id, workspace_id, key, label, status, owner, resolution_path, required_before_phase, created_at, resolved_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-     ON CONFLICT(workspace_id, key) DO UPDATE SET
-       label = excluded.label,
-       status = excluded.status,
-       owner = excluded.owner,
-       resolution_path = excluded.resolution_path,
-       required_before_phase = excluded.required_before_phase,
-       resolved_at = CASE WHEN excluded.status = 'resolved' THEN ? ELSE NULL END`,
-  ).run(
-    randomUUID(),
-    input.workspaceId,
-    input.key,
-    input.label,
-    input.status,
-    input.owner,
-    input.resolutionPath,
-    input.requiredBeforePhase,
-    timestamp,
-    timestamp,
-  );
-}
-
-export function listBlockers(workspaceId: string) {
-  return many<BlockerRecord>(
-    "SELECT * FROM blockers WHERE workspace_id = ? ORDER BY required_before_phase, created_at",
-    [workspaceId],
-  );
-}
+// Activity
 
 export function insertActivity(workspaceId: string, kind: string, summary: string, detail: string) {
   db().prepare(
@@ -432,7 +379,7 @@ export function insertActivity(workspaceId: string, kind: string, summary: strin
 
 export function listActivity(workspaceId: string) {
   return many<ActivityEvent>(
-    "SELECT * FROM activity_events WHERE workspace_id = ? ORDER BY created_at DESC",
+    "SELECT * FROM activity_events WHERE workspace_id = ? ORDER BY created_at DESC, rowid DESC",
     [workspaceId],
   );
 }

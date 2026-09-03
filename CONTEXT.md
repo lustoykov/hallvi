@@ -8,17 +8,13 @@ Canonical product language for Server Guy's deployment and operations domain.
 An operating model in which Pi handles interpretation, ambiguity, diagnosis, and plan revision while Server Guy supplies durable context, tools, observations, resumability, approval behavior, and inspectable execution. A model-native product may still use deterministic procedures wherever the next valid operation follows from explicit desired state and fresh observations.
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
-**Operator Session**:
-A durable, application-scoped chat and activity thread between the engineer and Pi. A Launch Phase may contain many Operator Sessions, all contributing to the same Phase Workspace and Operator Record. A session can be started, resumed, resolved, or made read-only without losing its recorded outcomes.
-_Avoid_: Chat session, workflow run, pipeline execution
+**Chat**:
+A durable conversation between the engineer and Pi inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
+_Avoid_: Operator Session, workflow run, pipeline execution
 
 **Phase Workspace**:
-The durable collaboration boundary for one Launch Phase, containing its Phase Deliverable, Exit Gate, shared operational context, and every Operator Session created to complete that phase. Completing the phase makes its sessions read-only together; no single session owns phase progress.
-_Avoid_: Phase chat, workflow run, second Operator Record
-
-**Operator Record**:
-The shared, structured operational state of an application, including recognized decisions, current resources, approvals, blockers, and evidence. Operator Sessions may update it, but archiving a session does not remove its recorded outcomes.
-_Avoid_: Chat transcript, dashboard state
+The durable collaboration boundary for one Launch Phase, containing every Chat created to produce the shared Phase Deliverable and satisfy its Exit Gate. Completing the phase makes its Chats read-only together; no single Chat owns phase progress.
+_Avoid_: Phase chat, workflow run, second application record
 
 **Launch Phase**:
 A user-visible segment of Application Launch organized around one Phase Workspace, one Phase Deliverable, and one Exit Gate. It describes progress for the engineer without prescribing Pi's internal reasoning sequence.
@@ -32,32 +28,36 @@ _Avoid_: Task list, phase goal
 The small set of observable conditions that must be satisfied before Application Launch advances to the next Launch Phase. An unmet condition remains visible as waiting or blocked rather than being treated as progress.
 _Avoid_: Vague completion, confidence score, checklist progress
 
+**Gate Requirement**:
+A stable product rule defining one condition that must be satisfied before an Exit Gate passes. It names the required evidence but is not itself application state.
+_Avoid_: Gate Check result, database rule, manual checkbox
+
 **Gate Check**:
 One observable condition inside an Exit Gate whose current result is recomputed from its source and supporting evidence. Its human-readable condition is its name; any stable identifier is only a reference for records and evidence. It is not a decision and cannot be manually marked as passed.
 _Avoid_: Decision, manual checkbox, confidence judgment, internal reference as the name
 
-**Decision Record**:
-A durable, revisable choice or constraint recognized from an Operator Session and stored with its origin and affected scope.
+**Decision**:
+A durable, revisable choice or constraint recognized from a Chat and stored with its originating message and affected application. A replacement supersedes the prior Decision without erasing its history.
 _Avoid_: Chat message, Gate Check, application configuration, product rule, permanent preference
 
 **Control Point**:
-A user-facing path from a Decision Record, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.
+A user-facing path from a Decision, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.
 _Avoid_: Help tooltip, status override
 
 **Operator Takeover**:
 The engineer or an External Agent Client inspecting and changing the underlying decision, repository, configuration, or provider state before Server Guy re-verifies the result.
 _Avoid_: Manual pass, bypass, leaving Server Guy
 
-**Session Event**:
-A recorded item in an Operator Session, such as Pi's visible intent, a tool call, command result, Observation, conclusion, approval, or recovery assessment.
+**Activity Event**:
+A durable historical item such as a Chat creation, tool call, command result, Decision change, Observation, approval, or recovery assessment.
 _Avoid_: Chain of thought, raw agent trace
 
 **Operator View**:
-The structured UI projection of an Operator Session, combining conversation, current activity, timelines, evidence, approvals, and application status.
-_Avoid_: Chat window, agent transcript
+The generated application view combining the selected Chat, current Decisions, Observations, Gate Checks, upcoming requirements, and activity. It is rebuilt from durable records rather than stored as one polymorphic record.
+_Avoid_: Operator Record, Chat transcript, dashboard state
 
 **Operator UI**:
-The engineer-facing interface for viewing and controlling Server Guy's applications, Operator Sessions, Releases, Incident Cases, integrations, and evidence.
+The engineer-facing interface for viewing and controlling Server Guy's applications, Chats, Releases, Incident Cases, integrations, and evidence.
 _Avoid_: Control plane, dashboard
 
 **Operational Control Plane**:
@@ -65,7 +65,7 @@ The authoritative system of record and execution coordination for application st
 _Avoid_: Operator UI, dashboard
 
 **Guided Operation**:
-A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside an Operator Session rather than controlling the overall session.
+A bounded, ordered subflow used when an operational procedure itself requires a stable protocol; it exists inside a Chat rather than controlling the overall conversation.
 _Avoid_: Main workflow, agent pipeline
 
 **Launch Reconciliation**:
@@ -85,7 +85,7 @@ A durable record of one intended external effect, including its subject, actor, 
 _Avoid_: Workflow run, agent step, tool call
 
 **Blocker**:
-A precise unresolved condition preventing an Operation or Exit Gate from advancing, including its affected scope, supporting evidence, owner, and possible resolutions.
+A precise explanation derived when an unresolved condition prevents an Operation or Exit Gate from advancing, including its affected scope, supporting evidence, owner, and possible resolutions.
 _Avoid_: Generic error, vague risk, failed task
 
 **Application Profile**:
@@ -137,7 +137,7 @@ A source-attributed, timestamped operational fact such as a probe result, log ev
 _Avoid_: Finding, Diagnosis, evidence claim
 
 **Operational Claim**:
-A user-visible assertion about an application's current or past operational state, such as “public health check passed” or “Release verified.” It must cite the Observations, Decision Records, or receipts that support it and must not imply more certainty or duration than those sources establish.
+A user-visible assertion about an application's current or past operational state, such as “public health check passed” or “Release verified.” It must cite the Observations, Decisions, or receipts that support it and must not imply more certainty or duration than those sources establish.
 _Avoid_: Observation, source fact, unsupported status
 
 **Evidence Reference**:

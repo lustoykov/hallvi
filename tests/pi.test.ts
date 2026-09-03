@@ -17,6 +17,29 @@ describe("parsePiReply", () => {
     });
   });
 
+  it("accepts an exact Decision replacement reference", () => {
+    expect(
+      parsePiReply(
+        JSON.stringify({
+          message: "I corrected the priority.",
+          decisions: [
+            {
+              kind: "launch-priority",
+              value: "Prefer predictable cost",
+              replaces: "decision-id",
+            },
+          ],
+        }),
+      ).decisions,
+    ).toEqual([
+      {
+        kind: "launch-priority",
+        value: "Prefer predictable cost",
+        replaces: "decision-id",
+      },
+    ]);
+  });
+
   it("drops unsupported or malformed decisions", () => {
     expect(
       parsePiReply(
@@ -27,6 +50,7 @@ describe("parsePiReply", () => {
             { kind: "target-environment", value: "staging" },
             { kind: "approval-mode", value: "full-autonomy" },
             { kind: ["launch-priority"], value: "bypass kind validation" },
+            { kind: "launch-priority", value: "bad replacement", replaces: 42 },
           ],
         }),
       ).decisions,

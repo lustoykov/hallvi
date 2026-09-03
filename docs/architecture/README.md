@@ -18,4 +18,4 @@ Then open `http://127.0.0.1:8765/docs/architecture/` and select the PR artifact.
 
 Current explanations:
 
-- [PR #1 — Journey 1 Phase 1](pr-001-journey-1-phase-1.html)
+- [Journey 1 Phase 1 — current simplified architecture](pr-001-journey-1-phase-1.html)

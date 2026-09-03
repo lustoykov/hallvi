@@ -1,36 +1,42 @@
 import {
+  archiveChat as archiveChatRecord,
   getApplication,
   getApplicationByRepository,
+  getChat,
+  getDecision,
   getLatestApplication,
-  getOperatorSession,
   getWorkspace,
   insertActivity,
   insertApplication,
+  insertChat,
   insertDecision,
   insertMessage,
   insertObservation,
-  insertOperatorSession,
   insertWorkspace,
   latestObservation,
+  listActiveDecisions,
   listActivity,
-  listBlockers,
-  listDecisions,
+  listChats,
   listMessages,
   listObservations,
-  listOperatorSessions,
-  resolveOperatorSession,
-  updateWorkspaceStatus,
-  upsertBlocker,
+  supersedeDecision,
   withTransaction,
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
-import { APPROVAL_MODE_LABELS, PREREQUISITES, computeChecks } from "./phase-one-spec";
+import {
+  APPROVAL_MODE_LABELS,
+  PHASE_ONE,
+  computeChecks,
+  deriveUpcomingRequirements,
+} from "./phase-one-spec";
 import { askPi } from "./pi";
 import type {
   ApplicationRecord,
   CreateApplicationInput,
+  GateCheck,
   PhaseOneOperatorView,
-  PhaseWorkspace,
+  PhaseWorkspaceRecord,
+  PhaseWorkspaceView,
   PiDecision,
 } from "./types";
 
@@ -46,26 +52,32 @@ function loadWorkspace(applicationId: string) {
   return { application, workspace };
 }
 
-function loadSession(applicationId: string, sessionId: string) {
+function loadChat(applicationId: string, chatId: string) {
   const { application, workspace } = loadWorkspace(applicationId);
-  const session = getOperatorSession(sessionId);
-  if (!session || session.workspaceId !== workspace.id) {
-    throw new NotFoundError("Operator Session not found.");
+  const chat = getChat(chatId);
+  if (!chat || chat.workspaceId !== workspace.id) {
+    throw new NotFoundError("Chat not found.");
   }
-  return { application, workspace, session };
+  return { application, workspace, chat };
 }
 
-function currentChecks(application: ApplicationRecord, workspace: PhaseWorkspace) {
+function currentChecks(application: ApplicationRecord) {
   return computeChecks(
     application,
-    latestObservation(workspace.id, REPOSITORY_OBSERVATION),
-    listBlockers(workspace.id),
+    latestObservation(application.id, REPOSITORY_OBSERVATION),
   );
 }
 
-function refreshCompletion(application: ApplicationRecord, workspace: PhaseWorkspace) {
-  const complete = currentChecks(application, workspace).every((check) => check.status === "passed");
-  updateWorkspaceStatus(workspace.id, complete ? "ready" : "in-progress");
+function workspaceView(
+  workspace: PhaseWorkspaceRecord,
+  checks: GateCheck[],
+): PhaseWorkspaceView {
+  return {
+    ...workspace,
+    phaseNumber: PHASE_ONE.number,
+    deliverable: PHASE_ONE.deliverable,
+    status: checks.every((check) => check.status === "passed") ? "ready" : "in-progress",
+  };
 }
 
 export async function createPhaseOneApplication(input: CreateApplicationInput) {
@@ -80,7 +92,7 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   if (existing) {
     if (existing.approvalMode !== input.approvalMode) {
       throw new ExistingApplicationConflictError(
-        `A launch workspace already exists for this repository with ${APPROVAL_MODE_LABELS[existing.approvalMode]}. Open that workspace instead of replacing its permission policy.`,
+        `An application already exists for this repository with ${APPROVAL_MODE_LABELS[existing.approvalMode]}. Open it instead of replacing its permission policy.`,
       );
     }
     return { view: getPhaseOneOperatorView(existing.id), created: false };
@@ -97,16 +109,12 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
       approvalScope: "Current application launch",
     });
     const workspace = insertWorkspace(application.id);
-    const session = insertOperatorSession(workspace.id, "Launch Brief", true);
-
-    for (const prerequisite of PREREQUISITES) {
-      upsertBlocker({ workspaceId: workspace.id, ...prerequisite, status: "open" });
-    }
+    const chat = insertChat(workspace.id, "Launch Brief", true);
 
     insertMessage(
-      session.id,
+      chat.id,
       "assistant",
-      `I created the ${repository.name} launch workspace. I’m checking the exact GitHub repository identity now. No code, infrastructure, domain, or paid resource has been changed.`,
+      `I created the ${repository.name} application. I’m checking the exact GitHub repository identity now. No code, infrastructure, domain, or paid resource has been changed.`,
       "server-guy",
     );
     insertActivity(
@@ -124,7 +132,6 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
 
 export async function observeRepository(applicationId: string) {
   const { application, workspace } = loadWorkspace(applicationId);
-
   const result = await inspectGithubRepository({
     owner: application.repositoryOwner,
     name: application.repositoryName,
@@ -133,7 +140,6 @@ export async function observeRepository(applicationId: string) {
 
   const observation = insertObservation({
     applicationId: application.id,
-    workspaceId: workspace.id,
     kind: REPOSITORY_OBSERVATION,
     status: result.status,
     summary: result.summary,
@@ -147,13 +153,12 @@ export async function observeRepository(applicationId: string) {
     result.status === "passed" ? "Repository identity recorded" : "Repository check did not pass",
     observation.summary,
   );
-  refreshCompletion(application, workspace);
   return observation;
 }
 
 export function getPhaseOneOperatorView(
   applicationId?: string,
-  sessionId?: string,
+  chatId?: string,
 ): PhaseOneOperatorView {
   const application = applicationId ? getApplication(applicationId) : getLatestApplication();
   const workspace = application ? getWorkspace(application.id) : null;
@@ -161,61 +166,59 @@ export function getPhaseOneOperatorView(
     return {
       application: null,
       workspace: null,
-      sessions: [],
-      activeSessionId: null,
+      chats: [],
+      selectedChatId: null,
       messages: [],
       checks: [],
       decisions: [],
       observations: [],
-      blockers: [],
+      upcomingRequirements: deriveUpcomingRequirements(),
       activity: [],
     };
   }
 
-  const sessions = listOperatorSessions(workspace.id);
-  const active =
-    (sessionId ? sessions.find((session) => session.id === sessionId) : null) ??
-    sessions.find((session) => session.status === "active" && session.isPrimary) ??
-    sessions.find((session) => session.status === "active") ??
-    sessions[0] ??
+  const checks = currentChecks(application);
+  const chats = listChats(workspace.id);
+  const selected =
+    (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
+    chats.find((chat) => !chat.archivedAt && chat.isPrimary) ??
+    chats.find((chat) => !chat.archivedAt) ??
+    chats[0] ??
     null;
 
   return {
     application,
-    workspace,
-    sessions,
-    activeSessionId: active?.id ?? null,
-    messages: active ? listMessages(active.id) : [],
-    checks: currentChecks(application, workspace),
-    decisions: listDecisions(workspace.id),
-    observations: listObservations(workspace.id),
-    blockers: listBlockers(workspace.id),
+    workspace: workspaceView(workspace, checks),
+    chats,
+    selectedChatId: selected?.id ?? null,
+    messages: selected ? listMessages(selected.id) : [],
+    checks,
+    decisions: listActiveDecisions(application.id),
+    observations: listObservations(application.id),
+    upcomingRequirements: deriveUpcomingRequirements(),
     activity: listActivity(workspace.id),
   };
 }
 
-export function createOperatorSession(applicationId: string, title?: string) {
+export function createChat(applicationId: string, title?: string) {
   const { application, workspace } = loadWorkspace(applicationId);
-  const sessionNumber = listOperatorSessions(workspace.id).length + 1;
-  const session = insertOperatorSession(
-    workspace.id,
-    title?.trim() || `Launch question ${sessionNumber}`,
-  );
+  const chatNumber = listChats(workspace.id).length + 1;
+  const chat = insertChat(workspace.id, title?.trim() || `Launch question ${chatNumber}`);
   insertMessage(
-    session.id,
+    chat.id,
     "assistant",
-    "This is a separate conversation for the same Launch Brief. I can see the shared record and checks, but this transcript starts fresh.",
+    "This is a separate Chat for the same Launch Brief. I can see the shared Operator View and checks, but this transcript starts fresh.",
     "server-guy",
   );
-  insertActivity(workspace.id, "operator-session-created", "Operator Session created", session.title);
-  return getPhaseOneOperatorView(application.id, session.id);
+  insertActivity(workspace.id, "chat-created", "Chat created", chat.title);
+  return getPhaseOneOperatorView(application.id, chat.id);
 }
 
-export function archiveOperatorSession(applicationId: string, sessionId: string) {
-  const { application, workspace, session } = loadSession(applicationId, sessionId);
-  if (session.isPrimary) throw new Error("The main Launch Brief chat stays with Phase 1.");
-  resolveOperatorSession(session.id);
-  insertActivity(workspace.id, "operator-session-archived", "Operator Session archived", session.title);
+export function archiveChat(applicationId: string, chatId: string) {
+  const { application, workspace, chat } = loadChat(applicationId, chatId);
+  if (chat.isPrimary) throw new Error("The main Launch Brief Chat stays with Phase 1.");
+  archiveChatRecord(chat.id);
+  insertActivity(workspace.id, "chat-archived", "Chat archived", chat.title);
   return getPhaseOneOperatorView(application.id);
 }
 
@@ -223,53 +226,79 @@ function decisionLabel(decision: PiDecision) {
   return { "launch-priority": "Additional launch priority" }[decision.kind];
 }
 
-export async function sendOperatorMessage(applicationId: string, sessionId: string, body: string) {
-  const { application, workspace, session } = loadSession(applicationId, sessionId);
-  if (session.status !== "active") throw new Error("This chat is archived.");
-  const userMessage = body.trim();
-  if (!userMessage) throw new Error("Write a message first.");
-  if (userMessage.length > 5_000) throw new Error("Keep this message under 5,000 characters.");
-
-  const openBlockers = listBlockers(workspace.id).filter((blocker) => blocker.status === "open");
-  const recordSummary = [
+function buildViewSummary(application: ApplicationRecord) {
+  const checks = currentChecks(application);
+  const upcoming = deriveUpcomingRequirements();
+  return [
     `Application: ${application.name}`,
     `Repository: ${application.repositoryUrl}`,
     "Environment: Production",
     `Permission policy: ${APPROVAL_MODE_LABELS[application.approvalMode]}`,
-    `Checks: ${currentChecks(application, workspace)
-      .map((check) => `${check.label}=${check.status}`)
-      .join("; ")}`,
-    `Known later blockers: ${openBlockers
-      .map((blocker) => `${blocker.label} before Phase ${blocker.requiredBeforePhase}`)
+    `Checks: ${checks.map((check) => `${check.label}=${check.status}`).join("; ")}`,
+    `Upcoming requirements: ${upcoming
+      .map((requirement) => `${requirement.label} before Phase ${requirement.requiredBeforePhase}`)
       .join("; ")}`,
   ].join("\n");
+}
 
+export async function sendChatMessage(applicationId: string, chatId: string, body: string) {
+  const { application, workspace, chat } = loadChat(applicationId, chatId);
+  if (chat.archivedAt) throw new Error("This Chat is archived.");
+  const userMessage = body.trim();
+  if (!userMessage) throw new Error("Write a message first.");
+  if (userMessage.length > 5_000) throw new Error("Keep this message under 5,000 characters.");
+
+  const decisions = listActiveDecisions(application.id);
   const reply = await askPi({
     userMessage,
-    messages: listMessages(session.id),
-    decisions: listDecisions(workspace.id),
-    recordSummary,
+    messages: listMessages(chat.id),
+    decisions,
+    viewSummary: buildViewSummary(application),
   });
 
   withTransaction(() => {
-    insertMessage(session.id, "user", userMessage, "user");
-    insertMessage(session.id, "assistant", reply.message, "pi");
-    for (const decision of reply.decisions) {
-      insertDecision({
-        workspaceId: workspace.id,
-        operatorSessionId: session.id,
-        kind: decision.kind,
-        label: decisionLabel(decision),
-        value: decision.value,
+    const sourceMessage = insertMessage(chat.id, "user", userMessage, "user");
+    insertMessage(chat.id, "assistant", reply.message, "pi");
+
+    for (const proposed of reply.decisions) {
+      const previous = proposed.replaces ? getDecision(proposed.replaces) : null;
+      if (
+        proposed.replaces &&
+        (!previous ||
+          previous.applicationId !== application.id ||
+          previous.supersededById !== null)
+      ) {
+        throw new Error(
+          "Pi referenced a Decision that is missing, already replaced, or belongs to another application.",
+        );
+      }
+
+      const decision = insertDecision({
+        applicationId: application.id,
+        sourceMessageId: sourceMessage.id,
+        kind: proposed.kind,
+        label: decisionLabel(proposed),
+        value: proposed.value,
       });
-      insertActivity(
-        workspace.id,
-        "decision-recorded",
-        "Decision recorded from Operator Session",
-        `${decisionLabel(decision)}: ${decision.value}`,
-      );
+
+      if (previous) {
+        supersedeDecision(application.id, previous.id, decision.id);
+        insertActivity(
+          workspace.id,
+          "decision-revised",
+          "Decision revised from Chat",
+          `${previous.value} → ${decision.value}`,
+        );
+      } else {
+        insertActivity(
+          workspace.id,
+          "decision-recorded",
+          "Decision recorded from Chat",
+          `${decision.label}: ${decision.value}`,
+        );
+      }
     }
   });
 
-  return getPhaseOneOperatorView(application.id, session.id);
+  return getPhaseOneOperatorView(application.id, chat.id);
 }

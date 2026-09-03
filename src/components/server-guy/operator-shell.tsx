@@ -18,10 +18,7 @@ function initialChecks(): GateCheck[] {
     ...check,
     status: "not-yet",
     result: "Create the application workspace to evaluate this check.",
-    sourceLabel: null,
-    sourceUrl: null,
-    observationId: null,
-    observedAt: null,
+    evidence: [],
     canRerun: false,
   }));
 }
@@ -35,7 +32,7 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
 
   const application = view.application;
   const checks = view.checks.length ? view.checks : initialChecks();
-  const activeSession = view.sessions.find((session) => session.id === view.activeSessionId) ?? null;
+  const activeChat = view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
   const selectedCheck = checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
 
@@ -62,31 +59,31 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
     void run("create", () => api.createApplication(input));
   }
 
-  function selectSession(sessionId: string) {
-    if (!application || sessionId === view.activeSessionId) return;
-    void run("session", () => api.view(application.id, sessionId));
+  function selectChat(chatId: string) {
+    if (!application || chatId === view.selectedChatId) return;
+    void run("chat", () => api.view(application.id, chatId));
   }
 
-  function createOperatorSession() {
+  function createChat() {
     if (!application) return;
-    void run("new-chat", () => api.createSession(application.id));
+    void run("new-chat", () => api.createChat(application.id));
   }
 
-  function archiveActiveSession() {
-    if (!application || !activeSession || activeSession.isPrimary) return;
-    void run("archive", () => api.archiveSession(application.id, activeSession.id));
+  function archiveActiveChat() {
+    if (!application || !activeChat || activeChat.isPrimary) return;
+    void run("archive", () => api.archiveChat(application.id, activeChat.id));
   }
 
   function sendMessage() {
     const message = composer.trim();
-    if (busy || !application || !activeSession || !message) return;
+    if (busy || !application || !activeChat || !message) return;
     setComposer("");
     void run(
       "message",
-      () => api.sendMessage(application.id, activeSession.id, message),
+      () => api.sendMessage(application.id, activeChat.id, message),
       async () => {
         setComposer((current) => current || message);
-        const refreshed = await api.view(application.id, activeSession.id).catch(() => null);
+        const refreshed = await api.view(application.id, activeChat.id).catch(() => null);
         if (refreshed) setView(refreshed);
       },
     );
@@ -130,20 +127,20 @@ export function OperatorShell({ initialView }: { initialView: PhaseOneOperatorVi
 
       <section className="sg-workspace">
         <ChatList
-          activeSessionId={view.activeSessionId}
           busy={busy !== null}
+          chats={view.chats}
           hasApplication={application !== null}
-          onCreate={createOperatorSession}
-          onSelect={selectSession}
-          sessions={view.sessions}
+          onCreate={createChat}
+          onSelect={selectChat}
+          selectedChatId={view.selectedChatId}
         />
         <ChatPane
-          activeSession={activeSession}
+          activeChat={activeChat}
           busy={busy}
           checks={checks}
           composer={composer}
           error={error}
-          onArchive={archiveActiveSession}
+          onArchive={archiveActiveChat}
           onComposerChange={setComposer}
           onCreateApplication={createApplication}
           onSend={sendMessage}

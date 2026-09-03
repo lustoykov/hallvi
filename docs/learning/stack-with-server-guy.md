@@ -2,7 +2,7 @@
 
 **Status:** Living learning guide
 
-**Last revised:** 2026-09-01
+**Last revised:** 2026-09-03
 
 **Canonical stack:** [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
 
@@ -28,8 +28,8 @@ Installing a dependency does not demonstrate that capability.
                   ┌────────────────┴────────────────┐
                   │                                 │
          TypeScript agent app              Python service/app
-      Next.js · AI SDK · Zod           FastAPI · Pydantic AI
-      Workflow DevKit · Drizzle        SQLAlchemy · Alembic
+       Next.js · Pi · Zod              FastAPI · Pydantic AI
+       Node worker · Drizzle            SQLAlchemy · Alembic
       PostgreSQL                       asyncio worker · PostgreSQL
                   │                                 │
                   └────────── Docker contract ──────┘
@@ -52,7 +52,7 @@ Next.js
 ├── Operator UI
 ├── Route Handlers
 ├── Phase 1 domain logic
-├── SQLite Operator Record
+├── SQLite durable records
 ├── GitHub adapter
 └── Pi SDK adapter
 ```
@@ -65,9 +65,9 @@ It already provides direct practice with:
 - GitHub integration and source-attributed Observations;
 - idempotent intake, policy conflicts, provenance stability, and malformed-model-output tests.
 
-Pi's model comes from Pi's own configuration; Server Guy does not currently select a provider or model tier.
+Pi is Server Guy's only model and agent runtime. Explicit Pi setup is a Phase 1 follow-up; the initial default will be `openai-codex`, `gpt-5.6-sol`, with `high` reasoning effort.
 
-It does **not** yet provide direct practice with the stack's default model provider through AI SDK, AI SDK Core, Zod, PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, a Fastify service, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience.
+It does **not** yet provide direct practice with Zod, PostgreSQL/Drizzle, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
 The current modular monolith is the right product architecture. Do not add a separate API service or worker until a real request-lifetime, retry, timer, concurrency, or crash-survival requirement demands one.
 
@@ -111,14 +111,11 @@ Test at least these cases:
 - model output containing invented repository facts;
 - a model timeout or malformed structured response.
 
-### AI SDK comparison
+### Pi runtime boundary
 
-Server Guy currently uses Pi. Do not replace it merely to match `STACK.md`.
+Server Guy calls Pi directly. Application code supplies a bounded prompt, validates Pi's structured reply, and commits only accepted messages and Decisions. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
-Implement the same bounded extraction once with AI SDK Core and the same Zod contract. Use the stack's default provider for the comparison, currently OpenAI through AI SDK's OpenAI provider on the Responses API, and keep the provider and model identifiers in configuration so the comparison also proves that a provider change is a configuration change. Compare structured output, cancellation, telemetry, error behavior, and testability. Merge the alternative only if the evidence shows that it improves Server Guy. Until then:
-
-- agent-system capability: practiced through Pi;
-- AI SDK Core and the default model provider: practiced only when the comparison or a managed TypeScript application uses them.
+Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed run and event records, a Node worker, and a reconnectable HTTP stream. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 
 ## The central reliability exercise: one durable Operation
 
@@ -146,7 +143,7 @@ At minimum, an Operation records:
 - reconciliation result;
 - recovery or operator-action state.
 
-The Operator Record is the system of record. Every step that takes an external effect writes its intent, approval, receipt, and outcome there, so a run can be reconciled, replaced, or audited without any workflow engine. If Workflow DevKit is introduced later, its event log is never the system of record.
+Server Guy's durable application records are the system of record. Every step that takes an external effect writes its intent, approval, receipt, and outcome there, so a run can be reconciled, replaced, or audited without any workflow engine. If Workflow DevKit is introduced later, its event log is never the system of record.
 
 ### Required failure drill
 
@@ -185,7 +182,7 @@ Develop the UI and deterministic domain behavior. `npm run dev` is a development
 
 ### 2. Production-like local Docker
 
-Run the controller, database, and, once it exists, the Fastify workflow service with declared ports, health checks, validated configuration, persistent volumes, migrations, structured logs, and restart tests.
+Run the controller, database, and, once it exists, the Node worker with declared ports, health checks, validated configuration, persistent volumes, migrations, structured logs, and restart tests.
 
 ### 3. Always-on user-owned or home server
 
@@ -197,7 +194,7 @@ Exercise DNS, TLS, external health checks, monitoring, immutable image-based rel
 
 ### 5. Managed-platform lab
 
-Deploy one bounded TypeScript application through Vercel and Supabase to learn previews, runtime constraints, managed Auth/Storage/PostgreSQL behavior, and platform rollback. Run its durable agent loop as a Workflow DevKit workflow in the Vercel World. Server Guy does not need to become a managed-cloud product.
+Deploy one bounded TypeScript application through Vercel and Supabase to learn previews, runtime constraints, managed Auth/Storage/PostgreSQL behavior, and platform rollback. A Workflow DevKit lab may be added when the application has a real durability trigger. Server Guy does not need to become a managed-cloud product.
 
 ### 6. Guided AWS lab
 
@@ -210,10 +207,10 @@ Manually deploy the same application through GitHub Actions → ECR → ECS/Farg
 Build or select one small but real agent application using:
 
 - React and Next.js App Router;
-- AI SDK UI streaming that returns a run ID, reconnects from the last index, and recovers state from PostgreSQL rather than from the stream;
-- AI SDK Core with the stack's default model provider configured, not hard-coded;
+- Pi as the direct agent runtime, with its provider and model selected through explicit configuration;
+- streaming that returns a run ID, reconnects from the last event, and recovers state from PostgreSQL rather than from the stream;
 - Zod tool and output contracts;
-- a Workflow DevKit agent loop whose model calls, tool executions, and authoritative writes are `"use step"` units, with `needsApproval` waits for approvals;
+- a plain durable worker first; add a Workflow DevKit loop only after a concrete trigger proves it reduces operational complexity;
 - PostgreSQL and Drizzle, with `supabase-js` only on the managed path;
 - Vitest plus repository-owned evals, Promptfoo matrices gating CI, and Playwright for the streaming and approval flows;
 - pnpm, pinned Node LTS, and Biome;
@@ -236,14 +233,15 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | Capability or tool | Trigger |
 | --- | --- |
 | **PostgreSQL + Drizzle** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same domain invariants and rerun the same tests. |
-| **Workflow DevKit in a Fastify service** | Introduce when monitoring, timers, autonomous retries, or crash-surviving reconciliation can no longer remain request-bound. Run the work as Workflow DevKit workflows in the Postgres World inside a containerized Fastify service, which requires PostgreSQL first. The Operator Record stays the system of record; the workflow event log never is. |
-| **Run-ID streaming** | Introduce when a Pi turn outlives one request or the Operator View must survive a reload mid-turn: the request returns a run ID, the UI streams and reconnects from its last index, and state is recovered from the Operator Record rather than from the stream. |
+| **SQLite + Node worker** | Introduce when a Pi turn outlives one request: persist runs and events, claim work idempotently, and recover after disconnects or process restarts. |
+| **Workflow DevKit** | Re-evaluate when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate. Durable application records remain authoritative. |
+| **Run-ID streaming** | Introduce with the durable Pi worker: the request returns a run ID, the UI reconnects from its last event, and state is recovered from durable run records rather than from the stream. |
 | **Structured logs + OpenTelemetry** | Add before the first multi-component operation; propagate one trace ID through model, domain, provider, and verification boundaries. |
 | **Langfuse** | Add for model and agent traces/evaluations after telemetry is instrumented. Installation alone does not produce useful traces. |
 | **Sentry** | Add when external users receive releases and application exceptions need release-aware grouping. |
 | **Promptfoo** | Add when prompt/model matrices, adversarial suites, or CI gates are valuable beyond repository-owned fixtures. |
 | **MCP** | Add a basic, least-privilege interface when an External Agent Client needs bounded Server Guy observations or operations. |
-| **PostgreSQL full-text search** | Add when the Operator Record becomes difficult to search with ordinary queries. |
+| **PostgreSQL full-text search** | Add when durable application records become difficult to search with ordinary queries. |
 | **pgvector** | Add only after measured retrieval quality justifies semantic or hybrid retrieval, using the stack's default embedding model; add a reranker only when measured retrieval quality justifies it. |
 | **Playwright** | Add when the Operator UI has a streaming or approval flow worth an end-to-end test, starting with the first approved Operation. |
 | **pnpm and Biome** | Practice through the managed TypeScript application; do not churn Server Guy's npm and ESLint setup without a concrete reason. |
@@ -270,7 +268,7 @@ Use the same correlation identity across:
 - Langfuse for model and agent behavior;
 - OpenTelemetry and structured logs for runtime operations;
 - Sentry for release-aware application exceptions;
-- the Operator Record for durable approvals, effects, receipts, and claims.
+- Server Guy's durable application records for approvals, effects, receipts, and claims.
 
 Telemetry explains behavior. It does not replace authorization, approval, authoritative state, audit evidence, or external verification. Exclude secrets and unnecessary sensitive data.
 
@@ -300,15 +298,16 @@ Record learning evidence in the PR:
 
 1. Harden Phase 1 inputs and Pi output with Zod and adversarial tests.
 2. Implement the Phase 2 Application Contract as a read-only vertical slice.
-3. Compare the same bounded extraction with AI SDK Core.
-4. Specify and test the durable Operation lifecycle without a provider mutation.
-5. Reconcile the first real Hetzner host effect through approval and verification.
-6. Containerize and deploy the first exact application Release to a VPS.
-7. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
-8. Introduce Workflow DevKit in the Postgres World inside a Fastify service, after PostgreSQL, when continuous observation or retries require it.
-9. Break, recover, roll back, and externally re-verify a deployed application.
-10. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
-11. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
+3. Add explicit GitHub and Pi setup flows, with happy and unhappy path tests.
+4. Make Pi requests durable with SQLite, a Node worker, run IDs, and reconnectable events.
+5. Specify and test the durable Operation lifecycle without a provider mutation.
+6. Reconcile the first real Hetzner host effect through approval and verification.
+7. Containerize and deploy the first exact application Release to a VPS.
+8. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
+9. Revisit Workflow DevKit only when its durability trigger is present.
+10. Break, recover, roll back, and externally re-verify a deployed application.
+11. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
+12. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
 
 ## Guardrails
 

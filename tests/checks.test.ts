@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PREREQUISITES, computeChecks } from "../src/server/phase-one-spec";
-import type {
-  ApplicationRecord,
-  BlockerRecord,
-  GateCheck,
-  ObservationRecord,
-} from "../src/server/types";
+import { computeChecks } from "../src/server/phase-one-spec";
+import type { ApplicationRecord, GateCheck, Observation } from "../src/server/types";
 
 const application: ApplicationRecord = {
   id: "app",
@@ -21,24 +16,14 @@ const application: ApplicationRecord = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
-const blockers: BlockerRecord[] = PREREQUISITES.map((prerequisite) => ({
-  id: prerequisite.key,
-  workspaceId: "workspace",
-  ...prerequisite,
-  status: "open",
-  createdAt: "2026-09-01T00:00:01.000Z",
-  resolvedAt: null,
-}));
-
-function repositoryObservation(status: ObservationRecord["status"]): ObservationRecord {
+function repositoryObservation(status: Observation["status"]): Observation {
   return {
     id: "observation",
     applicationId: "app",
-    workspaceId: "workspace",
     kind: "github-repository-identity",
     status,
     summary: `repository ${status}`,
-    sourceLabel: "GitHub commit",
+    sourceLabel: "GitHub repository check",
     sourceUrl: null,
     raw: {},
     observedAt: "2026-09-01T00:00:02.000Z",
@@ -49,35 +34,38 @@ const statuses = (checks: GateCheck[]) =>
   Object.fromEntries(checks.map((check) => [check.key, check.status]));
 
 describe("computeChecks", () => {
-  it("waits for the repository observation before passing the repository and authority checks", () => {
-    expect(statuses(computeChecks(application, null, blockers))).toEqual({
+  it("evaluates configuration independently while waiting for repository evidence", () => {
+    expect(statuses(computeChecks(application, null))).toEqual({
       "application-identity": "passed",
       "repository-readable": "not-yet",
       "target-environment": "passed",
-      "approval-authority": "not-yet",
-      "intent-prerequisites": "passed",
+      "approval-authority": "passed",
     });
   });
 
-  it("blocks the repository check on a failed observation while still recording authority", () => {
-    const checks = computeChecks(application, repositoryObservation("failed"), blockers);
+  it("blocks only when the latest repository evidence refutes readability", () => {
+    const checks = computeChecks(application, repositoryObservation("failed"));
     expect(statuses(checks)["repository-readable"]).toBe("blocked");
-    expect(statuses(checks)["approval-authority"]).toBe("passed");
-    expect(checks.find((check) => check.key === "approval-authority")?.result).toContain(
-      "not currently available",
-    );
   });
 
-  it("passes every check once the repository is readable and prerequisites are recorded", () => {
-    const checks = computeChecks(application, repositoryObservation("passed"), blockers);
+  it("does not claim a repository failure when GitHub could not be checked", () => {
+    const checks = computeChecks(application, repositoryObservation("unavailable"));
+    expect(statuses(checks)["repository-readable"]).toBe("not-yet");
+  });
+
+  it("passes all four checks and cites the exact repository observation", () => {
+    const checks = computeChecks(application, repositoryObservation("passed"));
+    const repositoryCheck = checks.find((check) => check.key === "repository-readable")!;
+
+    expect(checks).toHaveLength(4);
     expect(checks.every((check) => check.status === "passed")).toBe(true);
-    expect(checks.find((check) => check.key === "approval-authority")?.observationId).toBe(
-      "observation",
-    );
+    expect(repositoryCheck.evidence).toEqual([
+      expect.objectContaining({
+        recordType: "observation",
+        recordId: "observation",
+        role: "Latest repository access result",
+      }),
+    ]);
   });
 
-  it("keeps the prerequisites check open until every prerequisite is recorded", () => {
-    const checks = computeChecks(application, repositoryObservation("passed"), blockers.slice(1));
-    expect(statuses(checks)["intent-prerequisites"]).toBe("not-yet");
-  });
 });

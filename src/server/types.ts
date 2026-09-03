@@ -1,6 +1,7 @@
 export type ApprovalMode = "pi-decides" | "always-ask" | "full-autonomy";
 
 export type GateStatus = "passed" | "blocked" | "not-yet";
+export type ObservationStatus = "passed" | "failed" | "unavailable";
 
 export interface ApplicationRecord {
   id: string;
@@ -15,70 +16,58 @@ export interface ApplicationRecord {
   updatedAt: string;
 }
 
-export interface PhaseWorkspace {
+export interface PhaseWorkspaceRecord {
   id: string;
   applicationId: string;
+  phaseKey: "start";
+  createdAt: string;
+}
+
+export interface PhaseWorkspaceView extends PhaseWorkspaceRecord {
   phaseNumber: 1;
   deliverable: "Launch Brief";
   status: "in-progress" | "ready";
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface OperatorSession {
+export interface Chat {
   id: string;
   workspaceId: string;
   title: string;
   isPrimary: boolean;
-  status: "active" | "resolved";
   createdAt: string;
-  resolvedAt: string | null;
+  archivedAt: string | null;
 }
 
-export interface OperatorMessage {
+export interface ChatMessage {
   id: string;
-  operatorSessionId: string;
+  chatId: string;
   role: "user" | "assistant";
   body: string;
   source: "user" | "pi" | "server-guy";
   createdAt: string;
 }
 
-export interface DecisionRecord {
+export interface Decision {
   id: string;
-  workspaceId: string;
-  operatorSessionId: string;
+  applicationId: string;
+  sourceMessageId: string;
   kind: "launch-priority";
   label: string;
   value: string;
+  supersededById: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
-export interface ObservationRecord {
+export interface Observation {
   id: string;
   applicationId: string;
-  workspaceId: string;
   kind: string;
-  status: "passed" | "failed" | "unavailable";
+  status: ObservationStatus;
   summary: string;
   sourceLabel: string;
   sourceUrl: string | null;
   raw: unknown;
   observedAt: string;
-}
-
-export interface BlockerRecord {
-  id: string;
-  workspaceId: string;
-  key: string;
-  label: string;
-  status: "open" | "resolved";
-  owner: "engineer" | "server-guy" | "pi";
-  resolutionPath: string;
-  requiredBeforePhase: number;
-  createdAt: string;
-  resolvedAt: string | null;
 }
 
 export interface ActivityEvent {
@@ -90,29 +79,45 @@ export interface ActivityEvent {
   createdAt: string;
 }
 
+export interface EvidenceReference {
+  recordType: "application" | "decision" | "observation";
+  recordId: string;
+  role: string;
+  label: string;
+  href: string;
+  observedAt: string;
+}
+
 export interface GateCheck {
   key: string;
   label: string;
   status: GateStatus;
   result: string;
   definition: string;
-  sourceLabel: string | null;
-  sourceUrl: string | null;
-  observationId: string | null;
-  observedAt: string | null;
+  evidence: EvidenceReference[];
   canRerun: boolean;
+}
+
+export interface UpcomingRequirement {
+  key: string;
+  label: string;
+  status: "satisfied" | "missing" | "unavailable" | "failed";
+  owner: "engineer" | "server-guy" | "pi";
+  resolutionPath: string;
+  requiredBeforePhase: number;
+  evidence: EvidenceReference[];
 }
 
 export interface PhaseOneOperatorView {
   application: ApplicationRecord | null;
-  workspace: PhaseWorkspace | null;
-  sessions: OperatorSession[];
-  activeSessionId: string | null;
-  messages: OperatorMessage[];
+  workspace: PhaseWorkspaceView | null;
+  chats: Chat[];
+  selectedChatId: string | null;
+  messages: ChatMessage[];
   checks: GateCheck[];
-  decisions: DecisionRecord[];
-  observations: ObservationRecord[];
-  blockers: BlockerRecord[];
+  decisions: Decision[];
+  observations: Observation[];
+  upcomingRequirements: UpcomingRequirement[];
   activity: ActivityEvent[];
 }
 
@@ -125,6 +130,7 @@ export interface CreateApplicationInput {
 export interface PiDecision {
   kind: "launch-priority";
   value: string;
+  replaces?: string;
 }
 
 export interface PiReply {

@@ -2,21 +2,21 @@
 
 import { Plus } from "@phosphor-icons/react";
 
-import type { OperatorSession } from "@/server/types";
+import type { Chat } from "@/server/types";
 
 export function ChatList({
-  sessions,
-  activeSessionId,
+  chats,
+  selectedChatId,
   hasApplication,
   busy,
   onSelect,
   onCreate,
 }: {
-  sessions: OperatorSession[];
-  activeSessionId: string | null;
+  chats: Chat[];
+  selectedChatId: string | null;
   hasApplication: boolean;
   busy: boolean;
-  onSelect: (sessionId: string) => void;
+  onSelect: (chatId: string) => void;
   onCreate: () => void;
 }) {
   return (
@@ -37,20 +37,20 @@ export function ChatList({
         </button>
       </div>
       <div className="sg-session-list">
-        {sessions.length ? (
-          sessions.map((session) => (
+        {chats.length ? (
+          chats.map((chat) => (
             <button
-              className={`sg-session ${session.id === activeSessionId ? "selected" : ""}`}
+              className={`sg-session ${chat.id === selectedChatId ? "selected" : ""}`}
               disabled={busy}
-              key={session.id}
-              onClick={() => onSelect(session.id)}
+              key={chat.id}
+              onClick={() => onSelect(chat.id)}
               type="button"
             >
               <span className="sg-session-mark">Pi</span>
               <span>
-                <strong>{session.title}</strong>
-                <small>{session.isPrimary ? "Main phase chat" : "Separate transcript"}</small>
-                <em>{session.status === "active" ? "Active" : "Archived"}</em>
+                <strong>{chat.title}</strong>
+                <small>{chat.isPrimary ? "Main phase chat" : "Separate transcript"}</small>
+                <em>{chat.archivedAt ? "Archived" : "Active"}</em>
               </span>
             </button>
           ))

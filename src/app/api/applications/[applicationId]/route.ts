@@ -12,7 +12,7 @@ export async function GET(
 ) {
   return handle(async () => {
     const { applicationId } = await context.params;
-    const sessionId = request.nextUrl.searchParams.get("session") ?? undefined;
-    return getPhaseOneOperatorView(applicationId, sessionId);
+    const chatId = request.nextUrl.searchParams.get("chat") ?? undefined;
+    return getPhaseOneOperatorView(applicationId, chatId);
   });
 }

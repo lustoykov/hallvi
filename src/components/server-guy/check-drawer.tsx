@@ -53,20 +53,21 @@ export function CheckDrawer({
         </section>
         <section>
           <span className="sg-eyebrow">Verify it yourself</span>
-          <p>Open the underlying record or external source. Server Guy’s status is derived from that source and can be rechecked.</p>
-          <div className="sg-drawer-actions">
-            {check.sourceUrl && (
-              <a href={check.sourceUrl} rel="noreferrer" target="_blank">
-                {check.sourceLabel ?? "Open source"} <ArrowSquareOut />
-              </a>
-            )}
-            {check.observationId && (
-              <a href={`/api/observations/${check.observationId}`} rel="noreferrer" target="_blank">
-                Raw receipt <ArrowSquareOut />
-              </a>
-            )}
-          </div>
-          {check.observedAt && <small>Recorded {formatTimestamp(check.observedAt)}</small>}
+          <p>Server Guy derives this result from the records below. A check may use no evidence, one record, or several independent observations.</p>
+          {check.evidence.length ? (
+            <div className="sg-evidence-list">
+              {check.evidence.map((evidence) => (
+                <a href={evidence.href} key={`${evidence.recordType}:${evidence.recordId}:${evidence.role}`} rel="noreferrer" target="_blank">
+                  <span>{evidence.role}</span>
+                  <strong>{evidence.label}</strong>
+                  <small>Recorded {formatTimestamp(evidence.observedAt)}</small>
+                  <ArrowSquareOut />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p>No relevant evidence has been recorded yet.</p>
+          )}
         </section>
         <section>
           <span className="sg-eyebrow">Take control</span>

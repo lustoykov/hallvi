@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PR #1 architecture — Journey 1 Phase 1</title>
+  <title>Phase 1 architecture — simplified durable model</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&amp;family=Geist:wght@400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -17,9 +18,9 @@
       --rule-solid: #cbd5e5;
       --accent: #285ad8;
       --accent-tint: rgba(40, 90, 216, 0.08);
-      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --serif: ui-serif, Georgia, serif;
-      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: 'Geist', sans-serif;
+      --serif: 'Instrument Serif', serif;
+      --mono: 'Geist Mono', monospace;
     }
 
     body {
@@ -89,7 +90,7 @@
       flex: 1;
       padding: 12px;
       border: 1px solid var(--rule-solid);
-      border-radius: 7px;
+      border-radius: 8px;
       background: var(--paper);
     }
     .flow-step:not(:last-child)::after {
@@ -141,16 +142,16 @@
 </head>
 <body>
   <main>
-    <p class="eyebrow">Architecture · PR #1 · Journey 1 Phase 1</p>
-    <h1>One Next.js process owns the launch brief</h1>
+    <p class="eyebrow">Architecture · Journey 1 · Phase 1</p>
+    <h1>Persist records; derive the operator state</h1>
     <p class="subtitle">
-      Phase 1 is a full-stack Next.js modular monolith. The operator UI sends commands to Route Handlers; domain logic validates them, records the Operator Record in SQLite, and calls GitHub or a deliberately isolated Pi session through narrow adapters.
+      Phase 1 remains a full-stack Next.js modular monolith. Domain logic validates commands and writes seven explicit record types to SQLite. The Operator View, workspace status, upcoming requirements, and four Gate Checks are generated from those records.
     </p>
 
     <div class="diagram">
       <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr-001-phase-1-title pr-001-phase-1-desc">
         <title id="pr-001-phase-1-title">Journey 1 Phase 1 architecture</title>
-        <desc id="pr-001-phase-1-desc">The engineer uses a Next.js operator interface whose Route Handlers invoke deterministic Phase 1 domain logic, persist application state and Operator Sessions in SQLite, inspect GitHub, and ask Pi for bounded judgment.</desc>
+        <desc id="pr-001-phase-1-desc">The engineer uses a Next.js Operator UI. Route Handlers invoke deterministic Phase 1 domain logic, which reads and writes seven durable record types in SQLite, derives the current Operator View and Gate Checks, inspects GitHub, and asks Pi for bounded judgment.</desc>
         <defs>
           <marker id="pr-001-phase-1-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="#59667b"/>
@@ -178,7 +179,8 @@
         <line x1="224" y1="264" x2="320" y2="264" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
         <line x1="480" y1="264" x2="512" y2="264" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
         <line x1="672" y1="264" x2="704" y2="264" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
-        <line x1="776" y1="312" x2="776" y2="400" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
+        <line x1="764" y1="312" x2="764" y2="400" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
+        <line x1="788" y1="400" x2="788" y2="312" stroke="#59667b" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow)"/>
         <line x1="848" y1="264" x2="984" y2="264" stroke="#285ad8" stroke-width="1.2" marker-end="url(#pr-001-phase-1-arrow-link)"/>
         <path d="M 848 280 H 936 Q 944 280 944 288 V 440 Q 944 448 952 448 H 984" fill="none" stroke="#285ad8" stroke-width="1" stroke-dasharray="4,4" marker-end="url(#pr-001-phase-1-arrow-link)"/>
 
@@ -192,8 +194,10 @@
         <rect x="868" y="252" width="52" height="12" rx="4" fill="#f7f9fc"/>
         <text x="894" y="260" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ASK PI</text>
 
-        <rect x="788" y="344" width="64" height="16" rx="4" fill="#f7f9fc"/>
-        <text x="820" y="356" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PERSIST</text>
+        <rect x="692" y="344" width="72" height="16" rx="4" fill="#f7f9fc"/>
+        <text x="728" y="356" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PERSIST</text>
+        <rect x="788" y="344" width="52" height="16" rx="4" fill="#f7f9fc"/>
+        <text x="814" y="356" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">LOAD</text>
 
         <!-- Engineer and browser -->
         <rect x="48" y="216" width="176" height="96" rx="8" fill="#f7f9fc"/>
@@ -201,7 +205,7 @@
         <rect x="60" y="228" width="48" height="16" rx="4" fill="transparent" stroke="rgba(102,115,137,0.40)" stroke-width="0.8"/>
         <text x="84" y="240" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INPUT</text>
         <text x="136" y="268" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Engineer + Browser</text>
-        <text x="136" y="288" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">localhost operator session</text>
+        <text x="136" y="288" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">localhost Operator UI</text>
 
         <!-- Next.js nodes -->
         <rect x="320" y="216" width="160" height="96" rx="8" fill="#f7f9fc"/>
@@ -222,15 +226,15 @@
         <rect x="704" y="216" width="144" height="96" rx="8" fill="rgba(40,90,216,0.08)" stroke="#285ad8" stroke-width="1.2"/>
         <rect x="716" y="228" width="56" height="16" rx="4" fill="transparent" stroke="rgba(40,90,216,0.48)" stroke-width="0.8"/>
         <text x="744" y="240" fill="#285ad8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DOMAIN</text>
-        <text x="776" y="268" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Phase 1 logic</text>
-        <text x="776" y="288" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">commands + gate checks</text>
+        <text x="776" y="268" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Phase 1 domain</text>
+        <text x="776" y="288" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">commands + derived view</text>
 
         <rect x="676" y="400" width="200" height="96" rx="8" fill="#f7f9fc"/>
         <rect x="676" y="400" width="200" height="96" rx="8" fill="rgba(25,35,56,0.05)" stroke="#59667b" stroke-width="1"/>
         <rect x="688" y="412" width="48" height="16" rx="4" fill="transparent" stroke="rgba(89,102,123,0.40)" stroke-width="0.8"/>
         <text x="712" y="424" fill="#59667b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STORE</text>
-        <text x="776" y="452" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SQLite Operator Record</text>
-        <text x="776" y="472" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">sessions · messages · durable records</text>
+        <text x="776" y="452" fill="#192338" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SQLite records</text>
+        <text x="776" y="472" fill="#667389" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">7 tables · no gate/view rows</text>
 
         <!-- External adapters -->
         <rect x="984" y="216" width="184" height="96" rx="8" fill="#f7f9fc"/>
@@ -262,24 +266,24 @@
     <section class="flows" aria-label="Important control flows">
       <article class="flow">
         <p class="card-kicker">Flow 01 · Create launch workspace</p>
-        <h2>A fixed command creates the record, then observes GitHub</h2>
+        <h2>A fixed command creates durable records, then observes GitHub</h2>
         <p>A repeat with the same permission policy is idempotent. A conflicting policy returns an explicit conflict instead of silently changing authority.</p>
         <div class="flow-track">
-          <div class="flow-step"><b>Validate input</b><span>GitHub repo · Production · permission policy</span></div>
-          <div class="flow-step"><b>Write transaction</b><span>Application · Phase Workspace · Operator Session · prerequisites</span></div>
+          <div class="flow-step"><b>Validate input</b><span>repository · environment · Approval Mode</span></div>
+          <div class="flow-step"><b>Write transaction</b><span>Application · thin workspace · main Chat</span></div>
           <div class="flow-step"><b>Observe GitHub</b><span>Repo · branch · SHA · access or exact failure</span></div>
-          <div class="flow-step"><b>Compute gate</b><span>Five checks derived from the current record</span></div>
+          <div class="flow-step"><b>Compute gate</b><span>4 checks from app + latest Observation</span></div>
         </div>
       </article>
       <article class="flow">
         <p class="card-kicker">Flow 02 · Collaborate with Pi</p>
-        <h2>Pi proposes Decision Records; Server Guy validates the reply</h2>
-        <p>Application configuration, Approval Mode, and the production baseline keep their own homes. Only a user-owned launch priority becomes a Phase 1 Decision Record, with its originating Operator Session and timestamp.</p>
+        <h2>Pi proposes Decisions; Server Guy validates the reply</h2>
+        <p>Application configuration and Approval Mode keep their own homes. A recognized launch priority becomes a revisable Decision with its exact originating user message.</p>
         <div class="flow-track">
-          <div class="flow-step"><b>Record message</b><span>Selected Operator Session transcript only</span></div>
+          <div class="flow-step"><b>Build context</b><span>selected Chat + current Decisions + checks</span></div>
           <div class="flow-step"><b>Ask isolated Pi</b><span>No tools · extensions · skills · project context</span></div>
-          <div class="flow-step"><b>Validate JSON</b><span>One Phase 1 decision kind · strict value · complete stop</span></div>
-          <div class="flow-step"><b>Commit reply</b><span>Message + decisions in one transaction</span></div>
+          <div class="flow-step"><b>Validate JSON</b><span>decision kind · value · replacement ID</span></div>
+          <div class="flow-step"><b>Commit reply</b><span>messages · Decision · activity transaction</span></div>
         </div>
       </article>
     </section>
@@ -292,21 +296,21 @@
       </article>
       <article class="card">
         <p class="card-kicker">Durable truth</p>
-        <h2>Operator Sessions do not own launch state</h2>
-        <p>SQLite stores applications, Phase Workspaces, Operator Sessions, messages, true Decision Records, Observations, Blockers, and activity. Gate Checks are recomputed from those sources.</p>
+        <h2>Chats do not own launch state</h2>
+        <p>SQLite stores applications, thin Phase Workspaces, Chats, messages, Decisions, Observations, and activity events. It stores no Blocker, Gate Check, workspace-status, or Operator View row.</p>
       </article>
       <article class="card">
         <p class="card-kicker">Narrow intelligence</p>
         <h2>Pi is isolated; adapters expose facts</h2>
         <ul>
           <li>GitHub identity comes from `gh api`.</li>
-          <li>Pi receives only the supplied Operator Record and current Operator Session, with tools and project resources disabled.</li>
+          <li>Pi receives generated context from current records and the selected Chat, with tools and project resources disabled.</li>
           <li>Incomplete model output and adapter errors remain visible.</li>
         </ul>
       </article>
     </section>
 
-    <footer>SERVER GUY · PR #1 · SYSTEM TOPOLOGY + 2 CONTROL FLOWS · ENGINEER REVIEW</footer>
+    <footer>SERVER GUY · PHASE 1 · SYSTEM TOPOLOGY + 2 CONTROL FLOWS · ENGINEER REVIEW</footer>
   </main>
 </body>
 </html>

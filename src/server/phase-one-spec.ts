@@ -1,35 +1,39 @@
 import type {
   ApplicationRecord,
   ApprovalMode,
-  BlockerRecord,
+  EvidenceReference,
   GateCheck,
-  ObservationRecord,
+  GateStatus,
+  Observation,
+  UpcomingRequirement,
 } from "./types";
 
 export const PHASES = [
-  { number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
-  { number: 2, name: "Inspect app", deliverable: "Application Contract", group: "plan" },
-  { number: 3, name: "Make launch-ready", deliverable: "Conformance Result", group: "plan" },
-  { number: 4, name: "Review launch plan", deliverable: "Launch Plan", group: "plan" },
-  { number: 5, name: "Set up server", deliverable: "Host Record", group: "setup" },
-  { number: 6, name: "Connect domain", deliverable: "Domain Route", group: "setup" },
-  { number: 7, name: "Configure and protect", deliverable: "Operational Baseline", group: "setup" },
-  { number: 8, name: "Go live", deliverable: "Verified Release", group: "live" },
-  { number: 9, name: "Handoff", deliverable: "Operations Handoff", group: "live" },
+  { key: "start", number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
+  { key: "inspect-app", number: 2, name: "Inspect app", deliverable: "Application Contract", group: "plan" },
+  { key: "make-launch-ready", number: 3, name: "Make launch-ready", deliverable: "Conformance Result", group: "plan" },
+  { key: "review-launch-plan", number: 4, name: "Review launch plan", deliverable: "Launch Plan", group: "plan" },
+  { key: "set-up-server", number: 5, name: "Set up server", deliverable: "Host Record", group: "setup" },
+  { key: "connect-domain", number: 6, name: "Connect domain", deliverable: "Domain Route", group: "setup" },
+  { key: "configure-protect", number: 7, name: "Configure and protect", deliverable: "Operational Baseline", group: "setup" },
+  { key: "go-live", number: 8, name: "Go live", deliverable: "Verified Release", group: "live" },
+  { key: "handoff", number: 9, name: "Handoff", deliverable: "Operations Handoff", group: "live" },
 ] as const;
+
+export const PHASE_ONE = PHASES[0];
 
 export const PHASE_ONE_CHECKS = [
   {
     key: "application-identity",
     label: "Application identity recorded",
     definition:
-      "The application has a durable name, repository identity, target environment, and Server Guy application ID.",
+      "The application has a durable name, repository identity, and Server Guy application ID.",
   },
   {
     key: "repository-readable",
     label: "Repository readable at a recorded identity",
     definition:
-      "Server Guy can read the repository and has recorded its default branch and exact commit SHA.",
+      "Server Guy has successfully read the repository and recorded its default branch and exact commit SHA.",
   },
   {
     key: "target-environment",
@@ -39,15 +43,9 @@ export const PHASE_ONE_CHECKS = [
   },
   {
     key: "approval-authority",
-    label: "Permission policy is explicit",
+    label: "Permission policy explicit",
     definition:
-      "The user has chosen how Pi should decide when to ask, and the launch scope plus currently available access are recorded.",
-  },
-  {
-    key: "intent-prerequisites",
-    label: "Launch baseline and prerequisites recorded",
-    definition:
-      "Server Guy's production baseline and the known provider/domain prerequisites are explicit, with owners and resolution paths.",
+      "The user has chosen how Pi should decide when to ask before an external change.",
   },
 ] as const;
 
@@ -57,26 +55,26 @@ export const PRODUCTION_BASELINE = [
   { key: "keep-cost-low", label: "Keep infrastructure cost low", rule: "Use the smallest credible infrastructure" },
 ] as const;
 
-export const PREREQUISITES = [
+export const UPCOMING_REQUIREMENTS = [
   {
     key: "hetzner-access",
     label: "Hetzner access",
     owner: "engineer" as const,
-    resolutionPath: "Connect or verify Hetzner before Create server.",
+    resolutionPath: "Connect or verify Hetzner before Set up server.",
     requiredBeforePhase: 5,
   },
   {
     key: "cloudflare-access",
     label: "Cloudflare access",
     owner: "engineer" as const,
-    resolutionPath: "Connect or verify Cloudflare before Claim domain.",
+    resolutionPath: "Connect or verify Cloudflare before Connect domain.",
     requiredBeforePhase: 6,
   },
   {
     key: "domain-starting-state",
     label: "Domain starting state",
     owner: "engineer" as const,
-    resolutionPath: "Tell Pi whether the domain is already owned before Claim domain.",
+    resolutionPath: "Tell Pi whether the domain is already owned before Connect domain.",
     requiredBeforePhase: 6,
   },
 ] as const;
@@ -87,76 +85,87 @@ export const APPROVAL_MODE_LABELS: Record<ApprovalMode, string> = {
   "full-autonomy": "Full autonomy",
 };
 
+export function phaseOneCheckListForPrompt() {
+  return PHASE_ONE_CHECKS.map((check, index) => `${index + 1}. ${check.label}.`).join("\n");
+}
+
+function applicationEvidence(
+  application: ApplicationRecord,
+  role: string,
+): EvidenceReference {
+  return {
+    recordType: "application",
+    recordId: application.id,
+    role,
+    label: "Application record",
+    href: `/api/applications/${application.id}`,
+    observedAt: application.updatedAt,
+  };
+}
+
+function observationEvidence(observation: Observation, role: string): EvidenceReference {
+  return {
+    recordType: "observation",
+    recordId: observation.id,
+    role,
+    label: observation.sourceLabel,
+    href: `/api/observations/${observation.id}`,
+    observedAt: observation.observedAt,
+  };
+}
+
+function repositoryStatus(repository: Observation | null): GateStatus {
+  if (!repository || repository.status === "unavailable") return "not-yet";
+  return repository.status === "passed" ? "passed" : "blocked";
+}
+
 /**
- * Evaluates the Phase 1 exit gate from durable records only. Statuses come from the
- * application record, the latest GitHub observation, and the recorded prerequisites,
- * never from chat prose.
+ * Evaluates the Phase 1 Exit Gate from current records. Gate results are projections:
+ * they are never stored and they never fall back to an older passing Observation.
  */
 export function computeChecks(
   application: ApplicationRecord,
-  repository: ObservationRecord | null,
-  blockers: BlockerRecord[],
+  repository: Observation | null,
 ): GateCheck[] {
-  const recordUrl = `/api/applications/${application.id}`;
-  const prerequisitesRecorded = PREREQUISITES.every(({ key }) =>
-    blockers.some((blocker) => blocker.key === key),
+  const identityComplete = Boolean(
+    application.id &&
+      application.name &&
+      application.repositoryUrl &&
+      application.repositoryOwner &&
+      application.repositoryName,
   );
-  const intentRecordedAt =
-    [application.createdAt, ...blockers.map((blocker) => blocker.createdAt)].sort().at(-1) ??
-    application.createdAt;
-  const githubAccess =
-    repository?.status === "passed"
-      ? "GitHub repository access is recorded."
-      : "GitHub repository access is not currently available.";
+  const environmentExplicit = application.environment === "production";
+  const approvalExplicit = Object.hasOwn(APPROVAL_MODE_LABELS, application.approvalMode);
 
   const values = {
     "application-identity": {
-      status: "passed",
-      result: `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`,
-      sourceLabel: "Application record",
-      sourceUrl: recordUrl,
-      observationId: null,
-      observedAt: application.createdAt,
+      status: identityComplete ? "passed" : "not-yet",
+      result: identityComplete
+        ? `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`
+        : "The application identity is incomplete.",
+      evidence: [applicationEvidence(application, "Application identity and repository selection")],
       canRerun: false,
     },
     "repository-readable": {
-      status: repository ? (repository.status === "passed" ? "passed" : "blocked") : "not-yet",
+      status: repositoryStatus(repository),
       result: repository?.summary ?? "The repository has not been checked yet.",
-      sourceLabel: repository?.sourceLabel ?? "GitHub",
-      sourceUrl: repository?.sourceUrl ?? application.repositoryUrl,
-      observationId: repository?.id ?? null,
-      observedAt: repository?.observedAt ?? null,
+      evidence: repository
+        ? [observationEvidence(repository, "Latest repository access result")]
+        : [],
       canRerun: true,
     },
     "target-environment": {
-      status: "passed",
-      result: "Production",
-      sourceLabel: "Application record",
-      sourceUrl: recordUrl,
-      observationId: null,
-      observedAt: application.createdAt,
+      status: environmentExplicit ? "passed" : "not-yet",
+      result: environmentExplicit ? "Production" : "Choose a target environment.",
+      evidence: [applicationEvidence(application, "Selected target environment")],
       canRerun: false,
     },
     "approval-authority": {
-      status: repository ? "passed" : "not-yet",
-      result: repository
-        ? `${APPROVAL_MODE_LABELS[application.approvalMode]} · ${application.approvalScope}. ${githubAccess} Hetzner and Cloudflare are not configured yet.`
-        : "Choose how Pi should ask for permission and record the access currently available.",
-      sourceLabel: "Application permission policy",
-      sourceUrl: recordUrl,
-      observationId: repository?.id ?? null,
-      observedAt: repository?.observedAt ?? application.createdAt,
-      canRerun: false,
-    },
-    "intent-prerequisites": {
-      status: prerequisitesRecorded ? "passed" : "not-yet",
-      result: prerequisitesRecorded
-        ? `${PRODUCTION_BASELINE.map(({ label }) => label).join(", ")}. ${PREREQUISITES.length} later prerequisites are recorded with owners and resolution paths.`
-        : "The production baseline or later prerequisites are incomplete.",
-      sourceLabel: "Launch record",
-      sourceUrl: recordUrl,
-      observationId: null,
-      observedAt: intentRecordedAt,
+      status: approvalExplicit ? "passed" : "not-yet",
+      result: approvalExplicit
+        ? `${APPROVAL_MODE_LABELS[application.approvalMode]} · ${application.approvalScope}`
+        : "Choose how Pi should ask before external changes.",
+      evidence: [applicationEvidence(application, "Selected permission policy")],
       canRerun: false,
     },
   } satisfies Record<
@@ -165,4 +174,12 @@ export function computeChecks(
   >;
 
   return PHASE_ONE_CHECKS.map((check) => ({ ...check, ...values[check.key] }));
+}
+
+export function deriveUpcomingRequirements(): UpcomingRequirement[] {
+  return UPCOMING_REQUIREMENTS.map((requirement) => ({
+    ...requirement,
+    status: "missing",
+    evidence: [],
+  }));
 }

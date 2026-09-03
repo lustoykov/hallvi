@@ -27,7 +27,7 @@ The engineer connects or selects a repository and asks Server Guy to launch it.
 
 ### Main journey
 
-1. Server Guy creates the application workspace and resumes or starts its Operator Session.
+1. Server Guy creates the application workspace and starts its main Chat.
 2. The engineer selects an Approval Mode and provides any short prose describing important intent, such as cost sensitivity, acceptable downtime, and data importance.
 3. Pi inspects the repository and determines whether it matches a supported Application Profile.
 4. Pi drafts or updates the Application Contract and identifies changes needed for conformance. The contract's provenance and confirmation status remain visible; repository changes become a reviewable pull request when appropriate.
@@ -72,7 +72,7 @@ The always-on sentinel captures Incident Signals showing that the application's 
 2. An always-on component applies a contract-defined failure threshold so that one transient failed probe does not necessarily alert the engineer.
 3. If the sentinel is only a prober, it persists the minimal detection event and sends an Alert; the Operational Control Plane creates the Incident Case when it next synchronizes. If the sentinel is a small remote control-plane component, it opens or updates the Incident Case before alerting. This topology is unresolved.
 4. The Incident Case links the affected application, current Release, recent changes, initial observations, and detection source.
-5. If an always-on Pi runtime is available, Server Guy resumes the Operator Session and Pi begins investigation according to the selected Approval Mode.
+5. If an always-on Pi runtime is available, Server Guy resumes the Incident Chat and Pi begins investigation according to the selected Approval Mode.
 6. The Alert identifies the application, observed unavailability, detection time, and a route into Server Guy. Pi activity appears in the initial Alert only when it is already known; otherwise it becomes a later status update.
 7. Further observations, Pi activity, user messages, and status changes update the same Incident Case rather than producing disconnected alerts.
 
@@ -102,7 +102,7 @@ An Incident Case exists, whether created by the sentinel, Pi, the engineer, or a
 
 ### Main journey
 
-1. Server Guy resumes the application's Operator Session with the Incident Case, current Release, recent changes, Application Contract, previous incidents, Pi-authored operational notes, and current user intent.
+1. Server Guy resumes the application's Incident Chat with the Incident Case, current Release, recent changes, Application Contract, previous incidents, Pi-authored operational notes, and current user intent.
 2. Pi chooses what to inspect and gathers Observations through telemetry, provider tools, repository state, and the application-host shell.
 3. Pi records Findings and a current Diagnosis as model-authored conclusions citing the relevant Observations. The UI keeps conclusions distinct from facts.
 4. Pi records its visible remediation intent or short plan.

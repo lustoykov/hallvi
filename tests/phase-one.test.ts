@@ -23,6 +23,20 @@ let databasePath: string;
 let database: typeof import("../src/server/db");
 let phaseOne: typeof import("../src/server/phase-one");
 
+const passingInspection = {
+  status: "passed" as const,
+  summary: "lustoykov/todo-fastapi is readable at main · abcdef12.",
+  sourceUrl: "https://github.com/lustoykov/todo-fastapi/commit/abcdef123456",
+  raw: {
+    repository: "lustoykov/todo-fastapi",
+    defaultBranch: "main",
+    commitSha: "abcdef123456",
+    commitUrl: "https://github.com/lustoykov/todo-fastapi/commit/abcdef123456",
+    authenticatedAs: "lustoykov",
+    permissions: { pull: true },
+  },
+};
+
 beforeAll(async () => {
   databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-phase-one-"));
   databasePath = join(databaseDirectory, "test.db");
@@ -36,19 +50,7 @@ beforeEach(() => {
   database.db().exec("DELETE FROM applications");
   mocks.askPi.mockReset();
   mocks.inspectGithubRepository.mockReset();
-  mocks.inspectGithubRepository.mockResolvedValue({
-    status: "passed",
-    summary: "lustoykov/todo-fastapi is readable at main · abcdef12.",
-    sourceUrl: "https://github.com/lustoykov/todo-fastapi/commit/abcdef123456",
-    raw: {
-      repository: "lustoykov/todo-fastapi",
-      defaultBranch: "main",
-      commitSha: "abcdef123456",
-      commitUrl: "https://github.com/lustoykov/todo-fastapi/commit/abcdef123456",
-      authenticatedAs: "lustoykov",
-      permissions: { pull: true },
-    },
-  });
+  mocks.inspectGithubRepository.mockResolvedValue(passingInspection);
 });
 
 afterAll(() => {
@@ -67,18 +69,26 @@ async function createApplication(approvalMode: "pi-decides" | "always-ask" = "pi
 }
 
 describe("Phase 1 application workspace", () => {
-  it("records the launch, authority context, prerequisites, and five passing checks", async () => {
+  it("stores durable inputs and derives four passing checks plus later requirements", async () => {
     const result = await createApplication();
 
     expect(result.created).toBe(true);
-    expect(result.view.checks).toHaveLength(5);
+    expect(result.view.checks).toHaveLength(4);
     expect(result.view.checks.every((check) => check.status === "passed")).toBe(true);
-    expect(result.view.blockers).toHaveLength(3);
+    expect(result.view.upcomingRequirements).toHaveLength(3);
+    expect(result.view.upcomingRequirements.every((item) => item.status === "missing")).toBe(true);
     expect(result.view.observations.map((observation) => observation.kind)).toEqual([
       "github-repository-identity",
     ]);
     expect(result.view.application?.approvalMode).toBe("pi-decides");
-    expect(result.view.workspace?.status).toBe("ready");
+    expect(result.view.workspace).toEqual(
+      expect.objectContaining({
+        phaseKey: "start",
+        phaseNumber: 1,
+        deliverable: "Launch Brief",
+        status: "ready",
+      }),
+    );
     expect(result.view.decisions).toEqual([]);
   });
 
@@ -93,54 +103,128 @@ describe("Phase 1 application workspace", () => {
     );
   });
 
-  it("preserves each Operator Session priority without treating application policy as a decision", async () => {
+  it("shares Decisions across Chats while keeping transcripts separate", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
-    const sessionId = created.view.activeSessionId!;
-    mocks.askPi
-      .mockResolvedValueOnce({
-        message: "I recorded fast recovery.",
-        decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
-      })
-      .mockResolvedValueOnce({
-        message: "I recorded predictable cost.",
-        decisions: [{ kind: "launch-priority", value: "Keep spend predictable" }],
-      });
+    const primaryChatId = created.view.selectedChatId!;
+    mocks.askPi.mockResolvedValueOnce({
+      message: "I recorded fast recovery.",
+      decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
+    });
 
-    await phaseOne.sendOperatorMessage(applicationId, sessionId, "Recovery matters.");
-    const view = await phaseOne.sendOperatorMessage(applicationId, sessionId, "Keep spend predictable.");
-    const priorities = view.decisions.filter(
-      (decision) => decision.label === "Additional launch priority",
+    await phaseOne.sendChatMessage(applicationId, primaryChatId, "Recovery matters.");
+    const secondChat = phaseOne.createChat(applicationId, "Cost questions");
+
+    expect(secondChat.decisions.map((decision) => decision.value)).toEqual(["Recover quickly"]);
+    expect(secondChat.messages.map((message) => message.role)).toEqual(["assistant"]);
+    expect(secondChat.chats).toHaveLength(2);
+  });
+
+  it("revises a Decision while preserving its originating Message and history", async () => {
+    const created = await createApplication();
+    const applicationId = created.view.application!.id;
+    const chatId = created.view.selectedChatId!;
+    mocks.askPi.mockResolvedValueOnce({
+      message: "I recorded fast recovery.",
+      decisions: [{ kind: "launch-priority", value: "Recover quickly" }],
+    });
+    const firstView = await phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters.");
+    const first = firstView.decisions[0];
+    mocks.askPi.mockResolvedValueOnce({
+      message: "I replaced that priority.",
+      decisions: [
+        {
+          kind: "launch-priority",
+          value: "Prefer predictable cost",
+          replaces: first.id,
+        },
+      ],
+    });
+
+    const revised = await phaseOne.sendChatMessage(
+      applicationId,
+      chatId,
+      "Actually, predictable cost matters more.",
     );
+    const replacement = revised.decisions[0];
+    const sourceMessage = database
+      .db()
+      .prepare("SELECT body FROM messages WHERE id = ?")
+      .get(replacement.sourceMessageId) as { body: string };
 
-    expect(priorities.map((decision) => decision.value)).toEqual([
-      "Recover quickly",
-      "Keep spend predictable",
+    expect(revised.decisions.map((decision) => decision.value)).toEqual([
+      "Prefer predictable cost",
     ]);
-    expect(view.application?.approvalMode).toBe("pi-decides");
+    expect(database.getDecision(first.id)?.supersededById).toBe(replacement.id);
+    expect(sourceMessage.body).toBe("Actually, predictable cost matters more.");
+  });
+
+  it("rejects an invalid Decision replacement without committing a partial transcript", async () => {
+    const created = await createApplication();
+    const applicationId = created.view.application!.id;
+    const chatId = created.view.selectedChatId!;
+    const before = created.view.messages;
+    mocks.askPi.mockResolvedValueOnce({
+      message: "I changed the decision.",
+      decisions: [
+        { kind: "launch-priority", value: "Invented replacement", replaces: "missing" },
+      ],
+    });
+
+    await expect(
+      phaseOne.sendChatMessage(applicationId, chatId, "Replace the old priority."),
+    ).rejects.toThrow("missing, already replaced, or belongs to another application");
+
+    const after = phaseOne.getPhaseOneOperatorView(applicationId, chatId);
+    expect(after.messages).toEqual(before);
+    expect(after.decisions).toEqual([]);
   });
 
   it("keeps a failed Pi turn out of the transcript", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
-    const sessionId = created.view.activeSessionId!;
+    const chatId = created.view.selectedChatId!;
     mocks.askPi.mockRejectedValueOnce(new Error("Pi is unavailable: no model is configured."));
 
     await expect(
-      phaseOne.sendOperatorMessage(applicationId, sessionId, "Recovery matters."),
+      phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters."),
     ).rejects.toThrow("Pi is unavailable");
 
-    const view = phaseOne.getPhaseOneOperatorView(applicationId, sessionId);
+    const view = phaseOne.getPhaseOneOperatorView(applicationId, chatId);
     expect(view.messages.map((message) => message.role)).toEqual(["assistant"]);
   });
 
-  it("does not rewrite provenance timestamps when completion is recomputed", async () => {
+  it("derives readiness from the latest result without treating unavailability as failure", async () => {
     const created = await createApplication();
-    const application = created.view.application!;
-    const workspace = created.view.workspace!;
+    const applicationId = created.view.application!.id;
+    mocks.inspectGithubRepository.mockResolvedValueOnce({
+      status: "failed",
+      summary: "Repository not found.",
+      sourceUrl: "https://github.com/lustoykov/todo-fastapi",
+      raw: { repository: "lustoykov/todo-fastapi", error: "Not Found" },
+    });
+    await phaseOne.observeRepository(applicationId);
+    const failed = phaseOne.getPhaseOneOperatorView(applicationId);
 
-    database.updateWorkspaceStatus(workspace.id, "ready");
+    expect(
+      failed.checks.find((check) => check.key === "repository-readable")?.status,
+    ).toBe("blocked");
+    expect(failed.workspace?.status).toBe("in-progress");
 
-    expect(database.getWorkspace(application.id)?.updatedAt).toBe(workspace.updatedAt);
+    mocks.inspectGithubRepository.mockResolvedValueOnce({
+      status: "unavailable",
+      summary: "GitHub inspection timed out.",
+      sourceUrl: "https://github.com/lustoykov/todo-fastapi",
+      raw: { repository: "lustoykov/todo-fastapi", error: "timeout" },
+    });
+    const unavailableObservation = await phaseOne.observeRepository(applicationId);
+    const unavailable = phaseOne.getPhaseOneOperatorView(applicationId);
+    const repositoryCheck = unavailable.checks.find(
+      (check) => check.key === "repository-readable",
+    )!;
+
+    expect(repositoryCheck.status).toBe("not-yet");
+    expect(repositoryCheck.evidence[0].recordId).toBe(unavailableObservation.id);
+    expect(unavailable.workspace?.status).toBe("in-progress");
   });
 });

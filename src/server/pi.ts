@@ -1,25 +1,22 @@
-import type { DecisionRecord, OperatorMessage, PiDecision, PiReply } from "./types";
+import { phaseOneCheckListForPrompt } from "./phase-one-spec";
+import type { ChatMessage, Decision, PiDecision, PiReply } from "./types";
 
 export class PiUnavailableError extends Error {}
 
 const SYSTEM_PROMPT = `You are Pi inside Server Guy, an operator product for individual engineers.
 
 You are collaborating on Phase 1, Start. The deliverable is a Launch Brief. The checks are:
-1. Application identity recorded.
-2. Repository readable at an exact identity.
-3. Target environment explicit.
-4. Permission policy and launch authority explicit.
-5. Launch baseline and known prerequisites recorded.
+${phaseOneCheckListForPrompt()}
 
-The durable Operator Record in the user prompt is authoritative. Do not claim that an external system was checked unless its Observation says so. Do not claim to have changed code, infrastructure, DNS, or accounts. Phase 1 is read-only apart from Server Guy's local records.
+The current Operator View in the user prompt is authoritative. Do not claim that an external system was checked unless its Observation says so. Do not claim to have changed code, infrastructure, DNS, or accounts. Phase 1 is read-only apart from Server Guy's local records.
 
 Answer the engineer directly and concisely. If they state a durable decision, extract only supported decisions. Return strict JSON with this shape and no markdown fence:
-{"message":"Your response","decisions":[{"kind":"launch-priority","value":"..."}]}
+{"message":"Your response","decisions":[{"kind":"launch-priority","value":"...","replaces":"optional exact Decision ID"}]}
 
 The only Phase 1 decision kind is:
 - launch-priority: a concise user-stated operating priority
 
-Application configuration, product rules, future-phase facts, and Approval Mode are not Decision Records. An empty decisions array is valid. Never invent a decision.`;
+To correct a current Decision, copy its exact ID from CURRENT DECISIONS into replaces. Omit replaces for an additional Decision. Application configuration, product rules, future-phase facts, and Approval Mode are not Decisions. An empty decisions array is valid. Never invent a Decision or Decision ID.`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -44,11 +41,22 @@ export function parsePiReply(text: string): PiReply {
   if (Array.isArray(candidate.decisions)) {
     for (const item of candidate.decisions) {
       if (!item || typeof item !== "object") continue;
-      const { kind, value } = item as { kind?: unknown; value?: unknown };
+      const { kind, value, replaces } = item as {
+        kind?: unknown;
+        value?: unknown;
+        replaces?: unknown;
+      };
       if (kind !== "launch-priority" || typeof value !== "string" || !value.trim()) {
         continue;
       }
-      decisions.push({ kind, value: value.trim().slice(0, 300) });
+      if (replaces !== undefined && (typeof replaces !== "string" || !replaces.trim())) {
+        continue;
+      }
+      decisions.push({
+        kind,
+        value: value.trim().slice(0, 300),
+        ...(typeof replaces === "string" ? { replaces: replaces.trim() } : {}),
+      });
     }
   }
 
@@ -83,23 +91,25 @@ function lastAssistantOutcome(messages: unknown[]): { text: string; error: strin
 
 function buildPrompt(input: {
   userMessage: string;
-  messages: OperatorMessage[];
-  decisions: DecisionRecord[];
-  recordSummary: string;
+  messages: ChatMessage[];
+  decisions: Decision[];
+  viewSummary: string;
 }) {
   const transcript = input.messages
     .map((message) => `${message.role.toUpperCase()}: ${message.body}`)
     .join("\n");
-  const decisions = input.decisions.map((decision) => `${decision.label}: ${decision.value}`).join("\n");
+  const decisions = input.decisions
+    .map((decision) => `${decision.id} · ${decision.label}: ${decision.value}`)
+    .join("\n");
 
-  return `OPERATOR RECORD\n${input.recordSummary}\n\nDECISIONS\n${decisions || "None yet"}\n\nCURRENT OPERATOR SESSION\n${transcript || "No previous messages"}\n\nENGINEER\n${input.userMessage}`;
+  return `CURRENT OPERATOR VIEW\n${input.viewSummary}\n\nCURRENT DECISIONS\n${decisions || "None yet"}\n\nCURRENT CHAT\n${transcript || "No previous messages"}\n\nENGINEER\n${input.userMessage}`;
 }
 
 export async function askPi(input: {
   userMessage: string;
-  messages: OperatorMessage[];
-  decisions: DecisionRecord[];
-  recordSummary: string;
+  messages: ChatMessage[];
+  decisions: Decision[];
+  viewSummary: string;
 }): Promise<PiReply> {
   const {
     createAgentSession,

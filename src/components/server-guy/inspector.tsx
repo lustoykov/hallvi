@@ -83,19 +83,19 @@ export function Inspector({
               )}
             </section>
             <section className="sg-record-section">
-              <span className="sg-eyebrow">Later prerequisites</span>
-              {view.blockers.length ? (
+              <span className="sg-eyebrow">Upcoming requirements</span>
+              {view.upcomingRequirements.length ? (
                 <div className="sg-prerequisite-list">
-                  {view.blockers.map((blocker) => (
-                    <article key={blocker.id}>
-                      <span className={blocker.status}>{blocker.status}</span>
-                      <strong>{blocker.label}</strong>
-                      <small>{blocker.resolutionPath} Owner: {blocker.owner}.</small>
+                  {view.upcomingRequirements.map((requirement) => (
+                    <article key={requirement.key}>
+                      <span className={requirement.status}>{requirement.status}</span>
+                      <strong>{requirement.label}</strong>
+                      <small>{requirement.resolutionPath} Owner: {requirement.owner}.</small>
                     </article>
                   ))}
                 </div>
               ) : (
-                <p>Prerequisites are recorded when the workspace is created.</p>
+                <p>No later requirement needs attention.</p>
               )}
             </section>
           </>

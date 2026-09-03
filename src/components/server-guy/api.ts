@@ -30,19 +30,19 @@ export const api = {
   createApplication(input: { repositoryUrl: string; approvalMode: ApprovalMode }) {
     return post("/api/applications", input);
   },
-  view(applicationId: string, sessionId: string) {
+  view(applicationId: string, chatId: string) {
     return jsonRequest<PhaseOneOperatorView>(
-      `/api/applications/${applicationId}?session=${encodeURIComponent(sessionId)}`,
+      `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}`,
     );
   },
-  createSession(applicationId: string) {
-    return post(`/api/applications/${applicationId}/sessions`, {});
+  createChat(applicationId: string) {
+    return post(`/api/applications/${applicationId}/chats`, {});
   },
-  archiveSession(applicationId: string, sessionId: string) {
-    return post(`/api/applications/${applicationId}/sessions/${sessionId}/archive`, {});
+  archiveChat(applicationId: string, chatId: string) {
+    return post(`/api/applications/${applicationId}/chats/${chatId}/archive`, {});
   },
-  sendMessage(applicationId: string, sessionId: string, message: string) {
-    return post(`/api/applications/${applicationId}/sessions/${sessionId}/messages`, { message });
+  sendMessage(applicationId: string, chatId: string, message: string) {
+    return post(`/api/applications/${applicationId}/chats/${chatId}/messages`, { message });
   },
   rerunRepositoryCheck(applicationId: string) {
     return post(`/api/applications/${applicationId}/checks/repository-readable/rerun`, {});

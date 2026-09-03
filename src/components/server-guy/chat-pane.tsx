@@ -12,8 +12,8 @@ import { Message, MessageContent, MessageResponse } from "@/components/ai-elemen
 import { PRODUCTION_BASELINE } from "@/server/phase-one-spec";
 import type {
   ApprovalMode,
+  Chat,
   GateCheck,
-  OperatorSession,
   PhaseOneOperatorView,
 } from "@/server/types";
 
@@ -115,7 +115,7 @@ function LaunchForm({
 
 export function ChatPane({
   view,
-  activeSession,
+  activeChat,
   checks,
   busy,
   error,
@@ -126,7 +126,7 @@ export function ChatPane({
   onCreateApplication,
 }: {
   view: PhaseOneOperatorView;
-  activeSession: OperatorSession | null;
+  activeChat: Chat | null;
   checks: GateCheck[];
   busy: string | null;
   error: string | null;
@@ -145,7 +145,7 @@ export function ChatPane({
           <span className="sg-eyebrow">Working toward</span>
           <strong>Launch Brief</strong>
         </div>
-        {activeSession && !activeSession.isPrimary && activeSession.status === "active" && (
+        {activeChat && !activeChat.isPrimary && !activeChat.archivedAt && (
           <button className="sg-text-button" disabled={busy !== null} onClick={onArchive} type="button">
             <Archive /> Archive chat
           </button>
@@ -194,7 +194,7 @@ export function ChatPane({
               <span className="sg-ready-icon"><Check weight="bold" /></span>
               <div>
                 <strong>Launch Brief ready</strong>
-                <p>All five checks pass. Phase 2 is intentionally not implemented in this pull request.</p>
+                <p>All four checks pass. Phase 2 is intentionally not implemented in this pull request.</p>
               </div>
             </div>
           )}
@@ -211,7 +211,7 @@ export function ChatPane({
         }}
       >
         <textarea
-          disabled={!application || activeSession?.status !== "active"}
+          disabled={!application || !activeChat || Boolean(activeChat.archivedAt)}
           id="pi-composer"
           onChange={(event) => onComposerChange(event.target.value)}
           onKeyDown={(event) => {
@@ -225,8 +225,17 @@ export function ChatPane({
           value={composer}
         />
         <div>
-          <span>Decisions Pi recognizes are saved to the shared Record.</span>
-          <button disabled={!composer.trim() || busy !== null || !application} type="submit">
+          <span>Recognized Decisions are saved for the application and shown in the shared Operator View.</span>
+          <button
+            disabled={
+              !composer.trim() ||
+              busy !== null ||
+              !application ||
+              !activeChat ||
+              Boolean(activeChat.archivedAt)
+            }
+            type="submit"
+          >
             {busy === "message" ? <SpinnerGap className="spin" /> : "Send"}
           </button>
         </div>

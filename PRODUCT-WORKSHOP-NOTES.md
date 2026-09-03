@@ -2,9 +2,11 @@
 
 Status: living planning notes, not a finished specification and not evidence of implementation.
 
-Last updated: 2026-08-31
+Last updated: 2026-09-03
 
 These notes preserve decisions, hypotheses, and unresolved questions from the product workshop. They should later be distilled into a tight product specification. Unresolved choices must not be presented as settled in that specification.
+
+**Current terminology note:** the 2026-09-03 Phase 1 simplification renamed the durable conversation to **Chat** and removed Operator Session, Operator Record, and Session Event as domain entities. Server Guy persists explicit application records and Activity Events, then generates the Operator View, Gate Checks, workspace status, and Blockers. Older reviewer-input sections below retain their original terminology as historical context; they are not the current data model.
 
 ## Product thesis
 
@@ -111,15 +113,15 @@ This knowledge should not be dismissed as generic boilerplate. It is the reusabl
 
 Settled direction:
 
-> The durable, resumable Operator Session is Server Guy's primary execution model. Pi controls the adaptive operational loop.
+> Chat is the durable conversation surface. Pi controls the adaptive operational loop while Server Guy owns durable application state, evidence, effects, and generated views.
 
-Inspect, Resolve profile, Plan, Policy, Approval, Execute, Verify, and Evidence may remain useful classifications for Session Events and UI presentation. They are not a required sequence imposed on Pi. Pi may inspect, act, gather more evidence, revise its explanation, ask the user, or enter a bounded Guided Operation as the situation requires.
+Inspect, Resolve profile, Plan, Policy, Approval, Execute, Verify, and Evidence may remain useful classifications for Activity Events and UI presentation. They are not a required sequence imposed on Pi. Pi may inspect, act, gather more evidence, revise its explanation, ask the user, or enter a bounded Guided Operation as the situation requires.
 
 Server Guy records Pi's visible intent, tool calls, commands, results, conclusions, approvals, and verification evidence. It does not expose or require private model reasoning.
 
-A Guided Operation is a bounded rigid subflow inside an Operator Session. It is appropriate when the operation itself has a stable ordered protocol, especially for an external transaction, a destructive or difficult-to-reverse sequence, or a process requiring specific user-supplied information. It should not become the default shape of deployment or incident response.
+A Guided Operation is a bounded rigid subflow inside a Chat. It is appropriate when the operation itself has a stable ordered protocol, especially for an external transaction, a destructive or difficult-to-reverse sequence, or a process requiring specific user-supplied information. It should not become the default shape of deployment or incident response.
 
-Temporal is not planned for V1. It may be reconsidered only if the proven needs of durable Operator Sessions, long waits, retries, and recovery cannot be handled cleanly without it. The course stack is general orientation rather than a requirement that should distort the product.
+Workflow DevKit and Temporal are not planned for the first durable-run implementation. Start with SQLite-backed runs and events plus a Node worker; reconsider a workflow framework only when monitoring, timers, autonomous retries, or multi-step crash recovery make that design difficult to operate.
 
 ## Product interfaces
 
@@ -130,7 +132,7 @@ Current V1 interface direction:
 
 No general-purpose public REST API or user-facing CLI is currently planned for V1. Internal service and transport boundaries may still use HTTP. A remotely hosted MCP endpoint also uses an HTTP transport underneath and therefore requires authentication, authorization, TLS, and application/incident scoping.
 
-The first UI should make the Operator Session inspectable without reducing the product to chat. Conversation is an input and collaboration surface; it is not the whole interface.
+The first UI should make the application's generated Operator View inspectable without reducing the product to a transcript. Chat is an input and collaboration surface; it is not the whole interface.
 
 The Operator View should include:
 
@@ -144,7 +146,7 @@ The Operator View should include:
 - remediation and recovery progress;
 - a few predefined operational views.
 
-Structured cards, timelines, diffs, status indicators, and evidence views should be derived from the same Session Events that Pi produces while working. The UI should summarize noisy activity but always let the engineer inspect the underlying operational record.
+Structured cards, timelines, diffs, status indicators, and evidence views should be derived from durable application records and Activity Events. The UI should summarize noisy activity but always let the engineer inspect the supporting records.
 
 Custom dashboard generation and richer analytics views may come later. Pi should eventually be able to build an on-demand dashboard from Server Guy's telemetry when that is more useful than a fixed view.
 
@@ -317,7 +319,7 @@ Cloud coding tasks may later investigate or prepare fixes while the user's compu
 
 Current high-level direction:
 
-- Pi records a visible current intent or short plan before consequential action. This is a model-authored part of the Operator Session, not a fixed workflow gate.
+- Pi records a visible current intent or short plan before consequential action. This is a model-authored part of the current Chat, not a fixed workflow gate.
 - Read-only observation and evidence collection can generally run automatically.
 - **Full Autonomy**: Pi may perform state-changing operations without required user approval. Pi may still ask when it lacks information or genuinely cannot infer the user's intent.
 - **Pi Decides**: Pi decides whether a state-changing operation warrants user approval.
@@ -357,7 +359,7 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 - Product is for individual engineers and tinkerers first, not enterprises.
 - Open-source and useful in its own right; also a course capstone.
 - Pi is the only embedded Agent Runtime and is central to the product.
-- A durable, resumable Operator Session is the primary execution model; Pi controls the adaptive operational loop.
+- Chat is the durable conversation surface; Pi controls the adaptive operational loop while Server Guy owns durable application state and effects.
 - Inspect -> Resolve profile -> Plan -> Policy -> Approval -> Execute -> Verify -> Evidence is descriptive vocabulary for the record and UI, not an orchestrated sequence.
 - The UI must make Pi's visible intent, live actions, commands, results, evidence, approvals, and progress inspectable without exposing private model reasoning.
 - Rigid Guided Operations may exist as bounded subflows when the operation itself has a stable ordered protocol; they are not the default product architecture.

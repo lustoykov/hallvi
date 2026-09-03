@@ -49,7 +49,7 @@ Application Launch is broader than a Deployment. It includes:
 - the engineer may already own a domain or may need the guided acquisition path;
 - the repository may or may not conform to a supported Application Profile.
 
-**Completion condition:** Phase 9's Exit Gate is satisfied, its Phase Workspace and Operator Sessions are read-only, and the normal application workspace can show the current Release, public route, operational responsibilities, ongoing observation, evidence, costs, gaps, and ownership from the Operator Record without importing completed chat transcripts.
+**Completion condition:** Phase 9's Exit Gate is satisfied, its Phase Workspace and Chats are read-only, and the normal application workspace can show the current Release, public route, operational responsibilities, ongoing observation, evidence, costs, gaps, and ownership from the Operator View without importing completed chat transcripts.
 
 “The container is running” is not completion. “The Deployment command returned success” is not completion. Reachable, Verified, and ongoing observation are distinct claims.
 
@@ -62,17 +62,17 @@ Application Launch
         ├── 1 Phase Deliverable
         ├── 1 Exit Gate
         │   └── N fixed Gate Checks
-        └── 1..N Operator Sessions presented as chats
+        └── 1..N Chats presented as chats
 ```
 
-The 39 `L*` rows in the earlier UI map are retained as **presentation and alternate-path inventory**, not as a second progression model. For example, `L6.3` domain delegation, `L6.5` propagation waiting, and `L6.6` DNS conflict are different interaction states inside Phase 6. They do not add phases or redefine its Gate Checks. Likewise, `L3.W1-L3.W3` are repository-handoff presentations inside the Phase 3 session, not hidden Launch substeps.
+The 39 `L*` rows in the earlier UI map are retained as **presentation and alternate-path inventory**, not as a second progression model. For example, `L6.3` domain delegation, `L6.5` propagation waiting, and `L6.6` DNS conflict are different interaction states inside Phase 6. They do not add phases or redefine its Gate Checks. Likewise, `L3.W1-L3.W3` are repository-handoff presentations inside the Phase 3 Chat, not hidden Launch substeps.
 
 The current UI state is therefore a projection of:
 
 ```text
 current Launch Phase
 + Gate Check results and blockers
-+ selected Operator Session and phase-wide recognized decisions
++ selected Chat and phase-wide recognized decisions
 + current presentation family
 + selected detail destination
 ```
@@ -81,7 +81,7 @@ current Launch Phase
 
 | Phase | Phase Deliverable | Engineer experience | Pi and Server Guy behavior |
 | --- | --- | --- | --- |
-| **1. Start** | **Launch Brief** | Selects the repository, Environment, Approval Mode, and material operating intent; sees prerequisites without being overwhelmed. | Creates the Application record and Phase Workspace, validates read access, records decisions, and makes blockers explicit. |
+| **1. Start** | **Launch Brief** | Selects the repository, Environment, and Approval Mode; sees later prerequisites without treating them as current blockers. | Creates the Application record and thin Phase Workspace, observes repository access, and derives the four Phase 1 Gate Checks. |
 | **2. Inspect app** | **Application Contract** | Watches Pi inspect the repository, sees provenance, and corrects unsupported assumptions. | Resolves an Application Profile, constructs the app-level contract, and keeps unknowns and incompatibilities visible. |
 | **3. Make launch-ready** | **Conformance Result** | Reviews required repository work and can use Pi, Codex, Claude, another harness, or manual work under the same bounded brief. | Tracks one exact candidate revision, preserves worker evidence separately, and runs profile checks against the returned result. |
 | **4. Review launch plan** | **Launch Plan** | Reviews topology, cost, actors, effects, verification, and material risks before paid or account-level work. | Revises the plan when evidence changes and keeps VPS and domain operations separate. |
@@ -89,7 +89,7 @@ current Launch Phase
 | **6. Connect domain** | **Domain Route** | Chooses a hostname and follows the applicable controlled, delegated, acquisition, waiting, or conflict path. | Observes authority, configures permitted DNS/HTTPS work, waits honestly, refuses silent overwrites, and verifies externally. |
 | **7. Configure and protect** | **Operational Baseline** | Sees runtime, secrets, persistence, logs/telemetry, and external-observation responsibilities with evidence and unresolved policy clearly named. | Establishes the profile-interpreted responsibilities and records missing or accepted gaps without hiding them. |
 | **8. Go live** | **Verified Release** | Sees the exact candidate, deployment activity, public checks, semantic checks, failures, remediation, and drift. | Deploys/reconciles the candidate, verifies through the intended HTTPS hostname, and records a current Release only when the required bar passes. |
-| **9. Handoff** | **Operations Handoff** | Lands in a normal application workspace with topology, Release, health evidence, cost, responsibilities, gaps, and ongoing observation. | Assembles the evidence and ownership record, archives the Handoff session, and transitions out of Application Launch. |
+| **9. Handoff** | **Operations Handoff** | Lands in a normal application workspace with topology, Release, health evidence, cost, responsibilities, gaps, and ongoing observation. | Assembles the evidence and ownership record, archives the Handoff Chat, and transitions out of Application Launch. |
 
 The phases describe user-visible progress, not Pi's private reasoning or a required model-call sequence. Pi may loop within a phase or revisit evidence, but the product does not move to the next phase until the current Exit Gate is satisfied.
 
@@ -125,9 +125,9 @@ The Operator UI uses a stable shell. Pi may choose suitable typed content and ex
 1. **Application and phase-chat navigation** — the selected phase exposes a clear list of its chats; the current phase may create many; completed-phase chats are read-only and inspectable; future Phase Workspaces do not exist yet.
 2. **Application header** — application, Environment, Approval Mode, concise status, and always-visible nine-phase position.
 3. **Chat with Pi** — the primary flow and collaboration surface; Pi names the current Phase Deliverable and works toward the current Gate Checks.
-4. **Compact Operator Record** — current Phase Deliverable, every current Gate Check, unsatisfied reasons, evidence age when material, and Decision Records recognized across the current phase's chats.
+4. **Compact Operator View** — current Phase Deliverable, every current Gate Check, unsatisfied reasons, evidence age when material, and Decisions recognized across the current phase's chats.
 5. **Deeper Inspector** — Activity, Changes, and Evidence opened on demand; it does not crowd the default view.
-6. **Control Point** — every Gate Check, Decision Record, material fact, Operational Claim, and Phase Deliverable has one Details path to explanation, proof, source/takeover, and re-verification.
+6. **Control Point** — every Gate Check, Decision, material fact, Operational Claim, and Phase Deliverable has one Details path to explanation, proof, source/takeover, and re-verification.
 7. **Persistent composer** — free-text collaboration remains available even when structured input, approval, waiting, intervention, or outcome cards are present.
 
 ### Presentation families
@@ -136,11 +136,11 @@ Three layers must not be confused:
 
 | Layer | Question it answers | Examples |
 | --- | --- | --- |
-| **Domain record** | What durable operational thing exists? | Operation, Gate Check, Observation, Decision Record |
+| **Domain record** | What durable operational thing exists? | Operation, Gate Check, Observation, Decision |
 | **Presentation family** | What kind of interaction is happening? | Approval, Intervention, Outcome |
 | **Detail renderer** | How is one technical artifact inspected? | Pull-request diff, command output, provider receipt |
 
-The UI is projected from the canonical records in [`CONTEXT.md`](../../CONTEXT.md): Phase Deliverable, Gate Check, Decision Record, Operation, Approval Record, Observation, Operational Claim, Evidence Reference, and Blocker. Repository, host, domain, Release, pull request, worker, provider object, actor, authority, provenance, freshness, and affected checks are identities, fields, or relationships rather than new top-level product nouns.
+The UI is projected from the canonical records in [`CONTEXT.md`](../../CONTEXT.md): Phase Deliverable, Gate Check, Decision, Operation, Approval Record, Observation, Operational Claim, Evidence Reference, and Blocker. Repository, host, domain, Release, pull request, worker, provider object, actor, authority, provenance, freshness, and affected checks are identities, fields, or relationships rather than new top-level product nouns.
 
 Every presentation must give stable homes to orientation, current condition, meaning, Gate impact, authority and consequence, provenance and freshness, net change, proof and limits, available control, and next transition. Dense material may be progressively disclosed, but Pi-authored prose never replaces provenance or evidence.
 
@@ -148,7 +148,7 @@ The 39-state inventory maps into seven stable presentation families:
 
 | Family | Used for | Must surface |
 | --- | --- | --- |
-| **Input / Decision** | Required information, corrections, path choices, prerequisites. | Why the input matters; required/optional fields; sourced defaults; consequences; deferral; affected Gate Checks; free text plus bounded controls; recognized outcomes as Decision Records. |
+| **Input / Decision** | Required information, corrections, path choices, prerequisites. | Why the input matters; required/optional fields; sourced defaults; consequences; deferral; affected Gate Checks; free text plus bounded controls; recognized outcomes as Decisions. |
 | **Review / Proposal** | Application Contract, conformance plan, Launch Plan, baseline, Release candidate. | Exact subject; current/proposed state; assumptions, unknowns, provenance and freshness; cost/risk/responsibilities; affected checks; material diff; correct, inspect, ask Pi, and continue paths. |
 | **Approval** | A state-changing Operation requiring input under the current Approval Mode. | Intended effect, target and actor; material scope/cost/risk/reversibility; reason approval is requested; verification/recovery intent; excluded effects; approve/reject/modify/inspect/ask-Pi; stale-proposal behavior. |
 | **Operation** | Inspecting, executing, reconciling, or waiting on one bounded objective. | Operation identity, effect, actor, target and status; objective and meaningful events; affected checks; concise tool outcomes; receipts and reconciliation; whether state is changing; inspect/intervene/check-now; next observation. |
@@ -167,7 +167,7 @@ These states are presentation inventory inside the fixed phases. They are not wo
 | --- | --- | --- | --- | --- | --- |
 | L1.1 | Start launch | Repository selector, production environment, Approval Mode, short operating-intent fields | Why these inputs matter and any ambiguity Pi notices | Select and describe | §User journey phase 1; §Starting state |
 | L1.2 | Prerequisites visible | GitHub, Hetzner, Cloudflare, and domain starting-state checks with missing/available provenance | The smallest next prerequisite and what can still be inspected now | Connect, defer, or correct | §Starting state; §Important alternate paths |
-| L1.3 | Workspace created | Application identity, authority context, durable Operator Session, next phase | Pi's initial understanding and intent to inspect | Continue or correct identity | §User journey phase 1 |
+| L1.3 | Workspace created | Application identity, authority context, durable Chat, next phase | Pi's initial understanding and intent to inspect | Continue or correct identity | §User journey phase 1 |
 | L2.1 | Repository inspection | Live inspection activity, detected stack facts, unknowns, and provenance badges | Pi narrates its current hypothesis without claiming certainty | Ask or correct while inspection runs | §User journey phase 2; §Operator UI bullets 1–2 |
 | L2.2 | Contract review | Application Profile match, Application Contract fields grouped as repository-declared, inferred, user-confirmed, or unknown | Pi explains the proposed contract and the material unknowns | Confirm or correct fields | §User journey phase 2; §Evidence produced |
 | L2.3 | Profile gap or unsupported repository | Bounded conformance gaps or an explicit unmatched-contract result; no deploy action | Why the repository is outside the supported contract and what would make it eligible | Choose conformance or stop | §Important alternate paths: unsupported repository |
@@ -251,7 +251,7 @@ Full diffs, logs, traces, and raw command output remain collapsed or linked by d
 
 - Pi may select the relevant presentation family and populate model-authored explanation; it may not invent new layout regions or visual meanings.
 - Navigation, pane placement, Inspector destinations, Launch-map placement, status vocabulary, approval affordances, and evidence/takeover locations remain stable.
-- A presentation is rendered from canonical records. It must not maintain an independent status that can drift from the Operator Record.
+- A presentation is rendered from canonical records. It must not maintain an independent status that can drift from the Operator View.
 - A material claim always exposes an Evidence Reference or clearly states that supporting evidence is missing.
 - Pi prose remains visibly interpretive; it does not render as an Observation, Gate Check result, or approval.
 - New situations should first be expressed as existing family + records + detail renderers. A new family is justified only when the user's interaction and information needs are materially different.
@@ -276,7 +276,7 @@ The catalog is ready to drive the next prototype when:
 - State-changing work follows the selected Approval Mode. Provider access is capability, not blanket permission.
 - VPS creation and domain/DNS work remain separate user-understandable Operations, even when Pi can perform both.
 - Domain acquisition, registrar checkout, and nameserver delegation begin as guided user-owned account steps. Automated routing and HTTPS work begin only after Server Guy observes control.
-- A Decision Record explains what the engineer chose. It does not itself prove an Operational Claim or satisfy a Gate Check.
+- A Decision explains what the engineer chose. It does not itself prove an Operational Claim or satisfy a Gate Check.
 - Every Operational Claim follows **Claim → Evidence Reference → Observation or receipt**. Point-in-time evidence is labeled as such and refreshes append history rather than overwrite it.
 - Every paid or account-level Operation shows its intended effect and expected external cost before it occurs under the applicable Approval Mode.
 - Public verification uses the intended HTTPS hostname. A running process, successful command, or reachable IP is not equivalent to a Verified Release.
@@ -303,8 +303,8 @@ The following inputs are treated as fixed for this draft:
 
 - the nine Launch Phases and their Phase Deliverables;
 - Chat with Pi as the primary completion surface;
-- one Phase Workspace with one or more Operator Sessions per Launch Phase;
-- the compact default sidebar shows the current Exit Gate and Decision Records recognized from chat;
+- one Phase Workspace with one or more Chats per Launch Phase;
+- the compact default sidebar shows the current Exit Gate and Decisions recognized from chat;
 - Activity, Changes, and Evidence are opened on demand;
 - every Gate Check has a human-verifiable Control Point;
 - Gate Checks are computed from evidence and cannot be manually marked satisfied;
@@ -322,7 +322,7 @@ The proposed gates contain between three and six checks. Only the current phase'
 
 | Phase | Deliverable | Proposed checks |
 | --- | --- | ---: |
-| 1. Start | Launch Brief | 5 |
+| 1. Start | Launch Brief | 4 |
 | 2. Inspect app | Application Contract | 4 |
 | 3. Make launch-ready | Conformance Result | 3 |
 | 4. Review launch plan | Launch Plan | 4 |
@@ -342,9 +342,9 @@ Every Gate Check has the same product-level shape:
 | **Applicability interpretation** | How the selected Application Profile evaluates the same check for this application. A profile may prove that a responsibility is absent; it may not delete the check. |
 | **Current result** | **Satisfied** or **Unsatisfied**. An unsatisfied result carries a reason such as missing input, waiting, blocked, failed, missing evidence, or stale evidence. |
 | **Evidence References** | Current evidence supporting or refuting the claim. Each reference identifies source, observation time, collection method, raw result, artifact identity when available, and limits. |
-| **Observability targets** | Real destinations a human can open: repository revision, pull request, provider console object, server session, raw probe, evidence artifact, or the originating Decision Record. |
+| **Observability targets** | Real destinations a human can open: repository revision, pull request, provider console object, server session, raw probe, evidence artifact, or the originating Decision. |
 | **Re-verification** | A way to run the check again against current sources. Re-verification appends a new Observation; it does not overwrite the previous one. |
-| **Dependencies** | Decision Records, source identities, product policies, or other Gate Checks whose changes make the result stale. |
+| **Dependencies** | Decisions, source identities, product policies, or other Gate Checks whose changes make the result stale. |
 
 ### Result rules
 
@@ -353,7 +353,7 @@ Every Gate Check has the same product-level shape:
 - Missing, refuting, unavailable, or stale evidence makes the check **Unsatisfied**. The reason remains visible.
 - “Not applicable” is not a hidden third result. The Application Profile must provide evidence that the responsibility does not apply; that evidence can satisfy the same check.
 - Pi may explain evidence, investigate an unsatisfied check, and recommend a resolution. Pi's statement is not proof that the check is satisfied.
-- A Decision Record may change the source used by a check, but it does not directly change the result. The check must be re-run.
+- A Decision may change the source used by a check, but it does not directly change the result. The check must be re-run.
 - The exact general mechanism for material-change detection and evidence freshness remains a specification gap identified by F-7. Each check below names the source changes that must invalidate it without choosing a universal hashing or time-to-live policy.
 
 ### Observability-link contract
@@ -371,44 +371,37 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 ## Phase 1 — Start
 
-**Phase Deliverable:** **Launch Brief** — application identity, repository, target environment, Approval Mode and authority context, operating intent, and known prerequisites.
+**Phase Deliverable:** **Launch Brief** — application identity, repository, target environment, and Approval Mode. Later infrastructure prerequisites remain visible as upcoming requirements, not Phase 1 Gate Checks.
 
 ### P1.G1. Application identity recorded
 
 - **Satisfied when:** A stable Application record exists with the engineer-recognized application name and ownership context. It is unambiguously the application being launched.
-- **Evidence:** Application-record creation receipt plus the originating user input or Decision Record.
-- **Human observability:** Open **Operator Record → Launch Brief → Application identity**; open the originating message in the Start Operator Session.
+- **Evidence:** Application record.
+- **Human observability:** Open **Operator View → Launch Brief → Application identity** and its Application record.
 - **Invalidated by:** Changing the selected application or replacing the Application record.
 
 ### P1.G2. Repository is readable at a recorded identity
 
-- **Satisfied when:** Server Guy can read the selected repository and records its provider, owner, repository name, default branch, and inspected revision without requiring write access.
-- **Evidence:** Fresh repository-access Observation, returned repository metadata, inspected commit SHA, and observed credential scope.
-- **Human observability:** Open the repository at the inspected revision in GitHub; open the raw repository-access probe; open the GitHub integration scope.
+- **Satisfied when:** The latest repository-access Observation for the application confirms that Server Guy can read the exact recorded repository identity.
+- **Evidence:** Latest repository-access Observation and its returned repository metadata.
+- **Human observability:** Open the recorded repository in GitHub and inspect the latest repository-access Observation. Explicit GitHub connection and credential-scope visibility are Phase 1 follow-ups.
 - **Profile interpretation:** The profile may select which repository paths to inspect later, but readability and repository identity are stack-independent.
 - **Invalidated by:** Repository selection, installation/access scope, default branch, or inspected revision changing.
 
 ### P1.G3. Target environment is explicit
 
 - **Satisfied when:** The intended Environment and its purpose are recorded, and the engineer can distinguish it from any other environment.
-- **Evidence:** Environment record plus the originating Decision Record.
-- **Human observability:** Open **Operator Record → Launch Brief → Environment** and its originating chat decision.
+- **Evidence:** Application record.
+- **Human observability:** Open **Operator View → Launch Brief → Environment** and its Application record.
 - **Invalidated by:** Selecting a different Environment or changing the application's environment association.
 
-### P1.G4. Approval Mode and authority context are explicit
+### P1.G4. Approval Mode is explicit
 
-- **Satisfied when:** The selected Approval Mode, its effective scope, and the provider/repository capabilities currently available to Server Guy are recorded without implying broader authority than the integrations provide.
-- **Evidence:** Approval Mode Decision Record, authority-context snapshot, and redacted integration-scope Observations.
-- **Human observability:** Open the Approval Mode decision and origin; open **Integrations/Credentials → effective scopes**; open the relevant provider authorization page when available.
-- **Open dependency:** **U5** determines the permitted scope model for Approval Mode. This check requires the effective scope to be explicit but does not choose application-only, per-Release/per-Incident, or override semantics.
-- **Invalidated by:** Approval Mode, effective scope, credential scope, or connected account changing.
-
-### P1.G5. Operating intent and known prerequisites are explicit
-
-- **Satisfied when:** The Launch Brief records the engineer's material operating intent and every prerequisite currently known to be required is either available or represented by a precise Blocker with an owner and next resolution path.
-- **Evidence:** Launch Brief artifact, Decision Records recognized from chat, prerequisite Observations, and any Blocker records.
-- **Human observability:** Open the Launch Brief; jump to each originating chat decision; open the affected integration or source for each prerequisite.
-- **Invalidated by:** Revising operating intent, discovering a new material prerequisite, or resolving/invalidating a prerequisite Observation.
+- **Satisfied when:** The Application record contains one supported Approval Mode and its Phase 1 scope is explicit.
+- **Evidence:** Application record.
+- **Human observability:** Open **Operator View → Launch Brief → Approval Mode** and its Application record.
+- **Open dependency:** **U5** determines the eventual scope model. Phase 1 records the selected mode with the fixed scope **Current application launch**; it does not claim that connected integrations grant matching authority.
+- **Invalidated by:** Approval Mode or the application's authority scope changing.
 
 ## Phase 2 — Inspect app
 
@@ -420,7 +413,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Evidence:** Profile-resolution report, matched and rejected profile criteria, repository Observations, and profile identity.
 - **Human observability:** Open the profile-resolution report; open the profile specification; open each cited repository file or manifest at the inspected revision.
 - **Open dependency:** **U2** determines whether V1 exposes one or two supported profiles. The check itself remains unchanged; supporting two profiles adds a real ambiguity path rather than redefining the check.
-- **Invalidated by:** Repository revision, profile definition/version, or profile-selection Decision Record changing.
+- **Invalidated by:** Repository revision, profile definition/version, or profile-selection Decision changing.
 
 ### P2.G2. Every material Application Contract field is represented
 
@@ -433,7 +426,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 ### P2.G3. Every material field carries provenance
 
 - **Satisfied when:** Each material Application Contract value is labeled as repository-declared, profile-derived, user-confirmed, provider-observed, or unresolved, and links to the source that produced it.
-- **Evidence:** Contract provenance map and Evidence References for inferred or observed values; Decision Records for user-confirmed values.
+- **Evidence:** Contract provenance map and Evidence References for inferred or observed values; Decisions for user-confirmed values.
 - **Human observability:** Open any contract field to its repository line, profile rule, raw Observation, or originating chat decision.
 - **Invalidated by:** Any source value, source identity, or field origin changing.
 
@@ -500,7 +493,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 ### P4.G4. Verification bar and material risks are explicit
 
 - **Satisfied when:** The Launch Plan names the contract checks, semantic verification categories, known waits, material failure risks, and what evidence will be collected. Unresolved product policy is named rather than silently defaulted.
-- **Evidence:** Launch Plan verification section, Application Contract verification fields, and risk/Blocker records.
+- **Evidence:** Launch Plan verification section, Application Contract verification fields, and derived risk or Blocker explanations with their supporting records.
 - **Human observability:** Open each planned check's definition and source; open the risk detail and affected provider/application source.
 - **Open dependencies:** **U15** determines mandatory versus Pi-selected verification; **G-STOP-LAUNCH** leaves first-launch failure disposition undefined. Naming these dependencies satisfies transparency but does not resolve them.
 - **Invalidated by:** Verification requirements, risk evidence, Application Contract, or candidate topology changing.
@@ -545,9 +538,9 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 ### P6.G1. Intended public hostname is recorded
 
-- **Satisfied when:** One intended public hostname is recorded as a Decision Record and associated with this Environment. A proposed alternative during conflict resolution does not replace it until the decision changes.
-- **Evidence:** Hostname Decision Record and its originating chat context.
-- **Human observability:** Open **Operator Record → Domain Route → Intended hostname** and jump to the originating Domain chat decision.
+- **Satisfied when:** One intended public hostname is recorded as a Decision and associated with this Environment. A proposed alternative during conflict resolution does not replace it until the decision changes.
+- **Evidence:** Hostname Decision and its originating chat context.
+- **Human observability:** Open **Operator View → Domain Route → Intended hostname** and jump to the originating Domain chat decision.
 - **Invalidated by:** Hostname or target Environment changing.
 
 ### P6.G2. Authoritative domain control is observed
@@ -678,7 +671,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 ### P9.G1. Current topology and resource inventory are assembled
 
-- **Satisfied when:** The Operator Record links the current Environment, Host Record, Domain Route, runtime/persistence resources, connected providers, and current cost facts without conflicting identities.
+- **Satisfied when:** The Operator View links the current Environment, Host Record, Domain Route, runtime/persistence resources, connected providers, and current cost facts without conflicting identities.
 - **Evidence:** Cross-record identity validation plus fresh provider/host inventory Observations.
 - **Human observability:** Open each underlying provider resource, server session, Domain Route, and inventory comparison from the handoff view.
 - **Invalidated by:** Any linked resource identity, provider inventory, topology, or current cost changing.
@@ -694,7 +687,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 ### P9.G3. Gaps, ownership, costs, and drift are visible
 
 - **Satisfied when:** Every accepted gap, unresolved responsibility, Blocker, Out-of-band Change, and continuing cost has an explicit owner, status, impact, and next review/resolution path. Nothing is hidden by a generic “complete” status.
-- **Evidence:** Decision Records for accepted gaps, Blocker records, responsibility assignments, provider cost Observations, and Out-of-band Change records.
+- **Evidence:** Decisions for accepted gaps, supporting records for derived Blockers, responsibility assignments, provider cost Observations, and Out-of-band Change records.
 - **Human observability:** Open each item from the handoff summary to its originating chat decision, affected source/resource, evidence, and re-verification path.
 - **Open dependency:** **U1** determines which operational gaps may coexist with “live.” This check requires visibility and ownership but does not decide which gaps are acceptable.
 - **Invalidated by:** Gap acceptance/ownership, blocker status, cost evidence, or drift state changing.
@@ -707,22 +700,22 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Open dependencies:** **U1**, **U6**, and **G-SENTINEL-WATCHDOG** determine the mandatory observer, owner, staleness bound, and consequence of silence.
 - **Invalidated by:** Observer configuration/owner, hostname, public contract, freshness policy, liveness evidence, or latest observation changing.
 
-## Multiple Operator Sessions per phase
+## Multiple Chats per phase
 
-Each Launch Phase has one Phase Workspace and may contain many Operator Sessions, presented as chats. The main chat begins with the phase. The engineer may create focused chats for separate questions or workstreams without creating another Phase Deliverable, Exit Gate, or Operator Record.
+Each Launch Phase has one Phase Workspace and may contain many Chats, presented as chats. The main chat begins with the phase. The engineer may create focused chats for separate questions or workstreams without creating another Phase Deliverable, Exit Gate, or Operator View.
 
-All chats in the phase can read the shared Phase Workspace and contribute recognized decisions, facts, Operations, Blockers, and Evidence References to the Operator Record. Their conversation histories remain separate: one chat does not automatically import every sibling transcript. The chat list shows title, current status, and last activity so the engineer can switch context without losing phase position.
+All chats in the phase can read the shared Phase Workspace and contribute recognized decisions, facts, Operations, Blockers, and Evidence References to the Operator View. Their conversation histories remain separate: one chat does not automatically import every sibling transcript. The chat list shows title, current status, and last activity so the engineer can switch context without losing phase position.
 
 Chat is where the engineer and Pi collaborate toward the current Gate Checks; no chat is the durable source of truth for phase progress. Other application conversations remain outside Journey 1.
 
 When every Gate Check in the current Exit Gate becomes Satisfied, Server Guy performs one visible phase transition:
 
 1. finalize the Phase Deliverable and its version/identity;
-2. persist the Gate Check results and their Evidence References in the Operator Record;
-3. persist recognized Decision Records, current facts, Blockers, Operations, and unresolved product dependencies;
-4. mark every Operator Session in the completed Phase Workspace read-only without deleting its conversation or Session Events;
-5. open the next Phase Workspace with its main Operator Session;
-6. seed Pi from the Operator Record, not from completed chat transcripts;
+2. evaluate the Gate Checks from current records and retain the Evidence References used by the completed deliverable;
+3. persist recognized Decisions, current facts, Operations, and unresolved product dependencies; derive Blockers from those sources;
+4. mark every Chat in the completed Phase Workspace read-only without deleting its conversation or Activity Events;
+5. open the next Phase Workspace with its main Chat;
+6. seed Pi from the Operator View, not from completed chat transcripts;
 7. let Pi's first message name the new Phase Deliverable, summarize inherited facts/decisions, and identify the first unsatisfied Gate Checks.
 
 Completed chats remain available for provenance. Their transcripts are not injected wholesale into the next phase. Phase 9 ends by making the Handoff Phase Workspace read-only and entering the normal application workspace rather than creating a tenth Launch Phase.
@@ -736,7 +729,7 @@ The default sidebar for the current phase contains only:
 - the Phase Deliverable name and concise meaning;
 - every current Gate Check with Satisfied/Unsatisfied status and unsatisfied reason;
 - evidence age when it materially affects the result;
-- Decision Records recognized across the current phase's chats;
+- Decisions recognized across the current phase's chats;
 - one **Details** link on every check and decision.
 
 One level deeper:
