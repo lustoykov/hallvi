@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { pushTestDatabase } from "./test-database";
+
 const mocks = vi.hoisted(() => ({
   askPi: vi.fn(),
   inspectGithubRepository: vi.fn(),
@@ -41,20 +43,21 @@ beforeAll(async () => {
   databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-phase-one-"));
   databasePath = join(databaseDirectory, "test.db");
   process.env.SERVER_GUY_DB_PATH = databasePath;
+  pushTestDatabase(databasePath);
   delete globalThis.__serverGuyDb;
   database = await import("../src/server/db");
   phaseOne = await import("../src/server/phase-one");
 });
 
 beforeEach(() => {
-  database.db().exec("DELETE FROM applications");
+  database.db().$client.exec("DELETE FROM applications");
   mocks.askPi.mockReset();
   mocks.inspectGithubRepository.mockReset();
   mocks.inspectGithubRepository.mockResolvedValue(passingInspection);
 });
 
 afterAll(() => {
-  globalThis.__serverGuyDb?.close();
+  globalThis.__serverGuyDb?.$client.close();
   delete globalThis.__serverGuyDb;
   delete process.env.SERVER_GUY_DB_PATH;
   rmSync(databaseDirectory, { recursive: true, force: true });
@@ -149,6 +152,7 @@ describe("Phase 1 application workspace", () => {
     const replacement = revised.decisions[0];
     const sourceMessage = database
       .db()
+      .$client
       .prepare("SELECT body FROM messages WHERE id = ?")
       .get(replacement.sourceMessageId) as { body: string };
 

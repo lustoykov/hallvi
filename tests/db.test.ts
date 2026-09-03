@@ -5,10 +5,12 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { pushTestDatabase } from "./test-database";
+
 let databaseDirectory: string | null = null;
 
 afterEach(() => {
-  globalThis.__serverGuyDb?.close();
+  globalThis.__serverGuyDb?.$client.close();
   delete globalThis.__serverGuyDb;
   delete process.env.SERVER_GUY_DB_PATH;
   if (databaseDirectory) rmSync(databaseDirectory, { recursive: true, force: true });
@@ -18,6 +20,7 @@ afterEach(() => {
 async function loadFreshDatabase() {
   databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
   process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "test.db");
+  pushTestDatabase(process.env.SERVER_GUY_DB_PATH);
   vi.resetModules();
   return import("../src/server/db");
 }
@@ -35,6 +38,15 @@ function applicationInput(name: string) {
 }
 
 describe("Phase 1 schema", () => {
+  it("requires an explicit schema push for a fresh database", async () => {
+    databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+    process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "missing.db");
+    vi.resetModules();
+    const database = await import("../src/server/db");
+
+    expect(() => database.db()).toThrow("is not initialized. Run npm run db:push");
+  });
+
   it("refuses to open a record written by an older schema", async () => {
     databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
     const databasePath = join(databaseDirectory, "old.db");
@@ -51,14 +63,17 @@ describe("Phase 1 schema", () => {
 
   it("stores seven durable record types without persisted blockers or Gate Checks", async () => {
     const database = await loadFreshDatabase();
-    const tables = database
-      .db()
+    const client = database.db().$client;
+    const tables = client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
       .all()
       .map((row) => (row as { name: string }).name);
-    const workspaceColumns = database
-      .db()
+    const workspaceColumns = client
       .prepare("PRAGMA table_info(phase_workspaces)")
+      .all()
+      .map((row) => (row as { name: string }).name);
+    const indexes = client
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name")
       .all()
       .map((row) => (row as { name: string }).name);
 
@@ -72,6 +87,15 @@ describe("Phase 1 schema", () => {
       "phase_workspaces",
     ]);
     expect(workspaceColumns).toEqual(["id", "application_id", "phase_key", "created_at"]);
+    expect(indexes).toEqual([
+      "idx_activity_workspace",
+      "idx_decisions_application",
+      "idx_messages_chat",
+      "idx_observations_application_kind",
+    ]);
+    expect(client.pragma("user_version", { simple: true })).toBe(3);
+    expect(client.pragma("foreign_keys", { simple: true })).toBe(1);
+    expect(client.pragma("journal_mode", { simple: true })).toBe("wal");
   });
 
   it("selects the newest Observation deterministically within one Application", async () => {
@@ -94,7 +118,7 @@ describe("Phase 1 schema", () => {
       summary: "newer failure",
       sourceLabel: "GitHub",
       sourceUrl: null,
-      raw: {},
+      raw: { attempt: 2, reason: "private" },
     });
     database.insertObservation({
       applicationId: secondApplication.id,
@@ -107,11 +131,15 @@ describe("Phase 1 schema", () => {
     });
     database
       .db()
+      .$client
       .prepare("UPDATE observations SET observed_at = ? WHERE id IN (?, ?)")
       .run("2026-09-03T00:00:00.000Z", first.id, second.id);
 
     expect(
       database.latestObservation(firstApplication.id, "github-repository-identity")?.id,
     ).toBe(second.id);
+    expect(
+      database.latestObservation(firstApplication.id, "github-repository-identity")?.raw,
+    ).toEqual({ attempt: 2, reason: "private" });
   });
 });

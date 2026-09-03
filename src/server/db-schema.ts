@@ -1,0 +1,148 @@
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+
+import type {
+  ApplicationRecord,
+  Chat,
+  ChatMessage,
+  Decision,
+  Observation,
+  PhaseWorkspaceRecord,
+} from "./types";
+
+export const applications = sqliteTable(
+  "applications",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    repositoryUrl: text("repository_url").notNull().unique(),
+    repositoryOwner: text("repository_owner").notNull(),
+    repositoryName: text("repository_name").notNull(),
+    environment: text("environment").$type<ApplicationRecord["environment"]>().notNull(),
+    approvalMode: text("approval_mode").$type<ApplicationRecord["approvalMode"]>().notNull(),
+    approvalScope: text("approval_scope").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+);
+
+export const phaseWorkspaces = sqliteTable(
+  "phase_workspaces",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    phaseKey: text("phase_key").$type<PhaseWorkspaceRecord["phaseKey"]>().notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    unique().on(table.applicationId, table.phaseKey),
+  ],
+);
+
+export const chats = sqliteTable("chats", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+  archivedAt: text("archived_at"),
+});
+
+export const messages = sqliteTable(
+  "messages",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chats.id, { onDelete: "cascade" }),
+    role: text("role").$type<ChatMessage["role"]>().notNull(),
+    body: text("body").notNull(),
+    source: text("source").$type<ChatMessage["source"]>().notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_messages_chat").on(table.chatId, table.createdAt)],
+);
+
+export const decisions = sqliteTable(
+  "decisions",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    sourceMessageId: text("source_message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<Decision["kind"]>().notNull(),
+    label: text("label").notNull(),
+    value: text("value").notNull(),
+    supersededById: text("superseded_by_id").references(
+      (): AnySQLiteColumn => decisions.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_decisions_application").on(table.applicationId, table.createdAt)],
+);
+
+export const observations = sqliteTable(
+  "observations",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    status: text("status").$type<Observation["status"]>().notNull(),
+    summary: text("summary").notNull(),
+    sourceLabel: text("source_label").notNull(),
+    sourceUrl: text("source_url"),
+    raw: text("raw_json", { mode: "json" }).$type<unknown>().notNull(),
+    observedAt: text("observed_at").notNull(),
+  },
+  (table) => [
+    index("idx_observations_application_kind").on(
+      table.applicationId,
+      table.kind,
+      sql`${table.observedAt} desc`,
+    ),
+  ],
+);
+
+export const activityEvents = sqliteTable(
+  "activity_events",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    detail: text("detail").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_activity_workspace").on(table.workspaceId, sql`${table.createdAt} desc`),
+  ],
+);
+
+// These assignments fail compilation if a selected row drifts from its domain record.
+const _applicationRecord: ApplicationRecord = {} as typeof applications.$inferSelect;
+const _workspaceRecord: PhaseWorkspaceRecord = {} as typeof phaseWorkspaces.$inferSelect;
+const _chatRecord: Chat = {} as typeof chats.$inferSelect;
+const _messageRecord: ChatMessage = {} as typeof messages.$inferSelect;
+const _decisionRecord: Decision = {} as typeof decisions.$inferSelect;
+const _observationRecord: Observation = {} as typeof observations.$inferSelect;
+void [
+  _applicationRecord,
+  _workspaceRecord,
+  _chatRecord,
+  _messageRecord,
+  _decisionRecord,
+  _observationRecord,
+];

@@ -28,12 +28,13 @@ Requirements: Node.js, `gh` authenticated to GitHub, and Pi with at least one av
 
 ```bash
 npm install
+npm run db:push
 npm run dev
 ```
 
 Open <http://127.0.0.1:3000>.
 
-Durable application records are stored in `.server-guy/server-guy.db`; the Operator View and Gate Checks are derived from them. Delete the database only when you intentionally want a fresh local product state. Before the first release the schema can still change; Server Guy refuses to open a database written by an older schema and asks you to delete it.
+Durable application records are stored in `.server-guy/server-guy.db`; the Operator View and Gate Checks are derived from them. The TypeScript schema in `src/server/db-schema.ts` is the only schema definition, and `npm run db:push` applies it directly with Drizzle Kit. Delete the database only when you intentionally want a fresh local product state. Before the first release the schema can still change; Server Guy refuses to open a missing or older schema and tells you to push a fresh one.
 
 ## Verify
 
