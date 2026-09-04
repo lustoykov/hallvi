@@ -22,7 +22,8 @@ it("keeps human and advisory LLM verdicts separate, without mutating the origina
   saveReview(root, run, hash, "greeting:1", { type: "human", reviewer: "Test reviewer", verdict: "fail", reason: "Misleading claim" });
   saveReview(root, run, hash, "greeting:1", { type: "llm", model: "synthetic", effort: "low", promptVersion: "test", piVersion: "test", verdict: "pass", reason: "Looks correct" });
   expect(loadReport(root, run).hash).toBe(hash);
-  expect(listReports(root)[0].reviews.map((r) => r.type)).toEqual(["human", "llm"]);
+  // Reviews saved in the same millisecond have no guaranteed relative order.
+  expect(listReports(root)[0].reviews.map((r) => r.type).sort()).toEqual(["human", "llm"]);
 });
 it("rejects stale results, fabricated cases and path traversal", () => {
   const { root, run, hash } = fixture();

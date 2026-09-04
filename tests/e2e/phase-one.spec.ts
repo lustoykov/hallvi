@@ -20,6 +20,8 @@ async function send(page: Page, message: string) {
 }
 
 test("P1-04/06 add an application, record a priority, reload", journey("add-application"), async ({ page }) => {
+  // This first journey compiles the dev routes; CI spent ~60s before its final state check.
+  test.setTimeout(90_000);
   await page.goto("/");
   await expect(page).toHaveURL(/\/applications$/);
   await addApplication(page, "smoke-app");
