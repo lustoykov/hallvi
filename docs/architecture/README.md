@@ -22,3 +22,4 @@ Current explanations:
 - [PR 7 — Pi contract evolution and Phase 1 boundary hardening](pr-007-phase-1-boundary-hardening.html)
 - [PR 8 — Drizzle over the existing SQLite persistence layer](pr-008-drizzle-sqlite.html)
 - [PR 9 — explicit Pi setup and fixed Phase 1 runtime](pr-009-explicit-pi-setup.html)
+- [PR 10 — real Pi evals, exact state checks and human meaning review](pr-010-phase-one-evals.html)
