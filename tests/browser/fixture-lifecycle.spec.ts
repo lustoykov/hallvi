@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -86,6 +86,9 @@ test("stopping a runner cleans up its detached real Next fixture and permits res
       else dashboard.stop();
       await expect.poll(() => pids.filter(alive), { timeout: 15_000 }).toEqual([]);
       await expect.poll(() => listening(port)).toBe(false);
+      // The fixture deletes its own /tmp/server-guy-e2e-* root as it exits, on both cancellation paths.
+      expect(fixtureRoots.length).toBeGreaterThan(0);
+      await expect.poll(() => fixtureRoots.filter((path) => existsSync(path)), { timeout: 10_000 }).toEqual([]);
       if (method === "stop-button") {
         await expect.poll(async () => (await (await fetch(`${origin}/api/state`, { headers })).json()).active).toBeNull();
       }
@@ -98,5 +101,34 @@ test("stopping a runner cleans up its detached real Next fixture and permits res
     }
     for (const path of fixtureRoots) rmSync(path, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ordinary worker teardown deletes the fixture directory and keeps the shared node_modules", journey("dashboard"), async () => {
+  const port = await unusedQaPort();
+  const fixturePath = fileURLToPath(new URL("./qa-fixture.mjs", import.meta.url));
+  const source = fileURLToPath(new URL("../..", import.meta.url));
+  // Exactly how tests/browser/fixtures.ts starts and stops the QA app.
+  const child = spawn(process.execPath, [fixturePath, String(port), "success", "ready"], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  let output = ""; let root = "";
+  child.stdout.on("data", (data) => { output += data; });
+  child.stderr.on("data", (data) => { output += data; });
+  try {
+    await expect.poll(() => {
+      if (child.exitCode !== null) throw new Error(`QA app exited: ${output}`);
+      root = output.split("\n").filter((line) => line.startsWith('{"root":')).map((line) => JSON.parse(line).root as string)[0] ?? "";
+      return root;
+    }, { timeout: 60_000 }).toMatch(/^\/tmp\/server-guy-e2e-[A-Za-z0-9]{6}$/);
+    await expect.poll(() => listening(port), { timeout: 60_000 }).toBe(true);
+    expect(existsSync(join(root, "state", "qa.db"))).toBe(true);
+    const closed = once(child, "close");
+    process.kill(-child.pid!, "SIGTERM");
+    await closed;
+    expect(existsSync(root)).toBe(false);
+    expect(existsSync(join(source, "node_modules", "next"))).toBe(true); // The symlinked node_modules was unlinked, not emptied.
+    await expect.poll(() => listening(port)).toBe(false);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) { try { process.kill(-child.pid!, "SIGKILL"); } catch { /* stopped */ } }
+    if (root && existsSync(root)) rmSync(root, { recursive: true, force: true });
   }
 });

@@ -1,15 +1,15 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it, vi } from "vitest";
 import { configuredPiRuntime, createPiCatalog, readPiConfiguration, savePiConfiguration } from "../../src/server/pi-configuration";
 import { validatePiSelection } from "../../src/server/pi-models";
 import { findCase, readJson, saveReview } from "../dashboard/results";
 import { judgeAnswer, judgeCaseKeys, judgeSelectedAnswers, JUDGE_PROMPT_VERSION } from "./judge";
+import { createEvalScratch, releaseEvalScratch } from "./scratch";
 import { phaseOneCases } from "./phase-one-cases";
 
 if (process.env.SERVER_GUY_LIVE_JUDGE !== "1") throw new Error("Explicit LLM-judge opt-in required");
 it("reviews selected saved answers without rerunning Server Guy", async () => {
+  let temporary: string | undefined;
   try {
     const root = process.cwd();
     const run = process.env.PI_JUDGE_RUN!;
@@ -22,7 +22,7 @@ it("reviews selected saved answers without rerunning Server Guy", async () => {
     const selected = { ...configuration, modelId: process.env.PI_JUDGE_MODEL || configuration.modelId,
       reasoningEffort: (process.env.PI_JUDGE_EFFORT || configuration.reasoningEffort) as typeof configuration.reasoningEffort };
     validatePiSelection(await createPiCatalog(sdk), selected); // Before provider authentication.
-    const temporary = mkdtempSync(join(tmpdir(), "server-guy-judge-"));
+    temporary = createEvalScratch("judge");
     vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(temporary, "config"));
     vi.stubEnv("PI_CODING_AGENT_DIR", join(temporary, "pi"));
     savePiConfiguration(selected); // Preferences only; never copies OAuth tokens.
@@ -39,5 +39,5 @@ it("reviews selected saved answers without rerunning Server Guy", async () => {
   } catch {
     // SDK failures may contain credentials. Never print the raw error/cause.
     throw new Error("Judge did not complete the selection. Earlier verdicts remain saved; remaining answers were not judged. Check results and subscription access; no retry or fallback was attempted.");
-  } finally { vi.unstubAllEnvs(); }
+  } finally { vi.unstubAllEnvs(); releaseEvalScratch(temporary); }
 });

@@ -1,9 +1,10 @@
 // Isolated browser QA: real app/routes/domain/SQLite, deterministic external adapters.
 // Never copies .server-guy, .env files, or credentials from the source checkout.
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync, symlinkSync, chmodSync } from "node:fs";
+import { cpSync, mkdirSync, writeFileSync, symlinkSync, chmodSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
+import { createTemporaryRoot, removeTemporaryRoot } from "../temporary-root.mjs";
 
 const source = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const parentPid = process.ppid;
@@ -13,7 +14,13 @@ if (!["success", "failure"].includes(loginMode)) throw new Error("Choose success
 const initialSetup = process.argv[4] ?? "ready";
 if (!["ready", "fresh"].includes(initialSetup)) throw new Error("Choose ready or fresh for initial QA setup.");
 if (!Number.isInteger(port) || port < 3100 || port > 3999) throw new Error("Use a QA port from 3100 to 3999.");
-const root = mkdtempSync("/tmp/server-guy-e2e-");
+const root = createTemporaryRoot("/tmp/server-guy-e2e-");
+// Everything under root is disposable. It is deleted whenever this process ends: after Next stops on
+// SIGTERM/SIGINT from Playwright or the dashboard, after the orphan watch, or after a setup failure.
+// Only a hard kill (SIGKILL) skips this, because no handler runs then.
+let child = null;
+process.on("exit", () => { try { removeTemporaryRoot(root); } catch (error) { console.error(`Could not delete ${root}: ${error.message}`); } });
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { if (child) child.kill(signal); else process.exit(143); });
 const app = join(root, "app");
 const state = join(root, "state");
 const pi = join(root, "pi");
@@ -55,8 +62,7 @@ execFileSync("npm", ["run", "db:push", "--silent"], { cwd: app, env, stdio: "pip
 const manifest = { root, app, state, pi, port, source, initialSetup, database: env.SERVER_GUY_DB_PATH, externalAdapters: "Pi turn and gh are synthetic; OAuth " + loginMode + " simulated without provider calls" };
 writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log(JSON.stringify(manifest));
-const child = spawn(process.execPath, [join(source, "node_modules/next/dist/bin/next"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: app, env, stdio: "inherit" });
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
+child = spawn(process.execPath, [join(source, "node_modules/next/dist/bin/next"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: app, env, stdio: "inherit" });
 // Playwright can die before worker teardown runs. Stop this detached fixture's
 // Next child even if the parent disappeared while database setup was running.
 const orphanWatch = setInterval(() => {

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeTemporaryRoot } from "../temporary-root.mjs";
 
 // One disposable app per worker; distinct repositories per test. Never port 3000.
 export const test = base.extend<Record<never, never>, { fixture: { url: string; state: string } }>({
@@ -15,13 +16,14 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
     child.stdout.on("data", (data) => { output = (output + data).slice(-80_000); });
     child.stderr.on("data", (data) => { output = (output + data).slice(-80_000); });
     const url = `http://127.0.0.1:${port}`;
+    let root = "";
     try {
       let state = "";
       await expect.poll(async () => {
         if (child.exitCode !== null) throw new Error(`QA app exited: ${output}`);
         const manifest = output.split("\n").find((line) => line.startsWith('{"root":'));
         if (!manifest) return false;
-        state = JSON.parse(manifest).state;
+        ({ root, state } = JSON.parse(manifest));
         return fetch(`${url}/applications`).then((r) => r.ok).catch(() => false);
       }, { timeout: 90_000, intervals: [500, 1000] }).toBe(true);
       await provide({ url, state });
@@ -33,6 +35,8 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
         await closed;
         clearTimeout(timer);
       }
+      // The fixture deletes its own root as it exits; this only matters if the SIGKILL fallback above fired.
+      if (root) removeTemporaryRoot(root);
     }
   }, { scope: "worker", timeout: 100_000 }],
   baseURL: async ({ fixture }, provide) => { await provide(fixture.url); },

@@ -33,8 +33,8 @@ test("the How it works page compares every suite without starting a runner", jou
     for (const phrase of [
       "Unit and integration tests", "a chat saved by one Phase 1 test cannot appear in the next", "database connections close and these temporary folders are deleted",
       "Only the two journeys tagged @smoke run.", "dashboard journey starts its own temporary testing dashboard", "model replies are not mocked",
-      "the greeting case cannot inherit messages or Decisions from revise-existing", "the database connection closes; the file remains in /tmp", "failed code checks stay failed",
-      "tests/evals/phase-one.eval.ts", "retained for debugging", "npm run eval:pi",
+      "the greeting case cannot inherit messages or Decisions from revise-existing", "the /tmp/server-guy-pi-eval-* directory is deleted", "failed code checks stay failed",
+      "tests/evals/phase-one.eval.ts", "deleted once the run's reports are written", "npm run eval:pi",
     ]) await expect(table).toContainText(phrase);
     // A state refresh re-renders the table in place without losing it.
     revision++;

@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
@@ -14,6 +13,7 @@ import type { PhaseOneOperatorView, PiTurnResult } from "../../src/server/types"
 import { pushTestDatabase } from "../test-database";
 import { checkPhaseOne } from "./check-phase-one";
 import { evalRepeatCount, selectPhaseOneCases, type PhaseOneEvalCase } from "./phase-one-cases";
+import { createEvalScratch, releaseEvalScratch } from "./scratch";
 
 // This file is deliberately .eval.ts, excluded by Vitest's normal test discovery.
 // The separate config must also opt in before any setup or provider work runs.
@@ -38,6 +38,7 @@ const results: Array<{
   semanticReview: "pending" | "not-applicable";
 }> = [];
 let runDirectory: string | undefined;
+let state: string | undefined;
 let metadata: Record<string, unknown>;
 let initialFingerprints: ReturnType<typeof fingerprints>;
 let blockedByRuntime = false;
@@ -52,7 +53,7 @@ beforeAll(() => {
     throw new Error("Model preferences changed after confirmation. Reload and confirm the intended settings.");
   }
   if (globalThis.__serverGuyDb) throw new Error("The live eval worker must not already own an application database.");
-  const state = mkdtempSync(join(tmpdir(), "server-guy-pi-eval-"));
+  state = createEvalScratch("pi-eval");
   const artifacts = resolve("tests/results/evals");
   mkdirSync(artifacts, { recursive: true, mode: 0o700 });
   runDirectory = mkdtempSync(join(artifacts, `${new Date().toISOString().replaceAll(":", "-")}-`));
@@ -63,7 +64,7 @@ beforeAll(() => {
     provider: chosen.providerId, model: chosen.modelId, effort: chosen.reasoningEffort,
     piVersion: JSON.parse(readFileSync("package.json", "utf8")).dependencies["@earendil-works/pi-coding-agent"],
     commit: git("rev-parse", "HEAD"), dirty: Boolean(git("status", "--porcelain")),
-    sourceFingerprints: initialFingerprints, database: join(state, "eval.db"),
+    sourceFingerprints: initialFingerprints, database: join(state, "eval.db"), databaseRetained: false,
     coverage: "Real Pi adapter and SQLite transaction; synthetic application/context; no GitHub calls. Only accepted tool proposals are captured, not a full SDK trace.",
   };
   vi.stubEnv("SERVER_GUY_DB_PATH", join(state, "eval.db"));
@@ -146,7 +147,8 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
 }
 
 afterAll(() => {
-  if (!runDirectory) return;
+  // The scratch database is released even when setup failed before a run directory existed.
+  if (!runDirectory) { releaseEvalScratch(state); return; }
   const sourcesUnchanged = JSON.stringify(initialFingerprints) === JSON.stringify(fingerprints());
   const report = {
     ...metadata, finishedAt: new Date().toISOString(), sourcesUnchanged,
@@ -167,8 +169,8 @@ afterAll(() => {
     ]),
   ].join("\n");
   writeFileSync(join(runDirectory, "review.md"), review, { mode: 0o600 });
-  globalThis.__serverGuyDb?.$client.close();
-  delete globalThis.__serverGuyDb;
+  // Reports are on disk: close SQLite, then delete the scratch directory. tests/results/ keeps everything reviewable.
+  releaseEvalScratch(state);
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   console.log(`Saved ${runDirectory}/review.md. Human meaning review is still pending.`);

@@ -35,7 +35,7 @@ tests/
     └── evals/<run>/    results.json, review.md, reviews/*.json, run-state.json
 ```
 
-The product's acceptance cases and dated verification evidence stay in the single [Phase 1 acceptance guide](../docs/testing/phase-one-acceptance.md). Implementation order stays in [ROADMAP.md](../ROADMAP.md). This file is an index, not another plan. Temporary fixture apps/databases are scratch state outside the repository; their results belong here. Do not commit private outputs or credentials.
+The product's acceptance cases and dated verification evidence stay in the single [Phase 1 acceptance guide](../docs/testing/phase-one-acceptance.md). Implementation order stays in [ROADMAP.md](../ROADMAP.md). This file is an index, not another plan. Temporary fixture apps and eval databases live under `/tmp/server-guy-*` and are deleted after normal runs (only a hard kill can leave one behind); their results belong here. Do not commit private outputs or credentials.
 
 ## Suite explanations
 
