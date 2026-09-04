@@ -8,7 +8,7 @@ import { join } from "node:path";
 export const test = base.extend<Record<never, never>, { fixture: { url: string; state: string } }>({
   fixture: [async ({}, provide, workerInfo) => {
     const port = 3180 + workerInfo.workerIndex;
-    const child = spawn(process.execPath, ["tests/e2e/qa-fixture.mjs", String(port), "success", "ready"], {
+    const child = spawn(process.execPath, ["tests/browser/qa-fixture.mjs", String(port), "success", "ready"], {
       detached: true, stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";

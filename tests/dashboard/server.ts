@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { archiveRun, caseKey, directory, findCase, humanReviewSchema, listReports, readJson, reviewKeysSchema, saveHumanReviews, saveReview, writeJson } from "./results.ts";
-import { browserJourneys } from "../e2e/journeys.ts";
+import { browserJourneys } from "../browser/journeys.ts";
 import { phaseOneCases } from "../evals/phase-one-cases.ts";
 import { suiteGuides } from "./suite-guides.ts";
 

@@ -105,7 +105,7 @@ Install Chromium once after `npm ci`: `npx playwright install chromium`. On Linu
 Start a disposable desktop fixture in another terminal:
 
 ```sh
-node tests/e2e/qa-fixture.mjs 3112 success fresh
+node tests/browser/qa-fixture.mjs 3112 success fresh
 ```
 
 Open `http://127.0.0.1:3112/`. Each invocation creates a new temporary app copy, SQLite database and Pi/config directories. It does not copy `.server-guy`, `.env` or user credentials. The startup output names those directories. Stop with Ctrl+C; temporary files are retained for diagnosis. Use another free port from 3100–3999 for a separate run, never the user's port 3000.
@@ -136,9 +136,9 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Desktop automation and CI policy
 
-The [checked-in desktop suite](../../tests/e2e/phase-one.spec.ts) has eight application scenarios, plus a [dashboard review scenario](../../tests/e2e/dashboard.spec.ts). These cover selected branches of the contract, not every branch of all sixteen cases. Fresh setup/device-code variants, further evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
+The [checked-in desktop suite](../../tests/browser/phase-one.spec.ts) has eight application scenarios, plus a [dashboard review scenario](../../tests/browser/dashboard.spec.ts). These cover selected branches of the contract, not every branch of all sixteen cases. Fresh setup/device-code variants, further evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
 
-The dashboard's **Choose journeys** dialog describes each scenario and runs only the selected stable tags from [the shared catalog](../../tests/e2e/journeys.ts), without scrolling away from the suite table. Empty, duplicate and unknown selections are rejected. Browser smoke remains the two tagged smoke journeys; selecting a local subset does not change CI.
+The dashboard's **Choose journeys** dialog describes each scenario and runs only the selected stable tags from [the shared catalog](../../tests/browser/journeys.ts), without scrolling away from the suite table. Empty, duplicate and unknown selections are rejected. Browser smoke remains the two tagged smoke journeys; selecting a local subset does not change CI.
 
 - One Chromium worker, desktop 1440 × 1000, no automatic test retries. Each application-suite worker owns a disposable app/database/configuration; scenarios use distinct repository identities and restore synthetic model preferences. Contexts isolate browser state; they do not by themselves isolate SQLite.
 - Tests assert UI behavior and saved state: priority provenance, exact replacement, provider retry recovery, application isolation, typed removal confirmation, disconnect/reuse and double-send handling. Accessible labels/roles are preferred over coordinates or generated-prose snapshots.
@@ -219,7 +219,7 @@ Deployment, infrastructure provisioning, monitoring automations, and Phase 2 wor
 
 ## Latest verification
 
-**2026-09-04 — one-click review and automatic judging:** 266 Vitest tests passed (the new dashboard tests cover reviewer-less verdicts and the automatic judge run after a live eval); the desktop dashboard journey passed (5.6 seconds) covering the single-step run and judge confirmations, one-click and keyboard verdicts with auto-advance, optional notes, bulk Pass/Fail, judging unjudged answers by default, archive/restore and the 16-answer queue. Lint and TypeScript passed. `tests/journey-catalog.test.ts` fails only because two additional `@journey-dashboard` spec files were added concurrently outside this change. Synthetic saved data only; no live model calls.
+**2026-09-04 — one-click review and automatic judging:** 266 Vitest tests passed (the new dashboard tests cover reviewer-less verdicts and the automatic judge run after a live eval); the desktop dashboard journey passed (5.6 seconds) covering the single-step run and judge confirmations, one-click and keyboard verdicts with auto-advance, optional notes, bulk Pass/Fail, judging unjudged answers by default, archive/restore and the 16-answer queue. Lint and TypeScript passed. `tests/application/integration/journey-catalog.test.ts` fails only because two additional `@journey-dashboard` spec files were added concurrently outside this change. Synthetic saved data only; no live model calls.
 
 **2026-09-04 — declutter pass on Eval runs and Run checks:** 263 Vitest tests in 21 files passed; the desktop dashboard journey passed (6.3 seconds) covering topbar page navigation, the single triage status line, sidebar filter counts, the run-level triage bar text, spot-check, judge/rerun confirmations, bulk verdicts, archive/restore and the 16-answer queue. Lint and TypeScript passed. Synthetic saved data only; no live model calls or mobile checks.
 
@@ -237,7 +237,7 @@ Fable reviewed the earlier dashboard source and saved desktop screenshots, not a
 
 **2026-09-04 — journey selection, explicit live-eval counts and bulk review:** 246 Vitest tests in 20 files passed; all nine desktop Playwright journeys passed (40.4 seconds), including synthetic selection/consent requests and actual bulk human-review persistence. TypeScript, lint and diff checks passed. The catalog parity test checks every selectable journey against Playwright's discovered tags. Judge selection/stop-on-first-failure tests use no model; real bulk LLM judging was not executed. Desktop screenshots cover the selectors and bulk form. Existing live results and human verdicts were not changed by verification.
 
-**2026-09-04 — testing dashboard / checked-in runner follow-up, `codex/phase-one-evals`.** Selected desktop application scenarios are now executable under `tests/e2e/`. Dashboard and judge safety tests use synthetic saved data; no paid judge run or new live baseline was started for this follow-up. The previous live baseline was moved intact into `tests/results/evals/`; its source fingerprints remain historical, and its human meaning review is still pending. Hosted CI results must be checked separately after the workflow runs.
+**2026-09-04 — testing dashboard / checked-in runner follow-up, `codex/phase-one-evals`.** Selected desktop application scenarios are now executable under `tests/browser/`. Dashboard and judge safety tests use synthetic saved data; no paid judge run or new live baseline was started for this follow-up. The previous live baseline was moved intact into `tests/results/evals/`; its source fingerprints remain historical, and its human meaning review is still pending. Hosted CI results must be checked separately after the workflow runs.
 
 - **237/237 Vitest tests** across 18 files passed; opening the dashboard and starting its Application tests control also completed successfully.
 - **9/9 desktop Playwright scenarios** passed (eight application journeys plus dashboard review), 38.6 seconds. Includes draft preservation/focus between review cases, saved-review reload, explicit spend confirmation, exact application removal/recreation and disconnect/reuse on disposable state.

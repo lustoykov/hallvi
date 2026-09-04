@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { get } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
-import { commandFor, createDashboard } from "./dashboard/server";
-import type { Launch } from "./dashboard/server";
-import { directory, listReports, loadReport, readJson, writeJson } from "./dashboard/results";
-import { phaseOneCases } from "./evals/phase-one-cases";
-import { browserJourneys } from "./e2e/journeys";
+import { commandFor, createDashboard } from "../../dashboard/server";
+import type { Launch } from "../../dashboard/server";
+import { directory, listReports, loadReport, readJson, writeJson } from "../../dashboard/results";
+import { phaseOneCases } from "../../evals/phase-one-cases";
+import { browserJourneys } from "../../browser/journeys";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); vi.unstubAllEnvs(); });

@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { expect, it } from "vitest";
-import { browserJourneys } from "./e2e/journeys";
+import { browserJourneys } from "../../browser/journeys";
 
 it("keeps dashboard journeys and CI scope in agreement with executable Playwright tests", () => {
   type Suite = { suites?: Suite[]; specs?: { tags: string[] }[] };
-  const listed = JSON.parse(execFileSync(process.execPath, ["node_modules/playwright/cli.js", "test", "--config", "tests/e2e/playwright.config.ts", "--list", "--reporter=json"], { encoding: "utf8" })) as Suite;
+  const listed = JSON.parse(execFileSync(process.execPath, ["node_modules/playwright/cli.js", "test", "--config", "tests/browser/playwright.config.ts", "--list", "--reporter=json"], { encoding: "utf8" })) as Suite;
   const specs = (suite: Suite): { tags: string[] }[] => [...suite.specs ?? [], ...suite.suites?.flatMap(specs) ?? []];
   const tests = specs(listed);
   for (const test of tests) {

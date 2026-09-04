@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const startLogin = vi.hoisted(() => vi.fn(() => ({ id: "attempt", state: "starting" })));
-vi.mock("../src/server/pi-setup", () => ({ getPiSetupStatus: async () => ({ state: "needs-auth" }), piLoginCoordinator: { start: startLogin } }));
+vi.mock("../../../src/server/pi-setup", () => ({ getPiSetupStatus: async () => ({ state: "needs-auth" }), piLoginCoordinator: { start: startLogin } }));
 
-import { PATCH, POST } from "../src/app/api/pi/setup/route";
-import { POST as LOGIN } from "../src/app/api/pi/setup/login/route";
-import { readPiConfiguration } from "../src/server/pi-configuration";
+import { PATCH, POST } from "../../../src/app/api/pi/setup/route";
+import { POST as LOGIN } from "../../../src/app/api/pi/setup/login/route";
+import { readPiConfiguration } from "../../../src/server/pi-configuration";
 
 beforeEach(() => { startLogin.mockClear(); vi.stubEnv("SERVER_GUY_CONFIG_DIR", mkdtempSync(join(tmpdir(), "server-guy-pi-route-"))); });
 afterEach(() => vi.unstubAllEnvs());

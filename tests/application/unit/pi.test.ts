@@ -25,7 +25,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   SettingsManager: { inMemory: () => ({ isolated: true }) },
 }));
 
-vi.mock("../src/server/pi-configuration", () => ({ configuredPiRuntime: sdkMocks.configuredPiRuntime }));
+vi.mock("../../../src/server/pi-configuration", () => ({ configuredPiRuntime: sdkMocks.configuredPiRuntime }));
 
 import {
   askPi,
@@ -34,8 +34,8 @@ import {
   MAX_PI_DECISION_PROPOSALS,
   normalizePiAssistantMessage,
   proposeDecisionParameters,
-} from "../src/server/pi";
-import type { PiDecision } from "../src/server/types";
+} from "../../../src/server/pi";
+import type { PiDecision } from "../../../src/server/types";
 
 beforeEach(() => {
   sdkMocks.createAgentSession.mockReset();

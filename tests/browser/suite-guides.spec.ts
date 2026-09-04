@@ -30,7 +30,8 @@ test("suite explanations show isolation and grading without starting a runner", 
     await unit.focus(); await unit.press("Enter");
     const unitGuide = page.getByRole("region", { name: "Application tests explained" });
     await expect(unitGuide).toContainText("Unit and integration tests");
-    await expect(unitGuide).toContainText("clear application rows before each test");
+    await expect(unitGuide).toContainText("a chat saved by one Phase 1 test cannot appear in the next");
+    await expect(unitGuide).toContainText("database connections close and these temporary folders are deleted");
     await expect(unit).toHaveAttribute("aria-expanded", "true");
     revision++;
     await expect.poll(() => shownRevision).toBe(revision);
@@ -44,11 +45,12 @@ test("suite explanations show isolation and grading without starting a runner", 
       await page.getByRole("button", { name: `About ${name}`, exact: true }).click();
       const guide = page.getByRole("region", { name: `${name} explained` });
       await expect(guide).toContainText(phrase);
-      await expect(guide.locator("dt")).toHaveText(["Execution", "Real", "Mocked / simulated", "Database boundary", "Checks & review", "Doesn’t prove"]);
+      await expect(guide.locator("dt")).toHaveText(["Execution", "Real", "Mocked / simulated", "Database & state lifecycle", "Checks & review", "Doesn’t prove"]);
       await expect(page.locator(".suite-explanation")).toHaveCount(1);
     }
     const liveGuide = page.getByRole("region", { name: "Live agent evals explained" });
-    await expect(liveGuide).toContainText("Every case and repetition gets a new application");
+    await expect(liveGuide).toContainText("the greeting case cannot inherit messages or Decisions from revise-existing");
+    await expect(liveGuide).toContainText("the database connection closes; the file remains in /tmp");
     await expect(liveGuide).toContainText("failed code checks stay failed");
     await page.screenshot({ path: testInfo.outputPath("suite-live-evals.png"), fullPage: true });
     await liveGuide.getByText("Code & saved output", { exact: true }).click();

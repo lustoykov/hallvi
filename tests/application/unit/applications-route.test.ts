@@ -5,13 +5,13 @@ const mocks = vi.hoisted(() => ({
   createPhaseOneApplication: vi.fn(),
 }));
 
-vi.mock("../src/server/phase-one", () => ({
+vi.mock("../../../src/server/phase-one", () => ({
   ExistingApplicationConflictError: class ExistingApplicationConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createPhaseOneApplication: mocks.createPhaseOneApplication,
 }));
 
-import { POST } from "../src/app/api/applications/route";
+import { POST } from "../../../src/app/api/applications/route";
 
 function request(body: unknown) {
   return new NextRequest("http://localhost/api/applications", {

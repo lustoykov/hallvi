@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { expect, it } from "vitest";
-import { suites } from "./dashboard/server";
-import { suiteGuides } from "./dashboard/suite-guides";
+import { suites } from "../../dashboard/server";
+import { suiteGuides } from "../../dashboard/suite-guides";
 
 it("every suite has the same explanation fields and real source pointers", () => {
   expect(Object.keys(suiteGuides).sort()).toEqual(suites.map((suite) => suite.id).sort());

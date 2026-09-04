@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { checkPhaseOne } from "./evals/check-phase-one";
-import { evalRepeatCount, phaseOneCases, selectPhaseOneCases, type PhaseOneEvalCase } from "./evals/phase-one-cases";
-import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../src/server/types";
+import { checkPhaseOne } from "../../evals/check-phase-one";
+import { evalRepeatCount, phaseOneCases, selectPhaseOneCases, type PhaseOneEvalCase } from "../../evals/phase-one-cases";
+import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../../../src/server/types";
 
 function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
   const application = {

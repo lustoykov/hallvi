@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { judgeCaseKeys, judgeSelectedAnswers } from "./evals/judge";
+import { judgeCaseKeys, judgeSelectedAnswers } from "../../evals/judge";
 
 it("validates a bounded explicit saved-answer selection", () => {
   expect(judgeCaseKeys('["greeting:1","greeting:2"]')).toEqual(["greeting:1", "greeting:2"]);

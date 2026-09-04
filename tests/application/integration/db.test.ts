@@ -5,8 +5,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import schemaVersion from "../src/server/schema-version.json";
-import { pushTestDatabase } from "./test-database";
+import schemaVersion from "../../../src/server/schema-version.json";
+import { pushTestDatabase } from "../../test-database";
 
 let databaseDirectory: string | null = null;
 
@@ -23,7 +23,7 @@ async function loadFreshDatabase() {
   process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "test.db");
   pushTestDatabase(process.env.SERVER_GUY_DB_PATH);
   vi.resetModules();
-  return import("../src/server/db");
+  return import("../../../src/server/db");
 }
 
 function applicationInput(name: string) {
@@ -43,7 +43,7 @@ describe("Phase 1 schema", () => {
     databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
     process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "missing.db");
     vi.resetModules();
-    const database = await import("../src/server/db");
+    const database = await import("../../../src/server/db");
 
     expect(() => database.db()).toThrow("is not initialized. Run npm run db:push");
   });
@@ -57,7 +57,7 @@ describe("Phase 1 schema", () => {
 
     process.env.SERVER_GUY_DB_PATH = databasePath;
     vi.resetModules();
-    const database = await import("../src/server/db");
+    const database = await import("../../../src/server/db");
 
     expect(() => database.db()).toThrow(
       `prototype schema version 0; expected ${schemaVersion.version}`,

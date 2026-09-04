@@ -5,7 +5,7 @@
 Run checks, see model usage/CI policy, inspect recent runs, and review saved **live agent eval** answers. Nothing runs just by opening it. Live agent evals and LLM judgments use your subscription, so they start from one confirmation dialog; a live run judges its own answers when it finishes unless you untick that. Human verdicts and LLM judgments remain separate records.
 
 - **Run checks:** the suite table shows each suite's scope, model usage, CI policy and its last recorded result. Recent runs list status, scope (selected journeys, cases × repetitions, or judged answers), commit, start time and duration; clicking a run expands its command and bounded output inline. A running check shows a live elapsed time and a Stop control.
-- **Choose journeys:** opens a dialog beside the run action, without scrolling the page. Inspect descriptions and select any of nine desktop journeys (eight product journeys plus the dashboard). The shared catalog and exact test tags live in [e2e/journeys.ts](e2e/journeys.ts). Smoke still runs just two.
+- **Choose journeys:** opens a dialog beside the run action, without scrolling the page. Inspect descriptions and select any of nine desktop journeys (eight product journeys plus the dashboard). The shared catalog and exact test tags live in [browser/journeys.ts](browser/journeys.ts). Smoke still runs just two.
 - **Choose live eval cases:** a dialog with expected behavior, exact inputs and 1–5 repetitions, defaulting to **one**. It shows `cases × repetitions = planned answers` before spending confirmation. Cancel preserves the selection. Saved-run counts are historical, not today's defaults; interrupted runs may have fewer answers.
 - **Run case again…:** on an individual answer, runs that case **once** using the current code/case definition and confirmed model settings, even if the original run or picker used more repetitions. Creates a new saved run and never overwrites old answers/reviews; like any live run it is judged automatically afterwards unless you untick that in the confirmation. Also available when the case failed before replying; removed cases cannot be rerun.
 - **Eval runs:** the topbar switches between **Run checks** (`/`) and **Eval runs** (`/evals`); the Eval runs link carries a count of answers needing attention, and **View saved runs** under Live agent evals opens the same page. Direct links, refresh, new tabs and browser Back/Forward work. In-page route changes preserve unsaved review drafts and selections. The sidebar lists runs (newest first, archived ones in a collapsed group) and the open run's answers; the main column shows one answer with Previous/Next and J/K navigation. Repetitions of a case sit together. **Run evals** generates answers and, by default, judges them as soon as the run finishes with the same model. The run header's **Judge** button covers older runs: it targets the answers the current judge policy has not judged yet, or everything again once all are judged.
@@ -20,9 +20,11 @@ Run checks, see model usage/CI policy, inspect recent runs, and review saved **l
 
 ```text
 tests/
-├── *.test.ts(x)         Vitest: application and testing-tool rules
-├── vitest.config.mjs    Ordinary tests only; excludes live evals
-├── e2e/                Desktop Playwright tests, config and fixture launcher
+├── application/        Application tests suite (Vitest)
+│   ├── unit/           Isolated rules, routes and components; external boundaries mocked
+│   ├── integration/    Real SQLite, filesystem, HTTP or subprocess boundaries
+│   └── vitest.config.mjs  Selects only these two folders; never live evals
+├── browser/            Browser journeys + tagged smoke subset (Playwright)
 ├── browser-fixtures/   Synthetic Pi, GitHub and login adapters
 ├── evals/              Live Server Guy cases/checks/runner; saved-answer judge
 ├── dashboard/          Separate loopback-only Node server and static UI
@@ -39,14 +41,18 @@ The product's acceptance cases and dated verification evidence stay in the singl
 
 Click a suite name to expand its explanation directly below the row; this never starts a test. Every suite uses the same fields: execution, real dependencies, mocked dependencies, database isolation, checks/review, and what passing does not prove. **Code & saved output** lists the command, source files and artifact locations. The copy lives in [dashboard/suite-guides.ts](dashboard/suite-guides.ts), separate from execution logic.
 
-Unit and integration tests currently share `tests/*.test.ts`; browser tests live in `tests/e2e/`; live evals and judging live in `tests/evals/`. Browser smoke selects tagged tests from the same browser suite, not a separate folder.
+The folders match the dashboard suites: **Application tests** → `application/`, **Browser smoke / Browser journeys** → `browser/`, **Live agent evals** → `evals/`. Browser smoke selects tagged tests from the same browser suite, not a separate folder. `dashboard/` is the testing tool, not another test suite; `browser-fixtures/` and `test-database.ts` are shared support.
+
+Application tests are split by their strongest boundary. `unit/` calls isolated rules, routes or components with external dependencies mocked; `integration/` exercises real SQLite, filesystem, HTTP or subprocess interactions. A file containing both stays under integration. These are both deterministic, no-model suites—not live evals. Database setup still belongs to each test file; moving a file does not change its reset policy.
+
+Run either subset without a new runner: `npm test -- tests/application/unit` or `npm test -- tests/application/integration`. Existing `test:e2e` commands keep their names and now point at `browser/playwright.config.ts`.
 
 ## Commands
 
 | Task | Command | Model calls |
 | --- | --- | --- |
 | Testing dashboard | `npm run test:dashboard` | None until explicit live start |
-| Application/runner unit tests | `npm test` | None |
+| Application unit + integration tests | `npm test` | None |
 | Interactive Vitest | `npm run test:ui` | None |
 | Two desktop smoke journeys | `npm run test:e2e:smoke` | None |
 | Full desktop suite | `npm run test:e2e` | None |

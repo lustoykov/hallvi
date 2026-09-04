@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import Home from "../src/app/page";
-import { ApplicationsScreen } from "../src/components/server-guy/applications-screen";
-import { NewApplicationScreen } from "../src/components/server-guy/new-application-screen";
-import type { ApplicationRecord } from "../src/server/types";
+import Home from "../../../src/app/page";
+import { ApplicationsScreen } from "../../../src/components/server-guy/applications-screen";
+import { NewApplicationScreen } from "../../../src/components/server-guy/new-application-screen";
+import type { ApplicationRecord } from "../../../src/server/types";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));

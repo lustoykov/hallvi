@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
-import { archiveRun, directory, findCase, humanReviewSchema, listReports, loadReport, readJson, saveHumanReviews, saveReview, writeJson } from "./dashboard/results";
+import { archiveRun, directory, findCase, humanReviewSchema, listReports, loadReport, readJson, saveHumanReviews, saveReview, writeJson } from "../../dashboard/results";
 
 const roots: string[] = [];
 function fixture() {

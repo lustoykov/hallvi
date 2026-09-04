@@ -4,13 +4,13 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.{ts,tsx}"],
+    include: ["tests/application/{unit,integration}/**/*.test.{ts,tsx}"],
     exclude: ["tests/results/**"],
     coverage: { reportsDirectory: "tests/results/coverage" },
   },
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("../src", import.meta.url)),
+      "@": fileURLToPath(new URL("../../src", import.meta.url)),
     },
   },
 });

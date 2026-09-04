@@ -6,15 +6,15 @@ const mocks = vi.hoisted(() => ({
   sendChatMessage: vi.fn(),
 }));
 
-vi.mock("../src/server/phase-one", () => ({
+vi.mock("../../../src/server/phase-one", () => ({
   ExistingApplicationConflictError: class ExistingApplicationConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createChat: mocks.createChat,
   sendChatMessage: mocks.sendChatMessage,
 }));
 
-import { POST as createChat } from "../src/app/api/applications/[applicationId]/chats/route";
-import { POST as sendMessage } from "../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
+import { POST as createChat } from "../../../src/app/api/applications/[applicationId]/chats/route";
+import { POST as sendMessage } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
 
 function request(path: string, body: unknown) {
   return new NextRequest(`http://localhost${path}`, {

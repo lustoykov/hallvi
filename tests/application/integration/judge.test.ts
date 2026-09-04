@@ -2,10 +2,10 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { Value } from "typebox/value";
 import { afterEach, expect, it, vi } from "vitest";
-import type { PiSdk } from "../src/server/pi-configuration";
-import type { SavedCase } from "./dashboard/results";
-import { judgeAnswer, judgeParameters, judgePrompt } from "./evals/judge";
-import { JUDGE_PROMPT_VERSION } from "./evals/judge-policy";
+import type { PiSdk } from "../../../src/server/pi-configuration";
+import type { SavedCase } from "../../dashboard/results";
+import { judgeAnswer, judgeParameters, judgePrompt } from "../../evals/judge";
+import { JUDGE_PROMPT_VERSION } from "../../evals/judge-policy";
 
 const record: SavedCase = { caseId: "question", repetition: 1, rubric: "Discuss without inventing a choice",
   input: { userMessage: "Should I prioritize simplicity?", decisions: [] },

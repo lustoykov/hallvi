@@ -4,26 +4,26 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { pushTestDatabase } from "./test-database";
+import { pushTestDatabase } from "../../test-database";
 
 const mocks = vi.hoisted(() => ({
   askPi: vi.fn(),
   inspectGithubRepository: vi.fn(),
 }));
 
-vi.mock("../src/server/github", async () => {
-  const actual = await vi.importActual<typeof import("../src/server/github")>(
-    "../src/server/github",
+vi.mock("../../../src/server/github", async () => {
+  const actual = await vi.importActual<typeof import("../../../src/server/github")>(
+    "../../../src/server/github",
   );
   return { ...actual, inspectGithubRepository: mocks.inspectGithubRepository };
 });
 
-vi.mock("../src/server/pi", () => ({ askPi: mocks.askPi }));
+vi.mock("../../../src/server/pi", () => ({ askPi: mocks.askPi }));
 
 let databaseDirectory: string;
 let databasePath: string;
-let database: typeof import("../src/server/db");
-let phaseOne: typeof import("../src/server/phase-one");
+let database: typeof import("../../../src/server/db");
+let phaseOne: typeof import("../../../src/server/phase-one");
 
 const passingInspection = {
   status: "passed" as const,
@@ -45,8 +45,8 @@ beforeAll(async () => {
   process.env.SERVER_GUY_DB_PATH = databasePath;
   pushTestDatabase(databasePath);
   delete globalThis.__serverGuyDb;
-  database = await import("../src/server/db");
-  phaseOne = await import("../src/server/phase-one");
+  database = await import("../../../src/server/db");
+  phaseOne = await import("../../../src/server/phase-one");
 });
 
 beforeEach(() => {

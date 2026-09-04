@@ -8,24 +8,24 @@ const effects = vi.hoisted(() => ({
   removeApplication: vi.fn(() => ({})), choosePiSetup: vi.fn(), updatePiPreferences: vi.fn(),
   start: vi.fn(() => ({ id: "attempt" })), cancel: vi.fn(() => ({ id: "attempt" })), disconnect: vi.fn(),
 }));
-vi.mock("../src/server/phase-one", () => ({
+vi.mock("../../../src/server/phase-one", () => ({
   ...effects, getPhaseOneOperatorView: () => ({}),
   ExistingApplicationConflictError: class extends Error {}, NotFoundError: class extends Error {},
 }));
-vi.mock("../src/server/pi-configuration", async (original) => ({
+vi.mock("../../../src/server/pi-configuration", async (original) => ({
   ...await original<object>(), choosePiSetup: effects.choosePiSetup, updatePiPreferences: effects.updatePiPreferences,
 }));
-vi.mock("../src/server/pi-setup", () => ({ getPiSetupStatus: () => ({}), piLoginCoordinator: effects }));
+vi.mock("../../../src/server/pi-setup", () => ({ getPiSetupStatus: () => ({}), piLoginCoordinator: effects }));
 
-import { POST as application } from "../src/app/api/applications/route";
-import { DELETE as remove } from "../src/app/api/applications/[applicationId]/route";
-import { POST as chat } from "../src/app/api/applications/[applicationId]/chats/route";
-import { POST as message } from "../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
-import { POST as archive } from "../src/app/api/applications/[applicationId]/chats/[chatId]/archive/route";
-import { POST as rerun } from "../src/app/api/applications/[applicationId]/checks/repository-readable/rerun/route";
-import { POST as setup, PATCH as preferences, DELETE as disconnect } from "../src/app/api/pi/setup/route";
-import { POST as login } from "../src/app/api/pi/setup/login/route";
-import { DELETE as cancel } from "../src/app/api/pi/setup/login/[attemptId]/route";
+import { POST as application } from "../../../src/app/api/applications/route";
+import { DELETE as remove } from "../../../src/app/api/applications/[applicationId]/route";
+import { POST as chat } from "../../../src/app/api/applications/[applicationId]/chats/route";
+import { POST as message } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
+import { POST as archive } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/archive/route";
+import { POST as rerun } from "../../../src/app/api/applications/[applicationId]/checks/repository-readable/rerun/route";
+import { POST as setup, PATCH as preferences, DELETE as disconnect } from "../../../src/app/api/pi/setup/route";
+import { POST as login } from "../../../src/app/api/pi/setup/login/route";
+import { DELETE as cancel } from "../../../src/app/api/pi/setup/login/[attemptId]/route";
 
 const context = { params: Promise.resolve({ applicationId: "app", chatId: "chat", attemptId: "attempt" }) };
 const model = { modelId: "gpt-5.6-sol", reasoningEffort: "high" };

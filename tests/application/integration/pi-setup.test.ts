@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { choosePiSetup, choosePiSetupSchema, configuredPiRuntime, detectPiSetup, readPiConfiguration, updatePiPreferences } from "../src/server/pi-configuration";
-import { getPiSetupStatus, PiLoginCoordinator } from "../src/server/pi-setup";
+import { choosePiSetup, choosePiSetupSchema, configuredPiRuntime, detectPiSetup, readPiConfiguration, updatePiPreferences } from "../../../src/server/pi-configuration";
+import { getPiSetupStatus, PiLoginCoordinator } from "../../../src/server/pi-setup";
 
 const model = { provider: "openai-codex", id: "gpt-5.6-sol", name: "GPT-5.6 Sol", reasoning: true };
 const oauth = { type: "oauth", access: "secret-access", refresh: "secret-refresh", expires: Date.now() + 3_600_000 };

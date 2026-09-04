@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ disconnect: vi.fn(), removeApplication: vi.fn(), getPiSetupStatus: vi.fn() }));
-vi.mock("../src/server/pi-setup", () => ({ piLoginCoordinator: { disconnect: mocks.disconnect }, getPiSetupStatus: mocks.getPiSetupStatus }));
-vi.mock("../src/server/phase-one", () => ({
+vi.mock("../../../src/server/pi-setup", () => ({ piLoginCoordinator: { disconnect: mocks.disconnect }, getPiSetupStatus: mocks.getPiSetupStatus }));
+vi.mock("../../../src/server/phase-one", () => ({
   ExistingApplicationConflictError: class extends Error {}, NotFoundError: class extends Error {},
   getPhaseOneOperatorView: vi.fn(), removeApplication: mocks.removeApplication,
 }));
-import { DELETE as disconnect } from "../src/app/api/pi/setup/route";
-import { DELETE as remove } from "../src/app/api/applications/[applicationId]/route";
+import { DELETE as disconnect } from "../../../src/app/api/pi/setup/route";
+import { DELETE as remove } from "../../../src/app/api/applications/[applicationId]/route";
 
 function request(body: unknown, origin = "http://localhost") {
   return new Request("http://localhost/api/action", { method: "DELETE", headers: { origin, "content-type": "application/json" }, body: JSON.stringify(body) });

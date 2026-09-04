@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
-import { directory, writeJson } from "./dashboard/results";
-import { createDashboard } from "./dashboard/server";
+import { directory, writeJson } from "../../dashboard/results";
+import { createDashboard } from "../../dashboard/server";
 
 it.each([false, true])("explains failed live runs without leaking output (partial report: %s)", async (partialReport) => {
   const root = mkdtempSync(join(tmpdir(), "sg-dashboard-failure-"));

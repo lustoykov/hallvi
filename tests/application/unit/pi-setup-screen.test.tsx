@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { PiSetupScreen } from "../src/components/server-guy/pi-setup-screen";
-import type { PiSetupStatus } from "../src/server/pi-setup";
+import { PiSetupScreen } from "../../../src/components/server-guy/pi-setup-screen";
+import type { PiSetupStatus } from "../../../src/server/pi-setup";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 

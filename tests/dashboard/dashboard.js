@@ -103,7 +103,7 @@ function suiteExplanation(suite) {
   const section = element("section", "", "suite-guide"); section.setAttribute("aria-label", `${suite.name} explained`);
   section.append(element("p", suite.guide.purpose, "suite-purpose"));
   const facts = document.createElement("dl");
-  for (const [label, key] of [["Execution", "execution"], ["Real", "real"], ["Mocked / simulated", "mocked"], ["Database boundary", "isolation"], ["Checks & review", "checks"], ["Doesn’t prove", "limits"]]) {
+  for (const [label, key] of [["Execution", "execution"], ["Real", "real"], ["Mocked / simulated", "mocked"], ["Database & state lifecycle", "isolation"], ["Checks & review", "checks"], ["Doesn’t prove", "limits"]]) {
     facts.append(element("dt", label), element("dd", suite.guide[key]));
   }
   const technical = document.createElement("details");

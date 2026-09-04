@@ -2,7 +2,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 
-import { piModelOptions, validatePiSelection } from "../src/server/pi-models";
+import { piModelOptions, validatePiSelection } from "../../../src/server/pi-models";
 
 describe("the bundled Pi model catalog", () => {
   it("offers only ChatGPT models with Pi's own supported reasoning levels", async () => {

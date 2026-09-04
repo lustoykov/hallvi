@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import { triageCase, type SavedCase } from "./dashboard/results";
-import { JUDGE_PROMPT_VERSION } from "./evals/judge-policy";
+import { triageCase, type SavedCase } from "../../dashboard/results";
+import { JUDGE_PROMPT_VERSION } from "../../evals/judge-policy";
 
 const record: SavedCase = { caseId: "greeting", repetition: 1, rubric: "Greet without inventing a choice",
   input: { userMessage: "Hello" }, reply: { message: "Hello", decisionProposals: [] },

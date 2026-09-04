@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeChecks } from "../src/server/phase-one-spec";
-import type { ApplicationRecord, GateCheck, Observation } from "../src/server/types";
+import { computeChecks } from "../../../src/server/phase-one-spec";
+import type { ApplicationRecord, GateCheck, Observation } from "../../../src/server/types";
 
 const application: ApplicationRecord = {
   id: "app",

@@ -91,7 +91,10 @@ test("dashboard reviews saved answers without model calls or changing source res
     await page.getByRole("button", { name: "Choose journeys…" }).click();
     await expect(page.getByRole("dialog", { name: "Choose browser journeys" })).toBeVisible();
     await expect(page.locator("#journey-options input")).toHaveCount(9);
+    await expect(page.locator("#journey-options .ci-badge")).toHaveText(["CI · Every PR", "CI · Every PR"]);
     await page.getByRole("button", { name: "Clear journeys", exact: true }).click();
+    // Local selection never changes which journeys belong to automatic CI.
+    await expect(page.locator("#journey-options .ci-badge")).toHaveCount(2);
     await expect(page.getByRole("button", { name: "Run selected journeys" })).toBeDisabled();
     await page.getByRole("checkbox", { name: /^Settings and privacy help/ }).check();
     await page.getByRole("checkbox", { name: /^Disconnect without losing history/ }).check();
