@@ -1,10 +1,38 @@
-# Server Guy TODOs
+# Server Guy development roadmap
 
-## Phase 1 follow-ups — Start
+This is the single owner of development order, implementation status, and the remaining work. Keep detailed checklists here rather than maintaining a separate TODO file. See the [documentation map](README.md#documentation) for the other documents' roles.
 
-These are separate follow-up PRs after the current Phase 1 implementation. Complete items 1–4 before starting Phase 2. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
+**Launch phases** describe the [user's Application Launch journey](docs/user-journeys/01-application-launch.md#nine-phase-journey). **Development milestones and PRs** describe how we build it. One launch phase spans several PRs: Phase 1 includes boundaries, Drizzle, Pi setup, evals, GitHub connection, and durable requests. Milestone numbers below are not launch-phase numbers.
 
-### 1. Add Drizzle over the existing SQLite database
+## Development sequence
+
+The sequence below carries the agreed order formerly kept in the learning guide, with the current Phase 1 eval work made explicit. It is not a replacement for the journey's product requirements or exit gates. Conditional technology adoption is not a mandatory step.
+
+| Order | Development milestone | Status / detail |
+| --- | --- | --- |
+| 1 | Harden Phase 1 HTTP and Pi boundaries with Zod, TypeBox, and adversarial tests. | Merged: [PR #7](https://github.com/lustoykov/server-guy/pull/7). |
+| 2 | Add Drizzle over the existing SQLite database. | Merged: [PR #8](https://github.com/lustoykov/server-guy/pull/8). [Checklist](#add-drizzle-over-the-existing-sqlite-database). |
+| 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
+| 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | In review: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Human meaning review and desktop Playwright automation remain open below. |
+| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Planned: [checklist](#connect-github-explicitly). |
+| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Planned: [checklist](#make-pi-requests-durable). |
+| 7 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
+| 8 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
+| 9 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
+| 10 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
+| 11 | Add structured logs, OpenTelemetry, and Langfuse with one correlation identity. | Planned. |
+| 12 | Revisit Workflow DevKit only when its durability trigger is present. | Conditional: [trigger](#revisit-workflow-devkit-only-at-its-trigger); not a prerequisite for the next milestone. |
+| 13 | Break, recover, roll back, and externally re-verify a deployed application. | Planned. |
+| 14 | Add the EC2 Host Adapter, reusing the proven Linux-host lifecycle and Host Record. | Planned: [AWS direction](#aws-integration-direction). |
+| 15 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
+
+Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
+
+## Phase 1 implementation backlog
+
+Finish the required [Phase 1 acceptance gates](docs/testing/phase-one-acceptance.md#what-done-means), including explicit GitHub connection and durable requests, before starting Phase 2. Optional cleanup and conditional architecture studies are not automatic blockers. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
+
+### Add Drizzle over the existing SQLite database
 
 - [x] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
 - [x] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
@@ -14,7 +42,7 @@ These are separate follow-up PRs after the current Phase 1 implementation. Compl
 
 Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or intentionally nuking the local database.
 
-### 2. Configure Pi explicitly
+### Configure Pi explicitly
 
 - [x] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
 - [x] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
@@ -43,7 +71,7 @@ Decision: the packaged Pi SDK is the runtime; users do not install Pi or Codex C
 
 Tokens are unencrypted JSON; new credential files are owner-only (0600), and Pi preserves existing file permissions. `SERVER_GUY_CONFIG_DIR` overrides the storage directory. Detection does not refresh tokens, execute key commands, contact providers, expose secrets, or read Codex CLI auth. Only built-in `openai-codex` models and stored ChatGPT OAuth credentials are reusable. Readiness means local configuration/credentials are present; provider access and limits are checked on send. Live OAuth completion and a real model response still require a user-approved account test.
 
-### 3. Connect GitHub explicitly
+### Connect GitHub explicitly
 
 - [ ] Add a user-visible GitHub authentication and connection flow.
 - [ ] Detect and explain any reusable local credentials instead of silently assuming access.
@@ -52,7 +80,7 @@ Tokens are unencrypted JSON; new credential files are owner-only (0600), and Pi 
 
 Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reuse machine credentials or must keep its own isolated connection.
 
-### 4. Make Pi requests durable
+### Make Pi requests durable
 
 - [ ] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
 - [ ] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
@@ -69,7 +97,7 @@ The current Pi session is created and disposed inside one HTTP request, while th
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
 
-### 5. Revisit Workflow DevKit only at its trigger
+## Revisit Workflow DevKit only at its trigger
 
 - [ ] Re-evaluate Workflow DevKit when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate.
 
@@ -92,7 +120,7 @@ Originating discussion: Codex side chat [`01a06676-6a82-7f03-91b9-95c61504a066`]
 
 ## AWS integration direction
 
-The ordered plan and the boundary between an EC2 host and an ECS/Fargate deployment target are recorded in [docs/integrations/aws.md](docs/integrations/aws.md).
+Build order and status stay here. The boundary between an EC2 host and an ECS/Fargate deployment target, capability details, and supporting references live in [docs/integrations/aws.md](docs/integrations/aws.md).
 
 - [ ] Finish and prove the provider-independent Linux-host lifecycle on the Hetzner reference path.
 - [ ] Add an EC2 Host Adapter that produces the same Host Record and reuses the Linux-host lifecycle.

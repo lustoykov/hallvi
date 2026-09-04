@@ -3,6 +3,8 @@
 **Status:** Planned learning and product direction; not implemented  
 **Current product boundary:** Hetzner remains the V1 reference provider. AWS does not replace the current Linux-host path.
 
+This document owns AWS-specific design boundaries, capability detail, and references. Development order and implementation status belong to the [Server Guy roadmap](../../ROADMAP.md#aws-integration-direction).
+
 ## Decision
 
 Add AWS in two deliberately separate forms:
@@ -29,9 +31,9 @@ EC2 is an AWS virtual server. Server Guy still manages an identifiable Linux mac
 
 ECS/Fargate is a different deployment model. Server Guy would manage task definitions, services, networking, permissions, releases, and supporting AWS resources rather than one machine.
 
-## Ordered learning sequence
+## Capability detail
 
-### 1. Prove the generic Linux-host lifecycle
+### Generic Linux-host lifecycle
 
 Finish the Hetzner and adopted-Linux path first. This is where Server Guy learns the portable deployment contract:
 
@@ -45,7 +47,7 @@ Finish the Hetzner and adopted-Linux path first. This is where Server Guy learns
 
 The application-level contract should not change when the Linux machine comes from another provider. See [the current hosting research](../research/2026-08-31-self-hosting-demand-and-use-cases.md) and [Application Launch](../user-journeys/01-application-launch.md).
 
-### 2. Add an EC2 Host Adapter
+### EC2 Host Adapter
 
 The EC2 adapter owns AWS-facing reconciliation and emits the same Host Record consumed by the common Linux-host lifecycle.
 
@@ -111,7 +113,7 @@ Primary references:
 - [CloudWatch agent for metrics, logs, and traces](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html)
 - [Amazon VPC public IPv4 pricing](https://aws.amazon.com/vpc/pricing/)
 
-### 3. Manually deploy the same application to ECS/Fargate
+### Manual ECS/Fargate lab
 
 Do this once outside Server Guy before automating it:
 
@@ -144,7 +146,7 @@ The concrete managed-AWS responsibility map is:
 
 This is the enterprise AWS learning exercise. It is not evidence that ECS/Fargate belongs inside Server Guy yet.
 
-### 4. Automate ECS/Fargate only after demand
+### ECS/Fargate automation trigger
 
 An ECS/Fargate target is not another Host Adapter:
 
@@ -159,20 +161,8 @@ ECS/Fargate Deployment Target
 
 Automate the managed target only when a client or validated product use case requires it and the manual deployment has established its release, rollback, observability, cost, authority, and deletion model. If that happens, give it a separate target contract rather than scattering AWS conditionals through the Deployment Host implementation.
 
-## Product sequence
+## Development roadmap
 
-```text
-Server Guy V1
-└── Hetzner reference path + existing Linux host
-
-Next provider extension
-└── EC2 Host Adapter
-
-Personal enterprise lab
-└── ECR + ECS/Fargate + RDS + CloudWatch
-
-Possible future Server Guy target
-└── ECS/Fargate automation after client demand
-```
+See the [AWS implementation backlog](../../ROADMAP.md#aws-integration-direction) for the ordered work and status. Do not maintain a second sequence here.
 
 The governing principle is: **do not distort the product into a curriculum**. Use Server Guy to learn deployment and recovery deeply; use the separate ECS/Fargate lab to learn the managed AWS resource graph; connect them only after both contracts are understood and there is a customer reason.
