@@ -226,7 +226,7 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(answer("question:1")).toContainText("LLM advice: Pass");
     await page.screenshot({ path: testInfo.outputPath("dashboard-review.png"), fullPage: true });
     // One answer can be judged on its own from its judgment section.
-    await advice.getByRole("button", { name: "Judge again…", exact: true }).click();
+    await page.getByRole("button", { name: "Judge again…", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Judge this answer", exact: true })).toBeVisible();
     await expect(page.locator("#confirm-selection")).toHaveText("question:1");
     await page.getByRole("button", { name: "Start judging", exact: true }).click();
@@ -240,9 +240,10 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.locator("#no-answers")).toContainText("Nothing needs attention");
     await expect(page.locator("#progress-text")).toHaveText("Nothing needs attention · 4 of 4 human-reviewed");
     await expect(reviewTab).not.toContainText("need attention");
-    // Grading an answer yourself never counts as judging it: all four still lack a current-policy judgment.
-    await page.getByRole("button", { name: "Judge 4 unjudged answers…", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Judge 4 unjudged answers", exact: true })).toBeVisible();
+    // With nothing left in the queue, the run-level button means "judge everything again" and steps back to secondary.
+    await expect(page.locator("#judge-run")).toHaveClass("secondary");
+    await page.getByRole("button", { name: "Judge again…", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Judge all 4 answers again", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Change", exact: true }).click();
     await page.getByRole("dialog").getByLabel("Model", { exact: true }).fill("gpt-5.6-luna");
     await expect(page.locator("#confirm-model")).toHaveText("gpt-5.6-luna");

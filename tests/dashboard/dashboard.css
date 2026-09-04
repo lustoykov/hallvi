@@ -198,8 +198,8 @@ dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 
 #checks li.failed::before { background: var(--red-bar); }
 .disclosures pre { margin-top: 10px; }
 .advice header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.advice header button { margin-left: auto; font-size: 12px; }
 .judgment { margin-top: 10px; max-width: 78ch; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.judgment .lead { font-weight: 600; }
 .judgment.none { color: var(--muted); }
 .advice > .footnote { margin-top: 8px; }
 .verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }

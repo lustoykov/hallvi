@@ -63,10 +63,11 @@ function matchesFilter(saved, c, filter) {
 }
 function shownResults(saved) { return orderedResults(saved).filter((c) => matchesFilter(saved, c, answerFilter)); }
 function pendingCount(saved) { return saved.results.filter((c) => attentionStatuses.includes(triageFor(saved, c).status)).length; }
-// Judging defaults to what the current policy has not judged yet, graded or not; once everything is judged it means "judge again".
+// Judging defaults to the queue's answers without a current judgment; answers you graded yourself are your call,
+// so they are left alone unless you judge them one at a time. Once the queue is judged, the button means "judge again".
 function judgeTargets(saved) {
   const all = orderedResults(saved).filter(reviewable);
-  const unjudged = all.filter((c) => !triageFor(saved, c).judged);
+  const unjudged = all.filter((c) => triageFor(saved, c).status === "needs-judge");
   return { keys: (unjudged.length ? unjudged : all).map(keyOf), unjudged: unjudged.length > 0 };
 }
 // Where you and a current judgment both exist, the judge is either right or wrong; that is the calibration signal.
@@ -309,7 +310,7 @@ function renderAnswer(saved, ordered, shown) {
   $("judge-verdict").hidden = !llm;
   if (llm) { $("judge-verdict").textContent = VERDICTS[llm.verdict][0]; $("judge-verdict").className = `chip llm ${VERDICTS[llm.verdict][1]}`; }
   $("judge-meta").textContent = llm ? `${llm.model} · ${llm.effort} · ${formatDate(llm.createdAt)}` : "";
-  $("judge-result").textContent = llm?.reason ?? "Not judged yet.";
+  renderJudgment(llm?.reason, human);
   $("judge-result").className = `judgment${llm ? "" : " none"}`;
   $("judge").textContent = llm ? "Judge again…" : "Judge this answer…";
   $("judge").disabled = Boolean(state.active) || busy || !reviewable(current);
@@ -329,6 +330,13 @@ function renderAnswer(saved, ordered, shown) {
     $("note-field").hidden = !$("reason").value;
   }
   $("note-toggle").textContent = $("note-field").hidden ? "Add a note" : "Hide note";
+}
+// The judge's first sentence is usually the reason for its verdict; the rest is evidence.
+function renderJudgment(reason, human) {
+  const node = $("judge-result");
+  if (!reason) { node.textContent = human ? "Not judged by the LLM; your verdict stands on its own." : "Not judged yet."; return; }
+  const split = reason.match(/^([\s\S]*?[.!?])(\s+)([\s\S]+)$/);
+  node.replaceChildren(...(split ? [element("span", split[1], "lead"), split[2] + split[3]] : [element("span", reason, "lead")]));
 }
 $("note-toggle").addEventListener("click", () => { $("note-field").hidden = !$("note-field").hidden; $("note-toggle").textContent = $("note-field").hidden ? "Add a note" : "Hide note"; if (!$("note-field").hidden) $("reason").focus(); });
 $("reason").addEventListener("input", () => notes.set(noteKey, $("reason").value));
