@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { get } from "node:http";
@@ -35,7 +35,7 @@ async function fixture() {
   return { root, origin, headers, launch, dashboard };
 }
 it("serves both dashboard routes without launching checks or weakening API protection", async () => {
-  const { origin, launch, dashboard } = await fixture();
+  const { root, origin, launch, dashboard } = await fixture();
   for (const route of ["/", "/evals", "/about"]) {
     const response = await fetch(`${origin}${route}`);
     expect(response.status).toBe(200);
@@ -45,6 +45,18 @@ it("serves both dashboard routes without launching checks or weakening API prote
     expect(html).toContain(`content="${dashboard.token}"`);
     expect((await fetch(`${origin}${route}`, { headers: { Origin: "https://attacker.invalid" } })).status).toBe(403);
   }
+  // The acceptance guide renders as a page in the same shell, escaped, and says so when the file is missing.
+  expect((await fetch(`${origin}/guide`)).status).toBe(404);
+  mkdirSync(join(root, "docs/testing"), { recursive: true });
+  writeFileSync(join(root, "docs/testing/phase-one-acceptance.md"), "# Guide\n\n| Entry | Note |\n| --- | --- |\n| P1-01 | <b>escaped</b> |\n");
+  const guide = await fetch(`${origin}/guide`);
+  expect(guide.status).toBe(200);
+  expect(guide.headers.get("Content-Type")).toContain("text/html");
+  const rendered = await guide.text();
+  expect(rendered).toContain('<h1 id="guide">Guide</h1>');
+  expect(rendered).toContain("<td>&lt;b&gt;escaped&lt;/b&gt;</td>");
+  expect(rendered).toContain('href="/dashboard.css"');
+  expect(rendered).not.toContain("<script");
   expect((await fetch(`${origin}/api/state`)).status).toBe(403);
   expect(launch).not.toHaveBeenCalled();
 });

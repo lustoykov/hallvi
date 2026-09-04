@@ -43,6 +43,8 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .topbar .resources a { color: #dbe4f5; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
 .topbar .resources a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .ext { width: 11px; height: 11px; opacity: .75; flex-shrink: 0; }
+.topbar .resources a[aria-current=page] { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
+.topbar .pages a, .topbar .resources a { transition: background-color .15s ease-out, color .15s ease-out; }
 .topbar :focus-visible { outline-color: #fff; }
 main { max-width: 1440px; margin: auto; padding: 24px 36px 72px; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-bottom: 22px; }
@@ -107,6 +109,28 @@ textarea { resize: vertical; min-height: 84px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); padding: 14px; font-size: 12px; line-height: 1.5; max-height: 420px; overflow: auto; border-radius: 6px; margin: 0; tab-size: 2; }
 .disclosures summary, .archived-runs summary, .side-help summary, dialog summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #234577; }
 dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 13px; margin: 14px 0 0; } dt { font-weight: 600; } dd { margin: 0; }
+
+/* Acceptance guide: the contract as a readable document, not a raw file */
+.guide { max-width: 960px; margin: 0 auto; padding: 32px 36px 96px; }
+.markdown { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 40px 56px 48px; font-size: 15px; line-height: 1.6; }
+.markdown > :first-child { margin-top: 0; }
+.markdown h1 { font-size: 26px; letter-spacing: -.02em; margin: 0 0 8px; }
+.markdown h2 { font-size: 20px; margin: 40px 0 10px; padding-top: 22px; border-top: 1px solid var(--line); }
+.markdown h3 { font-size: 16px; margin: 26px 0 8px; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 14px; color: var(--muted); margin: 20px 0 6px; }
+.markdown p { margin: 0 0 14px; max-width: 78ch; }
+.markdown ul, .markdown ol { margin: 0 0 14px; padding-left: 24px; max-width: 78ch; }
+.markdown li { margin: 4px 0; }
+.markdown a { color: var(--blue); }
+.markdown code { font-size: 13px; background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+.markdown pre { margin: 0 0 16px; max-height: none; }
+.markdown pre code { background: none; padding: 0; font-size: 12.5px; }
+.markdown table { width: 100%; border-collapse: collapse; margin: 6px 0 18px; font-size: 14px; }
+.markdown th, .markdown td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+.markdown th { background: var(--panel); font-size: 12px; font-weight: 600; color: var(--muted); }
+.markdown blockquote { margin: 0 0 14px; padding: 12px 16px; background: var(--panel); border-radius: 8px; color: var(--muted); }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+.markdown .empty { padding: 32px; }
 
 /* How it works */
 .about-block { margin-top: 30px; }

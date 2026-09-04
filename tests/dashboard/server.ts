@@ -10,6 +10,7 @@ import { archiveRun, caseKey, directory, findCase, humanReviewSchema, listReport
 import { browserJourneys } from "../browser/journeys.ts";
 import { phaseOneCases } from "../evals/phase-one-cases.ts";
 import { suiteGuides } from "./suite-guides.ts";
+import { guidePage, renderMarkdown } from "./markdown.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing quietly against a stale process.
 export const API_VERSION = 4;
@@ -168,8 +169,11 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         response.end(readFileSync(new URL(name, import.meta.url), "utf8").replace("CSRF_TOKEN", token)); return;
       }
       if (request.method === "GET" && url.pathname === "/guide") {
-        response.setHeader("Content-Type", "text/plain; charset=utf-8");
-        response.end(readFileSync(join(root, "docs/testing/phase-one-acceptance.md"))); return;
+        // The written acceptance contract, rendered read-only inside the dashboard shell.
+        response.setHeader("Content-Type", "text/html; charset=utf-8");
+        try { response.end(guidePage(renderMarkdown(readFileSync(join(root, "docs/testing/phase-one-acceptance.md"), "utf8")), "Acceptance guide")); }
+        catch { response.writeHead(404); response.end(guidePage('<p class="empty">The acceptance guide was not found at docs/testing/phase-one-acceptance.md.</p>', "Acceptance guide")); }
+        return;
       }
       if (request.headers["x-sg-testing-token"] !== token) { json({ error: "Reload the dashboard to reconnect" }, 403); return; }
       if (request.method === "GET" && url.pathname === "/api/state") {
