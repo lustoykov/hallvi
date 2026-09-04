@@ -510,8 +510,10 @@ function initializeSelectors() {
     $(`${prefix}-options`).replaceChildren(...items.map((item) => {
       const row = element("div", "", "selection-option"); const label = document.createElement("label");
       const input = document.createElement("input"); input.type = "checkbox"; input.value = item.id; input.checked = true;
-      const copy = element("span", item.name); copy.append(element("small", item.description ?? item.rubric));
-      if (item.smoke) copy.append(element("small", "Included in Browser smoke"));
+      const copy = element("span", "", "selection-copy");
+      const title = element("span", item.name, "selection-title");
+      if (item.smoke) title.append(element("span", "CI · Every PR", "chip ci-badge"));
+      copy.append(title, element("small", item.description ?? item.rubric));
       label.append(input, copy); row.append(label); input.addEventListener("change", updateSelections);
       if (item.message) { const details = document.createElement("details"); details.append(element("summary", "Exact input"), element("p", item.message)); row.append(details); }
       return row;
@@ -534,4 +536,5 @@ $("eval-repeats").addEventListener("change", updateSelections);
 $("run-journeys").addEventListener("click", () => { $("journey-picker").close(); requestRun({ suite: "e2e", journeys: selectedOptions("journey") }); });
 $("run-evals").addEventListener("click", () => requestRun({ suite: "live", cases: selectedOptions("eval"), repeats: Number($("eval-repeats").value) }));
 
+$("origin").textContent = `Local · ${location.host}`; // Loopback only; the host doubles as the reminder.
 renderPage(); void refresh(); setInterval(() => { if (!document.hidden) void refresh(); }, 2500);
