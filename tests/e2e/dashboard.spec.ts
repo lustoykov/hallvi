@@ -214,12 +214,15 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.locator("#saved")).toContainText("Saved");
     await page.screenshot({ path: testInfo.outputPath("dashboard-verdict.png"), fullPage: true });
     // LLM advice is displayed beside the saved human verdict without changing it.
-    saveReview(root, run, hash, "question:1", { type: "llm", model: "synthetic-judge", effort: "high", promptVersion: "fixture", piVersion: "fixture", verdict: "pass", reason: "The reply discusses the tradeoff without recording an invented choice." });
+    saveReview(root, run, hash, "question:1", { type: "llm", model: "synthetic-judge", effort: "high", promptVersion: "fixture", piVersion: "fixture", verdict: "pass", reason: "The reply discusses the tradeoff without recording an invented choice. Nothing in it claims a decision was made." });
     await page.reload();
     await expect(page).toHaveURL(`http://127.0.0.1:${address.port}/evals`);
     await expect(verdict("Discuss")).toHaveAttribute("aria-pressed", "true");
     const advice = page.getByRole("region", { name: "LLM judgment", exact: true });
-    await expect(advice).toContainText("without recording an invented choice");
+    await expect(advice.locator(".lead")).toHaveText("The reply discusses the tradeoff without recording an invented choice.");
+    await expect(advice.locator(".judgment-more")).not.toHaveAttribute("open", "");
+    await advice.getByText("Full reasoning", { exact: true }).click();
+    await expect(advice.locator(".judgment-more")).toContainText("Nothing in it claims a decision was made.");
     await expect(page.locator("#judge-verdict")).toHaveText("Pass");
     await expect(page.locator("#triage-chip")).toHaveText("Needs review");
     await expect(page.locator("#verdict .verdict-button.pass .llm-tag")).toBeVisible();

@@ -13,6 +13,7 @@ let judgePreferences = null;
 let selectorsReady = false;
 let busy = false;
 const notes = new Map();
+const openReasoning = new Set();
 let openRun = "";
 const VERDICTS = { pass: ["Pass", "pass"], fail: ["Fail", "fail"], "needs-discussion": ["Needs discussion", "discuss"] };
 const keyOf = (record) => `${record.caseId}:${record.repetition}`;
@@ -338,12 +339,16 @@ function renderAnswer(saved, ordered, shown) {
   }
   $("note-toggle").textContent = $("note-field").hidden ? "Add a note" : "Hide note";
 }
-// The judge's first sentence is usually the reason for its verdict; the rest is evidence.
+// The judge's first sentence is usually the reason for its verdict; the rest is evidence, folded away until asked for.
 function renderJudgment(reason, human) {
   const node = $("judge-result");
   if (!reason) { node.textContent = human ? "Not judged by the LLM; your verdict stands on its own." : "Not judged yet."; return; }
   const split = reason.match(/^([\s\S]*?[.!?])(\s+)([\s\S]+)$/);
-  node.replaceChildren(...(split ? [element("span", split[1], "lead"), split[2] + split[3]] : [element("span", reason, "lead")]));
+  if (!split) { node.replaceChildren(element("span", reason, "lead")); return; }
+  const more = document.createElement("details"); more.className = "judgment-more"; more.open = openReasoning.has(selectedCase);
+  more.append(element("summary", "Full reasoning"), element("p", split[3]));
+  more.addEventListener("toggle", () => { if (more.open) openReasoning.add(selectedCase); else openReasoning.delete(selectedCase); });
+  node.replaceChildren(element("span", split[1], "lead"), more);
 }
 $("note-toggle").addEventListener("click", () => { $("note-field").hidden = !$("note-field").hidden; $("note-toggle").textContent = $("note-field").hidden ? "Add a note" : "Hide note"; if (!$("note-field").hidden) $("reason").focus(); });
 $("reason").addEventListener("input", () => notes.set(noteKey, $("reason").value));

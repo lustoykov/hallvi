@@ -208,8 +208,11 @@ dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 
 .disclosures pre { margin-top: 10px; }
 .advice header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .advice header button { margin-left: auto; }
-.judgment { margin-top: 10px; max-width: 78ch; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
-.judgment .lead { font-weight: 600; }
+.judgment { margin-top: 10px; max-width: 78ch; overflow-wrap: anywhere; font-size: 14px; }
+.judgment .lead { font-weight: 600; white-space: pre-wrap; }
+.judgment-more { margin-top: 6px; }
+.judgment-more summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #234577; }
+.judgment-more p { margin-top: 6px; white-space: pre-wrap; }
 .judgment.none { color: var(--muted); }
 .advice > .footnote { margin-top: 8px; }
 .verdict-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
