@@ -12,6 +12,7 @@ import { phaseOneCases } from "../evals/phase-one-cases.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing quietly against a stale process.
 export const API_VERSION = 3;
+const currentRubrics = Object.fromEntries(phaseOneCases.map((item) => [item.id, item.rubric]));
 export const suites = [
   { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
   { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
@@ -176,7 +177,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           const settings = readJson(join(process.env.SERVER_GUY_CONFIG_DIR ?? join(root, ".server-guy"), "pi-settings.json"));
           defaults = z.object({ model: z.string(), effort: z.string() }).parse({ model: settings.modelId, effort: settings.reasoningEffort });
         } catch { /* No saved settings: display defaults, not an authenticated claim. */ }
-        json({ apiVersion: API_VERSION, suites, journeys: browserJourneys, evalCases: phaseOneCases, active, history: history(), reports: listReports(root), defaults }); return;
+        json({ apiVersion: API_VERSION, suites, journeys: browserJourneys, evalCases: phaseOneCases, active, history: history(), reports: listReports(root, currentRubrics), defaults }); return;
       }
       if (request.method !== "POST" || !["/api/start", "/api/review", "/api/review/bulk", "/api/runs/archive", "/api/stop"].includes(url.pathname)) { json({ error: "Not found" }, 404); return; }
       if (request.headers.origin !== origin || !request.headers["content-type"]?.startsWith("application/json")) { json({ error: "Same-origin JSON required" }, 403); return; }

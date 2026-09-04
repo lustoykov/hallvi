@@ -63,12 +63,15 @@ function matchesFilter(saved, c, filter) {
 }
 function shownResults(saved) { return orderedResults(saved).filter((c) => matchesFilter(saved, c, answerFilter)); }
 function pendingCount(saved) { return saved.results.filter((c) => attentionStatuses.includes(triageFor(saved, c).status)).length; }
-// Judging defaults to the queue's answers without a current judgment; answers you graded yourself are your call,
-// so they are left alone unless you judge them one at a time. Once the queue is judged, the button means "judge again".
-function judgeTargets(saved) {
+// The run's Judge button: first whatever lacks a current judgment (answers you graded yourself are your call and are
+// left alone), then "again" for what the current filter shows, then the whole run.
+function judgeTargets(saved, shown) {
   const all = orderedResults(saved).filter(reviewable);
   const unjudged = all.filter((c) => triageFor(saved, c).status === "needs-judge");
-  return { keys: (unjudged.length ? unjudged : all).map(keyOf), unjudged: unjudged.length > 0 };
+  if (unjudged.length) return { keys: unjudged.map(keyOf), label: `Judge ${plural(unjudged.length, "unjudged answer")}…`, title: `Judge ${plural(unjudged.length, "unjudged answer")}`, primary: true };
+  const subset = shown.filter(reviewable);
+  if (subset.length && subset.length < all.length) return { keys: subset.map(keyOf), label: subset.length === 1 ? "Judge this one again…" : `Judge these ${subset.length} again…`, title: `Judge ${plural(subset.length, "answer")} again`, primary: false };
+  return { keys: all.map(keyOf), label: "Judge again…", title: `Judge all ${all.length} answers again`, primary: false };
 }
 // Where you and a current judgment both exist, the judge is either right or wrong; that is the calibration signal.
 function agreement(saved, c) {
@@ -171,7 +174,7 @@ function renderReview() {
   const ordered = orderedResults(saved); const shown = shownResults(saved);
   if (!shown.some((c) => keyOf(c) === selectedCase)) selectedCase = shown[0] ? keyOf(shown[0]) : "";
   renderAnswerList(saved, ordered, shown);
-  renderRunHeader(saved);
+  renderRunHeader(saved, shown);
   renderAnswer(saved, ordered, shown);
 }
 
@@ -232,7 +235,7 @@ function answerRow(saved, c, repeated) {
   li.append(button); return li;
 }
 
-function renderRunHeader(saved) {
+function renderRunHeader(saved, shown) {
   const caseCount = saved.caseIds?.length ?? new Set(saved.results.map((c) => c.caseId)).size;
   const answers = saved.results.filter((c) => c.reply).length;
   const plan = saved.repeats ? `${plural(caseCount, "case")} × ${plural(saved.repeats, "repetition")} = ${saved.plannedCases ?? caseCount * saved.repeats} planned` : `${plural(caseCount, "case")} · repetitions not recorded`;
@@ -243,9 +246,9 @@ function renderRunHeader(saved) {
   $("run-archived").hidden = !saved.archived;
   $("archive-run").textContent = saved.archived ? "Restore run" : "Archive run";
   $("archive-run").disabled = busy || Boolean(saved.archiveError);
-  const targets = judgeTargets(saved);
-  $("judge-run").textContent = !targets.keys.length ? "Judge…" : targets.unjudged ? `Judge ${plural(targets.keys.length, "unjudged answer")}…` : "Judge again…";
-  $("judge-run").className = targets.unjudged ? "primary" : "secondary"; // Re-judging everything is the rare, paid case.
+  const targets = judgeTargets(saved, shown);
+  $("judge-run").textContent = targets.keys.length ? targets.label : "Judge…";
+  $("judge-run").className = targets.primary ? "primary" : "secondary"; // Re-judging is the rare, paid case.
   $("judge-run").disabled = busy || Boolean(state.active) || !targets.keys.length;
   $("archive-error").hidden = !saved.archiveError;
   // One bar for the whole run: what still needs attention, what the judge cleared, what you graded.
@@ -287,7 +290,10 @@ function renderAnswer(saved, ordered, shown) {
   const knownCase = state.evalCases.some((c) => c.id === current.caseId);
   $("rerun-case").hidden = !knownCase; $("rerun-case").disabled = Boolean(state.active) || busy;
   $("rerun-unavailable").hidden = knownCase;
-  $("rubric").textContent = current.rubric;
+  const currentRubric = state.evalCases.find((c) => c.id === current.caseId)?.rubric; // The judge grades against today's wording.
+  $("rubric").textContent = currentRubric ?? current.rubric;
+  $("rubric-changed").hidden = !currentRubric || currentRubric === current.rubric;
+  $("rubric-saved").textContent = `Saved with this run: ${current.rubric}`;
   const decisions = Array.isArray(current.input?.decisions) ? current.input.decisions : [];
   $("context").hidden = !decisions.length;
   $("context-list").replaceChildren(...decisions.map((d) => { const li = document.createElement("li"); li.append(chip(d.kind ?? "decision"), element("span", d.value ?? JSON.stringify(d))); return li; }));
@@ -441,8 +447,8 @@ $("empty-choose").addEventListener("click", () => $("eval-picker").showModal());
 $("rerun-case").addEventListener("click", () => requestRun({ suite: "live", cases: [record().caseId], repeats: 1 }));
 $("judge").addEventListener("click", () => requestRun({ suite: "judge", run: selectedRun, hash: report().hash, keys: [selectedCase], title: "Judge this answer" }));
 $("judge-run").addEventListener("click", () => {
-  const targets = judgeTargets(report()); if (!targets.keys.length) return;
-  requestRun({ suite: "judge", run: selectedRun, hash: report().hash, keys: targets.keys, title: targets.unjudged ? `Judge ${plural(targets.keys.length, "unjudged answer")}` : `Judge all ${targets.keys.length} answers again` });
+  const targets = judgeTargets(report(), shownResults(report())); if (!targets.keys.length) return;
+  requestRun({ suite: "judge", run: selectedRun, hash: report().hash, keys: targets.keys, title: targets.title });
 });
 
 $("archive-run").addEventListener("click", async () => {

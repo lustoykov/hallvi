@@ -35,6 +35,14 @@ it("keeps human decisions distinct, and a later LLM pass never overwrites them",
   expect(triageCase(record, [human("pass"), llm("fail")]).status).toBe("reviewed");
   expect(triageCase(record, [human("fail"), human("pass")]).label).toBe("Human pass");
 });
+it("counts a judgment only under the rubric wording the casebook has now", () => {
+  expect(triageCase(record, [llm("pass")], record.rubric).status).toBe("cleared");
+  const stale = triageCase(record, [llm("pass")], "A newer rubric");
+  expect(stale.status).toBe("needs-judge");
+  expect(stale.reason).toContain("Rubric wording changed");
+  expect(triageCase(record, [human("pass"), llm("pass")], "A newer rubric").judged).toBe(false);
+  expect(triageCase(record, [llm("pass")]).judged).toBe(true);
+});
 it("uses the latest judgment for the exact answer without mutating evidence", () => {
   const reviews = [llm("pass"), llm("fail"), { ...llm("pass"), key: "greeting:2" }];
   const before = JSON.stringify({ record, reviews });

@@ -6,6 +6,7 @@ import { configuredPiRuntime, createPiCatalog, readPiConfiguration, savePiConfig
 import { validatePiSelection } from "../../src/server/pi-models";
 import { findCase, readJson, saveReview } from "../dashboard/results";
 import { judgeAnswer, judgeCaseKeys, judgeSelectedAnswers, JUDGE_PROMPT_VERSION } from "./judge";
+import { phaseOneCases } from "./phase-one-cases";
 
 if (process.env.SERVER_GUY_LIVE_JUDGE !== "1") throw new Error("Explicit LLM-judge opt-in required");
 it("reviews selected saved answers without rerunning Server Guy", async () => {
@@ -28,8 +29,10 @@ it("reviews selected saved answers without rerunning Server Guy", async () => {
     const runtime = await configuredPiRuntime(sdk);
     await judgeSelectedAnswers(keys, async (key) => {
       const { record } = findCase(root, run, hash, key);
-      const result = await judgeAnswer(sdk, runtime, record);
-      saveReview(root, run, hash, key, { ...result, type: "llm", model: selected.modelId, effort: selected.reasoningEffort,
+      // Grade against the casebook's current wording when the case still exists; the judgment records the wording it used.
+      const rubric = phaseOneCases.find((item) => item.id === record.caseId)?.rubric ?? record.rubric;
+      const result = await judgeAnswer(sdk, runtime, { ...record, rubric });
+      saveReview(root, run, hash, key, { ...result, type: "llm", rubric, model: selected.modelId, effort: selected.reasoningEffort,
         promptVersion: JUDGE_PROMPT_VERSION, piVersion: readJson(join(root, "package.json")).dependencies["@earendil-works/pi-coding-agent"] });
       console.log("Advisory LLM verdict saved. Human verdict and original results unchanged.");
     });

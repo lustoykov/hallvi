@@ -42,11 +42,13 @@ const savedReviewSchema = z.discriminatedUnion("type", [
 ]);
 const runStateSchema = z.strictObject({ sourceHash: z.string(), archived: z.boolean() });
 
-export function triageCase(record: SavedCase, reviews: z.infer<typeof savedReviewSchema>[]) {
+export function triageCase(record: SavedCase, reviews: z.infer<typeof savedReviewSchema>[], currentRubric?: string) {
   const key = caseKey(record);
   const llm = reviews.filter((review) => review.key === key && review.type === "llm").at(-1);
-  // "judged" means a current-policy judgment exists, whatever the human said; it drives what the Judge button targets.
-  const judged = Boolean(llm && llm.type === "llm" && llm.promptVersion === JUDGE_PROMPT_VERSION);
+  // A judgment counts only under the current judge policy and the rubric wording the casebook has now;
+  // editing a rubric sends its answers back to Attention instead of leaving stale verdicts in place.
+  const stale = Boolean(llm && currentRubric && llm.rubric !== currentRubric);
+  const judged = Boolean(llm && llm.type === "llm" && llm.promptVersion === JUDGE_PROMPT_VERSION && !stale);
   const outcome = (status: string, label: string, reason: string) => ({ status, label, reason, judged });
   const failure = automaticFailure(record);
   if (failure) return outcome("failures", "Failed checks", failure);
@@ -57,7 +59,7 @@ export function triageCase(record: SavedCase, reviews: z.infer<typeof savedRevie
     if (human.verdict === "needs-discussion") return outcome("needs-review", "Needs review", reason);
     return outcome("reviewed", "Human pass", reason);
   }
-  if (!llm || !judged) return outcome("needs-judge", "Not judged", llm ? "Older judge policy. Judge again to use current triage rules." : "No judgment yet. Run the judge or review this answer yourself.");
+  if (!llm || !judged) return outcome("needs-judge", "Not judged", !llm ? "No judgment yet. Run the judge or review this answer yourself." : stale ? "Rubric wording changed since this judgment. Judge again to grade against the current wording." : "Older judge policy. Judge again to use current triage rules.");
   if (llm.verdict === "fail") return outcome("failures", "LLM fail", llm.reason);
   if (llm.verdict === "needs-discussion" || !hasAutomaticEvidence(record)) {
     return outcome("needs-review", "Needs review", hasAutomaticEvidence(record) ? llm.reason : "Automatic evidence is missing; a model pass cannot clear this answer.");
@@ -113,7 +115,7 @@ export function reviewsFor(path: string, hash: string) {
 }
 export function saveReview(root: string, run: string, hash: string, key: string,
   review: ({ type: "human" } & HumanReview)
-    | { type: "llm"; verdict: Judgment["verdict"]; reason: string; model: string; effort: string; promptVersion: string; piVersion: string }) {
+    | { type: "llm"; verdict: Judgment["verdict"]; reason: string; model: string; effort: string; promptVersion: string; piVersion: string; rubric?: string }) {
   const { path, record } = findCase(root, run, hash, key);
   const base = { key, sourceHash: hash, rubric: record.rubric, createdAt: new Date().toISOString() };
   const entry = savedReviewSchema.parse(review.type === "human"
@@ -122,14 +124,14 @@ export function saveReview(root: string, run: string, hash: string, key: string,
   writeJson(join(directory(join(path, "reviews")), `${randomUUID()}.json`), entry);
   return entry;
 }
-export function listReports(root: string) {
+export function listReports(root: string, currentRubrics: Record<string, string> = {}) {
   return readdirSync(directory(join(root, "tests/results/evals"))).flatMap((run) => {
     try {
       const { report, hash, path } = loadReport(root, run);
       let archived = false; let archiveError = false;
       try { archived = runArchived(path, hash); } catch { archiveError = true; }
       const reviews = reviewsFor(path, hash);
-      const triage = Object.fromEntries(report.results.map((record) => [caseKey(record), triageCase(record, reviews)]));
+      const triage = Object.fromEntries(report.results.map((record) => [caseKey(record), triageCase(record, reviews, currentRubrics[record.caseId])]));
       return [{ run, ...report, hash, reviews, triage, archived, archiveError }];
     } catch { return []; } // Foreign/incomplete directories are not dashboard runs.
   }).sort((a, b) => b.startedAt.localeCompare(a.startedAt));

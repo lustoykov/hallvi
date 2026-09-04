@@ -343,33 +343,39 @@ test("dashboard reviews saved answers without model calls or changing source res
     // Judge-first triage: current passes clear; failures and uncertainty stay visible.
     // All artifacts here are synthetic; no judge/model is actually launched.
     const triageRun = "judge-triage-run";
-    const triageIds = ["clear", "fail", "unsure", "legacy", "unjudged", "blocked", "human"];
+    const triageIds = ["clear", "fail", "unsure", "legacy", "unjudged", "blocked", "human", "greeting"];
     writeJson(join(directory(join(root, "tests/results/evals", triageRun)), "results.json"), {
       ...saved, startedAt: "2026-09-04T11:00:00Z", caseIds: triageIds, repeats: 1, plannedCases: triageIds.length,
       results: triageIds.map((caseId) => ({ ...saved.results[0], caseId, repetition: 1, checks: { count: caseId !== "blocked" } })),
     });
     const triageHash = loadReport(root, triageRun).hash;
-    for (const [caseId, verdictValue] of [["clear", "pass"], ["fail", "fail"], ["unsure", "needs-discussion"], ["legacy", "pass"], ["blocked", "pass"], ["human", "fail"]] as const) {
+    for (const [caseId, verdictValue] of [["clear", "pass"], ["fail", "fail"], ["unsure", "needs-discussion"], ["legacy", "pass"], ["blocked", "pass"], ["human", "fail"], ["greeting", "pass"]] as const) {
       saveReview(root, triageRun, triageHash, `${caseId}:1`, { type: "llm", model: "synthetic-judge", effort: "high",
         promptVersion: caseId === "legacy" ? "phase-one-meaning-v1" : JUDGE_PROMPT_VERSION, piVersion: "fixture", verdict: verdictValue, reason: `Saved evidence for ${caseId}.` });
     }
     saveReview(root, triageRun, triageHash, "human:1", { type: "human", reviewer: "Fixture reviewer", verdict: "pass", reason: "Human assessment stays separate." });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.reload();
-    for (const [filter, count] of [["attention", "5"], ["failures", "2"], ["cleared", "1"], ["reviewed", "1"], ["all", "7"]]) {
+    for (const [filter, count] of [["attention", "6"], ["failures", "2"], ["cleared", "1"], ["reviewed", "1"], ["all", "8"]]) {
       await expect(filterCount(filter)).toHaveText(count);
     }
-    await expect(page.locator("#progress-text")).toHaveText("5 need attention · 1 LLM-cleared · 1 of 7 human-reviewed · judge agreed 0 of 1");
+    await expect(page.locator("#progress-text")).toHaveText("6 need attention · 1 LLM-cleared · 1 of 8 human-reviewed · judge agreed 0 of 1");
     await page.getByRole("button", { name: /^Reviewed/ }).click();
     await answer("human:1").click();
     await expect(page.locator("#triage-reason")).toHaveText("The judge said fail; your verdict wins.");
     await page.getByRole("button", { name: /^Attention/ }).click();
     await expect(page.getByRole("button", { name: /^Attention/ })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#answer-list .answer-open")).toHaveCount(5);
+    await expect(page.locator("#answer-list .answer-open")).toHaveCount(6);
     await expect(answer("clear:1")).toHaveCount(0);
     await expect(answer("legacy:1")).toContainText("Not judged");
     await answer("legacy:1").click();
     await expect(page.locator("#triage-reason")).toContainText("Older judge policy");
+    // A judgment saved under different rubric wording than today's casebook is stale, and the current wording is shown.
+    await answer("greeting:1").click();
+    await expect(page.locator("#triage-reason")).toContainText("Rubric wording changed");
+    await expect(page.locator("#rubric")).toContainText("Respond normally");
+    await expect(page.locator("#rubric-changed")).toBeVisible();
+    await expect(page.locator("#rubric-saved")).toContainText("Discuss without pretending a choice was made");
     await page.getByRole("button", { name: /^Failed/ }).click();
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(2);
     await answer("blocked:1").click();
@@ -384,10 +390,10 @@ test("dashboard reviews saved answers without model calls or changing source res
     expect(listReports(root).find((report) => report.run === triageRun)?.reviews.filter((review) => review.type === "human")).toHaveLength(1);
     await page.screenshot({ path: testInfo.outputPath("dashboard-judge-triage.png"), fullPage: true });
     // Judging the run targets only what the current policy has not judged, regardless of the display filter.
-    await page.getByRole("button", { name: "Judge 2 unjudged answers…", exact: true }).click();
-    await expect(page.locator("#confirm-selection")).toHaveText("legacy:1, unjudged:1");
+    await page.getByRole("button", { name: "Judge 3 unjudged answers…", exact: true }).click();
+    await expect(page.locator("#confirm-selection")).toHaveText("legacy:1, unjudged:1, greeting:1");
     await page.getByRole("button", { name: "Start judging", exact: true }).click();
-    await expect.poll(() => requests.at(-1)).toMatchObject({ suite: "judge", run: triageRun, hash: triageHash, keys: ["legacy:1", "unjudged:1"], consent: true });
+    await expect.poll(() => requests.at(-1)).toMatchObject({ suite: "judge", run: triageRun, hash: triageHash, keys: ["legacy:1", "unjudged:1", "greeting:1"], consent: true });
     // A human can reject a spot-checked pass; the answer returns to Failed, not hidden clearance.
     await verdict("Fail").click();
     await expect(page.locator("#no-answers")).toHaveText("No answers match this filter.");
@@ -396,6 +402,28 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(answer("clear:1")).toContainText("Human fail");
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(3);
     expect(loadReport(root, triageRun).hash).toBe(triageHash);
+    // With nothing unjudged, the Judge button re-judges what the current filter shows, or the whole run under All.
+    const judgedRun = "judged-run";
+    writeJson(join(directory(join(root, "tests/results/evals", judgedRun)), "results.json"), {
+      ...saved, startedAt: "2026-09-04T12:00:00Z", caseIds: ["a", "b", "c"], repeats: 1, plannedCases: 3,
+      results: ["a", "b", "c"].map((caseId) => ({ ...saved.results[0], caseId, repetition: 1 })),
+    });
+    const judgedHash = loadReport(root, judgedRun).hash;
+    for (const [caseId, verdictValue] of [["a", "pass"], ["b", "fail"], ["c", "pass"]] as const) {
+      saveReview(root, judgedRun, judgedHash, `${caseId}:1`, { type: "llm", model: "synthetic-judge", effort: "high", promptVersion: JUDGE_PROMPT_VERSION, piVersion: "fixture", verdict: verdictValue, reason: `Saved evidence for ${caseId}.` });
+    }
+    await page.reload();
+    await expect(page.locator("#answer-list .answer-open")).toHaveCount(1);
+    await expect(page.locator("#judge-run")).toHaveClass("secondary");
+    await page.getByRole("button", { name: "Judge this one again…", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Judge 1 answer again", exact: true })).toBeVisible();
+    await expect(page.locator("#confirm-selection")).toHaveText("b:1");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("button", { name: /^All/ }).click();
+    await page.getByRole("button", { name: "Judge again…", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Judge all 3 answers again", exact: true })).toBeVisible();
+    await expect(page.locator("#confirm-selection")).toHaveText("a:1, b:1, c:1");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
     expect(launches).toBe(0);
     expect(errors).toEqual([]);
   } finally { await page.close(); dashboard.stop(); dashboard.server.closeAllConnections(); rmSync(root, { recursive: true, force: true }); }
