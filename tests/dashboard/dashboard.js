@@ -63,11 +63,16 @@ function matchesFilter(saved, c, filter) {
 }
 function shownResults(saved) { return orderedResults(saved).filter((c) => matchesFilter(saved, c, answerFilter)); }
 function pendingCount(saved) { return saved.results.filter((c) => attentionStatuses.includes(triageFor(saved, c).status)).length; }
-// Judging defaults to what the current policy has not judged yet; once everything is judged it means "judge again".
+// Judging defaults to what the current policy has not judged yet, graded or not; once everything is judged it means "judge again".
 function judgeTargets(saved) {
   const all = orderedResults(saved).filter(reviewable);
-  const unjudged = all.filter((c) => triageFor(saved, c).status === "needs-judge");
+  const unjudged = all.filter((c) => !triageFor(saved, c).judged);
   return { keys: (unjudged.length ? unjudged : all).map(keyOf), unjudged: unjudged.length > 0 };
+}
+// Where you and a current judgment both exist, the judge is either right or wrong; that is the calibration signal.
+function agreement(saved, c) {
+  const human = reviewFor(saved, "human", keyOf(c)); const llm = reviewFor(saved, "llm", keyOf(c));
+  return human && llm && triageFor(saved, c).judged ? human.verdict === llm.verdict : null;
 }
 function failure(error) { $("error").textContent = error.message; $("error").hidden = false; }
 async function api(path, body) {
@@ -238,7 +243,8 @@ function renderRunHeader(saved) {
   $("archive-run").textContent = saved.archived ? "Restore run" : "Archive run";
   $("archive-run").disabled = busy || Boolean(saved.archiveError);
   const targets = judgeTargets(saved);
-  $("judge-run").textContent = !targets.keys.length ? "Judge…" : targets.unjudged ? `Judge ${plural(targets.keys.length, "unjudged answer")}…` : `Judge all ${targets.keys.length} again…`;
+  $("judge-run").textContent = !targets.keys.length ? "Judge…" : targets.unjudged ? `Judge ${plural(targets.keys.length, "unjudged answer")}…` : "Judge again…";
+  $("judge-run").className = targets.unjudged ? "primary" : "secondary"; // Re-judging everything is the rare, paid case.
   $("judge-run").disabled = busy || Boolean(state.active) || !targets.keys.length;
   $("archive-error").hidden = !saved.archiveError;
   // One bar for the whole run: what still needs attention, what the judge cleared, what you graded.
@@ -251,6 +257,8 @@ function renderRunHeader(saved) {
   const parts = [attention ? `${attention} need attention` : "Nothing needs attention"];
   if (counts.cleared) parts.push(`${counts.cleared} LLM-cleared`);
   parts.push(`${humanReviewed} of ${answers} human-reviewed`);
+  const compared = saved.results.map((c) => agreement(saved, c)).filter((verdict) => verdict !== null);
+  if (compared.length) parts.push(`judge agreed ${compared.filter(Boolean).length} of ${compared.length}`);
   $("progress-text").textContent = answers ? parts.join(" · ") : "No answers to review";
   $("progress-bar").setAttribute("aria-label", $("progress-text").textContent);
 }
@@ -262,9 +270,12 @@ function renderAnswer(saved, ordered, shown) {
   const key = keyOf(current);
   const triage = triageFor(saved, current);
   $("triage-chip").textContent = triage.label; $("triage-chip").className = `chip ${triageKinds[triage.status]}`;
+  const agrees = agreement(saved, current); const llmVerdict = reviewFor(saved, "llm", key)?.verdict;
   $("triage-reason").textContent = triage.status === "cleared" ? "Current judge policy and recorded code checks passed. Not human-approved."
     : triage.status === "needs-judge" || triage.label === "Failed checks" ? triage.reason
-    : triage.status === "reviewed" ? "Your verdict is saved separately from the model judgment."
+    : agrees === true ? "The judge agrees with your verdict."
+    : agrees === false ? `The judge said ${VERDICTS[llmVerdict][0].toLowerCase()}; your verdict wins.`
+    : triage.status === "reviewed" ? "Not judged by the LLM under the current policy."
     : "See the judgment and verdict below for the supporting evidence.";
   const index = shown.findIndex((c) => keyOf(c) === key);
   $("answer-position").textContent = index >= 0 ? `${index + 1} of ${shown.length}` : "";
@@ -298,7 +309,7 @@ function renderAnswer(saved, ordered, shown) {
   $("judge-verdict").hidden = !llm;
   if (llm) { $("judge-verdict").textContent = VERDICTS[llm.verdict][0]; $("judge-verdict").className = `chip llm ${VERDICTS[llm.verdict][1]}`; }
   $("judge-meta").textContent = llm ? `${llm.model} · ${llm.effort} · ${formatDate(llm.createdAt)}` : "";
-  $("judge-result").textContent = llm?.reason ?? "Not judged yet. Use Judge in the run header; new runs are judged automatically when they finish.";
+  $("judge-result").textContent = llm?.reason ?? "Not judged yet.";
   $("judge-result").className = `judgment${llm ? "" : " none"}`;
   $("judge").textContent = llm ? "Judge again…" : "Judge this answer…";
   $("judge").disabled = Boolean(state.active) || busy || !reviewable(current);

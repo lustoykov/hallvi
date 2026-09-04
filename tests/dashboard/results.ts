@@ -43,25 +43,26 @@ const savedReviewSchema = z.discriminatedUnion("type", [
 const runStateSchema = z.strictObject({ sourceHash: z.string(), archived: z.boolean() });
 
 export function triageCase(record: SavedCase, reviews: z.infer<typeof savedReviewSchema>[]) {
-  const failure = automaticFailure(record);
-  if (failure) return { status: "failures", label: "Failed checks", reason: failure };
   const key = caseKey(record);
+  const llm = reviews.filter((review) => review.key === key && review.type === "llm").at(-1);
+  // "judged" means a current-policy judgment exists, whatever the human said; it drives what the Judge button targets.
+  const judged = Boolean(llm && llm.type === "llm" && llm.promptVersion === JUDGE_PROMPT_VERSION);
+  const outcome = (status: string, label: string, reason: string) => ({ status, label, reason, judged });
+  const failure = automaticFailure(record);
+  if (failure) return outcome("failures", "Failed checks", failure);
   const human = reviews.filter((review) => review.key === key && review.type === "human").at(-1);
   if (human) {
     const reason = human.reason || "Your verdict, without a note.";
-    if (human.verdict === "fail") return { status: "failures", label: "Human fail", reason };
-    if (human.verdict === "needs-discussion") return { status: "needs-review", label: "Needs review", reason };
-    return { status: "reviewed", label: "Human pass", reason };
+    if (human.verdict === "fail") return outcome("failures", "Human fail", reason);
+    if (human.verdict === "needs-discussion") return outcome("needs-review", "Needs review", reason);
+    return outcome("reviewed", "Human pass", reason);
   }
-  const llm = reviews.filter((review) => review.key === key && review.type === "llm").at(-1);
-  if (!llm || llm.type !== "llm" || llm.promptVersion !== JUDGE_PROMPT_VERSION) {
-    return { status: "needs-judge", label: "Not judged", reason: llm ? "Older judge policy. Judge again to use current triage rules." : "No judgment yet. Run the judge or review this answer yourself." };
-  }
-  if (llm.verdict === "fail") return { status: "failures", label: "LLM fail", reason: llm.reason };
+  if (!llm || !judged) return outcome("needs-judge", "Not judged", llm ? "Older judge policy. Judge again to use current triage rules." : "No judgment yet. Run the judge or review this answer yourself.");
+  if (llm.verdict === "fail") return outcome("failures", "LLM fail", llm.reason);
   if (llm.verdict === "needs-discussion" || !hasAutomaticEvidence(record)) {
-    return { status: "needs-review", label: "Needs review", reason: hasAutomaticEvidence(record) ? llm.reason : "Automatic evidence is missing; a model pass cannot clear this answer." };
+    return outcome("needs-review", "Needs review", hasAutomaticEvidence(record) ? llm.reason : "Automatic evidence is missing; a model pass cannot clear this answer.");
   }
-  return { status: "cleared", label: "LLM-cleared", reason: llm.reason };
+  return outcome("cleared", "LLM-cleared", llm.reason);
 }
 
 // The dashboard serves known artifacts, never arbitrary workspace paths or symlinks.

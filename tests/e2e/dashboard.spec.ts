@@ -240,9 +240,9 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.locator("#no-answers")).toContainText("Nothing needs attention");
     await expect(page.locator("#progress-text")).toHaveText("Nothing needs attention · 4 of 4 human-reviewed");
     await expect(reviewTab).not.toContainText("need attention");
-    // Once everything is judged or graded, the same button means "judge everything again"; changed settings are sent.
-    await page.getByRole("button", { name: "Judge all 4 again…", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Judge all 4 answers again", exact: true })).toBeVisible();
+    // Grading an answer yourself never counts as judging it: all four still lack a current-policy judgment.
+    await page.getByRole("button", { name: "Judge 4 unjudged answers…", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Judge 4 unjudged answers", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Change", exact: true }).click();
     await page.getByRole("dialog").getByLabel("Model", { exact: true }).fill("gpt-5.6-luna");
     await expect(page.locator("#confirm-model")).toHaveText("gpt-5.6-luna");
@@ -358,7 +358,11 @@ test("dashboard reviews saved answers without model calls or changing source res
     for (const [filter, count] of [["attention", "5"], ["failures", "2"], ["cleared", "1"], ["reviewed", "1"], ["all", "7"]]) {
       await expect(filterCount(filter)).toHaveText(count);
     }
-    await expect(page.locator("#progress-text")).toHaveText("5 need attention · 1 LLM-cleared · 1 of 7 human-reviewed");
+    await expect(page.locator("#progress-text")).toHaveText("5 need attention · 1 LLM-cleared · 1 of 7 human-reviewed · judge agreed 0 of 1");
+    await page.getByRole("button", { name: /^Reviewed/ }).click();
+    await answer("human:1").click();
+    await expect(page.locator("#triage-reason")).toHaveText("The judge said fail; your verdict wins.");
+    await page.getByRole("button", { name: /^Attention/ }).click();
     await expect(page.getByRole("button", { name: /^Attention/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(5);
     await expect(answer("clear:1")).toHaveCount(0);
