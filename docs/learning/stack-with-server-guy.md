@@ -2,13 +2,15 @@
 
 **Status:** Living learning guide
 
-**Last revised:** 2026-09-03
+**Last revised:** 2026-09-04
 
 **Canonical stack:** [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
 
 ## Purpose
 
 Use Server Guy as the practical spine for learning the capabilities in `STACK.md`.
+
+This guide owns capability mapping and learning exercises. The [development roadmap](../../ROADMAP.md) owns build order and implementation status; [user journeys](../user-journeys/README.md) own product behavior; the [testing guide](../testing/phase-one-acceptance.md) owns executable acceptance and verification evidence. Learning exercises below are not an independent backlog or a replacement for product exit gates.
 
 Server Guy is not a container for every named technology. A tool belongs in the product only when a current product requirement justifies it. Capabilities that do not belong in Server Guy should be learned through applications Server Guy operates or through bounded comparison and deployment labs.
 
@@ -65,7 +67,7 @@ It already provides direct practice with:
 - GitHub integration and source-attributed Observations;
 - schema-validated request and model boundaries, idempotent intake, policy conflicts, provenance stability, and adversarial malformed-model-output tests.
 
-Pi is Server Guy's only model and agent runtime. The [explicit Pi setup](../../TODO.md#2-configure-pi-explicitly) detects existing provider/model/effort and credential presence without using them. The user chooses whether to reuse that shared credential store and snapshot the displayed preferences, or sign in separately with editable defaults of `openai-codex` / `gpt-5.6-sol` / `high`. Each new login uses its own OAuth file; only successful sign-in activates it, so cancellation or failure preserves the previous connection. Only ChatGPT subscription OAuth is supported. Model and reasoning dropdowns use Pi’s supported catalog/levels, and changes persist only in Server Guy’s preferences for subsequent turns. A short storage notice links to exact paths and technical details in a separate help panel. Server Guy does not import machine tools/extensions/instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing. The setup screen checks local configuration; provider validity and quota are checked on send.
+Pi is Server Guy's only model and agent runtime. The [explicit Pi setup](../../ROADMAP.md#configure-pi-explicitly) detects existing provider/model/effort and credential presence without using them. The user chooses whether to reuse that shared credential store and snapshot the displayed preferences, or sign in separately with editable defaults of `openai-codex` / `gpt-5.6-sol` / `high`. Each new login uses its own OAuth file; only successful sign-in activates it, so cancellation or failure preserves the previous connection. Only ChatGPT subscription OAuth is supported. Model and reasoning dropdowns use Pi’s supported catalog/levels, and changes persist only in Server Guy’s preferences for subsequent turns. A short storage notice links to exact paths and technical details in a separate help panel. Server Guy does not import machine tools/extensions/instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing. The setup screen checks local configuration; provider validity and quota are checked on send.
 
 The [applications overview](../testing/phase-one-acceptance.md#current-entry-points-and-setup-rules) is now the entry point after home or Pi setup. Users explicitly add or choose an application instead of automatically opening the newest one. Pi configuration remains installation-wide; chats, Decisions, and checks stay application-scoped, and switching resets transient UI state. This extends the existing routes and SQLite records without a schema change; overview readiness describes the Phase 1 Launch Brief, not deployment.
 
@@ -75,13 +77,15 @@ The [real-Pi casebook](../testing/phase-one-acceptance.md#real-pi-casebook-and-r
 
 It now provides direct practice with Drizzle over SQLite, but it does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../TODO.md#1-add-drizzle-over-the-existing-sqlite-database) without changing the domain model. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../TODO.md#4-make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../ROADMAP.md#add-drizzle-over-the-existing-sqlite-database) without changing the domain model. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../ROADMAP.md#make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
-| Server Guy milestone | Primary learning | Required proof |
+The phase names refer to the [product journey](../user-journeys/01-application-launch.md#nine-phase-journey). This table maps learning opportunities, not development order or completion status.
+
+| Launch phase / journey | Primary learning | Learning proof |
 | --- | --- | --- |
-| **Phase 1 hardening — Start** | TypeScript boundaries, Zod, TypeBox, adversarial tests, intent evals | Validate API input with Zod and Pi tool arguments with TypeBox; reject invalid writes. Separately evaluate whether real Pi proposals reflect the user's intent, with exact state checks and human meaning review. |
+| **Phase 1 — Start** | TypeScript boundaries, Zod, TypeBox, adversarial tests, intent evals | Validate API input with Zod and Pi tool arguments with TypeBox; reject invalid writes. Separately evaluate whether real Pi proposals reflect the user's intent, with exact state checks and human meaning review. |
 | **Phase 2 — Inspect app** | Typed tools, agent boundaries, Application Contracts, evals, provenance | Every material contract field is schema-valid and cites a repository fact, profile rule, Observation, or explicit decision. Unsupported claims become visible gaps. |
 | **Phase 3 — Make launch-ready** | GitHub integration, CI, repository mutation safety, Docker contracts | One exact candidate revision passes profile checks; every required change maps to a reviewed diff and independent evidence. |
 | **Phase 4 — Review launch plan** | Deterministic planning, responsibility boundaries, current provider facts | The plan separates provider, Pi, and engineer actions and includes sourced cost, risks, effects, verification, and rollback. |
@@ -94,7 +98,7 @@ The current modular monolith is the right product architecture. Keep the UI, API
 
 ## The first learning slice: Phase 2 Application Contract
 
-Implement Phase 2 as a read-only vertical slice after the Drizzle refactor, explicit Pi and GitHub setup, and durable Pi request follow-ups, and before performing infrastructure mutations.
+Use the Phase 2 read-only Application Contract slice for the exercises below. Its scheduling and prerequisites live in the [development sequence](../../ROADMAP.md#development-sequence).
 
 ### Build
 
@@ -255,7 +259,7 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | **Temporal** | Add only when a client already runs it or cross-service orchestration with in-flight versioning needs a workflow platform beyond Workflow DevKit. |
 | **Inngest, Braintrust, OpenTofu, Vault, Kubernetes, PostHog, deeper AWS** | Keep on demand until a current product or client requirement justifies them, as `STACK.md` defines. |
 
-Horizontal worker scaling is deliberately deferred, not solved by the table above. When a release or client design genuinely needs independent workers, use the [horizontal worker scaling study](../../TODO.md#later-architecture-study--horizontal-workers-and-durable-queues) to reproduce claim and crash failures, compare database queues, message queues, and durable workflows, and choose from measured requirements. The result should be an ADR and runnable failure scenarios, not an assumed default technology.
+Horizontal worker scaling is deliberately deferred, not solved by the table above. When a release or client design genuinely needs independent workers, use the [horizontal worker scaling study](../../ROADMAP.md#later-architecture-study--horizontal-workers-and-durable-queues) to reproduce claim and crash failures, compare database queues, message queues, and durable workflows, and choose from measured requirements. The result should be an ADR and runnable failure scenarios, not an assumed default technology.
 
 ## Observability learning target
 
@@ -305,20 +309,7 @@ Record learning evidence in the PR:
 
 ## Recommended milestone order
 
-1. Harden Phase 1 HTTP input with Zod, Decision tool arguments with TypeBox, final Pi text in the adapter, and all three with adversarial tests.
-2. Use the completed Drizzle-over-SQLite layer as the persistence baseline; `drizzle-kit push` owns prototype schema application.
-3. Add explicit Pi setup, with runtime, credential, quota, and model happy and unhappy path tests.
-4. Add explicit GitHub connection, with authorization, scope, revocation, and repository-access happy and unhappy path tests.
-5. Make Pi requests durable with SQLite, one local Node worker process, run IDs, revisioned assistant messages, reconnectable SSE, a bounded transcript window, and a durable summary.
-6. Implement the Phase 2 Application Contract as a read-only vertical slice.
-7. Specify and test the durable Operation lifecycle without a provider mutation.
-8. Reconcile the first real Hetzner host effect through approval and verification.
-9. Containerize and deploy the first exact application Release to a VPS.
-10. Add structured logs, OpenTelemetry, and Langfuse with one correlation identity.
-11. Revisit Workflow DevKit only when its durability trigger is present.
-12. Break, recover, roll back, and externally re-verify a deployed application.
-13. Add the EC2 Host Adapter that emits the same Host Record and reuses the Linux-host lifecycle.
-14. Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 product boundary.
+Moved to the [development roadmap](../../ROADMAP.md#development-sequence). Keep the sequence and its status there; use this guide for the learning exercises attached to each milestone.
 
 ## Guardrails
 
@@ -335,7 +326,8 @@ Record learning evidence in the PR:
 ## References
 
 - [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
-- [`ROADMAP.md`](../../../ai-agent-engineer-roadmap/ROADMAP.md)
+- [Server Guy development roadmap](../../ROADMAP.md)
+- [AI Agent Engineer course roadmap (separate project)](../../../ai-agent-engineer-roadmap/ROADMAP.md)
 - [Journey 1: Application Launch](../user-journeys/01-application-launch.md)
 - [AWS integration direction](../integrations/aws.md)
 - [Shared discussion: Connect Server Guy to `STACK.md`](https://chatgpt.com/s/cx_6a9714af692c819182087392e7a2105b)

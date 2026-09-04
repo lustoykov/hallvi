@@ -2,6 +2,8 @@
 
 Status: maintained acceptance contract and test plan, 2026-09-04. This is the single testing guide for Phase 1, consolidating the former setup/prototype/application QA reports. Vitest, disposable browser fixtures and an opt-in real-Pi casebook run today. A Playwright Test runner is still a follow-up. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance.
 
+This guide owns acceptance cases, test/eval procedures, and dated verification evidence. The [journey](../user-journeys/01-application-launch.md) owns expected product behavior; the [roadmap](../../ROADMAP.md) owns development order and implementation status. Failures found here become linked roadmap work, not a competing build plan.
+
 ## What “done” means
 
 Acceptance is observable evidence that an engineer can complete a workflow and recover from its expected failures. It is not just a green test count or a model saying that work is complete.
@@ -9,7 +11,7 @@ Acceptance is observable evidence that an engineer can complete a workflow and r
 There are two different completion claims:
 
 - **An application's Launch Brief is ready:** its four current checks pass: recorded identity, readable repository at a recorded commit, explicit target environment, and explicit permission policy. This does not mean the application is deployed.
-- **Phase 1 product work is complete:** the current journey below passes, plus the explicit GitHub connection and durable-request follow-ups in [TODO](../../TODO.md) pass their acceptance cases. Those follow-ups are still pending. Do not treat the four checks as evidence that the entire product phase is done.
+- **Phase 1 product work is complete:** the current journey below passes, plus the explicit GitHub connection and durable-request follow-ups in the [roadmap](../../ROADMAP.md#phase-1-implementation-backlog) pass their acceptance cases. Those follow-ups are still pending. Do not treat the four checks as evidence that the entire product phase is done.
 
 Desktop only. Do not add mobile checks unless the user changes the project scope.
 
@@ -118,6 +120,8 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Playwright follow-up scope
 
+This specifies the planned runner's acceptance requirements. Its implementation status is tracked in the [roadmap](../../ROADMAP.md#configure-pi-explicitly).
+
 - Install `@playwright/test` and add a desktop-only `test:e2e` command. Keep it distinct from `npm test` and opt-in live evaluations.
 - Port the case IDs above into tests using accessible labels/roles and state assertions, not fragile coordinates or exact generated-prose snapshots.
 - Give each worker its own fixture server, database, configuration and external-adapter state. Start each independent scenario with fresh data. A separate browser context does **not** isolate server-side SQLite or login state.
@@ -179,7 +183,7 @@ Fresh checks:
 | P1-14 | Drawer evidence/tabs, X/Escape/backdrop restoration and Ask Pi prefill/focus **passed**. No background application control received focus in the native modal traversal; full accessibility/focus-wrap verification remains partial. |
 | P1-15–16 | Deterministic checks **passed:** visible 503 retry/recovery, terminal 404, late callback handling, detected/draft model settings, invalid combinations and real-adapter configuration boundaries. This is not live OAuth/model acceptance. |
 
-Audit fixes and remaining work are tracked in [TODO](../../TODO.md):
+Audit fixes and remaining work are tracked in the [roadmap](../../ROADMAP.md#configure-pi-explicitly):
 
 1. **Fixed: setup Origin bypass.** The earlier hostile-Origin `text/plain` POST could create or overwrite configuration. [`parseJsonRequest`](../../src/server/schemas.ts) now guards every JSON mutation; bodyless archive/rerun/login-cancel handlers guard explicitly. All 11 mutation handlers have positive/negative regression coverage. This does not add authentication or claim the local app is safe to expose publicly. Browser delivery/exploitability of the original defect was **not** tested.
 2. **Fixed: Disconnect focus loss.** [`ConfirmActionDialog`](../../src/components/server-guy/confirm-action-dialog.tsx) now restores its connected opener after unmount/close. Both Escape and Cancel returned focus to Disconnect in the fresh browser regression check. A checked-in automated browser regression remains part of the Playwright follow-up.

@@ -2,7 +2,16 @@
 
 Server Guy provides PaaS-like deployment and recovery on infrastructure the engineer owns. The current implementation covers Phase 1 of Journey 1: **Start**.
 
-[Learn the agent-engineering stack through Server Guy](docs/learning/stack-with-server-guy.md).
+## Documentation
+
+| Question | Owner |
+| --- | --- |
+| What do we build next, and what is implemented or still open? | [Development roadmap](ROADMAP.md) — ordered milestones/PRs and the implementation backlog. |
+| What should users experience? | [User journeys](docs/user-journeys/README.md) — product behavior, launch phases, deliverables and exit gates. |
+| What engineering capabilities does this teach? | [Learning guide](docs/learning/stack-with-server-guy.md) — stack mapping and exercises, not another build plan. |
+| How do we prove the implemented behavior works? | [Phase 1 testing guide](docs/testing/phase-one-acceptance.md) — acceptance cases, test/eval procedures and verification evidence. |
+
+Launch phases are product steps; development milestones are implementation work and may span several PRs. Update each fact in its owning document and link to it from the others.
 
 ## Architecture
 
