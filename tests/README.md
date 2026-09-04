@@ -39,7 +39,7 @@ The product's acceptance cases and dated verification evidence stay in the singl
 
 ## Suite explanations
 
-Click a suite name to expand its explanation directly below the row; this never starts a test. Every suite uses the same fields: execution, real dependencies, mocked dependencies, database isolation, checks/review, and what passing does not prove. **Code & saved output** lists the command, source files and artifact locations. The copy lives in [dashboard/suite-guides.ts](dashboard/suite-guides.ts), separate from execution logic.
+The **How it works** page (topbar) compares the four suites in one table and also holds the AI-usage notes and the file map; reading it never starts a test. The Run checks table itself stays a plain table of actions. Every suite uses the same fields: execution, real dependencies, mocked dependencies, database isolation, checks/review, and what passing does not prove. **Code & saved output** lists the command, source files and artifact locations. The copy lives in [dashboard/suite-guides.ts](dashboard/suite-guides.ts), separate from execution logic.
 
 The folders match the dashboard suites: **Application tests** → `application/`, **Browser smoke / Browser journeys** → `browser/`, **Live agent evals** → `evals/`. Browser smoke selects tagged tests from the same browser suite, not a separate folder. `dashboard/` is the testing tool, not another test suite; `browser-fixtures/` and `test-database.ts` are shared support.
 

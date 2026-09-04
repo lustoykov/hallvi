@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { createDashboard } from "../dashboard/server";
 import { journey } from "./journeys";
 
-test("suite explanations show isolation and grading without starting a runner", journey("dashboard"), async ({ page }, testInfo) => {
+test("the How it works page compares every suite without starting a runner", journey("dashboard"), async ({ page }, testInfo) => {
   const root = mkdtempSync(join(tmpdir(), "sg-suite-guides-"));
   let launches = 0;
   const dashboard = createDashboard(root, () => { launches++; throw new Error("No runner allowed"); });
@@ -24,49 +24,32 @@ test("suite explanations show isolation and grading without starting a runner", 
     dashboard.server.listen(0, "127.0.0.1"); await once(dashboard.server, "listening");
     const address = dashboard.server.address();
     if (!address || typeof address === "string") throw new Error("Missing dashboard address");
-    await page.goto(`http://127.0.0.1:${address.port}/`);
-    await expect(page.locator(".suite-explanation")).toHaveCount(0);
-    const unit = page.getByRole("button", { name: "About Application tests", exact: true });
-    await unit.focus(); await unit.press("Enter");
-    const unitGuide = page.getByRole("region", { name: "Application tests explained" });
-    await expect(unitGuide).toContainText("Unit and integration tests");
-    await expect(unitGuide).toContainText("a chat saved by one Phase 1 test cannot appear in the next");
-    await expect(unitGuide).toContainText("database connections close and these temporary folders are deleted");
-    await expect(unit).toHaveAttribute("aria-expanded", "true");
+    await page.goto(`http://127.0.0.1:${address.port}/about`);
+    await expect(page).toHaveTitle("How it works · Server Guy Testing");
+    await expect(page.getByRole("heading", { name: "How it works", exact: true })).toBeVisible();
+    const table = page.locator("#compare");
+    await expect(table.locator("thead th")).toHaveText(["", "Application tests", "Browser smoke", "Browser journeys", "Live agent evals"]);
+    await expect(table.locator("tbody th")).toHaveText(["Purpose", "Execution", "Real", "Mocked / simulated", "Database & state lifecycle", "Checks & review", "Doesn’t prove", "Code & saved output"]);
+    for (const phrase of [
+      "Unit and integration tests", "a chat saved by one Phase 1 test cannot appear in the next", "database connections close and these temporary folders are deleted",
+      "Only the two journeys tagged @smoke run.", "dashboard journey starts its own temporary testing dashboard", "model replies are not mocked",
+      "the greeting case cannot inherit messages or Decisions from revise-existing", "the database connection closes; the file remains in /tmp", "failed code checks stay failed",
+      "tests/evals/phase-one.eval.ts", "retained for debugging", "npm run eval:pi",
+    ]) await expect(table).toContainText(phrase);
+    // A state refresh re-renders the table in place without losing it.
     revision++;
     await expect.poll(() => shownRevision).toBe(revision);
-    await expect(unitGuide).toBeVisible(); await expect(unit).toBeFocused();
-    await page.screenshot({ path: testInfo.outputPath("suite-application-tests.png"), fullPage: true });
-    for (const [name, phrase] of [
-      ["Browser smoke", "Only the two journeys tagged @smoke run."],
-      ["Browser journeys", "dashboard journey starts its own temporary testing dashboard"],
-      ["Live agent evals", "model replies are not mocked"],
-    ]) {
-      await page.getByRole("button", { name: `About ${name}`, exact: true }).click();
-      const guide = page.getByRole("region", { name: `${name} explained` });
-      await expect(guide).toContainText(phrase);
-      await expect(guide.locator("dt")).toHaveText(["Execution", "Real", "Mocked / simulated", "Database & state lifecycle", "Checks & review", "Doesn’t prove"]);
-      await expect(page.locator(".suite-explanation")).toHaveCount(1);
-    }
-    const liveGuide = page.getByRole("region", { name: "Live agent evals explained" });
-    await expect(liveGuide).toContainText("the greeting case cannot inherit messages or Decisions from revise-existing");
-    await expect(liveGuide).toContainText("the database connection closes; the file remains in /tmp");
-    await expect(liveGuide).toContainText("failed code checks stay failed");
-    await page.screenshot({ path: testInfo.outputPath("suite-live-evals.png"), fullPage: true });
-    await liveGuide.getByText("Code & saved output", { exact: true }).click();
-    await expect(liveGuide).toContainText("tests/evals/phase-one.eval.ts");
-    await expect(liveGuide).toContainText("retained for debugging");
-    await expect(liveGuide).toContainText("npm run eval:pi");
-    await page.getByRole("button", { name: "About Live agent evals", exact: true }).press("Space");
-    await expect(page.locator(".suite-explanation")).toHaveCount(0);
-    await page.getByRole("button", { name: "Choose journeys…" }).click();
-    await expect(page.getByRole("dialog", { name: "Choose browser journeys" })).toBeVisible();
-    await page.keyboard.press("Escape");
-    expect(launches).toBe(0); expect(errors).toEqual([]);
-    const state = await page.request.get(`http://127.0.0.1:${address.port}/api/state`, { headers: { "x-sg-testing-token": dashboard.token } });
-    expect((await state.json()).history).toEqual([]);
+    await expect(table.locator("tbody tr")).toHaveCount(8);
+    await page.screenshot({ path: testInfo.outputPath("how-it-works.png"), fullPage: true });
+    // The suite table on Run checks stays a plain table of actions.
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Run checks", exact: true }).click();
+    await expect(page).toHaveURL(`http://127.0.0.1:${address.port}/`);
+    await expect(page.locator("#suites tr")).toHaveCount(4);
+    await expect(page.locator("#suites button")).toHaveText(["Run", "Run", "Choose journeys…", "Choose cases…"]);
+    await expect(page.locator("#suites details, #suites [aria-expanded]")).toHaveCount(0);
+    expect(launches).toBe(0);
+    expect(errors).toEqual([]);
   } finally {
-    await page.unrouteAll({ behavior: "wait" });
     dashboard.stop(); dashboard.server.closeAllConnections();
     rmSync(root, { recursive: true, force: true });
   }

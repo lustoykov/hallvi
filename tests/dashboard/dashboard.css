@@ -86,26 +86,10 @@ textarea { resize: vertical; min-height: 84px; }
 .suites .last-result { display: grid; gap: 3px; justify-items: start; } .suites .last-result small { color: var(--muted); font-size: 12px; }
 .suites td strong { display: block; margin-bottom: 2px; font-size: 15px; } .suites td small { display: block; color: var(--muted); font-size: 13px; }
 .suites .suite-links { margin-top: 8px; display: flex; gap: 14px; align-items: center; }
-.suite-explain { display: inline-flex; align-items: center; gap: 10px; color: var(--blue-deep); font-size: 15px; font-weight: 600; text-align: left; margin-bottom: 2px; }
-.suite-explain:hover { text-decoration: underline; text-underline-offset: 3px; }
-.suite-explain::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin-top: -3px; }
-.suite-explain[aria-expanded=true]::after { transform: rotate(225deg); margin-top: 3px; }
-.suites .suite-explanation > td { padding: 20px 28px 24px; text-align: left; width: auto; background: var(--paper); }
-.suite-guide { max-width: 940px; }
-.suite-purpose { font-size: 15px; font-weight: 600; max-width: 80ch; }
-.suite-guide dl { grid-template-columns: 155px minmax(0, 1fr); gap: 12px 24px; margin-top: 18px; font-size: 14px; }
-.suite-guide dd { max-width: 80ch; color: var(--muted); }
-.suite-guide details { margin-top: 20px; font-size: 13px; }
-.suite-guide summary { color: var(--blue-deep); font-weight: 600; cursor: pointer; }
-.suite-guide details p { margin-top: 10px; color: var(--muted); }
-.suite-guide ul { padding-left: 18px; margin: 8px 0 0; overflow-wrap: anywhere; }
 .suites .usage-free { background: transparent; padding: 0; color: var(--muted); font-weight: 500; }
 .suites .usage-paid { background: var(--amber-bg); color: var(--amber); }
 .suite-schedule > span { display: block; font-size: 13px; font-weight: 600; }
 .suite-schedule small { margin-top: 3px; }
-.suite-help { margin-top: 12px; font-size: 13px; color: var(--muted); }
-.suite-help summary { cursor: pointer; color: #234577; font-weight: 600; }
-.suite-help p { margin-top: 10px; max-width: 85ch; }
 .history { margin-top: 36px; }
 .history h2 { margin-bottom: 12px; }
 .history-list { border-top: 1px solid var(--line); }
@@ -121,10 +105,22 @@ textarea { resize: vertical; min-height: 84px; }
 .log-panel header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 10px; }
 .log-panel h3 { font-size: 14px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); padding: 14px; font-size: 12px; line-height: 1.5; max-height: 420px; overflow: auto; border-radius: 6px; margin: 0; tab-size: 2; }
-.file-guide { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 18px; }
-.file-guide summary, .disclosures summary, .archived-runs summary, .side-help summary, dialog summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #234577; }
-.file-guide p { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.disclosures summary, .archived-runs summary, .side-help summary, dialog summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #234577; }
 dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 13px; margin: 14px 0 0; } dt { font-weight: 600; } dd { margin: 0; }
+
+/* How it works */
+.about-block { margin-top: 30px; }
+.about-block h2 { margin-bottom: 12px; }
+.about-block p { font-size: 14px; color: var(--muted); max-width: 85ch; margin-top: 8px; }
+.about-block dl { margin-top: 12px; }
+.compare-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.compare { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.5; }
+.compare th, .compare td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+.compare thead th { background: var(--panel); font-size: 13px; font-weight: 600; color: var(--ink); }
+.compare tbody th { width: 168px; color: var(--muted); font-size: 12px; font-weight: 600; background: var(--paper); }
+.compare tbody tr:last-child th, .compare tbody tr:last-child td { border-bottom: 0; }
+.compare td p { margin: 0; color: var(--ink); font-size: 13px; max-width: none; } .compare td p + p { margin-top: 8px; }
+.compare ul { padding-left: 16px; margin: 8px 0 0; overflow-wrap: anywhere; } .compare code { font-size: 12px; }
 
 /* Eval runs: heading */
 .empty { padding: 56px 24px; text-align: center; color: var(--muted); display: grid; gap: 10px; justify-items: center; background: var(--surface); border: 1px dashed var(--line-strong); border-radius: 12px; }

@@ -85,7 +85,7 @@ The easiest entry point is:
 npm run test:dashboard
 ```
 
-Open **http://127.0.0.1:4317**. Nothing runs automatically. **Run checks** shows each suite's scope, model usage, CI policy, recent runs and bounded logs. **Review live eval answers** opens existing saved evals without rerunning Server Guy. **Where everything lives** is the file index. The page binds to loopback only, rejects foreign Host/Origin requests, requires same-origin JSON and a per-process token for controls, and runs one allowlisted command at a time. Do not expose it through a tunnel. Live SDK logs are deliberately not retained because they can contain sensitive diagnostics.
+Open **http://127.0.0.1:4317**. Nothing runs automatically. **Run checks** shows each suite's scope, model usage, CI policy, recent runs and bounded logs. **Review live eval answers** opens existing saved evals without rerunning Server Guy. **How it works** compares the four suites in one table and holds the file index. The page binds to loopback only, rejects foreign Host/Origin requests, requires same-origin JSON and a per-process token for controls, and runs one allowlisted command at a time. Do not expose it through a tunnel. Live SDK logs are deliberately not retained because they can contain sensitive diagnostics.
 
 CLI alternatives, from the repository:
 

@@ -12,7 +12,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" data-route><strong>Server Guy</strong><span class="brand-tag">Testing</span></a>
-    <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval runs <span id="pending" class="chip discuss" hidden></span></a></nav>
+    <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval runs <span id="pending" class="chip discuss" hidden></span></a><a id="about-link" href="/about" data-route>How it works</a></nav>
     <nav class="resources" aria-label="Resources"><span id="origin" class="local"></span><a href="/guide" target="_blank">Acceptance guide<svg class="ext" aria-hidden="true" viewBox="0 0 12 12"><path d="M4 1.5h6.5V8M10.5 1.5 1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden"> (opens in a new tab)</span></a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app<svg class="ext" aria-hidden="true" viewBox="0 0 12 12"><path d="M4 1.5h6.5V8M10.5 1.5 1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden"> (opens in a new tab)</span></a></nav>
   </header>
   <main>
@@ -21,20 +21,25 @@
     <div id="active" class="active" role="status" hidden><span class="pulse" aria-hidden="true"></span><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
 
     <section id="runs-panel" aria-labelledby="checks-title">
-      <div class="page-heading"><div><h1 id="checks-title" tabindex="-1">Run checks</h1><p>Open a suite name to see what is real, mocked and checked. Run actions are separate.</p></div></div>
+      <div class="page-heading"><div><h1 id="checks-title" tabindex="-1">Run checks</h1><p>Fixed test commands and their saved results. Nothing runs until you start it here. <a href="/about" data-route class="text-button">How the suites differ</a></p></div></div>
       <table class="suites"><caption class="visually-hidden">Available test suites, AI usage and CI policy</caption><thead><tr><th>Suite</th><th>AI usage</th><th>CI</th><th>Last result</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
-      <details class="suite-help"><summary>About AI usage &amp; automatic runs</summary>
-        <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
-        <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM judgments are local-only; this dashboard confirms before using your ChatGPT subscription, and one confirmation covers a run and judging its answers.</p>
-        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
-      </details>
       <section class="history" aria-labelledby="history-title">
         <h2 id="history-title">Recent runs</h2>
         <p id="empty-runs" class="muted">Nothing has run from this dashboard yet. Saved eval answers are under Eval runs.</p>
         <div id="history" class="history-list"></div>
         <section id="log-panel" class="log-panel" aria-labelledby="log-title" hidden><header><h3 id="log-title"></h3><button id="log-close" class="text-button" type="button">Hide output</button></header><pre id="log"></pre></section>
       </section>
-      <details class="file-guide"><summary>Where everything lives</summary><dl><dt>Application tests</dt><dd><code>tests/application/unit/</code> and <code>tests/application/integration/</code></dd><dt>Browser smoke &amp; journeys</dt><dd><code>tests/browser/</code> · smoke selects <code>@smoke</code> tags · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></details>
+    </section>
+
+    <section id="about-panel" aria-labelledby="about-title" hidden>
+      <div class="page-heading"><div><h1 id="about-title" tabindex="-1">How it works</h1><p>What each suite exercises, what is simulated, and where results end up. Reading this runs nothing.</p></div></div>
+      <section class="about-block" aria-labelledby="compare-title"><h2 id="compare-title">The four suites</h2><div class="compare-wrap"><table id="compare" class="compare"><caption class="visually-hidden">How the suites differ</caption></table></div></section>
+      <section class="about-block" aria-labelledby="usage-title"><h2 id="usage-title">AI usage &amp; automatic runs</h2>
+        <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
+        <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM judgments are local-only; this dashboard confirms before using your ChatGPT subscription, and one confirmation covers a run and judging its answers.</p>
+        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
+      </section>
+      <section class="about-block" aria-labelledby="files-title"><h2 id="files-title">Where everything lives</h2><dl><dt>Application tests</dt><dd><code>tests/application/unit/</code> and <code>tests/application/integration/</code></dd><dt>Browser smoke &amp; journeys</dt><dd><code>tests/browser/</code> · smoke selects <code>@smoke</code> tags · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></section>
     </section>
 
     <section id="reviews-panel" aria-labelledby="reviews-title" hidden>

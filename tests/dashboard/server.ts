@@ -162,8 +162,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     if (request.headers.host !== new URL(origin).host || (request.headers.origin && request.headers.origin !== origin)) { json({ error: "Local same-origin requests only" }, 403); return; }
     const url = new URL(request.url!, origin);
     try {
-      if (request.method === "GET" && ["/", "/evals", "/dashboard.js", "/dashboard.css"].includes(url.pathname)) {
-        const name = ["/", "/evals"].includes(url.pathname) ? "dashboard.html" : url.pathname.slice(1);
+      if (request.method === "GET" && ["/", "/evals", "/about", "/dashboard.js", "/dashboard.css"].includes(url.pathname)) {
+        const name = ["/", "/evals", "/about"].includes(url.pathname) ? "dashboard.html" : url.pathname.slice(1);
         response.setHeader("Content-Type", name.endsWith("html") ? "text/html; charset=utf-8" : name.endsWith("css") ? "text/css" : "text/javascript");
         response.end(readFileSync(new URL(name, import.meta.url), "utf8").replace("CSRF_TOKEN", token)); return;
       }

@@ -59,11 +59,15 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(liveRow.getByRole("link", { name: /View saved runs/ })).toHaveAttribute("href", "/evals");
     await expect(page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Run checks", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText("Full suite: manual", { exact: true })).toHaveCount(0);
-    await expect(page.locator(".suite-help")).not.toHaveAttribute("open", "");
-    await page.getByText("About AI usage & automatic runs", { exact: true }).click();
-    await expect(page.locator(".suite-help")).toContainText("The tests still run automatically after you start them.");
-    await expect(page.locator(".suite-help")).toContainText("GitHub-hosted runs still consume Actions minutes.");
-    await page.getByText("About AI usage & automatic runs", { exact: true }).click();
+    // Reference material lives on its own page; the suite table stays a plain table of actions.
+    await expect(page.locator("#suites details, #suites [aria-expanded]")).toHaveCount(0);
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "How it works", exact: true }).click();
+    await expect(page).toHaveURL(`http://127.0.0.1:${address.port}/about`);
+    await expect(page.locator("#about-panel")).toContainText("The tests still run automatically after you start them.");
+    await expect(page.locator("#about-panel")).toContainText("GitHub-hosted runs still consume Actions minutes.");
+    await expect(page.locator("#compare thead th")).toHaveText(["", "Application tests", "Browser smoke", "Browser journeys", "Live agent evals"]);
+    await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Run checks", exact: true }).click();
+    await expect(page.locator("#runs-panel")).toBeVisible();
     // Inner result stacks must not turn table cells into grids or break row borders.
     for (const row of await page.locator("#suites tr").all()) {
       const cells = row.locator("td");

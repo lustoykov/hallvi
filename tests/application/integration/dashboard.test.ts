@@ -36,7 +36,7 @@ async function fixture() {
 }
 it("serves both dashboard routes without launching checks or weakening API protection", async () => {
   const { origin, launch, dashboard } = await fixture();
-  for (const route of ["/", "/evals"]) {
+  for (const route of ["/", "/evals", "/about"]) {
     const response = await fetch(`${origin}${route}`);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/html");

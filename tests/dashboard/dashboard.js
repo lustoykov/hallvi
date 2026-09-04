@@ -11,7 +11,6 @@ let pendingRun = null;
 let returnToEvalPicker = false;
 let judgePreferences = null;
 let selectorsReady = false;
-let expandedSuite = "";
 let busy = false;
 const notes = new Map();
 const openReasoning = new Set();
@@ -97,24 +96,6 @@ function renderRich(node, text) {
   }));
 }
 
-function suiteExplanation(suite) {
-  const row = element("tr", "", "suite-explanation"); row.id = `suite-details-${suite.id}`;
-  const cell = document.createElement("td"); cell.colSpan = 5;
-  const section = element("section", "", "suite-guide"); section.setAttribute("aria-label", `${suite.name} explained`);
-  section.append(element("p", suite.guide.purpose, "suite-purpose"));
-  const facts = document.createElement("dl");
-  for (const [label, key] of [["Execution", "execution"], ["Real", "real"], ["Mocked / simulated", "mocked"], ["Database & state lifecycle", "isolation"], ["Checks & review", "checks"], ["Doesn’t prove", "limits"]]) {
-    facts.append(element("dt", label), element("dd", suite.guide[key]));
-  }
-  const technical = document.createElement("details");
-  technical.append(element("summary", "Code & saved output"), element("p", suite.guide.artifacts));
-  const command = element("p", "Command: "); command.append(element("code", suite.command)); technical.append(command);
-  const sources = document.createElement("ul");
-  for (const path of suite.guide.sources) { const item = document.createElement("li"); item.append(element("code", path)); sources.append(item); }
-  technical.append(sources); section.append(facts, technical); cell.append(section); row.append(cell);
-  return row;
-}
-
 async function refresh() {
   try {
     const nextState = await api("/api/state");
@@ -123,24 +104,9 @@ async function refresh() {
     stateSignature = signature; state = nextState;
     $("stale").hidden = (state.apiVersion ?? 0) >= 4; // The page can outrun the server process behind it.
     $("active").hidden = !state.active; tick();
-    const focusedSuite = document.activeElement?.dataset.suiteHelp;
-    $("suites").replaceChildren(...state.suites.flatMap((suite) => {
+    $("suites").replaceChildren(...state.suites.map((suite) => {
       const row = document.createElement("tr"); const name = document.createElement("td");
-      if (suite.guide) {
-        const explain = element("button", suite.name, "suite-explain"); explain.type = "button";
-        explain.id = `suite-help-${suite.id}`; explain.dataset.suiteHelp = suite.id;
-        explain.setAttribute("aria-label", `About ${suite.name}`);
-        explain.setAttribute("aria-expanded", String(expandedSuite === suite.id));
-        explain.setAttribute("aria-controls", `suite-details-${suite.id}`);
-        explain.addEventListener("click", () => {
-          expandedSuite = expandedSuite === suite.id ? "" : suite.id;
-          $("suites").querySelector(".suite-explanation")?.remove();
-          for (const button of $("suites").querySelectorAll("[data-suite-help]")) button.setAttribute("aria-expanded", String(button.dataset.suiteHelp === expandedSuite));
-          if (expandedSuite) row.after(suiteExplanation(suite));
-        });
-        name.append(explain);
-      } else name.append(element("strong", suite.name));
-      name.append(element("small", suite.scope));
+      name.append(element("strong", suite.name), element("small", suite.scope));
       if (suite.id === "live") { const links = element("div", "", "suite-links"); const link = element("a", "View saved runs", "text-button"); link.href = "/evals"; link.dataset.route = ""; links.append(link); name.append(links); }
       const last = state.history.find((r) => r.suite === suite.id); const resultCell = document.createElement("td"); const result = element("div", "", "last-result");
       if (last) result.append(chip(statusLabel(last.status), statusKind(last.status)), element("small", formatDate(last.startedAt))); else result.append(element("small", "Not run yet"));
@@ -152,9 +118,9 @@ async function refresh() {
       const action = document.createElement("td"); const button = element("button", picker === "journey" ? "Choose journeys…" : picker ? "Choose cases…" : "Run", picker ? "secondary" : "primary");
       button.disabled = Boolean(state.active);
       button.addEventListener("click", () => { if (picker) $(`${picker}-picker`).showModal(); else requestRun({ suite: suite.id }); });
-      action.append(button); row.append(action); return [row, ...(expandedSuite === suite.id && suite.guide ? [suiteExplanation(suite)] : [])];
+      action.append(button); row.append(action); return row;
     }));
-    if (focusedSuite) $(`suite-help-${focusedSuite}`)?.focus({ preventScroll: true });
+    renderAbout();
     initializeSelectors(); updateSelections();
     renderHistory();
     const pending = state.reports.filter((r) => !r.archived).reduce((count, r) => count + pendingCount(r), 0);
@@ -162,6 +128,32 @@ async function refresh() {
     $("pending").replaceChildren(...(pending ? [String(pending), element("span", " need attention", "visually-hidden")] : []));
     renderReview();
   } catch (error) { failure(error); }
+}
+
+// How it works: one comparison table across the suites, built from the guide the server ships with each suite.
+function renderAbout() {
+  const suites = state.suites.filter((suite) => suite.guide);
+  $("compare").hidden = !suites.length; if (!suites.length) return;
+  const cell = (tag, text, scope) => { const node = element(tag, text); if (scope) node.scope = scope; return node; };
+  const head = document.createElement("thead"); const headRow = document.createElement("tr"); headRow.append(cell("th", ""));
+  for (const suite of suites) headRow.append(cell("th", suite.name, "col"));
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const [label, key] of [["Purpose", "purpose"], ["Execution", "execution"], ["Real", "real"], ["Mocked / simulated", "mocked"], ["Database & state lifecycle", "isolation"], ["Checks & review", "checks"], ["Doesn’t prove", "limits"]]) {
+    const tr = document.createElement("tr"); tr.append(cell("th", label, "row"));
+    for (const suite of suites) tr.append(element("td", suite.guide[key]));
+    body.append(tr);
+  }
+  const tr = document.createElement("tr"); tr.append(cell("th", "Code & saved output", "row"));
+  for (const suite of suites) {
+    const td = document.createElement("td"); td.append(element("p", suite.guide.artifacts));
+    const command = element("p", "Command: "); command.append(element("code", suite.command)); td.append(command);
+    const list = document.createElement("ul");
+    for (const path of suite.guide.sources ?? []) { const item = document.createElement("li"); item.append(element("code", path)); list.append(item); }
+    td.append(list); tr.append(td);
+  }
+  body.append(tr);
+  $("compare").replaceChildren($("compare").querySelector("caption"), head, body);
 }
 
 // Recent runs: one row each; the selected run's output expands inline right under it.
@@ -468,11 +460,15 @@ $("confirm-run").addEventListener("click", () => {
 for (const button of document.querySelectorAll("[data-close]")) button.addEventListener("click", () => { if (!busy) $(button.dataset.close).close(); });
 $("stop").addEventListener("click", () => { void api("/api/stop", {}).then(refresh).catch(failure); });
 // Two real URLs sharing one shell, so moving between them keeps unsaved notes.
+const pages = { "/": ["runs", "checks-link", "checks-title", "Run checks"], "/evals": ["reviews", "reviews-link", "reviews-title", "Eval runs"], "/about": ["about", "about-link", "about-title", "How it works"] };
+function currentPage() { return pages[location.pathname] ?? pages["/"]; }
 function renderPage() {
-  const reviewing = location.pathname === "/evals";
-  $("runs-panel").hidden = reviewing; $("reviews-panel").hidden = !reviewing;
-  for (const [id, current] of [["checks-link", !reviewing], ["reviews-link", reviewing]]) { if (current) $(id).setAttribute("aria-current", "page"); else $(id).removeAttribute("aria-current"); }
-  document.title = `${reviewing ? "Eval runs" : "Run checks"} · Server Guy Testing`;
+  const [panel, link, , title] = currentPage();
+  for (const [name, id] of Object.values(pages)) {
+    $(`${name}-panel`).hidden = name !== panel;
+    if (id === link) $(id).setAttribute("aria-current", "page"); else $(id).removeAttribute("aria-current");
+  }
+  document.title = `${title} · Server Guy Testing`;
 }
 document.addEventListener("click", (event) => {
   const link = event.target.closest("a[data-route]");
@@ -480,7 +476,7 @@ document.addEventListener("click", (event) => {
   event.preventDefault();
   if (link.getAttribute("href") !== location.pathname) history.pushState(null, "", link.getAttribute("href"));
   renderPage();
-  $(location.pathname === "/evals" ? "reviews-title" : "checks-title").focus({ preventScroll: true });
+  $(currentPage()[2]).focus({ preventScroll: true });
   window.scrollTo(0, 0);
 });
 window.addEventListener("popstate", renderPage);
