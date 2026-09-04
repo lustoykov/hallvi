@@ -71,7 +71,7 @@ function judgeTargets(saved, shown) {
   if (unjudged.length) return { keys: unjudged.map(keyOf), label: `Judge ${plural(unjudged.length, "unjudged answer")}…`, title: `Judge ${plural(unjudged.length, "unjudged answer")}`, primary: true };
   const subset = shown.filter(reviewable);
   if (subset.length && subset.length < all.length) return { keys: subset.map(keyOf), label: subset.length === 1 ? "Judge this one again…" : `Judge these ${subset.length} again…`, title: `Judge ${plural(subset.length, "answer")} again`, primary: false };
-  return { keys: all.map(keyOf), label: "Judge again…", title: `Judge all ${all.length} answers again`, primary: false };
+  return { keys: all.map(keyOf), label: "Judge run again…", title: `Judge all ${all.length} answers again`, primary: false };
 }
 // Where you and a current judgment both exist, the judge is either right or wrong; that is the calibration signal.
 function agreement(saved, c) {
@@ -318,7 +318,7 @@ function renderAnswer(saved, ordered, shown) {
   $("judge-meta").textContent = llm ? `${llm.model} · ${llm.effort} · ${formatDate(llm.createdAt)}` : "";
   renderJudgment(llm?.reason, human);
   $("judge-result").className = `judgment${llm ? "" : " none"}`;
-  $("judge").textContent = llm ? "Judge again…" : "Judge this answer…";
+  $("judge").textContent = llm ? "Judge this answer again…" : "Judge this answer…";
   $("judge").disabled = Boolean(state.active) || busy || !reviewable(current);
   $("verdict").hidden = !reviewable(current); $("unreviewable").hidden = reviewable(current);
   for (const button of document.querySelectorAll(".verdict-button")) {
