@@ -1,6 +1,6 @@
 # Phase 1 acceptance: repeatable desktop journeys
 
-Status: maintained acceptance contract and test plan, 2026-09-04. This is the single testing guide for Phase 1, consolidating the former setup/prototype/application QA reports. Vitest and disposable browser fixtures run today. A Playwright Test runner and an opt-in real-Pi casebook are follow-ups. Deterministic checks do not imply human-reviewed model quality or complete Phase 1 acceptance.
+Status: maintained acceptance contract and test plan, 2026-09-04. This is the single testing guide for Phase 1, consolidating the former setup/prototype/application QA reports. Vitest, disposable browser fixtures and an opt-in real-Pi casebook run today. A Playwright Test runner is still a follow-up. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance.
 
 ## What “done” means
 
@@ -35,7 +35,7 @@ Technical help must accurately explain credential paths, shared versus separate 
 | --- | --- | --- |
 | Schemas, domain rules, transactions, login coordination | Existing Vitest | Deterministic rules, isolation, atomic writes, cancellation and failure handling. |
 | Browser journey through real routes and SQLite | Recommend Playwright Test | Forms, navigation, dialogs, visible errors, keyboard behavior, reload and recovery. Replace external Pi/GitHub calls with deterministic fixtures. |
-| Real Pi behavior | Planned opt-in casebook using the actual Pi adapter | Exact proposal/state assertions plus a separate human meaning review. A synthetic fixture cannot prove real model behavior. |
+| Real Pi behavior | Opt-in `npm run eval:pi`, using existing Vitest and the actual Pi adapter | Exact proposal/state assertions plus a separate human meaning review. A synthetic fixture cannot prove real model behavior. |
 
 Playwright provides [fixtures](https://playwright.dev/docs/test-fixtures), isolated [browser contexts](https://playwright.dev/docs/browser-contexts), and [failure traces](https://playwright.dev/docs/trace-viewer). Next.js also recommends E2E testing for [async Server Components](https://nextjs.org/docs/app/guides/testing). This fits our server-rendered entry pages and multi-screen workflow.
 
@@ -126,7 +126,25 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Real Pi casebook and remaining Phase 1 gates
 
-Add a small repeatable casebook in a separate PR. It must exercise the real Pi adapter against isolated application data, record exact proposals and resulting state, and leave meaning checks for explicit human review. Do not add a new eval platform just to run the first cases.
+The runnable [casebook](../../evals/phase-one-cases.ts) contains eight fixed inputs and meaning rubrics: greeting, explicit priority, question versus commitment, hypothetical, exact revision, unresolved conflict, same-message retraction, and quoted untrusted instructions. This is a small regression set, not a broad reliability benchmark.
+
+```sh
+# Eight real Pi turns using your saved Server Guy model/effort and subscription.
+SERVER_GUY_LIVE_EVALS=1 npm run eval:pi
+
+# Repeat each case to expose variation: 16 turns, sequentially.
+SERVER_GUY_LIVE_EVALS=1 PI_EVAL_REPEATS=2 npm run eval:pi
+```
+
+Without opt-in, the command fails before running the suite. Repeats default to one and are limited to 1–5 (8–40 turns). A turn may involve multiple model requests because of tool calls. `npm test` never discovers the `.eval.ts` file and never calls the provider. No additional eval library or API key is needed.
+
+The [runner](../../evals/phase-one.eval.ts) seeds a private temporary SQLite database, snapshots the saved model preferences and invokes the real `sendChatMessage → askPi → SQLite transaction` path. It does not read your existing applications/transcripts or contact GitHub. The configured credential file remains the auth source; normal Pi OAuth refresh may update it. Credentials are not copied into the temporary configuration or serialized into reports. There are no automatic provider retries or model/billing fallbacks; a Pi runtime/provider failure stops further turns.
+
+Each run creates a git-ignored `eval-results/<run>/results.json` and `review.md`: fixed inputs, current context, accepted tool proposals, resulting records, timings, model/effort, Pi version, commit/dirty flag and source hashes. It records accepted proposals, not a full SDK trace. Temporary state remains for diagnosis. Never publish results containing real private data.
+
+The [exact checks](../../evals/check-phase-one.ts) verify proposal count, supported shape, replacement IDs, source-message provenance, one persisted message pair and supersession. Meaning is a separate **pending human review** against each case's rubric. Exit code zero means the automated checks passed, not that the model is semantically correct or the phase complete. An assistant can suggest a verdict but cannot supply human sign-off. Review `review.md`, record pass/fail with reasons, and retain that reviewed baseline before accepting prompt/tool/model changes. Do not assert exact generated wording.
+
+For each later phase, define cases before implementation, run them as the real behavior becomes available, and rerun relevant earlier cases before acceptance. Add observed failures as regressions. Do not prebuild eval machinery for unimplemented phases; UI/login/database behavior still belongs in ordinary application tests.
 
 Live account checks are opt-in, user-approved and use the configured Pi runtime/subscription. Record model ID, effort, prompt version, inputs, tool proposals, resulting records and semantic pass/fail reason, never OAuth secrets. Check ordinary chat, explicit priority, valid revision, conflicting/retracted instructions, injected repository text and provider rejection. Judge whether the response agrees with the accepted Decision, not whether it matches one exact sentence. Label human judgments as human-reviewed; do not let another model's rating be the sole authority for state correctness.
 
@@ -139,22 +157,23 @@ Deployment, infrastructure provisioning, monitoring automations, and Phase 2 wor
 
 ## Latest verification
 
-**2026-09-04 — setup audit follow-up. The complete contract is not passing yet.** The two confirmed audit defects are now fixed; the earlier three-agent journey evidence below is supplemented by targeted regression checks. The real-Pi casebook is a separate follow-up.
+**2026-09-04 — audit follow-up and first live baseline on the dirty `codex/pi-setup` checkout, based on `2f82308`. The complete contract is not passing yet.** The two confirmed audit defects are now fixed; the earlier three-agent journey evidence below is supplemented by targeted regression checks and a real-Pi run.
 
 Fresh checks:
 
-- Setup-only deterministic Vitest suite: **204/204** tests passed across 14 files, including Origin checks on all mutation handlers and saved-setting preservation. These tests make no model calls.
+- Current deterministic Vitest suite: **223/223** tests passed across 15 files, including Origin checks on all mutation handlers, saved-setting preservation and tests of the eval checks themselves. These tests make no model calls.
 - Fresh targeted checks: actual Next route rejects hostile-Origin `text/plain` setup POST without modifying saved configuration, accepts same-origin JSON; desktop Cancel and Escape both restore focus to Disconnect.
 - Earlier three-agent audit: **44 HTTP/SQLite assertions**, **20 read-only HTTP assertions** against browser-created state and **15 extra disposable boundary tests** passed. These were not all rerun during the targeted fix pass; the current ordinary suite and targeted checks above were rerun.
 - TypeScript, lint, whitespace checks and an isolated production build passed.
+- First real-Pi baseline: **16/16 automated cases passed** (eight inputs, two repetitions), `gpt-5.6-sol` / `high`, Pi `0.84.4`, 84.26 seconds. Source fingerprints stayed unchanged. Human meaning review remains pending: both unresolved-conflict replies recommended a concrete compromise without recording a Decision, which needs interpretation against the initial rubric. The assistant's review is not human approval. Local artifacts: `eval-results/2026-09-04T08-42-41.046Z-Q6vAk1/`.
 - Real production login start/poll/cancel routes shared the same attempt correctly. The invalid-model probe stopped before provider authentication. The earlier coordinator-sharing concern was not reproduced; this says nothing about restart recovery or multiple processes.
 
 | Cases | Current evidence / status |
 | --- | --- |
-| P1-01, P1-03 | Discovery, consent UI, recovery and preferences passed in deterministic tests; the setup Origin defect is now fixed and regression-tested. Live quota/auth failure acceptance was not run. |
+| P1-01, P1-03 | Discovery, consent UI, recovery and preferences passed in deterministic tests; the setup Origin defect is now fixed and regression-tested. The configured live model ran successfully; live quota/auth failure acceptance was not run. |
 | P1-02 | **Partial:** synthetic fresh/replacement success and failed/cancelled replacement preservation passed; real provider rejection/expiry was not exercised. |
 | P1-04–05, P1-07–08, P1-12–13 | Exercised deterministic browser/server paths **passed:** creation, isolation, rollback/retry, evidence, archival, double-send prevention, draft preservation and slow-create navigation. Pi/GitHub adapters were synthetic. |
-| P1-06 | **Partial:** deterministic proposal persistence/provenance/supersession passed. A repeatable real-Pi casebook and human meaning review remain follow-ups. |
+| P1-06 | **Partial:** real-Pi proposal count, persistence/provenance/supersession passed on the eight-case baseline. Human meaning review and the unresolved-conflict expectation remain open. |
 | P1-09–10 | **Partial:** browser confirmation/cancellation and separate HTTP/domain deletion/disconnect passed, including fresh IDs, late-result rejection and preservation of other records/credentials. Final destructive browser clicks were not submitted. |
 | P1-11 | **Partial:** Disconnect focus restoration is now fixed and both dismissal paths passed in the desktop browser. Application-removal restoration passed in the earlier audit. A full keyboard-only/screen-reader audit was not completed. |
 | P1-14 | Drawer evidence/tabs, X/Escape/backdrop restoration and Ask Pi prefill/focus **passed**. No background application control received focus in the native modal traversal; full accessibility/focus-wrap verification remains partial. |
@@ -165,6 +184,6 @@ Audit fixes and remaining work are tracked in [TODO](../../TODO.md):
 1. **Fixed: setup Origin bypass.** The earlier hostile-Origin `text/plain` POST could create or overwrite configuration. [`parseJsonRequest`](../../src/server/schemas.ts) now guards every JSON mutation; bodyless archive/rerun/login-cancel handlers guard explicitly. All 11 mutation handlers have positive/negative regression coverage. This does not add authentication or claim the local app is safe to expose publicly. Browser delivery/exploitability of the original defect was **not** tested.
 2. **Fixed: Disconnect focus loss.** [`ConfirmActionDialog`](../../src/components/server-guy/confirm-action-dialog.tsx) now restores its connected opener after unmount/close. Both Escape and Cancel returned focus to Disconnect in the fresh browser regression check. A checked-in automated browser regression remains part of the Playwright follow-up.
 
-Screenshot captures were inspected inline, but the browser tool exposed no supported local-image persistence mechanism; this is not a complete saved-screenshot visual audit. No mobile checks were made. Broader Pi behavior, explicit GitHub onboarding and durable-worker acceptance remain unverified or unimplemented. Earlier temporary audit evidence remains under `/tmp/server-guy-phase1-audit-dBJnR5`; a real-Pi runner and desktop E2E runner are still pending in this PR.
+Screenshot captures were inspected inline, but the browser tool exposed no supported local-image persistence mechanism; this is not a complete saved-screenshot visual audit. No mobile checks were made. The opt-in baseline used the existing Pi login for real model calls, not a fresh OAuth flow or GitHub access. Broader Pi behavior, explicit GitHub onboarding and durable-worker acceptance remain unverified or unimplemented. Earlier temporary audit evidence remains under `/tmp/server-guy-phase1-audit-dBJnR5`; the new real-Pi runner now exists in the repository, but a desktop E2E runner is still pending.
 
 Design provenance only: the retired A/B/C prototype source is preserved on local branch `codex/archive-pi-setup-prototypes-2026-09-04`, commit `449b59d10366b0cd816433508aa0c1b175b98230`. It is not the current implementation or current acceptance evidence.

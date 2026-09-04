@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:pi": "vitest run --config evals/vitest.config.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.84.4",

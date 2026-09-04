@@ -7,5 +7,6 @@ node_modules/
 .next/
 out/
 coverage/
+eval-results/
 *.tsbuildinfo
 .env.local
