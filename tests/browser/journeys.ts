@@ -4,6 +4,7 @@ export const browserJourneys = [
   { id: "settings", name: "Settings and privacy help", description: "Open help, cancel disconnect, save reasoning effort and verify it after returning.", smoke: true },
   { id: "provider-failure", name: "Recover from a provider failure", description: "Show an error without a partial conversation, then retry successfully.", smoke: false },
   { id: "isolation", name: "Keep applications separate", description: "Switch applications without leaking Decisions or unsent drafts.", smoke: false },
+  { id: "chat-navigation", name: "Navigate chats and inspect evidence", description: "Keep drafts separate, restore the selected transcript after refresh, read archived chats and navigate Record tabs with the keyboard.", smoke: false },
   { id: "revision", name: "Revise a Decision safely", description: "Replace the exact Decision; reject a fabricated replacement without saving partial changes.", smoke: false },
   { id: "removal", name: "Remove and recreate an application", description: "Require the repository name as confirmation; recreate it with fresh IDs and no old Decisions.", smoke: false },
   { id: "disconnect", name: "Disconnect without losing history", description: "Keep chats, disable new messages and require consent before reusing a discovered login.", smoke: false },

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowClockwise, ArrowSquareOut, ChatCircleDots, Check, Circle, SpinnerGap, X } from "@phosphor-icons/react";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 
 import type { GateCheck } from "@/server/types";
@@ -22,13 +22,14 @@ export function CheckDrawer({
   onRerun: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog?.showModal();
     return () => {
       dialog?.close();
-      // React can remove the dialog before native close restores its opener.
+      // Restore before the next frame, so an explicit Ask Pi action can then
+      // move focus to the composer without this cleanup stealing it back.
       if (opener?.isConnected) opener.focus();
     };
   }, []);

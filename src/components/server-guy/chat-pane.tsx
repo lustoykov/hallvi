@@ -96,7 +96,7 @@ export function ChatPane({
               <span className="sg-ready-icon"><Check weight="bold" /></span>
               <div>
                 <strong>Launch Brief ready</strong>
-                <p>All four checks pass. Phase 2 is intentionally not implemented in this pull request.</p>
+                <p>All four launch checks pass. Your app is not deployed; later launch steps are not available yet.</p>
               </div>
             </div>
           )}
@@ -104,10 +104,10 @@ export function ChatPane({
             <div className="sg-pi-required">
               <WarningCircle weight="bold" />
               <div>
-                <strong>Connect Pi before chatting</strong>
-                <p>The application workspace still works, but model turns are disabled.</p>
+                <strong>Connect ChatGPT to chat</strong>
+                <p>Your applications and chat history are still available.</p>
               </div>
-              <Link href="/setup/pi">Open Pi setup</Link>
+              <Link href="/setup/pi">Open Settings</Link>
             </div>
           )}
           {error && application && <div className="sg-error" role="alert">{error}</div>}
@@ -122,19 +122,23 @@ export function ChatPane({
           onSend();
         }}
       >
+        {activeChat?.archivedAt && <p className="sg-archived-notice">This chat is archived and read-only. Choose an active chat or start a new one.</p>}
         <textarea
           disabled={!piReady || !application || !activeChat || Boolean(activeChat.archivedAt)}
           id="pi-composer"
+          aria-label="Message Pi"
           onChange={(event) => onComposerChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
               if (!busy) event.currentTarget.form?.requestSubmit();
             }
           }}
           placeholder={
-            !piReady
-              ? "Connect Pi to ChatGPT before chatting"
+            activeChat?.archivedAt
+              ? "This chat is archived"
+              : !piReady
+              ? "Connect ChatGPT in Settings to chat"
               : application
                 ? "Ask Pi, correct a decision, or add context…"
                 : "Create the application workspace to start chatting"
@@ -143,7 +147,7 @@ export function ChatPane({
           value={composer}
         />
         <div>
-          <span>Recognized Decisions are saved for the application and shown in the shared Operator View.</span>
+          <span>Saved decisions appear in the Record tab and are shared across this application’s chats.</span>
           <button
             disabled={
               !composer.trim() ||

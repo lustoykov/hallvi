@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CaretDown, Check, Plus, Trash } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
 import { APPROVAL_MODES } from "@/server/types";
@@ -29,19 +29,41 @@ export function OperatorShell({
   const router = useRouter();
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
-  const [composer, setComposer] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const applicationPicker = useRef<HTMLButtonElement>(null);
+  const focusComposerAfterClose = useRef(false);
 
   const application = view.application;
   const checks = view.checks;
   const activeChat = view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
+  const composer = activeChat ? drafts[activeChat.id] ?? "" : "";
   const selectedCheck = checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
+
+  useLayoutEffect(() => {
+    if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
+    focusComposerAfterClose.current = false;
+    document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus();
+  }, [selectedCheckKey]);
+
+  function setComposer(value: string) {
+    if (!activeChat) return;
+    setDrafts((current) => ({ ...current, [activeChat.id]: value }));
+  }
+
+  function applyView(next: PhaseOneOperatorView) {
+    setView(next);
+    // The transcript is navigable state; keep it when this page is refreshed.
+    const url = new URL(window.location.href);
+    if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);
+    else url.searchParams.delete("chat");
+    window.history.replaceState(null, "", url);
+  }
 
   async function removeApplication() {
     if (!application || busy) return;
@@ -66,7 +88,7 @@ export function OperatorShell({
     setBusy(label);
     setError(null);
     try {
-      setView(await work());
+      applyView(await work());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Server Guy could not complete that request.");
       await recover?.();
@@ -100,9 +122,9 @@ export function OperatorShell({
       "message",
       () => api.sendMessage(application.id, activeChat.id, message),
       async () => {
-        setComposer((current) => current || message);
+        setDrafts((current) => ({ ...current, [activeChat.id]: current[activeChat.id] || message }));
         const refreshed = await api.view(application.id, activeChat.id).catch(() => null);
-        if (refreshed) setView(refreshed);
+        if (refreshed) applyView(refreshed);
       },
     );
   }
@@ -112,14 +134,27 @@ export function OperatorShell({
     void run("rerun", async () => {
       const next = await api.rerunRepositoryCheck(application.id);
       setSelectedCheckKey("repository-readable");
-      return next;
+      return activeChat && next.selectedChatId !== activeChat.id
+        ? api.view(application.id, activeChat.id)
+        : next;
     });
   }
 
-  function askAboutCheck(check: GateCheck) {
+  async function askAboutCheck(check: GateCheck) {
+    const question = `Explain “${check.label}”, its current result, and what I can verify myself.`;
+    if (application && activeChat?.archivedAt) {
+      const primary = view.chats.find((chat) => chat.isPrimary && !chat.archivedAt);
+      if (!primary) return;
+      await run("chat", async () => {
+        const next = await api.view(application.id, primary.id);
+        setDrafts((current) => ({ ...current, [primary.id]: question }));
+        return next;
+      });
+    } else {
+      setComposer(question);
+    }
+    focusComposerAfterClose.current = true;
     setSelectedCheckKey(null);
-    setComposer(`Explain “${check.label}”, its current result, and what I can verify myself.`);
-    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus());
   }
 
   return (

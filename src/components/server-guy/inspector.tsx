@@ -1,13 +1,14 @@
 "use client";
 
 import { ArrowSquareOut, CaretRight, Check, Circle, GithubLogo } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
 
 import { formatTimestamp, statusLabel } from "./format";
 
 type InspectorTab = "record" | "activity" | "changes" | "receipts";
+const tabs = ["record", "activity", "changes", "receipts"] as const;
 
 export function Inspector({
   view,
@@ -19,26 +20,39 @@ export function Inspector({
   onSelectCheck: (key: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("record");
+  const tabId = useId();
   const passed = checks.filter((check) => check.status === "passed").length;
 
   return (
     <aside className="sg-inspector">
-      <nav className="sg-inspector-tabs" aria-label="Application record views">
-        {(["record", "activity", "changes", "receipts"] as const).map((tab) => (
+      <div className="sg-inspector-tabs" role="tablist" aria-label="Application record views">
+        {tabs.map((tab, index) => (
           <button
+            id={`${tabId}-${tab}`}
+            aria-controls={`${tabId}-panel`}
             aria-selected={activeTab === tab}
+            tabIndex={activeTab === tab ? 0 : -1}
             className={activeTab === tab ? "selected" : ""}
             key={tab}
             onClick={() => setActiveTab(tab)}
+            onKeyDown={(event) => {
+              const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+                : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
+                : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+              if (next === null) return;
+              event.preventDefault();
+              setActiveTab(tabs[next]);
+              document.getElementById(`${tabId}-${tabs[next]}`)?.focus();
+            }}
             role="tab"
             type="button"
           >
             {tab[0].toUpperCase() + tab.slice(1)}
           </button>
         ))}
-      </nav>
+      </div>
 
-      <div className="sg-inspector-body">
+      <div className="sg-inspector-body" id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-${activeTab}`} tabIndex={0}>
         {activeTab === "record" && (
           <>
             <div className="sg-record-heading">

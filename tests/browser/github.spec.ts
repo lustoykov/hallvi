@@ -13,6 +13,7 @@ test("GitHub consent, exact repository evidence, disconnect and re-verification"
   expect((await (await page.request.get("/api/github/setup")).json()).connection).toBeNull();
   await page.goto("/applications/new");
   await page.getByLabel("GitHub repository", { exact: true }).fill("https://github.com/qa/github-consent");
+  await page.getByRole("radio", { name: "Always ask", exact: true }).check();
   await expect(page.getByRole("button", { name: "Add application", exact: true })).toBeDisabled();
   await page.getByRole("link", { name: "Connect GitHub", exact: true }).click();
   await page.getByRole("button", { name: "Use existing login", exact: true }).click();
@@ -20,7 +21,8 @@ test("GitHub consent, exact repository evidence, disconnect and re-verification"
   await expect(page.getByRole("link", { name: "Choose repositories on GitHub" })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("github-connected.png"), fullPage: true });
   await page.getByRole("link", { name: "Back to add application" }).click();
-  await page.getByLabel("GitHub repository", { exact: true }).fill("https://github.com/qa/github-consent");
+  await expect(page.getByLabel("GitHub repository", { exact: true })).toHaveValue("https://github.com/qa/github-consent");
+  await expect(page.getByRole("radio", { name: "Always ask", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Add application", exact: true }).click();
   await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30_000 });
   const path = new URL(page.url()).pathname;
