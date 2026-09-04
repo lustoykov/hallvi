@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { Value } from "typebox/value";
 import { afterEach, expect, it, vi } from "vitest";
 import type { PiSdk } from "../src/server/pi-configuration";
 import type { SavedCase } from "./dashboard/results";
 import { judgeAnswer, judgeParameters, judgePrompt } from "./evals/judge";
+import { JUDGE_PROMPT_VERSION } from "./evals/judge-policy";
 
 const record: SavedCase = { caseId: "question", repetition: 1, rubric: "Discuss without inventing a choice",
   input: { userMessage: "Should I prioritize simplicity?", decisions: [] },
@@ -31,6 +33,7 @@ it("uses the saved rubric/context, not current cases or other reviewers' opinion
 it("requires evidence for every rubric criterion, permits uncertainty, and rejects nitpicking", async () => {
   const f = fixture(); await judgeAnswer(f.sdk, f.runtime, record);
   const prompt = f.loader.mock.calls[0][0].systemPromptOverride();
+  expect(JUDGE_PROMPT_VERSION).toBe(`phase-one-meaning-${createHash("sha256").update(prompt).digest("hex")}`);
   expect(prompt).toContain("every applicable rubric requirement");
   expect(prompt).toContain("NEEDS-DISCUSSION");
   expect(prompt).toContain("Do not invent a violation");

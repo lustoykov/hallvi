@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
 
 const source = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+const parentPid = process.ppid;
 const port = Number(process.argv[2] ?? 3111);
 const loginMode = process.argv[3] ?? "failure";
 if (!["success", "failure"].includes(loginMode)) throw new Error("Choose success or failure for QA login.");
@@ -56,4 +57,10 @@ writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log(JSON.stringify(manifest));
 const child = spawn(process.execPath, [join(source, "node_modules/next/dist/bin/next"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: app, env, stdio: "inherit" });
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
+// Playwright can die before worker teardown runs. Stop this detached fixture's
+// Next child even if the parent disappeared while database setup was running.
+const orphanWatch = setInterval(() => {
+  if (process.ppid !== parentPid) child.kill("SIGTERM");
+}, 250);
+orphanWatch.unref();
 child.on("exit", (code) => process.exit(code ?? 0));

@@ -382,6 +382,10 @@ function requestRun(input) {
   $("confirm-selection").textContent = judge ? input.keys.join(", ") : input.cases.join(", ");
   $("confirm-limits").textContent = judge ? "One judgment per answer, sequentially. Stops on the first failure or after 15 minutes; earlier advice stays saved. No retries. Model advice can be wrong." : "Repeats test consistency, not retry failures. Tool calls and Pi’s built-in retries can make multiple requests per turn.";
   $("run-model").value = model; $("run-effort").value = effort;
+  // Live evals exercise the app's saved configuration, not runtime overrides.
+  // Only the separate judge can choose its own model.
+  $("live-settings").hidden = judge;
+  $("run-model").readOnly = !judge; $("run-effort").disabled = !judge;
   returnToEvalPicker = $("eval-picker").open;
   if (returnToEvalPicker) $("eval-picker").close();
   $("consent").checked = false; $("confirm-run").disabled = true; $("confirm").showModal();

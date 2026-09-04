@@ -85,6 +85,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
   function start(input: StartRequest) {
     if (active) throw new Error("A check is already running. Wait for it to finish.");
     const command = commandFor(input);
+    const previousReports = input.suite === "live" ? new Set(listReports(root).map((report) => report.run)) : null;
     if (input.suite === "judge") for (const key of input.keys ?? [input.key!]) findCase(root, input.run!, input.hash!, key);
     const run: Run = { id: randomUUID(), suite: input.suite, startedAt: new Date().toISOString(), status: "running", log: "Starting…\n",
       command: commandText(command),
@@ -125,7 +126,11 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       if (forceKill) clearTimeout(forceKill);
       run.status = timedOut ? "timed-out" : cancelled ? "cancelled" : code === 0 ? "passed" : "failed";
       run.exitCode = code; run.finishedAt = new Date().toISOString();
-      if (paid) run.log = code === 0 ? "Run completed. Open View saved runs under Live agent evals to inspect answers and separate judgments. Runner completion is not semantic acceptance.\n" : "Run stopped or failed. Earlier saved answers and verdicts remain; remaining items may not have run. No automatic rerun or model fallback. Check saved results and account access before retrying.\n";
+      if (paid) {
+        const noReport = previousReports && !listReports(root).some((report) => !previousReports.has(report.run));
+        run.log = code === 0 ? "Run completed. Open View saved runs under Live agent evals to inspect answers and separate judgments. Runner completion is not semantic acceptance.\n"
+          : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${noReport ? "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made." : "Earlier saved answers and verdicts remain; remaining items may not have run."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
+      }
       writeJson(path, run); active = null; child = null; cancelActive = null;
     };
     child.on("error", () => finish(null)); child.on("close", finish);

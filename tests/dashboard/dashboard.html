@@ -132,6 +132,7 @@
   </dialog>
   <dialog id="confirm" aria-labelledby="confirm-title">
     <h2 id="confirm-title">Use your subscription?</h2><p id="confirm-description" class="muted"></p>
+    <p><a id="live-settings" href="http://127.0.0.1:3000/setup/pi" target="_blank" rel="noopener" hidden>Change model settings in Server Guy</a></p>
     <div class="form-row"><label class="field">Model<input id="run-model" spellcheck="false" required pattern="[a-zA-Z0-9_.-]{1,100}"></label><label class="field">Reasoning effort<select id="run-effort"><option>off</option><option>minimal</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label></div>
     <details><summary>Selection and limits</summary><p id="confirm-selection"></p><p id="confirm-limits"></p><p>No API billing fallback. Stopping cannot refund requests already sent.</p></details>
     <label class="consent"><input id="consent" type="checkbox">I want to spend subscription usage on this run.</label>
