@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { piLoginCoordinator } from "@/server/pi-setup";
+import { handle } from "@/server/http";
+import { assertSameOrigin } from "@/server/schemas";
 
 export const runtime = "nodejs";
 
@@ -21,10 +23,13 @@ export async function GET(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ attemptId: string }> },
 ) {
-  const { attemptId } = await context.params;
-  const attempt = piLoginCoordinator.cancel(attemptId);
-  return attempt ? NextResponse.json(attempt) : missingAttempt();
+  return handle(async () => {
+    assertSameOrigin(request);
+    const { attemptId } = await context.params;
+    const attempt = piLoginCoordinator.cancel(attemptId);
+    return attempt ? NextResponse.json(attempt) : missingAttempt();
+  });
 }

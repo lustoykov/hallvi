@@ -51,13 +51,13 @@
     <p class="eyebrow">Architecture · PR 9 · Pi runtime boundary</p>
     <h1>One visible setup path, one explicit Pi configuration</h1>
     <p class="subtitle">
-      Detect first, choose explicitly, then run. Reuse snapshots the displayed Pi preferences and shares its credential file. Separate setup defaults to Sol / high and signs into ChatGPT in a Server Guy-owned file. Global Pi preferences stay untouched.
+      Prototype A is the selected desktop login screen. Reuse snapshots Pi’s displayed preferences and shares its credential file. A separate login keeps the chosen model draft and activates its own file only after OAuth succeeds. Global Pi preferences stay untouched.
     </p>
 
     <section class="diagram" aria-label="Explicit Pi setup and chat architecture">
       <svg viewBox="0 0 1200 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pr9-title pr9-desc">
         <title id="pr9-title">Explicit Pi setup and configured chat path</title>
-        <desc id="pr9-desc">Server Guy previews existing Pi preferences before consent, saves an explicit configuration, optionally completes separate ChatGPT OAuth, and passes the chosen model and credential source into isolated Pi sessions.</desc>
+        <desc id="pr9-desc">Server Guy previews existing Pi preferences before consent, activates a separate login only after successful OAuth, and passes the explicitly chosen model and credential source into isolated Pi sessions.</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b"/></marker>
           <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8"/></marker>
@@ -88,6 +88,9 @@
         <line x1="992" y1="200" x2="992" y2="272" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
         <rect x="1004" y="228" width="44" height="12" rx="2" fill="#f7f9fc"/>
         <text x="1026" y="236" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">STORE</text>
+        <line x1="904" y1="284" x2="784" y2="284" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <rect x="812" y="264" width="64" height="12" rx="2" fill="#f7f9fc"/>
+        <text x="844" y="272" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">ACTIVATE</text>
 
         <line x1="232" y1="420" x2="352" y2="420" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)"/>
         <rect x="264" y="396" width="56" height="12" rx="2" fill="#f7f9fc"/>
@@ -112,7 +115,7 @@
         <rect x="608" y="208" width="176" height="144" rx="6" fill="rgba(40,90,216,0.08)" stroke="#285ad8" stroke-width="1.2"/>
         <rect x="624" y="224" width="48" height="12" rx="2" fill="transparent" stroke="rgba(40,90,216,0.40)" stroke-width="0.8"/>
         <text x="648" y="232" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">CHOSEN</text>
-        <text x="696" y="264" fill="#192338" font-family="'Geist', sans-serif" font-size="12" font-weight="600" text-anchor="middle">Saved choice + Pi</text>
+        <text x="696" y="264" fill="#192338" font-family="'Geist', sans-serif" font-size="12" font-weight="600" text-anchor="middle">Connection setup</text>
         <text x="696" y="288" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">provider / model / effort</text>
         <text x="696" y="308" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">explicit credential path</text>
         <text x="696" y="328" fill="#285ad8" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">no inherited tools or settings</text>
@@ -126,7 +129,7 @@
         <text x="992" y="172" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">user approves one-time code</text>
         <rect x="904" y="272" width="176" height="80" rx="6" fill="rgba(25,35,56,0.05)" stroke="#59667b" stroke-width="1"/>
         <text x="992" y="304" fill="#192338" font-family="'Geist', sans-serif" font-size="12" font-weight="600" text-anchor="middle">Separate credential file</text>
-        <text x="992" y="324" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">.server-guy/pi-auth.json</text>
+        <text x="992" y="324" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">pi-auth-&lt;login-id&gt;.json</text>
         <rect x="904" y="380" width="176" height="80" rx="6" fill="#fff" stroke="#192338" stroke-width="1"/>
         <text x="992" y="412" fill="#192338" font-family="'Geist', sans-serif" font-size="12" font-weight="600" text-anchor="middle">Chosen provider</text>
         <text x="992" y="432" fill="#59667b" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">no automatic billing fallback</text>
@@ -154,21 +157,21 @@
         <h2>Visible setup</h2>
         <ul>
           <li>Read-only preview reports provider, model, effort, and credential presence. No token refresh or provider request happens during detection.</li>
-          <li>Reuse skips the OAuth branch above: it shares Pi’s existing <code>auth.json</code>. Separate login writes <code>.server-guy/pi-auth.json</code>.</li>
-          <li>API-backed reuse requires an explicit billing acknowledgment. Custom models and command-based credentials are not imported.</li>
+          <li>Reuse skips OAuth and shares Pi’s existing <code>auth.json</code>. Separate login writes <code>.server-guy/pi-auth-&lt;login-id&gt;.json</code>, then atomically activates it in <code>pi-settings.json</code>. Failure or cancellation keeps the old connection.</li>
+          <li>Only ChatGPT subscription OAuth is reusable. API keys, other providers, custom models, and command-based credentials are not imported.</li>
         </ul>
       </article>
       <article class="card">
         <h2>Enforced at runtime</h2>
         <ul>
           <li><code>askPi()</code> requires the saved <code>pi-settings.json</code> choice and passes its model and effort explicitly.</li>
-          <li>Global model preferences never change. Shared OAuth token refresh is allowed only after consent.</li>
+          <li>Global model preferences never change. Shared OAuth token refresh is allowed only after consent. Model/effort combinations are validated on save and before each turn.</li>
           <li>Readiness is local presence, not a provider probe. Access, refresh, and usage errors appear on send.</li>
         </ul>
       </article>
       <article class="card">
         <h2>Still deferred</h2>
-        <p>No GitHub OAuth, durable Pi Run, worker, SSE, transcript compaction, API-key entry screen, or Phase 2 behavior. A live account test still needs the user to approve OAuth.</p>
+        <p>No GitHub OAuth, durable Pi Run, worker, SSE, transcript compaction, API-key billing, or Phase 2 behavior. A live account test still needs the user to approve OAuth.</p>
       </article>
     </section>
 
@@ -177,10 +180,10 @@
       <table>
         <thead><tr><th>Concern</th><th>Before PR 9</th><th>After PR 9</th></tr></thead>
         <tbody>
-          <tr><td>Model selection</td><td>Pi session defaults and machine settings could choose the model.</td><td>Reuse snapshots the displayed choice. Separate setup defaults to <code>openai-codex/gpt-5.6-sol/high</code>. Every turn reads Server Guy’s choice.</td></tr>
+          <tr><td>Model selection</td><td>Pi session defaults and machine settings could choose the model.</td><td>Reuse snapshots the detected choice. Separate sign-in starts with editable <code>openai-codex/gpt-5.6-sol/high</code> defaults and saves the draft on success. Later changes apply to new turns only.</td></tr>
           <tr><td>Authentication</td><td>The app assumed a usable credential existed somewhere on the machine.</td><td>The user confirms shared Pi auth or chooses a separate Server Guy store. No credential is used before a choice.</td></tr>
           <tr><td>Operator readiness</td><td>Configuration became visible only after a Pi request failed.</td><td>The operator sees readiness before chat and model chat is disabled until ready.</td></tr>
-          <tr><td>Failure handling</td><td>Provider errors surfaced as a generic Pi-unavailable message.</td><td>Authentication, runtime, model, cancellation, and usage-limit paths have specific recovery text and tests.</td></tr>
+          <tr><td>Failure handling</td><td>Provider errors surfaced as a generic Pi-unavailable message.</td><td>Temporary polling failures retry without ending login. Cancel/failure preserves the old credentials; accepted files remain available to running turns. Provider access is still checked on send.</td></tr>
         </tbody>
       </table>
     </section>

@@ -1,23 +1,25 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { choosePiSetup, choosePiSetupSchema, configuredPiRuntime, detectPiSetup, readPiConfiguration } from "../src/server/pi-configuration";
+import { choosePiSetup, choosePiSetupSchema, configuredPiRuntime, detectPiSetup, readPiConfiguration, updatePiPreferences } from "../src/server/pi-configuration";
 import { getPiSetupStatus, PiLoginCoordinator } from "../src/server/pi-setup";
 
 const model = { provider: "openai-codex", id: "gpt-5.6-sol", name: "GPT-5.6 Sol", reasoning: true };
 const oauth = { type: "oauth", access: "secret-access", refresh: "secret-refresh", expires: Date.now() + 3_600_000 };
 let directory: string;
 let agentDirectory: string;
-const runtime = { getModel: vi.fn(), getProvider: vi.fn(), getAuth: vi.fn(), setRuntimeApiKey: vi.fn(), login: vi.fn() };
+const alternateModel = { ...model, id: "gpt-5.6-luna", name: "GPT-5.6 Luna", thinkingLevelMap: { max: "max" } };
+const runtime = { getModel: vi.fn(), getModels: vi.fn(), getProvider: vi.fn(), getAuth: vi.fn(), setRuntimeApiKey: vi.fn(), login: vi.fn() };
 const createRuntime = vi.fn();
-const sdkLoader = async () => ({ getAgentDir: () => agentDirectory, ModelRuntime: { create: createRuntime } }) as never;
+class CredentialSynchronizationError extends Error {}
+const sdkLoader = async () => ({ getAgentDir: () => agentDirectory, ModelRuntime: { create: createRuntime }, CredentialSynchronizationError }) as never;
 function preferences(value: object) { writeFileSync(join(agentDirectory, "settings.json"), JSON.stringify(value)); }
 function credentials(value: object) { writeFileSync(join(agentDirectory, "auth.json"), JSON.stringify(value)); }
-async function adopt(acknowledgeApiBilling = false) {
+async function adopt() {
   const detected = await detectPiSetup(await sdkLoader());
-  await choosePiSetup({ mode: "shared", candidateId: detected.id, acknowledgeApiBilling }, sdkLoader);
+  await choosePiSetup({ mode: "shared", candidateId: detected.id }, sdkLoader);
 }
 
 beforeEach(() => {
@@ -28,7 +30,8 @@ beforeEach(() => {
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(directory, "server-guy"));
   preferences({ defaultProvider: model.provider, defaultModel: model.id, defaultThinkingLevel: "medium" });
   credentials({ [model.provider]: oauth });
-  runtime.getModel.mockReturnValue(model);
+  runtime.getModel.mockImplementation((_provider, id) => [model, alternateModel].find((item) => item.id === id));
+  runtime.getModels.mockReturnValue([model, alternateModel]);
   runtime.getProvider.mockReturnValue({ auth: { oauth: { isSubscription: true }, apiKey: {} } });
   runtime.getAuth.mockResolvedValue({ auth: { apiKey: "secret-access" } });
   createRuntime.mockResolvedValue(runtime);
@@ -36,6 +39,105 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("explicit Pi adoption", () => {
+  it.each(["shared", "separate"] as const)("disconnects %s setup without deleting credentials or automatically reusing them", async (mode) => {
+    if (mode === "shared") await adopt();
+    else {
+      await choosePiSetup({ mode: "separate" }, sdkLoader);
+      writeFileSync(readPiConfiguration()!.authPath, JSON.stringify({ [model.provider]: oauth }));
+    }
+    const authPath = readPiConfiguration()!.authPath;
+    const before = readFileSync(authPath, "utf8");
+    const piPreferences = readFileSync(join(agentDirectory, "settings.json"), "utf8");
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    coordinator.disconnect();
+    coordinator.disconnect(); // Safe to retry after a lost response.
+    expect(readPiConfiguration()).toBeNull();
+    expect(readFileSync(authPath, "utf8")).toBe(before);
+    expect(readFileSync(join(agentDirectory, "settings.json"), "utf8")).toBe(piPreferences);
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: false, detected: { canReuse: true } });
+    await expect(configuredPiRuntime(await sdkLoader())).rejects.toThrow("choose whether");
+    expect(runtime.getAuth).not.toHaveBeenCalled();
+  });
+
+  it("automatically finds a reusable Pi login when saved Server Guy credentials are missing", async () => {
+    await choosePiSetup({ mode: "separate" }, sdkLoader);
+    const before = readPiConfiguration();
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ state: "needs-auth", ready: false, detected: { canReuse: true } });
+    expect(readPiConfiguration()).toEqual(before);
+    expect(runtime.getAuth).not.toHaveBeenCalled();
+    expect(runtime.login).not.toHaveBeenCalled();
+  });
+
+  it("finds a recovery login even when the saved Server Guy configuration is malformed", async () => {
+    mkdirSync(join(directory, "server-guy"));
+    writeFileSync(join(directory, "server-guy", "pi-settings.json"), "{broken}");
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: false, detected: { canReuse: true } });
+    expect(runtime.getAuth).not.toHaveBeenCalled();
+    expect(readFileSync(join(directory, "server-guy", "pi-settings.json"), "utf8")).toBe("{broken}");
+  });
+
+  it("does not let unrelated broken Pi preferences invalidate a saved Server Guy login", async () => {
+    await adopt();
+    writeFileSync(join(agentDirectory, "settings.json"), "{broken}");
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: true, mode: "shared", detected: { canReuse: false } });
+  });
+
+  it("persists choices across reads and uses them on the next runtime without mutating an earlier snapshot", async () => {
+    await adopt();
+    const globalBefore = readFileSync(join(agentDirectory, "settings.json"), "utf8");
+    const authBefore = readFileSync(join(agentDirectory, "auth.json"), "utf8");
+    const earlierTurn = await configuredPiRuntime(await sdkLoader());
+    await updatePiPreferences({ modelId: alternateModel.id, reasoningEffort: "max" }, sdkLoader);
+    expect(readPiConfiguration()).toMatchObject({ mode: "shared", authPath: join(agentDirectory, "auth.json"), modelId: alternateModel.id, reasoningEffort: "max" });
+    const nextTurn = await configuredPiRuntime(await sdkLoader());
+    expect(nextTurn.model).toBe(alternateModel);
+    expect(nextTurn.configuration.reasoningEffort).toBe("max");
+    expect(earlierTurn.model).toBe(model);
+    expect(earlierTurn.configuration.reasoningEffort).toBe("medium");
+    expect(readFileSync(join(agentDirectory, "settings.json"), "utf8")).toBe(globalBefore);
+    expect(readFileSync(join(agentDirectory, "auth.json"), "utf8")).toBe(authBefore);
+  });
+
+  it.each([
+    { modelId: "unknown-model", reasoningEffort: "high" as const },
+    { modelId: model.id, reasoningEffort: "max" as const },
+  ])("rejects invalid model/effort choices without changing saved settings", async (input) => {
+    await adopt();
+    const before = readPiConfiguration();
+    await expect(updatePiPreferences(input, sdkLoader)).rejects.toThrow();
+    expect(readPiConfiguration()).toEqual(before);
+  });
+
+  it("rejects an unsupported persisted effort before auth or a new turn", async () => {
+    await adopt();
+    writeFileSync(join(directory, "server-guy", "pi-settings.json"), JSON.stringify({ ...readPiConfiguration(), reasoningEffort: "max" }));
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: false, state: "model-unavailable", issue: expect.stringContaining("reasoning effort") });
+    await expect(configuredPiRuntime(await sdkLoader())).rejects.toThrow("reasoning effort");
+    expect(runtime.getAuth).not.toHaveBeenCalled();
+  });
+
+  it("preserves supported max effort from existing Pi but rejects unsupported preferences", async () => {
+    preferences({ defaultProvider: model.provider, defaultModel: alternateModel.id, defaultThinkingLevel: "max" });
+    await adopt();
+    expect(readPiConfiguration()).toMatchObject({ modelId: alternateModel.id, reasoningEffort: "max" });
+    preferences({ defaultProvider: model.provider, defaultModel: model.id, defaultThinkingLevel: "max" });
+    expect(await detectPiSetup(await sdkLoader())).toMatchObject({ canReuse: false, issue: expect.stringContaining("reasoning effort") });
+  });
+
+  it("rejects other providers even with OAuth", async () => {
+    preferences({ defaultProvider: "anthropic", defaultModel: "claude-opus", defaultThinkingLevel: "high" });
+    credentials({ anthropic: oauth });
+    await expect(adopt()).rejects.toThrow("subscription access only");
+    expect(readPiConfiguration()).toBeNull();
+  });
+
+  it("allows preferences before separate login and keeps the separate auth destination", async () => {
+    await choosePiSetup({ mode: "separate" }, sdkLoader);
+    await updatePiPreferences({ modelId: alternateModel.id, reasoningEffort: "low" }, sdkLoader);
+    expect(readPiConfiguration()).toMatchObject({ mode: "separate", modelId: alternateModel.id, reasoningEffort: "low", authPath: join(directory, "server-guy", "pi-auth.json") });
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ state: "needs-auth", selection: { modelId: alternateModel.id, reasoningEffort: "low" } });
+  });
+
   it("previews without refreshing auth, writing files, or exposing secrets", async () => {
     const before = readFileSync(join(agentDirectory, "auth.json"), "utf8");
     const status = await getPiSetupStatus(sdkLoader);
@@ -76,7 +178,7 @@ describe("explicit Pi adoption", () => {
   it("rejects a stale preview", async () => {
     const detected = await detectPiSetup(await sdkLoader());
     preferences({ defaultProvider: model.provider, defaultModel: model.id, defaultThinkingLevel: "high" });
-    await expect(choosePiSetup({ mode: "shared", candidateId: detected.id, acknowledgeApiBilling: false }, sdkLoader)).rejects.toThrow("setup changed");
+    await expect(choosePiSetup({ mode: "shared", candidateId: detected.id }, sdkLoader)).rejects.toThrow("setup changed");
     expect(readPiConfiguration()).toBeNull();
   });
 
@@ -92,16 +194,14 @@ describe("explicit Pi adoption", () => {
   it("rejects credentials unsupported by the selected provider", async () => {
     credentials({ [model.provider]: { type: "api_key", key: "fixture-key" } });
     runtime.getProvider.mockReturnValue({ auth: { oauth: { isSubscription: true } } });
-    expect(await detectPiSetup(await sdkLoader())).toMatchObject({ canReuse: false, issue: expect.stringContaining("does not support") });
+    expect(await detectPiSetup(await sdkLoader())).toMatchObject({ canReuse: false, issue: expect.stringContaining("subscription access only") });
   });
 
-  it("requires API acknowledgment and pins only the consented literal key", async () => {
+  it("rejects API credentials rather than offering API billing", async () => {
     credentials({ [model.provider]: { type: "api_key", key: "fixture-api-key" } });
-    await expect(adopt()).rejects.toThrow("Confirm API billing");
+    await expect(adopt()).rejects.toThrow("subscription access only");
     expect(readPiConfiguration()).toBeNull();
-    await adopt(true);
-    await configuredPiRuntime(await sdkLoader());
-    expect(runtime.setRuntimeApiKey).toHaveBeenCalledWith(model.provider, "fixture-api-key");
+    expect(runtime.setRuntimeApiKey).not.toHaveBeenCalled();
   });
 
   it("rejects a credential type change after consent", async () => {
@@ -166,40 +266,124 @@ describe("explicit Pi adoption", () => {
 });
 
 describe("separate Pi device-code login", () => {
-  it("rejects login before choosing separate setup", async () => {
+  const selection = { modelId: alternateModel.id, reasoningEffort: "max" as const };
+  function saveLogin(value: object = oauth) {
+    writeFileSync(createRuntime.mock.lastCall![0].authPath, JSON.stringify({ [model.provider]: value }), { mode: 0o600 });
+  }
+
+  it("signs in directly and saves the user's draft model only after success", async () => {
+    runtime.login.mockImplementation(async () => { expect(readPiConfiguration()).toBeNull(); saveLogin(); });
     const coordinator = new PiLoginCoordinator(sdkLoader);
-    const attempt = coordinator.start();
-    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("failed"));
-    expect(runtime.login).not.toHaveBeenCalled();
+    const attempt = coordinator.start(selection);
+    expect(readPiConfiguration()).toBeNull();
+    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("complete"));
+    expect(readPiConfiguration()).toMatchObject({ ...selection, mode: "separate", authPath: attempt.authPath });
+    expect((await getPiSetupStatus(sdkLoader)).ready).toBe(true);
   });
 
-  it("publishes the code, reuses an active attempt, and uses the separate path", async () => {
-    await choosePiSetup({ mode: "separate" }, sdkLoader);
+  it("publishes the code, deduplicates an active attempt and preserves the old login until success", async () => {
+    await adopt();
+    const before = readPiConfiguration();
+    const authBefore = readFileSync(join(agentDirectory, "auth.json"), "utf8");
     let finishLogin!: () => void;
     runtime.login.mockImplementation(async (_provider, _type, interaction) => {
       expect(await interaction.prompt({ type: "select", options: [{ id: "device_code" }] })).toBe("device_code");
       interaction.notify({ type: "device_code", userCode: "ABCD-EFGH", verificationUri: "https://auth.openai.com/codex/device" });
       await new Promise<void>((resolve) => { finishLogin = resolve; });
+      saveLogin();
     });
     const coordinator = new PiLoginCoordinator(sdkLoader);
-    const attempt = coordinator.start();
+    const attempt = coordinator.start(selection);
     await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("awaiting-user"));
-    expect(coordinator.start().id).toBe(attempt.id);
-    expect(createRuntime).toHaveBeenCalledWith({ authPath: join(directory, "server-guy", "pi-auth.json"), modelsPath: null, refreshOnCreate: false });
+    expect(coordinator.start({ modelId: model.id, reasoningEffort: "high" })).toMatchObject({ id: attempt.id, selection });
+    expect(createRuntime).toHaveBeenLastCalledWith({ authPath: attempt.authPath, modelsPath: null, refreshOnCreate: false });
+    expect(readPiConfiguration()).toEqual(before);
     finishLogin();
     await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("complete"));
+    expect(readPiConfiguration()?.authPath).toBe(attempt.authPath);
+    expect(readFileSync(join(agentDirectory, "auth.json"), "utf8")).toBe(authBefore);
   });
 
-  it("cancels an in-progress login without reporting success", async () => {
-    await choosePiSetup({ mode: "separate" }, sdkLoader);
+  it("cancels an in-progress login and ignores late SDK notifications", async () => {
+    await adopt();
+    const before = readPiConfiguration();
     runtime.login.mockImplementation(async (_provider, _type, interaction) => {
       interaction.notify({ type: "device_code", userCode: "ABCD-EFGH", verificationUri: "https://auth.openai.com/codex/device" });
-      await new Promise((_, reject) => interaction.signal.addEventListener("abort", () => reject(new Error("cancelled"))));
+      saveLogin();
+      await new Promise((_, reject) => interaction.signal.addEventListener("abort", () => {
+        queueMicrotask(() => interaction.notify({ type: "device_code", userCode: "LATE-CODE", verificationUri: "https://auth.openai.com/codex/device" }));
+        reject(new Error("cancelled"));
+      }));
     });
     const coordinator = new PiLoginCoordinator(sdkLoader);
-    const attempt = coordinator.start();
+    const attempt = coordinator.start(selection);
     await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("awaiting-user"));
     expect(coordinator.cancel(attempt.id)?.state).toBe("cancelled");
     await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("cancelled"));
+    await vi.waitFor(() => expect(existsSync(attempt.authPath)).toBe(false));
+    expect(coordinator.get(attempt.id)?.userCode).toBe("ABCD-EFGH");
+    expect(readPiConfiguration()).toEqual(before);
+  });
+
+  it("disconnect cancels a pending replacement so late OAuth success cannot reconnect", async () => {
+    await adopt();
+    const authBefore = readFileSync(join(agentDirectory, "auth.json"), "utf8");
+    let finishLogin!: () => void;
+    runtime.login.mockImplementation(async (_provider, _type, interaction) => {
+      interaction.notify({ type: "device_code", userCode: "TEST-CODE", verificationUri: "https://example.test" });
+      await new Promise<void>((resolve) => { finishLogin = resolve; });
+      saveLogin();
+    });
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    const attempt = coordinator.start(selection);
+    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("awaiting-user"));
+    coordinator.disconnect();
+    finishLogin();
+    await vi.waitFor(() => expect(existsSync(attempt.authPath)).toBe(false));
+    expect(coordinator.get(attempt.id)?.state).toBe("cancelled");
+    expect(readPiConfiguration()).toBeNull();
+    expect(readFileSync(join(agentDirectory, "auth.json"), "utf8")).toBe(authBefore);
+  });
+
+  it("keeps an existing separate login intact when its replacement fails", async () => {
+    runtime.login.mockImplementation(async () => saveLogin());
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    const first = coordinator.start(selection);
+    await vi.waitFor(() => expect(coordinator.get(first.id)?.state).toBe("complete"));
+    const before = readPiConfiguration();
+    const authBefore = readFileSync(first.authPath, "utf8");
+    runtime.login.mockImplementation(async () => { saveLogin(); throw new Error("Provider rejected sign-in"); });
+    const second = coordinator.start(selection);
+    await vi.waitFor(() => expect(coordinator.get(second.id)?.state).toBe("failed"));
+    expect(readPiConfiguration()).toEqual(before);
+    expect(readFileSync(first.authPath, "utf8")).toBe(authBefore);
+    expect(existsSync(second.authPath)).toBe(false);
+  });
+
+  it.each([undefined, { type: "api_key", key: "fixture-key" }])("does not report success without saved OAuth credentials", async (credential) => {
+    runtime.login.mockImplementation(async () => { if (credential) saveLogin(credential); });
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    const attempt = coordinator.start(selection);
+    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("failed"));
+    expect(readPiConfiguration()).toBeNull();
+    expect(existsSync(attempt.authPath)).toBe(false);
+  });
+
+  it("recognizes credentials committed before an SDK snapshot-refresh failure", async () => {
+    runtime.login.mockImplementation(async () => { saveLogin(); throw new CredentialSynchronizationError("secret-credential-details"); });
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    const attempt = coordinator.start(selection);
+    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("complete"));
+    expect(coordinator.get(attempt.id)?.message).toContain("local refresh failed");
+    expect(JSON.stringify(coordinator.get(attempt.id))).not.toContain("secret-");
+    expect(readPiConfiguration()?.authPath).toBe(attempt.authPath);
+  });
+
+  it("rejects unsupported preferences before starting provider login", async () => {
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    const attempt = coordinator.start({ modelId: model.id, reasoningEffort: "max" });
+    await vi.waitFor(() => expect(coordinator.get(attempt.id)?.state).toBe("failed"));
+    expect(runtime.login).not.toHaveBeenCalled();
+    expect(readPiConfiguration()).toBeNull();
   });
 });

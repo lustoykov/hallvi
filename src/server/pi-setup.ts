@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { mkdirSync, rmSync } from "node:fs";
 
-import { createPiCatalog, defaultPiSelection, detectPiSetup, loadPiSdk, piConfigDir, readPiConfiguration, readPiCredential } from "./pi-configuration";
+import { createPiCatalog, defaultPiSelection, detectPiSetup, forgetPiConfiguration, loadPiSdk, piConfigDir, readPiConfiguration, readPiCredential, savePiConfiguration } from "./pi-configuration";
 import type { DetectedPiSetup, PiSdkLoader, PiSelection } from "./pi-configuration";
-import { PI_MODEL_ID, PI_PROVIDER_ID } from "./pi-settings";
+import { PI_PROVIDER_ID } from "./pi-settings";
+import { piModelOptions, validatePiSelection, type PiModelOption } from "./pi-models";
 
 export type PiSetupState =
   | "needs-choice"
@@ -20,6 +22,8 @@ export interface PiSetupStatus {
   billing: "subscription" | "api";
   detected: DetectedPiSetup | null;
   hasSavedConfiguration: boolean;
+  models: PiModelOption[];
+  separateAuthPath: string;
   runtime: {
     label: string;
     detail: string;
@@ -44,6 +48,8 @@ function baseStatus(): PiSetupStatus {
     billing: "subscription",
     detected: null,
     hasSavedConfiguration: false,
+    models: [],
+    separateAuthPath: join(piConfigDir(), "pi-auth.json"),
     runtime: {
       label: "Bundled Pi SDK",
       detail: "No separate Pi or Codex CLI installation is required.",
@@ -73,34 +79,40 @@ export async function getPiSetupStatus(
   const status = baseStatus();
   try {
     const sdk = await sdkLoader();
+    const catalog = await createPiCatalog(sdk);
+    status.models = piModelOptions(catalog.getModels(PI_PROVIDER_ID));
+    // Detection is read-only and runs before rendering, including recovery from a broken saved login.
+    status.detected = await detectPiSetup(sdk);
     let configuration;
     try { configuration = readPiConfiguration(); } catch (error) { if (!preview) throw error; }
     status.hasSavedConfiguration = Boolean(configuration);
     if (!configuration || preview) {
-      const detected = await detectPiSetup(sdk);
+      const detected = status.detected;
+      const selection = detected.canReuse ? detected.selection : defaultPiSelection;
       return {
         ...status,
         detected,
-        billing: detected.billing,
-        selection: { ...detected.selection, provider: detected.selection.providerId, model: detected.selection.modelId },
+        selection: { ...selection, provider: "OpenAI Codex", model: catalog.getModel(selection.providerId, selection.modelId)?.name ?? selection.modelId },
         authentication: {
-          configured: Boolean(detected.credentialType),
-          label: detected.credentialType ? `${detected.credentialType === "oauth" ? "OAuth" : "API key"} found — not used yet` : "No matching credential",
-          source: detected.authPath,
+          configured: detected.canReuse,
+          label: detected.canReuse ? "ChatGPT OAuth found — not used yet" : "ChatGPT connection required",
+          source: detected.canReuse ? detected.authPath : status.separateAuthPath,
         },
       };
     }
     status.mode = configuration.mode;
-    status.selection = { providerId: configuration.providerId, modelId: configuration.modelId, reasoningEffort: configuration.reasoningEffort, provider: configuration.providerId, model: configuration.modelId };
+    status.selection = { providerId: configuration.providerId, modelId: configuration.modelId, reasoningEffort: configuration.reasoningEffort, provider: "OpenAI Codex", model: configuration.modelId };
     status.authentication.source = configuration.authPath;
-    const catalog = await createPiCatalog(sdk);
-    const model = catalog.getModel(configuration.providerId, configuration.modelId);
-    if (!model) {
+    let model;
+    try {
+      if (configuration.credentialType !== "oauth") throw new Error("Server Guy supports ChatGPT subscription access only. Use a new ChatGPT connection.");
+      model = validatePiSelection(catalog, configuration);
+    } catch (error) {
       return {
         ...status,
         state: "model-unavailable",
         ready: false,
-        issue: "The chosen model is not present in the bundled Pi catalog. Choose a setup again.",
+        issue: errorMessage(error),
       };
     }
 
@@ -119,7 +131,7 @@ export async function getPiSetupStatus(
           configured: true,
           label: "Unsupported credential type",
         },
-        issue: "The credential type changed. Choose a setup again to confirm its billing method.",
+        issue: "The credential type changed. Use a new ChatGPT connection.",
       };
     }
     status.billing = credential.type === "oauth" && catalog.getProvider(configuration.providerId)?.auth.oauth?.isSubscription
@@ -132,7 +144,7 @@ export async function getPiSetupStatus(
       authentication: {
         ...status.authentication,
         configured: true,
-        label: `${credential.type === "oauth" ? "OAuth" : "API key"} present — checked with provider on send`,
+        label: "ChatGPT connected — checked with provider on send",
       },
     };
   } catch (error) {
@@ -154,6 +166,8 @@ export interface PiLoginAttempt {
   userCode: string | null;
   message: string;
   expiresAt: string | null;
+  selection: PiSelection;
+  authPath: string;
 }
 
 interface PiLoginAttemptRecord {
@@ -170,7 +184,7 @@ export class PiLoginCoordinator {
 
   constructor(private readonly sdkLoader: PiSdkLoader = loadPiSdk) {}
 
-  start(): PiLoginAttempt {
+  start(preferences: Pick<PiSelection, "modelId" | "reasoningEffort">): PiLoginAttempt {
     this.cleanup();
     for (const record of this.attempts.values()) {
       if (record.public.state === "starting" || record.public.state === "awaiting-user") {
@@ -186,6 +200,8 @@ export class PiLoginCoordinator {
         userCode: null,
         message: "Requesting a one-time code from OpenAI…",
         expiresAt: null,
+        selection: { ...preferences, providerId: PI_PROVIDER_ID },
+        authPath: join(piConfigDir(), `pi-auth-${id}.json`),
       },
       controller: new AbortController(),
       updatedAt: Date.now(),
@@ -209,10 +225,16 @@ export class PiLoginCoordinator {
       record.controller.abort();
       this.update(record, {
         state: "cancelled",
-        message: "Login cancelled. No credential was saved.",
+        message: "Sign-in cancelled. No login was changed.",
       });
     }
     return { ...record.public };
+  }
+
+  disconnect() {
+    // A pending login must not reconnect this installation after disconnect returns.
+    for (const id of this.attempts.keys()) this.cancel(id);
+    forgetPiConfiguration();
   }
 
   private update(record: PiLoginAttemptRecord, update: Partial<PiLoginAttempt>) {
@@ -221,17 +243,18 @@ export class PiLoginCoordinator {
   }
 
   private async run(record: PiLoginAttemptRecord) {
+    let accepted = false;
     try {
-      const configuration = readPiConfiguration();
-      if (configuration?.mode !== "separate") {
-        throw new Error("Choose Configure separately before connecting ChatGPT. Shared Pi credentials are not overwritten here.");
-      }
       const sdk = await this.sdkLoader();
-      const modelRuntime = await sdk.ModelRuntime.create({ authPath: configuration.authPath, modelsPath: null, refreshOnCreate: false });
-      if (!modelRuntime.getModel(PI_PROVIDER_ID, PI_MODEL_ID)) {
-        throw new Error(`${PI_PROVIDER_ID}/${PI_MODEL_ID} is unavailable.`);
-      }
-      await modelRuntime.login(PI_PROVIDER_ID, "oauth", {
+      record.controller.signal.throwIfAborted();
+      const { selection, authPath } = record.public;
+      const modelRuntime = await sdk.ModelRuntime.create({ authPath, modelsPath: null, refreshOnCreate: false });
+      validatePiSelection(modelRuntime, selection);
+      record.controller.signal.throwIfAborted();
+      mkdirSync(piConfigDir(), { recursive: true, mode: 0o700 });
+      let synchronizationWarning = false;
+      try {
+        await modelRuntime.login(PI_PROVIDER_ID, "oauth", {
         signal: record.controller.signal,
         prompt: async (prompt) => {
           if (
@@ -243,6 +266,7 @@ export class PiLoginCoordinator {
           throw new Error(`Pi requested an unsupported ${prompt.type} login prompt.`);
         },
         notify: (event) => {
+          if (record.controller.signal.aborted) return;
           if (event.type === "device_code") {
             this.update(record, {
               state: "awaiting-user",
@@ -257,19 +281,36 @@ export class PiLoginCoordinator {
             this.update(record, { message: event.message });
           }
         },
-      });
-      if (!record.controller.signal.aborted) {
-        this.update(record, {
-          state: "complete",
-          message: "ChatGPT OAuth is connected in Server Guy’s separate credential file.",
         });
+      } catch (error) {
+        if (!sdk.CredentialSynchronizationError || !(error instanceof sdk.CredentialSynchronizationError)) throw error;
+        // This SDK error means the credential was saved, but its local snapshot refresh failed.
+        // Never expose the error object: it contains the credential itself.
+        synchronizationWarning = true;
       }
+      record.controller.signal.throwIfAborted();
+      if (readPiCredential(authPath, PI_PROVIDER_ID)?.type !== "oauth") throw new Error("Sign-in did not save a usable ChatGPT login. Try again.");
+      // Commit one configuration pointer only after success. Old credentials and in-flight turns stay intact.
+      savePiConfiguration({ ...selection, mode: "separate", authPath, credentialType: "oauth" });
+      accepted = true;
+      this.update(record, {
+        state: "complete",
+        message: synchronizationWarning
+          ? "Login saved. Pi’s local refresh failed; access will be checked when you send a message."
+          : "ChatGPT login saved.",
+      });
     } catch (error) {
       if (record.controller.signal.aborted) return;
       this.update(record, {
         state: "failed",
         message: errorMessage(error),
       });
+    } finally {
+      // Only this attempt's unaccepted file is disposable, never the user's existing login.
+      if (!accepted) {
+        try { rmSync(record.public.authPath, { force: true }); }
+        catch { this.update(record, { message: record.public.message + " An unused login file could not be removed; see storage details." }); }
+      }
     }
   }
 

@@ -154,6 +154,27 @@ describe("Pi Decision proposals", () => {
 });
 
 describe("askPi", () => {
+  it("uses new preferences for subsequent sessions without changing a running turn", async () => {
+    const alternateModel = { ...configuredModel, id: "gpt-5.6-luna", name: "GPT-5.6 Luna" };
+    let finishFirst!: () => void;
+    const firstPrompt = new Promise<void>((resolve) => { finishFirst = resolve; });
+    sdkMocks.createAgentSession.mockImplementation(async () => ({ session: {
+      messages: [{ role: "assistant", content: [{ type: "text", text: "Done." }], stopReason: "stop" }],
+      subscribe: () => () => {},
+      prompt: sdkMocks.createAgentSession.mock.calls.length === 1 ? () => firstPrompt : async () => {},
+      async abort() {}, dispose() {},
+    } }));
+    const input = { userMessage: "Hello", messages: [], decisions: [], viewSummary: "Example" };
+    const firstTurn = askPi(input);
+    await vi.waitFor(() => expect(sdkMocks.createAgentSession).toHaveBeenCalledTimes(1));
+    sdkMocks.configuredPiRuntime.mockResolvedValue({ configuration: { reasoningEffort: "max" }, model: alternateModel, modelRuntime: {} });
+    await askPi(input);
+    expect(sdkMocks.createAgentSession.mock.calls[0][0]).toMatchObject({ model: configuredModel, thinkingLevel: "high" });
+    expect(sdkMocks.createAgentSession.mock.calls[1][0]).toMatchObject({ model: alternateModel, thinkingLevel: "max" });
+    finishFirst();
+    await firstTurn;
+  });
+
   it("combines normal assistant text with successful typed tool calls", async () => {
     let sessionOptions: {
       tools?: string[];

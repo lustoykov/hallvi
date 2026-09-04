@@ -1,10 +1,10 @@
 import {
   archiveChat as archiveChatRecord,
+  deleteApplication,
   getApplication,
   getApplicationByRepository,
   getChat,
   getDecision,
-  getLatestApplication,
   getWorkspace,
   insertActivity,
   insertApplication,
@@ -16,6 +16,7 @@ import {
   latestObservation,
   listActiveDecisions,
   listActivity,
+  listApplications,
   listChats,
   listMessages,
   listObservations,
@@ -156,26 +157,33 @@ export async function observeRepository(applicationId: string) {
   return observation;
 }
 
+export function listApplicationSummaries() {
+  return listApplications().map((application) => {
+    const checks = currentChecks(application);
+    return {
+      application,
+      passedChecks: checks.filter((check) => check.status === "passed").length,
+      totalChecks: checks.length,
+    };
+  });
+}
+
+export function removeApplication(applicationId: string, repository: string) {
+  const { application } = loadWorkspace(applicationId);
+  if (repository !== `${application.repositoryOwner}/${application.repositoryName}`) {
+    throw new Error("Type the exact repository owner/name to remove this application.");
+  }
+  // Delete the identity too: adding the repository again gets new IDs, so old
+  // in-flight messages/observations cannot repopulate the new application.
+  deleteApplication(application.id);
+  return { removedApplicationId: application.id };
+}
+
 export function getPhaseOneOperatorView(
-  applicationId?: string,
+  applicationId: string,
   chatId?: string,
 ): PhaseOneOperatorView {
-  const application = applicationId ? getApplication(applicationId) : getLatestApplication();
-  const workspace = application ? getWorkspace(application.id) : null;
-  if (!application || !workspace) {
-    return {
-      application: null,
-      workspace: null,
-      chats: [],
-      selectedChatId: null,
-      messages: [],
-      checks: [],
-      decisions: [],
-      observations: [],
-      upcomingRequirements: deriveUpcomingRequirements(),
-      activity: [],
-    };
-  }
+  const { application, workspace } = loadWorkspace(applicationId);
 
   const checks = currentChecks(application);
   const chats = listChats(workspace.id);

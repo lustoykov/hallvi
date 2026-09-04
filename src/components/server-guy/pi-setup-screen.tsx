@@ -1,330 +1,251 @@
 "use client";
 
-import {
-  ArrowLeft,
-  ArrowSquareOut,
-  Check,
-  Copy,
-  SpinnerGap,
-  WarningCircle,
-  X,
-} from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, ArrowSquareOut, Check, Copy, SpinnerGap, X } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { DetectedPiSetup } from "@/server/pi-configuration";
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
+import { ConfirmActionDialog } from "./confirm-action-dialog";
+import s from "./pi-setup-screen.module.css";
 
-async function readJson<T>(response: Response): Promise<T> {
-  const body = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
-  if (!response.ok || !body) {
-    throw new Error(body?.error ?? "Server Guy could not complete the Pi setup request.");
-  }
-  return body;
+class SetupRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
 }
-
-function activeAttempt(attempt: PiLoginAttempt | null) {
+async function readJson<T>(response: Response): Promise<T> {
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body) throw new SetupRequestError(body?.error ?? "Could not reach Server Guy. Try again.", response.status);
+  return body as T;
+}
+function active(attempt: PiLoginAttempt | null) {
   return attempt?.state === "starting" || attempt?.state === "awaiting-user";
+}
+function effortLabel(effort: string) {
+  return effort === "xhigh" ? "Extra high" : effort.charAt(0).toUpperCase() + effort.slice(1);
 }
 
 export function PiSetupScreen({ initialStatus }: { initialStatus: PiSetupStatus }) {
+  const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
+  const [detected, setDetected] = useState<DetectedPiSetup | null>(initialStatus.detected);
+  const [choosing, setChoosing] = useState(!initialStatus.ready);
   const [attempt, setAttempt] = useState<PiLoginAttempt | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [pollError, setPollError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [acknowledgeApiBilling, setAcknowledgeApiBilling] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const [modelId, setModelId] = useState(initialStatus.selection.modelId);
+  const [effort, setEffort] = useState(initialStatus.selection.reasoningEffort);
+  const working = active(attempt);
+  const models = [...status.models].sort((a, b) => Number(b.id === "gpt-5.6-sol") - Number(a.id === "gpt-5.6-sol"));
+  const selectedModel = models.find((model) => model.id === modelId);
+  const validSelection = selectedModel?.reasoningEfforts.includes(effort) ?? false;
+  const hasChanges = modelId !== status.selection.modelId || effort !== status.selection.reasoningEffort;
+  const connectionReady = status.ready && !choosing;
+  const visibleError = error ?? (attempt?.state === "failed" ? attempt.message : null) ?? status.issue;
 
-  const refreshStatus = useCallback(async () => {
-    const response = await fetch("/api/pi/setup", { cache: "no-store" });
-    setStatus(await readJson<PiSetupStatus>(response));
-  }, []);
+  function applyStatus(next: PiSetupStatus) {
+    setStatus(next); setDetected(next.detected); setModelId(next.selection.modelId); setEffort(next.selection.reasoningEffort); setChoosing(!next.ready);
+  }
+
+  async function disconnect() {
+    setSaving(true); setDisconnectError(null);
+    try {
+      applyStatus(await readJson<PiSetupStatus>(await fetch("/api/pi/setup", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "disconnect" }),
+      })));
+      setAttempt(null); setError(null); setPollError(null); setConfirmDisconnect(false);
+      router.refresh();
+    } catch (caught) {
+      setDisconnectError(caught instanceof Error ? caught.message : "Could not disconnect. Try again.");
+    } finally { setSaving(false); }
+  }
 
   useEffect(() => {
-    if (!attempt || !activeAttempt(attempt)) return;
-    const currentAttempt = attempt;
+    if (!active(attempt)) return;
+    const current = attempt!;
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       try {
-        const response = await fetch(`/api/pi/setup/login/${currentAttempt.id}`, { cache: "no-store", signal: controller.signal });
-        const next = await readJson<PiLoginAttempt>(response);
+        const next = await readJson<PiLoginAttempt>(await fetch("/api/pi/setup/login/" + current.id, { cache: "no-store", signal: controller.signal }));
+        // Reconcile saved setup before stopping polling; a failed status refresh is retryable too.
+        const saved = next.state === "complete"
+          ? await readJson<PiSetupStatus>(await fetch("/api/pi/setup", { cache: "no-store", signal: controller.signal }))
+          : null;
         if (controller.signal.aborted) return;
-        setAttempt(next);
-        if (next.state === "complete") await refreshStatus();
+        if (saved) applyStatus(saved);
+        setPollError(null); setAttempt(next);
       } catch (caught) {
         if (controller.signal.aborted) return;
-        const message = caught instanceof Error ? caught.message : "Could not check the login attempt.";
-        setError(message);
-        setAttempt((current) =>
-          current ? { ...current, state: "failed", message } : current,
-        );
+        if (caught instanceof SetupRequestError && caught.status === 404) {
+          setAttempt({ ...current, state: "failed", message: "This sign-in is no longer available. Start again." });
+          setPollError(null);
+        } else {
+          setPollError("Can’t check sign-in right now. Retrying… You can still cancel.");
+          setAttempt((latest) => latest?.id === current.id ? { ...latest } : latest);
+        }
       }
-    }, currentAttempt.state === "starting" ? 700 : 1_500);
+    }, current.state === "starting" ? 700 : 1_500);
     return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [attempt, refreshStatus]);
+  }, [attempt]);
 
-  async function previewSetup() {
-    setError(null);
-    setAcknowledgeApiBilling(false);
-    setAttempt(null);
-    setSaving(true);
+  async function changeConnection() {
+    setSaving(true); setError(null); setAttempt(null); setPollError(null);
     try {
-      setStatus(await readJson<PiSetupStatus>(await fetch("/api/pi/setup?preview=1", { cache: "no-store" })));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not inspect Pi setup.");
-    } finally { setSaving(false); }
+      const preview = await readJson<PiSetupStatus>(await fetch("/api/pi/setup?preview=1", { cache: "no-store" }));
+      setDetected(preview.detected); setStatus((current) => ({ ...current, models: preview.models })); setChoosing(true);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not check for a saved login."); }
+    finally { setSaving(false); }
   }
-
-  async function chooseSetup(mode: "shared" | "separate") {
-    setError(null);
-    setSaving(true);
-    setAttempt(null);
+  async function reuse() {
+    setSaving(true); setError(null); setAttempt(null);
     try {
-      const body = mode === "separate" ? { mode } : { mode, candidateId: status.detected?.id, acknowledgeApiBilling };
-      setStatus(await readJson<PiSetupStatus>(await fetch("/api/pi/setup", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      applyStatus(await readJson<PiSetupStatus>(await fetch("/api/pi/setup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "shared", candidateId: detected?.id }),
       })));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save Pi setup.");
-    } finally { setSaving(false); }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not reuse this login. Check again."); }
+    finally { setSaving(false); }
   }
-
   async function startLogin() {
-    setError(null);
-    setCopied(false);
-    setSaving(true);
+    setSaving(true); setError(null); setPollError(null); setCopied(false);
     try {
-      const response = await fetch("/api/pi/setup/login", { method: "POST" });
-      setAttempt(await readJson<PiLoginAttempt>(response));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not start ChatGPT login.");
-    } finally { setSaving(false); }
+      const next = await readJson<PiLoginAttempt>(await fetch("/api/pi/setup/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId, reasoningEffort: effort }),
+      }));
+      setAttempt(next); setModelId(next.selection.modelId); setEffort(next.selection.reasoningEffort);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not start sign-in."); }
+    finally { setSaving(false); }
   }
-
   async function cancelLogin() {
     if (!attempt) return;
+    setSaving(true);
     try {
-      const response = await fetch(`/api/pi/setup/login/${attempt.id}`, { method: "DELETE" });
-      setAttempt(await readJson<PiLoginAttempt>(response));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not cancel ChatGPT login.");
-    }
+      const next = await readJson<PiLoginAttempt>(await fetch("/api/pi/setup/login/" + attempt.id, { method: "DELETE" }));
+      const saved = next.state === "complete" ? await readJson<PiSetupStatus>(await fetch("/api/pi/setup", { cache: "no-store" })) : null;
+      setAttempt(next); setError(null); setPollError(null);
+      if (saved) applyStatus(saved);
+      else setChoosing(!status.ready);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not cancel sign-in. Try again."); }
+    finally { setSaving(false); }
   }
-
+  async function viewApplications() {
+    setSaving(true); setError(null);
+    try {
+      if (hasChanges) applyStatus(await readJson<PiSetupStatus>(await fetch("/api/pi/setup", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId, reasoningEffort: effort }),
+      })));
+      router.push("/applications"); router.refresh();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not save model preferences."); }
+    finally { setSaving(false); }
+  }
   async function copyCode() {
-    if (!attempt?.userCode) return;
-    try {
-      await navigator.clipboard.writeText(attempt.userCode);
-      setCopied(true);
-    } catch { setError("Could not copy the code. Select it and copy it manually."); }
+    try { await navigator.clipboard.writeText(attempt?.userCode ?? ""); setCopied(true); }
+    catch { setError("Could not copy. Select the code and copy it manually."); }
   }
 
-  const isReady = status.ready;
-  const isWorking = activeAttempt(attempt);
-  const needsChoice = status.state === "needs-choice";
-  const selectionLabel = needsChoice ? "Preview" : status.mode === "shared" ? "Adopted" : "Default";
-
-  return (
-    <main className="sg-setup-shell">
-      <header className="sg-setup-topbar">
-        <Link className="sg-setup-brand" href="/">
-          <span className="sg-app-mark">SG</span>
-          <span>Server Guy</span>
-        </Link>
-        <Link className="sg-setup-back" href="/">
-          <ArrowLeft /> Back to operator
-        </Link>
-      </header>
-
-      <section className="sg-setup-page">
-        <header className="sg-setup-heading">
-          <div>
-            <h1>Set up Pi for Server Guy</h1>
-            <p>
-              Reuse an existing Pi setup, or connect ChatGPT separately with Sol and high reasoning.
-              Server Guy bundles Pi; no separate installation is needed.
-            </p>
+  return <main className={"sg-setup-shell " + s.root}>
+    <header className="sg-setup-topbar">
+      <Link className="sg-setup-brand" href="/"><span className="sg-app-mark">SG</span><span>Server Guy</span></Link>
+      <Link className="sg-setup-back" href="/applications"><ArrowLeft /> All applications</Link>
+    </header>
+    <div className={s.page}>
+      <header className={s.heading}><h1>Settings</h1><p>ChatGPT account and model preferences.</p></header>
+      <section className={s.card} aria-label="ChatGPT and model settings">
+        <section className={s.section} aria-labelledby="account-heading">
+          <h2 id="account-heading"><span className={s.step}>{connectionReady && !working ? <Check /> : "1"}</span>ChatGPT account</h2>
+          <div aria-live="polite">
+            {working ? <div className={s.device}>
+              {attempt?.state === "awaiting-user" ? <>
+                <p>Enter this code on OpenAI’s website.</p>
+                <div className={s.codeRow}><code>{attempt.userCode}</code><button className={s.textButton} type="button" onClick={copyCode}>{copied ? <Check /> : <Copy />}{copied ? "Copied" : "Copy code"}</button></div>
+                <a className={s.primary} href={attempt.verificationUri ?? undefined} target="_blank" rel="noreferrer">Open OpenAI &amp; enter code <ArrowSquareOut /></a>
+                {attempt.expiresAt && <p className={s.hint}>Code expires at {new Date(attempt.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.</p>}
+                <p className={s.hint}><SpinnerGap className="spin" /> Waiting for approval…</p>
+              </> : <p><SpinnerGap className="spin" /> Starting sign-in…</p>}
+              <button className={s.textButton} type="button" disabled={saving} onClick={cancelLogin}>Cancel sign-in</button>
+            </div> : connectionReady ? <div className={s.accountRow}>
+              <div><strong className={s.success}><Check /> Login saved</strong><p>{status.mode === "shared" ? "Using the saved Pi login" : "Separate login for Server Guy"}</p></div>
+              <button className={s.textButton} type="button" disabled={saving} onClick={changeConnection}>Change</button>
+            </div> : <div className={s.actions}>
+              {detected?.canReuse && <>
+                <div className={s.savedLogin}><Check /><div><strong>Existing ChatGPT login found</strong><p>In Pi on this machine · {models.find((model) => model.id === detected.selection.modelId)?.name ?? detected.selection.modelId} / {effortLabel(detected.selection.reasoningEffort)}</p></div></div>
+                <p className={s.hint}>Reuse its login file and model settings.</p>
+                <button className={s.primary} type="button" disabled={saving} onClick={reuse}>Use existing login</button>
+              </>}
+              {detected && !detected.canReuse && <p className={s.hint}>No reusable ChatGPT login found.</p>}
+              <button className={detected?.canReuse ? s.textButton : s.primary} type="button" disabled={saving || !validSelection} onClick={startLogin}>
+                {saving ? "Connecting…" : detected?.canReuse ? "Connect another account" : "Connect ChatGPT"}<ArrowRight />
+              </button>
+              {status.ready && <button className={s.textButton} type="button" disabled={saving} onClick={() => { setChoosing(false); setAttempt(null); setError(null); }}>Keep current login</button>}
+            </div>}
+            {attempt?.state === "cancelled" && <p className={s.hint}>{attempt.message}</p>}
+            {attempt?.state === "complete" && <p className={s.hint}>{attempt.message}</p>}
+            {pollError && <p className={s.error} role="status">{pollError}</p>}
+            {visibleError && <p className={s.error} role="alert">{visibleError}</p>}
           </div>
-          <span className={`sg-setup-state ${isReady ? "ready" : "attention"}`}>
-            {isReady ? <Check weight="bold" /> : <WarningCircle weight="bold" />}
-            {isReady ? "Ready" : needsChoice && status.hasSavedConfiguration ? "Review setup" : "Setup required"}
-          </span>
-        </header>
-
-        <div className="sg-setup-layout">
-          <section className="sg-setup-main" aria-labelledby="pi-readiness-heading">
-            <div className="sg-setup-section-heading">
-              <h2 id="pi-readiness-heading">{needsChoice ? "Existing Pi setup preview" : "Server Guy’s Pi setup"}</h2>
-              <p>{needsChoice
-                ? status.hasSavedConfiguration ? "Read-only preview. Your saved setup stays active until you choose a replacement." : "Read-only detection. Nothing has been adopted or sent to a provider."
-                : "These saved choices are passed explicitly to every Pi turn."}</p>
-            </div>
-
-            <dl className="sg-readiness-list">
-              <div>
-                <dt>Runtime</dt>
-                <dd>
-                  <strong>{status.runtime.label}</strong>
-                  <span>{status.runtime.detail}</span>
-                </dd>
-                <dd className={`sg-readiness-status ${status.state === "runtime-unavailable" ? "failed" : "passed"}`}>
-                  {status.state === "runtime-unavailable" ? "Unavailable" : "Available"}
-                </dd>
-              </div>
-              <div>
-                <dt>Authentication</dt>
-                <dd>
-                  <strong>{status.authentication.label}</strong>
-                  <span>{status.billing === "api" ? "API usage is billed by this provider." : "Subscription access, subject to account limits."}</span>
-                </dd>
-                <dd className={`sg-readiness-status ${status.authentication.configured && isReady ? "passed" : "pending"}`}>
-                  {status.authentication.configured ? "Found" : "Required"}
-                </dd>
-              </div>
-              <div>
-                <dt>Provider</dt>
-                <dd>
-                  <strong>{status.selection.provider}</strong>
-                  <code>{status.selection.providerId}</code>
-                </dd>
-                <dd className="sg-readiness-status fixed">{selectionLabel}</dd>
-              </div>
-              <div>
-                <dt>Model</dt>
-                <dd>
-                  <strong>{status.selection.model}</strong>
-                  <code>{status.selection.modelId}</code>
-                </dd>
-                <dd className={`sg-readiness-status ${status.state === "model-unavailable" ? "failed" : "fixed"}`}>
-                  {status.state === "model-unavailable" ? "Unavailable" : selectionLabel}
-                </dd>
-              </div>
-              <div>
-                <dt>Reasoning effort</dt>
-                <dd>
-                  <strong>{status.selection.reasoningEffort}</strong>
-                  <span>Applied to every Phase 1 Pi session.</span>
-                </dd>
-                <dd className="sg-readiness-status fixed">{selectionLabel}</dd>
-              </div>
-            </dl>
-
-            <div className="sg-credential-source">
-              <strong>Credential source</strong>
-              <code>{status.authentication.source}</code>
-              <p>
-                {status.mode === "separate"
-                  ? "Separate Server Guy store. Your machine’s Pi settings and credentials are untouched."
-                  : "Shared Pi store. Reusing it allows Pi to refresh shared OAuth tokens; Server Guy never overwrites your global model preferences."}
-              </p>
-              {status.detected && <><strong className="sg-settings-source-label">Settings inspected</strong><code>{status.detected.settingsPath}</code>
-                {status.detected.usesDefaultModel && <p>No saved model selection was found. The preview uses Server Guy’s default: OpenAI Codex, Sol, high (unless Pi saved a different effort).</p>}</>}
-              <p>Only provider, model, and effort are adopted. Tools, extensions, instructions, and Codex CLI credentials are not imported.</p>
-            </div>
-          </section>
-
-          <aside className="sg-connect-panel" aria-live="polite">
-            {needsChoice ? (
-              <>
-                <span className="sg-connect-icon"><WarningCircle weight="bold" /></span>
-                <h2>{status.detected?.canReuse ? "Use this Pi setup?" : "Configure Pi separately"}</h2>
-                <p>{status.detected?.canReuse
-                  ? "Save these model preferences for Server Guy and reuse the shared credential file. Future changes to Pi’s model settings won’t change this choice."
-                  : status.detected?.issue ?? "No reusable Pi setup was found."}</p>
-                {status.detected?.canReuse && status.billing === "api" && (
-                  <label className="sg-billing-consent">
-                    <input type="checkbox" checked={acknowledgeApiBilling} onChange={(event) => setAcknowledgeApiBilling(event.target.checked)} />
-                    <span>I understand this setup uses paid API access, not my ChatGPT subscription.</span>
-                  </label>
-                )}
-                {status.detected?.canReuse && <button className="sg-primary-button" type="button"
-                  disabled={saving || (status.billing === "api" && !acknowledgeApiBilling)} onClick={() => chooseSetup("shared")}>
-                  {saving ? "Saving…" : "Use existing setup"}
-                </button>}
-                <button className={status.detected?.canReuse ? "sg-secondary-setup-button" : "sg-primary-button"} type="button" disabled={saving} onClick={() => chooseSetup("separate")}>
-                  Configure separately
-                </button>
-                <p className="sg-separate-copy">{status.hasSavedConfiguration ? "This replaces your saved choice. Chat will need a separate ChatGPT login. " : ""}Separate setup uses OpenAI Codex / Sol / high, with its own credential file.</p>
-                <button className="sg-link-button" type="button" disabled={saving} onClick={previewSetup}>Refresh preview</button>
-                {status.hasSavedConfiguration && <button className="sg-link-button" type="button" disabled={saving} onClick={() => { setError(null); void refreshStatus().catch(() => setError("Could not reload the saved setup.")); }}>Keep saved setup</button>}
-              </>
-            ) : isReady && !isWorking ? (
-              <>
-                <span className="sg-connect-icon ready"><Check weight="bold" /></span>
-                <h2>Pi is ready</h2>
-                <p>Model preferences are saved and a credential is present. Provider access and usage limits are checked when you send a message.</p>
-                <Link className="sg-primary-button" href="/">Return to operator</Link>
-                {status.mode === "separate" && <button className="sg-link-button" disabled={saving} onClick={startLogin} type="button">
-                  Connect a different ChatGPT account
-                </button>}
-                <button className="sg-link-button" disabled={saving} onClick={previewSetup} type="button">Change setup</button>
-              </>
-            ) : attempt?.state === "awaiting-user" ? (
-              <>
-                <span className="sg-connect-icon"><ArrowSquareOut weight="bold" /></span>
-                <h2>Enter this one-time code</h2>
-                <p>Open OpenAI’s device page, enter the code, and approve access.</p>
-                <button className="sg-device-code" onClick={copyCode} type="button">
-                  <code>{attempt.userCode}</code>
-                  <span>{copied ? <Check weight="bold" /> : <Copy />}{copied ? "Copied" : "Copy"}</span>
-                </button>
-                <a
-                  className="sg-primary-button"
-                  href={attempt.verificationUri ?? undefined}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open OpenAI <ArrowSquareOut />
-                </a>
-                <span className="sg-waiting-copy"><SpinnerGap className="spin" /> Waiting for approval…</span>
-                <button className="sg-link-button danger" onClick={cancelLogin} type="button">
-                  <X /> Cancel login
-                </button>
-              </>
-            ) : isWorking ? (
-              <>
-                <span className="sg-connect-icon"><SpinnerGap className="spin" /></span>
-                <h2>Starting secure login</h2>
-                <p>{attempt?.message}</p>
-                <button className="sg-link-button danger" onClick={cancelLogin} type="button">
-                  <X /> Cancel login
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="sg-connect-icon"><WarningCircle weight="bold" /></span>
-                <h2>{attempt?.state === "cancelled" ? "Login cancelled" : status.mode === "separate" ? "ChatGPT connection required" : "Pi setup needs attention"}</h2>
-                <p>
-                  {attempt?.state === "failed"
-                    ? attempt.message
-                    : status.mode === "separate" ? "Server Guy will request a one-time device code. Your password never enters this app. Login writes only to Server Guy’s separate credential file."
-                    : "Reconnect through Pi to repair shared credentials, or choose a separate Server Guy setup."}
-                </p>
-                <button
-                  className="sg-primary-button"
-                  disabled={saving || status.state === "model-unavailable"}
-                  onClick={status.mode === "separate" ? startLogin : previewSetup}
-                  type="button"
-                >
-                  {status.mode === "separate" ? "Connect ChatGPT" : "Choose setup"}
-                </button>
-                {status.mode === "separate" && <button className="sg-link-button" disabled={saving} onClick={previewSetup} type="button">Change setup</button>}
-              </>
-            )}
-
-            {(status.issue || error) && (
-              <div className="sg-setup-error" role="alert">
-                <WarningCircle weight="bold" />
-                <span>{error ?? status.issue}</span>
-              </div>
-            )}
-          </aside>
-        </div>
-
-        <p className="sg-setup-footnote">
-          Detection never contacts a provider or refreshes credentials. A failed chat turn restores
-          your draft and reports the error; Server Guy never automatically switches providers or billing methods.
-        </p>
+          <div className={s.privacy}>
+            <button className={s.textButton} type="button" popoverTarget="connection-help">Storage &amp; privacy</button>
+            {status.hasSavedConfiguration && <button className={`${s.textButton} ${s.disconnect}`} type="button" disabled={saving || working} onClick={() => { setDisconnectError(null); setConfirmDisconnect(true); }}>Disconnect</button>}
+          </div>
+        </section>
+        <section className={s.section} aria-labelledby="model-heading">
+          <h2 id="model-heading"><span className={s.step}>2</span>Model preferences</h2>
+          <div className={s.fields}>
+            <label htmlFor="pi-model">Model<select id="pi-model" value={modelId} disabled={saving || working || !models.length} onChange={(event) => {
+              const next = models.find((model) => model.id === event.target.value);
+              if (!next) return;
+              setModelId(next.id);
+              if (!next.reasoningEfforts.includes(effort)) setEffort(next.reasoningEfforts.includes("high") ? "high" : next.reasoningEfforts[0]);
+            }}>
+              {!selectedModel && <option value={modelId} disabled>{modelId} — unavailable</option>}
+              {models.map((model) => <option key={model.id} value={model.id}>{model.name}{model.id === "gpt-5.6-sol" ? " · Default" : ""}</option>)}
+            </select></label>
+            <label htmlFor="pi-effort">Reasoning effort<select id="pi-effort" value={effort} disabled={saving || working || !selectedModel} onChange={(event) => {
+              const next = selectedModel?.reasoningEfforts.find((level) => level === event.target.value);
+              if (next) setEffort(next);
+            }}>
+              {!validSelection && <option value={effort} disabled>{effortLabel(effort)} — unavailable</option>}
+              {selectedModel?.reasoningEfforts.map((level) => <option key={level} value={level}>{effortLabel(level)}{level === "high" ? " · Default" : ""}</option>)}
+            </select></label>
+            <p className={s.hint}>Higher effort allows more reasoning, usually with a longer wait.</p>
+          </div>
+        </section>
+        <footer className={s.footer}>
+          <span className={s.hint}>{working ? "Finish sign-in to continue." : !connectionReady ? "Connect your account to start." : hasChanges ? "Your model preferences will be saved." : "Access is checked when you send a message."}</span>
+          <button className={s.primary} type="button" disabled={!connectionReady || working || saving || !validSelection} onClick={viewApplications}>{saving ? "Saving…" : "View applications"}<ArrowRight /></button>
+        </footer>
       </section>
-    </main>
-  );
+    </div>
+    <aside popover="auto" id="connection-help" className={s.help} aria-labelledby="connection-help-title">
+      <header><h2 id="connection-help-title">Storage &amp; privacy</h2><button className={s.close} type="button" popoverTarget="connection-help" popoverTargetAction="hide" aria-label="Close connection help"><X /></button></header>
+      <h3>How your login is protected</h3><p>Pi saves OAuth tokens, not your password, in a local file. New files are readable and writable only by the operating-system user running Server Guy (0600). Existing files keep their permissions.</p>
+      <p>The tokens are not encrypted by Pi or Server Guy or stored in an OS keychain. Other software running as that same user can read them. This prototype relies on file permissions, not encrypted credential storage.</p>
+      <dl><div><dt>Server Guy</dt><dd>Your app, chats, and saved decisions.</dd></div><div><dt>Pi</dt><dd>The included agent runtime. Calls the model; nothing to install.</dd></div><div><dt>ChatGPT</dt><dd>Your OpenAI account and subscription provide model access.</dd></div></dl>
+      <h3>Login files</h3><p>Stored on the machine running Server Guy—not necessarily this browser’s computer.</p>
+      {status.hasSavedConfiguration && <><strong>Current login file</strong><code>{status.authentication.source}</code></>}
+      {attempt && <><strong>New login file</strong><code>{attempt.authPath}</code></>}
+      {!attempt && <><strong>New, separate login</strong><code>{status.separateAuthPath.replace(/[^/]+$/, "pi-auth-<login-id>.json")}</code></>}
+      {detected && <><strong>Pi login checked</strong><code>{detected.authPath}</code>{detected.issue && <p>{detected.issue}</p>}</>}
+      <p>Reuse shares Pi’s login file and copies its model preferences. Later model changes apply only to Server Guy. A new login uses its own file and replaces your current connection only after it succeeds.</p>
+      <p>Previously accepted login files are retained for running turns; signing in again does not delete them. A separate login can use the same or a different ChatGPT account.</p>
+      <h3>Disconnecting</h3><p>Disconnect removes Server Guy’s saved connection choice and model preferences. New messages require setup again. Credential files remain on disk, and messages already running may finish. It does not revoke OAuth tokens or sign you out of ChatGPT or Pi.</p>
+      <h3>What leaves this machine?</h3><p>Sign-in goes to OpenAI. Chat messages and relevant context go to its model. Your subscription limits apply; there’s no automatic switch to API billing.</p>
+      <p>Detection is read-only. A saved login is not proof of provider access; that is checked when you send a message. Pi tools, extensions, and Codex CLI credentials are not imported.</p>
+    </aside>
+    {confirmDisconnect && <ConfirmActionDialog
+      title="Disconnect ChatGPT?"
+      description="Stops new messages across all applications and clears Server Guy’s connection preferences. Chats and credential files stay intact. This does not sign you out of ChatGPT or Pi."
+      action="Disconnect"
+      busy={saving}
+      error={disconnectError}
+      onCancel={() => setConfirmDisconnect(false)}
+      onConfirm={() => void disconnect()}
+    />}
+  </main>;
 }

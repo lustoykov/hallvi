@@ -25,8 +25,13 @@ function post(url: string, body: unknown) {
   return jsonRequest<PhaseOneOperatorView>(url, { method: "POST", body: JSON.stringify(body) });
 }
 
-/** Every call returns the whole Phase 1 view; the shell replaces its state with it. */
+/** Workspace reads/edits return the whole view; removal returns the removed identity. */
 export const api = {
+  removeApplication(applicationId: string, repository: string) {
+    return jsonRequest<{ removedApplicationId: string }>(`/api/applications/${applicationId}`, {
+      method: "DELETE", body: JSON.stringify({ repository }),
+    });
+  },
   createApplication(input: { repositoryUrl: string; approvalMode: ApprovalMode }) {
     return post("/api/applications", input);
   },

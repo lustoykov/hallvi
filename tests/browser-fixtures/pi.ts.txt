@@ -1,0 +1,29 @@
+// Only copied into a disposable QA app. Never imported by the real application.
+import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
+import { existsSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
+
+export class PiUnavailableError extends Error {}
+
+export async function askPi(input: { userMessage: string; messages: ChatMessage[]; decisions: Decision[]; viewSummary: string }): Promise<PiTurnResult> {
+  const root = process.env.SERVER_GUY_QA_ROOT;
+  if (!root) throw new Error("QA fixture requires an isolated root.");
+  await new Promise((resolve) => setTimeout(resolve, input.userMessage.includes("[slow]") ? 1_500 : 150));
+  const failureMarker = join(root, `pi-failed-${createHash("sha256").update(input.userMessage).digest("hex")}`);
+  if (input.userMessage.includes("[fail-once]") && !existsSync(failureMarker)) {
+    writeFileSync(failureMarker, "failed");
+    throw new PiUnavailableError("QA simulated provider failure. Retry this message; no message or decision was saved.");
+  }
+  const decisionProposals: PiDecision[] = [];
+  if (input.userMessage.startsWith("priority: ")) {
+    decisionProposals.push({ kind: "launch-priority", value: input.userMessage.slice(10) });
+  }
+  if (input.userMessage.startsWith("replace-priority: ")) {
+    decisionProposals.push({ kind: "launch-priority", value: input.userMessage.slice(18), replaces: input.decisions.at(-1)?.id });
+  }
+  if (input.userMessage.startsWith("invalid-replacement: ")) {
+    decisionProposals.push({ kind: "launch-priority", value: "Must not persist", replaces: "00000000-0000-4000-8000-000000000000" });
+  }
+  return { message: `[QA fixture reply] ${input.userMessage}`, decisionProposals };
+}
