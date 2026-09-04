@@ -85,6 +85,12 @@ describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
     expect(Object.values(fixture.check()).every(Boolean)).toBe(true);
   });
 
+  it("defaults to one repetition and allows explicit extra repetitions", () => {
+    expect(evalRepeatCount()).toBe(1);
+    expect(evalRepeatCount(undefined)).toBe(1);
+    expect(evalRepeatCount("2")).toBe(2);
+  });
+
   it.each(["0", "6", "2.5", "nope"])("rejects an unbounded or invalid repeat count: %s", (value) => {
     expect(() => evalRepeatCount(value)).toThrow("1 to 5");
   });

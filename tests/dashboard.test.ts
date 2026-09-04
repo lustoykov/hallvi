@@ -34,6 +34,20 @@ async function fixture() {
   });
   return { root, origin, headers, launch, dashboard };
 }
+it("serves both dashboard routes without launching checks or weakening API protection", async () => {
+  const { origin, launch, dashboard } = await fixture();
+  for (const route of ["/", "/evals"]) {
+    const response = await fetch(`${origin}${route}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    const html = await response.text();
+    expect(html).toContain('href="/evals"');
+    expect(html).toContain(`content="${dashboard.token}"`);
+    expect((await fetch(`${origin}${route}`, { headers: { Origin: "https://attacker.invalid" } })).status).toBe(403);
+  }
+  expect((await fetch(`${origin}/api/state`)).status).toBe(403);
+  expect(launch).not.toHaveBeenCalled();
+});
 it("maps a closed set of suites to fixed arguments and requires explicit spend consent", () => {
   expect(commandFor({ suite: "smoke" })).toEqual({ args: ["run", "test:e2e:smoke"], env: {} });
   expect(() => commandFor({ suite: "live" })).toThrow("Confirm subscription");
@@ -42,6 +56,14 @@ it("maps a closed set of suites to fixed arguments and requires explicit spend c
   expect(commandFor({ suite: "live", consent: true, model: "gpt-5.6-sol", effort: "high" }).env).toEqual({
     SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_REPEATS: "1", PI_EVAL_EXPECTED_MODEL: "gpt-5.6-sol", PI_EVAL_EXPECTED_EFFORT: "high",
     PI_EVAL_CASES: phaseOneCases.map((item) => item.id).join(","),
+  });
+});
+it("runs a single eval case once without implicitly judging it", () => {
+  const command = commandFor({ suite: "live", cases: ["greeting"], consent: true, model: "gpt-5.6-sol", effort: "high" });
+  expect(command.args).toEqual(["run", "eval:pi"]);
+  expect(command.env).toEqual({
+    SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_CASES: "greeting", PI_EVAL_REPEATS: "1",
+    PI_EVAL_EXPECTED_MODEL: "gpt-5.6-sol", PI_EVAL_EXPECTED_EFFORT: "high",
   });
 });
 it("selects exact known journey tags and rejects empty, duplicate and foreign selections", () => {

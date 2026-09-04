@@ -11,10 +11,10 @@ import { browserJourneys } from "../e2e/journeys.ts";
 import { phaseOneCases } from "../evals/phase-one-cases.ts";
 
 export const suites = [
-  { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No model calls", ci: "Every PR" },
-  { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No model calls", ci: "Every PR" },
-  { id: "e2e", name: "Browser journeys", command: "npm run test:e2e", scope: `${browserJourneys.length} selectable journeys · simulated Pi, GitHub and login`, cost: "No model calls", ci: `${browserJourneys.filter((journey) => journey.smoke).length} journeys on every PR · all ${browserJourneys.length} on demand` },
-  { id: "live", name: "Live agent evals", command: "npm run eval:pi", scope: `${phaseOneCases.length} selectable cases · real Server Guy agent responses to review`, cost: "Uses ChatGPT subscription", ci: "Local opt-in only" },
+  { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
+  { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
+  { id: "e2e", name: "Browser journeys", command: "npm run test:e2e", scope: `${browserJourneys.length} selectable journeys · simulated Pi, GitHub and login`, cost: "No AI calls", ci: `${browserJourneys.filter((journey) => journey.smoke).length} of ${browserJourneys.length} per PR`, ciDetail: `All ${browserJourneys.length} on demand` },
+  { id: "live", name: "Live agent evals", command: "npm run eval:pi", scope: `${phaseOneCases.length} selectable cases · real Server Guy agent responses to review`, cost: "Uses subscription", ci: "On demand only", ciDetail: "Local only · never in CI" },
 ] as const;
 const startSchema = z.strictObject({
   suite: z.enum(["unit", "smoke", "e2e", "live", "judge"]),
@@ -125,7 +125,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       if (forceKill) clearTimeout(forceKill);
       run.status = timedOut ? "timed-out" : cancelled ? "cancelled" : code === 0 ? "passed" : "failed";
       run.exitCode = code; run.finishedAt = new Date().toISOString();
-      if (paid) run.log = code === 0 ? "Run completed. Open Review live eval answers to inspect saved answers and separate verdicts.\n" : "Run stopped or failed. Earlier saved answers and verdicts remain; remaining items may not have run. No automatic rerun or model fallback. Check saved results and account access before retrying.\n";
+      if (paid) run.log = code === 0 ? "Run completed. Open View saved runs under Live agent evals to inspect answers and separate judgments. Runner completion is not semantic acceptance.\n" : "Run stopped or failed. Earlier saved answers and verdicts remain; remaining items may not have run. No automatic rerun or model fallback. Check saved results and account access before retrying.\n";
       writeJson(path, run); active = null; child = null; cancelActive = null;
     };
     child.on("error", () => finish(null)); child.on("close", finish);
@@ -139,8 +139,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     if (request.headers.host !== new URL(origin).host || (request.headers.origin && request.headers.origin !== origin)) { json({ error: "Local same-origin requests only" }, 403); return; }
     const url = new URL(request.url!, origin);
     try {
-      if (request.method === "GET" && ["/", "/dashboard.js", "/dashboard.css"].includes(url.pathname)) {
-        const name = url.pathname === "/" ? "dashboard.html" : url.pathname.slice(1);
+      if (request.method === "GET" && ["/", "/evals", "/dashboard.js", "/dashboard.css"].includes(url.pathname)) {
+        const name = ["/", "/evals"].includes(url.pathname) ? "dashboard.html" : url.pathname.slice(1);
         response.setHeader("Content-Type", name.endsWith("html") ? "text/html; charset=utf-8" : name.endsWith("css") ? "text/css" : "text/javascript");
         response.end(readFileSync(new URL(name, import.meta.url), "utf8").replace("CSRF_TOKEN", token)); return;
       }

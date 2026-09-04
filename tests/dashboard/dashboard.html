@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- Desktop developer tool. Inherits Server Guy's navy/blue palette and restrained list UI.
-     First viewport: what can run, its cost and CI policy, then the most recent evidence.
-     Saved-output review never executes a model until the separate confirmation. -->
+     Run checks: what can run, its cost and CI policy, then recent evidence.
+     Review: an expanded run/answer queue beside one answer at a time. Reading spends nothing;
+     LLM advice and live evals go through the separate spending confirmation. -->
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,38 +15,96 @@
   <main>
     <h1 class="visually-hidden">Server Guy testing</h1>
     <div id="error" class="error" role="alert" hidden></div>
-    <nav class="sections" aria-label="Testing sections"><button id="runs-tab" aria-pressed="true">Run checks</button><button id="reviews-tab" aria-pressed="false">Review live eval answers <span id="pending"></span></button></nav>
-    <div id="active" class="active" role="status" hidden><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
-    <section id="runs-panel" aria-labelledby="runs-tab">
-      <table class="suites"><caption class="visually-hidden">Available test suites and model usage</caption><thead><tr><th>Suite</th><th>Model usage</th><th>CI policy</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
-      <p class="footnote">Browser tests run Server Guy with synthetic Pi, GitHub and login responses. No Codex or Pi model calls. GitHub-hosted CI still consumes Actions minutes.</p>
-      <section class="history"><h2>Recent runs</h2><p id="empty-runs" class="muted">Nothing has run from this dashboard yet. Existing saved evals are in Review live eval answers.</p><div id="history"></div><details id="log-details" hidden><summary>Selected run output</summary><pre id="log"></pre></details></section>
+    <div class="page-navigation"><h2 id="checks-title" tabindex="-1">Run checks</h2><a id="checks-link" href="/" class="text-button" hidden>Run checks</a></div>
+    <div hidden><a id="reviews-link" href="/evals" class="text-button eval-entry">View saved runs <span id="pending" class="chip discuss" hidden></span></a></div>
+    <div id="active" class="active" role="status" hidden><span class="pulse" aria-hidden="true"></span><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
+
+    <section id="runs-panel" aria-labelledby="checks-title">
+      <table class="suites"><caption class="visually-hidden">Available test suites, AI usage and CI policy</caption><thead><tr><th>Suite</th><th>AI usage</th><th>CI</th><th>Last result</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
+      <details class="suite-help"><summary>About AI usage &amp; automatic runs</summary>
+        <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
+        <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM advice are local-only; this dashboard asks for confirmation before using your ChatGPT subscription.</p>
+        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
+      </details>
+      <section class="history" aria-labelledby="history-title">
+        <h2 id="history-title">Recent runs</h2>
+        <p id="empty-runs" class="muted">Nothing has run from this dashboard yet. Open View saved runs under Live agent evals to review existing answers.</p>
+        <div id="history" class="history-list"></div>
+        <section id="log-panel" class="log-panel" aria-labelledby="log-title" hidden><header><h3 id="log-title"></h3><button id="log-close" class="text-button" type="button">Hide output</button></header><pre id="log"></pre></section>
+      </section>
       <details class="file-guide"><summary>Where everything lives</summary><dl><dt>Application tests</dt><dd><code>tests/*.test.ts(x)</code></dd><dt>Browser journeys</dt><dd><code>tests/e2e/</code> · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></details>
     </section>
-    <section id="reviews-panel" aria-labelledby="reviews-tab" hidden>
-      <div class="review-heading"><div><h2>Live eval runs</h2><p>Saved Server Guy answers—not browser test results. Open a run to review its answers.</p></div><div class="view-switch" aria-label="Eval run inbox"><button id="view-active" aria-pressed="true">Active runs</button><button id="view-archived" aria-pressed="false">Archived runs</button></div></div>
-      <p id="empty-reviews" class="muted" hidden>No saved live eval answers yet. Choose cases under Run checks → Live agent evals.</p>
-      <p id="bulk-result" role="status"></p>
-      <p id="empty-inbox" class="empty-inbox" hidden></p>
-      <div id="review-content"><div class="review-layout"><aside><h3 class="list-heading">Saved runs <span>newest first</span></h3><ul id="eval-runs" aria-label="Saved eval runs"></ul></aside><article>
-        <header class="run-heading"><div><h3 id="run-title"></h3><p id="run-model-label" class="muted"></p></div><button id="archive-run" class="secondary">Archive run</button></header>
-        <p id="report-meta" class="footnote"></p>
-        <p id="archive-error" class="error" role="alert" hidden>Run metadata could not be read. The run stays visible; archiving is disabled until the file is repaired.</p>
-        <section class="bulk-review" aria-label="Bulk answer review">
-          <div class="review-toolbar"><span id="answer-count" role="status">0 selected</span><div class="bulk-actions"><button id="bulk-human" class="secondary" disabled>Human verdict…</button><button id="bulk-judge" class="primary" disabled>Judge selected (0)…</button></div></div>
-          <div class="review-selection"><div><button id="answers-all" class="text-button">Select whole run</button><button id="answers-pending" class="text-button">Select unreviewed</button><button id="answers-clear" class="text-button">Clear</button></div><span id="selection-help">LLM judging uses subscription.</span></div>
-        </section>
-        <p id="empty-answers" class="muted" hidden>No results in this run. You can still archive it.</p>
-        <div id="answer-detail">
-        <header class="case-heading"><h3 id="case-title"></h3><span id="automatic" class="badge"></span></header>
-        <section class="evidence"><h4>Expected behavior</h4><p id="rubric"></p><h4>Engineer’s message</h4><p id="input"></p><h4>Server Guy’s answer</h4><p id="answer"></p><details><summary>Decision proposals and automatic checks</summary><pre id="proposals"></pre><ul id="checks"></ul></details><details><summary>Recorded state before / after</summary><pre id="state"></pre></details></section>
-        <section class="answer-review" aria-labelledby="answer-review-title"><header class="review-section-heading"><h4 id="answer-review-title">Review this answer</h4><button id="judge" class="secondary" type="button">Ask LLM for advice…</button></header><div class="review-columns">
-          <form id="human-form"><h4>Your verdict</h4><div class="form-row"><label>Reviewer<input id="reviewer" required maxlength="100" autocomplete="name"></label><label>Verdict<select id="verdict"><option value="pass">Pass</option><option value="fail">Fail</option><option value="needs-discussion">Needs discussion</option></select></label></div><label>Reason<textarea id="reason" required maxlength="5000" rows="3" placeholder="What agrees with or violates the expected behavior?"></textarea></label><div class="save-row"><button class="primary" type="submit">Save human review</button><span id="saved" role="status"></span></div></form>
-          <section class="judge" aria-labelledby="judge-title"><h4 id="judge-title">LLM advice <span id="judge-verdict" class="badge"></span></h4><p id="judge-result" class="judgment">No advice yet. Ask the LLM for a second opinion.</p><p id="judge-meta" class="footnote"></p><p class="footnote">Advice only. Your verdict stays yours.</p></section>
-        </div></section></div>
-      </article></div></div>
+
+    <section id="reviews-panel" aria-labelledby="reviews-title" hidden>
+      <div class="panel-heading">
+        <div><h2 id="reviews-title" tabindex="-1">Eval runs</h2><p>Saved Server Guy answers, not browser test results. Run evals to generate answers; judge saved answers separately.</p></div>
+        <label class="reviewer-field">Reviewing as<input id="reviewer" maxlength="100" autocomplete="name" placeholder="Your name"></label>
+      </div>
+      <p id="bulk-result" class="notice" role="status"></p>
+      <div id="empty-reviews" class="empty" hidden><p>No saved live eval answers yet.</p><p class="footnote">Run Live agent evals to create the first run. Each run needs explicit spending confirmation.</p><button id="empty-choose" class="secondary" type="button">Choose cases to run…</button></div>
+      <div id="review-content" class="review-layout" hidden>
+        <aside class="review-sidebar" aria-label="Runs and answers">
+          <h3 class="side-heading">Runs</h3>
+          <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
+          <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
+          <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          <div id="answers-block" class="answers-block">
+            <div class="answers-heading"><input id="select-all" type="checkbox" aria-label="Select all shown answers"><h3>Answers</h3><span id="answers-total"></span></div>
+            <div class="filters" role="group" aria-label="Filter answers"><button type="button" data-filter="attention" aria-pressed="true">Needs attention <span></span></button><button type="button" data-filter="failures" aria-pressed="false">Failures <span></span></button><button type="button" data-filter="cleared" aria-pressed="false">LLM-cleared <span></span></button><button type="button" data-filter="reviewed" aria-pressed="false">Human reviewed <span></span></button><button type="button" data-filter="all" aria-pressed="false">All <span></span></button></div>
+            <ul id="answer-list" class="answer-list" aria-label="Answers in selected run"></ul>
+            <p id="no-answers" class="side-empty" hidden></p>
+            <p class="side-hint">J / K move between answers · ⌘↩ saves a verdict</p>
+          </div>
+        </aside>
+        <article class="review-main">
+          <header id="run-header" class="run-header">
+            <div class="run-title-row"><div><h3 id="run-title"></h3><p id="run-meta"></p><p id="run-repeats" class="footnote" hidden></p></div><div class="run-actions"><span id="run-archived" class="chip" hidden>Archived</span><button id="judge-run" class="primary" type="button">Judge run…</button><button id="archive-run" class="secondary" type="button">Archive run</button></div></div>
+            <p id="triage-summary" class="triage-summary"></p>
+            <div class="triage-help"><button id="spot-check" class="text-button" type="button">Spot-check a cleared answer</button><details><summary>How triage works</summary><p>Needs attention includes unjudged answers, failures and uncertain judgments. LLM-cleared answers passed the current judge policy and recorded code checks; they are not human-approved. Older advice stays visible but needs rejudging. Human verdicts remain separate and never override failed code checks.</p><p>Before relying on clearance, compare the judge with your own labels on a small set including known failures. Then periodically spot-check cleared answers: the judge can be confidently wrong. Spot-checking opens a random cleared answer; it does not save a verdict.</p></details></div>
+            <p id="archive-error" class="error" role="alert" hidden>Run metadata could not be read. The run stays visible; archiving is disabled until the file is repaired.</p>
+            <div class="progress"><div id="progress-bar" class="progress-bar" role="img"><span class="seg pass"></span><span class="seg fail"></span><span class="seg discuss"></span></div><p id="progress-text"></p></div>
+          </header>
+          <p id="empty-answers" class="empty" hidden>No answers match this filter. Open All or spot-check an LLM-cleared answer.</p>
+          <section id="answer-detail" class="answer-card" aria-labelledby="case-title">
+            <header class="answer-header">
+              <div><h3 id="case-title"></h3><p id="case-sub"></p><button id="rerun-case" class="secondary small" type="button">Run case again…</button><p id="rerun-unavailable" class="footnote" hidden>This case is no longer in the current casebook.</p></div>
+              <nav class="answer-nav" aria-label="Answer navigation"><span id="answer-position"></span><button id="prev-answer" class="secondary small" type="button">Previous</button><button id="next-answer" class="secondary small" type="button">Next</button></nav>
+            </header>
+            <div class="status-strip"><span id="triage-chip" class="chip"></span><span id="automatic" class="chip"></span><span id="human-chip" class="chip"></span><span id="llm-chip" class="chip llm" hidden></span></div>
+            <p id="triage-reason" class="triage-reason"></p>
+            <section class="rubric" aria-labelledby="rubric-title"><h4 id="rubric-title">Expected behavior</h4><p id="rubric"></p></section>
+            <section class="transcript" aria-label="Saved conversation">
+              <div id="context" class="context" hidden><h4>Decisions already recorded before this message</h4><ul id="context-list"></ul></div>
+              <div class="turn"><h4>Engineer</h4><div id="input" class="turn-body"></div></div>
+              <div class="turn agent"><h4>Server Guy</h4><div id="answer" class="turn-body"></div><p id="answer-error" class="error" hidden></p></div>
+              <div class="proposals"><h4>Proposed decisions</h4><ul id="proposals"></ul><p id="no-proposals" class="muted">None proposed.</p></div>
+              <div class="disclosures"><details><summary id="checks-summary">Automatic checks</summary><ul id="checks"></ul></details><details><summary>Recorded state before / after</summary><pre id="state"></pre></details></div>
+            </section>
+            <section id="advice" class="advice" aria-labelledby="advice-title">
+              <header><h4 id="advice-title">LLM judgment</h4><span id="judge-verdict" class="chip llm" hidden></span><span id="judge-meta" class="footnote"></span><button id="judge" class="secondary small" type="button">Judge answer…</button></header>
+              <p id="judge-result" class="judgment"></p>
+              <p class="footnote">Advisory only. It never fills in or changes your verdict.</p>
+            </section>
+            <form id="human-form" class="verdict-form" aria-labelledby="verdict-title">
+              <h4 id="verdict-title">Your verdict</h4>
+              <fieldset class="segmented"><legend class="visually-hidden">Verdict</legend><label><input type="radio" name="verdict" value="pass" required>Pass</label><label><input type="radio" name="verdict" value="fail">Fail</label><label><input type="radio" name="verdict" value="needs-discussion">Needs discussion</label></fieldset>
+              <label class="field">Reason<textarea id="reason" required maxlength="5000" rows="3" placeholder="What agrees with or violates the expected behavior?"></textarea></label>
+              <div class="save-row"><button id="save-verdict" class="primary" type="submit">Save verdict</button><span id="saved" role="status"></span><button id="next-pending" class="text-button" type="button" hidden>Next needing attention</button></div>
+            </form>
+            <p id="unreviewable" class="unreviewable" hidden>This answer failed before Server Guy replied, so there is nothing to grade or judge.</p>
+          </section>
+        </article>
+      </div>
     </section>
   </main>
+
+  <div id="selection-bar" class="selection-bar" role="toolbar" aria-label="Selected answers" hidden>
+    <span id="selection-count" role="status"></span>
+    <button id="bulk-judge" class="primary" type="button">Judge selected…</button>
+    <button id="bulk-human" class="secondary" type="button">Set human verdict…</button>
+    <button id="selection-clear" class="text-button" type="button">Clear</button>
+  </div>
+
   <dialog id="journey-picker" class="picker" aria-labelledby="journey-summary">
     <header class="dialog-heading"><h2 id="journey-summary">Choose browser journeys</h2><button class="text-button" data-close="journey-picker" aria-label="Close journey selection">Close</button></header>
     <p class="muted">Desktop checks with synthetic responses. No model calls.</p>
@@ -56,10 +115,26 @@
   <dialog id="eval-picker" class="picker" aria-labelledby="eval-summary">
     <header class="dialog-heading"><h2 id="eval-summary">Choose live eval cases</h2><button class="text-button" data-close="eval-picker" aria-label="Close eval selection">Close</button></header>
     <p class="muted">Real Server Guy agent responses, not browser tests. Each repetition starts fresh.</p>
-    <div class="selection-actions"><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <div class="selection-actions"><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
     <div class="picker-body"><fieldset><legend class="visually-hidden">Live eval cases</legend><div id="eval-options" class="selection-list"></div></fieldset></div>
     <footer class="picker-footer"><span id="eval-count" role="status"></span><button id="run-evals" class="primary">Review and run live evals…</button></footer>
   </dialog>
-  <dialog id="bulk-human-dialog" aria-labelledby="bulk-human-title"><h2 id="bulk-human-title">Apply a human verdict</h2><p class="muted">Same verdict and reason for the selected answers. Previous reviews are kept.</p><p id="bulk-error" class="error" role="alert" hidden></p><form id="bulk-human-form"><div class="form-row"><label>Bulk reviewer<input id="bulk-reviewer" required maxlength="100" autocomplete="name"></label><label>Bulk verdict<select id="bulk-verdict"><option value="pass">Pass</option><option value="fail">Fail</option><option value="needs-discussion">Needs discussion</option></select></label></div><label>Shared reason<textarea id="bulk-reason" required maxlength="5000" rows="3"></textarea></label><div class="dialog-actions"><button class="secondary" type="button" data-close="bulk-human-dialog">Cancel</button><button id="bulk-save" class="primary" type="submit">Save human verdict</button></div></form></dialog>
-  <dialog id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Use your subscription?</h2><p id="confirm-description"></p><div class="form-row"><label>Model<input id="run-model" spellcheck="false" required pattern="[a-zA-Z0-9_.-]{1,100}"></label><label>Reasoning effort<select id="run-effort"><option>off</option><option>minimal</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label></div><details><summary>Selection and limits</summary><p id="confirm-selection"></p><p id="confirm-limits"></p><p>No API billing fallback. Stopping cannot refund requests already sent.</p></details><label class="consent"><input id="consent" type="checkbox">I want to spend subscription usage on this run.</label><div class="dialog-actions"><button id="cancel" class="secondary">Cancel</button><button id="confirm-run" class="primary" disabled>Start run</button></div></dialog>
+  <dialog id="bulk-human-dialog" aria-labelledby="bulk-human-title">
+    <h2 id="bulk-human-title">Set a human verdict</h2>
+    <p class="muted">The same verdict and reason is saved for every selected answer. Earlier verdicts are kept in the history.</p>
+    <p id="bulk-error" class="error" role="alert" hidden></p>
+    <form id="bulk-human-form">
+      <label class="field">Reviewer<input id="bulk-reviewer" required maxlength="100" autocomplete="name"></label>
+      <span class="field-label" id="bulk-verdict-label">Verdict</span><fieldset class="segmented" aria-labelledby="bulk-verdict-label"><legend class="visually-hidden">Bulk verdict</legend><label><input type="radio" name="bulk-verdict" value="pass" required>Pass</label><label><input type="radio" name="bulk-verdict" value="fail">Fail</label><label><input type="radio" name="bulk-verdict" value="needs-discussion">Needs discussion</label></fieldset>
+      <label class="field">Shared reason<textarea id="bulk-reason" required maxlength="5000" rows="3"></textarea></label>
+      <div class="dialog-actions"><button class="secondary" type="button" data-close="bulk-human-dialog">Cancel</button><button id="bulk-save" class="primary" type="submit">Save verdict</button></div>
+    </form>
+  </dialog>
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">Use your subscription?</h2><p id="confirm-description" class="muted"></p>
+    <div class="form-row"><label class="field">Model<input id="run-model" spellcheck="false" required pattern="[a-zA-Z0-9_.-]{1,100}"></label><label class="field">Reasoning effort<select id="run-effort"><option>off</option><option>minimal</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label></div>
+    <details><summary>Selection and limits</summary><p id="confirm-selection"></p><p id="confirm-limits"></p><p>No API billing fallback. Stopping cannot refund requests already sent.</p></details>
+    <label class="consent"><input id="consent" type="checkbox">I want to spend subscription usage on this run.</label>
+    <div class="dialog-actions"><button id="cancel" class="secondary">Cancel</button><button id="confirm-run" class="primary" disabled>Start run</button></div>
+  </dialog>
 </body></html>

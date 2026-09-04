@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { automaticFailure, hasAutomaticEvidence, JUDGE_PROMPT_VERSION } from "../evals/judge-policy.ts";
 
 const safeName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,180}$/);
 const caseSchema = z.object({
@@ -36,6 +37,27 @@ const savedReviewSchema = z.discriminatedUnion("type", [
   z.object({ ...reviewFields, type: z.literal("llm"), model: z.string(), effort: z.string(), promptVersion: z.string(), piVersion: z.string() }),
 ]);
 const runStateSchema = z.strictObject({ sourceHash: z.string(), archived: z.boolean() });
+
+export function triageCase(record: SavedCase, reviews: z.infer<typeof savedReviewSchema>[]) {
+  const failure = automaticFailure(record);
+  if (failure) return { status: "failures", label: "Failed checks", reason: failure };
+  const key = caseKey(record);
+  const human = reviews.filter((review) => review.key === key && review.type === "human").at(-1);
+  if (human) {
+    if (human.verdict === "fail") return { status: "failures", label: "Human fail", reason: human.reason };
+    if (human.verdict === "needs-discussion") return { status: "needs-review", label: "Needs review", reason: human.reason };
+    return { status: "reviewed", label: "Human pass", reason: human.reason };
+  }
+  const llm = reviews.filter((review) => review.key === key && review.type === "llm").at(-1);
+  if (!llm || llm.type !== "llm" || llm.promptVersion !== JUDGE_PROMPT_VERSION) {
+    return { status: "needs-judge", label: "Not judged", reason: llm ? "Older judge policy. Judge again to use current triage rules." : "No judgment yet. Run the judge or review this answer yourself." };
+  }
+  if (llm.verdict === "fail") return { status: "failures", label: "LLM fail", reason: llm.reason };
+  if (llm.verdict === "needs-discussion" || !hasAutomaticEvidence(record)) {
+    return { status: "needs-review", label: "Needs review", reason: hasAutomaticEvidence(record) ? llm.reason : "Automatic evidence is missing; a model pass cannot clear this answer." };
+  }
+  return { status: "cleared", label: "LLM-cleared", reason: llm.reason };
+}
 
 // The dashboard serves known artifacts, never arbitrary workspace paths or symlinks.
 export function directory(path: string) {
@@ -98,7 +120,9 @@ export function listReports(root: string) {
       const { report, hash, path } = loadReport(root, run);
       let archived = false; let archiveError = false;
       try { archived = runArchived(path, hash); } catch { archiveError = true; }
-      return [{ run, ...report, hash, reviews: reviewsFor(path, hash), archived, archiveError }];
+      const reviews = reviewsFor(path, hash);
+      const triage = Object.fromEntries(report.results.map((record) => [caseKey(record), triageCase(record, reviews)]));
+      return [{ run, ...report, hash, reviews, triage, archived, archiveError }];
     } catch { return []; } // Foreign/incomplete directories are not dashboard runs.
   }).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
