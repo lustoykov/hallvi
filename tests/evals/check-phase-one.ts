@@ -1,4 +1,4 @@
-import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../src/server/types";
+import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../../src/server/types";
 import type { PhaseOneEvalCase } from "./phase-one-cases";
 
 /** Exact structural/state checks only. Meaning is deliberately a separate review. */

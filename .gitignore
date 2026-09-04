@@ -7,6 +7,7 @@ node_modules/
 .next/
 out/
 coverage/
-eval-results/
+tests/results/
+.impeccable/
 *.tsbuildinfo
 .env.local

@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
 
-const source = dirname(dirname(fileURLToPath(import.meta.url)));
+const source = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const port = Number(process.argv[2] ?? 3111);
 const loginMode = process.argv[3] ?? "failure";
 if (!["success", "failure"].includes(loginMode)) throw new Error("Choose success or failure for QA login.");

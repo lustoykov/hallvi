@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Desktop developer tool. Inherits Server Guy's navy/blue palette and restrained list UI.
+     First viewport: what can run, its cost and CI policy, then the most recent evidence.
+     Saved-output review never executes a model until the separate confirmation. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="testing-token" content="CSRF_TOKEN">
+  <title>Server Guy Testing</title><link rel="stylesheet" href="/dashboard.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><strong>Server Guy <span>/ Testing</span></strong><nav aria-label="Resources"><a href="/guide" target="_blank">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app</a></nav></header>
+  <main>
+    <div class="heading"><div><h1>Server Guy testing</h1><p>Run checks and review saved answers.</p></div><span class="local">Local developer tool</span></div>
+    <div id="error" class="error" role="alert" hidden></div>
+    <nav class="sections" aria-label="Testing sections"><button id="runs-tab" aria-pressed="true">Run checks</button><button id="reviews-tab" aria-pressed="false">Review answers <span id="pending"></span></button></nav>
+    <section id="runs-panel" aria-labelledby="runs-tab">
+      <div id="active" class="active" role="status" hidden><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
+      <table class="suites"><caption class="visually-hidden">Available test suites and model usage</caption><thead><tr><th>Suite</th><th>Model usage</th><th>CI policy</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
+      <p class="footnote">Browser tests run Server Guy with synthetic Pi, GitHub and login responses. No Codex or Pi model calls. GitHub-hosted CI still consumes Actions minutes.</p>
+      <section class="history"><h2>Recent runs</h2><p id="empty-runs" class="muted">Nothing has run from this dashboard yet. Existing saved evals are in Review answers.</p><div id="history"></div><details id="log-details" hidden><summary>Selected run output</summary><pre id="log"></pre></details></section>
+      <details class="file-guide"><summary>Where everything lives</summary><dl><dt>Application tests</dt><dd><code>tests/*.test.ts(x)</code></dd><dt>Browser journeys</dt><dd><code>tests/e2e/</code> · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></details>
+    </section>
+    <section id="reviews-panel" aria-labelledby="reviews-tab" hidden>
+      <div class="review-heading"><div><h2>Review saved answers</h2><p>Automatic checks, LLM advice and your judgment stay separate.</p></div><label>Saved eval run<select id="report"></select></label></div>
+      <p id="empty-reviews" class="muted" hidden>No saved eval answers yet. Run Live agent evals to create a casebook.</p>
+      <div id="review-content"><p id="report-meta" class="footnote"></p><div class="review-layout"><aside><ul id="cases" aria-label="Saved cases"></ul></aside><article>
+        <header class="case-heading"><h3 id="case-title"></h3><span id="automatic" class="badge"></span></header>
+        <section class="evidence"><h4>Expected behavior</h4><p id="rubric"></p><h4>Engineer’s message</h4><p id="input"></p><h4>Server Guy’s answer</h4><p id="answer"></p><details><summary>Decision proposals and automatic checks</summary><pre id="proposals"></pre><ul id="checks"></ul></details><details><summary>Recorded state before / after</summary><pre id="state"></pre></details></section>
+        <form id="human-form"><h4>Your review</h4><div class="form-row"><label>Reviewer<input id="reviewer" required maxlength="100" autocomplete="name"></label><label>Verdict<select id="verdict"><option value="pass">Pass</option><option value="fail">Fail</option><option value="needs-discussion">Needs discussion</option></select></label></div><label>Reason<textarea id="reason" required maxlength="5000" rows="3" placeholder="What agrees with or violates the expected behavior?"></textarea></label><div class="save-row"><button class="primary" type="submit">Save human review</button><span id="saved" role="status"></span></div></form>
+        <details class="judge"><summary>Ask an LLM judge · uses subscription</summary><p>Reviews this saved answer only. Does not rerun Server Guy or replace your verdict. A model can be wrong or biased—even when it grades another model.</p><div class="form-row"><label>Judge model<input id="judge-model" spellcheck="false" placeholder="gpt-5.6-sol"></label><label>Effort<select id="judge-effort"><option>off</option><option>minimal</option><option>low</option><option>medium</option><option selected>high</option><option>xhigh</option><option>max</option></select></label></div><button id="judge" class="secondary" type="button">Review this answer with LLM…</button><p id="judge-result" class="judgment">No LLM judgment for this answer.</p></details>
+      </article></div></div>
+    </section>
+  </main>
+  <dialog id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Use your subscription?</h2><p id="confirm-description"></p><p>No API billing fallback. Stopping prevents further work but cannot refund requests already sent.</p><label class="consent"><input id="consent" type="checkbox">I want to spend subscription usage on this run.</label><div class="dialog-actions"><button id="cancel" class="secondary">Cancel</button><button id="confirm-run" class="primary" disabled>Start run</button></div></dialog>
+</body></html>

@@ -8,8 +8,14 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
-    "test": "vitest run",
-    "eval:pi": "vitest run --config evals/vitest.config.ts"
+    "test": "vitest run --config tests/vitest.config.mjs",
+    "test:ui": "vitest --ui --config tests/vitest.config.mjs",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:e2e:smoke": "npm run test:e2e -- --grep @smoke",
+    "test:e2e:ui": "npm run test:e2e -- --ui",
+    "test:dashboard": "node --experimental-strip-types tests/dashboard/server.ts",
+    "eval:pi": "vitest run --config tests/evals/vitest.config.ts",
+    "eval:judge": "vitest run --config tests/evals/judge.config.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.84.4",
@@ -25,10 +31,12 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "24.5.2",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
+    "@vitest/ui": "4.1.11",
     "drizzle-kit": "0.31.10",
     "eslint": "9.36.0",
     "eslint-config-next": "16.3.3",

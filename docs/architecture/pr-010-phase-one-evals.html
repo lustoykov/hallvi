@@ -102,12 +102,13 @@
     </div>
     <div>
       <h2>What stays outside</h2>
-      <p>Your application database and transcripts are not read. No GitHub calls, new runtime, worker, UI flow or eval service. The existing OAuth file remains the credential source; normal Pi refresh may update it. Tokens are not copied into reports.</p>
+      <p>Your application database and transcripts are not read. No GitHub calls, new runtime, worker or production UI flow. The existing OAuth file remains the credential source; normal Pi refresh may update it. Tokens are not copied into reports.</p>
       <p>The runner records accepted proposals, not a full SDK trace. Model quality is not certified by eight examples or by a second model's opinion.</p>
     </div>
   </section>
   <footer>
-    Source: <a href="../testing/phase-one-acceptance.md">Phase 1 acceptance contract</a> · <a href="../../evals/phase-one-cases.ts">Cases</a> · <a href="../../evals/phase-one.eval.ts">Runner</a><br>
+    Developer entry point: <code>npm run test:dashboard</code> opens a separate localhost page for test runs and saved-answer review. The optional isolated Pi judge adds advisory records beside human reviews; it does not replace them. Desktop Playwright checks use synthetic providers, separate from this live-model flow.<br>
+    Source: <a href="../testing/phase-one-acceptance.md">Phase 1 acceptance contract</a> · <a href="../../tests/evals/phase-one-cases.ts">Cases</a> · <a href="../../tests/evals/phase-one.eval.ts">Runner</a> · <a href="../../tests/README.md">Test runners and dashboard</a><br>
     Static wide architecture view · Server Guy diagram profile · No animation or external scripts.
   </footer>
 </main>

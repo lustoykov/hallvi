@@ -1,0 +1,158 @@
+import { spawn, execFileSync } from "node:child_process";
+import type { ChildProcess, SpawnOptions } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createServer } from "node:http";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { z } from "zod";
+import { directory, findCase, humanReviewSchema, listReports, readJson, saveReview, writeJson } from "./results.ts";
+
+export const suites = [
+  { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No model calls", ci: "Every PR" },
+  { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No model calls", ci: "Every PR" },
+  { id: "e2e", name: "All browser journeys", command: "npm run test:e2e", scope: "Desktop journeys with synthetic Pi, GitHub and login", cost: "No model calls", ci: "Manual only" },
+  { id: "live", name: "Live agent evals", command: "npm run eval:pi", scope: "8 cases through Server Guy’s real Pi adapter and SQLite", cost: "Uses ChatGPT subscription", ci: "Local opt-in only" },
+] as const;
+const startSchema = z.strictObject({
+  suite: z.enum(["unit", "smoke", "e2e", "live", "judge"]),
+  consent: z.literal(true).optional(),
+  run: z.string().optional(), hash: z.string().optional(), key: z.string().optional(),
+  model: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/).optional(),
+  effort: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+});
+export type StartRequest = z.infer<typeof startSchema>;
+type Run = { id: string; suite: string; startedAt: string; finishedAt?: string; status: string; log: string; commit: string; dirty: boolean; exitCode?: number | null };
+export function commandFor(input: StartRequest) {
+  const commands = { unit: "test", smoke: "test:e2e:smoke", e2e: "test:e2e", live: "eval:pi", judge: "eval:judge" };
+  const env: Record<string, string> = {};
+  if (input.suite === "live" || input.suite === "judge") {
+    if (!input.consent) throw new Error("Confirm subscription usage before starting");
+    if (input.suite === "live") {
+      if (!input.model || !input.effort) throw new Error("Confirm the model and effort before starting");
+      Object.assign(env, { SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_REPEATS: "1",
+        PI_EVAL_EXPECTED_MODEL: input.model, PI_EVAL_EXPECTED_EFFORT: input.effort });
+    }
+    else {
+      if (!input.run || !input.hash || !input.key || !input.model || !input.effort) throw new Error("Select a saved answer and judge settings");
+      Object.assign(env, { SERVER_GUY_LIVE_JUDGE: "1", PI_JUDGE_RUN: input.run, PI_JUDGE_HASH: input.hash,
+        PI_JUDGE_CASE: input.key, PI_JUDGE_MODEL: input.model, PI_JUDGE_EFFORT: input.effort });
+    }
+  }
+  return { args: ["run", commands[input.suite]], env };
+}
+
+export type Launch = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+export function createDashboard(root: string, launch: Launch = spawn) {
+  const storage = directory(join(root, "tests/results"));
+  const historyDir = directory(join(storage, "runs"));
+  const token = randomUUID();
+  let active: Run | null = null;
+  let child: ReturnType<typeof spawn> | null = null;
+  let cancelActive: (() => void) | null = null;
+  let origin = "";
+  function history() {
+    return readdirSync(historyDir).filter((name) => /^[a-f0-9-]+\.json$/.test(name)).flatMap((name) => {
+      try {
+        const run = readJson(join(historyDir, name)) as Run;
+        if (run.status === "running" && run.id !== active?.id) return [{ ...run, status: "interrupted" }];
+        return [run];
+      } catch { return []; }
+    }).sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 30);
+  }
+  function start(input: StartRequest) {
+    if (active) throw new Error("A check is already running. Wait for it to finish.");
+    const command = commandFor(input);
+    if (input.suite === "judge") findCase(root, input.run!, input.hash!, input.key!);
+    const run: Run = { id: randomUUID(), suite: input.suite, startedAt: new Date().toISOString(), status: "running", log: "Starting…\n",
+      commit: execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+      dirty: Boolean(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()),
+    };
+    active = run;
+    const path = join(historyDir, `${run.id}.json`);
+    writeJson(path, run);
+    // Never inherit opt-in switches from the dashboard's shell for ordinary runs.
+    const env = { ...process.env, SERVER_GUY_LIVE_EVALS: "", SERVER_GUY_LIVE_JUDGE: "", ...command.env, FORCE_COLOR: "0" };
+    try { child = launch("npm", command.args, { cwd: root, env, detached: true, stdio: ["ignore", "pipe", "pipe"] }); }
+    catch (error) {
+      run.status = "failed"; run.finishedAt = new Date().toISOString(); run.log = "Could not start the test runner.";
+      writeJson(path, run); active = null; throw error;
+    }
+    const processForRun = child;
+    const paid = input.suite === "live" || input.suite === "judge";
+    const log = (data: Buffer) => {
+      // SDK diagnostics may contain secrets. Live runs expose only completion and saved reports.
+      if (!paid) { run.log = (run.log + data.toString().replace(/\x1b\[[0-9;]*m/g, "")).slice(-40_000); writeJson(path, run); }
+    };
+    child.stdout?.on("data", log); child.stderr?.on("data", log);
+    let timedOut = false;
+    let cancelled = false;
+    let forceKill: ReturnType<typeof setTimeout> | undefined;
+    const kill = () => {
+      if (processForRun.pid) {
+        try { process.kill(-processForRun.pid, "SIGTERM"); } catch { /* stopped */ }
+        forceKill = setTimeout(() => { try { process.kill(-processForRun.pid!, "SIGKILL"); } catch { /* stopped */ } }, 3000);
+      }
+    };
+    cancelActive = () => { cancelled = true; kill(); };
+    const timeout = setTimeout(() => { timedOut = true; kill(); }, 15 * 60_000);
+    const finish = (code: number | null) => {
+      if (run.finishedAt) return;
+      clearTimeout(timeout);
+      if (forceKill) clearTimeout(forceKill);
+      run.status = timedOut ? "timed-out" : cancelled ? "cancelled" : code === 0 ? "passed" : "failed";
+      run.exitCode = code; run.finishedAt = new Date().toISOString();
+      if (paid) run.log = code === 0 ? "Run completed. Open Review answers to inspect automatic checks and separate review verdicts.\n" : "Run failed. The runner does not rerun cases or switch models. Check Settings/account access and saved results before another run.\n";
+      writeJson(path, run); active = null; child = null; cancelActive = null;
+    };
+    child.on("error", () => finish(null)); child.on("close", finish);
+    return run;
+  }
+  const server = createServer(async (request, response) => {
+    response.setHeader("Cache-Control", "no-store");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    const json = (value: unknown, status = 200) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(value)); };
+    if (request.headers.host !== new URL(origin).host || (request.headers.origin && request.headers.origin !== origin)) { json({ error: "Local same-origin requests only" }, 403); return; }
+    const url = new URL(request.url!, origin);
+    try {
+      if (request.method === "GET" && ["/", "/dashboard.js", "/dashboard.css"].includes(url.pathname)) {
+        const name = url.pathname === "/" ? "dashboard.html" : url.pathname.slice(1);
+        response.setHeader("Content-Type", name.endsWith("html") ? "text/html; charset=utf-8" : name.endsWith("css") ? "text/css" : "text/javascript");
+        response.end(readFileSync(new URL(name, import.meta.url), "utf8").replace("CSRF_TOKEN", token)); return;
+      }
+      if (request.method === "GET" && url.pathname === "/guide") {
+        response.setHeader("Content-Type", "text/plain; charset=utf-8");
+        response.end(readFileSync(join(root, "docs/testing/phase-one-acceptance.md"))); return;
+      }
+      if (request.headers["x-sg-testing-token"] !== token) { json({ error: "Reload the dashboard to reconnect" }, 403); return; }
+      if (request.method === "GET" && url.pathname === "/api/state") {
+        let defaults = { model: "gpt-5.6-sol", effort: "high" };
+        try {
+          const settings = readJson(join(process.env.SERVER_GUY_CONFIG_DIR ?? join(root, ".server-guy"), "pi-settings.json"));
+          defaults = z.object({ model: z.string(), effort: z.string() }).parse({ model: settings.modelId, effort: settings.reasoningEffort });
+        } catch { /* No saved settings: display defaults, not an authenticated claim. */ }
+        json({ suites, active, history: history(), reports: listReports(root), defaults }); return;
+      }
+      if (request.method !== "POST" || !["/api/start", "/api/review", "/api/stop"].includes(url.pathname)) { json({ error: "Not found" }, 404); return; }
+      if (request.headers.origin !== origin || !request.headers["content-type"]?.startsWith("application/json")) { json({ error: "Same-origin JSON required" }, 403); return; }
+      let text = "";
+      for await (const chunk of request) { text += chunk; if (Buffer.byteLength(text) > 16_000) throw new Error("Request too large"); }
+      const body = JSON.parse(text);
+      if (url.pathname === "/api/stop") { z.strictObject({}).parse(body); cancelActive?.(); json({ stopping: Boolean(active) }); return; }
+      if (url.pathname === "/api/start") { json(start(startSchema.parse(body)), 202); return; }
+      const review = z.strictObject({ run: z.string(), hash: z.string(), key: z.string(), review: humanReviewSchema }).parse(body);
+      json(saveReview(root, review.run, review.hash, review.key, { type: "human", ...review.review }));
+    } catch { json({ error: "Could not complete this request. Check the selection, required fields and running check, then reload if results changed." }, 400); }
+  });
+  server.on("listening", () => { const address = server.address(); if (address && typeof address !== "string") origin = `http://127.0.0.1:${address.port}`; });
+  return { server, token, stop: () => { cancelActive?.(); server.close(); } };
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const root = process.cwd();
+  if (!existsSync(join(root, "tests/evals", "phase-one-cases.ts"))) throw new Error("Run from the Server Guy repository");
+  const dashboard = createDashboard(root);
+  dashboard.server.listen(4317, "127.0.0.1", () => console.log("Server Guy Testing: http://127.0.0.1:4317 (local only; no checks start automatically)"));
+  dashboard.server.on("error", (error) => { console.error(error.message); process.exitCode = 1; });
+  process.on("SIGINT", dashboard.stop); process.on("SIGTERM", dashboard.stop);
+}

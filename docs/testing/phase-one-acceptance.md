@@ -1,6 +1,6 @@
 # Phase 1 acceptance: repeatable desktop journeys
 
-Status: maintained acceptance contract and test plan, 2026-09-04. This is the single testing guide for Phase 1, consolidating the former setup/prototype/application QA reports. Vitest, disposable browser fixtures and an opt-in real-Pi casebook run today. A Playwright Test runner is still a follow-up. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance.
+Status: maintained acceptance contract and test plan, 2026-09-04. This is the single testing guide for Phase 1. Vitest, checked-in desktop Playwright journeys, an opt-in real-Pi casebook and a local testing dashboard run today. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance. All executable testing code, runner configurations and generated reports live under [tests/](../../tests/README.md).
 
 This guide owns acceptance cases, test/eval procedures, and dated verification evidence. The [journey](../user-journeys/01-application-launch.md) owns expected product behavior; the [roadmap](../../ROADMAP.md) owns development order and implementation status. Failures found here become linked roadmap work, not a competing build plan.
 
@@ -36,12 +36,13 @@ Technical help must accurately explain credential paths, shared versus separate 
 | Layer | Tool | What it proves |
 | --- | --- | --- |
 | Schemas, domain rules, transactions, login coordination | Existing Vitest | Deterministic rules, isolation, atomic writes, cancellation and failure handling. |
-| Browser journey through real routes and SQLite | Recommend Playwright Test | Forms, navigation, dialogs, visible errors, keyboard behavior, reload and recovery. Replace external Pi/GitHub calls with deterministic fixtures. |
+| Browser journey through real routes and SQLite | `npm run test:e2e`, Playwright Test | Forms, navigation, dialogs, visible errors, keyboard behavior, reload and recovery. External Pi/GitHub calls use deterministic fixtures. |
 | Real Pi behavior | Opt-in `npm run eval:pi`, using existing Vitest and the actual Pi adapter | Exact proposal/state assertions plus a separate human meaning review. A synthetic fixture cannot prove real model behavior. |
+| Meaning of a saved Server Guy answer | Human review; optional opt-in LLM judge | Rubric-based semantic review. LLM advice never changes automatic results, application state, or human sign-off. |
 
 Playwright provides [fixtures](https://playwright.dev/docs/test-fixtures), isolated [browser contexts](https://playwright.dev/docs/browser-contexts), and [failure traces](https://playwright.dev/docs/trace-viewer). Next.js also recommends E2E testing for [async Server Components](https://nextjs.org/docs/app/guides/testing). This fits our server-rendered entry pages and multi-screen workflow.
 
-Start with Vitest + Playwright Test, not an additional workflow engine. If the live-model casebook grows into a model/prompt comparison matrix, consider [Promptfoo's custom JavaScript provider](https://www.promptfoo.dev/docs/providers/custom-api/) calling our Pi adapter. That would not replace Pi, introduce AI SDK, or silently switch to API billing.
+Use Vitest + Playwright Test with the small casebook, not an additional evaluation platform or workflow engine. The local dashboard only launches fixed commands and reads/writes private result artifacts. It is not part of the production Next.js application.
 
 ## Current journey contract
 
@@ -78,18 +79,33 @@ No “nuke everything” browser endpoint is needed. For repeated automated runs
 
 ## Run today's checks
 
-From the repository:
+The easiest entry point is:
+
+```sh
+npm run test:dashboard
+```
+
+Open **http://127.0.0.1:4317**. Nothing runs automatically. **Run checks** shows each suite's scope, model usage, CI policy, recent runs and bounded logs. **Review answers** opens existing saved evals without rerunning Server Guy. **Where everything lives** is the file index. The page binds to loopback only, rejects foreign Host/Origin requests, requires same-origin JSON and a per-process token for controls, and runs one allowlisted command at a time. Do not expose it through a tunnel. Live SDK logs are deliberately not retained because they can contain sensitive diagnostics.
+
+CLI alternatives, from the repository:
 
 ```sh
 npm test
 npx tsc --noEmit
 npm run lint
+npm run test:e2e:smoke
+npm run test:e2e
+# Interactive runner UIs:
+npm run test:ui
+npm run test:e2e:ui
 ```
+
+Install Chromium once after `npm ci`: `npx playwright install chromium`. On Linux CI use `npx playwright install --with-deps chromium`. The dashboard and runner UIs require no model calls just to open or inspect saved output.
 
 Start a disposable desktop fixture in another terminal:
 
 ```sh
-node scripts/qa-fixture.mjs 3112 success fresh
+node tests/e2e/qa-fixture.mjs 3112 success fresh
 ```
 
 Open `http://127.0.0.1:3112/`. Each invocation creates a new temporary app copy, SQLite database and Pi/config directories. It does not copy `.server-guy`, `.env` or user credentials. The startup output names those directories. Stop with Ctrl+C; temporary files are retained for diagnosis. Use another free port from 3100–3999 for a separate run, never the user's port 3000.
@@ -118,19 +134,25 @@ Report each case as **passed**, **failed**, **partial**, **blocked**, or **not r
 
 This workflow authorizes audit/test work, not unrelated product fixes or new dependencies. Record reproducible defects for the next implementation pass. Automated browser submission of destructive actions must follow the active tool's confirmation policy; if blocked, test the UI up to confirmation and report API/domain coverage separately.
 
-## Playwright follow-up scope
+## Desktop automation and CI policy
 
-This specifies the planned runner's acceptance requirements. Its implementation status is tracked in the [roadmap](../../ROADMAP.md#configure-pi-explicitly).
+The [checked-in desktop suite](../../tests/e2e/phase-one.spec.ts) has eight application scenarios, plus a [dashboard review scenario](../../tests/e2e/dashboard.spec.ts). These cover selected branches of the contract, not every branch of all sixteen cases. Fresh setup/device-code variants, further evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
 
-- Install `@playwright/test` and add a desktop-only `test:e2e` command. Keep it distinct from `npm test` and opt-in live evaluations.
-- Port the case IDs above into tests using accessible labels/roles and state assertions, not fragile coordinates or exact generated-prose snapshots.
-- Give each worker its own fixture server, database, configuration and external-adapter state. Start each independent scenario with fresh data. A separate browser context does **not** isolate server-side SQLite or login state.
-- Keep traces/screenshots on failures in the synthetic environment. Do not upload real OAuth codes/tokens, account details, or private transcripts to CI artifacts.
-- Run deterministic checks in CI. A failed critical case blocks completion; retries must not hide a reproducible failure. Record test command, commit, fixture mode and evidence with each acceptance report.
+- One Chromium worker, desktop 1440 × 1000, no automatic test retries. Each application-suite worker owns a disposable app/database/configuration; scenarios use distinct repository identities and restore synthetic model preferences. Contexts isolate browser state; they do not by themselves isolate SQLite.
+- Tests assert UI behavior and saved state: priority provenance, exact replacement, provider retry recovery, application isolation, typed removal confirmation, disconnect/reuse and double-send handling. Accessible labels/roles are preferred over coordinates or generated-prose snapshots.
+- Reports live in `tests/results/browser-report/`; traces and screenshots in `tests/results/browser-artifacts/`. Open a saved report with `npx playwright show-report tests/results/browser-report`. Do not upload real OAuth codes/tokens, account details, or private transcripts.
+
+| Trigger | Checks | Model usage |
+| --- | --- | --- |
+| Every PR / push to main | Vitest, lint, TypeScript, production build, **two** browser smoke journeys | None; GitHub-hosted runners consume Actions minutes, not Codex/Pi credits. |
+| Manual GitHub Actions run with full suite selected | Above plus all desktop scenarios instead of smoke | None; synthetic adapters only. |
+| Local explicit start | Real Server Guy agent evals or one saved-answer LLM judgment | Uses configured ChatGPT subscription; never silently falls back to API billing. |
+
+The [workflow](../../.github/workflows/checks.yml) uploads only synthetic browser failure artifacts, retained seven days. Live evals and judge results are never uploaded by this workflow. Workflow configuration is not proof of a successful hosted CI run.
 
 ## Real Pi casebook and remaining Phase 1 gates
 
-The runnable [casebook](../../evals/phase-one-cases.ts) contains eight fixed inputs and meaning rubrics: greeting, explicit priority, question versus commitment, hypothetical, exact revision, unresolved conflict, same-message retraction, and quoted untrusted instructions. This is a small regression set, not a broad reliability benchmark.
+The runnable [casebook](../../tests/evals/phase-one-cases.ts) contains eight fixed inputs and meaning rubrics: greeting, explicit priority, question versus commitment, hypothetical, exact revision, unresolved conflict, same-message retraction, and quoted untrusted instructions. This is a small regression set, not a broad reliability benchmark.
 
 ```sh
 # Eight real Pi turns using your saved Server Guy model/effort and subscription.
@@ -142,11 +164,19 @@ SERVER_GUY_LIVE_EVALS=1 PI_EVAL_REPEATS=2 npm run eval:pi
 
 Without opt-in, the command fails before running the suite. Repeats default to one and are limited to 1–5 (8–40 turns). A turn may involve multiple model requests because of tool calls. `npm test` never discovers the `.eval.ts` file and never calls the provider. No additional eval library or API key is needed.
 
-The [runner](../../evals/phase-one.eval.ts) seeds a private temporary SQLite database, snapshots the saved model preferences and invokes the real `sendChatMessage → askPi → SQLite transaction` path. It does not read your existing applications/transcripts or contact GitHub. The configured credential file remains the auth source; normal Pi OAuth refresh may update it. Credentials are not copied into the temporary configuration or serialized into reports. There are no automatic provider retries or model/billing fallbacks; a Pi runtime/provider failure stops further turns.
+The [runner](../../tests/evals/phase-one.eval.ts) seeds a private temporary SQLite database, snapshots the saved model preferences and invokes the real `sendChatMessage → askPi → SQLite transaction` path. It does not read your existing applications/transcripts or contact GitHub. The configured credential file remains the auth source; normal Pi OAuth refresh may update it. Credentials are not copied into temporary configuration or reports. The runner does not retry cases or change models/billing; a Pi runtime/provider failure stops later turns. **Pi's existing internal retries remain active in the actual application adapter**, so tool calls and retries can produce multiple requests per turn. Eight cases does not mean eight requests.
 
-Each run creates a git-ignored `eval-results/<run>/results.json` and `review.md`: fixed inputs, current context, accepted tool proposals, resulting records, timings, model/effort, Pi version, commit/dirty flag and source hashes. It records accepted proposals, not a full SDK trace. Temporary state remains for diagnosis. Never publish results containing real private data.
+Each run creates a git-ignored `tests/results/evals/<run>/results.json` and `review.md`: fixed inputs, current context, accepted tool proposals, resulting records, timings, model/effort, Pi version, commit/dirty flag and source hashes. It records accepted proposals, not a full SDK trace. Temporary state remains for diagnosis. Never publish results containing real private data.
 
-The [exact checks](../../evals/check-phase-one.ts) verify proposal count, supported shape, replacement IDs, source-message provenance, one persisted message pair and supersession. Meaning is a separate **pending human review** against each case's rubric. Exit code zero means the automated checks passed, not that the model is semantically correct or the phase complete. An assistant can suggest a verdict but cannot supply human sign-off. Review `review.md`, record pass/fail with reasons, and retain that reviewed baseline before accepting prompt/tool/model changes. Do not assert exact generated wording.
+The [exact checks](../../tests/evals/check-phase-one.ts) verify proposal count, supported shape, replacement IDs, source-message provenance, one persisted message pair and supersession. Meaning is a separate **pending human review** against each case's rubric. Exit code zero means the automated checks passed, not that the model is semantically correct or the phase complete. An assistant can suggest a verdict but cannot supply human sign-off. Use **Review answers** in the dashboard to save pass/fail/needs-discussion with your name and reason. Do not assert exact generated wording.
+
+### Reviewing saved output, with optional LLM advice
+
+Choose a saved run and case. Read its original rubric, engineer message, answer, proposals and before/after state. Human reviews append private JSON records in `tests/results/evals/<run>/reviews/`. They never rewrite `results.json` or the original `review.md`. Correcting a verdict appends another record; the dashboard shows the latest. A source-data hash prevents attaching a review to changed results. Existing handwritten notes in `review.md` or `assistant-review.md` are not automatically imported as human approval.
+
+For a second opinion, expand **Ask an LLM judge**, choose model/effort and confirm usage. This uses a separate Pi session to judge **one saved Server Guy answer**, not to rerun the application. The judge receives the saved rubric/input/answer, not the current casebook or your previous verdict. It has only a constrained `submit_judgment` tool, no file/browser/application tools, no imported extensions/instructions, and disabled session/provider retries. Its verdict, reason, model/effort, Pi version, prompt version and source hash append as **LLM advice**, never human sign-off. Isolation prevents tool side effects; it cannot guarantee freedom from bias or prompt-injection influence on a rating. A completed judge run can pass operationally while advising that the answer fails semantically.
+
+Both live controls require a separate explicit consent click showing the intended model/effort and planned case count. The live runner refuses settings that changed after confirmation. Opening or reviewing reports spends nothing. Stop prevents further runner work but cannot refund already sent requests. The CLI judge additionally requires `SERVER_GUY_LIVE_JUDGE=1` and an exact saved run/hash/case selection; prefer the dashboard to entering those identifiers manually. No live judge evaluation is claimed until an explicitly approved provider run is recorded.
 
 For each later phase, define cases before implementation, run them as the real behavior becomes available, and rerun relevant earlier cases before acceptance. Add observed failures as regressions. Do not prebuild eval machinery for unimplemented phases; UI/login/database behavior still belongs in ordinary application tests.
 
@@ -161,6 +191,17 @@ Deployment, infrastructure provisioning, monitoring automations, and Phase 2 wor
 
 ## Latest verification
 
+**2026-09-04 — testing dashboard / checked-in runner follow-up, `codex/phase-one-evals`.** Selected desktop application scenarios are now executable under `tests/e2e/`. Dashboard and judge safety tests use synthetic saved data; no paid judge run or new live baseline was started for this follow-up. The previous live baseline was moved intact into `tests/results/evals/`; its source fingerprints remain historical, and its human meaning review is still pending. Hosted CI results must be checked separately after the workflow runs.
+
+- **237/237 Vitest tests** across 18 files passed; opening the dashboard and starting its Application tests control also completed successfully.
+- **9/9 desktop Playwright scenarios** passed (eight application journeys plus dashboard review), 38.6 seconds. Includes draft preservation/focus between review cases, saved-review reload, explicit spend confirmation, exact application removal/recreation and disconnect/reuse on disposable state.
+- TypeScript, lint and whitespace checks passed. An isolated production **webpack** build passed without disturbing the development server or its `.next` output. Hosted CI uses the normal build command and is a separate verification surface.
+- Dashboard desktop captures were saved and inspected under `tests/results/dashboard-review/`. No mobile checks or new provider calls were made. The existing live baseline's `results.json` SHA-256 stayed `4cc302e04317f368ff6af44b17ce3447d09553e02cb51f17bf7fe8fed7c5de65` after relocation.
+
+The dashboard is a local convenience over fixed runners and artifacts, not a product control plane. Fable's focused read-only architecture review supported this scope and highlighted explicit spend consent, same-origin controls, isolated judging, immutable source evidence and keeping CI smoke small. These boundaries are implemented and regression-tested; an isolated judge can still produce a biased or mistaken rating.
+
+### Earlier evidence (historical, not a fresh full-contract pass)
+
 **2026-09-04 — audit follow-up and first live baseline on the dirty `codex/pi-setup` checkout, based on `2f82308`. The complete contract is not passing yet.** The two confirmed audit defects are now fixed; the earlier three-agent journey evidence below is supplemented by targeted regression checks and a real-Pi run.
 
 Fresh checks:
@@ -169,7 +210,7 @@ Fresh checks:
 - Fresh targeted checks: actual Next route rejects hostile-Origin `text/plain` setup POST without modifying saved configuration, accepts same-origin JSON; desktop Cancel and Escape both restore focus to Disconnect.
 - Earlier three-agent audit: **44 HTTP/SQLite assertions**, **20 read-only HTTP assertions** against browser-created state and **15 extra disposable boundary tests** passed. These were not all rerun during the targeted fix pass; the current ordinary suite and targeted checks above were rerun.
 - TypeScript, lint, whitespace checks and an isolated production build passed.
-- First real-Pi baseline: **16/16 automated cases passed** (eight inputs, two repetitions), `gpt-5.6-sol` / `high`, Pi `0.84.4`, 84.26 seconds. Source fingerprints stayed unchanged. Human meaning review remains pending: both unresolved-conflict replies recommended a concrete compromise without recording a Decision, which needs interpretation against the initial rubric. The assistant's review is not human approval. Local artifacts: `eval-results/2026-09-04T08-42-41.046Z-Q6vAk1/`.
+- First real-Pi baseline: **16/16 automated cases passed** (eight inputs, two repetitions), `gpt-5.6-sol` / `high`, Pi `0.84.4`, 84.26 seconds. Source fingerprints stayed unchanged. Human meaning review remains pending: both unresolved-conflict replies recommended a concrete compromise without recording a Decision, which needs interpretation against the initial rubric. The assistant's review is not human approval. Local artifacts now: `tests/results/evals/2026-09-04T08-42-41.046Z-Q6vAk1/`.
 - Real production login start/poll/cancel routes shared the same attempt correctly. The invalid-model probe stopped before provider authentication. The earlier coordinator-sharing concern was not reproduced; this says nothing about restart recovery or multiple processes.
 
 | Cases | Current evidence / status |
@@ -186,8 +227,8 @@ Fresh checks:
 Audit fixes and remaining work are tracked in the [roadmap](../../ROADMAP.md#configure-pi-explicitly):
 
 1. **Fixed: setup Origin bypass.** The earlier hostile-Origin `text/plain` POST could create or overwrite configuration. [`parseJsonRequest`](../../src/server/schemas.ts) now guards every JSON mutation; bodyless archive/rerun/login-cancel handlers guard explicitly. All 11 mutation handlers have positive/negative regression coverage. This does not add authentication or claim the local app is safe to expose publicly. Browser delivery/exploitability of the original defect was **not** tested.
-2. **Fixed: Disconnect focus loss.** [`ConfirmActionDialog`](../../src/components/server-guy/confirm-action-dialog.tsx) now restores its connected opener after unmount/close. Both Escape and Cancel returned focus to Disconnect in the fresh browser regression check. A checked-in automated browser regression remains part of the Playwright follow-up.
+2. **Fixed: Disconnect focus loss.** [`ConfirmActionDialog`](../../src/components/server-guy/confirm-action-dialog.tsx) restores its connected opener after unmount/close. Both Escape and Cancel returned focus to Disconnect in the targeted browser check. The checked-in Playwright smoke suite now covers cancellation focus restoration too.
 
-Screenshot captures were inspected inline, but the browser tool exposed no supported local-image persistence mechanism; this is not a complete saved-screenshot visual audit. No mobile checks were made. The opt-in baseline used the existing Pi login for real model calls, not a fresh OAuth flow or GitHub access. Broader Pi behavior, explicit GitHub onboarding and durable-worker acceptance remain unverified or unimplemented. Earlier temporary audit evidence remains under `/tmp/server-guy-phase1-audit-dBJnR5`; the new real-Pi runner now exists in the repository, but a desktop E2E runner is still pending.
+Earlier audit screenshots were inspected inline without saved image artifacts; that was not a complete saved-screenshot visual audit. The new Playwright runner retains synthetic failure evidence under `tests/results/`. No mobile checks were made. The opt-in baseline used the existing Pi login for real model calls, not a fresh OAuth flow or GitHub access. Broader Pi behavior, explicit GitHub onboarding and durable-worker acceptance remain unverified or unimplemented. Historical temporary audit evidence remains under `/tmp/server-guy-phase1-audit-dBJnR5` if the machine has retained it.
 
 Design provenance only: the retired A/B/C prototype source is preserved on local branch `codex/archive-pi-setup-prototypes-2026-09-04`, commit `449b59d10366b0cd816433508aa0c1b175b98230`. It is not the current implementation or current acceptance evidence.

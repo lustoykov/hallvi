@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { checkPhaseOne } from "../evals/check-phase-one";
-import { evalRepeatCount, phaseOneCases, type PhaseOneEvalCase } from "../evals/phase-one-cases";
+import { checkPhaseOne } from "./evals/check-phase-one";
+import { evalRepeatCount, phaseOneCases, type PhaseOneEvalCase } from "./evals/phase-one-cases";
 import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../src/server/types";
 
 function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
@@ -87,7 +87,7 @@ describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
     ["0", "1", "Opt in"],
     ["1", "9", "PI_EVAL_REPEATS"],
   ])("fails closed before loading the live suite (%s, %s)", (consent, repeats, expected) => {
-    const run = spawnSync(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--config", "evals/vitest.config.ts"], {
+    const run = spawnSync(process.execPath, ["node_modules/vitest/vitest.mjs", "run", "--config", "tests/evals/vitest.config.ts"], {
       encoding: "utf8", env: { ...process.env, SERVER_GUY_LIVE_EVALS: consent, PI_EVAL_REPEATS: repeats }, timeout: 10_000,
     });
     expect(run.status).not.toBe(0);

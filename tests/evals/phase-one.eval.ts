@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
-import * as database from "../src/server/db";
-import * as github from "../src/server/github";
-import { getPhaseOneOperatorView, sendChatMessage } from "../src/server/phase-one";
-import * as pi from "../src/server/pi";
-import { readPiConfiguration, savePiConfiguration } from "../src/server/pi-configuration";
-import type { PhaseOneOperatorView, PiTurnResult } from "../src/server/types";
-import { pushTestDatabase } from "../tests/test-database";
+import * as database from "../../src/server/db";
+import * as github from "../../src/server/github";
+import { getPhaseOneOperatorView, sendChatMessage } from "../../src/server/phase-one";
+import * as pi from "../../src/server/pi";
+import { readPiConfiguration, savePiConfiguration } from "../../src/server/pi-configuration";
+import type { PhaseOneOperatorView, PiTurnResult } from "../../src/server/types";
+import { pushTestDatabase } from "../test-database";
 import { checkPhaseOne } from "./check-phase-one";
 import { evalRepeatCount, phaseOneCases, type PhaseOneEvalCase } from "./phase-one-cases";
 
@@ -22,7 +22,7 @@ const repeats = evalRepeatCount(process.env.PI_EVAL_REPEATS);
 const sourceFiles = [
   "src/server/pi.ts", "src/server/phase-one.ts", "src/server/phase-one-spec.ts",
   "src/server/pi-configuration.ts", "src/server/db.ts", "src/server/db-schema.ts",
-  "evals/phase-one-cases.ts", "evals/check-phase-one.ts", "evals/phase-one.eval.ts", "evals/vitest.config.ts", "package-lock.json",
+  "tests/evals/phase-one-cases.ts", "tests/evals/check-phase-one.ts", "tests/evals/phase-one.eval.ts", "tests/evals/vitest.config.ts", "package-lock.json",
 ];
 const fingerprints = () => Object.fromEntries(sourceFiles.map((file) => [file,
   createHash("sha256").update(readFileSync(file)).digest("hex"),
@@ -46,9 +46,13 @@ beforeAll(() => {
   if (!chosen || chosen.providerId !== "openai-codex" || chosen.credentialType !== "oauth") {
     throw new Error("Configure ChatGPT subscription access in Server Guy before running live Pi evals.");
   }
+  if ((process.env.PI_EVAL_EXPECTED_MODEL && chosen.modelId !== process.env.PI_EVAL_EXPECTED_MODEL)
+    || (process.env.PI_EVAL_EXPECTED_EFFORT && chosen.reasoningEffort !== process.env.PI_EVAL_EXPECTED_EFFORT)) {
+    throw new Error("Model preferences changed after confirmation. Reload and confirm the intended settings.");
+  }
   if (globalThis.__serverGuyDb) throw new Error("The live eval worker must not already own an application database.");
   const state = mkdtempSync(join(tmpdir(), "server-guy-pi-eval-"));
-  const artifacts = resolve("eval-results");
+  const artifacts = resolve("tests/results/evals");
   mkdirSync(artifacts, { recursive: true, mode: 0o700 });
   runDirectory = mkdtempSync(join(artifacts, `${new Date().toISOString().replaceAll(":", "-")}-`));
   initialFingerprints = fingerprints();

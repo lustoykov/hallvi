@@ -8,7 +8,7 @@ evalRepeatCount(process.env.PI_EVAL_REPEATS);
 
 export default defineConfig({
   test: {
-    include: ["evals/**/*.eval.ts"],
+    include: ["tests/evals/phase-one.eval.ts"],
     fileParallelism: false,
     maxWorkers: 1,
     testTimeout: 60_000,
