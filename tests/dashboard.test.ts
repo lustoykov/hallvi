@@ -48,6 +48,49 @@ it("serves both dashboard routes without launching checks or weakening API prote
   expect((await fetch(`${origin}/api/state`)).status).toBe(403);
   expect(launch).not.toHaveBeenCalled();
 });
+it("saves one-click verdicts without a name or note, filling in the local reviewer", async () => {
+  const { root, origin, headers } = await fixture();
+  const path = directory(join(root, "tests/results/evals", "quick"));
+  writeJson(join(path, "results.json"), {
+    model: "synthetic", effort: "high", startedAt: "2026-09-04", commit: "test", dirty: false, sourceFingerprints: {},
+    results: [1, 2].map((repetition) => ({ caseId: "greeting", repetition, rubric: "No invented choice", outcome: "checks-passed", checks: { count: true },
+      error: null, input: { userMessage: "Hello" }, reply: { message: "Hello", decisionProposals: [] }, before: {}, after: {} })),
+  });
+  const hash = loadReport(root, "quick").hash;
+  const post = (path: string, body: unknown) => fetch(`${origin}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+  expect((await post("/api/review", { run: "quick", hash, key: "greeting:1", review: { verdict: "pass" } })).status).toBe(200);
+  expect((await post("/api/review/bulk", { run: "quick", hash, keys: ["greeting:2"], review: { verdict: "fail", reason: "Too terse" } })).status).toBe(200);
+  expect((await post("/api/review", { run: "quick", hash, key: "greeting:1", review: { verdict: "maybe" } })).status).toBe(400);
+  const reviews = listReports(root)[0].reviews;
+  expect(reviews.map((review) => review.type === "human" && [review.verdict, review.reason, review.reviewer.length > 0])).toEqual([["pass", "", true], ["fail", "Too terse", true]]);
+  expect(listReports(root)[0].triage["greeting:1"].status).toBe("reviewed");
+  expect(listReports(root)[0].triage["greeting:2"].status).toBe("failures");
+});
+it("judges a finished live run automatically only when asked, with the same model settings", async () => {
+  const { root, origin, headers, launch } = await fixture();
+  const post = (path: string, body: unknown) => fetch(`${origin}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+  const stateOf = async () => (await fetch(`${origin}/api/state`, { headers })).json();
+  // A report the runner "saved" during the run: dated after the dashboard run starts.
+  writeJson(join(directory(join(root, "tests/results/evals", "fresh")), "results.json"), {
+    model: "gpt-5.6-sol", effort: "high", startedAt: new Date(Date.now() + 60_000).toISOString(), commit: "test", dirty: false, sourceFingerprints: {},
+    results: [{ caseId: "greeting", repetition: 1, rubric: "No invented choice", outcome: "checks-passed", checks: { count: true },
+      error: null, input: { userMessage: "Hello" }, reply: { message: "Hello", decisionProposals: [] }, before: {}, after: {} }],
+  });
+  const exitQuickly: Launch = (_command, _args, options) => spawn(process.execPath, ["-e", "process.exit(0)"], options);
+  launch.mockImplementationOnce(exitQuickly);
+  expect((await post("/api/start", { suite: "live", cases: ["greeting"], consent: true, model: "gpt-5.6-sol", effort: "high" })).status).toBe(202);
+  await vi.waitFor(async () => expect((await stateOf()).active).toBeNull());
+  expect(launch).toHaveBeenCalledTimes(1);
+  launch.mockImplementationOnce(exitQuickly);
+  expect((await post("/api/start", { suite: "live", cases: ["greeting"], consent: true, model: "gpt-5.6-luna", effort: "low", judgeAfter: true })).status).toBe(202);
+  await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(3));
+  expect(launch.mock.calls[2][2].env).toMatchObject({ SERVER_GUY_LIVE_JUDGE: "1", PI_JUDGE_RUN: "fresh", PI_JUDGE_HASH: loadReport(root, "fresh").hash,
+    PI_JUDGE_CASES: '["greeting:1"]', PI_JUDGE_MODEL: "gpt-5.6-luna", PI_JUDGE_EFFORT: "low" });
+  const state = await stateOf();
+  expect(state.history.map((run: { suite: string }) => run.suite)).toEqual(["judge", "live", "live"]);
+  expect(state.history[1].log).toContain("Judging 1 saved answer automatically");
+  expect(() => commandFor({ suite: "judge", judgeAfter: true, consent: true } as never)).toThrow();
+});
 it("maps a closed set of suites to fixed arguments and requires explicit spend consent", () => {
   expect(commandFor({ suite: "smoke" })).toEqual({ args: ["run", "test:e2e:smoke"], env: {} });
   expect(() => commandFor({ suite: "live" })).toThrow("Confirm subscription");

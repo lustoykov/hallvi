@@ -6,10 +6,12 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { archiveRun, directory, findCase, humanReviewSchema, listReports, readJson, reviewKeysSchema, saveHumanReviews, saveReview, writeJson } from "./results.ts";
+import { archiveRun, caseKey, directory, findCase, humanReviewSchema, listReports, readJson, reviewKeysSchema, saveHumanReviews, saveReview, writeJson } from "./results.ts";
 import { browserJourneys } from "../e2e/journeys.ts";
 import { phaseOneCases } from "../evals/phase-one-cases.ts";
 
+// Bumped when the page needs a newer server; the page warns instead of failing quietly against a stale process.
+export const API_VERSION = 3;
 export const suites = [
   { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
   { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No AI calls", ci: "Every PR", ciDetail: "" },
@@ -26,6 +28,7 @@ const startSchema = z.strictObject({
   cases: z.array(z.enum(phaseOneCases.map((item) => item.id))).min(1).max(phaseOneCases.length)
     .refine((ids) => new Set(ids).size === ids.length).optional(),
   repeats: z.number().int().min(1).max(5).optional(),
+  judgeAfter: z.boolean().optional(),
   model: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/).optional(),
   effort: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
 });
@@ -36,6 +39,7 @@ export function commandFor(request: StartRequest) {
   if (input.suite !== "e2e" && input.journeys) throw new Error("Journey selection is for browser tests");
   if (input.suite !== "live" && (input.cases || input.repeats !== undefined)) throw new Error("Case selection is for live evals");
   if (input.suite !== "judge" && (input.key || input.keys || input.run || input.hash)) throw new Error("Saved answers are for the judge");
+  if (input.suite !== "live" && input.judgeAfter) throw new Error("Automatic judging follows a live eval run");
   const commands = { unit: "test", smoke: "test:e2e:smoke", e2e: "test:e2e", live: "eval:pi", judge: "eval:judge" };
   const env: Record<string, string> = {};
   if (input.suite === "live" || input.suite === "judge") {
@@ -128,13 +132,25 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       run.exitCode = code; run.finishedAt = new Date().toISOString();
       if (paid) {
         const noReport = previousReports && !listReports(root).some((report) => !previousReports.has(report.run));
-        run.log = code === 0 ? "Run completed. Open View saved runs under Live agent evals to inspect answers and separate judgments. Runner completion is not semantic acceptance.\n"
+        run.log = code === 0 ? "Run completed. Open Eval runs to inspect answers and judgments. Runner completion is not semantic acceptance.\n"
           : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${noReport ? "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made." : "Earlier saved answers and verdicts remain; remaining items may not have run."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
       }
       writeJson(path, run); active = null; child = null; cancelActive = null;
+      if (input.suite === "live" && input.judgeAfter && code === 0) judgeAfterRun(run, path, input);
     };
     child.on("error", () => finish(null)); child.on("close", finish);
     return run;
+  }
+  // The one confirmation for a live run also covers judging its answers with the same model once they are saved.
+  function judgeAfterRun(run: Run, path: string, input: StartRequest) {
+    try {
+      const report = listReports(root).find((r) => r.startedAt >= run.startedAt);
+      const keys = report?.results.filter((c) => c.reply && c.input).map(caseKey) ?? [];
+      if (!report || !keys.length) throw new Error("no saved answers were found for this run");
+      start({ suite: "judge", consent: true, run: report.run, hash: report.hash, keys, model: input.model, effort: input.effort });
+      run.log += `Judging ${keys.length} saved answer${keys.length === 1 ? "" : "s"} automatically.\n`;
+    } catch (error) { run.log += `Automatic judging did not start: ${error instanceof Error ? error.message : "unknown error"}.\n`; }
+    writeJson(path, run);
   }
   const server = createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -160,7 +176,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           const settings = readJson(join(process.env.SERVER_GUY_CONFIG_DIR ?? join(root, ".server-guy"), "pi-settings.json"));
           defaults = z.object({ model: z.string(), effort: z.string() }).parse({ model: settings.modelId, effort: settings.reasoningEffort });
         } catch { /* No saved settings: display defaults, not an authenticated claim. */ }
-        json({ suites, journeys: browserJourneys, evalCases: phaseOneCases, active, history: history(), reports: listReports(root), defaults }); return;
+        json({ apiVersion: API_VERSION, suites, journeys: browserJourneys, evalCases: phaseOneCases, active, history: history(), reports: listReports(root), defaults }); return;
       }
       if (request.method !== "POST" || !["/api/start", "/api/review", "/api/review/bulk", "/api/runs/archive", "/api/stop"].includes(url.pathname)) { json({ error: "Not found" }, 404); return; }
       if (request.headers.origin !== origin || !request.headers["content-type"]?.startsWith("application/json")) { json({ error: "Same-origin JSON required" }, 403); return; }
