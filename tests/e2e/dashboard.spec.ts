@@ -225,6 +225,12 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.locator("#verdict .verdict-button.pass .llm-tag")).toBeVisible();
     await expect(answer("question:1")).toContainText("LLM advice: Pass");
     await page.screenshot({ path: testInfo.outputPath("dashboard-review.png"), fullPage: true });
+    // One answer can be judged on its own from its judgment section.
+    await advice.getByRole("button", { name: "Judge again…", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Judge this answer", exact: true })).toBeVisible();
+    await expect(page.locator("#confirm-selection")).toHaveText("question:1");
+    await page.getByRole("button", { name: "Start judging", exact: true }).click();
+    await expect.poll(() => requests.at(-1)).toMatchObject({ suite: "judge", keys: ["question:1"], consent: true, hash });
     // Working through the queue is a keypress per answer.
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(3);
     for (const remaining of [2, 1, 0]) {
@@ -281,6 +287,7 @@ test("dashboard reviews saved answers without model calls or changing source res
     await answer("greeting:2").click();
     await expect(page.locator("#unreviewable")).toBeVisible();
     await expect(page.locator("#verdict")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Judge this answer…", exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Run case again…", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Archive run", exact: true }).click();
     await expect(page.locator("#archived-list").locator(runCard(secondRun))).toBeVisible();

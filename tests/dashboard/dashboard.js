@@ -300,6 +300,8 @@ function renderAnswer(saved, ordered, shown) {
   $("judge-meta").textContent = llm ? `${llm.model} · ${llm.effort} · ${formatDate(llm.createdAt)}` : "";
   $("judge-result").textContent = llm?.reason ?? "Not judged yet. Use Judge in the run header; new runs are judged automatically when they finish.";
   $("judge-result").className = `judgment${llm ? "" : " none"}`;
+  $("judge").textContent = llm ? "Judge again…" : "Judge this answer…";
+  $("judge").disabled = Boolean(state.active) || busy || !reviewable(current);
   $("verdict").hidden = !reviewable(current); $("unreviewable").hidden = reviewable(current);
   for (const button of document.querySelectorAll(".verdict-button")) {
     button.setAttribute("aria-pressed", String(human?.verdict === button.dataset.verdict));
@@ -418,6 +420,7 @@ document.addEventListener("click", (event) => {
 window.addEventListener("popstate", renderPage);
 $("empty-choose").addEventListener("click", () => $("eval-picker").showModal());
 $("rerun-case").addEventListener("click", () => requestRun({ suite: "live", cases: [record().caseId], repeats: 1 }));
+$("judge").addEventListener("click", () => requestRun({ suite: "judge", run: selectedRun, hash: report().hash, keys: [selectedCase], title: "Judge this answer" }));
 $("judge-run").addEventListener("click", () => {
   const targets = judgeTargets(report()); if (!targets.keys.length) return;
   requestRun({ suite: "judge", run: selectedRun, hash: report().hash, keys: targets.keys, title: targets.unjudged ? `Judge ${plural(targets.keys.length, "unjudged answer")}` : `Judge all ${targets.keys.length} answers again` });
