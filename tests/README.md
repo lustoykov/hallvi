@@ -35,6 +35,12 @@ tests/
 
 The product's acceptance cases and dated verification evidence stay in the single [Phase 1 acceptance guide](../docs/testing/phase-one-acceptance.md). Implementation order stays in [ROADMAP.md](../ROADMAP.md). This file is an index, not another plan. Temporary fixture apps/databases are scratch state outside the repository; their results belong here. Do not commit private outputs or credentials.
 
+## Suite explanations
+
+Click a suite name to expand its explanation directly below the row; this never starts a test. Every suite uses the same fields: execution, real dependencies, mocked dependencies, database isolation, checks/review, and what passing does not prove. **Code & saved output** lists the command, source files and artifact locations. The copy lives in [dashboard/suite-guides.ts](dashboard/suite-guides.ts), separate from execution logic.
+
+Unit and integration tests currently share `tests/*.test.ts`; browser tests live in `tests/e2e/`; live evals and judging live in `tests/evals/`. Browser smoke selects tagged tests from the same browser suite, not a separate folder.
+
 ## Commands
 
 | Task | Command | Model calls |

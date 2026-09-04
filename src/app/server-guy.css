@@ -306,6 +306,7 @@
   font-size: 10px;
 }
 .sg-source-tag { color: #6c7790; background: #f0f2f6; }
+.sg-reply-pending { display: flex; align-items: center; gap: 8px; color: #53617a; font-size: 13px; }
 .sg-launch-card {
   margin-left: 35px;
   border: 1px solid #ccd6e5;

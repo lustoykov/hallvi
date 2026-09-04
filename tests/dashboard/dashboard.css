@@ -79,6 +79,19 @@ textarea { resize: vertical; min-height: 84px; }
 .suites .last-result { display: grid; gap: 3px; justify-items: start; } .suites .last-result small { color: var(--muted); font-size: 12px; }
 .suites td strong { display: block; margin-bottom: 2px; font-size: 15px; } .suites td small { display: block; color: var(--muted); font-size: 13px; }
 .suites .suite-links { margin-top: 8px; display: flex; gap: 14px; align-items: center; }
+.suite-explain { display: inline-flex; align-items: center; gap: 10px; color: var(--blue-deep); font-size: 15px; font-weight: 600; text-align: left; margin-bottom: 2px; }
+.suite-explain:hover { text-decoration: underline; text-underline-offset: 3px; }
+.suite-explain::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin-top: -3px; }
+.suite-explain[aria-expanded=true]::after { transform: rotate(225deg); margin-top: 3px; }
+.suites .suite-explanation > td { padding: 20px 28px 24px; text-align: left; width: auto; background: var(--paper); }
+.suite-guide { max-width: 940px; }
+.suite-purpose { font-size: 15px; font-weight: 600; max-width: 80ch; }
+.suite-guide dl { grid-template-columns: 155px minmax(0, 1fr); gap: 12px 24px; margin-top: 18px; font-size: 14px; }
+.suite-guide dd { max-width: 80ch; color: var(--muted); }
+.suite-guide details { margin-top: 20px; font-size: 13px; }
+.suite-guide summary { color: var(--blue-deep); font-weight: 600; cursor: pointer; }
+.suite-guide details p { margin-top: 10px; color: var(--muted); }
+.suite-guide ul { padding-left: 18px; margin: 8px 0 0; overflow-wrap: anywhere; }
 .suites .usage-free { background: transparent; padding: 0; color: var(--muted); font-weight: 500; }
 .suites .usage-paid { background: var(--amber-bg); color: var(--amber); }
 .suite-schedule > span { display: block; font-size: 13px; font-weight: 600; }

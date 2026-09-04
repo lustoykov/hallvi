@@ -21,6 +21,7 @@ export function ChatPane({
   activeChat,
   busy,
   error,
+  pendingMessage,
   piReady,
   composer,
   onComposerChange,
@@ -31,6 +32,7 @@ export function ChatPane({
   activeChat: Chat | null;
   busy: string | null;
   error: string | null;
+  pendingMessage: string | null;
   piReady: boolean;
   composer: string;
   onComposerChange: (value: string) => void;
@@ -70,6 +72,24 @@ export function ChatPane({
               </MessageContent>
             </Message>
           ))}
+
+          {pendingMessage !== null && (
+            <>
+              <Message from="user">
+                <div className="sg-message-heading">
+                  <span className="sg-avatar user">You</span>
+                  <strong>You</strong>
+                  <span className="sg-source-tag">Pending</span>
+                </div>
+                <MessageContent>
+                  <MessageResponse>{pendingMessage}</MessageResponse>
+                </MessageContent>
+              </Message>
+              <p className="sg-reply-pending" role="status">
+                <SpinnerGap className="spin" aria-hidden="true" /> Waiting for Pi…
+              </p>
+            </>
+          )}
 
           {application && view.workspace?.status === "ready" && (
             <div className="sg-ready-card">

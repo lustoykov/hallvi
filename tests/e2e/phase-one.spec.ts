@@ -56,8 +56,12 @@ test("P1-07 provider failure leaves no partial turn and retry works", journey("p
   await page.getByRole("textbox").fill("Hello [fail-once]");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "QA simulated provider failure" })).toBeVisible();
+  await expect(page.getByRole("textbox")).toHaveValue("Hello [fail-once]");
+  await expect(page.getByRole("status").filter({ hasText: "Waiting for Pi" })).toHaveCount(0);
+  await expect(page.locator(".sg-messages").getByText("Hello [fail-once]", { exact: true })).toHaveCount(0);
   expect((await view(page)).messages).toEqual(before.messages);
   await send(page, "Hello [fail-once]");
+  await expect(page.locator(".sg-messages").getByText("Hello [fail-once]", { exact: true })).toHaveCount(1);
   expect((await view(page)).messages).toHaveLength(before.messages.length + 2);
 });
 
@@ -119,15 +123,37 @@ test("P1-10 disconnect preserves application history and requires consent to reu
   expect((await view(page)).messages).toEqual(before.messages);
 });
 
-test("P1-13 double Enter saves one pair and keeps a newer draft", journey("slow-reply"), async ({ page }) => {
+test("P1-13 shows a pending message immediately; double Enter saves one pair and keeps a newer draft", journey("slow-reply"), async ({ page }, testInfo) => {
   await addApplication(page, "slow-send-app");
   const before = await view(page);
   const composer = page.getByRole("textbox");
-  await composer.fill("Hello [slow]");
-  await composer.press("Enter");
-  await composer.press("Enter");
-  await composer.fill("Next unsent draft");
+  let release!: () => void;
+  let requests = 0;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/applications/*/chats/*/messages", async (route) => {
+    requests++;
+    await held;
+    await route.continue();
+  });
+  try {
+    await composer.fill("Hello [slow]");
+    await composer.press("Enter");
+    await composer.press("Enter");
+    await expect(page.locator(".sg-messages").getByText("Hello [slow]", { exact: true })).toBeVisible();
+    await expect(page.locator(".sg-messages").getByText("Pending", { exact: true })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Waiting for Pi" })).toBeVisible();
+    await expect(page.getByText("[QA fixture reply] Hello [slow]", { exact: true })).toHaveCount(0);
+    await expect(composer).toHaveValue("");
+    await composer.fill("Next unsent draft");
+    await expect.poll(() => requests).toBe(1);
+    expect((await view(page)).messages).toEqual(before.messages);
+    await page.screenshot({ path: testInfo.outputPath("pending-chat-message.png"), fullPage: true });
+  } finally { release(); }
   await expect(page.getByText("[QA fixture reply] Hello [slow]", { exact: true })).toBeVisible();
+  await expect(page.locator(".sg-messages").getByText("Hello [slow]", { exact: true })).toHaveCount(1);
+  await expect(page.locator(".sg-messages").getByText("Pending", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "Waiting for Pi" })).toHaveCount(0);
   await expect(composer).toHaveValue("Next unsent draft");
+  expect(requests).toBe(1);
   expect((await view(page)).messages).toHaveLength(before.messages.length + 2);
 });

@@ -30,6 +30,7 @@ export function OperatorShell({
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -70,6 +71,7 @@ export function OperatorShell({
       setError(caught instanceof Error ? caught.message : "Server Guy could not complete that request.");
       await recover?.();
     } finally {
+      if (label === "message") setPendingMessage(null);
       setBusy(null);
     }
   }
@@ -92,6 +94,7 @@ export function OperatorShell({
   function sendMessage() {
     const message = composer.trim();
     if (busy || !initialPiSetup.ready || !application || !activeChat || !message) return;
+    setPendingMessage(message);
     setComposer("");
     void run(
       "message",
@@ -170,6 +173,7 @@ export function OperatorShell({
           busy={busy}
           composer={composer}
           error={error}
+          pendingMessage={pendingMessage}
           piReady={initialPiSetup.ready}
           onArchive={archiveActiveChat}
           onComposerChange={setComposer}

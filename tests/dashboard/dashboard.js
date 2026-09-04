@@ -11,6 +11,7 @@ let pendingRun = null;
 let returnToEvalPicker = false;
 let judgePreferences = null;
 let selectorsReady = false;
+let expandedSuite = "";
 let busy = false;
 const notes = new Map();
 const openReasoning = new Set();
@@ -96,17 +97,50 @@ function renderRich(node, text) {
   }));
 }
 
+function suiteExplanation(suite) {
+  const row = element("tr", "", "suite-explanation"); row.id = `suite-details-${suite.id}`;
+  const cell = document.createElement("td"); cell.colSpan = 5;
+  const section = element("section", "", "suite-guide"); section.setAttribute("aria-label", `${suite.name} explained`);
+  section.append(element("p", suite.guide.purpose, "suite-purpose"));
+  const facts = document.createElement("dl");
+  for (const [label, key] of [["Execution", "execution"], ["Real", "real"], ["Mocked / simulated", "mocked"], ["Database boundary", "isolation"], ["Checks & review", "checks"], ["Doesn’t prove", "limits"]]) {
+    facts.append(element("dt", label), element("dd", suite.guide[key]));
+  }
+  const technical = document.createElement("details");
+  technical.append(element("summary", "Code & saved output"), element("p", suite.guide.artifacts));
+  const command = element("p", "Command: "); command.append(element("code", suite.command)); technical.append(command);
+  const sources = document.createElement("ul");
+  for (const path of suite.guide.sources) { const item = document.createElement("li"); item.append(element("code", path)); sources.append(item); }
+  technical.append(sources); section.append(facts, technical); cell.append(section); row.append(cell);
+  return row;
+}
+
 async function refresh() {
   try {
     const nextState = await api("/api/state");
     const signature = JSON.stringify(nextState);
     if (signature === stateSignature) return; // Preserve keyboard focus and open controls between polls.
     stateSignature = signature; state = nextState;
-    $("stale").hidden = (state.apiVersion ?? 0) >= 3; // The page can outrun the server process behind it.
+    $("stale").hidden = (state.apiVersion ?? 0) >= 4; // The page can outrun the server process behind it.
     $("active").hidden = !state.active; tick();
-    $("suites").replaceChildren(...state.suites.map((suite) => {
+    const focusedSuite = document.activeElement?.dataset.suiteHelp;
+    $("suites").replaceChildren(...state.suites.flatMap((suite) => {
       const row = document.createElement("tr"); const name = document.createElement("td");
-      name.append(element("strong", suite.name), element("small", suite.scope));
+      if (suite.guide) {
+        const explain = element("button", suite.name, "suite-explain"); explain.type = "button";
+        explain.id = `suite-help-${suite.id}`; explain.dataset.suiteHelp = suite.id;
+        explain.setAttribute("aria-label", `About ${suite.name}`);
+        explain.setAttribute("aria-expanded", String(expandedSuite === suite.id));
+        explain.setAttribute("aria-controls", `suite-details-${suite.id}`);
+        explain.addEventListener("click", () => {
+          expandedSuite = expandedSuite === suite.id ? "" : suite.id;
+          $("suites").querySelector(".suite-explanation")?.remove();
+          for (const button of $("suites").querySelectorAll("[data-suite-help]")) button.setAttribute("aria-expanded", String(button.dataset.suiteHelp === expandedSuite));
+          if (expandedSuite) row.after(suiteExplanation(suite));
+        });
+        name.append(explain);
+      } else name.append(element("strong", suite.name));
+      name.append(element("small", suite.scope));
       if (suite.id === "live") { const links = element("div", "", "suite-links"); const link = element("a", "View saved runs", "text-button"); link.href = "/evals"; link.dataset.route = ""; links.append(link); name.append(links); }
       const last = state.history.find((r) => r.suite === suite.id); const resultCell = document.createElement("td"); const result = element("div", "", "last-result");
       if (last) result.append(chip(statusLabel(last.status), statusKind(last.status)), element("small", formatDate(last.startedAt))); else result.append(element("small", "Not run yet"));
@@ -118,8 +152,9 @@ async function refresh() {
       const action = document.createElement("td"); const button = element("button", picker === "journey" ? "Choose journeys…" : picker ? "Choose cases…" : "Run", picker ? "secondary" : "primary");
       button.disabled = Boolean(state.active);
       button.addEventListener("click", () => { if (picker) $(`${picker}-picker`).showModal(); else requestRun({ suite: suite.id }); });
-      action.append(button); row.append(action); return row;
+      action.append(button); row.append(action); return [row, ...(expandedSuite === suite.id && suite.guide ? [suiteExplanation(suite)] : [])];
     }));
+    if (focusedSuite) $(`suite-help-${focusedSuite}`)?.focus({ preventScroll: true });
     initializeSelectors(); updateSelections();
     renderHistory();
     const pending = state.reports.filter((r) => !r.archived).reduce((count, r) => count + pendingCount(r), 0);

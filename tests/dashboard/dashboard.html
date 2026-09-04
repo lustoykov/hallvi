@@ -21,7 +21,7 @@
     <div id="active" class="active" role="status" hidden><span class="pulse" aria-hidden="true"></span><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
 
     <section id="runs-panel" aria-labelledby="checks-title">
-      <div class="page-heading"><div><h1 id="checks-title" tabindex="-1">Run checks</h1><p>Fixed test commands and their saved results. Nothing runs until you start it here.</p></div></div>
+      <div class="page-heading"><div><h1 id="checks-title" tabindex="-1">Run checks</h1><p>Open a suite name to see what is real, mocked and checked. Run actions are separate.</p></div></div>
       <table class="suites"><caption class="visually-hidden">Available test suites, AI usage and CI policy</caption><thead><tr><th>Suite</th><th>AI usage</th><th>CI</th><th>Last result</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
       <details class="suite-help"><summary>About AI usage &amp; automatic runs</summary>
         <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
