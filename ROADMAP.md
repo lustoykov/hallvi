@@ -14,7 +14,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 2 | Add Drizzle over the existing SQLite database. | Merged: [PR #8](https://github.com/lustoykov/server-guy/pull/8). [Checklist](#add-drizzle-over-the-existing-sqlite-database). |
 | 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
-| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Planned: [checklist](#connect-github-explicitly). |
+| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Implemented on `codex/github-connection`, awaiting PR review. [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
 | 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Planned: [checklist](#make-pi-requests-durable). |
 | 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
@@ -57,9 +57,9 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 - [x] Automatically detect reusable Pi login on page load, including broken-login recovery; offer **Use existing login** / **Connect another account** without a manual scan button.
 - [x] Return from Pi setup to an [applications overview](docs/testing/phase-one-acceptance.md#current-entry-points-and-setup-rules), with explicit creation and switching; keep Pi configuration installation-wide and each application's chats, Decisions, and checks separate.
 - [x] Use **Settings** navigation and progressive storage disclosure; add explicit disconnect (forget Server Guy's selection, preserve credential files) and confirmed per-application removal for fresh testing.
-- [x] Document the [Phase 1 desktop acceptance contract](docs/testing/phase-one-acceptance.md), separating deterministic UI/domain tests from live Pi behavior and still-pending GitHub/worker gates.
+- [x] Document the [Phase 1 desktop acceptance contract](docs/testing/phase-one-acceptance.md), separating deterministic UI/domain tests from live Pi behavior, GitHub authorization and pending durable-worker gates.
 - [x] Add desktop-only Playwright Test with isolated app/database/config fixtures and failure traces, two CI smoke journeys and manual full-suite runs. Keep Vitest and opt-in live Pi cases separate; all code/config/results live under `tests/`.
-- [ ] Extend checked-in browser coverage to remaining branches of the sixteen-case [acceptance contract](docs/testing/phase-one-acceptance.md#current-journey-contract); the initial eight application scenarios are not complete Phase 1 acceptance.
+- [ ] Extend checked-in browser coverage to remaining branches of the eighteen-case [acceptance contract](docs/testing/phase-one-acceptance.md#current-journey-contract); current automation covers selected branches, not complete Phase 1 acceptance.
 - [x] Add a separate localhost-only testing dashboard for fixed runner commands, recent runs, file locations and saved-answer human review; no production app page or test-control service.
 - [x] Add optional, explicitly confirmed LLM judging of one saved answer, with configurable model/effort, isolated tools and separate immutable review records. Unit/browser validation does not claim a successful real-provider judge run.
 - [x] Fix the September 4 audit's setup request-boundary defect: reject untrusted Origins across all 11 mutation handlers, with regression coverage including saved-setting preservation and a real-Next HTTP check. Browser exploitability of the original defect was not tested.
@@ -76,12 +76,13 @@ Tokens are unencrypted JSON; new credential files are owner-only (0600), and Pi 
 
 ### Connect GitHub explicitly
 
-- [ ] Add a user-visible GitHub authentication and connection flow.
-- [ ] Detect and explain any reusable local credentials instead of silently assuming access.
-- [ ] Verify access to the exact selected repository and record the credential source, repository identity, permissions, and observation time.
-- [ ] Test successful authorization, cancelled or denied authorization, missing scope, revoked or expired credentials, and an inaccessible private repository.
+- [x] Add a user-visible GitHub authentication and connection flow.
+- [x] Detect and explain any reusable local credentials instead of silently assuming access.
+- [x] Verify access to the exact selected repository and record the credential source, repository identity, permissions, and observation time.
+- [x] Test successful authorization, cancelled or denied authorization, missing scope, revoked or expired credentials, and an inaccessible private repository with controlled provider responses.
+- [x] Verify real GitHub App installation, device sign-in and read access to the selected private repository without a client secret or private key.
 
-Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reuse machine credentials or must keep its own isolated connection.
+Decision: offer explicit reuse of a detected GitHub CLI/environment credential or a separate GitHub App device login. The App asks only for Contents read access plus mandatory Metadata read access. Server Guy records exact repository membership in the installation as well as the user/repository identities. Disconnect preserves application history but invalidates old repository gates; reconnect requires re-verification. Expiring App user tokens require sign-in again in this local prototype rather than distributing a client secret for refresh. Detailed behavior and registration steps live in the [GitHub guide](docs/integrations/github.md). No worker, webhook, provider-write or Phase 2 scope is included.
 
 ### Make Pi requests durable
 

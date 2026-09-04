@@ -24,6 +24,7 @@ import {
   withTransaction,
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
+import { currentGithubConnectionId } from "./github-connection";
 import {
   PHASE_ONE,
   computeChecks,
@@ -66,6 +67,7 @@ function currentChecks(application: ApplicationRecord) {
   return computeChecks(
     application,
     latestObservation(application.id, REPOSITORY_OBSERVATION),
+    currentGithubConnectionId(),
   );
 }
 
@@ -133,11 +135,13 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
 
 export async function observeRepository(applicationId: string) {
   const { application, workspace } = loadWorkspace(applicationId);
+  const recorded = listObservations(application.id).find((observation) => observation.kind === REPOSITORY_OBSERVATION && observation.status === "passed" && observation.raw && typeof observation.raw === "object" && "repositoryId" in observation.raw);
+  const expectedId = recorded?.raw && typeof recorded.raw === "object" && "repositoryId" in recorded.raw && typeof recorded.raw.repositoryId === "number" ? recorded.raw.repositoryId : undefined;
   const result = await inspectGithubRepository({
     owner: application.repositoryOwner,
     name: application.repositoryName,
     canonicalUrl: application.repositoryUrl,
-  });
+  }, expectedId);
 
   const observation = insertObservation({
     applicationId: application.id,

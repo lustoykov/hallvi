@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pushTestDatabase } from "../../test-database";
+import { saveGithubConnection } from "../../../src/server/github-connection";
 
 const mocks = vi.hoisted(() => ({
   askPi: vi.fn(),
@@ -30,6 +31,7 @@ const passingInspection = {
   summary: "lustoykov/todo-fastapi is readable at main · abcdef12.",
   sourceUrl: "https://github.com/lustoykov/todo-fastapi/commit/abcdef123456",
   raw: {
+    connectionId: "00000000-0000-4000-8000-000000000001",
     repository: "lustoykov/todo-fastapi",
     defaultBranch: "main",
     commitSha: "abcdef123456",
@@ -43,6 +45,8 @@ beforeAll(async () => {
   databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-phase-one-"));
   databasePath = join(databaseDirectory, "test.db");
   process.env.SERVER_GUY_DB_PATH = databasePath;
+  vi.stubEnv("SERVER_GUY_CONFIG_DIR", databaseDirectory);
+  saveGithubConnection({ id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "fixture" }, connectedAt: new Date().toISOString() });
   pushTestDatabase(databasePath);
   delete globalThis.__serverGuyDb;
   database = await import("../../../src/server/db");
@@ -60,6 +64,7 @@ afterAll(() => {
   globalThis.__serverGuyDb?.$client.close();
   delete globalThis.__serverGuyDb;
   delete process.env.SERVER_GUY_DB_PATH;
+  vi.unstubAllEnvs();
   rmSync(databaseDirectory, { recursive: true, force: true });
 });
 
@@ -278,7 +283,7 @@ describe("Phase 1 application workspace", () => {
       status: "failed",
       summary: "Repository not found.",
       sourceUrl: "https://github.com/lustoykov/todo-fastapi",
-      raw: { repository: "lustoykov/todo-fastapi", error: "Not Found" },
+      raw: { repository: "lustoykov/todo-fastapi", error: "Not Found", connectionId: passingInspection.raw.connectionId },
     });
     await phaseOne.observeRepository(applicationId);
     const failed = phaseOne.getPhaseOneOperatorView(applicationId);
@@ -292,7 +297,7 @@ describe("Phase 1 application workspace", () => {
       status: "unavailable",
       summary: "GitHub inspection timed out.",
       sourceUrl: "https://github.com/lustoykov/todo-fastapi",
-      raw: { repository: "lustoykov/todo-fastapi", error: "timeout" },
+      raw: { repository: "lustoykov/todo-fastapi", error: "timeout", connectionId: passingInspection.raw.connectionId },
     });
     const unavailableObservation = await phaseOne.observeRepository(applicationId);
     const unavailable = phaseOne.getPhaseOneOperatorView(applicationId);

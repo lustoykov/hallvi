@@ -2,6 +2,7 @@
 
 import { ArrowClockwise, ArrowSquareOut, ChatCircleDots, Check, Circle, SpinnerGap, X } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 
 import type { GateCheck } from "@/server/types";
 
@@ -91,6 +92,7 @@ export function CheckDrawer({
               Re-run repository check
             </button>
           )}
+          {check.key === "repository-readable" && <p><Link href="/setup/github">GitHub connection settings</Link></p>}
         </section>
       </aside>
     </dialog>

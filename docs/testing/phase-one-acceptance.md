@@ -11,7 +11,7 @@ Acceptance is observable evidence that an engineer can complete a workflow and r
 There are two different completion claims:
 
 - **An application's Launch Brief is ready:** its four current checks pass: recorded identity, readable repository at a recorded commit, explicit target environment, and explicit permission policy. This does not mean the application is deployed.
-- **Phase 1 product work is complete:** the current journey below passes, plus the explicit GitHub connection and durable-request follow-ups in the [roadmap](../../ROADMAP.md#phase-1-implementation-backlog) pass their acceptance cases. Those follow-ups are still pending. Do not treat the four checks as evidence that the entire product phase is done.
+- **Phase 1 product work is complete:** the current journey below passes, plus the explicit GitHub connection and durable-request follow-ups in the [roadmap](../../ROADMAP.md#phase-1-implementation-backlog) pass their acceptance cases. GitHub connection is now implemented with automated and live happy-path evidence; durable requests and the broader outstanding acceptance work remain. Do not treat the four checks as evidence that the entire product phase is done.
 
 Desktop only. Do not add mobile checks unless the user changes the project scope.
 
@@ -21,11 +21,12 @@ Desktop only. Do not add mobile checks unless the user changes the project scope
 | --- | --- |
 | `/` | Redirects to `/applications`, never automatically selects the newest application. |
 | `/applications` | Lists application/repository identity, target and passing-check count; empty state offers Add application. |
-| `/applications/new` | Blank HTTPS/SSH GitHub repository input and explicit permission policy, initially Pi decides. Success opens the returned workspace. |
+| `/applications/new` | Blank HTTPS/SSH GitHub repository input and explicit permission policy, initially Pi decides. Shows the selected GitHub account, or a Connect GitHub action; submission is disabled until a connection is chosen. Success opens the returned workspace. |
 | `/applications/[applicationId]` | Selected application's chats/checks; application-name menu provides switching, adding and confirmed removal. Unknown or removed identity returns 404, never another app. |
 | `/setup/pi` | Settings: account first, model/effort, then View applications. Changed preferences save before navigation. Storage & privacy opens technical details. |
+| `/setup/github` | Automatically identifies reusable GitHub credentials, requires consent to reuse, or starts a separate GitHub App device login. Shows account, source, expiry/recovery, repository-installation link for App connections and disconnect. |
 
-Pi configuration is installation-wide; chats, Decisions, Observations and checks are application-scoped. Switching applications clears transient drafts, drawers, errors and busy state. Production is a target, not evidence of deployment. Prototype A is the real setup screen; no variant parameter or demo controls are required.
+Pi and GitHub connections are installation-wide; chats, Decisions, Observations and checks are application-scoped. Switching applications clears transient drafts, drawers, errors and busy state. Production is a target, not evidence of deployment. Prototype A is the real setup screen; no variant parameter or demo controls are required.
 
 Reuse must import the detected model/effort with explicit consent. Separate sign-in preserves the draft selection and writes a new attempt-specific credential file. Only successful login activates it by atomically replacing Server Guy's configuration pointer; cancellation/failure leaves the old login and preferences intact. Existing accepted credentials remain available to in-flight turns. Global Pi model preferences are never overwritten; unrelated tools/extensions/instructions are never imported. Reading saved credentials does not prove live provider access.
 
@@ -66,6 +67,8 @@ Each case needs assertions about both what the engineer sees and the resulting s
 | P1-14 Check drawer and record tabs | Open each check; navigate Record/Activity/Changes/Receipts; close via X, Escape and backdrop; choose Ask Pi. | Correct evidence and history; no invented external changes. Modal contains focus and restores it on close. Ask Pi closes the drawer, prefills and focuses the composer. |
 | P1-15 Login transport and late callbacks | Interrupt an attempt-status poll then restore it; return 404 for a missing attempt; cancel before a late callback; simulate SDK post-write synchronization failure. | Transient failure retries with Cancel available; 404 is terminal. Late callbacks cannot revive cancellation. A saved login plus local sync failure is distinguished from failed OAuth, without serializing the credential-bearing error. |
 | P1-16 Model/runtime boundary | Reuse non-default supported model/effort; change away from a Max-capable model; tamper with saved provider/effort/API credentials; inspect already-running versus new turn configuration. | Reuse uses detected settings, invalid combinations are rejected or reset visibly, and new turns use saved preferences while in-flight turns keep their snapshot. API-key/other-provider fallback is rejected before provider authentication. |
+| P1-17 GitHub connection | Detect/reuse a login; complete/cancel/deny/expire separate App device login; disconnect and reconnect; change/revoke the credential. | Detection alone grants no application access. Tokens never reach browser data/evidence. Replacement activates only on success; late callbacks cannot undo cancellation or disconnect. History survives; old checks require re-verification. |
+| P1-18 Exact GitHub access | Check a selected private repository; deny scope, suspend/uninstall the App or omit that repository; retry after fixing access. Return a changed account/repository ID or a different repository at the same URL. | Only the exact accessible repository/commit with the current connection can pass. Safe evidence distinguishes the user's repository role from the App's permissions. Failure stays visible and cannot inherit a stale pass. No repository writes. |
 
 P1-06 has two layers: deterministic fixture tests prove persistence/UI plumbing; live Pi cases prove model behavior. Do not substitute one for the other.
 
@@ -74,6 +77,8 @@ P1-06 has two layers: deterministic fixture tests prove persistence/UI plumbing;
 **Start an application from scratch:** open its name in the workspace header, choose **Remove application…**, type the displayed `owner/name`, and confirm. Removal is permanent; it is not chat archival and has no undo. Re-add the same repository in the form that opens afterward. Its GitHub repository, all other applications and installation-wide login are untouched.
 
 **Disconnect ChatGPT from Server Guy:** open **Settings → Disconnect**. This removes `pi-settings.json` (the saved consent/connection/model selection) and cancels pending sign-in attempts. It does **not** delete accepted OAuth files, revoke provider tokens, sign out ChatGPT/Pi, or clear application records. Shared Pi login files must never be deleted by this control. Reconnecting requires another explicit choice.
+
+**Disconnect GitHub from Server Guy:** open **Settings → GitHub → Disconnect**. This cancels its pending sign-in and replaces the owned `github-connection.json` with `null`, removing its current saved token/selection. GitHub CLI/environment credentials and application history are untouched. Upstream authorization is revoked separately on GitHub. A newly selected connection requires a fresh repository check.
 
 No “nuke everything” browser endpoint is needed. For repeated automated runs, use isolated temporary databases/configuration instead of clearing the user's working installation.
 
@@ -108,16 +113,16 @@ Start a disposable desktop fixture in another terminal:
 node tests/browser/qa-fixture.mjs 3112 success fresh
 ```
 
-Open `http://127.0.0.1:3112/`. Each invocation creates a new temporary app copy, SQLite database and Pi/config directories. It does not copy `.server-guy`, `.env` or user credentials. The startup output names those directories. Stop with Ctrl+C; temporary files are retained for diagnosis. Use another free port from 3100–3999 for a separate run, never the user's port 3000.
+Open `http://127.0.0.1:3112/`. Each invocation creates a new temporary app copy, SQLite database and Pi/config directories. It does not copy `.server-guy`, `.env` or user credentials. The startup output names those directories. Stop with Ctrl+C; the fixture stops Next.js and deletes its temporary files. Only a hard kill can leave scratch state behind. Use another free port from 3100–3999 for a separate run, never the user's port 3000.
 
-Options: `success`/`failure` chooses synthetic OAuth outcome; `fresh`/`ready` chooses starting configuration. These replace OAuth routes: real coordinator races are covered by the Vitest tests, not this simulated login UI.
+Options: `success`/`failure` chooses synthetic ChatGPT OAuth outcome; `fresh`/`ready` chooses starting configuration. ChatGPT OAuth routes are replaced; real Pi coordinator races are covered by Vitest. GitHub uses its real routes/coordinator and synthetic API/device/credential responses; edit the fixture's `state/github-scenario.json` for `login: pending|denied|expired|success`, `credential: missing|changed`, or `repository: missing-scope|denied|revoked`. Omitted fields use the successful fixture. No real accounts are contacted.
 
 Useful fixture inputs:
 
 | Input | Scenario |
 | --- | --- |
 | `https://github.com/qa/example` | Synthetic readable repository; no GitHub write. |
-| Repository name containing `missing`, `offline`, or `recovering` | Access failure, network failure, or first-check failure followed by recovery. |
+| Repository name containing `missing` or `offline` | Access failure or network failure. For recoverable permission denial, set `repository: missing-scope` in the fixture scenario, then clear it and re-run the check. |
 | Repository name containing `slow-create` | Slow creation; leaving the form must not trigger late navigation. |
 | `priority: Fast recovery matters most` | A synthetic typed Decision proposal. |
 | `replace-priority: Simplicity matters most` | A synthetic replacement proposal. |
@@ -136,7 +141,7 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Desktop automation and CI policy
 
-The [checked-in desktop suite](../../tests/browser/phase-one.spec.ts) has eight application scenarios, plus a [dashboard review scenario](../../tests/browser/dashboard.spec.ts). These cover selected branches of the contract, not every branch of all sixteen cases. Fresh setup/device-code variants, further evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
+The [shared catalog](../../tests/browser/journeys.ts) contains ten selectable groups: eight original application groups, [GitHub connection](../../tests/browser/github.spec.ts) and dashboard testing. The complete suite currently has sixteen test cases; one group can contain several tests. These cover selected contract branches, not every branch of all eighteen acceptance cases. Further fresh Pi setup/device-code variants, evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
 
 The dashboard's **Choose journeys** dialog describes each scenario and runs only the selected stable tags from [the shared catalog](../../tests/browser/journeys.ts), without scrolling away from the suite table. Empty, duplicate and unknown selections are rejected. Browser smoke remains the two tagged smoke journeys; selecting a local subset does not change CI.
 
@@ -218,6 +223,10 @@ Before declaring the complete Phase 1 follow-up sequence done, also prove:
 Deployment, infrastructure provisioning, monitoring automations, and Phase 2 work remain outside this Phase 1 acceptance contract. Workflow DevKit is still a later complexity-triggered choice, not a test runner.
 
 ## Latest verification
+
+**2026-09-04 — explicit GitHub connection:** 312 deterministic Vitest tests in 28 files and the complete 16-test desktop suite passed; TypeScript, ESLint and the production build passed. GitHub tests cover consent, file privacy, exact account/repository identity, selected-installation membership, revoked/expired credentials, missing scope, inaccessible private repositories, cancellation/late callbacks, disconnect/reconnect and safe evidence. The browser coordinator and domain code are real; upstream GitHub responses are synthetic in the automated suite. No live Pi or LLM-judge calls and no mobile checks.
+
+**Live GitHub evidence, 2026-09-04 19:05 UTC; reverified at 19:15 UTC:** with explicit user authorization, registered the account-restricted `server-guy-local` App, installed it for only the existing private `todo-fastapi` repository with Contents/Metadata read permissions, completed device login, and re-ran its repository check in the product UI. The new Observation passed at exact commit `04e98710b1b60028152d833fa7c7ac180e85d0a7` with numeric repository, account and installation IDs recorded locally. The final-code rerun confirmed that the read-only App grant and the account's broader repository role are recorded separately. No App private key or client secret was generated, no repository writes were made, and prior chats/evidence remained. Live denial/revocation/expiry were not forced on the user's connection; those cases use controlled automated fixtures. App login expires and requires sign-in again; CI cannot inherit this live result or access these credentials.
 
 **2026-09-04 — one-click review and automatic judging:** 266 Vitest tests passed (the new dashboard tests cover reviewer-less verdicts and the automatic judge run after a live eval); the desktop dashboard journey passed (5.6 seconds) covering the single-step run and judge confirmations, one-click and keyboard verdicts with auto-advance, optional notes, bulk Pass/Fail, judging unjudged answers by default, archive/restore and the 16-answer queue. Lint and TypeScript passed. `tests/application/integration/journey-catalog.test.ts` fails only because two additional `@journey-dashboard` spec files were added concurrently outside this change. Synthetic saved data only; no live model calls.
 

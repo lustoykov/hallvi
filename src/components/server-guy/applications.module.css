@@ -31,6 +31,8 @@
 .attention { color: #8b4b15; }
 .newContent { max-width: 780px; padding-top: 42px; }
 .form { padding: 28px; border: 1px solid #d8e0ec; border-radius: 12px; background: white; }
+.githubConnection { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid #d8e0ec; font-size: 14px; }
+.githubConnection > a { color: #2852a6; white-space: nowrap; }
 .field, .permissions legend { display: block; font-size: 14px; font-weight: 650; margin-bottom: 10px; }
 .form > input { width: 100%; height: 46px; border: 1px solid #bcc9dd; border-radius: 8px; padding: 10px 12px; font-size: 15px; caret-color: #285ad8; }
 .form > input::placeholder { color: #626f85; }

@@ -1,7 +1,8 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { z } from "zod";
 
-const execFileAsync = promisify(execFile);
+import { GithubAccessError, githubJson } from "./github-api";
+import { connectedGithubCredential, currentGithubConnectionId, githubAccountSchema, invalidateGithubConnection } from "./github-connection";
+import type { GithubConnection } from "./github-connection";
 
 export interface RepositoryIdentity {
   owner: string;
@@ -15,12 +16,21 @@ export interface GithubInspection {
   sourceUrl: string;
   raw: {
     repository: string;
+    repositoryId?: number;
+    connectionId?: string;
+    credentialSource?: string;
+    accountId?: number;
+    scopes?: string[];
+    installationId?: number;
+    repositorySelection?: string;
+    grantedPermissions?: Record<string, string>;
+    checkedAt?: string;
     visibility?: string;
     defaultBranch?: string;
     commitSha?: string;
     commitUrl?: string;
     authenticatedAs?: string;
-    permissions?: Record<string, boolean>;
+    accountRepositoryPermissions?: Record<string, boolean>;
     error?: string;
   };
 }
@@ -66,70 +76,87 @@ export function classifyGithubFailure(error: unknown): {
   status: "failed" | "unavailable";
   reason: string;
 } {
-  const details = error as {
-    code?: unknown;
-    killed?: unknown;
-    signal?: unknown;
-    stderr?: unknown;
-    message?: unknown;
-  };
-  if (details?.killed === true || typeof details?.signal === "string") {
-    return { status: "unavailable", reason: "gh did not respond in time." };
-  }
-  const stderr = typeof details?.stderr === "string" ? details.stderr.trim() : "";
-  const message = typeof details?.message === "string" ? details.message.trim() : "";
-  const reason = stderr || message || "GitHub inspection failed.";
-  const unavailable =
-    details?.code === "ENOENT" ||
-    /not logged|auth|rate limit|timed? ?out|network|connect|spawn|not found.*command/i.test(reason);
-  return { status: unavailable ? "unavailable" : "failed", reason };
+  return error instanceof GithubAccessError
+    ? { status: error.kind === "access" ? "failed" : "unavailable", reason: error.message }
+    : { status: "unavailable", reason: "GitHub returned an unreadable response. Try the check again." };
 }
 
-async function ghJson<T>(args: string[]): Promise<T> {
-  const { stdout } = await execFileAsync("gh", args, {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    maxBuffer: 2_000_000,
-    timeout: 20_000,
-  });
-  return JSON.parse(stdout) as T;
+const repositorySchema = z.object({
+  id: z.number().int().positive(), full_name: z.string(), visibility: z.string(),
+  default_branch: z.string().min(1).max(1024), permissions: z.record(z.string(), z.boolean()).optional(),
+});
+const installationSchema = z.object({
+  id: z.number().int().positive(), app_slug: z.string(), account: githubAccountSchema,
+  permissions: z.record(z.string(), z.string()), repository_selection: z.enum(["all", "selected"]),
+  suspended_at: z.string().nullable(),
+});
+
+async function verifyInstallation(token: string, connection: GithubConnection, repo: z.infer<typeof repositorySchema>) {
+  if (connection.mode !== "app") return {};
+  const owner = repo.full_name.split("/")[0];
+  for (let page = 1; page <= 20; page++) {
+    const { installations } = z.object({ installations: z.array(installationSchema) }).parse((await githubJson(`/user/installations?per_page=100&page=${page}`, token)).data);
+    for (const installation of installations.filter((item) => item.app_slug === connection.slug && item.account.login.toLowerCase() === owner.toLowerCase())) {
+      if (installation.suspended_at || !["read", "write"].includes(installation.permissions.contents)) throw new GithubAccessError("Grant Server Guy read access to repository contents on GitHub, then run the check again.", "access");
+      for (let repoPage = 1; repoPage <= 20; repoPage++) {
+        const { repositories } = z.object({ repositories: z.array(z.object({ id: z.number().int().positive() })) }).parse((await githubJson(`/user/installations/${installation.id}/repositories?per_page=100&page=${repoPage}`, token)).data);
+        if (repositories.some((item) => item.id === repo.id)) return { installationId: installation.id, repositorySelection: installation.repository_selection, grantedPermissions: installation.permissions };
+        if (repositories.length < 100) break;
+      }
+    }
+    if (installations.length < 100) break;
+  }
+  throw new GithubAccessError("Allow this exact repository in Server Guy’s GitHub App installation, then run the check again.", "access");
 }
 
 export async function inspectGithubRepository(
   repository: RepositoryIdentity,
+  expectedRepositoryId?: number,
 ): Promise<GithubInspection> {
   const sourceUrl = repository.canonicalUrl;
+  const fullName = `${repository.owner}/${repository.name}`;
+  const checkedAt = new Date().toISOString();
+  let connection: GithubConnection | undefined;
 
   try {
-    const repo = await ghJson<{
-      full_name: string;
-      html_url: string;
-      visibility: string;
-      default_branch: string;
-      permissions?: Record<string, boolean>;
-    }>(["api", `repos/${repository.owner}/${repository.name}`]);
-
-    const commit = await ghJson<{ sha: string; html_url: string }>([
-      "api",
-      `repos/${repository.owner}/${repository.name}/commits/${repo.default_branch}`,
-    ]);
-    const user = await ghJson<{ login: string }>(["api", "user"]).catch(() => null);
+    const credential = await connectedGithubCredential();
+    connection = credential.connection;
+    const { token } = credential;
+    const identity = await githubJson("/user", token);
+    const account = githubAccountSchema.parse(identity.data);
+    if (account.id !== connection.account.id) throw new GithubAccessError("The GitHub account changed. Choose a connection again in Settings.", "auth");
+    const repo = repositorySchema.parse((await githubJson(`/repos/${fullName}`, token)).data);
+    if (expectedRepositoryId !== undefined && repo.id !== expectedRepositoryId) throw new GithubAccessError("This URL now belongs to a different repository. Add it as a new application to avoid reusing the old repository’s history.", "access");
+    if (repo.full_name.toLowerCase() !== fullName.toLowerCase()) throw new GithubAccessError("GitHub returned a different repository. Check the selected repository URL.", "access");
+    const scope = await verifyInstallation(token, connection, repo);
+    const commit = z.object({ sha: z.string().regex(/^[a-f0-9]{40}$/) }).parse((await githubJson(`/repos/${fullName}/commits/${encodeURIComponent(repo.default_branch)}`, token)).data);
+    if (currentGithubConnectionId() !== connection.id) throw new GithubAccessError("The connection changed during this check. Run it again.", "auth");
+    const commitUrl = `${sourceUrl}/commit/${commit.sha}`;
 
     return {
       status: "passed",
       summary: `${repo.full_name} is readable at ${repo.default_branch} · ${commit.sha.slice(0, 8)}.`,
-      sourceUrl: commit.html_url,
+      sourceUrl: commitUrl,
       raw: {
         repository: repo.full_name,
+        repositoryId: repo.id,
+        connectionId: connection.id,
+        credentialSource: connection.mode === "cli" ? connection.source : "Server Guy GitHub App",
+        accountId: account.id,
+        scopes: identity.scopes,
+        ...scope,
+        checkedAt,
         visibility: repo.visibility,
         defaultBranch: repo.default_branch,
         commitSha: commit.sha,
-        commitUrl: commit.html_url,
-        authenticatedAs: user?.login,
-        permissions: repo.permissions,
+        commitUrl,
+        authenticatedAs: account.login,
+        // The account's repository role is not the App token's effective grant.
+        accountRepositoryPermissions: repo.permissions,
       },
     };
   } catch (error) {
+    if (connection && error instanceof GithubAccessError && error.kind === "auth") invalidateGithubConnection(connection, error.message);
     const failure = classifyGithubFailure(error);
     return {
       status: failure.status,
@@ -139,7 +166,9 @@ export async function inspectGithubRepository(
           : `${repository.owner}/${repository.name} is not readable with the current GitHub access: ${failure.reason}`,
       sourceUrl,
       raw: {
-        repository: `${repository.owner}/${repository.name}`,
+        repository: fullName,
+        connectionId: connection?.id,
+        checkedAt,
         error: failure.reason,
       },
     };

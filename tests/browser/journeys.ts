@@ -8,6 +8,7 @@ export const browserJourneys = [
   { id: "removal", name: "Remove and recreate an application", description: "Require the repository name as confirmation; recreate it with fresh IDs and no old Decisions.", smoke: false },
   { id: "disconnect", name: "Disconnect without losing history", description: "Keep chats, disable new messages and require consent before reusing a discovered login.", smoke: false },
   { id: "slow-reply", name: "Handle a slow reply and double Enter", description: "Save one message pair and preserve the next draft typed while waiting.", smoke: false },
+  { id: "github-connection", name: "Connect GitHub and verify repository access", description: "Reuse a login with consent, authorize or cancel a separate account, verify repository permissions, disconnect and re-check.", smoke: false },
   { id: "dashboard", name: "Testing dashboard and saved reviews", description: "Check selection, spending confirmation and saved human reviews. Tests this dashboard, not the product app.", smoke: false },
 ] as const;
 

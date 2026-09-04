@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { classifyGithubFailure, parseGithubRepository } from "../../../src/server/github";
+import { GithubAccessError } from "../../../src/server/github-api";
 
 describe("parseGithubRepository", () => {
   it("normalizes an HTTPS GitHub URL", () => {
@@ -57,32 +58,18 @@ describe("parseGithubRepository", () => {
 });
 
 describe("classifyGithubFailure", () => {
-  it("marks missing or unauthenticated GitHub tooling as unavailable", () => {
-    expect(classifyGithubFailure({ code: "ENOENT", message: "spawn gh ENOENT" })).toEqual({
-      status: "unavailable",
-      reason: "spawn gh ENOENT",
-    });
-    expect(classifyGithubFailure({ stderr: "gh: not logged into any GitHub hosts" })).toEqual({
-      status: "unavailable",
-      reason: "gh: not logged into any GitHub hosts",
-    });
+  it("marks authentication failures as unavailable", () => {
+    expect(classifyGithubFailure(new GithubAccessError("Reconnect", "auth"))).toEqual({ status: "unavailable", reason: "Reconnect" });
   });
 
-  it("marks a killed gh process as unavailable rather than a failed repository check", () => {
-    expect(
-      classifyGithubFailure({
-        killed: true,
-        signal: "SIGTERM",
-        code: null,
-        message: "Command failed: gh api repos/lustoykov/todo-fastapi\n",
-      }),
-    ).toEqual({ status: "unavailable", reason: "gh did not respond in time." });
+  it("does not expose raw provider/CLI errors or credentials", () => {
+    expect(classifyGithubFailure({ stderr: "ghp_private-token", message: "Authorization: secret" })).toEqual({ status: "unavailable", reason: "GitHub returned an unreadable response. Try the check again." });
   });
 
   it("preserves provider errors that mean the repository check failed", () => {
-    expect(classifyGithubFailure({ stderr: "gh: Not Found (HTTP 404)" })).toEqual({
+    expect(classifyGithubFailure(new GithubAccessError("Repository access denied", "access"))).toEqual({
       status: "failed",
-      reason: "gh: Not Found (HTTP 404)",
+      reason: "Repository access denied",
     });
   });
 });

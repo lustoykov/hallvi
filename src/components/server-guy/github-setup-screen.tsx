@@ -1,0 +1,144 @@
+"use client";
+
+import { ArrowLeft, ArrowRight, ArrowSquareOut, Check, Copy, SpinnerGap, X } from "@phosphor-icons/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { GithubLoginAttempt, GithubSetupStatus } from "@/server/github-setup";
+import { ConfirmActionDialog } from "./confirm-action-dialog";
+import { SettingsNav } from "./settings-nav";
+import s from "./pi-setup-screen.module.css";
+
+async function request<T>(url: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body), cache: "no-store", signal });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) throw new Error(data?.error ?? "Could not reach Server Guy. Try again.");
+  return data;
+}
+const waiting = (attempt: GithubLoginAttempt | null) => attempt?.status === "waiting" || attempt?.status === "starting";
+const sourceLabel = (source: string) => source === "gh" ? "Existing GitHub CLI login" : source === "Server Guy" ? "Separate login for Server Guy" : `${source} environment variable`;
+
+/** Extend the chosen Pi setup layout: account, repository access, then one Continue action. */
+export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { initialStatus: GithubSetupStatus; returnToAdd?: boolean }) {
+  const router = useRouter();
+  const [status, setStatus] = useState(initialStatus);
+  const [attempt, setAttempt] = useState(initialStatus.attempt);
+  const [choosing, setChoosing] = useState(!initialStatus.connection || Boolean(initialStatus.issue));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState<number | null>(null);
+  const generation = useRef(0);
+  const inFlight = useRef(false);
+  const working = waiting(attempt);
+  const connected = Boolean(status.connection && !status.issue);
+  const candidate = status.detected.candidate;
+
+  useEffect(() => {
+    if (!working) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [working]);
+
+  useEffect(() => {
+    if (!waiting(attempt)) return;
+    const current = attempt!;
+    const controller = new AbortController();
+    const expected = generation.current;
+    const timeout = window.setTimeout(async () => {
+      try {
+        const next = await request<GithubLoginAttempt>(`/api/github/setup/login/${current.id}`, "POST", {}, controller.signal);
+        const saved = next.status === "connected" ? await request<GithubSetupStatus>("/api/github/setup", "GET", undefined, controller.signal) : null;
+        if (controller.signal.aborted || generation.current !== expected) return;
+        if (saved) { setStatus(saved); setChoosing(false); router.refresh(); }
+        setAttempt(next); setError(null);
+      } catch (caught) {
+        if (controller.signal.aborted || generation.current !== expected) return;
+        setError(caught instanceof Error ? caught.message : "Could not check sign-in. Try again.");
+        setAttempt({ ...current, status: "failed" });
+      }
+    }, current.intervalSeconds * 1000);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [attempt, router]);
+
+  async function act(work: () => Promise<void>) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true); setError(null);
+    try { await work(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Could not change GitHub settings."); }
+    finally { setBusy(false); inFlight.current = false; }
+  }
+  async function refresh() {
+    const fresh = await request<GithubSetupStatus>("/api/github/setup");
+    setStatus(fresh); setAttempt(fresh.attempt);
+    return fresh;
+  }
+  async function useExisting() {
+    generation.current++;
+    const fresh = await request<GithubSetupStatus>("/api/github/setup", "POST", { candidateId: candidate?.id });
+    setStatus(fresh); setAttempt(null); setChoosing(false); router.refresh();
+  }
+  async function disconnect() {
+    generation.current++;
+    const fresh = await request<GithubSetupStatus>("/api/github/setup", "DELETE", { confirm: "disconnect" });
+    setStatus(fresh); setAttempt(null); setChoosing(true); setConfirmDisconnect(false); router.refresh();
+  }
+  const remaining = attempt?.expiresAt && now ? Math.max(0, Math.ceil((Date.parse(attempt.expiresAt) - now) / 1000)) : null;
+
+  return <main className={`sg-setup-shell ${s.root}`}>
+    <header className="sg-setup-topbar">
+      <Link className="sg-setup-brand" href="/applications"><span className="sg-app-mark">SG</span><span>Server Guy</span></Link>
+      <Link className="sg-setup-back" href="/applications"><ArrowLeft /> All applications</Link>
+    </header>
+    <div className={s.page}>
+      <SettingsNav current="github" />
+      <div className={s.heading}><h1>Connect GitHub</h1><p>Choose which login Server Guy uses to read your repositories.</p></div>
+      <section className={s.card}>
+        <section className={s.section} aria-labelledby="github-account-heading">
+          <h2 id="github-account-heading">GitHub account</h2>
+          {working && attempt ? <div className={s.device}>
+            {connected && status.connection && <p className={s.hint}>Using {status.connection.account.login} until the new sign-in succeeds.</p>}
+            <p>Enter this code on GitHub:</p>
+            <div className={s.codeRow}><code>{attempt.userCode ?? "Getting code…"}</code><button className={s.textButton} disabled={!attempt.userCode} onClick={() => { void navigator.clipboard.writeText(attempt.userCode!).then(() => setCopied(true)).catch(() => setError("Select the code to copy it manually.")); }}><Copy />{copied ? "Copied" : "Copy code"}</button></div>
+            <a className={s.primary} href={attempt.verificationUrl} target="_blank" rel="noreferrer">Open GitHub <ArrowSquareOut /></a>
+            <p role="status"><SpinnerGap className="spin" /> Waiting for sign-in…</p>
+            {remaining !== null && <p aria-live="off">Code expires in {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</p>}
+            <button className={s.textButton} disabled={busy} onClick={() => void act(async () => { generation.current++; setAttempt(await request<GithubLoginAttempt>(`/api/github/setup/login/${attempt.id}`, "DELETE", {})); })}>Cancel sign-in</button>
+          </div> : connected && !choosing && status.connection ? <>
+            <div className={s.accountRow}><div><strong className={s.success} role="status"><Check />Connected as {status.connection.account.login}</strong><p>{sourceLabel(status.connection.source)}</p></div><button className={s.textButton} disabled={busy} onClick={() => void act(async () => { await refresh(); setChoosing(true); })}>Change</button></div>
+            {status.connection.expiresAt && <p className={s.connectionHelp}>This login expires {new Date(status.connection.expiresAt).toISOString().replace("T", " ").slice(0, 16)} UTC. Sign in again after expiry.</p>}
+          </> : <div className={s.actions}>
+            {candidate && <><div className={s.savedLogin}><Check /><div><strong>Found {candidate.account.login}</strong><p>{sourceLabel(candidate.source)}</p></div></div>
+              <div className={s.choiceActions}><button className={s.primary} disabled={busy} onClick={() => void act(useExisting)}>Use existing login</button>{status.registration && <button className={s.textButton} disabled={busy} onClick={() => void act(async () => { generation.current++; setCopied(false); setAttempt(await request<GithubLoginAttempt>("/api/github/setup/login", "POST", {})); })}>Connect another account</button>}</div>
+              <p className={s.hint}>Uses this login’s existing permissions. Server Guy will only read repositories in this phase.</p>
+            </>}
+            {!candidate && status.registration && <button className={s.primary} disabled={busy} onClick={() => void act(async () => { generation.current++; setCopied(false); setAttempt(await request<GithubLoginAttempt>("/api/github/setup/login", "POST", {})); })}>Connect GitHub</button>}
+            {!status.registration && <details className={s.connectionHelp} open={!candidate}><summary>Enable a separate GitHub login</summary><p>The owner of this Server Guy installation needs to register its GitHub App. Set these values, then restart Server Guy:</p><code>SERVER_GUY_GITHUB_CLIENT_ID<br />SERVER_GUY_GITHUB_APP_SLUG</code><p>Enable device flow and Contents: read-only. Keep user-token expiration enabled.</p><a href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Register GitHub App</a></details>}
+            {status.detected.issue && <p className={s.hint}>{status.detected.issue}</p>}
+            <button className={s.textButton} disabled={busy} onClick={() => void act(async () => { await refresh(); })}>Check again</button>
+            {connected && <button className={s.textButton} disabled={busy} onClick={() => { setChoosing(false); setAttempt(null); }}>Keep current connection</button>}
+          </div>}
+          {(error ?? status.issue ?? attempt?.message) && !confirmDisconnect && <p role="alert" className={s.error}>{error ?? status.issue ?? attempt?.message}</p>}
+          <div className={s.privacy}><button className={s.textButton} popoverTarget="github-storage">Storage &amp; privacy</button>{status.connection && <button className={`${s.textButton} ${s.disconnect}`} disabled={busy || working} onClick={() => setConfirmDisconnect(true)}>Disconnect</button>}</div>
+        </section>
+        <section className={s.section}>
+          <h2>Repository access</h2>
+          <p className={s.hint}>{status.connection?.mode === "app" ? "Install Server Guy on GitHub for the repositories you want it to read. Adding an application checks its access and exact commit." : connected ? "Adding an application checks repository access using your existing login and records the exact commit." : "Connect an account first. When you add an application, Server Guy checks its repository access and exact commit."}</p>
+          {status.connection?.mode === "app" && <p><a className={s.textButton} href={status.connection.accessUrl} target="_blank" rel="noreferrer">Choose repositories on GitHub <ArrowSquareOut /></a></p>}
+        </section>
+        <footer className={s.footer}><Link className={s.primary} href={returnToAdd ? "/applications/new" : "/applications"}>{returnToAdd ? "Back to add application" : "View applications"}<ArrowRight /></Link></footer>
+      </section>
+    </div>
+    <aside popover="auto" id="github-storage" className={s.help} aria-labelledby="github-storage-title">
+      <header><h2 id="github-storage-title">Storage &amp; privacy</h2><button className={s.close} popoverTarget="github-storage" popoverTargetAction="hide" aria-label="Close GitHub help"><X /></button></header>
+      <h3>Existing login</h3><p>Server Guy reads the GitHub CLI’s login or the server’s GH_TOKEN / GITHUB_TOKEN environment variable. It checks the account with GitHub automatically. Reuse requires your choice; tokens are never copied from the CLI into Server Guy’s settings.</p>
+      <h3>Separate login</h3><p>GitHub sign-in stores a user access token in the file below. It is not encrypted; the file is readable and writable only by the operating-system user running Server Guy. Your password never reaches Server Guy.</p><code>{status.storagePath}</code>
+      <p>For this local prototype, expiring tokens require sign-in again. Server Guy does not ship a GitHub App private key or client secret.</p>
+      <h3>Permissions</h3><p>The GitHub App limits access to installed repositories and its granted permissions. Reusing a CLI login keeps that credential’s existing scope, which may be broader. Server Guy currently makes only read requests to the repository.</p>
+      <h3>Disconnect</h3><p>Disconnect removes Server Guy’s saved login and token. The CLI login and environment variables stay intact. Application history remains, and repository checks require a new connection and re-verification. To revoke the authorization on GitHub too, open <a href="https://github.com/settings/apps/authorizations" target="_blank" rel="noreferrer">authorized GitHub Apps</a>.</p>
+    </aside>
+    {confirmDisconnect && <ConfirmActionDialog title="Disconnect GitHub?" description="Removes Server Guy’s saved connection. Application history stays; repository access must be checked again after reconnecting. Your GitHub CLI login is unchanged." action="Disconnect" busy={busy} error={error} onCancel={() => { setConfirmDisconnect(false); setError(null); }} onConfirm={() => void act(disconnect)} />}
+  </main>;
+}

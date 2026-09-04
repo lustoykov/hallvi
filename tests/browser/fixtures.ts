@@ -44,6 +44,8 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
     // Restore synthetic preferences after settings tests, without touching user state.
     const path = join(fixture.state, "pi-settings.json");
     const settings = readFileSync(path, "utf8");
+    const githubPath = join(fixture.state, "github-connection.json");
+    const githubSettings = readFileSync(githubPath, "utf8");
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.context().route("**/*", (route) => {
@@ -51,7 +53,11 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
       return origin === fixture.url ? route.continue() : route.abort();
     });
     try { await provide(page); }
-    finally { writeFileSync(path, settings, { mode: 0o600 }); }
+    finally {
+      writeFileSync(path, settings, { mode: 0o600 });
+      writeFileSync(githubPath, githubSettings, { mode: 0o600 });
+      writeFileSync(join(fixture.state, "github-scenario.json"), "{}", { mode: 0o600 });
+    }
     expect(errors, "Unexpected browser exceptions").toEqual([]);
   },
 });

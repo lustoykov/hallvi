@@ -2,12 +2,12 @@
 const browserGuide = {
   execution: "Playwright drives Chromium against a disposable Next.js app. The dashboard journey starts its own temporary testing dashboard.",
   real: "Browser, UI, HTTP routes, domain logic and SQLite. Clicks, reloads and error handling run through real application code.",
-  mocked: "Pi replies, GitHub and login responses are synthetic. Dashboard tests simulate runner launches and saved answers; no model or provider calls.",
+  mocked: "Pi replies and ChatGPT login responses are synthetic. GitHub API responses and credential discovery are synthetic, but its setup routes and login coordinator are real. Dashboard tests simulate runner launches and saved answers; no model or provider calls.",
   isolation: "Product journeys start one disposable Server Guy app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js stops and the whole /tmp/server-guy-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
   checks: "Code assertions check visible UI and saved state: for example, send a priority, reload, and verify its message and Decision. No human or LLM grading.",
   limits: "Passing proves the selected journeys work with simulated providers. It does not prove real OAuth, GitHub access or model response quality.",
   artifacts: "HTML report, failure screenshots and traces: tests/results/browser-report/ and tests/results/browser-artifacts/.",
-  sources: ["tests/browser/fixtures.ts", "tests/browser/phase-one.spec.ts", "tests/browser/journeys.ts"],
+  sources: ["tests/browser/fixtures.ts", "tests/browser/phase-one.spec.ts", "tests/browser/github.spec.ts", "tests/browser/journeys.ts"],
 };
 
 export const suiteGuides = {

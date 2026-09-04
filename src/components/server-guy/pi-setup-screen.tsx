@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { DetectedPiSetup } from "@/server/pi-configuration";
 import type { PiLoginAttempt, PiSetupStatus } from "@/server/pi-setup";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
 
 class SetupRequestError extends Error {
@@ -155,6 +156,7 @@ export function PiSetupScreen({ initialStatus }: { initialStatus: PiSetupStatus 
       <Link className="sg-setup-back" href="/applications"><ArrowLeft /> All applications</Link>
     </header>
     <div className={s.page}>
+      <SettingsNav current="pi" />
       <header className={s.heading}><h1>Settings</h1><p>ChatGPT account and model preferences.</p></header>
       <section className={s.card} aria-label="ChatGPT and model settings">
         <section className={s.section} aria-labelledby="account-heading">

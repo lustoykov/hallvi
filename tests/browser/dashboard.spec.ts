@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDashboard } from "../dashboard/server";
 import { directory, listReports, loadReport, saveReview, writeJson } from "../dashboard/results";
-import { journey } from "./journeys";
+import { browserJourneys, journey } from "./journeys";
 import { JUDGE_PROMPT_VERSION } from "../evals/judge-policy";
 
 test("dashboard reviews saved answers without model calls or changing source results", journey("dashboard"), async ({ page }, testInfo) => {
@@ -49,8 +49,8 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.getByRole("columnheader", { name: "AI usage", exact: true })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "CI", exact: true })).toBeVisible();
     const browserRow = page.getByRole("row").filter({ hasText: "Browser journeys" });
-    await expect(browserRow.locator(".suite-schedule > span")).toHaveText("2 of 9 per PR");
-    await expect(browserRow.locator(".suite-schedule small")).toHaveText("All 9 on demand");
+    await expect(browserRow.locator(".suite-schedule > span")).toHaveText(`2 of ${browserJourneys.length} per PR`);
+    await expect(browserRow.locator(".suite-schedule small")).toHaveText(`All ${browserJourneys.length} on demand`);
     await expect(page.locator("#suites .usage-free")).toHaveCount(3);
     const liveRow = page.getByRole("row").filter({ hasText: "Live agent evals" });
     await expect(liveRow.locator(".usage-paid")).toHaveText("Uses subscription");
@@ -94,7 +94,7 @@ test("dashboard reviews saved answers without model calls or changing source res
     await page.screenshot({ path: testInfo.outputPath("dashboard-runs.png"), fullPage: true });
     await page.getByRole("button", { name: "Choose journeys…" }).click();
     await expect(page.getByRole("dialog", { name: "Choose browser journeys" })).toBeVisible();
-    await expect(page.locator("#journey-options input")).toHaveCount(9);
+    await expect(page.locator("#journey-options input")).toHaveCount(browserJourneys.length);
     await expect(page.locator("#journey-options .ci-badge")).toHaveText(["CI · Every PR", "CI · Every PR"]);
     await page.getByRole("button", { name: "Clear journeys", exact: true }).click();
     // Local selection never changes which journeys belong to automatic CI.
@@ -102,12 +102,12 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.getByRole("button", { name: "Run selected journeys" })).toBeDisabled();
     await page.getByRole("checkbox", { name: /^Settings and privacy help/ }).check();
     await page.getByRole("checkbox", { name: /^Disconnect without losing history/ }).check();
-    await expect(page.locator("#journey-count")).toContainText("2 of 9 journeys selected");
+    await expect(page.locator("#journey-count")).toContainText(`2 of ${browserJourneys.length} journeys selected`);
     await page.screenshot({ path: testInfo.outputPath("dashboard-journey-selection.png"), fullPage: true });
     await page.getByRole("dialog").press("Escape");
     await expect(page.getByRole("button", { name: "Choose journeys…" })).toBeFocused();
     await page.getByRole("button", { name: "Choose journeys…" }).click();
-    await expect(page.locator("#journey-count")).toContainText("2 of 9 journeys selected");
+    await expect(page.locator("#journey-count")).toContainText(`2 of ${browserJourneys.length} journeys selected`);
     await page.getByRole("button", { name: "Run selected journeys" }).click();
     await expect.poll(() => requests.at(-1)).toEqual({ suite: "e2e", journeys: ["settings", "disconnect"] });
     await expect(page.getByRole("dialog")).toHaveCount(0);

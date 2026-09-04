@@ -1,0 +1,42 @@
+// Synthetic provider boundary, copied into disposable apps only. No fetch, no real credentials.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export class GithubAccessError extends Error {
+  constructor(message: string, public readonly kind: "auth" | "access" | "unavailable" = "unavailable") { super(message); }
+}
+function scenario() {
+  if (!process.env.SERVER_GUY_QA_ROOT) throw new Error("QA root required");
+  try { return JSON.parse(readFileSync(join(process.env.SERVER_GUY_CONFIG_DIR!, "github-scenario.json"), "utf8")); }
+  catch { return {}; }
+}
+export async function readGithubCliCredential() {
+  const current = scenario();
+  if (current.credential === "missing") return null;
+  return { token: current.credential === "changed" ? "QA-CHANGED" : "QA-GITHUB-TOKEN", source: "gh" as const };
+}
+export async function githubDeviceRequest(path: string) {
+  const current = scenario();
+  if (path === "/login/device/code") return { device_code: "QA-DEVICE-SECRET", user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 1 };
+  if (current.login === "pending") return { error: "authorization_pending" };
+  if (current.login === "denied") return { error: "access_denied" };
+  if (current.login === "expired") return { error: "expired_token" };
+  return { access_token: "ghu_QA-SYNTHETIC", token_type: "bearer", expires_in: 28800 };
+}
+export async function githubJson(path: string) {
+  const current = scenario();
+  if (current.repository === "revoked") throw new GithubAccessError("GitHub no longer accepts this login. Reconnect in Settings → GitHub.", "auth");
+  let data: unknown;
+  if (path === "/user") data = { id: 42, login: "qa-fixture-user" };
+  else if (path.startsWith("/user/installations?")) data = { installations: [{ id: 7, app_slug: "qa-server-guy", account: { id: 1, login: "qa" }, permissions: { contents: current.repository === "missing-scope" ? "none" : "read", metadata: "read" }, repository_selection: "selected", suspended_at: null }] };
+  else if (path.startsWith("/user/installations/7/repositories")) data = { repositories: current.repository === "denied" ? [] : [{ id: 99 }] };
+  else {
+    const [, , owner, name, action] = path.split("/");
+    if (!owner || !name) throw new Error("Unknown fixture endpoint");
+    if (name.includes("missing")) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
+    if (name.includes("offline")) throw new GithubAccessError("Could not reach GitHub.");
+    if (name.includes("slow-create") && !action) await new Promise((resolve) => setTimeout(resolve, 3000));
+    data = action === "commits" ? { sha: "1234567890abcdef1234567890abcdef12345678" } : { id: 99, full_name: `${owner}/${name}`, visibility: "private", default_branch: "main", permissions: { pull: true, push: false, admin: false } };
+  }
+  return { data, scopes: ["repo"] };
+}

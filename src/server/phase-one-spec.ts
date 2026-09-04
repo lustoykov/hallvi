@@ -120,7 +120,10 @@ function repositoryStatus(repository: Observation | null): GateStatus {
 export function computeChecks(
   application: ApplicationRecord,
   repository: Observation | null,
+  githubConnectionId: string | null,
 ): GateCheck[] {
+  const raw = repository?.raw;
+  const currentRepository = Boolean(githubConnectionId && raw && typeof raw === "object" && "connectionId" in raw && raw.connectionId === githubConnectionId);
   const identityComplete = Boolean(
     application.id &&
       application.name &&
@@ -141,8 +144,10 @@ export function computeChecks(
       canRerun: false,
     },
     "repository-readable": {
-      status: repositoryStatus(repository),
-      result: repository?.summary ?? "The repository has not been checked yet.",
+      status: currentRepository ? repositoryStatus(repository) : "not-yet",
+      result: !githubConnectionId ? "Connect GitHub in Settings, then run the repository check."
+        : !currentRepository ? "Run the repository check with your current GitHub connection."
+        : repository?.summary ?? "The repository has not been checked yet.",
       evidence: repository
         ? [observationEvidence(repository, "Latest repository access result")]
         : [],

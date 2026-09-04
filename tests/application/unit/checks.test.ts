@@ -25,7 +25,7 @@ function repositoryObservation(status: Observation["status"]): Observation {
     summary: `repository ${status}`,
     sourceLabel: "GitHub repository check",
     sourceUrl: null,
-    raw: {},
+    raw: { connectionId: "github-connection" },
     observedAt: "2026-09-01T00:00:02.000Z",
   };
 }
@@ -35,7 +35,7 @@ const statuses = (checks: GateCheck[]) =>
 
 describe("computeChecks", () => {
   it("evaluates configuration independently while waiting for repository evidence", () => {
-    expect(statuses(computeChecks(application, null))).toEqual({
+    expect(statuses(computeChecks(application, null, "github-connection"))).toEqual({
       "application-identity": "passed",
       "repository-readable": "not-yet",
       "target-environment": "passed",
@@ -44,17 +44,17 @@ describe("computeChecks", () => {
   });
 
   it("blocks only when the latest repository evidence refutes readability", () => {
-    const checks = computeChecks(application, repositoryObservation("failed"));
+    const checks = computeChecks(application, repositoryObservation("failed"), "github-connection");
     expect(statuses(checks)["repository-readable"]).toBe("blocked");
   });
 
   it("does not claim a repository failure when GitHub could not be checked", () => {
-    const checks = computeChecks(application, repositoryObservation("unavailable"));
+    const checks = computeChecks(application, repositoryObservation("unavailable"), "github-connection");
     expect(statuses(checks)["repository-readable"]).toBe("not-yet");
   });
 
   it("passes all four checks and cites the exact repository observation", () => {
-    const checks = computeChecks(application, repositoryObservation("passed"));
+    const checks = computeChecks(application, repositoryObservation("passed"), "github-connection");
     const repositoryCheck = checks.find((check) => check.key === "repository-readable")!;
 
     expect(checks).toHaveLength(4);
@@ -68,4 +68,9 @@ describe("computeChecks", () => {
     ]);
   });
 
+  it.each([null, "new-account"])("requires re-verification after disconnect or replacement (%s)", (connectionId) => {
+    const check = computeChecks(application, repositoryObservation("passed"), connectionId).find((item) => item.key === "repository-readable")!;
+    expect(check.status).toBe("not-yet");
+    expect(check.evidence).toHaveLength(1); // Historical evidence remains inspectable.
+  });
 });

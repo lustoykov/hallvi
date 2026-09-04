@@ -23,6 +23,7 @@ const selectedCases = selectPhaseOneCases(process.env.PI_EVAL_CASES);
 const sourceFiles = [
   "src/server/pi.ts", "src/server/phase-one.ts", "src/server/phase-one-spec.ts",
   "src/server/pi-configuration.ts", "src/server/db.ts", "src/server/db-schema.ts",
+  "src/server/github-connection.ts", "src/server/github-api.ts",
   "tests/evals/phase-one-cases.ts", "tests/evals/check-phase-one.ts", "tests/evals/phase-one.eval.ts", "tests/evals/vitest.config.ts", "package-lock.json",
 ];
 const fingerprints = () => Object.fromEntries(sourceFiles.map((file) => [file,

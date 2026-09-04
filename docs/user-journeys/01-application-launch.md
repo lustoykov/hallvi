@@ -384,7 +384,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 - **Satisfied when:** The latest repository-access Observation for the application confirms that Server Guy can read the exact recorded repository identity.
 - **Evidence:** Latest repository-access Observation and its returned repository metadata.
-- **Human observability:** Open the recorded repository in GitHub and inspect the latest repository-access Observation. Explicit GitHub connection and credential-scope visibility are Phase 1 follow-ups.
+- **Human observability:** Open Settings → GitHub to inspect the selected account and connection source; open the repository-access Observation for its exact repository ID, commit, account role and App grant. The [GitHub connection guide](../integrations/github.md) explains these boundaries. Switching or disconnecting a connection requires fresh repository verification, without removing old evidence.
 - **Profile interpretation:** The profile may select which repository paths to inspect later, but readability and repository identity are stack-independent.
 - **Invalidated by:** Repository selection, installation/access scope, default branch, or inspected revision changing.
 
