@@ -2,7 +2,7 @@
 
 Status: living planning notes, not a finished specification and not evidence of implementation.
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 These notes preserve decisions, hypotheses, and unresolved questions from the product workshop. They should later be distilled into a tight product specification. Unresolved choices must not be presented as settled in that specification.
 
@@ -10,7 +10,7 @@ These notes preserve decisions, hypotheses, and unresolved questions from the pr
 
 ## Product thesis
 
-Server Guy is an open-source, AI-native deployment and operations agent for individual software engineers who want to own and self-host their applications without repeatedly reconstructing infrastructure knowledge and configuration.
+Server Guy is an open-source, AI-native deployment and operations agent for individual software engineers who want to self-host their own applications and the open-source tools they rely on without repeatedly reconstructing infrastructure knowledge and configuration.
 
 Its primary job is:
 
@@ -32,9 +32,19 @@ The product should eventually feel like giving an application to a capable serve
 
 Settled positioning:
 
-> PaaS-like deployment and recovery on infrastructure the customer owns, with predictable VPS economics.
+> PaaS-like deployment and recovery for your applications and supported open-source tools, on infrastructure you own, with predictable VPS economics.
 
 Server Guy should not compete merely as the cheapest hosting option. Its value is the managed-platform experience it creates on user-owned infrastructure: application deployment, observation, recovery, and operational evidence without surrendering infrastructure ownership or accepting opaque usage-based pricing. Hetzner remains the V1 reference infrastructure rather than the product's identity or permanent provider boundary.
+
+### Self-hosted OSS deployment
+
+**Positioning addition agreed on 2026-09-04; deployment capability not yet implemented.** The engineer may bring an existing open-source project they want to use, not only an application they wrote. Server Guy should help turn that project's upstream release and deployment instructions into a working installation on user-owned infrastructure.
+
+The value to prove is understanding the project's requirements, adapting its configuration to the chosen host, making domains, secrets and persistent data explicit, and verifying the application outcome. The same Approval Mode, operational records and recovery expectations should apply as for the engineer's own application. An installer finishing successfully is not sufficient evidence that the application works or that its data can be recovered.
+
+Langfuse is the proposed first OSS example: Server Guy deploys it, then sends a real Pi execution trace to that instance. Candidate acceptance includes verifying the installation and retained trace after a restart, followed later by an upgrade and backup-restoration exercise. These are proposed checks, not completed results or an approved change to the immediate implementation sequence. Server Guy must remain usable if the observability service is unavailable; its own authoritative operation records remain independent.
+
+Support should be earned through concrete deployment and recovery evidence. This addition does not promise arbitrary OSS compatibility, a large app catalog, or automatic upstream upgrades, and it does not expand the current Phase 1 implementation boundary. The breadth of supported projects and the operational advantage over existing installers and AI-enabled deployment platforms remain to be validated.
 
 ## Central architecture principle
 
