@@ -16,12 +16,30 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 
 ### 2. Configure Pi explicitly
 
-- [ ] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
-- [ ] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
-- [ ] Reuse existing Codex credentials only when the source is visible to the user; otherwise start an explicit OAuth flow.
-- [ ] Test existing credentials, first-time login, cancelled login, expired credentials, exhausted quota, missing runtime, and unavailable model.
+- [x] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
+- [x] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
+- [x] Keep Codex CLI credentials separate, show Pi's exact credential source, and start an explicit ChatGPT device-code OAuth flow.
+- [x] Cover existing credentials, first-time login, cancellation, expiry/refresh failures, quota errors, missing runtime, and unavailable models with isolated automated tests; live account acceptance remains below.
+- [x] Detect existing Pi provider/model/effort and credential presence read-only; require **Use existing Pi setup** or **Use a new ChatGPT connection** before chat.
+- [x] Snapshot the adopted preferences in Server Guy’s own config; never import machine tools, extensions, instructions, or custom model/provider definitions.
+- [x] Keep authentication limited to ChatGPT subscription OAuth; reject API keys and other providers.
+- [x] Offer Pi catalog models and model-supported reasoning levels, validate on save and before each turn, and persist changes only in Server Guy preferences.
+- [x] Explain unencrypted JSON token storage and the actual shared/separate destination before reuse or login; keep runtime details collapsed.
+- [x] Promote prototype A to the real login screen; keep technical details in a separate help panel and preserve the current connection until replacement login succeeds. See the [current setup rules](docs/testing/phase-one-acceptance.md#current-entry-points-and-setup-rules).
+- [x] Automatically detect reusable Pi login on page load, including broken-login recovery; offer **Use existing login** / **Connect another account** without a manual scan button.
+- [x] Return from Pi setup to an [applications overview](docs/testing/phase-one-acceptance.md#current-entry-points-and-setup-rules), with explicit creation and switching; keep Pi configuration installation-wide and each application's chats, Decisions, and checks separate.
+- [x] Use **Settings** navigation and progressive storage disclosure; add explicit disconnect (forget Server Guy's selection, preserve credential files) and confirmed per-application removal for fresh testing.
+- [x] Document the [Phase 1 desktop acceptance contract](docs/testing/phase-one-acceptance.md), separating deterministic UI/domain tests from live Pi behavior and still-pending GitHub/worker gates.
+- [ ] Automate that contract with desktop-only Playwright Test, isolated app/database/config fixtures and failure traces; keep Vitest and opt-in live Pi cases separate.
+- [x] Fix the September 4 audit's setup request-boundary defect: reject untrusted Origins across all 11 mutation handlers, with regression coverage including saved-setting preservation and a real-Next HTTP check. Browser exploitability of the original defect was not tested.
+- [x] Restore keyboard focus to **Disconnect** after its confirmation dialog closes via Cancel/Escape; both paths verified in the desktop browser. Full keyboard accessibility remains separate acceptance work.
+- [ ] Add a small opt-in real-Pi casebook with repeatable inputs, exact proposal/state checks, isolated SQLite state, model/source metadata and human meaning review; reuse Vitest, not a new eval service.
+- [ ] Retain a repeatable real-route production smoke check that login POST and attempt GET share the coordinator in one process. A fresh September 4 production start/poll/cancel probe passed; the old Fable singleton concern was not reproduced. Do not add cross-process machinery without a demonstrated need.
+- [ ] Review remaining unused Pi presentation fields/constants (`billing`, `usesDefaultModel`, `PI_PROVIDER_LABEL`, `PI_MODEL_LABEL`) for removal. Preserve credential validation, API-key rejection and no-API-fallback guarantees; this is cleanup, not an architecture blocker. Carried forward from the September 3 Fable review.
 
-Open decision: confirm whether the packaged Pi SDK is sufficient on every supported machine or whether Server Guy must also distribute or require a separate Pi/Codex runtime. Also choose between a Server Guy-owned credential store and an explicitly shared machine-level credential store.
+Decision: the packaged Pi SDK is the runtime; users do not install Pi or Codex CLI. **Use saved login** snapshots the detected model/effort and shares Pi’s `auth.json`; token refresh may update that file after consent, but global model preferences stay untouched. **Connect ChatGPT** defaults to `openai-codex` / `gpt-5.6-sol` / `high`; model and effort can be edited before sign-in. Each attempt writes a separate `.server-guy/pi-auth-<login-id>.json`. Only successful OAuth activates that file and the selected preferences by atomically replacing `pi-settings.json`. Failure or cancellation leaves the previous connection intact. Older accepted credential files are retained for in-flight turns. Existing `pi-auth.json` configurations remain readable.
+
+Tokens are unencrypted JSON; new credential files are owner-only (0600), and Pi preserves existing file permissions. `SERVER_GUY_CONFIG_DIR` overrides the storage directory. Detection does not refresh tokens, execute key commands, contact providers, expose secrets, or read Codex CLI auth. Only built-in `openai-codex` models and stored ChatGPT OAuth credentials are reusable. Readiness means local configuration/credentials are present; provider access and limits are checked on send. Live OAuth completion and a real model response still require a user-approved account test.
 
 ### 3. Connect GitHub explicitly
 

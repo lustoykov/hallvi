@@ -72,6 +72,75 @@ async function createApplication(approvalMode: "pi-decides" | "always-ask" = "pi
 }
 
 describe("Phase 1 application workspace", () => {
+  it("requires the exact repository before removing anything", async () => {
+    const { view } = await createApplication();
+    expect(() => phaseOne.removeApplication(view.application!.id, "wrong/repo")).toThrow("exact repository");
+    expect(phaseOne.getPhaseOneOperatorView(view.application!.id)).toEqual(view);
+    expect(() => phaseOne.removeApplication("unknown", "lustoykov/todo-fastapi")).toThrow(phaseOne.NotFoundError);
+  });
+
+  it("removes only the selected application, including superseded decisions, then permits a fresh start", async () => {
+    const { view } = await createApplication();
+    const id = view.application!.id;
+    const chatId = view.selectedChatId!;
+    mocks.askPi.mockResolvedValueOnce({ message: "First", decisionProposals: [{ kind: "launch-priority", value: "First" }] });
+    const first = await phaseOne.sendChatMessage(id, chatId, "First priority");
+    mocks.askPi.mockResolvedValueOnce({ message: "Second", decisionProposals: [{ kind: "launch-priority", value: "Second", replaces: first.decisions[0].id }] });
+    await phaseOne.sendChatMessage(id, chatId, "Replace priority");
+    const other = await phaseOne.createPhaseOneApplication({ repositoryUrl: "https://github.com/example/other", environment: "production", approvalMode: "always-ask" });
+    phaseOne.removeApplication(id, "lustoykov/todo-fastapi");
+    expect(database.getApplication(id)).toBeNull();
+    expect(database.getChat(chatId)).toBeNull();
+    expect(database.listMessages(chatId)).toEqual([]);
+    expect(database.getDecision(first.decisions[0].id)).toBeNull();
+    expect(database.listObservations(id)).toEqual([]);
+    expect(database.listActivity(view.workspace!.id)).toEqual([]);
+    expect(phaseOne.getPhaseOneOperatorView(other.view.application!.id)).toEqual(other.view);
+    const fresh = await createApplication();
+    expect(fresh.view.application!.id).not.toBe(id);
+    expect(fresh.view.messages).toHaveLength(1);
+    expect(fresh.view.decisions).toEqual([]);
+  });
+
+  it("cannot save an old in-flight Pi turn into a recreated application", async () => {
+    const { view } = await createApplication();
+    let finish!: (value: { message: string; decisionProposals: [] }) => void;
+    mocks.askPi.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = phaseOne.sendChatMessage(view.application!.id, view.selectedChatId!, "Old message");
+    const rejected = expect(pending).rejects.toThrow();
+    phaseOne.removeApplication(view.application!.id, "lustoykov/todo-fastapi");
+    const fresh = await createApplication();
+    finish({ message: "Old reply", decisionProposals: [] });
+    await rejected;
+    expect(phaseOne.getPhaseOneOperatorView(fresh.view.application!.id)).toEqual(fresh.view);
+  });
+
+  it("lists no applications before any have been added", () => {
+    expect(phaseOne.listApplicationSummaries()).toEqual([]);
+  });
+
+  it("lists every application with its own derived checks, newest first", async () => {
+    const first = await createApplication();
+    mocks.inspectGithubRepository.mockResolvedValueOnce({
+      status: "blocked", summary: "Repository unavailable.", sourceUrl: null, raw: {},
+    });
+    const second = await phaseOne.createPhaseOneApplication({
+      repositoryUrl: "https://github.com/example/another-app", environment: "production", approvalMode: "always-ask",
+    });
+    const summaries = phaseOne.listApplicationSummaries();
+    expect(summaries.map(({ application }) => application.id)).toEqual([second.view.application!.id, first.view.application!.id]);
+    expect(summaries[0].passedChecks).toBeLessThan(summaries[0].totalChecks);
+    expect(summaries[1]).toMatchObject({ passedChecks: 4, totalChecks: 4 });
+    expect(summaries[0]).not.toHaveProperty("messages");
+    expect(phaseOne.getPhaseOneOperatorView(first.view.application!.id)).toEqual(first.view);
+    expect(phaseOne.getPhaseOneOperatorView(second.view.application!.id).chats).not.toEqual(first.view.chats);
+  });
+
+  it("rejects an unknown application instead of opening another workspace", async () => {
+    await createApplication();
+    expect(() => phaseOne.getPhaseOneOperatorView("unknown")).toThrow(phaseOne.NotFoundError);
+  });
+
   it("stores durable inputs and derives four passing checks plus later requirements", async () => {
     const result = await createApplication();
 

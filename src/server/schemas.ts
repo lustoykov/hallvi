@@ -34,6 +34,25 @@ export const sendChatMessageRequestSchema = z.strictObject({
 
 export class RequestValidationError extends Error {}
 
+export const removeApplicationRequestSchema = z.strictObject({
+  repository: z.string().min(1).max(2_048),
+});
+
+export const disconnectPiRequestSchema = z.strictObject({ confirm: z.literal("disconnect") });
+
+/** Reject cross-origin browser mutations. Origin-less local clients remain supported. */
+export function assertSameOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  const destination = new URL(request.url);
+  // Next normalizes loopback request URLs to localhost. The incoming Host still
+  // identifies the browser's destination (e.g. 127.0.0.1:3000); don't trust X-Forwarded-Host.
+  const host = request.headers.get("host");
+  if (host) destination.host = host;
+  if (origin && origin !== destination.origin) {
+    throw new RequestValidationError("Cross-origin requests are not allowed.");
+  }
+}
+
 const MAX_JSON_REQUEST_CHARACTERS = 16_384;
 
 function firstIssue(error: z.ZodError) {
@@ -44,6 +63,8 @@ export async function parseJsonRequest<T extends z.ZodType>(
   request: Request,
   schema: T,
 ): Promise<z.output<T>> {
+  // All JSON mutation routes share this boundary, including simple text/plain POSTs.
+  assertSameOrigin(request);
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_REQUEST_CHARACTERS) {
     throw new RequestValidationError("Keep the request body under 16,384 characters.");

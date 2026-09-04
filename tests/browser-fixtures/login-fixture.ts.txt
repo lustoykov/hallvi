@@ -1,0 +1,52 @@
+// Copied only into the isolated QA app. Never contacts OpenAI.
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { savePiConfiguration } from "./pi-configuration";
+import type { PiLoginAttempt } from "./pi-setup";
+type Record = { attempt: PiLoginAttempt; started: number; polls: number };
+const host = globalThis as typeof globalThis & { qaLogin?: Record };
+function record() {
+  if (!process.env.SERVER_GUY_QA_ROOT?.startsWith("/tmp/server-guy-e2e-")) throw new Error("QA app only");
+  return host.qaLogin;
+}
+export async function begin(request: Request) {
+  record();
+  const selection = { ...await request.json(), providerId: "openai-codex" };
+  const id = randomUUID();
+  host.qaLogin = { started: Date.now(), polls: 0, attempt: {
+    id, selection, authPath: join(process.env.SERVER_GUY_CONFIG_DIR!, "pi-auth-" + id + ".json"),
+    state: "starting", verificationUri: "https://example.invalid/qa-only", userCode: "QA-1234",
+    expiresAt: new Date(Date.now() + 900_000).toISOString(), message: "QA sign-in starting",
+  } };
+  return Response.json(host.qaLogin.attempt, { status: 202 });
+}
+export function poll() {
+  const entry = record();
+  if (!entry) return Response.json({ error: "No attempt" }, { status: 404 });
+  if (++entry.polls === 1) return Response.json({ error: "QA temporary connection loss" }, { status: 503 });
+  if (["starting", "awaiting-user"].includes(entry.attempt.state)) {
+    entry.attempt.state = "awaiting-user";
+    if (Date.now() - entry.started > 12_000) {
+      if (process.env.SERVER_GUY_QA_LOGIN_MODE === "failure") {
+        entry.attempt.state = "failed";
+        entry.attempt.message = "QA simulated sign-in failure. Your previous login is unchanged.";
+      } else {
+        writeFileSync(entry.attempt.authPath, JSON.stringify({ "openai-codex": { type: "oauth", access: "QA-ONLY", refresh: "QA-ONLY", expires: Date.now() + 86_400_000 } }), { mode: 0o600 });
+        savePiConfiguration({ ...entry.attempt.selection, mode: "separate", credentialType: "oauth", authPath: entry.attempt.authPath });
+        entry.attempt.state = "complete";
+        entry.attempt.message = "QA ChatGPT login saved.";
+      }
+    }
+  }
+  return Response.json(entry.attempt);
+}
+export function cancel() {
+  const entry = record();
+  if (!entry) return Response.json({ error: "No attempt" }, { status: 404 });
+  if (["starting", "awaiting-user"].includes(entry.attempt.state)) {
+    entry.attempt.state = "cancelled";
+    entry.attempt.message = "Sign-in cancelled. No login was changed.";
+  }
+  return Response.json(entry.attempt);
+}

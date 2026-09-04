@@ -1,6 +1,7 @@
 import { Type } from "typebox";
 
 import { phaseOneCheckListForPrompt } from "./phase-one-spec";
+import { configuredPiRuntime } from "./pi-configuration";
 import type { ChatMessage, Decision, PiDecision, PiTurnResult } from "./types";
 
 export class PiUnavailableError extends Error {}
@@ -70,6 +71,30 @@ export function normalizePiAssistantMessage(input: string): string {
   return message;
 }
 
+export function describePiFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Pi did not return an error message.";
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("usage limit") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("quota") ||
+    normalized.includes("status 429") ||
+    normalized.includes("status: 429")
+  ) {
+    return "Pi cannot run because the selected provider reports a usage or rate limit. Check the account’s allowance, then retry.";
+  }
+  if (
+    normalized.includes("invalid_grant") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("status 401") ||
+    normalized.includes("status: 401") ||
+    normalized.includes("provider is not configured")
+  ) {
+    return "Pi authentication is missing or expired. Open Pi setup and reconnect or choose a setup again.";
+  }
+  return `Pi is unavailable: ${message}`;
+}
+
 function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index] as {
@@ -118,13 +143,19 @@ export async function askPi(input: {
   decisions: Decision[];
   viewSummary: string;
 }): Promise<PiTurnResult> {
+  const sdk = await import("@earendil-works/pi-coding-agent");
   const {
     createAgentSession,
     defineTool,
     DefaultResourceLoader,
     getAgentDir,
+    SettingsManager,
     SessionManager,
-  } = await import("@earendil-works/pi-coding-agent");
+  } = sdk;
+
+  const { configuration, modelRuntime, model } = await configuredPiRuntime(sdk).catch((error) => {
+    throw new PiUnavailableError(describePiFailure(error));
+  });
 
   const decisionProposals: PiDecision[] = [];
   const proposeDecisionTool = defineTool({
@@ -155,9 +186,11 @@ export async function askPi(input: {
   });
 
   const cwd = process.cwd();
+  const settingsManager = SettingsManager.inMemory();
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: getAgentDir(),
+    settingsManager,
     systemPromptOverride: () => SYSTEM_PROMPT,
     appendSystemPromptOverride: () => [],
     skillsOverride: () => ({ skills: [], diagnostics: [] }),
@@ -173,6 +206,10 @@ export async function askPi(input: {
 
   const { session } = await createAgentSession({
     cwd,
+    model,
+    modelRuntime,
+    thinkingLevel: configuration.reasoningEffort,
+    settingsManager,
     tools: ["propose_decision"],
     customTools: [proposeDecisionTool],
     resourceLoader: loader,
@@ -205,8 +242,8 @@ export async function askPi(input: {
       decisionProposals,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Pi is unavailable.";
-    throw new PiUnavailableError(`Pi is unavailable: ${message}`);
+    if (error instanceof PiUnavailableError) throw error;
+    throw new PiUnavailableError(describePiFailure(error));
   } finally {
     if (timeout) clearTimeout(timeout);
     unsubscribe();

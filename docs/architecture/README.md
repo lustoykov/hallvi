@@ -21,3 +21,4 @@ Current explanations:
 - [Journey 1 Phase 1 — current simplified architecture](pr-001-journey-1-phase-1.html)
 - [PR 7 — Pi contract evolution and Phase 1 boundary hardening](pr-007-phase-1-boundary-hardening.html)
 - [PR 8 — Drizzle over the existing SQLite persistence layer](pr-008-drizzle-sqlite.html)
+- [PR 9 — explicit Pi setup and fixed Phase 1 runtime](pr-009-explicit-pi-setup.html)

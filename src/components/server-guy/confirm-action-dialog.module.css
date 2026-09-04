@@ -1,0 +1,14 @@
+.dialog { width: 540px; max-width: calc(100vw - 48px); margin: auto; padding: 30px; background: #fff; color: #192338; border: 0; border-radius: 14px; box-shadow: 0 18px 60px #17223833; }
+.dialog::backdrop { background: #17223866; }
+.dialog h2 { margin: 0 0 14px; font-size: 23px; line-height: 1.25; letter-spacing: -.02em; }
+.dialog p { color: #536078; font-size: 14px; line-height: 1.65; margin: 0 0 24px; }
+.dialog label { display: grid; gap: 10px; font-size: 14px; }
+.dialog label strong { overflow-wrap: anywhere; }
+.dialog input { width: 100%; border: 1px solid #bdc9dc; border-radius: 7px; padding: 11px 12px; font: inherit; }
+.dialog footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 26px; }
+.dialog button { border: 1px solid #bdc9dc; border-radius: 7px; background: white; color: #192338; padding: 11px 16px; font: inherit; cursor: pointer; }
+.dialog .danger { background: #a6312b; border-color: #a6312b; color: white; }
+.dialog .error { color: #a6312b; margin: 16px 0 0; }
+.dialog button:hover:not(:disabled) { filter: brightness(.94); }
+.dialog button:disabled { opacity: .5; cursor: not-allowed; }
+.dialog :is(input, button):focus-visible { outline: 3px solid #285ad8; outline-offset: 3px; }

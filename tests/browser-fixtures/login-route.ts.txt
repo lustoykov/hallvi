@@ -1,0 +1,1 @@
+export { begin as POST } from "@/server/qa-login-fixture";

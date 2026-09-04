@@ -86,12 +86,17 @@ const rowId = sql<number>`rowid`;
 
 // Applications
 
-export function getLatestApplication() {
-  return db().select().from(applications).orderBy(desc(applications.createdAt)).limit(1).get() ?? null;
+export function listApplications() {
+  return db().select().from(applications).orderBy(desc(applications.createdAt), desc(rowId)).all();
 }
 
 export function getApplication(id: string) {
   return db().select().from(applications).where(eq(applications.id, id)).get() ?? null;
+}
+
+export function deleteApplication(id: string) {
+  // Foreign keys remove only this application's workspace and dependent records.
+  db().delete(applications).where(eq(applications.id, id)).run();
 }
 
 export function getApplicationByRepository(repositoryUrl: string) {

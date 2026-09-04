@@ -44,6 +44,25 @@
 }
 
 .sg-app-identity { gap: 12px; }
+.sg-all-applications { color: #dce5f3; font-size: 13px; text-underline-offset: 4px; margin-right: 8px; }
+.sg-application-picker { display: flex; align-items: center; gap: 16px; max-width: 300px; min-height: 42px; padding: 8px 12px; border: 1px solid #526078; border-radius: 8px; color: #fff; background: #22304a; cursor: pointer; }
+.sg-application-picker strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.sg-application-picker svg { flex-shrink: 0; }
+.sg-application-picker:hover { background: #2b3b58; }
+.sg-application-picker:disabled { opacity: .65; cursor: wait; }
+.sg-application-picker:focus-visible, .sg-all-applications:focus-visible { outline: 2px solid #b1c8ff; outline-offset: 3px; }
+.sg-app-identity .sg-environment-label { color: #d0d9e8; font-size: 12px; }
+.sg-application-menu { position: fixed; inset: 58px auto auto 150px; width: 350px; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0; padding: 10px; border: 1px solid #d8e0ec; border-radius: 12px; background: white; color: #192338; }
+.sg-application-menu h2 { margin: 8px 10px 12px; font-size: 14px; font-weight: 600; color: #536078; }
+.sg-application-menu a, .sg-application-menu button { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 6px; color: #192338; background: transparent; text-decoration: none; text-align: left; cursor: pointer; font-size: 14px; }
+.sg-application-menu a:hover, .sg-application-menu button:hover { background: #edf3ff; }
+.sg-application-menu :is(a, button):focus-visible { outline: 2px solid #285ad8; outline-offset: -2px; }
+.sg-application-menu a[aria-current] { background: #edf3ff; }
+.sg-application-menu a div { display: grid; gap: 5px; min-width: 0; }
+.sg-application-menu a strong { font-size: 15px; overflow-wrap: anywhere; }
+.sg-application-menu .sg-application-menu-action { justify-content: flex-start; }
+.sg-application-menu small { color: #536078; font-size: 12px; overflow-wrap: anywhere; }
+.sg-application-menu .sg-remove-application { color: #a6312b; justify-content: flex-start; border-top: 1px solid #e1e6ef; border-radius: 0; margin-top: 6px; }
 .sg-app-mark {
   width: 39px;
   height: 39px;
@@ -60,6 +79,20 @@
 .sg-topbar-meta { gap: 14px; font-size: 12px; }
 .sg-topbar-meta .sg-eyebrow { color: #9faabd; }
 .sg-topbar-meta > strong { font-weight: 550; }
+.sg-pi-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid #46546b;
+  border-radius: 7px;
+  color: #dce5f3;
+  text-decoration: none;
+  font-weight: 600;
+}
+.sg-pi-status > span { width: 7px; height: 7px; border-radius: 50%; background: #e6a15c; }
+.sg-pi-status.ready > span { background: #42c98a; }
+.sg-pi-status:hover { border-color: #72809a; background: #202d46; }
 .sg-status {
   margin-left: 8px;
   border: 1px solid #46546b;
@@ -339,6 +372,21 @@
 .sg-ready-icon svg { width: 15px; }
 .sg-ready-card strong { font-size: 13px; }
 .sg-ready-card p { margin: 4px 0 0; color: #49715f; font-size: 11px; }
+.sg-pi-required {
+  margin-left: 35px;
+  border: 1px solid #e7bd8d;
+  border-radius: 9px;
+  padding: 13px 14px;
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: var(--amber-soft);
+}
+.sg-pi-required > svg { width: 20px; color: var(--amber); }
+.sg-pi-required strong { font-size: 12px; }
+.sg-pi-required p { margin: 3px 0 0; color: #79563b; font-size: 10px; }
+.sg-pi-required a { color: #784112; font-size: 10px; font-weight: 650; text-underline-offset: 3px; }
 
 .sg-composer { border-top: 1px solid var(--line); padding: 11px 28px 12px; background: #fff; }
 .sg-composer textarea { width: 100%; resize: none; min-height: 52px; padding: 12px; border: 1px solid #c9d4e4; border-radius: 8px; color: var(--ink); font-size: 12px; line-height: 1.45; }
@@ -416,7 +464,8 @@
 .sg-receipt-actions svg,
 .sg-drawer-actions svg { width: 11px; }
 
-.sg-drawer-layer { position: fixed; inset: 0; z-index: 50; background: rgb(19 29 48 / 36%); }
+.sg-drawer-layer { position: fixed; inset: 0; z-index: 50; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; color: inherit; background: transparent; }
+.sg-drawer-layer::backdrop { background: rgb(19 29 48 / 36%); }
 .sg-detail-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: min(475px, 44vw); overflow-y: auto; background: white; box-shadow: -12px 0 28px rgb(20 29 48 / 16%); }
 .sg-detail-drawer > header { min-height: 72px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--line); }
 .sg-detail-drawer h2 { margin: 5px 0 0; font-size: 16px; }
@@ -446,4 +495,50 @@
   .sg-workspace { grid-template-columns: 205px minmax(490px, 1fr) 350px; }
   .sg-phase-copy strong { font-size: 11px; }
   .sg-phase { gap: 5px; padding-inline: 5px; }
+}
+
+.sg-setup-shell {
+  --navy: #172238;
+  --blue: #285ad8;
+  --green: #14945f;
+  --amber: #a95414;
+  --ink: #192338;
+  --muted-ink: #69758b;
+  --line: #d6deea;
+  min-height: 100vh;
+  color: var(--ink);
+  background: #f5f7fb;
+}
+.sg-setup-shell ::selection { color: #fff; background: #285ad8; }
+.sg-setup-topbar {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--navy);
+  color: #fff;
+}
+.sg-setup-brand,
+.sg-setup-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.sg-setup-brand { font-size: 14px; font-weight: 650; }
+.sg-setup-back { color: #cad3e3; font-size: 12px; }
+.sg-setup-back:hover { color: #fff; }
+.sg-setup-back svg { width: 15px; }
+
+@media (max-width: 540px) {
+  .sg-setup-topbar { padding: 0 15px; }
+  .sg-setup-brand > span:last-child { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-setup-shell *,
+  .sg-setup-shell *::before,
+  .sg-setup-shell *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; }
 }

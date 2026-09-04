@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowClockwise, ArrowSquareOut, ChatCircleDots, Check, Circle, SpinnerGap, X } from "@phosphor-icons/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { GateCheck } from "@/server/types";
 
@@ -20,22 +20,33 @@ export function CheckDrawer({
   onAsk: (check: GateCheck) => void;
   onRerun: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+    const dialog = dialogRef.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      // React can remove the dialog before native close restores its opener.
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
 
   return (
-    <div className="sg-drawer-layer" role="presentation" onMouseDown={onClose}>
+    <dialog
+      ref={dialogRef}
+      className="sg-drawer-layer"
+      aria-label={`${check.label} details`}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
+    >
       <aside
-        aria-label={`${check.label} details`}
-        aria-modal="true"
         className="sg-detail-drawer"
-        onMouseDown={(event) => event.stopPropagation()}
-        role="dialog"
       >
         <header>
           <div><span className="sg-eyebrow">Launch Brief check</span><h2>{check.label}</h2></div>
@@ -82,6 +93,6 @@ export function CheckDrawer({
           )}
         </section>
       </aside>
-    </div>
+    </dialog>
   );
 }
