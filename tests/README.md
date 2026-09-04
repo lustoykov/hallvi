@@ -47,6 +47,4 @@ The product's acceptance cases and dated verification evidence stay in the singl
 
 Install Chromium once with `npx playwright install chromium`. Desktop only. Browser scenarios launch disposable Next.js fixtures on 3180+, never use/reset the app on port 3000 and block external browser requests. Their synthetic model responses prove UI/state behavior, not model quality.
 
-Automated browser runs use `copy app + synthetic adapters → next build --webpack → next start → browser journeys`, once per worker. Build/startup has a separate three-minute readiness budget, so route compilation does not consume browser assertion timeouts. Direct fixture runs still default to development mode; use `node tests/e2e/qa-fixture.mjs 3112 success fresh production` to run a manual fixture in production mode.
-
 CI runs Vitest, lint, TypeScript, build and **two** browser smoke journeys. Full desktop coverage is manual through GitHub Actions' `full_browser_suite` option. Neither uses model credits; hosted CI uses Actions minutes. Real model evals and judgments remain local and opt-in. See the [workflow](../.github/workflows/checks.yml).

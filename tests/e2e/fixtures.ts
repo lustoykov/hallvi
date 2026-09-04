@@ -8,7 +8,7 @@ import { join } from "node:path";
 export const test = base.extend<Record<never, never>, { fixture: { url: string; state: string } }>({
   fixture: [async ({}, provide, workerInfo) => {
     const port = 3180 + workerInfo.workerIndex;
-    const child = spawn(process.execPath, ["tests/e2e/qa-fixture.mjs", String(port), "success", "ready", "production"], {
+    const child = spawn(process.execPath, ["tests/e2e/qa-fixture.mjs", String(port), "success", "ready"], {
       detached: true, stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
@@ -17,16 +17,13 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
     const url = `http://127.0.0.1:${port}`;
     try {
       let state = "";
-      // Build and startup have their own budget; browser assertions keep their normal deadline.
       await expect.poll(async () => {
         if (child.exitCode !== null) throw new Error(`QA app exited: ${output}`);
         const manifest = output.split("\n").find((line) => line.startsWith('{"root":'));
         if (!manifest) return false;
         state = JSON.parse(manifest).state;
         return fetch(`${url}/applications`).then((r) => r.ok).catch(() => false);
-      }, { timeout: 180_000, intervals: [500, 1000] }).toBe(true).catch((cause: unknown) => {
-        throw new Error(`QA app failed to become ready:\n${output}`, { cause });
-      });
+      }, { timeout: 90_000, intervals: [500, 1000] }).toBe(true);
       await provide({ url, state });
     } finally {
       if (child.pid && child.exitCode === null && child.signalCode === null) {
@@ -37,7 +34,7 @@ export const test = base.extend<Record<never, never>, { fixture: { url: string; 
         clearTimeout(timer);
       }
     }
-  }, { scope: "worker", timeout: 200_000 }],
+  }, { scope: "worker", timeout: 100_000 }],
   baseURL: async ({ fixture }, provide) => { await provide(fixture.url); },
   page: async ({ page, fixture }, provide) => {
     // Restore synthetic preferences after settings tests, without touching user state.
