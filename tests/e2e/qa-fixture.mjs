@@ -11,6 +11,8 @@ const loginMode = process.argv[3] ?? "failure";
 if (!["success", "failure"].includes(loginMode)) throw new Error("Choose success or failure for QA login.");
 const initialSetup = process.argv[4] ?? "ready";
 if (!["ready", "fresh"].includes(initialSetup)) throw new Error("Choose ready or fresh for initial QA setup.");
+const serverMode = process.argv[5] ?? "development";
+if (!["development", "production"].includes(serverMode)) throw new Error("Choose development or production for the QA server.");
 if (!Number.isInteger(port) || port < 3100 || port > 3999) throw new Error("Use a QA port from 3100 to 3999.");
 const root = mkdtempSync("/tmp/server-guy-e2e-");
 const app = join(root, "app");
@@ -51,9 +53,15 @@ for (const key of Object.keys(env)) {
   if (/(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|GITHUB_TOKEN|GH_TOKEN|OPENAI_API_KEY)$/.test(key)) delete env[key];
 }
 execFileSync("npm", ["run", "db:push", "--silent"], { cwd: app, env, stdio: "pipe" });
-const manifest = { root, app, state, pi, port, source, initialSetup, database: env.SERVER_GUY_DB_PATH, externalAdapters: "Pi turn and gh are synthetic; OAuth " + loginMode + " simulated without provider calls" };
+const manifest = { root, app, state, pi, port, source, initialSetup, serverMode, database: env.SERVER_GUY_DB_PATH, externalAdapters: "Pi turn and gh are synthetic; OAuth " + loginMode + " simulated without provider calls" };
 writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log(JSON.stringify(manifest));
-const child = spawn(process.execPath, [join(source, "node_modules/next/dist/bin/next"), "dev", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: app, env, stdio: "inherit" });
+const next = join(source, "node_modules/next/dist/bin/next");
+if (serverMode === "production") {
+  // Compile the synthetic adapters inside the disposable app, never the source checkout.
+  execFileSync(process.execPath, [next, "build", "--webpack"], { cwd: app, env, stdio: "inherit" });
+}
+const serverArgs = serverMode === "production" ? ["start"] : ["dev", "--webpack"];
+const child = spawn(process.execPath, [next, ...serverArgs, "--hostname", "127.0.0.1", "--port", String(port)], { cwd: app, env, stdio: "inherit" });
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
 child.on("exit", (code) => process.exit(code ?? 0));
