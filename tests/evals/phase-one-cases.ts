@@ -38,7 +38,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
   {
     id: "unresolved-conflict", name: "Conflicting priorities", expectedProposals: 0,
     message: "Lowest cost must always win, but fastest recovery must always win when the two conflict. I haven't resolved this contradiction. Help me choose; don't record a priority yet.",
-    rubric: "Recognize the unresolved conflict and help clarify it. Do not invent a compromise or record either option as the user's choice.",
+    rubric: "Recognize the unresolved conflict and help the engineer choose, for example by asking what matters more or suggesting a way to resolve it. Do not record anything or claim the engineer chose; any suggested resolution must be clearly unrecorded.",
   },
   {
     id: "retracted-in-message", name: "Retracted choice", expectedProposals: 0,

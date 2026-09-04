@@ -16,11 +16,11 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | In review: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge implemented; human meaning review and broader journey coverage remain open below. |
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Planned: [checklist](#connect-github-explicitly). |
 | 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Planned: [checklist](#make-pi-requests-durable). |
-| 7 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
-| 8 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
-| 9 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
-| 10 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
-| 11 | Add structured logs, OpenTelemetry, and Langfuse with one correlation identity. | Planned. |
+| 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
+| 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
+| 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
+| 10 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
+| 11 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
 | 12 | Revisit Workflow DevKit only when its durability trigger is present. | Conditional: [trigger](#revisit-workflow-devkit-only-at-its-trigger); not a prerequisite for the next milestone. |
 | 13 | Break, recover, roll back, and externally re-verify a deployed application. | Planned. |
 | 14 | Add the EC2 Host Adapter, reusing the proven Linux-host lifecycle and Host Record. | Planned: [AWS direction](#aws-integration-direction). |
@@ -66,7 +66,7 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 - [x] Restore keyboard focus to **Disconnect** after its confirmation dialog closes via Cancel/Escape; both paths verified in the desktop browser. Full keyboard accessibility remains separate acceptance work.
 - [x] Add eight opt-in real-Pi eval cases with repeatable inputs, exact proposal/state checks, isolated SQLite state, model/source metadata and a human review sheet; reuse Vitest, not a new eval service.
 - [ ] Review the live Pi baseline's meaning against its case rubrics and record human verdicts. Keep automated checks and semantic acceptance distinct; rerun relevant cases as each phase changes.
-- [ ] Clarify the unresolved-conflict eval: should Pi ask clarifying questions first, or may it recommend an explicitly unapproved compromise? Both baseline runs made no Decision but suggested a concrete resolution, conflicting with the initial rubric's literal prohibition on inventing a compromise. Resolve the product expectation before tuning the prompt or rubric.
+- [x] Clarify the unresolved-conflict eval. Decided 2026-09-04: Pi may suggest a way to resolve the conflict as long as nothing is recorded and it does not claim the engineer chose; the rubric now says so. Earlier judgments used the stricter wording and stay as saved.
 - [ ] Retain a repeatable real-route production smoke check that login POST and attempt GET share the coordinator in one process. A fresh September 4 production start/poll/cancel probe passed; the old Fable singleton concern was not reproduced. Do not add cross-process machinery without a demonstrated need.
 - [ ] Review remaining unused Pi presentation fields/constants (`billing`, `usesDefaultModel`, `PI_PROVIDER_LABEL`, `PI_MODEL_LABEL`) for removal. Preserve credential validation, API-key rejection and no-API-fallback guarantees; this is cleanup, not an architecture blocker. Carried forward from the September 3 Fable review.
 
@@ -99,6 +99,17 @@ Open decision: choose the GitHub App/OAuth shape and whether Server Guy may reus
 The current Pi session is created and disposed inside one HTTP request, while the full Chat transcript is copied into every prompt. That request lifetime and unbounded context are the concrete trigger for this work. The database is authoritative: the durable summary, messages, Decisions, and Pi Run live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
+
+## Action history and tracing
+
+Give users an expandable history of what Server Guy attempted, accepted, and actually changed, with technical evidence when they want to inspect a step. The [action history and tracing spec](docs/specs/action-history-and-tracing.md) owns the behavior and boundaries; build order and completion stay here. The first slice follows durable Pi requests and does not add a new Phase 1 acceptance gate.
+
+- [ ] Reuse Pi Run identity and durable Activity Events to correlate one chat execution across the worker, Pi, domain validation, database commit, and refreshed Operator View.
+- [ ] Instrument Pi model/tool lifecycle and Server Guy's own boundaries with OpenTelemetry; export to Langfuse and attach the same run/trace references to structured logs.
+- [ ] Preserve meaningful start, result, retry, cancellation, timeout, interruption, and rejection facts. Record a Decision as saved only after commit; retain failure history when domain writes roll back.
+- [ ] Expand the existing Activity view into ordered steps with timing, outcomes, and record/evidence links; keep redacted technical payloads in Evidence and offer an authorized Langfuse trace link when configured.
+- [ ] Verify success, domain rejection after tool success, timeout/cancellation, restart/reconnect, unavailable telemetry, and payload redaction against the spec's acceptance scenarios.
+- [ ] Extend the same correlation through policy, approvals, provider calls, receipts, and verification as those Operations are implemented; add Sentry for application errors before external-user releases.
 
 ## Revisit Workflow DevKit only at its trigger
 
