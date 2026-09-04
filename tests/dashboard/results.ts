@@ -45,11 +45,10 @@ const runStateSchema = z.strictObject({ sourceHash: z.string(), archived: z.bool
 export function triageCase(record: SavedCase, reviews: z.infer<typeof savedReviewSchema>[], currentRubric?: string) {
   const key = caseKey(record);
   const llm = reviews.filter((review) => review.key === key && review.type === "llm").at(-1);
-  // A judgment counts only under the current judge policy and the rubric wording the casebook has now;
-  // editing a rubric sends its answers back to Attention instead of leaving stale verdicts in place.
+  // A judgment made under older rubric wording still counts: it is flagged as stale so the reviewer can re-judge it.
   const stale = Boolean(llm && currentRubric && llm.rubric !== currentRubric);
-  const judged = Boolean(llm && llm.type === "llm" && llm.promptVersion === JUDGE_PROMPT_VERSION && !stale);
-  const outcome = (status: string, label: string, reason: string) => ({ status, label, reason, judged });
+  const judged = Boolean(llm && llm.type === "llm" && llm.promptVersion === JUDGE_PROMPT_VERSION);
+  const outcome = (status: string, label: string, reason: string) => ({ status, label, reason, judged, stale });
   const failure = automaticFailure(record);
   if (failure) return outcome("failures", "Failed checks", failure);
   const human = reviews.filter((review) => review.key === key && review.type === "human").at(-1);
@@ -59,7 +58,7 @@ export function triageCase(record: SavedCase, reviews: z.infer<typeof savedRevie
     if (human.verdict === "needs-discussion") return outcome("needs-review", "Needs review", reason);
     return outcome("reviewed", "Human pass", reason);
   }
-  if (!llm || !judged) return outcome("needs-judge", "Not judged", !llm ? "No judgment yet. Run the judge or review this answer yourself." : stale ? "Rubric wording changed since this judgment. Judge again to grade against the current wording." : "Older judge policy. Judge again to use current triage rules.");
+  if (!llm || !judged) return outcome("needs-judge", "Not judged", llm ? "Older judge policy. Judge again to use current triage rules." : "No judgment yet. Run the judge or review this answer yourself.");
   if (llm.verdict === "fail") return outcome("failures", "LLM fail", llm.reason);
   if (llm.verdict === "needs-discussion" || !hasAutomaticEvidence(record)) {
     return outcome("needs-review", "Needs review", hasAutomaticEvidence(record) ? llm.reason : "Automatic evidence is missing; a model pass cannot clear this answer.");

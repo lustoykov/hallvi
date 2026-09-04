@@ -226,7 +226,7 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(answer("question:1")).toContainText("LLM advice: Pass");
     await page.screenshot({ path: testInfo.outputPath("dashboard-review.png"), fullPage: true });
     // One answer can be judged on its own from its judgment section.
-    await page.getByRole("button", { name: "Judge this answer again…", exact: true }).click();
+    await advice.getByRole("button", { name: "Judge again…", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Judge this answer", exact: true })).toBeVisible();
     await expect(page.locator("#confirm-selection")).toHaveText("question:1");
     await page.getByRole("button", { name: "Start judging", exact: true }).click();
@@ -356,26 +356,20 @@ test("dashboard reviews saved answers without model calls or changing source res
     saveReview(root, triageRun, triageHash, "human:1", { type: "human", reviewer: "Fixture reviewer", verdict: "pass", reason: "Human assessment stays separate." });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.reload();
-    for (const [filter, count] of [["attention", "6"], ["failures", "2"], ["cleared", "1"], ["reviewed", "1"], ["all", "8"]]) {
+    for (const [filter, count] of [["attention", "5"], ["failures", "2"], ["cleared", "2"], ["reviewed", "1"], ["all", "8"]]) {
       await expect(filterCount(filter)).toHaveText(count);
     }
-    await expect(page.locator("#progress-text")).toHaveText("6 need attention · 1 LLM-cleared · 1 of 8 human-reviewed · judge agreed 0 of 1");
+    await expect(page.locator("#progress-text")).toHaveText("5 need attention · 2 LLM-cleared · 1 of 8 human-reviewed · judge agreed 0 of 1");
     await page.getByRole("button", { name: /^Reviewed/ }).click();
     await answer("human:1").click();
     await expect(page.locator("#triage-reason")).toHaveText("The judge said fail; your verdict wins.");
     await page.getByRole("button", { name: /^Attention/ }).click();
     await expect(page.getByRole("button", { name: /^Attention/ })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#answer-list .answer-open")).toHaveCount(6);
+    await expect(page.locator("#answer-list .answer-open")).toHaveCount(5);
     await expect(answer("clear:1")).toHaveCount(0);
     await expect(answer("legacy:1")).toContainText("Not judged");
     await answer("legacy:1").click();
     await expect(page.locator("#triage-reason")).toContainText("Older judge policy");
-    // A judgment saved under different rubric wording than today's casebook is stale, and the current wording is shown.
-    await answer("greeting:1").click();
-    await expect(page.locator("#triage-reason")).toContainText("Rubric wording changed");
-    await expect(page.locator("#rubric")).toContainText("Respond normally");
-    await expect(page.locator("#rubric-changed")).toBeVisible();
-    await expect(page.locator("#rubric-saved")).toContainText("Discuss without pretending a choice was made");
     await page.getByRole("button", { name: /^Failed/ }).click();
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(2);
     await answer("blocked:1").click();
@@ -383,21 +377,29 @@ test("dashboard reviews saved answers without model calls or changing source res
     await expect(page.locator("#triage-reason")).toContainText("count");
     await expect(page.locator("#judge-verdict")).toHaveText("Pass");
     await page.getByRole("button", { name: /^Cleared/ }).click();
-    await expect(page.locator("#answer-list .answer-open")).toHaveCount(1);
+    await expect(page.locator("#answer-list .answer-open")).toHaveCount(2);
+    // A judgment saved under older rubric wording keeps its verdict but is flagged, and the current wording is shown.
+    await answer("greeting:1").click();
+    await expect(page.locator("#triage-chip")).toHaveText("LLM-cleared");
+    await expect(page.locator("#judge-stale")).toBeVisible();
+    await expect(page.locator("#rubric")).toContainText("Respond normally");
+    await expect(page.locator("#rubric-changed")).toBeVisible();
+    await expect(page.locator("#rubric-saved")).toContainText("Discuss without pretending a choice was made");
     await answer("clear:1").click();
+    await expect(page.locator("#judge-stale")).toBeHidden();
     await expect(page.locator("#triage-chip")).toHaveText("LLM-cleared");
     await expect(page.locator("#saved")).toHaveText("Not reviewed yet");
     expect(listReports(root).find((report) => report.run === triageRun)?.reviews.filter((review) => review.type === "human")).toHaveLength(1);
     await page.screenshot({ path: testInfo.outputPath("dashboard-judge-triage.png"), fullPage: true });
     // Judging the run targets only what the current policy has not judged, regardless of the display filter.
-    await page.getByRole("button", { name: "Judge 3 unjudged answers…", exact: true }).click();
-    await expect(page.locator("#confirm-selection")).toHaveText("legacy:1, unjudged:1, greeting:1");
+    await page.getByRole("button", { name: "Judge 2 unjudged answers…", exact: true }).click();
+    await expect(page.locator("#confirm-selection")).toHaveText("legacy:1, unjudged:1");
     await page.getByRole("button", { name: "Start judging", exact: true }).click();
-    await expect.poll(() => requests.at(-1)).toMatchObject({ suite: "judge", run: triageRun, hash: triageHash, keys: ["legacy:1", "unjudged:1", "greeting:1"], consent: true });
-    // A human can reject a spot-checked pass; the answer returns to Failed, not hidden clearance.
+    await expect.poll(() => requests.at(-1)).toMatchObject({ suite: "judge", run: triageRun, hash: triageHash, keys: ["legacy:1", "unjudged:1"], consent: true });
+    // A human can reject a spot-checked pass; the answer returns to Failed, not hidden clearance, and the queue moves on.
     await verdict("Fail").click();
-    await expect(page.locator("#no-answers")).toHaveText("No answers match this filter.");
-    await expect(filterCount("cleared")).toHaveText("0");
+    await expect(page.locator("#case-title")).toHaveText("Ordinary greeting");
+    await expect(filterCount("cleared")).toHaveText("1");
     await page.getByRole("button", { name: /^Failed/ }).click();
     await expect(answer("clear:1")).toContainText("Human fail");
     await expect(page.locator("#answer-list .answer-open")).toHaveCount(3);

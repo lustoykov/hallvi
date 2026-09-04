@@ -31,10 +31,11 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .topbar { height: 56px; background: var(--shell); color: #fff; padding: 0 32px; display: flex; align-items: center; gap: 36px; }
 .topbar strong { font-size: 15px; white-space: nowrap; } .topbar strong span { color: #9fb0cf; font-weight: 400; margin-left: 10px; }
 .topbar nav { display: flex; align-items: center; font-size: 13px; }
-.topbar .pages { gap: 4px; align-self: stretch; }
-.topbar .pages a { display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; color: #c6d2e8; text-decoration: none; font-weight: 600; border-bottom: 2px solid transparent; border-top: 2px solid transparent; }
+.topbar .pages { gap: 4px; }
+.topbar .pages a { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 6px; color: #c6d2e8; text-decoration: none; font-weight: 600; }
 .topbar .pages a:hover { color: #fff; }
-.topbar .pages a[aria-current=page] { color: #fff; border-bottom-color: #7fa3f5; }
+.topbar .pages a[aria-current=page] { color: #fff; background: rgb(255 255 255 / .12); }
+#pending { font-size: 11px; padding: 0 6px; line-height: 1.6; }
 .topbar .resources { margin-left: auto; gap: 22px; } .topbar .local { color: #9fb0cf; } .topbar .resources a { color: #e4ecf9; }
 main { max-width: 1440px; margin: auto; padding: 24px 36px 72px; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-bottom: 22px; }
@@ -178,12 +179,19 @@ dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 
 .rubric h4 { margin-bottom: 6px; }
 .rubric p { font-size: 15px; line-height: 1.5; max-width: 78ch; }
 .rubric-note { margin-top: 8px; } .rubric-note summary { font-size: 12px; } .rubric-note p { font-size: 13px; color: var(--muted); margin-top: 6px; }
-.transcript { display: grid; gap: 18px; }
-.transcript h4 { margin-bottom: 6px; }
-.turn-body { font-size: 15px; line-height: 1.55; max-width: 78ch; overflow-wrap: anywhere; }
+/* The conversation is the evidence: an inset chat area with one clearly styled turn per speaker. */
+.conversation { display: grid; gap: 16px; background: var(--paper); }
+.conversation h4 { margin-bottom: 6px; font-size: 12px; }
+.turn { max-width: 78ch; }
+.turn.engineer h4 { color: var(--blue); }
+.turn.agent h4 { color: var(--ink); }
+.turn-body { font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; padding: 14px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
 .turn-body p + p { margin-top: 10px; }
-.turn.agent .turn-body { padding: 14px 16px; background: var(--paper); border-radius: 8px; border: 1px solid var(--line); }
+.turn.engineer .turn-body { background: var(--blue-bg); border-color: var(--blue-line); }
+.turn.agent .turn-body { border-color: var(--line-strong); box-shadow: 0 1px 2px rgb(23 34 56 / .06); }
 .turn .error { margin: 0; max-width: 78ch; }
+.evidence { display: grid; gap: 16px; }
+.evidence h4 { margin-bottom: 6px; }
 .context ul, .proposals ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .context { padding: 12px 14px; background: var(--amber-bg); border-radius: 8px; max-width: 78ch; }
 .context h4 { color: var(--amber); }
@@ -199,6 +207,7 @@ dl { display: grid; grid-template-columns: 240px 1fr; gap: 8px 16px; font-size: 
 #checks li.failed::before { background: var(--red-bar); }
 .disclosures pre { margin-top: 10px; }
 .advice header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.advice header button { margin-left: auto; }
 .judgment { margin-top: 10px; max-width: 78ch; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .judgment .lead { font-weight: 600; }
 .judgment.none { color: var(--muted); }

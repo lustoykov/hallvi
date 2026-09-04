@@ -318,7 +318,8 @@ function renderAnswer(saved, ordered, shown) {
   $("judge-meta").textContent = llm ? `${llm.model} · ${llm.effort} · ${formatDate(llm.createdAt)}` : "";
   renderJudgment(llm?.reason, human);
   $("judge-result").className = `judgment${llm ? "" : " none"}`;
-  $("judge").textContent = llm ? "Judge this answer again…" : "Judge this answer…";
+  $("judge").textContent = llm ? "Judge again…" : "Judge this answer…";
+  $("judge-stale").hidden = !triage.stale; // Judged under wording the casebook no longer has; a retry uses today's.
   $("judge").disabled = Boolean(state.active) || busy || !reviewable(current);
   $("verdict").hidden = !reviewable(current); $("unreviewable").hidden = reviewable(current);
   for (const button of document.querySelectorAll(".verdict-button")) {

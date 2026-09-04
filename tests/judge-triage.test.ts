@@ -35,13 +35,11 @@ it("keeps human decisions distinct, and a later LLM pass never overwrites them",
   expect(triageCase(record, [human("pass"), llm("fail")]).status).toBe("reviewed");
   expect(triageCase(record, [human("fail"), human("pass")]).label).toBe("Human pass");
 });
-it("counts a judgment only under the rubric wording the casebook has now", () => {
-  expect(triageCase(record, [llm("pass")], record.rubric).status).toBe("cleared");
-  const stale = triageCase(record, [llm("pass")], "A newer rubric");
-  expect(stale.status).toBe("needs-judge");
-  expect(stale.reason).toContain("Rubric wording changed");
-  expect(triageCase(record, [human("pass"), llm("pass")], "A newer rubric").judged).toBe(false);
-  expect(triageCase(record, [llm("pass")]).judged).toBe(true);
+it("flags a judgment made under older rubric wording without un-judging it", () => {
+  expect(triageCase(record, [llm("pass")], record.rubric)).toMatchObject({ status: "cleared", judged: true, stale: false });
+  expect(triageCase(record, [llm("fail")], "A newer rubric")).toMatchObject({ status: "failures", label: "LLM fail", judged: true, stale: true });
+  expect(triageCase(record, [llm("pass")])).toMatchObject({ judged: true, stale: false });
+  expect(triageCase(record, [llm("pass", "phase-one-meaning-v1")], record.rubric)).toMatchObject({ status: "needs-judge", judged: false });
 });
 it("uses the latest judgment for the exact answer without mutating evidence", () => {
   const reviews = [llm("pass"), llm("fail"), { ...llm("pass"), key: "greeting:2" }];

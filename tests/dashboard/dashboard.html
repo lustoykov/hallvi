@@ -65,20 +65,22 @@
           <p id="empty-answers" class="empty" hidden>No answers match this filter. Nothing here needs you right now; open All to browse.</p>
           <section id="answer-detail" class="answer-card" aria-labelledby="case-title">
             <header class="answer-header">
-              <div><h3 id="case-title"></h3><p id="case-sub"><span id="case-meta"></span><button id="judge" class="text-button" type="button">Judge this answer…</button><button id="rerun-case" class="text-button" type="button">Run case again…</button><span id="rerun-unavailable" class="footnote" hidden>No longer in the casebook, so it cannot be rerun</span></p></div>
+              <div><h3 id="case-title"></h3><p id="case-sub"><span id="case-meta"></span><button id="rerun-case" class="text-button" type="button">Run case again…</button><span id="rerun-unavailable" class="footnote" hidden>No longer in the casebook, so it cannot be rerun</span></p></div>
               <nav class="answer-nav" aria-label="Answer navigation"><span id="answer-position"></span><button id="prev-answer" class="secondary small" type="button">Previous</button><button id="next-answer" class="secondary small" type="button">Next</button></nav>
             </header>
             <p class="status-line"><span id="triage-chip" class="chip"></span><span id="triage-reason"></span></p>
             <section class="rubric" aria-labelledby="rubric-title"><h4 id="rubric-title">Expected behavior</h4><p id="rubric"></p><details id="rubric-changed" class="rubric-note" hidden><summary>Wording changed since this run</summary><p id="rubric-saved"></p></details></section>
-            <section class="transcript" aria-label="Saved conversation">
+            <section class="conversation" aria-label="Saved conversation">
               <div id="context" class="context" hidden><h4>Decisions already recorded before this message</h4><ul id="context-list"></ul></div>
-              <div class="turn"><h4>Engineer</h4><div id="input" class="turn-body"></div></div>
+              <div class="turn engineer"><h4>Engineer</h4><div id="input" class="turn-body"></div></div>
               <div class="turn agent"><h4>Server Guy</h4><div id="answer" class="turn-body"></div><p id="answer-error" class="error" hidden></p></div>
+            </section>
+            <section class="evidence" aria-label="Recorded evidence">
               <div id="proposal-block" class="proposals"><h4 id="proposals-title">Proposed decisions</h4><ul id="proposals"></ul><p id="no-proposals" class="muted">No decisions proposed.</p></div>
               <div class="disclosures"><details><summary id="checks-summary">Automatic checks</summary><ul id="checks"></ul></details><details><summary>Recorded state before / after</summary><pre id="state"></pre></details></div>
             </section>
             <section id="advice" class="advice" aria-labelledby="advice-title">
-              <header><h4 id="advice-title">LLM judgment</h4><span id="judge-verdict" class="chip llm" hidden></span><span id="judge-meta" class="footnote"></span></header>
+              <header><h4 id="advice-title">LLM judgment</h4><span id="judge-verdict" class="chip llm" hidden></span><span id="judge-stale" class="chip discuss" hidden>Older rubric wording</span><span id="judge-meta" class="footnote"></span><button id="judge" class="secondary small" type="button">Judge this answer…</button></header>
               <p id="judge-result" class="judgment"></p>
             </section>
             <section id="verdict" class="verdict" aria-labelledby="verdict-title">
