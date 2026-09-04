@@ -1,0 +1,55 @@
+name: Server Guy checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      full_browser_suite:
+        description: Run all desktop browser journeys (no model calls)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Small smoke suite on PRs; full suite only when requested
+        env:
+          FULL_SUITE: ${{ inputs.full_browser_suite }}
+        run: |
+          if [ "$FULL_SUITE" = "true" ]; then npm run test:e2e; else npm run test:e2e:smoke; fi
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-failure-report
+          path: |
+            tests/results/browser-report/
+            tests/results/browser-artifacts/
+          retention-days: 7

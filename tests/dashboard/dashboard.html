@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- Desktop developer tool for one engineer. Inherits Server Guy's navy/blue palette and restrained list UI.
+     Two pages share one shell: / runs fixed checks, /evals reviews saved live eval answers.
+     Reading spends nothing; a live run and its automatic judging share one confirmation. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="testing-token" content="CSRF_TOKEN">
+  <title>Server Guy Testing</title><link rel="stylesheet" href="/dashboard.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" data-route><strong>Server Guy</strong><span class="brand-tag">Testing</span></a>
+    <nav class="pages" aria-label="Pages"><a id="checks-link" href="/" data-route>Run checks</a><a id="reviews-link" href="/evals" data-route>Eval runs <span id="pending" class="chip discuss" hidden></span></a><a id="about-link" href="/about" data-route>How it works</a></nav>
+    <nav class="resources" aria-label="Resources"><span id="origin" class="local"></span><a href="/guide">Acceptance guide</a><a href="http://127.0.0.1:3000/applications" target="_blank" rel="noreferrer">Open app<svg class="ext" aria-hidden="true" viewBox="0 0 12 12"><path d="M4 1.5h6.5V8M10.5 1.5 1.5 10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="visually-hidden"> (opens in a new tab)</span></a></nav>
+  </header>
+  <main>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div id="stale" class="error" role="alert" hidden>This page is newer than the dashboard server behind it, so some actions will fail. Restart it in your terminal with <code>npm run test:dashboard</code>, then reload.</div>
+    <div id="active" class="active" role="status" hidden><span class="pulse" aria-hidden="true"></span><span id="active-text"></span><button id="stop" class="secondary">Stop run</button></div>
+
+    <section id="runs-panel" aria-labelledby="checks-title">
+      <div class="page-heading"><div><h1 id="checks-title" tabindex="-1">Run checks</h1><p>Fixed test commands and their saved results. Nothing runs until you start it here. <a href="/about" data-route class="text-button">How the suites differ</a></p></div></div>
+      <table class="suites"><caption class="visually-hidden">Available test suites, AI usage and CI policy</caption><thead><tr><th>Suite</th><th>AI usage</th><th>CI</th><th>Last result</th><th><span class="visually-hidden">Action</span></th></tr></thead><tbody id="suites"></tbody></table>
+      <section class="history" aria-labelledby="history-title">
+        <h2 id="history-title">Recent runs</h2>
+        <p id="empty-runs" class="muted">Nothing has run from this dashboard yet. Saved eval answers are under Eval runs.</p>
+        <div id="history" class="history-list"></div>
+        <section id="log-panel" class="log-panel" aria-labelledby="log-title" hidden><header><h3 id="log-title"></h3><button id="log-close" class="text-button" type="button">Hide output</button></header><pre id="log"></pre></section>
+      </section>
+    </section>
+
+    <section id="about-panel" aria-labelledby="about-title" hidden>
+      <div class="page-heading"><div><h1 id="about-title" tabindex="-1">How it works</h1><p>What each suite exercises, what is simulated, and where results end up. Reading this runs nothing.</p></div></div>
+      <section class="about-block" aria-labelledby="compare-title"><h2 id="compare-title">The four suites</h2><div class="compare-wrap"><table id="compare" class="compare"><caption class="visually-hidden">How the suites differ</caption></table></div></section>
+      <section class="about-block" aria-labelledby="usage-title"><h2 id="usage-title">AI usage &amp; automatic runs</h2>
+        <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
+        <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM judgments are local-only; this dashboard confirms before using your ChatGPT subscription, and one confirmation covers a run and judging its answers.</p>
+        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
+      </section>
+      <section class="about-block" aria-labelledby="files-title"><h2 id="files-title">Where everything lives</h2><dl><dt>Application tests</dt><dd><code>tests/application/unit/</code> and <code>tests/application/integration/</code></dd><dt>Browser smoke &amp; journeys</dt><dd><code>tests/browser/</code> · smoke selects <code>@smoke</code> tags · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></section>
+    </section>
+
+    <section id="reviews-panel" aria-labelledby="reviews-title" hidden>
+      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval runs</h1><p>Saved Server Guy answers from live agent evals, not browser test results. New runs are judged by a model as they finish; you look at what still needs attention.</p></div></div>
+      <p id="bulk-result" class="notice" role="status"></p>
+      <div id="empty-reviews" class="empty" hidden><p>No saved live eval answers yet.</p><p class="footnote">Run Live agent evals to create the first run; its answers are judged automatically when it finishes.</p><button id="empty-choose" class="secondary" type="button">Choose cases to run…</button></div>
+      <div id="review-content" class="review-layout" hidden>
+        <aside class="review-sidebar" aria-label="Runs and answers">
+          <h2 class="side-heading">Runs</h2>
+          <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
+          <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
+          <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          <div id="answers-block" class="answers-block">
+            <div class="answers-heading"><h2>Answers</h2><span id="answers-total"></span></div>
+            <div class="filters" role="group" aria-label="Filter answers"><button type="button" data-filter="attention" aria-pressed="true">Attention <span></span></button><button type="button" data-filter="failures" aria-pressed="false">Failed <span></span></button><button type="button" data-filter="cleared" aria-pressed="false">Cleared <span></span></button><button type="button" data-filter="reviewed" aria-pressed="false">Reviewed <span></span></button><button type="button" data-filter="all" aria-pressed="false">All <span></span></button></div>
+            <ul id="answer-list" class="answer-list" aria-label="Answers in selected run"></ul>
+            <p id="no-answers" class="side-empty" hidden></p>
+            <details class="side-help"><summary>How triage works</summary><p><strong>Attention</strong> holds answers that are not judged under the current judge policy, judged as uncertain, or failed (code checks, the judge, or you). <strong>Cleared</strong> answers passed the current judge policy and their recorded code checks; they are not human-approved. <strong>Reviewed</strong> answers carry your verdict, which never overrides failed code checks.</p><p>Open Cleared now and then to spot-check the judge: it can be confidently wrong, and your verdict always wins.</p></details>
+            <p class="side-hint">J / K move between answers · P / F / D save a verdict for the open one</p>
+          </div>
+        </aside>
+        <article class="review-main">
+          <header id="run-header" class="run-header">
+            <div class="run-title-row"><div><h2 id="run-title"></h2><p id="run-meta"></p><p id="run-repeats" class="footnote" hidden></p></div><div class="run-actions"><span id="run-archived" class="chip" hidden>Archived</span><button id="judge-run" class="primary" type="button">Judge…</button><button id="archive-run" class="secondary" type="button">Archive run</button></div></div>
+            <p id="archive-error" class="error" role="alert" hidden>Run metadata could not be read. The run stays visible; archiving is disabled until the file is repaired.</p>
+            <div class="progress"><div id="progress-bar" class="progress-bar" role="img"><span class="seg failures"></span><span class="seg review"></span><span class="seg judge"></span><span class="seg cleared"></span><span class="seg reviewed"></span></div><p id="progress-text"></p></div>
+          </header>
+          <p id="empty-answers" class="empty" hidden>No answers match this filter. Nothing here needs you right now; open All to browse.</p>
+          <section id="answer-detail" class="answer-card" aria-labelledby="case-title">
+            <header class="answer-header">
+              <div><h3 id="case-title"></h3><p id="case-sub"><span id="case-meta"></span><button id="rerun-case" class="text-button" type="button">Run case again…</button><span id="rerun-unavailable" class="footnote" hidden>No longer in the casebook, so it cannot be rerun</span></p></div>
+              <nav class="answer-nav" aria-label="Answer navigation"><span id="answer-position"></span><button id="prev-answer" class="secondary small" type="button">Previous</button><button id="next-answer" class="secondary small" type="button">Next</button></nav>
+            </header>
+            <p class="status-line"><span id="triage-chip" class="chip"></span><span id="triage-reason"></span></p>
+            <section class="rubric" aria-labelledby="rubric-title"><h4 id="rubric-title">Expected behavior</h4><p id="rubric"></p><details id="rubric-changed" class="rubric-note" hidden><summary>Wording changed since this run</summary><p id="rubric-saved"></p></details></section>
+            <section class="conversation" aria-label="Saved conversation">
+              <div id="context" class="context" hidden><h4>Decisions already recorded before this message</h4><ul id="context-list"></ul></div>
+              <div class="turn engineer"><h4>Engineer</h4><div id="input" class="turn-body"></div></div>
+              <div class="turn agent"><h4>Server Guy</h4><div id="answer" class="turn-body"></div><p id="answer-error" class="error" hidden></p></div>
+            </section>
+            <section class="evidence" aria-label="Recorded evidence">
+              <div id="proposal-block" class="proposals"><h4 id="proposals-title">Proposed decisions</h4><ul id="proposals"></ul><p id="no-proposals" class="muted">No decisions proposed.</p></div>
+              <div class="disclosures"><details><summary id="checks-summary">Automatic checks</summary><ul id="checks"></ul></details><details><summary>Recorded state before / after</summary><pre id="state"></pre></details></div>
+            </section>
+            <section id="advice" class="advice" aria-labelledby="advice-title">
+              <header><h4 id="advice-title">LLM judgment</h4><span id="judge-verdict" class="chip llm" hidden></span><span id="judge-stale" class="chip discuss" hidden>Older rubric wording</span><span id="judge-meta" class="footnote"></span><button id="judge" class="secondary small" type="button">Judge this answer…</button></header>
+              <div id="judge-result" class="judgment"></div>
+            </section>
+            <section id="verdict" class="verdict" aria-labelledby="verdict-title">
+              <div class="verdict-row">
+                <h4 id="verdict-title">Your verdict</h4>
+                <div class="verdict-buttons" role="group" aria-label="Your verdict"><button class="verdict-button pass" data-verdict="pass" type="button" aria-pressed="false">Pass <kbd aria-hidden="true">P</kbd></button><button class="verdict-button fail" data-verdict="fail" type="button" aria-pressed="false">Fail <kbd aria-hidden="true">F</kbd></button><button class="verdict-button discuss" data-verdict="needs-discussion" type="button" aria-pressed="false">Discuss <kbd aria-hidden="true">D</kbd></button></div>
+                <span id="saved" role="status"></span>
+                <button id="note-toggle" class="text-button" type="button">Add a note</button>
+              </div>
+              <label id="note-field" class="field" hidden>Note<textarea id="reason" maxlength="5000" rows="2" placeholder="Optional. Saved with your next verdict click."></textarea></label>
+            </section>
+            <p id="unreviewable" class="unreviewable" hidden>This answer failed before Server Guy replied, so there is nothing to grade or judge.</p>
+          </section>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="journey-picker" class="picker" aria-labelledby="journey-summary">
+    <header class="dialog-heading"><h2 id="journey-summary">Choose browser journeys</h2><button class="text-button" data-close="journey-picker" aria-label="Close journey selection">Close</button></header>
+    <p class="muted">Desktop checks with synthetic responses. No model calls.</p>
+    <div class="selection-actions"><button id="journeys-all" class="text-button">Select all journeys</button><button id="journeys-clear" class="text-button">Clear journeys</button></div>
+    <div class="picker-body"><fieldset><legend class="visually-hidden">Browser journeys</legend><div id="journey-options" class="selection-list"></div></fieldset></div>
+    <footer class="picker-footer"><span id="journey-count" role="status"></span><button id="run-journeys" class="primary">Run selected journeys</button></footer>
+  </dialog>
+  <dialog id="eval-picker" class="picker" aria-labelledby="eval-summary">
+    <header class="dialog-heading"><h2 id="eval-summary">Choose live eval cases</h2><button class="text-button" data-close="eval-picker" aria-label="Close eval selection">Close</button></header>
+    <p class="muted">Real Server Guy agent responses, not browser tests. Each repetition starts fresh.</p>
+    <div class="selection-actions"><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <div class="picker-body"><fieldset><legend class="visually-hidden">Live eval cases</legend><div id="eval-options" class="selection-list"></div></fieldset></div>
+    <footer class="picker-footer"><span id="eval-count" role="status"></span><button id="run-evals" class="primary">Review and run live evals…</button></footer>
+  </dialog>
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <h2 id="confirm-title"></h2><p id="confirm-description" class="muted"></p>
+    <p class="settings-line">Uses <strong id="confirm-model"></strong> at <strong id="confirm-effort"></strong> effort. <button id="change-settings" class="text-button" type="button">Change</button><a id="live-settings" href="http://127.0.0.1:3000/setup/pi" target="_blank" rel="noopener">Change in Server Guy</a></p>
+    <div id="settings-fields" class="form-row" hidden><label class="field">Model<input id="run-model" spellcheck="false" required pattern="[a-zA-Z0-9_.-]{1,100}"></label><label class="field">Reasoning effort<select id="run-effort"><option>off</option><option>minimal</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label></div>
+    <label id="judge-after-row" class="consent"><input id="judge-after" type="checkbox" checked>Judge the answers automatically when the run finishes</label>
+    <details><summary>Selection and limits</summary><p id="confirm-selection"></p><p id="confirm-limits"></p><p>Uses your ChatGPT subscription through Pi; no API billing fallback. Stopping cannot refund requests already sent.</p></details>
+    <div class="dialog-actions"><button id="cancel" class="secondary">Cancel</button><button id="confirm-run" class="primary">Start</button></div>
+  </dialog>
+</body></html>

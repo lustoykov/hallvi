@@ -2,6 +2,8 @@
 
 Status: workshop drafts. These documents define the product experience, not implementation behavior or evidence that the product exists.
 
+These journeys own user-visible behavior, launch phases, deliverables, and exit gates. Development order and implementation status belong to the [roadmap](../../ROADMAP.md); executable acceptance cases and verification evidence belong to the [testing guide](../testing/phase-one-acceptance.md). Do not turn the journeys into a second implementation backlog.
+
 The five journeys are deliberately separate because **Application Launch**, routine **Deployment**, incident response, alert delivery, and external-agent collaboration have different triggers, user expectations, and definitions of success.
 
 | Journey | Workshop state | Core user outcome |

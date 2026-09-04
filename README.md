@@ -1,8 +1,20 @@
 # Server Guy
 
-Server Guy provides PaaS-like deployment and recovery on infrastructure the engineer owns. The current implementation covers Phase 1 of Journey 1: **Start**.
+Server Guy is being built to provide PaaS-like deployment and recovery for your own applications and supported self-hosted open-source tools, on infrastructure you own.
 
-[Learn the agent-engineering stack through Server Guy](docs/learning/stack-with-server-guy.md).
+The [product direction](docs/PRODUCT-WORKSHOP-NOTES.md#self-hosted-oss-deployment) includes taking a project such as Langfuse from upstream deployment instructions to a verified installation with inspectable configuration and recovery evidence. This is a planned use case, not a shipped installer catalog. The current implementation covers Phase 1 of Journey 1: **Start**.
+
+## Documentation
+
+| Question | Owner |
+| --- | --- |
+| What do we build next, and what is implemented or still open? | [Development roadmap](ROADMAP.md) — ordered milestones/PRs and the implementation backlog. |
+| What should users experience? | [User journeys](docs/user-journeys/README.md) — product behavior, launch phases, deliverables and exit gates. |
+| What engineering capabilities does this teach? | [Learning guide](docs/learning/stack-with-server-guy.md) — stack mapping and exercises, not another build plan. |
+| How do we prove the implemented behavior works? | [Phase 1 testing guide](docs/testing/phase-one-acceptance.md) — acceptance cases, test/eval procedures and verification evidence. |
+| Where are the test runners and saved results? | [Tests index](tests/README.md) — commands, folders and the local dashboard. |
+
+Launch phases are product steps; development milestones are implementation work and may span several PRs. Update each fact in its owning document and link to it from the others.
 
 ## Architecture
 
@@ -38,8 +50,13 @@ Durable application records are stored in `.server-guy/server-guy.db`; the Opera
 
 ## Verify
 
+For a visual entry point, run `npm run test:dashboard` and open [Server Guy Testing](http://127.0.0.1:4317). It can run checks and review saved eval answers. Nothing starts automatically; real model work requires explicit confirmation. This is a separate local developer tool, not a production app page.
+
 ```bash
 npm test
 npm run lint
 npm run build
+npm run test:e2e:smoke
 ```
+
+Browser checks use synthetic providers and no model credits. See the [tests index](tests/README.md) for the full desktop suite, interactive runner UIs and opt-in live evals.
