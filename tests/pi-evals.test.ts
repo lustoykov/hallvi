@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 import { checkPhaseOne } from "./evals/check-phase-one";
-import { evalRepeatCount, phaseOneCases, type PhaseOneEvalCase } from "./evals/phase-one-cases";
+import { evalRepeatCount, phaseOneCases, selectPhaseOneCases, type PhaseOneEvalCase } from "./evals/phase-one-cases";
 import type { Decision, PhaseOneOperatorView, PiTurnResult } from "../src/server/types";
 
 function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
@@ -42,6 +42,12 @@ describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
   it("has eight uniquely named cases with explicit semantic rubrics", () => {
     expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(8);
     expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
+  });
+
+  it("selects a case subset without silently expanding invalid selections", () => {
+    expect(selectPhaseOneCases().length).toBe(8);
+    expect(selectPhaseOneCases("greeting,hypothetical").map((c) => c.id)).toEqual(["greeting", "hypothetical"]);
+    for (const value of ["", "missing", "greeting,greeting", "greeting,", ".*"]) expect(() => selectPhaseOneCases(value)).toThrow("PI_EVAL_CASES");
   });
 
   it.each(phaseOneCases)("accepts correct structural/state evidence for $id", (scenario) => {

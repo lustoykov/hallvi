@@ -13,12 +13,13 @@ import { readPiConfiguration, savePiConfiguration } from "../../src/server/pi-co
 import type { PhaseOneOperatorView, PiTurnResult } from "../../src/server/types";
 import { pushTestDatabase } from "../test-database";
 import { checkPhaseOne } from "./check-phase-one";
-import { evalRepeatCount, phaseOneCases, type PhaseOneEvalCase } from "./phase-one-cases";
+import { evalRepeatCount, selectPhaseOneCases, type PhaseOneEvalCase } from "./phase-one-cases";
 
 // This file is deliberately .eval.ts, excluded by Vitest's normal test discovery.
 // The separate config must also opt in before any setup or provider work runs.
 if (process.env.SERVER_GUY_LIVE_EVALS !== "1") throw new Error("Explicit live-eval opt-in is required.");
 const repeats = evalRepeatCount(process.env.PI_EVAL_REPEATS);
+const selectedCases = selectPhaseOneCases(process.env.PI_EVAL_CASES);
 const sourceFiles = [
   "src/server/pi.ts", "src/server/phase-one.ts", "src/server/phase-one-spec.ts",
   "src/server/pi-configuration.ts", "src/server/db.ts", "src/server/db-schema.ts",
@@ -58,7 +59,7 @@ beforeAll(() => {
   initialFingerprints = fingerprints();
   metadata = {
     suite: "phase-one-decisions-v1", startedAt: new Date().toISOString(), repeats,
-    plannedCases: phaseOneCases.length * repeats,
+    caseIds: selectedCases.map((scenario) => scenario.id), plannedCases: selectedCases.length * repeats,
     provider: chosen.providerId, model: chosen.modelId, effort: chosen.reasoningEffort,
     piVersion: JSON.parse(readFileSync("package.json", "utf8")).dependencies["@earendil-works/pi-coding-agent"],
     commit: git("rev-parse", "HEAD"), dirty: Boolean(git("status", "--porcelain")),
@@ -76,7 +77,7 @@ beforeAll(() => {
   vi.spyOn(github, "inspectGithubRepository").mockImplementation(() => {
     throw new Error("GitHub access is outside this eval's scope.");
   });
-  console.log(`Live Pi eval: ${phaseOneCases.length * repeats} sequential turns, ${chosen.modelId}/${chosen.reasoningEffort}. Results: ${runDirectory}`);
+  console.log(`Live Pi eval: ${selectedCases.length * repeats} sequential turns, ${chosen.modelId}/${chosen.reasoningEffort}. Results: ${runDirectory}`);
 });
 
 function seed(scenario: PhaseOneEvalCase, repetition: number) {
@@ -99,7 +100,7 @@ function seed(scenario: PhaseOneEvalCase, repetition: number) {
 }
 
 for (let repetition = 1; repetition <= repeats; repetition++) {
-  for (const scenario of phaseOneCases) {
+  for (const scenario of selectedCases) {
     it(`${scenario.id} / repetition ${repetition}`, async (context) => {
       const before = seed(scenario, repetition);
       const record: typeof results[number] = {

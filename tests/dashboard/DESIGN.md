@@ -39,7 +39,7 @@ Use the system stack throughout; no separate display font. Headline identifies t
 
 ## Layout
 
-Desktop only: a full-width header (64px), centered content (1280px maximum), and main padding (40px 36px 64px). Run checks uses a suite/model-usage/CI/action table followed by recent runs. Review answers uses a case sidebar (245px) and flexible evidence column separated by a gap (28px). Two-column form rows retain visible labels; answer text is bounded (78ch). There is no mobile layout contract.
+Desktop only: a full-width header (64px), centered content (1440px maximum), and main padding (24px 36px 64px). The topbar identifies the tool; avoid repeating a large title above the tabs. Run checks uses a suite/model-usage/CI/action table followed by recent runs; the browser policy states how many journeys run on every PR versus on demand. Review uses an Active/Archived run filter, a saved-run sidebar (300px) and flexible evidence column separated by a gap (28px). Each run groups its answers, not case types. The open run's answer list expands fully in normal page flow; neither the list nor the sidebar clips answers into a nested scroll area. Two-column form rows retain visible labels; answer text is bounded (78ch). There is no mobile layout contract.
 
 ## Elevation & Depth
 
@@ -51,11 +51,14 @@ Modestly rounded controls, actions, answer panels, and dialogs use the roles abo
 
 ## Components
 
-- Buttons: solid blue for direct Run/Save actions; outlined secondary controls for configuration, stopping, and judge requests. Hover changes the fill; disabled controls visibly dim. Keyboard focus has a blue outline (3px, offset 4px).
+- Buttons: solid blue for direct Run/Save and the prominent bulk Judge action; outlined secondary controls for configuration, stopping, human verdicts and archive/restore. Hover changes the fill; disabled controls visibly dim. Keyboard focus has a blue outline (3px, offset 4px).
 - Navigation: section buttons combine a blue label and underline when selected; case buttons combine a tinted fill with `aria-current`. Keep visible focus through case selection and unchanged state polling.
 - Evidence: show the rubric, engineer message, and saved answer before expandable proposals/checks and recorded state. Automatic outcome, human verdict, and LLM advice remain separately labeled.
-- Review form: native inputs, selects, and textarea; save feedback sits beside the action. Preserve per-case unsaved drafts while switching cases, and distinguish “Unsaved changes” from timestamped saved feedback.
-- Paid actions: disclose subscription usage before the action. Judge advice stays in a separate disclosure; the confirmation dialog names the model/effort and requires a fresh consent checkbox before enabling Start run.
+- Review form: one “Review this answer” area contains the human form and LLM advice in adjacent columns, with Ask LLM for advice beside the shared heading. Verdicts remain explicitly human versus advisory; advice never fills or submits the human form. Native inputs, selects and textarea; save feedback sits beside the action. Preserve per-case/run unsaved drafts while switching, and distinguish “Unsaved changes” from timestamped saved feedback.
+- Paid actions: disclose subscription usage beside the toolbar. Judge opens the confirmation dialog directly; model/effort are configured only there, with a fresh consent checkbox before Start run. Changing either resets consent. Human and LLM results remain separately labeled.
+- Scope selection: suite actions open native dialogs, never detached scrolling sections. Use one-column checklists with a scrollable body and visible footer; closing retains selections. Live selection proceeds to spending confirmation; cancelling that returns to the picker and its Run control.
+- Review context: call the section “Review live eval answers.” Use the saved run's counts, not current defaults. Group by run, newest first; its tri-state checkbox selects all accepted answers and its open list is flat. Opening a run/answer and selecting answers remain separate actions. Selection never silently spans multiple runs. Toolbar actions stay visible and disabled at zero; bulk human verdicts use a small dialog.
+- Archive: Active runs and Archived runs are run-level inbox views, not verdicts. Archive run sits beside the selected run's date/model and affects all its answers, never the checked subset. Restore run reverses it. Selection clears when changing run/view. Empty/failed runs are archivable; failed answers can't be judged. Keep empty and metadata-error states visible.
 
 ## Do's and Don'ts
 

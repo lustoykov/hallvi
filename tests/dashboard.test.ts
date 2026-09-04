@@ -7,6 +7,9 @@ import { get } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
 import { commandFor, createDashboard } from "./dashboard/server";
 import type { Launch } from "./dashboard/server";
+import { directory, listReports, loadReport, readJson, writeJson } from "./dashboard/results";
+import { phaseOneCases } from "./evals/phase-one-cases";
+import { browserJourneys } from "./e2e/journeys";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); vi.unstubAllEnvs(); });
@@ -29,7 +32,7 @@ async function fixture() {
     dashboard.server.closeAllConnections();
     rmSync(root, { recursive: true, force: true });
   });
-  return { origin, headers, launch, dashboard };
+  return { root, origin, headers, launch, dashboard };
 }
 it("maps a closed set of suites to fixed arguments and requires explicit spend consent", () => {
   expect(commandFor({ suite: "smoke" })).toEqual({ args: ["run", "test:e2e:smoke"], env: {} });
@@ -38,7 +41,30 @@ it("maps a closed set of suites to fixed arguments and requires explicit spend c
   expect(() => commandFor({ suite: "judge", consent: true })).toThrow("saved answer");
   expect(commandFor({ suite: "live", consent: true, model: "gpt-5.6-sol", effort: "high" }).env).toEqual({
     SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_REPEATS: "1", PI_EVAL_EXPECTED_MODEL: "gpt-5.6-sol", PI_EVAL_EXPECTED_EFFORT: "high",
+    PI_EVAL_CASES: phaseOneCases.map((item) => item.id).join(","),
   });
+});
+it("selects exact known journey tags and rejects empty, duplicate and foreign selections", () => {
+  const command = commandFor({ suite: "e2e", journeys: ["settings", "disconnect"] });
+  expect(command.args.slice(0, 4)).toEqual(["run", "test:e2e", "--", "--grep"]);
+  const pattern = new RegExp(command.args[4]);
+  expect(browserJourneys.filter((item) => pattern.test(`title @journey-${item.id}`)).map((item) => item.id)).toEqual(["settings", "disconnect"]);
+  for (const journeys of [[], ["settings", "settings"], ["settings|.*"], ["missing"]]) {
+    expect(() => commandFor({ suite: "e2e", journeys } as never)).toThrow();
+  }
+  expect(() => commandFor({ suite: "unit", journeys: ["settings"] })).toThrow();
+});
+it("bounds live selection and passes exact bulk judge keys without starting a model", () => {
+  const command = commandFor({ suite: "live", cases: ["greeting", "hypothetical"], repeats: 2, consent: true, model: "gpt-5.6-sol", effort: "high" });
+  expect(command.env).toMatchObject({ PI_EVAL_REPEATS: "2", PI_EVAL_CASES: "greeting,hypothetical" });
+  for (const patch of [{ repeats: 6 }, { repeats: 1.5 }, { cases: [] }, { cases: ["fake"] }, { cases: ["greeting", "greeting"] }]) {
+    expect(() => commandFor({ suite: "live", consent: true, ...patch } as never)).toThrow();
+  }
+  const judge = { suite: "judge" as const, run: "run", hash: "hash", keys: ["greeting:1", "greeting:2"], model: "gpt-5.6-sol", effort: "high" as const };
+  expect(() => commandFor(judge)).toThrow("Confirm subscription");
+  expect(commandFor({ ...judge, consent: true }).env.PI_JUDGE_CASES).toBe('["greeting:1","greeting:2"]');
+  expect(() => commandFor({ ...judge, consent: true, keys: [] })).toThrow();
+  expect(() => commandFor({ ...judge, consent: true, key: "greeting:1" })).toThrow();
 });
 it("opens without launching anything and rejects foreign Host, Origin and missing token", async () => {
   const { origin, headers, launch } = await fixture();
@@ -63,11 +89,15 @@ it("rejects missing consent, missing Origin, non-JSON, arbitrary commands and fa
   }
   expect(launch).not.toHaveBeenCalled();
 });
-it("clears inherited paid opt-ins, allows one process and records cancellation", async () => {
+it("clears inherited paid opt-ins, allows one process and saves the launched command through cancellation", async () => {
   vi.stubEnv("SERVER_GUY_LIVE_EVALS", "1"); vi.stubEnv("SERVER_GUY_LIVE_JUDGE", "1");
-  const { origin, headers, launch } = await fixture();
+  const { root, origin, headers, launch } = await fixture();
   const post = (path: string, body: unknown) => fetch(`${origin}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
-  expect((await post("/api/start", { suite: "unit" })).status).toBe(202);
+  const response = await post("/api/start", { suite: "unit" });
+  expect(response.status).toBe(202);
+  const run = await response.json();
+  expect(run.command).toBe("npm run test");
+  expect(readJson(join(root, "tests/results/runs", `${run.id}.json`)).command).toBe(run.command);
   expect(launch.mock.calls[0].slice(0, 2)).toEqual(["npm", ["run", "test"]]);
   await vi.waitFor(async () => expect((await (await fetch(`${origin}/api/state`, { headers })).json()).active.log).toContain('"live":"","judge":""'));
   expect((await post("/api/start", { suite: "unit" })).status).toBe(400);
@@ -75,5 +105,38 @@ it("clears inherited paid opt-ins, allows one process and records cancellation",
   await vi.waitFor(async () => {
     const state = await (await fetch(`${origin}/api/state`, { headers })).json();
     expect(state.active).toBeNull(); expect(state.history[0].status).toBe("cancelled");
+    expect(state.history[0].command).toBe(run.command);
   });
+});
+it("preflights all bulk judge answers before launch and protects bulk human writes", async () => {
+  const { root, origin, headers, launch } = await fixture();
+  const path = directory(join(root, "tests/results/evals", "sample"));
+  writeJson(join(path, "results.json"), {
+    model: "synthetic", effort: "high", startedAt: "2026-09-04", commit: "test", dirty: false, sourceFingerprints: {},
+    results: [1, 2].map((repetition) => ({ caseId: "greeting", repetition, rubric: "No invented choice", outcome: "checks-passed", checks: {},
+      error: null, input: { userMessage: "Hello" }, reply: { message: "Hello", decisionProposals: [] }, before: {}, after: {} })),
+  });
+  const hash = loadReport(root, "sample").hash;
+  const post = (path: string, body: unknown, changed = {}) => fetch(`${origin}${path}`, { method: "POST", headers: { ...headers, ...changed }, body: JSON.stringify(body) });
+  expect((await post("/api/start", { suite: "judge", run: "sample", hash, keys: ["greeting:1", "missing:1"], consent: true, model: "gpt-5.6-sol", effort: "high" })).status).toBe(400);
+  expect(launch).not.toHaveBeenCalled();
+  const batch = { run: "sample", hash, keys: ["greeting:1", "greeting:2"], review: { reviewer: "Test", verdict: "pass", reason: "Reviewed both greetings" } };
+  expect((await post("/api/review/bulk", batch, { Origin: "https://attacker.invalid" })).status).toBe(403);
+  expect((await post("/api/review/bulk", { ...batch, keys: [] })).status).toBe(400);
+  expect((await post("/api/review/bulk", { ...batch, hash: "stale" })).status).toBe(400);
+  expect(listReports(root)[0].reviews).toHaveLength(0);
+  expect(await (await post("/api/review/bulk", batch)).json()).toEqual({ saved: batch.keys, failed: [] });
+  expect(listReports(root)[0].reviews).toHaveLength(2);
+  expect(loadReport(root, "sample").hash).toBe(hash);
+  const archive = { run: "sample", hash, archived: true };
+  expect((await post("/api/runs/archive", archive, { Origin: "https://attacker.invalid" })).status).toBe(403);
+  expect((await post("/api/runs/archive", archive, { "X-SG-Testing-Token": "" })).status).toBe(403);
+  expect((await post("/api/runs/archive", { ...archive, archived: "true" })).status).toBe(400);
+  expect((await post("/api/runs/archive", { ...archive, keys: ["greeting:1"] })).status).toBe(400);
+  expect((await post("/api/runs/archive", { ...archive, hash: "stale" })).status).toBe(400);
+  expect(listReports(root)[0].archived).toBe(false);
+  expect(await (await post("/api/runs/archive", archive)).json()).toEqual({ archived: true });
+  expect(await (await post("/api/runs/archive", { ...archive, archived: false })).json()).toEqual({ archived: false });
+  expect(listReports(root)[0].reviews).toHaveLength(2);
+  expect(loadReport(root, "sample").hash).toBe(hash);
 });

@@ -15,6 +15,8 @@ const caseSchema = z.object({
 export const reportSchema = z.object({
   model: z.string(), effort: z.string(), startedAt: z.string(), commit: z.string(),
   dirty: z.boolean(), sourceFingerprints: z.record(z.string(), z.string()),
+  caseIds: z.array(safeName).optional(), repeats: z.number().int().min(1).max(5).optional(),
+  plannedCases: z.number().int().nonnegative().optional(),
   results: z.array(caseSchema).max(100),
 });
 export type SavedCase = z.infer<typeof caseSchema>;
@@ -23,6 +25,9 @@ export const humanReviewSchema = z.strictObject({
   verdict: verdictSchema, reason: z.string().trim().min(1).max(5000),
   reviewer: z.string().trim().min(1).max(100),
 });
+const answerKeysSchema = z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,180}:[1-9][0-9]*$/))
+  .max(100).refine((keys) => new Set(keys).size === keys.length, "Duplicate answers");
+export const reviewKeysSchema = answerKeysSchema.min(1);
 export const judgmentSchema = z.strictObject({ verdict: verdictSchema, reason: z.string().trim().min(1).max(5000) });
 export type Judgment = z.infer<typeof judgmentSchema>;
 const reviewFields = { ...judgmentSchema.shape, key: z.string(), sourceHash: z.string(), rubric: z.string(), createdAt: z.string() };
@@ -30,6 +35,7 @@ const savedReviewSchema = z.discriminatedUnion("type", [
   z.object({ ...reviewFields, type: z.literal("human"), reviewer: z.string().min(1).max(100) }),
   z.object({ ...reviewFields, type: z.literal("llm"), model: z.string(), effort: z.string(), promptVersion: z.string(), piVersion: z.string() }),
 ]);
+const runStateSchema = z.strictObject({ sourceHash: z.string(), archived: z.boolean() });
 
 // The dashboard serves known artifacts, never arbitrary workspace paths or symlinks.
 export function directory(path: string) {
@@ -90,7 +96,39 @@ export function listReports(root: string) {
   return readdirSync(directory(join(root, "tests/results/evals"))).flatMap((run) => {
     try {
       const { report, hash, path } = loadReport(root, run);
-      return [{ run, ...report, hash, reviews: reviewsFor(path, hash) }];
+      let archived = false; let archiveError = false;
+      try { archived = runArchived(path, hash); } catch { archiveError = true; }
+      return [{ run, ...report, hash, reviews: reviewsFor(path, hash), archived, archiveError }];
     } catch { return []; } // Foreign/incomplete directories are not dashboard runs.
   }).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+}
+
+function runArchived(path: string, hash: string): boolean {
+  try {
+    const state = runStateSchema.parse(readJson(join(path, "run-state.json")));
+    return state.sourceHash === hash && state.archived;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+export function archiveRun(root: string, run: string, hash: string, archived: boolean) {
+  const saved = loadReport(root, run);
+  if (saved.hash !== hash) throw new Error("Results changed. Reload before archiving.");
+  runArchived(saved.path, hash); // Fail closed instead of overwriting corrupt or unsafe metadata.
+  writeJson(join(saved.path, "run-state.json"), runStateSchema.parse({ sourceHash: hash, archived }));
+  return { archived }; // The entire run moves; evidence and human/LLM verdicts are unchanged.
+}
+
+export function saveHumanReviews(root: string, run: string, hash: string, keys: string[], review: z.infer<typeof humanReviewSchema>) {
+  reviewKeysSchema.parse(keys); humanReviewSchema.parse(review);
+  // Validate the entire selection before the first write. Each verdict remains an independent, append-only record.
+  for (const key of keys) findCase(root, run, hash, key);
+  const saved: string[] = [];
+  for (const key of keys) {
+    try { saveReview(root, run, hash, key, { type: "human", ...review }); saved.push(key); }
+    catch { break; } // Report partial disk failure honestly; never mark unsaved answers reviewed.
+  }
+  return { saved, failed: keys.slice(saved.length) };
 }

@@ -1,11 +1,13 @@
 import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
+import { journey } from "./journeys";
 
 async function addApplication(page: Page, name: string) {
   await page.goto("/applications/new");
   await page.getByLabel("GitHub repository", { exact: true }).fill(`https://github.com/qa/${name}`);
   await page.getByRole("button", { name: "Add application", exact: true }).click();
-  await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/);
+  // The disposable Next dev server may compile creation and destination routes on first use.
+  await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30_000 });
   return new URL(page.url()).pathname;
 }
 async function view(page: Page) {
@@ -17,7 +19,7 @@ async function send(page: Page, message: string) {
   await expect(page.getByText(`[QA fixture reply] ${message}`, { exact: true })).toBeVisible();
 }
 
-test("P1-04/06 @smoke add an application, record a priority, reload", async ({ page }) => {
+test("P1-04/06 add an application, record a priority, reload", journey("add-application"), async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/applications$/);
   await addApplication(page, "smoke-app");
@@ -30,7 +32,7 @@ test("P1-04/06 @smoke add an application, record a priority, reload", async ({ p
   await expect(page.getByText("[QA fixture reply] priority: Fast recovery matters most", { exact: true })).toBeVisible();
 });
 
-test("P1-03/11 @smoke settings help, cancellation and persisted effort", async ({ page }) => {
+test("P1-03/11 settings help, cancellation and persisted effort", journey("settings"), async ({ page }) => {
   await page.goto("/setup/pi");
   await page.getByRole("button", { name: "Storage & privacy" }).click();
   await expect(page.getByRole("heading", { name: "Storage & privacy" })).toBeVisible();
@@ -46,7 +48,7 @@ test("P1-03/11 @smoke settings help, cancellation and persisted effort", async (
   await expect(page.getByLabel("Reasoning effort")).toHaveValue("medium");
 });
 
-test("P1-07 provider failure leaves no partial turn and retry works", async ({ page }) => {
+test("P1-07 provider failure leaves no partial turn and retry works", journey("provider-failure"), async ({ page }) => {
   await addApplication(page, "failure-app");
   const before = await view(page);
   await page.getByRole("textbox").fill("Hello [fail-once]");
@@ -57,7 +59,7 @@ test("P1-07 provider failure leaves no partial turn and retry works", async ({ p
   expect((await view(page)).messages).toHaveLength(before.messages.length + 2);
 });
 
-test("P1-05 applications isolate Decisions and unsent drafts", async ({ page }) => {
+test("P1-05 applications isolate Decisions and unsent drafts", journey("isolation"), async ({ page }) => {
   const first = await addApplication(page, "isolation-first");
   await send(page, "priority: First app only");
   await page.getByRole("textbox").fill("Unsent draft");
@@ -68,7 +70,7 @@ test("P1-05 applications isolate Decisions and unsent drafts", async ({ page }) 
   expect((await view(page)).decisions[0].value).toBe("First app only");
 });
 
-test("P1-06/07 revision replaces exactly; fabricated replacement rolls back", async ({ page }) => {
+test("P1-06/07 revision replaces exactly; fabricated replacement rolls back", journey("revision"), async ({ page }) => {
   await addApplication(page, "revision-app");
   await send(page, "priority: Lowest cost");
   const oldId = (await view(page)).decisions[0].id;
@@ -84,7 +86,7 @@ test("P1-06/07 revision replaces exactly; fabricated replacement rolls back", as
   expect((await view(page)).decisions).toEqual(revised.decisions);
 });
 
-test("P1-09 confirmed removal permits a genuinely fresh application", async ({ page }) => {
+test("P1-09 confirmed removal permits a genuinely fresh application", journey("removal"), async ({ page }) => {
   const oldPath = await addApplication(page, "removal-app");
   await send(page, "priority: Disposable decision");
   await page.getByRole("button", { name: "Switch application: removal-app" }).click();
@@ -101,7 +103,7 @@ test("P1-09 confirmed removal permits a genuinely fresh application", async ({ p
   expect((await page.request.get(`/api${oldPath}`)).status()).toBe(404);
 });
 
-test("P1-10 disconnect preserves application history and requires consent to reuse", async ({ page }) => {
+test("P1-10 disconnect preserves application history and requires consent to reuse", journey("disconnect"), async ({ page }) => {
   const path = await addApplication(page, "disconnect-app");
   await send(page, "Hello before disconnect");
   const before = await view(page);
@@ -115,7 +117,7 @@ test("P1-10 disconnect preserves application history and requires consent to reu
   expect((await view(page)).messages).toEqual(before.messages);
 });
 
-test("P1-13 double Enter saves one pair and keeps a newer draft", async ({ page }) => {
+test("P1-13 double Enter saves one pair and keeps a newer draft", journey("slow-reply"), async ({ page }) => {
   await addApplication(page, "slow-send-app");
   const before = await view(page);
   const composer = page.getByRole("textbox");

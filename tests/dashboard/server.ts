@@ -6,40 +6,62 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { directory, findCase, humanReviewSchema, listReports, readJson, saveReview, writeJson } from "./results.ts";
+import { archiveRun, directory, findCase, humanReviewSchema, listReports, readJson, reviewKeysSchema, saveHumanReviews, saveReview, writeJson } from "./results.ts";
+import { browserJourneys } from "../e2e/journeys.ts";
+import { phaseOneCases } from "../evals/phase-one-cases.ts";
 
 export const suites = [
   { id: "unit", name: "Application tests", command: "npm test", scope: "Schemas, domain rules, SQLite and adapter tests", cost: "No model calls", ci: "Every PR" },
   { id: "smoke", name: "Browser smoke", command: "npm run test:e2e:smoke", scope: "2 desktop journeys through Server Guy", cost: "No model calls", ci: "Every PR" },
-  { id: "e2e", name: "All browser journeys", command: "npm run test:e2e", scope: "Desktop journeys with synthetic Pi, GitHub and login", cost: "No model calls", ci: "Manual only" },
-  { id: "live", name: "Live agent evals", command: "npm run eval:pi", scope: "8 cases through Server Guy’s real Pi adapter and SQLite", cost: "Uses ChatGPT subscription", ci: "Local opt-in only" },
+  { id: "e2e", name: "Browser journeys", command: "npm run test:e2e", scope: `${browserJourneys.length} selectable journeys · simulated Pi, GitHub and login`, cost: "No model calls", ci: `${browserJourneys.filter((journey) => journey.smoke).length} journeys on every PR · all ${browserJourneys.length} on demand` },
+  { id: "live", name: "Live agent evals", command: "npm run eval:pi", scope: `${phaseOneCases.length} selectable cases · real Server Guy agent responses to review`, cost: "Uses ChatGPT subscription", ci: "Local opt-in only" },
 ] as const;
 const startSchema = z.strictObject({
   suite: z.enum(["unit", "smoke", "e2e", "live", "judge"]),
   consent: z.literal(true).optional(),
   run: z.string().optional(), hash: z.string().optional(), key: z.string().optional(),
+  keys: reviewKeysSchema.optional(),
+  journeys: z.array(z.enum(browserJourneys.map((item) => item.id))).min(1).max(browserJourneys.length)
+    .refine((ids) => new Set(ids).size === ids.length).optional(),
+  cases: z.array(z.enum(phaseOneCases.map((item) => item.id))).min(1).max(phaseOneCases.length)
+    .refine((ids) => new Set(ids).size === ids.length).optional(),
+  repeats: z.number().int().min(1).max(5).optional(),
   model: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/).optional(),
   effort: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
 });
 export type StartRequest = z.infer<typeof startSchema>;
-type Run = { id: string; suite: string; startedAt: string; finishedAt?: string; status: string; log: string; commit: string; dirty: boolean; exitCode?: number | null };
-export function commandFor(input: StartRequest) {
+type Run = { id: string; suite: string; command?: string; startedAt: string; finishedAt?: string; status: string; log: string; commit: string; dirty: boolean; exitCode?: number | null };
+export function commandFor(request: StartRequest) {
+  const input = startSchema.parse(request);
+  if (input.suite !== "e2e" && input.journeys) throw new Error("Journey selection is for browser tests");
+  if (input.suite !== "live" && (input.cases || input.repeats !== undefined)) throw new Error("Case selection is for live evals");
+  if (input.suite !== "judge" && (input.key || input.keys || input.run || input.hash)) throw new Error("Saved answers are for the judge");
   const commands = { unit: "test", smoke: "test:e2e:smoke", e2e: "test:e2e", live: "eval:pi", judge: "eval:judge" };
   const env: Record<string, string> = {};
   if (input.suite === "live" || input.suite === "judge") {
     if (!input.consent) throw new Error("Confirm subscription usage before starting");
     if (input.suite === "live") {
       if (!input.model || !input.effort) throw new Error("Confirm the model and effort before starting");
-      Object.assign(env, { SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_REPEATS: "1",
+      Object.assign(env, { SERVER_GUY_LIVE_EVALS: "1", PI_EVAL_REPEATS: String(input.repeats ?? 1),
+        PI_EVAL_CASES: (input.cases ?? phaseOneCases.map((item) => item.id)).join(","),
         PI_EVAL_EXPECTED_MODEL: input.model, PI_EVAL_EXPECTED_EFFORT: input.effort });
     }
     else {
-      if (!input.run || !input.hash || !input.key || !input.model || !input.effort) throw new Error("Select a saved answer and judge settings");
+      if (!input.run || !input.hash || (!input.key && !input.keys) || (input.key && input.keys) || !input.model || !input.effort) throw new Error("Select saved answers and judge settings");
+      const keys = reviewKeysSchema.parse(input.keys ?? [input.key]);
       Object.assign(env, { SERVER_GUY_LIVE_JUDGE: "1", PI_JUDGE_RUN: input.run, PI_JUDGE_HASH: input.hash,
-        PI_JUDGE_CASE: input.key, PI_JUDGE_MODEL: input.model, PI_JUDGE_EFFORT: input.effort });
+        PI_JUDGE_CASES: JSON.stringify(keys), PI_JUDGE_MODEL: input.model, PI_JUDGE_EFFORT: input.effort });
     }
   }
-  return { args: ["run", commands[input.suite]], env };
+  const args = ["run", commands[input.suite]];
+  if (input.journeys) args.push("--", "--grep", `@journey-(?:${input.journeys.join("|")})(?:\\s|$)`);
+  return { args, env };
+}
+
+function commandText(command: ReturnType<typeof commandFor>) {
+  const quote = (value: string) => /^[\w@/:=.,-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+  // Only explicit runner options, never the inherited environment or credentials.
+  return [...Object.entries(command.env).map(([key, value]) => `${key}=${quote(value)}`), "npm", ...command.args.map(quote)].join(" ");
 }
 
 export type Launch = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
@@ -63,8 +85,9 @@ export function createDashboard(root: string, launch: Launch = spawn) {
   function start(input: StartRequest) {
     if (active) throw new Error("A check is already running. Wait for it to finish.");
     const command = commandFor(input);
-    if (input.suite === "judge") findCase(root, input.run!, input.hash!, input.key!);
+    if (input.suite === "judge") for (const key of input.keys ?? [input.key!]) findCase(root, input.run!, input.hash!, key);
     const run: Run = { id: randomUUID(), suite: input.suite, startedAt: new Date().toISOString(), status: "running", log: "Starting…\n",
+      command: commandText(command),
       commit: execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
       dirty: Boolean(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()),
     };
@@ -102,7 +125,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       if (forceKill) clearTimeout(forceKill);
       run.status = timedOut ? "timed-out" : cancelled ? "cancelled" : code === 0 ? "passed" : "failed";
       run.exitCode = code; run.finishedAt = new Date().toISOString();
-      if (paid) run.log = code === 0 ? "Run completed. Open Review answers to inspect automatic checks and separate review verdicts.\n" : "Run failed. The runner does not rerun cases or switch models. Check Settings/account access and saved results before another run.\n";
+      if (paid) run.log = code === 0 ? "Run completed. Open Review live eval answers to inspect saved answers and separate verdicts.\n" : "Run stopped or failed. Earlier saved answers and verdicts remain; remaining items may not have run. No automatic rerun or model fallback. Check saved results and account access before retrying.\n";
       writeJson(path, run); active = null; child = null; cancelActive = null;
     };
     child.on("error", () => finish(null)); child.on("close", finish);
@@ -132,15 +155,23 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           const settings = readJson(join(process.env.SERVER_GUY_CONFIG_DIR ?? join(root, ".server-guy"), "pi-settings.json"));
           defaults = z.object({ model: z.string(), effort: z.string() }).parse({ model: settings.modelId, effort: settings.reasoningEffort });
         } catch { /* No saved settings: display defaults, not an authenticated claim. */ }
-        json({ suites, active, history: history(), reports: listReports(root), defaults }); return;
+        json({ suites, journeys: browserJourneys, evalCases: phaseOneCases, active, history: history(), reports: listReports(root), defaults }); return;
       }
-      if (request.method !== "POST" || !["/api/start", "/api/review", "/api/stop"].includes(url.pathname)) { json({ error: "Not found" }, 404); return; }
+      if (request.method !== "POST" || !["/api/start", "/api/review", "/api/review/bulk", "/api/runs/archive", "/api/stop"].includes(url.pathname)) { json({ error: "Not found" }, 404); return; }
       if (request.headers.origin !== origin || !request.headers["content-type"]?.startsWith("application/json")) { json({ error: "Same-origin JSON required" }, 403); return; }
       let text = "";
       for await (const chunk of request) { text += chunk; if (Buffer.byteLength(text) > 16_000) throw new Error("Request too large"); }
       const body = JSON.parse(text);
       if (url.pathname === "/api/stop") { z.strictObject({}).parse(body); cancelActive?.(); json({ stopping: Boolean(active) }); return; }
-      if (url.pathname === "/api/start") { json(start(startSchema.parse(body)), 202); return; }
+      if (url.pathname === "/api/start") { json(start(body), 202); return; } // commandFor validates before any launch or artifact write.
+      if (url.pathname === "/api/runs/archive") {
+        const input = z.strictObject({ run: z.string(), hash: z.string(), archived: z.boolean() }).parse(body);
+        json(archiveRun(root, input.run, input.hash, input.archived)); return;
+      }
+      if (url.pathname === "/api/review/bulk") {
+        const batch = z.strictObject({ run: z.string(), hash: z.string(), keys: reviewKeysSchema, review: humanReviewSchema }).parse(body);
+        json(saveHumanReviews(root, batch.run, batch.hash, batch.keys, batch.review)); return;
+      }
       const review = z.strictObject({ run: z.string(), hash: z.string(), key: z.string(), review: humanReviewSchema }).parse(body);
       json(saveReview(root, review.run, review.hash, review.key, { type: "human", ...review.review }));
     } catch { json({ error: "Could not complete this request. Check the selection, required fields and running check, then reload if results changed." }, 400); }

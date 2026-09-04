@@ -1,6 +1,16 @@
 import { Type } from "typebox";
 import type { SavedCase, Judgment } from "../dashboard/results";
 import type { PiSdk } from "../../src/server/pi-configuration";
+import { reviewKeysSchema } from "../dashboard/results";
+
+export function judgeCaseKeys(multiple?: string, single?: string) {
+  return reviewKeysSchema.parse(multiple === undefined ? [single] : JSON.parse(multiple));
+}
+
+export async function judgeSelectedAnswers(keys: string[], review: (key: string) => Promise<void>) {
+  // No concurrency, automatic retry or continue-after-failure. Earlier saved verdicts remain.
+  for (const key of keys) await review(key);
+}
 
 export const JUDGE_PROMPT_VERSION = "phase-one-meaning-v1";
 export const judgeParameters = Type.Object({
