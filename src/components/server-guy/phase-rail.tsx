@@ -22,7 +22,7 @@ export function PhaseRail({ checks }: { checks: GateCheck[] }) {
       {GROUPS.map((group) => (
         <div className="sg-phase-group" key={group.key}>
           <div className="sg-phase-group-label">{group.label}</div>
-          <ol>
+          <ol className="sg-phase-track">
             {PHASES.filter((phase) => phase.group === group.key).map((phase) =>
               phase.number === 1 ? (
                 <li
