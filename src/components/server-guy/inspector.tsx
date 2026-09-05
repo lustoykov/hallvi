@@ -4,17 +4,27 @@ import {
   ArrowSquareOut,
   CaretRight,
   Check,
-  Circle,
   GithubLogo,
+  Warning,
 } from "@phosphor-icons/react";
 import { useId, useState } from "react";
 
 import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
 
-import { formatTimestamp, statusLabel } from "./format";
+import { statusLabel } from "./format";
+import { LocalTime } from "./local-time";
 
 type InspectorTab = "record" | "activity" | "changes" | "receipts";
 const tabs = ["record", "activity", "changes", "receipts"] as const;
+
+export function CheckIcon({ status }: { status: GateCheck["status"] }) {
+  return (
+    <span aria-hidden="true" className={`sg-check-icon ${status}`}>
+      {status === "passed" && <Check weight="bold" />}
+      {status === "blocked" && <Warning weight="bold" />}
+    </span>
+  );
+}
 
 export function Inspector({
   view,
@@ -28,6 +38,7 @@ export function Inspector({
   const [activeTab, setActiveTab] = useState<InspectorTab>("record");
   const tabId = useId();
   const passed = checks.filter((check) => check.status === "passed").length;
+  const ready = view.workspace?.status === "ready";
 
   return (
     <aside className="sg-inspector">
@@ -79,22 +90,27 @@ export function Inspector({
         {activeTab === "record" && (
           <>
             <div className="sg-record-heading">
-              <span className="sg-eyebrow">Launch Brief</span>
               <div>
-                <strong>
-                  {passed} of {checks.length} checks complete
-                </strong>
-                <span>
-                  {view.workspace?.status === "ready"
+                <strong>Launch Brief</strong>
+                <span className={ready ? "ready" : undefined}>
+                  {ready
                     ? "Ready for review"
-                    : "Checks remaining"}
+                    : `${passed} of ${checks.length} checks complete`}
                 </span>
               </div>
               <div
                 className="sg-progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={checks.length}
+                aria-valuenow={passed}
                 aria-label={`${passed} of ${checks.length} checks complete`}
               >
-                <i style={{ width: `${(passed / checks.length) * 100}%` }} />
+                <i
+                  style={{
+                    transform: `scaleX(${checks.length ? passed / checks.length : 0})`,
+                  }}
+                />
               </div>
             </div>
             <div className="sg-check-list">
@@ -105,21 +121,16 @@ export function Inspector({
                   onClick={() => onSelectCheck(check.key)}
                   type="button"
                 >
-                  <span className={`sg-check-icon ${check.status}`}>
-                    {check.status === "passed" ? (
-                      <Check weight="bold" />
-                    ) : (
-                      <Circle weight="bold" />
-                    )}
-                  </span>
+                  <CheckIcon status={check.status} />
                   <span className="sg-check-copy">
                     <small>Check {index + 1}</small>
                     <strong>{check.label}</strong>
+                    <span className="sg-check-result">{check.result}</span>
                   </span>
                   <span className={`sg-check-status ${check.status}`}>
                     {statusLabel(check.status)}
                   </span>
-                  <CaretRight />
+                  <CaretRight aria-hidden="true" />
                 </button>
               ))}
             </div>
@@ -133,15 +144,19 @@ export function Inspector({
                       key={decision.id}
                       rel="noreferrer"
                       target="_blank"
+                      title="Open the saved decision record"
                     >
                       <span>{decision.label}</span>
                       <strong>{decision.value}</strong>
-                      <ArrowSquareOut />
+                      <ArrowSquareOut aria-hidden="true" />
                     </a>
                   ))}
                 </div>
               ) : (
-                <p>No decisions recorded yet.</p>
+                <p>
+                  No decisions recorded yet. Tell Pi a launch priority to save
+                  one.
+                </p>
               )}
             </section>
           </>
@@ -157,9 +172,7 @@ export function Inspector({
                   <div>
                     <strong>{event.summary}</strong>
                     <p>{event.detail}</p>
-                    <time dateTime={event.createdAt}>
-                      {formatTimestamp(event.createdAt)}
-                    </time>
+                    <LocalTime value={event.createdAt} />
                   </div>
                 </article>
               ))
@@ -192,7 +205,9 @@ export function Inspector({
                     <GithubLogo weight="fill" />
                     <span>
                       <strong>{observation.sourceLabel}</strong>
-                      <small>{formatTimestamp(observation.observedAt)}</small>
+                      <small>
+                        <LocalTime value={observation.observedAt} />
+                      </small>
                     </span>
                     <em className={observation.status}>{observation.status}</em>
                   </div>
@@ -203,7 +218,7 @@ export function Inspector({
                       rel="noreferrer"
                       target="_blank"
                     >
-                      Raw receipt <ArrowSquareOut />
+                      Raw receipt <ArrowSquareOut aria-hidden="true" />
                     </a>
                     {observation.sourceUrl && (
                       <a
@@ -211,7 +226,7 @@ export function Inspector({
                         rel="noreferrer"
                         target="_blank"
                       >
-                        Open source <ArrowSquareOut />
+                        Open source <ArrowSquareOut aria-hidden="true" />
                       </a>
                     )}
                   </div>

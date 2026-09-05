@@ -1,3 +1,42 @@
+:root {
+  /* Server Guy palette: navy chrome, white work surfaces, blue for the one
+     primary action, green/amber for check state, red only for removal. */
+  --navy: #172238;
+  --navy-2: #202d46;
+  --blue: #285ad8;
+  --blue-hover: #2350c4;
+  --blue-soft: #edf3ff;
+  --blue-text: #2852a6;
+  --green: #14945f;
+  --green-text: #0f7a4e;
+  --green-soft: #eaf8f1;
+  --amber: #b25a16;
+  --amber-text: #9a4b10;
+  --amber-soft: #fff4e9;
+  --red: #a6312b;
+  --red-soft: #fdf1f0;
+  --ink: #192338;
+  --ink-2: #3e4a60;
+  --muted: #647089;
+  --line: #d8e0ec;
+  --line-2: #e6ebf3;
+  --panel: #f7f9fc;
+  --canvas: #f5f7fb;
+  --radius-s: 6px;
+  --radius: 8px;
+  --radius-l: 12px;
+  --shadow-s: 0 1px 2px rgb(23 34 56 / 6%);
+  --shadow-m: 0 6px 16px -6px rgb(23 34 56 / 18%), 0 1px 3px rgb(23 34 56 / 6%);
+  --shadow-l:
+    0 24px 56px -20px rgb(23 34 56 / 35%), 0 4px 14px rgb(23 34 56 / 8%);
+  --ring: 0 0 0 3px rgb(40 90 216 / 22%);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 120ms;
+  --base: 180ms;
+  --mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,12 +49,15 @@ body {
 body {
   margin: 0;
   background: #ffffff;
-  color: #172033;
+  color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -25,10 +67,26 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+input,
+textarea {
+  caret-color: var(--blue);
+}
+
+::selection {
+  color: #fff;
+  background: var(--blue);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c3ccdb transparent;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #315fd5;
+  outline: 2px solid var(--blue);
   outline-offset: 2px;
 }

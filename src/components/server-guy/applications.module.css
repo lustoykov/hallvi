@@ -4,35 +4,49 @@
 .page {
   min-height: 100vh;
   min-width: 1060px;
-  background: #f5f7fb;
-  color: #192338;
+  background: var(--canvas);
+  color: var(--ink);
 }
 .page a {
   text-underline-offset: 4px;
 }
 .page :is(a, button, input):focus-visible {
-  outline: 3px solid #285ad8;
-  outline-offset: 4px;
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 .topbar {
-  height: 64px;
-  padding: 0 28px;
+  height: 56px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #172238;
+  background: var(--navy);
   color: #e4ecf9;
   font-size: 14px;
 }
 .topbar a {
   color: inherit;
 }
+.topbar > a:last-child {
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #cad3e3;
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+.topbar > a:last-child:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
 }
 .content {
   max-width: 1100px;
@@ -124,13 +138,22 @@
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 185px;
   align-items: center;
   gap: 28px;
-  padding: 26px 28px;
+  padding: 22px 26px;
   text-decoration: none;
   color: inherit;
+  transition: background-color var(--fast) var(--ease);
+}
+.list li:first-child .application {
+  border-radius: 12px 12px 0 0;
+}
+.list li:last-child .application {
+  border-radius: 0 0 12px 12px;
+}
+.list li:only-child .application {
   border-radius: 12px;
 }
 .application:hover {
-  background: #eef3fe;
+  background: #f3f6fc;
 }
 .repository {
   min-width: 0;

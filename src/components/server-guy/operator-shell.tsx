@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { CaretDown, Check, Plus, Trash } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  Check,
+  Plus,
+  ShieldCheck,
+  Trash,
+} from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
@@ -14,12 +20,11 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
-import { ChatList } from "./chat-list";
 import { ChatPane } from "./chat-pane";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { Inspector } from "./inspector";
-import { PhaseRail } from "./phase-rail";
+import { LaunchSidebar } from "./launch-sidebar";
 
 export function OperatorShell({
   initialView,
@@ -53,6 +58,8 @@ export function OperatorShell({
   const selectedCheck =
     checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
+  const policy = application ? APPROVAL_MODES[application.approvalMode] : null;
+  const { selection } = initialPiSetup;
 
   useLayoutEffect(() => {
     if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
@@ -233,7 +240,7 @@ export function OperatorShell({
               aria-label={`Switch application: ${application?.name}`}
             >
               <strong>{application?.name}</strong>
-              <CaretDown aria-hidden="true" />
+              <CaretDown aria-hidden="true" weight="bold" />
             </button>
             <span className="sg-environment-label">Production</span>
             <nav
@@ -301,38 +308,42 @@ export function OperatorShell({
           </div>
         </div>
         <div className="sg-topbar-meta">
+          {policy && (
+            <span
+              className="sg-chip"
+              title={`Permission policy · ${policy.hint}`}
+            >
+              <ShieldCheck aria-hidden="true" weight="bold" />
+              <span>Policy</span>
+              <strong>{policy.label}</strong>
+            </span>
+          )}
           <Link
-            className={`sg-pi-status ${initialPiSetup.ready ? "ready" : "attention"}`}
+            className="sg-chip"
             href="/setup/pi"
+            title={
+              initialPiSetup.ready
+                ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
+                : "Connect ChatGPT to chat with Pi"
+            }
           >
-            <span aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              className={`sg-dot${initialPiSetup.ready ? " ready" : ""}`}
+            />
             {initialPiSetup.ready ? "Settings" : "Settings · Connect ChatGPT"}
           </Link>
-          <span className="sg-eyebrow">Permission policy</span>
-          <strong>
-            {application
-              ? APPROVAL_MODES[application.approvalMode].label
-              : "Set during Start"}
-          </strong>
-          <span
-            className={`sg-status ${view.workspace?.status === "ready" ? "ready" : "working"}`}
-          >
-            {view.workspace?.status === "ready"
-              ? "Launch Brief ready"
-              : "Phase 1"}
-          </span>
         </div>
       </header>
 
-      <PhaseRail checks={checks} />
-
       <section className="sg-workspace">
-        <ChatList
+        <LaunchSidebar
           busy={busy !== null}
           chats={view.chats}
+          checks={checks}
           hasApplication={application !== null}
-          onCreate={createChat}
-          onSelect={selectChat}
+          onCreateChat={createChat}
+          onSelectChat={selectChat}
           selectedChatId={view.selectedChatId}
         />
         <ChatPane
