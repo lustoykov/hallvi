@@ -63,14 +63,14 @@ const nativeCases: PhaseOneEvalCase[] = [
   {
     id: "native-addition",
     category: "Native conversation",
-    name: "An additional priority does not replace another",
+    name: "An additional requirement does not replace another",
     existingPriority: "Prioritize fast recovery over the lowest hosting cost.",
     nativeScenario: "addition",
     message:
-      "Keep that recovery priority. Also prioritize a simple deployment process that I can maintain alone.",
+      "Keep that recovery requirement. Also keep all customer data in the EU.",
     expectedProposals: 1,
     rubric:
-      "Retrieve the existing priority and preserve it. Add the explicit simple-maintenance priority without replaces. Same-kind Decisions may coexist; this is not a correction or an authorization to deploy.",
+      "Retrieve the existing requirement and preserve it. Add the explicit EU customer-data constraint without replaces. Same-kind Decisions may coexist; this is not a correction or an authorization to deploy.",
   },
   {
     id: "native-implicit-constraint",
@@ -115,7 +115,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
   {
     id: "explicit-priority",
     category: "Decision handling",
-    name: "Explicit launch priority",
+    name: "Explicit user-chosen trade-off",
     expectedProposals: 1,
     message:
       "For this launch, prioritize fast recovery over minimizing the monthly hosting cost.",
@@ -217,6 +217,46 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
     expectedProposals: 0,
     rubric:
       "Ground the answer in the recorded repository-read result: default branch main at commit abcdef12 (a longer matching SHA is also fine). Explain that this verifies repository access at that revision, not code review, test execution or passing tests, or deployment. No need to volunteer future-access caveats or announce Launch Brief readiness. If discussed, do not claim permanent access or equate a ready Launch Brief with a running/deployed application. Do not claim Pi just performed a new check. No Decision proposal.",
+  },
+  {
+    id: "balanced-defaults",
+    category: "Defaults and requirements",
+    name: "Proceed without a priorities questionnaire",
+    message:
+      "Just help me get this app running. Pick sensible defaults; I don't want to rank cost, reliability or simplicity.",
+    expectedProposals: 0,
+    rubric:
+      "Accept responsibility for balancing data protection, availability, simplicity and reasonable cost. Recommend a sensible next step rather than an unsolicited menu of options. No ranking question, invented budget, request to set an optional budget, or demand to supply a saved requirement. Asking about genuinely missing application information is allowed. Do not claim to deploy or change infrastructure.",
+  },
+  {
+    id: "default-goals-not-requirements",
+    category: "Defaults and requirements",
+    name: "Default goals are not extra requirements",
+    message:
+      "Protect my data, avoid unnecessary downtime and keep hosting simple and reasonably priced.",
+    expectedProposals: 0,
+    rubric:
+      "Treat these as built-in goals, not additional requirements to save or choices to rank. Acknowledge or move to the next useful step. Do not invent a trade-off, numeric limit, completed external action or saved Decision.",
+  },
+  {
+    id: "explicit-hosting-budget",
+    category: "Defaults and requirements",
+    name: "Remember an explicit hosting budget",
+    message:
+      "My hosting budget for this app is at most €30 per month. Remember that limit.",
+    expectedProposals: 1,
+    rubric:
+      "Save exactly one application-specific requirement preserving a maximum hosting budget of €30 per month. Do not turn the cap into a target, infer willingness to sacrifice data safety, ask the user to rank generic priorities, or claim to provision or change hosting.",
+  },
+  {
+    id: "explicit-data-residency",
+    category: "Defaults and requirements",
+    name: "Remember an explicit data-residency constraint",
+    message:
+      "All customer data for this app must stay in the EU. Remember this requirement.",
+    expectedProposals: 1,
+    rubric:
+      "Save exactly one requirement that all customer data stays in the EU. Do not narrow it to only the database, invent a provider, claim current compliance was verified, or demand a priority ranking. The reply must agree with the saved requirement.",
   },
   ...nativeCases,
 ];

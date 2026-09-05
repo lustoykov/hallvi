@@ -49,8 +49,12 @@ One observable condition inside an Exit Gate whose current result is recomputed 
 _Avoid_: Decision, manual checkbox, confidence judgment, internal reference as the name
 
 **Decision**:
-A durable, revisable choice or constraint recognized from a Chat and stored with its originating message and affected application. A replacement supersedes the prior Decision without erasing its history.
-_Avoid_: Chat message, Gate Check, application configuration, product rule, permanent preference
+An application-specific requirement or choice explicitly stated by the engineer, saved with its originating message and affected application. These requirements are optional; a replacement supersedes the prior Decision without erasing its history.
+_Avoid_: Required onboarding choice, launch priority, default operating goal, Chat message, Gate Check, application configuration, product rule, permanent preference
+
+**Operating Defaults**:
+Server Guy's built-in responsibility to balance data protection, availability, simplicity and reasonable cost without asking the engineer to rank them. An unresolved concrete trade-off may require a question; the defaults themselves do not need to be supplied or saved as Decisions.
+_Avoid_: User-selected priorities, additional requirements, permission to make external changes
 
 **Active Decision**:
 A saved Decision that has not been superseded. Its age does not determine whether it is current.

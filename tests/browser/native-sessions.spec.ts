@@ -36,8 +36,21 @@ async function send(
 test(
   "native history continues across reload while separate Chats share only saved Decisions",
   journey("native-history"),
-  async ({ page, fixture }) => {
+  async ({ page, fixture }, testInfo) => {
     const first = await addApplication(page, "native-continuity");
+    await expect(
+      page.getByText("Saved requirements", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("No extra requirements.", { exact: false }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Tell Server Guy a launch priority", { exact: false }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("default-goals-no-questionnaire.png"),
+      fullPage: true,
+    });
     const firstPath = join(
       fixture.state,
       "pi-sessions",
@@ -54,7 +67,25 @@ test(
       "recall: Remember the violet deployment window",
       "[QA native history] found: Remember the violet deployment window",
     );
-    await send(page, "priority: Never risk customer data");
+    // The synthetic provider's priority: prefix exercises the real storage
+    // tool; live evals separately verify whether a model should call it.
+    await send(page, "priority: Customer data must stay in the EU");
+    await expect(page.locator(".sg-decision-list")).not.toBeVisible();
+    await page.getByText("Saved requirements (1)", { exact: true }).click();
+    await expect(page.locator(".sg-decision-list")).toBeVisible();
+    await expect(page.locator(".sg-decision-list")).toContainText(
+      "Customer data must stay in the EU",
+    );
+    await expect(page.locator(".sg-decision-list")).not.toContainText(
+      "launch priority",
+    );
+    await expect(
+      page.getByText("No extra requirements.", { exact: false }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("saved-app-requirement.png"),
+      fullPage: true,
+    });
     expect(JSON.parse(readFileSync(firstPath, "utf8").split("\n")[0]).id).toBe(
       sessionId,
     );
@@ -75,7 +106,7 @@ test(
     await send(
       page,
       "lookup-decisions",
-      "[QA saved Decisions] Never risk customer data",
+      "[QA saved Decisions] Customer data must stay in the EU",
     );
     const second = await snapshot(page);
     expect(second.selectedChatId).not.toBe(first.selectedChatId);

@@ -103,24 +103,6 @@ export const PHASE_ONE_CHECKS = [
   },
 ] as const;
 
-export const PRODUCTION_BASELINE = [
-  {
-    key: "protect-database",
-    label: "Protect database data",
-    rule: "Required for every production launch",
-  },
-  {
-    key: "minimize-downtime",
-    label: "Minimize downtime",
-    rule: "Prefer changes that preserve availability",
-  },
-  {
-    key: "keep-cost-low",
-    label: "Keep infrastructure cost low",
-    rule: "Use the smallest credible infrastructure",
-  },
-] as const;
-
 export const UPCOMING_REQUIREMENTS = [
   {
     key: "hetzner-access",

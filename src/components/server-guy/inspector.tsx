@@ -134,9 +134,9 @@ export function Inspector({
                 </button>
               ))}
             </div>
-            <section className="sg-record-section">
-              <span className="sg-eyebrow">Recorded decisions</span>
-              {view.decisions.length ? (
+            {view.decisions.length > 0 && (
+              <details className="sg-saved-requirements">
+                <summary>Saved requirements ({view.decisions.length})</summary>
                 <div className="sg-decision-list">
                   {view.decisions.map((decision) => (
                     <a
@@ -144,21 +144,15 @@ export function Inspector({
                       key={decision.id}
                       rel="noreferrer"
                       target="_blank"
-                      title="Open the saved decision record"
+                      title="Open the saved requirement"
                     >
-                      <span>{decision.label}</span>
                       <strong>{decision.value}</strong>
                       <ArrowSquareOut aria-hidden="true" />
                     </a>
                   ))}
                 </div>
-              ) : (
-                <p>
-                  No decisions recorded yet. Tell Server Guy a launch priority
-                  to save one.
-                </p>
-              )}
-            </section>
+              </details>
+            )}
           </>
         )}
 

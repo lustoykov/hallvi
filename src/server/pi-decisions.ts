@@ -11,18 +11,19 @@ export const PI_DECISION_PAGE_SIZE = 20;
 export const proposeDecisionParameters = Type.Object(
   {
     kind: Type.Literal("launch-priority", {
-      description: "The only Decision kind supported in Phase 1.",
+      description:
+        "Existing storage tag for an application-specific requirement; not a request to rank launch priorities.",
     }),
     value: Type.String({
       description:
-        "A concise operating priority explicitly stated by the engineer.",
+        "A concise application-specific requirement explicitly stated by the engineer, such as a hosting budget or data-residency constraint. Not a restatement of the default goals of data protection, availability, simplicity and reasonable cost.",
       minLength: 1,
       maxLength: 300,
     }),
     replaces: Type.Optional(
       Type.String({
         description:
-          "The exact UUID of an active saved Decision returned by search_decisions that this proposal replaces. Omit for an additional priority.",
+          "The exact UUID of an active saved Decision returned by search_decisions that this proposal replaces. Omit for an additional requirement.",
         format: "uuid",
       }),
     ),

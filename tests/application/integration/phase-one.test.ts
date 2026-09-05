@@ -424,6 +424,32 @@ describe("Phase 1 application workspace", () => {
     );
   });
 
+  it.each([
+    "Hosting must cost at most €30/month.",
+    "Customer data must stay in the EU.",
+  ])(
+    "saves an optional app-specific requirement without changing the storage contract: %s",
+    async (value) => {
+      const created = await createApplication();
+      mocks.askPi.mockResolvedValueOnce({
+        message: "I recorded that requirement.",
+        decisionProposals: [{ kind: "launch-priority", value }],
+      });
+      const result = await executePiTurn(
+        created.view.application!.id,
+        created.view.selectedChatId!,
+        value,
+      );
+      expect(result.decisions).toEqual([
+        expect.objectContaining({
+          kind: "launch-priority",
+          label: "Saved requirement",
+          value,
+        }),
+      ]);
+    },
+  );
+
   it("shares Decisions across Chats while keeping transcripts separate", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;

@@ -366,7 +366,7 @@ export function archiveChat(applicationId: string, chatId: string) {
 }
 
 function decisionLabel(decision: PiDecision) {
-  return { "launch-priority": "Additional launch priority" }[decision.kind];
+  return { "launch-priority": "Saved requirement" }[decision.kind];
 }
 
 export function buildViewSummary(application: ApplicationRecord) {

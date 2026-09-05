@@ -179,6 +179,20 @@ beforeEach(() => {
 });
 
 describe("assistant output and errors", () => {
+  it("balances built-in goals without requiring users to choose priorities", () => {
+    expect(SYSTEM_PROMPT).toContain("Balance these goals by default");
+    expect(SYSTEM_PROMPT).toContain("do not ask the engineer to rank them");
+    expect(SYSTEM_PROMPT).toContain("They are optional");
+    expect(SYSTEM_PROMPT).toContain("Recommend one sensible course of action");
+    expect(SYSTEM_PROMPT).toContain(
+      "Do not turn onboarding into a questionnaire",
+    );
+    expect(SYSTEM_PROMPT).toContain("Do not save the default goals themselves");
+    expect(SYSTEM_PROMPT).toContain("at most €30/month");
+    expect(SYSTEM_PROMPT).toContain("Customer data must stay in the EU");
+    expect(SYSTEM_PROMPT).not.toContain("durable launch priority");
+  });
+
   it("normalizes conversational text and rejects empty or oversized output", () => {
     expect(normalizePiAssistantMessage("  Looks good.  ")).toBe("Looks good.");
     expect(() => normalizePiAssistantMessage("   ")).toThrow(

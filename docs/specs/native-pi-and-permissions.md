@@ -14,6 +14,18 @@ The Bitter Lesson favors general methods that benefit from more computation over
 
 ## Product language: one assistant, Server Guy
 
+### Operating defaults, not a priorities questionnaire
+
+Server Guy balances data protection, availability, simplicity and reasonable cost by default. Do not ask users to rank those goals or to provide a "launch priority" before proceeding. Ask only when a concrete unresolved trade-off or missing requirement needs their input; defaults do not authorize spending or external changes.
+
+Recommend one sensible next action, not a menu of options by default. Do not solicit optional budgets during onboarding. Users may state their own constraints in chat; an empty requirements list is hidden, and saved requirements are available in a collapsed section of the Record panel rather than competing with the main task. This does not add a budget-setting questionnaire or bypass required approvals.
+
+Optional **saved requirements** are explicit application-specific constraints or user-chosen trade-offs beyond those defaults, for example a €30/month hosting cap or EU-only customer data. Merely repeating the default goals must not create Decisions. Existing saved choices remain valid; correction, source attribution, application scoping and atomic acceptance are unchanged. Keep the existing `launch-priority` storage tag for compatibility, not as user-facing terminology. Do not rewrite old records or require a data migration for this change.
+
+The stable system prompt owns these operating instructions. The old unused `PRODUCTION_BASELINE` catalog is removed rather than maintained as a second, disconnected policy. Four live evals under **Defaults and requirements** check no ranking questionnaire, no saved default goals, and correctly saved explicit budget/residency requirements; passing deterministic tests alone does not establish model behavior.
+
+### Assistant identity
+
 The ownership split below is for developers, not a distinction users must understand. Present one assistant named **Server Guy** throughout ordinary chat, settings, progress, approvals and recovery. Pi remains the internal runtime; there is no user-facing handoff between two assistants.
 
 | Current wording | Proposed user-facing wording |

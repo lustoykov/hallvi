@@ -51,6 +51,8 @@ Run either subset without a new runner: `npm test -- tests/application/unit` or 
 
 Seven cases in **Native conversation** cover old active priorities, cross-chat supersession, correction versus addition, implicit constraints after a missed query, and a cancelled proposal before/after compaction. [evals/native-scenarios.ts](evals/native-scenarios.ts) seeds clearly synthetic previous history/usage in real native sessions and lowers the retained-history setting for inexpensive real auto-compaction. The new reply, lookup/tool loop, summary and final transaction are real. This tests behavior, not production context-window capacity. Native tool calls/results and compaction summaries are retained in `results.json` as `nativeEvidence`, included in saved-state details and supplied to the optional judge. Temporary databases and native histories are deleted after reports are saved; no live user conversations are copied.
 
+Four cases in **Defaults and requirements** check that the model balances ordinary operating goals without a ranking questionnaire or unnecessary saved Decisions, while still recording an explicit hosting budget or EU data-residency requirement. The native addition case also checks that a new residency constraint preserves an existing saved choice. These are live behavior checks, not just assertions that the system prompt contains the right words.
+
 ## Commands
 
 | Task | Command | Model calls |
@@ -62,7 +64,7 @@ Seven cases in **Native conversation** cover old active priorities, cross-chat s
 | Full desktop suite | `npm run test:e2e` | None |
 | Interactive Playwright | `npm run test:e2e:ui` | None |
 | Saved browser report | `npx playwright show-report tests/results/browser-report` | None |
-| Eighteen real agent eval cases | `SERVER_GUY_LIVE_EVALS=1 npm run eval:pi` | ChatGPT subscription via configured Pi |
+| Twenty-two real agent eval cases | `SERVER_GUY_LIVE_EVALS=1 npm run eval:pi` | ChatGPT subscription via configured Pi |
 | Judge saved answers | Automatic after a successful dashboard live run; otherwise Eval runs → Judge in the run header | Separate opt-in Pi session per answer |
 
 Install Chromium once with `npx playwright install chromium`. Desktop only. Browser scenarios launch disposable Next.js fixtures on 3180+, never use/reset the app on port 3000 and block external browser requests. Their synthetic model responses prove UI/state behavior, not model quality.
