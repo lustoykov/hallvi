@@ -66,6 +66,26 @@ function suiteName(id) {
     (id === "judge" ? "LLM judgments" : id)
   );
 }
+function newEvalIds() {
+  return state.evalCases
+    .filter((item) => item.hasRun === false)
+    .map((item) => item.id);
+}
+function configureNewEvalsButton(button) {
+  const count = newEvalIds().length;
+  button.textContent = count
+    ? `Run new evals only (${count})…`
+    : "No new evals to run";
+  button.disabled =
+    !count || Boolean(state.active) || (state.apiVersion ?? 0) < 5;
+  button.title =
+    "New means no saved attempt on this machine, including archived runs. Existing cases are never included.";
+}
+function runNewEvals() {
+  const cases = newEvalIds();
+  if (!cases.length || state.active || (state.apiVersion ?? 0) < 5) return;
+  requestRun({ suite: "live", cases, repeats: 1 });
+}
 const statusLabel = (status) =>
   status === "timed-out"
     ? "Timed out"
@@ -297,12 +317,20 @@ async function refresh() {
           else requestRun({ suite: suite.id });
         });
         action.append(button);
+        if (suite.id === "live") {
+          const newButton = element("button", "", "primary");
+          configureNewEvalsButton(newButton);
+          newButton.addEventListener("click", runNewEvals);
+          action.prepend(newButton);
+          action.classList.add("eval-suite-actions");
+        }
         row.append(action);
         return row;
       }),
     );
     renderAbout();
     initializeSelectors();
+    configureNewEvalsButton($("run-new-evals"));
     updateSelections();
     renderHistory();
     const pending = state.reports
@@ -1097,6 +1125,7 @@ document.addEventListener("click", (event) => {
 });
 window.addEventListener("popstate", renderPage);
 $("empty-choose").addEventListener("click", () => $("eval-picker").showModal());
+$("run-new-evals").addEventListener("click", runNewEvals);
 $("rerun-case").addEventListener("click", () =>
   requestRun({ suite: "live", cases: [record().caseId], repeats: 1 }),
 );

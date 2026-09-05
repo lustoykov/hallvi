@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { phaseOneCases } from "../evals/phase-one-cases";
 import { createDashboard } from "../dashboard/server";
 import { journey } from "./journeys";
 
@@ -89,6 +90,7 @@ test(
         "Run",
         "Run",
         "Choose journeys…",
+        `Run new evals only (${phaseOneCases.length})…`,
         "Choose cases…",
       ]);
       await expect(

@@ -507,6 +507,13 @@ textarea {
   gap: 14px;
   align-items: center;
 }
+.suites .eval-suite-actions button + button {
+  margin-top: 8px;
+}
+#run-new-evals {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
 .suites .usage-free {
   background: transparent;
   padding: 0;

@@ -213,7 +213,7 @@ test(
             return { left, width, height };
           }),
         );
-      expect(actionBounds).toHaveLength(4);
+      expect(actionBounds).toHaveLength(5);
       for (const dimension of ["left", "width", "height"] as const) {
         expect(
           Math.max(...actionBounds.map((box) => box[dimension])) -

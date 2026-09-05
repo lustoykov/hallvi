@@ -76,6 +76,17 @@ test(
       page.locator(`.eval-category[data-category="${name}"]`);
     try {
       await page.goto(`http://127.0.0.1:${address.port}/`);
+      await page
+        .getByRole("button", { name: "Run new evals only (3)…" })
+        .click();
+      await expect(
+        page.getByRole("dialog", { name: "Run 3 cases", exact: true }),
+      ).toBeVisible();
+      await expect(page.locator("#confirm-selection")).toHaveText(
+        githubIds.join(", "),
+      );
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      expect(requests).toHaveLength(0);
       await page.getByRole("button", { name: "Choose cases…" }).click();
       await expect.poll(selected).toEqual(githubIds);
       await expect(category("Decision handling")).not.toHaveAttribute(
@@ -148,7 +159,38 @@ test(
           judgeAfter: false,
         });
 
+      // The prominent action ignores a previous manual selection and uses
+      // only unattempted cases, once each, with automatic judging enabled.
+      await page.goto(`http://127.0.0.1:${address.port}/evals`);
+      await page
+        .getByRole("button", { name: "Run new evals only (2)…" })
+        .click();
+      await expect(
+        page.getByRole("checkbox", {
+          name: "Judge the answers automatically when the run finishes",
+        }),
+      ).toBeChecked();
+      await page
+        .getByRole("button", { name: "Start run", exact: true })
+        .click();
+      await expect
+        .poll(() => requests.at(-1))
+        .toMatchObject({
+          suite: "live",
+          cases: githubIds.slice(1),
+          repeats: 1,
+          consent: true,
+          judgeAfter: true,
+        });
+
       save("finished", githubIds);
+      await expect(
+        page.getByRole("button", { name: "No new evals to run" }),
+      ).toBeDisabled();
+      await page.goto(`http://127.0.0.1:${address.port}/`);
+      await expect(
+        page.getByRole("button", { name: "No new evals to run" }),
+      ).toBeDisabled();
       await page.getByRole("button", { name: "Choose cases…" }).click();
       await expect(page.locator("#eval-history")).toContainText(
         "All cases have been run",

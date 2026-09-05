@@ -81,6 +81,8 @@ Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queu
 
 ## Do's and Don'ts
 
+- "Run new evals only (N)…" is prominent on both Run checks and Eval runs. It uses only case IDs with no saved attempt on this machine (archived runs count), one repetition, and the normal confirmation with automatic judging enabled. Zero eligible cases disables it; it never falls back to the full suite. Choose cases remains available for explicit reruns. This is history-based, not a diff of case revisions or a branch comparison.
+
 - Do keep human verdict, LLM advice and automatic checks separately labeled and differently styled.
 - Do keep the queue on the left, one answer on the right, and the verdict at the bottom of the card; all answers remain reachable by ordinary page scrolling.
 - Do state costs next to paid actions; reading and grading spend nothing.
