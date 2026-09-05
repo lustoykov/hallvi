@@ -1,6 +1,11 @@
 "use client";
 
-import { Archive, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
+import {
+  Archive,
+  PaperPlaneRight,
+  SpinnerGap,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 
 import {
@@ -15,7 +20,8 @@ import {
 } from "@/components/ai-elements/message";
 import type { Chat, PhaseOneOperatorView, PiRun } from "@/server/types";
 
-import { formatTimestamp } from "./format";
+import { LocalTime } from "./local-time";
+import { Markdown } from "./markdown";
 
 export function ChatPane({
   view,
@@ -47,20 +53,33 @@ export function ChatPane({
   onRunAction: (id: string, action: "cancel" | "retry") => void;
 }) {
   const application = view.application;
+  const archived = Boolean(activeChat?.archivedAt);
   // The gate's state lives in the pane header (and the top bar), not as a
   // standing message in the transcript.
   const ready = Boolean(application) && view.workspace?.status === "ready";
+  const passed = view.checks.filter(
+    (check) => check.status === "passed",
+  ).length;
+  const canWrite = piReady && Boolean(application) && Boolean(activeChat);
+  const composerDisabled = !canWrite || archived;
+  const requestPending = view.messages.some(
+    (message) => message.status === "queued" || message.status === "running",
+  );
 
   return (
     <section className="sg-chat-pane">
       <header className="sg-pane-title sg-chat-title">
         <div>
-          <span className={`sg-eyebrow${ready ? " ready" : ""}`}>
-            {ready ? "Ready for review" : "Working toward"}
+          <strong>{activeChat?.title ?? "Launch Brief"}</strong>
+          <span className={ready ? "ready" : undefined}>
+            {archived
+              ? "Archived · read-only"
+              : ready
+                ? "Ready for review"
+                : `Working toward the Launch Brief · ${passed} of ${view.checks.length} checks`}
           </span>
-          <strong>Launch Brief</strong>
         </div>
-        {activeChat && !activeChat.isPrimary && !activeChat.archivedAt && (
+        {activeChat && !activeChat.isPrimary && !archived && (
           <button
             className="sg-text-button"
             disabled={busy !== null}
@@ -71,6 +90,9 @@ export function ChatPane({
           </button>
         )}
       </header>
+      {(busy !== null || requestPending) && (
+        <div className="sg-busy-bar" aria-hidden="true" />
+      )}
 
       <Conversation className="sg-conversation">
         <ConversationContent className="sg-messages">
@@ -92,6 +114,7 @@ export function ChatPane({
                 <div className="sg-message-heading">
                   <span
                     className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
+                    aria-hidden="true"
                   >
                     {message.role === "user" ? "You" : "Pi"}
                   </span>
@@ -108,9 +131,7 @@ export function ChatPane({
                           : "Unsuccessful attempt"}
                     </span>
                   )}
-                  <time dateTime={message.createdAt}>
-                    {formatTimestamp(message.createdAt)}
-                  </time>
+                  <LocalTime value={message.createdAt} variant="compact" />
                 </div>
                 <MessageContent>
                   {provisional ? (
@@ -125,11 +146,15 @@ export function ChatPane({
                       </p>
                       {message.body &&
                         (inProgress ? (
-                          <MessageResponse>{message.body}</MessageResponse>
+                          <MessageResponse>
+                            <Markdown source={message.body} />
+                          </MessageResponse>
                         ) : (
                           <details>
                             <summary>Show unfinished draft</summary>
-                            <MessageResponse>{message.body}</MessageResponse>
+                            <MessageResponse>
+                              <Markdown source={message.body} />
+                            </MessageResponse>
                           </details>
                         ))}
                       {run &&
@@ -153,7 +178,9 @@ export function ChatPane({
                         )}
                     </div>
                   ) : (
-                    <MessageResponse>{message.body}</MessageResponse>
+                    <MessageResponse>
+                      <Markdown source={message.body} />
+                    </MessageResponse>
                   )}
                 </MessageContent>
               </Message>
@@ -164,12 +191,16 @@ export function ChatPane({
             <>
               <Message from="user">
                 <div className="sg-message-heading">
-                  <span className="sg-avatar user">You</span>
+                  <span className="sg-avatar user" aria-hidden="true">
+                    You
+                  </span>
                   <strong>You</strong>
                   <span className="sg-source-tag">Pending</span>
                 </div>
                 <MessageContent>
-                  <MessageResponse>{pendingMessage}</MessageResponse>
+                  <MessageResponse>
+                    <Markdown source={pendingMessage} />
+                  </MessageResponse>
                 </MessageContent>
               </Message>
               <p className="sg-reply-pending" role="status">
@@ -179,16 +210,6 @@ export function ChatPane({
             </>
           )}
 
-          {application && !piReady && (
-            <div className="sg-pi-required">
-              <WarningCircle weight="bold" />
-              <div>
-                <strong>Connect ChatGPT to chat</strong>
-                <p>Your applications and chat history are still available.</p>
-              </div>
-              <Link href="/setup/pi">Open Settings</Link>
-            </div>
-          )}
           {error && application && (
             <div className="sg-error" role="alert">
               {error}
@@ -205,62 +226,69 @@ export function ChatPane({
           onSend();
         }}
       >
-        {activeChat?.archivedAt && (
+        {archived && (
           <p className="sg-archived-notice">
             This chat is archived and read-only. Choose an active chat or start
             a new one.
           </p>
         )}
-        <textarea
-          disabled={
-            !piReady ||
-            !application ||
-            !activeChat ||
-            Boolean(activeChat.archivedAt)
-          }
-          id="pi-composer"
-          aria-label="Message Pi"
-          onChange={(event) => onComposerChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-              if (!busy) event.currentTarget.form?.requestSubmit();
+        {application && !piReady && (
+          <div className="sg-pi-required">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>Connect ChatGPT to chat</strong>
+              <p>Your applications and chat history are still available.</p>
+            </div>
+            <Link href="/setup/pi">Open Settings</Link>
+          </div>
+        )}
+        <div
+          className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
+        >
+          <textarea
+            disabled={composerDisabled}
+            id="pi-composer"
+            aria-label="Message Pi"
+            onChange={(event) => onComposerChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                if (!busy) event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder={
+              archived
+                ? "This chat is archived"
+                : !piReady
+                  ? "Connect ChatGPT in Settings to chat"
+                  : application
+                    ? "Ask Pi, correct a decision, or add context…"
+                    : "Create the application workspace to start chatting"
             }
-          }}
-          placeholder={
-            activeChat?.archivedAt
-              ? "This chat is archived"
-              : !piReady
-                ? "Connect ChatGPT in Settings to chat"
-                : application
-                  ? "Ask Pi, correct a decision, or add context…"
-                  : "Create the application workspace to start chatting"
-          }
-          rows={2}
-          value={composer}
-        />
-        <div>
-          <span>
-            Saved decisions appear in the Record tab and are shared across this
-            application’s chats.
-          </span>
-          <button
-            disabled={
-              !composer.trim() ||
-              !piReady ||
-              busy !== null ||
-              !application ||
-              !activeChat ||
-              Boolean(activeChat.archivedAt)
-            }
-            type="submit"
-          >
-            {busy === "message" ? <SpinnerGap className="spin" /> : "Send"}
-          </button>
+            rows={2}
+            value={composer}
+          />
+          <div className="sg-composer-bar">
+            <span className="sg-composer-hint">
+              <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+            </span>
+            <button
+              className="sg-send"
+              disabled={!composer.trim() || composerDisabled || busy !== null}
+              type="submit"
+            >
+              {busy === "message" ? (
+                <SpinnerGap className="spin" aria-hidden="true" />
+              ) : (
+                <PaperPlaneRight weight="fill" aria-hidden="true" />
+              )}
+              Send
+            </button>
+          </div>
         </div>
       </form>
     </section>

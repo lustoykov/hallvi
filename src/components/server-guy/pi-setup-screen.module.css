@@ -17,8 +17,8 @@
 .root button:focus-visible,
 .root select:focus-visible,
 .root a:focus-visible {
-  outline: 3px solid #7ba7ff;
-  outline-offset: 4px;
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 .root button svg,
 .root a svg,
@@ -141,16 +141,17 @@
   gap: 14px;
   align-items: center;
   justify-content: center;
-  background: #285ad8;
+  background: var(--blue);
   color: white;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius);
   font-weight: 600 !important;
   text-decoration: none;
   flex-shrink: 0;
+  transition: background-color var(--fast) var(--ease);
 }
 .primary:hover:not(:disabled) {
-  background: #1d49b6;
+  background: var(--blue-hover);
 }
 .textButton {
   padding: 4px 0;

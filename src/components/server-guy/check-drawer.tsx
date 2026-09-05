@@ -4,8 +4,6 @@ import {
   ArrowClockwise,
   ArrowSquareOut,
   ChatCircleDots,
-  Check,
-  Circle,
   GithubLogo,
   SpinnerGap,
   X,
@@ -15,7 +13,9 @@ import Link from "next/link";
 
 import type { GateCheck } from "@/server/types";
 
-import { formatTimestamp, statusLabel } from "./format";
+import { statusLabel } from "./format";
+import { CheckIcon } from "./inspector";
+import { LocalTime } from "./local-time";
 
 export function CheckDrawer({
   check,
@@ -81,16 +81,7 @@ export function CheckDrawer({
           <section className={`sg-drawer-summary ${check.status}`}>
             <span className="sg-eyebrow">Current result</span>
             <div className="sg-drawer-result">
-              <span
-                aria-hidden="true"
-                className={`sg-check-icon ${check.status}`}
-              >
-                {check.status === "passed" ? (
-                  <Check weight="bold" />
-                ) : (
-                  <Circle weight="bold" />
-                )}
-              </span>
+              <CheckIcon status={check.status} />
               <div>
                 <strong>{statusLabel(check.status)}</strong>
                 <p>{check.result}</p>
@@ -126,7 +117,7 @@ export function CheckDrawer({
                     <span>{evidence.role}</span>
                     <strong>{evidence.label}</strong>
                     <small>
-                      Recorded {formatTimestamp(evidence.observedAt)}
+                      Recorded <LocalTime value={evidence.observedAt} />
                     </small>
                     <ArrowSquareOut aria-hidden="true" />
                   </a>
