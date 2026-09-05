@@ -862,6 +862,98 @@ a.sg-chip:hover {
   line-height: 1.5;
 }
 
+/* ---------- Durable replies: queued, streaming, failed ---------- */
+
+.sg-stream-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #e7c9a3;
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+  color: #79563b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-stream-notice svg {
+  width: 14px;
+  flex: none;
+  color: var(--amber);
+}
+.sg-source-tag.live {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.sg-source-tag.failed {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.sg-run-progress {
+  display: grid;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.sg-run-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sg-run-status svg {
+  width: 14px;
+  flex: none;
+  color: var(--blue);
+}
+.sg-message-failed .sg-run-status {
+  color: var(--amber-text);
+}
+/* A caret at the end of a draft says "still writing" without any copy. */
+.sg-message-live .sg-message-response > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 1px;
+  background: var(--blue);
+  vertical-align: -2px;
+  animation: sg-blink 1s steps(2, jump-none) infinite;
+}
+@keyframes sg-blink {
+  to {
+    opacity: 0;
+  }
+}
+.sg-run-draft {
+  padding: 8px 12px;
+  border: 1px dashed #c9d4e3;
+  border-radius: var(--radius);
+  color: var(--ink-2);
+}
+.sg-run-draft summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.sg-run-draft[open] summary {
+  margin-bottom: 8px;
+}
+.sg-run-action {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.sg-run-action svg {
+  width: 13px;
+}
+
 /* ---------- Composer ---------- */
 
 .sg-composer {

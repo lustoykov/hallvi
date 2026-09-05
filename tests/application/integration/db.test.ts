@@ -67,7 +67,7 @@ describe("Phase 1 schema", () => {
     );
   });
 
-  it("stores seven durable record types without persisted blockers or Gate Checks", async () => {
+  it("stores durable domain and Pi execution records without persisted blockers or Gate Checks", async () => {
     const database = await loadFreshDatabase();
     const client = database.db().$client;
     const tables = client
@@ -90,11 +90,13 @@ describe("Phase 1 schema", () => {
     expect(tables).toEqual([
       "activity_events",
       "applications",
+      "chat_summaries",
       "chats",
       "decisions",
       "messages",
       "observations",
       "phase_workspaces",
+      "pi_runs",
     ]);
     expect(workspaceColumns).toEqual([
       "id",
@@ -107,6 +109,8 @@ describe("Phase 1 schema", () => {
       "idx_decisions_application",
       "idx_messages_chat",
       "idx_observations_application_kind",
+      "idx_pi_runs_chat",
+      "idx_pi_runs_queue",
     ]);
     expect(client.pragma("user_version", { simple: true })).toBe(
       schemaVersion.version,

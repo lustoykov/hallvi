@@ -77,7 +77,7 @@ The [real-Pi casebook](../testing/phase-one-acceptance.md#real-pi-casebook-and-r
 
 It now provides direct practice with Drizzle over SQLite, but it does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../ROADMAP.md#add-drizzle-over-the-existing-sqlite-database) without changing the domain model. The current Pi session ends with its HTTP request and copies the full Chat transcript into every new prompt, so [durable Pi requests](../../ROADMAP.md#make-pi-requests-durable) are now a concrete pre-Phase-2 requirement for a Node worker. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../ROADMAP.md#add-drizzle-over-the-existing-sqlite-database) without changing the domain model. [Durable Pi requests](../../ROADMAP.md#make-pi-requests-durable) now use one local Node worker, queued SQLite records and bounded Chat context. Accepted messages outlive HTTP requests. Do not add a separate general-purpose API service.
 
 ## Map the Server Guy journey to the stack
 
@@ -123,7 +123,7 @@ Test at least these cases:
 
 ### Pi runtime boundary
 
-Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. The Pi SDK validates Decision arguments with TypeBox; application code normalizes accepted values, validates the final message, checks Decision domain rules, and commits accepted messages and Decisions together. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
+Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. The Pi SDK validates Decision arguments with TypeBox; application code normalizes accepted values, validates the final message, checks Decision domain rules, and commits the completed assistant answer and Decisions together; the user message was already saved at acceptance. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
 Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 

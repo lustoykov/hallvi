@@ -30,6 +30,7 @@ export const sendChatMessageRequestSchema = z.strictObject({
     .trim()
     .min(1, "Write a message first.")
     .max(5_000, "Keep this message under 5,000 characters."),
+  requestKey: z.uuid({ error: "A unique request key is required." }),
 });
 
 export class RequestValidationError extends Error {}

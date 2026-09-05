@@ -66,6 +66,8 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
     messages: [
       {
         id: "user",
+        status: "completed",
+        revision: 0,
         chatId: "chat",
         role: "user",
         body: scenario.message,
@@ -74,6 +76,8 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
       },
       {
         id: "assistant",
+        status: "completed",
+        revision: 1,
         chatId: "chat",
         role: "assistant",
         body: reply.message,

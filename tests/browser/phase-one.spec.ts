@@ -29,6 +29,109 @@ async function send(page: Page, message: string) {
 }
 
 test(
+  "P1-20 durable acceptance, reconnect, cancellation and linked retry",
+  journey("durable-requests"),
+  async ({ page }, testInfo) => {
+    await addApplication(page, "durable-app");
+    const before = await view(page);
+    const route = `${new URL(page.url()).pathname}?chat=${before.selectedChatId}`;
+    const endpoint = `/api/applications/${before.application.id}/chats/${before.selectedChatId}/messages`;
+    const data = { message: "Hello [slow]", requestKey: crypto.randomUUID() };
+    const response = await page.request.post(endpoint, { data });
+    expect(response.status()).toBe(202);
+    const accepted = await response.json();
+    expect(accepted.run.status).toBe("queued");
+    const duplicate = await page.request.post(endpoint, { data });
+    expect((await duplicate.json()).run.id).toBe(accepted.run.id);
+    expect(
+      (
+        await page.request.post(endpoint, {
+          data: { ...data, message: "Different" },
+        })
+      ).status(),
+    ).toBe(409);
+    await page.goto("/applications"); // Closes the stream, not the accepted work.
+    await expect
+      .poll(async () => {
+        const snapshot = await (await page.request.get(endpoint)).json();
+        return snapshot.runs[0].status;
+      })
+      .toBe("succeeded");
+    await page.goto(route);
+    await expect(
+      page.getByText("[QA fixture reply] Hello [slow]", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
+    ).toHaveCount(1);
+
+    await page.getByRole("textbox").fill("Cancel **me** [slow-cancel]");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Cancel request" }),
+    ).toBeVisible();
+    await expect(page.locator(".sg-run-progress strong")).toHaveText(
+      "Reply in progress…",
+    );
+    // The HTTP acceptance has finished, but the saved run is still active.
+    await expect(page.getByRole("textbox")).toBeEnabled();
+    await expect(page.locator(".sg-busy-bar")).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("durable-reply-in-progress.png"),
+      fullPage: true,
+    });
+    const cancellation = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/cancel") &&
+        response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Cancel request" }).click();
+    expect((await (await cancellation).json()).status).toBe("cancelled");
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Retry reply" }),
+    ).toBeVisible();
+    await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
+    await page.getByText("Show unfinished draft", { exact: true }).click();
+    await expect(page.locator(".sg-run-progress details strong")).toHaveText(
+      "Reply in progress…",
+    );
+    await page.getByText("Show unfinished draft", { exact: true }).click();
+    await page.screenshot({
+      path: testInfo.outputPath("durable-cancelled-reply.png"),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Retry reply" }).click();
+    await expect(
+      page.getByText("[QA fixture reply] Cancel me [slow-cancel]", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator(".sg-messages")
+        .getByText("Cancel me [slow-cancel]", { exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      page
+        .locator(".sg-messages .sg-message-response strong")
+        .filter({ hasText: /^me$/ }),
+    ).toHaveCount(2); // Original user message and successful assistant answer.
+    const saved = await (await page.request.get(endpoint)).json();
+    expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
+      "succeeded",
+      "cancelled",
+      "succeeded",
+    ]);
+    expect(saved.runs[2].retryOfId).toBe(saved.runs[1].id);
+    await page.screenshot({
+      path: testInfo.outputPath("durable-retried-reply.png"),
+      fullPage: true,
+    });
+  },
+);
+
+test(
   "P1-04/06 add an application, record a priority, reload",
   journey("add-application"),
   async ({ page }) => {
@@ -79,7 +182,7 @@ test(
 );
 
 test(
-  "P1-07 provider failure leaves no partial turn and retry works",
+  "P1-07 provider failure preserves accepted intent and linked retry works",
   journey("provider-failure"),
   async ({ page }) => {
     await addApplication(page, "failure-app");
@@ -87,21 +190,9 @@ test(
     await page.getByRole("textbox").fill("Hello [fail-once]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
-      page
-        .getByRole("alert")
-        .filter({ hasText: "QA simulated provider failure" }),
+      page.getByText(/Pi could not finish this attempt/),
     ).toBeVisible();
-    await expect(page.getByRole("textbox")).toHaveValue("Hello [fail-once]");
-    await expect(
-      page.getByRole("status").filter({ hasText: "Waiting for Pi" }),
-    ).toHaveCount(0);
-    await expect(
-      page
-        .locator(".sg-messages")
-        .getByText("Hello [fail-once]", { exact: true }),
-    ).toHaveCount(0);
-    expect((await view(page)).messages).toEqual(before.messages);
-    await send(page, "Hello [fail-once]");
+    await expect(page.getByRole("textbox")).toHaveValue("");
     await expect(
       page
         .locator(".sg-messages")
@@ -109,6 +200,19 @@ test(
     ).toHaveCount(1);
     expect((await view(page)).messages).toHaveLength(
       before.messages.length + 2,
+    );
+    await page.reload();
+    await page.getByRole("button", { name: "Retry reply" }).click();
+    await expect(
+      page.getByText("[QA fixture reply] Hello [fail-once]", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator(".sg-messages")
+        .getByText("Hello [fail-once]", { exact: true }),
+    ).toHaveCount(1);
+    expect((await view(page)).messages).toHaveLength(
+      before.messages.length + 3,
     );
   },
 );
@@ -142,8 +246,12 @@ test(
     expect(revised.decisions[0].value).toBe("Fast recovery");
     await page.getByRole("textbox").fill("invalid-replacement: reject this");
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(page.locator(".sg-error[role=alert]")).toBeVisible();
-    expect((await view(page)).messages).toEqual(revised.messages);
+    await expect(
+      page.getByText(/Pi could not finish this attempt/),
+    ).toBeVisible();
+    expect((await view(page)).messages).toHaveLength(
+      revised.messages.length + 2,
+    );
     expect((await view(page)).decisions).toEqual(revised.decisions);
   },
 );
@@ -231,7 +339,7 @@ test(
         page.locator(".sg-messages").getByText("Pending", { exact: true }),
       ).toBeVisible();
       await expect(
-        page.getByRole("status").filter({ hasText: "Waiting for Pi" }),
+        page.getByRole("status").filter({ hasText: "Saving message" }),
       ).toBeVisible();
       await expect(
         page.getByText("[QA fixture reply] Hello [slow]", { exact: true }),
@@ -257,7 +365,7 @@ test(
       page.locator(".sg-messages").getByText("Pending", { exact: true }),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("status").filter({ hasText: "Waiting for Pi" }),
+      page.getByRole("status").filter({ hasText: "Saving message" }),
     ).toHaveCount(0);
     await expect(composer).toHaveValue("Next unsent draft");
     expect(requests).toBe(1);

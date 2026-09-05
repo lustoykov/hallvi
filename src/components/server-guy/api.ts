@@ -1,4 +1,10 @@
-import type { ApprovalMode, PhaseOneOperatorView } from "@/server/types";
+import type {
+  AcceptedPiRun,
+  ApprovalMode,
+  PhaseOneOperatorView,
+  PiRun,
+  ChatMessage,
+} from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -36,6 +42,11 @@ function post(url: string, body: unknown) {
  * identity.
  */
 export const api = {
+  runSnapshot(applicationId: string, chatId: string) {
+    return jsonRequest<{ runs: PiRun[]; messages: ChatMessage[] }>(
+      `/api/applications/${applicationId}/chats/${chatId}/messages`,
+    );
+  },
   removeApplication(applicationId: string, repository: string) {
     return jsonRequest<{ removedApplicationId: string }>(
       `/api/applications/${applicationId}`,
@@ -65,10 +76,30 @@ export const api = {
       {},
     );
   },
-  sendMessage(applicationId: string, chatId: string, message: string) {
-    return post(`/api/applications/${applicationId}/chats/${chatId}/messages`, {
-      message,
-    });
+  sendMessage(
+    applicationId: string,
+    chatId: string,
+    message: string,
+    requestKey: string,
+  ) {
+    return jsonRequest<AcceptedPiRun>(
+      `/api/applications/${applicationId}/chats/${chatId}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify({ message, requestKey }),
+      },
+    );
+  },
+  runAction(
+    applicationId: string,
+    chatId: string,
+    runId: string,
+    action: "cancel" | "retry",
+  ) {
+    return jsonRequest(
+      `/api/applications/${applicationId}/chats/${chatId}/runs/${runId}/${action}`,
+      { method: "POST" },
+    );
   },
   rerunRepositoryCheck(applicationId: string) {
     return post(

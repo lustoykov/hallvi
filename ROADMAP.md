@@ -14,8 +14,8 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 2 | Add Drizzle over the existing SQLite database. | Merged: [PR #8](https://github.com/lustoykov/server-guy/pull/8). [Checklist](#add-drizzle-over-the-existing-sqlite-database). |
 | 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
-| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | In review: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
-| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Planned: [checklist](#make-pi-requests-durable). |
+| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
+| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Implemented on `codex/durable-pi-requests`, pending PR review. Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
 | 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
@@ -91,18 +91,20 @@ Decision: offer explicit reuse of a detected GitHub CLI/environment credential o
 
 ### Make Pi requests durable
 
-- [ ] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
-- [ ] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
-- [ ] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
-- [ ] Persist the accumulated assistant message with `content`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
-- [ ] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
-- [ ] Validate the multiple-Chat experience with worker concurrency set to one, visible queue state, and cancellation. Add a small bounded concurrency pool inside the same process only if real waiting makes the interface materially unpleasant.
-- [ ] Return a run ID immediately, load the authoritative message snapshot after reload, and continue updates through a reconnectable SSE endpoint. SSE frames are delivery notifications, not the system of record.
-- [ ] On worker restart, mark an in-flight run `interrupted` and require an explicit safe retry or reconciliation instead of blindly repeating possible external effects.
-- [ ] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
-- [ ] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
+The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
 
-The current Pi session is created and disposed inside one HTTP request, while the full Chat transcript is copied into every prompt. That request lifetime and unbounded context are the concrete trigger for this work. The database is authoritative: the durable summary, messages, Decisions, and Pi Run live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+- [x] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
+- [x] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
+- [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
+- [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
+- [x] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
+- [x] Validate the multiple-Chat experience with worker concurrency set to one, visible queue state, and cancellation. Add a small bounded concurrency pool inside the same process only if real waiting makes the interface materially unpleasant.
+- [x] Return a run ID immediately, load the authoritative message snapshot after reload, and continue updates through a reconnectable SSE endpoint. SSE frames are delivery notifications, not the system of record.
+- [x] On worker restart, mark an in-flight run `interrupted` and require an explicit safe retry or reconciliation instead of blindly repeating possible external effects.
+- [x] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
+- [x] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
+
+Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered this worker and bounded-context implementation. The database is authoritative: the durable summary, messages, Decisions, and Pi Run live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
 

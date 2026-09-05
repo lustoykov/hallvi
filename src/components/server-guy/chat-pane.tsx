@@ -2,9 +2,11 @@
 
 import {
   Archive,
+  ArrowClockwise,
   PaperPlaneRight,
   SpinnerGap,
   WarningCircle,
+  X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 
@@ -18,10 +20,26 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import type { Chat, PhaseOneOperatorView } from "@/server/types";
+import type {
+  Chat,
+  ChatMessage,
+  PhaseOneOperatorView,
+  PiRun,
+} from "@/server/types";
 
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
+
+const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
+  completed: "Saved",
+  queued: "Queued",
+  running: "Draft",
+  succeeded: "Saved",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  "timed-out": "Timed out",
+  interrupted: "Interrupted",
+};
 
 export function ChatPane({
   view,
@@ -34,6 +52,9 @@ export function ChatPane({
   onComposerChange,
   onSend,
   onArchive,
+  runs,
+  reconnecting,
+  onRunAction,
 }: {
   view: PhaseOneOperatorView;
   activeChat: Chat | null;
@@ -45,6 +66,9 @@ export function ChatPane({
   onComposerChange: (value: string) => void;
   onSend: () => void;
   onArchive: () => void;
+  runs: PiRun[];
+  reconnecting: boolean;
+  onRunAction: (id: string, action: "cancel" | "retry") => void;
 }) {
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
@@ -56,6 +80,9 @@ export function ChatPane({
   ).length;
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || archived;
+  const requestPending = view.messages.some(
+    (message) => message.status === "queued" || message.status === "running",
+  );
 
   return (
     <section className="sg-chat-pane">
@@ -81,32 +108,115 @@ export function ChatPane({
           </button>
         )}
       </header>
-      {busy !== null && <div className="sg-busy-bar" aria-hidden="true" />}
+      {(busy !== null || requestPending) && (
+        <div className="sg-busy-bar" aria-hidden="true" />
+      )}
 
       <Conversation className="sg-conversation">
         <ConversationContent className="sg-messages">
-          {view.messages.map((message) => (
-            <Message from={message.role} key={message.id}>
-              <div className="sg-message-heading">
-                <span
-                  className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
-                  aria-hidden="true"
-                >
-                  {message.role === "user" ? "You" : "Pi"}
-                </span>
-                <strong>{message.role === "user" ? "You" : "Pi"}</strong>
-                {message.source === "server-guy" && (
-                  <span className="sg-source-tag">Recorded event</span>
-                )}
-                <LocalTime value={message.createdAt} variant="compact" />
-              </div>
-              <MessageContent>
-                <MessageResponse>
-                  <Markdown source={message.body} />
-                </MessageResponse>
-              </MessageContent>
-            </Message>
-          ))}
+          {reconnecting && (
+            <p className="sg-stream-notice" role="status">
+              <SpinnerGap className="spin" aria-hidden="true" />
+              Reconnecting… accepted messages keep running, and this view
+              catches up on its own.
+            </p>
+          )}
+          {view.messages.map((message) => {
+            const run = runs.find(
+              (run) => run.assistantMessageId === message.id,
+            );
+            const provisional = message.status !== "completed";
+            const inProgress =
+              message.status === "queued" || message.status === "running";
+            const retried =
+              run !== undefined &&
+              runs.some((attempt) => attempt.retryOfId === run.id);
+            return (
+              <Message
+                className={
+                  provisional
+                    ? inProgress
+                      ? "sg-message-live"
+                      : "sg-message-failed"
+                    : ""
+                }
+                from={message.role}
+                key={message.id}
+              >
+                <div className="sg-message-heading">
+                  <span
+                    className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {message.role === "user" ? "You" : "Pi"}
+                  </span>
+                  <strong>{message.role === "user" ? "You" : "Pi"}</strong>
+                  {message.source === "server-guy" && (
+                    <span className="sg-source-tag">Recorded event</span>
+                  )}
+                  {provisional && (
+                    <span
+                      className={`sg-source-tag ${inProgress ? "live" : "failed"}`}
+                    >
+                      {ATTEMPT_LABELS[message.status]}
+                    </span>
+                  )}
+                  <LocalTime value={message.createdAt} variant="compact" />
+                </div>
+                <MessageContent>
+                  {provisional ? (
+                    <div className="sg-run-progress">
+                      {message.body && inProgress && (
+                        <MessageResponse>
+                          <Markdown source={message.body} />
+                        </MessageResponse>
+                      )}
+                      <p className="sg-run-status" role="status">
+                        {inProgress && (
+                          <SpinnerGap className="spin" aria-hidden="true" />
+                        )}
+                        {message.status === "queued"
+                          ? "Message saved. Waiting for the worker…"
+                          : message.status === "running"
+                            ? "Pi is replying… Decisions are saved only when it finishes."
+                            : (run?.error ??
+                              "This attempt did not finish. No Decisions were saved.")}
+                      </p>
+                      {message.body && !inProgress && (
+                        <details className="sg-run-draft">
+                          <summary>Show unfinished draft</summary>
+                          <MessageResponse>
+                            <Markdown source={message.body} />
+                          </MessageResponse>
+                        </details>
+                      )}
+                      {run && !archived && !retried && (
+                        <button
+                          className={`sg-run-action ${inProgress ? "sg-secondary-button" : "sg-primary-button"}`}
+                          disabled={busy !== null}
+                          onClick={() =>
+                            onRunAction(run.id, inProgress ? "cancel" : "retry")
+                          }
+                          type="button"
+                        >
+                          {inProgress ? (
+                            <X aria-hidden="true" weight="bold" />
+                          ) : (
+                            <ArrowClockwise aria-hidden="true" weight="bold" />
+                          )}
+                          {inProgress ? "Cancel request" : "Retry reply"}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <MessageResponse>
+                      <Markdown source={message.body} />
+                    </MessageResponse>
+                  )}
+                </MessageContent>
+              </Message>
+            );
+          })}
 
           {pendingMessage !== null && (
             <>
@@ -125,8 +235,8 @@ export function ChatPane({
                 </MessageContent>
               </Message>
               <p className="sg-reply-pending" role="status">
-                <SpinnerGap className="spin" aria-hidden="true" /> Waiting for
-                Pi…
+                <SpinnerGap className="spin" aria-hidden="true" /> Saving
+                message…
               </p>
             </>
           )}

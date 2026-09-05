@@ -6,11 +6,10 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
 import * as database from "../../src/server/db";
 import * as github from "../../src/server/github";
-import {
-  getPhaseOneOperatorView,
-  sendChatMessage,
-} from "../../src/server/phase-one";
+import { getPhaseOneOperatorView } from "../../src/server/phase-one";
 import * as pi from "../../src/server/pi";
+import { executePiTurn } from "../execute-pi-turn";
+import { chatRunSnapshot } from "../../src/server/pi-runs";
 import {
   readPiConfiguration,
   savePiConfiguration,
@@ -34,6 +33,10 @@ const repeats = evalRepeatCount(process.env.PI_EVAL_REPEATS);
 const selectedCases = selectPhaseOneCases(process.env.PI_EVAL_CASES);
 const sourceFiles = [
   "src/server/pi.ts",
+  "src/server/pi-runs.ts",
+  "src/server/pi-context.ts",
+  "src/server/pi-worker.ts",
+  "tests/execute-pi-turn.ts",
   "src/server/phase-one.ts",
   "src/server/phase-one-spec.ts",
   "src/server/pi-configuration.ts",
@@ -62,6 +65,7 @@ const results: Array<{
   repetition: number;
   rubric: string;
   elapsedMs: number;
+  piCalls: number;
   input: Parameters<typeof pi.askPi>[0] | null;
   reply: PiTurnResult | null;
   before: PhaseOneOperatorView;
@@ -154,6 +158,7 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
         repetition,
         rubric: scenario.rubric,
         elapsedMs: 0,
+        piCalls: 0,
         input: null,
         reply: null,
         before,
@@ -174,7 +179,7 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
       const turn = vi.spyOn(pi, "askPi");
       const start = performance.now();
       try {
-        record.after = await sendChatMessage(
+        record.after = await executePiTurn(
           before.application!.id,
           before.selectedChatId!,
           scenario.message,
@@ -206,8 +211,12 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
         // Never serialize credential-bearing SDK/provider errors into reports.
         record.error = blockedByRuntime
           ? "Pi runtime/provider failure; remaining turns stopped. Check Settings/account access before an explicit rerun."
-          : "The turn failed before acceptance. Compare the captured proposal and unchanged/persisted state.";
+          : "The accepted message is saved, but the attempt failed. No Decisions were committed from it.";
       } finally {
+        record.piCalls = chatRunSnapshot(
+          before.application!.id,
+          before.selectedChatId!,
+        ).runs.reduce((sum, run) => sum + run.piCalls, 0);
         record.elapsedMs = Math.round(performance.now() - start);
         turn.mockRestore();
       }

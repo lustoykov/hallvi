@@ -13,6 +13,8 @@ import {
   messages,
   observations,
   phaseWorkspaces,
+  piRuns,
+  chatSummaries,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type {
@@ -33,6 +35,8 @@ const schema = {
   messages,
   observations,
   phaseWorkspaces,
+  piRuns,
+  chatSummaries,
 };
 type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -40,20 +44,26 @@ declare global {
   var __serverGuyDb: ServerGuyDatabase | undefined;
 }
 
-const defaultDbPath = join(process.cwd(), ".server-guy", "server-guy.db");
+export function databasePath() {
+  return (
+    process.env.SERVER_GUY_DB_PATH ??
+    join(process.cwd(), ".server-guy", "server-guy.db")
+  );
+}
 
 export function db(): ServerGuyDatabase {
   return (globalThis.__serverGuyDb ??= createDatabase());
 }
 
 function createDatabase(): ServerGuyDatabase {
-  const databasePath = process.env.SERVER_GUY_DB_PATH ?? defaultDbPath;
-  mkdirSync(dirname(databasePath), { recursive: true });
-  const client = new Database(databasePath);
+  const path = databasePath();
+  mkdirSync(dirname(path), { recursive: true });
+  const client = new Database(path);
   try {
     client.pragma("journal_mode = WAL");
     client.pragma("foreign_keys = ON");
-    assertCurrentSchema(client, databasePath);
+    client.pragma("busy_timeout = 5000");
+    assertCurrentSchema(client, path);
     return drizzle({ client, schema });
   } catch (error) {
     client.close();
@@ -209,6 +219,7 @@ export function insertMessage(
   role: ChatMessage["role"],
   body: string,
   source: ChatMessage["source"],
+  status: ChatMessage["status"] = "completed",
 ) {
   const message: ChatMessage = {
     id: randomUUID(),
@@ -217,6 +228,8 @@ export function insertMessage(
     body,
     source,
     createdAt: now(),
+    status,
+    revision: 0,
   };
   db().insert(messages).values(message).run();
   return message;
@@ -369,5 +382,5 @@ export function listActivity(workspaceId: string) {
 }
 
 export function withTransaction<T>(work: () => T): T {
-  return db().transaction(() => work());
+  return db().transaction(() => work(), { behavior: "immediate" });
 }

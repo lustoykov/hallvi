@@ -8,6 +8,7 @@ next-env.d.ts
 
 # Local state and generated results
 .server-guy
+.claude
 data
 tests/results
 

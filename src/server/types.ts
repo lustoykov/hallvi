@@ -64,6 +64,41 @@ export interface ChatMessage {
   body: string;
   source: "user" | "pi" | "server-guy";
   createdAt: string;
+  status: "completed" | PiRunStatus;
+  revision: number;
+}
+
+export type PiRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed-out"
+  | "interrupted";
+
+export interface PiRun {
+  id: string;
+  applicationId: string;
+  workspaceId: string;
+  chatId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  requestKey: string;
+  retryOfId: string | null;
+  status: PiRunStatus;
+  revision: number;
+  error: string | null;
+  piCalls: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface AcceptedPiRun {
+  run: PiRun;
+  userMessageId: string;
+  assistantMessageId: string;
 }
 
 export interface Decision {

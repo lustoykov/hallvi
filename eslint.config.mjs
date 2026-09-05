@@ -27,6 +27,7 @@ export default defineConfig([
     },
   },
   globalIgnores([
+    ".claude/**",
     ".next/**",
     "node_modules/**",
     "coverage/**",

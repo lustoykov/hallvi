@@ -6,14 +6,28 @@ import { join } from "node:path";
 
 export class PiUnavailableError extends Error {}
 
-export async function askPi(input: { userMessage: string; messages: ChatMessage[]; decisions: Decision[]; viewSummary: string }): Promise<PiTurnResult> {
+export function normalizePiAssistantMessage(input: string) {
+  const text = input.trim();
+  if (!text || text.length > 10_000) throw new Error("Invalid synthetic answer.");
+  return text;
+}
+export async function summarizePiChat(previous: string, transcript: string) {
+  return `Synthetic summary: ${previous} ${transcript}`.slice(-6_000);
+}
+export async function askPi(input: { userMessage: string; messages: ChatMessage[]; decisions: Decision[]; viewSummary: string }, options: { signal?: AbortSignal; onText?: (text: string) => void } = {}): Promise<PiTurnResult> {
   const root = process.env.SERVER_GUY_QA_ROOT;
   if (!root) throw new Error("QA fixture requires an isolated root.");
-  await new Promise((resolve) => setTimeout(resolve, input.userMessage.includes("[slow]") ? 1_500 : 150));
+  options.onText?.("[QA draft] **Reply in progress…**");
+  await new Promise<void>((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(new Error("Cancelled synthetic generation.")); };
+    const timer = setTimeout(() => { options.signal?.removeEventListener("abort", abort); resolve(); }, input.userMessage.includes("[slow-cancel]") ? 6_000 : input.userMessage.includes("[slow]") ? 1_500 : 150);
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted) abort();
+  });
   const failureMarker = join(root, `pi-failed-${createHash("sha256").update(input.userMessage).digest("hex")}`);
   if (input.userMessage.includes("[fail-once]") && !existsSync(failureMarker)) {
     writeFileSync(failureMarker, "failed");
-    throw new PiUnavailableError("QA simulated provider failure. Retry this message; no message or decision was saved.");
+    throw new PiUnavailableError("QA simulated provider failure.");
   }
   const decisionProposals: PiDecision[] = [];
   if (input.userMessage.startsWith("priority: ")) {

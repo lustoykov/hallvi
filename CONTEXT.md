@@ -12,6 +12,14 @@ _Avoid_: AI-assisted workflow, model-powered pipeline
 A durable conversation between the engineer and Pi inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
 _Avoid_: Operator Session, workflow run, pipeline execution
 
+**Pi Run**:
+One recorded attempt by Pi to answer an accepted engineer message in a Chat, with its own progress and outcome. A retry is another linked attempt, not a new Chat or proof that an external Operation occurred.
+_Avoid_: Chat, Operation, model call
+
+**Chat Summary**:
+A condensed, model-authored account of earlier messages in one Chat, with a record of which messages it covers. It preserves conversational context but does not replace authoritative Decisions or Observations.
+_Avoid_: Decision, Observation, shared application memory
+
 **Phase Workspace**:
 The durable collaboration boundary for one Launch Phase, containing every Chat created to produce the shared Phase Deliverable and satisfy its Exit Gate. Completing the phase makes its Chats read-only together; no single Chat owns phase progress.
 _Avoid_: Phase chat, workflow run, second application record
