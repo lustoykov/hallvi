@@ -12,7 +12,7 @@ colors:
   line: "#d8e0ec"
   success: "#0c7248"
   error: "#9c312a"
-  focus: "#7ba7ff"
+  focus: "#285ad8"
 typography:
   body: {fontFamily: "var(--font-geist-sans), system-ui, sans-serif", fontSize: "14px"}
   headline: {fontSize: "36px", lineHeight: 1.1, letterSpacing: "-0.03em"}
@@ -38,7 +38,7 @@ Inherit Geist Sans from the [app layout](../../../src/app/layout.tsx) and [globa
 
 ## Layout
 
-Keep a single centered content column (680px maximum including 16px side padding), a full-width topbar (64px tall), settings navigation, heading, and one divided card. Account controls precede the second settings section; the footer holds the return action. Standard section padding is 26px by 30px. The existing height breakpoint at 800px reduces vertical spacing; preserve the existing narrow-width fallback without treating it as mobile acceptance evidence.
+Keep a single centered content column (680px maximum including 16px side padding), a full-width topbar (56px tall, shared with the workspace and applications list), settings navigation, heading, and one divided card. Account controls precede the second settings section; the footer holds the return action. Standard section padding is 26px by 30px. The existing height breakpoint at 800px reduces vertical spacing; preserve the existing narrow-width fallback without treating it as mobile acceptance evidence.
 
 ## Elevation & Depth
 
@@ -51,7 +51,7 @@ Retain the shared card, primary-button, and help-panel radii above. Controls use
 ## Components
 
 - **Navigation:** reuse [SettingsNav](../../../src/components/server-guy/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
-- **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (3px, offset 4px) and disabled treatment.
+- **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (2px in the primary blue, offset 3px, shared by every screen) and disabled treatment.
 - **Account choice:** distinguish a detected login from an accepted connection. Show the account and credential source, explicit reuse, an alternative login when available, and a way to retain the current connection.
 - **Device sign-in:** show the code, copy feedback, provider link, stable waiting announcement, expiry, and cancel action. While replacing an account, name the account still in use. Keep the changing countdown outside the live announcement.
 - **Repository access:** show GitHub App installation guidance only for an App connection. Existing CLI/environment connections use their existing permissions. Account connection does not claim repository verification; adding an application checks access and the exact commit.
