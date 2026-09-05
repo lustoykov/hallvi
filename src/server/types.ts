@@ -57,6 +57,11 @@ export interface Chat {
   archivedAt: string | null;
 }
 
+/** A chat as the list shows it: with the time of its newest message. */
+export interface ChatSummary extends Chat {
+  lastActivityAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   chatId: string;
@@ -165,7 +170,7 @@ export interface UpcomingRequirement {
 export interface PhaseOneOperatorView {
   application: ApplicationRecord | null;
   workspace: PhaseWorkspaceView | null;
-  chats: Chat[];
+  chats: ChatSummary[];
   selectedChatId: string | null;
   messages: ChatMessage[];
   checks: GateCheck[];

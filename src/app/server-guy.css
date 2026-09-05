@@ -544,14 +544,16 @@ a.sg-chip:hover {
   min-width: 0;
 }
 .sg-session small,
-.sg-session em {
+.sg-session em,
+.sg-session time {
   color: var(--muted);
   font-size: 11px;
   font-style: normal;
   white-space: nowrap;
 }
 /* Separator dot drawn, not typed, so it stays out of the accessible name. */
-.sg-session em::before {
+.sg-session em::before,
+.sg-session time::before {
   content: "";
   display: inline-block;
   width: 3px;
@@ -560,6 +562,9 @@ a.sg-chip:hover {
   border-radius: 50%;
   background: currentColor;
   vertical-align: middle;
+}
+.sg-session time {
+  margin-left: auto;
 }
 .sg-icon-button {
   width: 28px;

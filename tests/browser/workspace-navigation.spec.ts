@@ -167,6 +167,9 @@ test(
     await expect(
       page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
     ).toBeVisible();
+    // Saved requirements sit behind a closed disclosure; open it once, then
+    // check the long value fits at both desktop widths.
+    await page.getByText(/^Saved requirements \(1\)$/).click();
     for (const width of [1440, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.locator(".sg-decision-list strong")).toBeVisible();

@@ -210,6 +210,20 @@ export function listChats(workspaceId: string) {
     .all();
 }
 
+// The chat list shows when each chat was last active: its newest message, or
+// its creation when nothing has been sent yet.
+export function listChatSummaries(workspaceId: string) {
+  return listChats(workspaceId).map((chat) => ({
+    ...chat,
+    lastActivityAt:
+      db()
+        .select({ at: sql<string | null>`max(${messages.createdAt})` })
+        .from(messages)
+        .where(eq(messages.chatId, chat.id))
+        .get()?.at ?? chat.createdAt,
+  }));
+}
+
 export function archiveChat(id: string) {
   db()
     .update(chats)

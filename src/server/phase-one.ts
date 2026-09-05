@@ -17,6 +17,7 @@ import {
   listActivity,
   listApplications,
   listChats,
+  listChatSummaries,
   listMessages,
   listObservations,
   supersedeDecision,
@@ -317,7 +318,7 @@ export function getPhaseOneOperatorView(
   const { application, workspace } = loadWorkspace(applicationId);
 
   const checks = currentChecks(application);
-  const chats = listChats(workspace.id);
+  const chats = listChatSummaries(workspace.id);
   const selected =
     (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
     chats.find((chat) => !chat.archivedAt && chat.isPrimary) ??

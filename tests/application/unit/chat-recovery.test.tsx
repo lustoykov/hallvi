@@ -68,7 +68,7 @@ function render({
       deliverable: "Launch Brief",
       status: "in-progress",
     },
-    chats: [chat],
+    chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
     messages: [
       {

@@ -3,7 +3,9 @@
 import { Plus } from "@phosphor-icons/react";
 
 import { PHASE_ONE } from "@/server/phase-one-spec";
-import type { Chat } from "@/server/types";
+import type { ChatSummary } from "@/server/types";
+
+import { LocalTime } from "./local-time";
 
 export function ChatList({
   chats,
@@ -13,7 +15,7 @@ export function ChatList({
   onSelect,
   onCreate,
 }: {
-  chats: Chat[];
+  chats: ChatSummary[];
   selectedChatId: string | null;
   hasApplication: boolean;
   busy: boolean;
@@ -58,6 +60,7 @@ export function ChatList({
                     {chat.isPrimary ? "Main phase chat" : "Separate transcript"}
                   </small>
                   {chat.archivedAt && <em>Archived</em>}
+                  <LocalTime value={chat.lastActivityAt} variant="compact" />
                 </span>
               </span>
             </button>
