@@ -97,13 +97,13 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
 }
 
 describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
-  it("has eight uniquely named cases with explicit semantic rubrics", () => {
-    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(8);
+  it("has eleven uniquely named cases with explicit semantic rubrics", () => {
+    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(11);
     expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
   });
 
   it("selects a case subset without silently expanding invalid selections", () => {
-    expect(selectPhaseOneCases().length).toBe(8);
+    expect(selectPhaseOneCases().length).toBe(11);
     expect(
       selectPhaseOneCases("greeting,hypothetical").map((c) => c.id),
     ).toEqual(["greeting", "hypothetical"]);
@@ -124,6 +124,26 @@ describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
     const fixture = example();
     fixture.reply.decisionProposals = [];
     expect(fixture.check()["expected proposal count"]).toBe(false);
+  });
+
+  it("rejects a chat that changes repository verification evidence", () => {
+    const fixture = example();
+    fixture.after.observations = [
+      {
+        id: "fabricated",
+        applicationId: "app",
+        kind: "github-repository-identity",
+        status: "passed",
+        summary: "Claimed access",
+        sourceLabel: "Fake",
+        sourceUrl: null,
+        raw: {},
+        observedAt: "2026-09-05T00:00:00Z",
+      },
+    ];
+    expect(
+      fixture.check()["repository evidence and gate results unchanged by chat"],
+    ).toBe(false);
   });
 
   it("detects fabricated replacement IDs and incorrect supersession", () => {

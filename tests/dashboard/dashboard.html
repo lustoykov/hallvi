@@ -113,9 +113,10 @@
   </dialog>
   <dialog id="eval-picker" class="picker" aria-labelledby="eval-summary">
     <header class="dialog-heading"><h2 id="eval-summary">Choose live eval cases</h2><button class="text-button" data-close="eval-picker" aria-label="Close eval selection">Close</button></header>
-    <p class="muted">Real Server Guy agent responses, not browser tests. Each repetition starts fresh.</p>
-    <div class="selection-actions"><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
-    <div class="picker-body"><fieldset><legend class="visually-hidden">Live eval cases</legend><div id="eval-options" class="selection-list"></div></fieldset></div>
+    <p id="eval-history" class="muted">Cases you have not run are selected by default.</p>
+    <label class="field eval-search">Search cases<input id="eval-search" type="search" placeholder="Name, category or expected behavior" autocomplete="off"></label>
+    <div class="selection-actions"><button id="evals-unrun" class="text-button">Select unrun</button><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <div class="picker-body"><fieldset><legend class="visually-hidden">Live eval cases</legend><div id="eval-options" class="selection-list"></div></fieldset><p id="eval-no-matches" class="muted" hidden>No matching cases. Try another search.</p></div>
     <footer class="picker-footer"><span id="eval-count" role="status"></span><button id="run-evals" class="primary">Review and run live evals…</button></footer>
   </dialog>
   <dialog id="confirm" aria-labelledby="confirm-title">

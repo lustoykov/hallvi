@@ -13,6 +13,7 @@ import {
   loadReport,
   readJson,
   writeJson,
+  archiveRun,
 } from "../../dashboard/results";
 import { phaseOneCases } from "../../evals/phase-one-cases";
 import { browserJourneys } from "../../browser/journeys";
@@ -188,6 +189,66 @@ it("saves one-click verdicts without a name or note, filling in the local review
   expect(listReports(root)[0].triage["greeting:1"].status).toBe("reviewed");
   expect(listReports(root)[0].triage["greeting:2"].status).toBe("failures");
 });
+it("marks attempted cases across archived runs, without treating skipped or merely planned cases as run", async () => {
+  const { root, origin, headers, launch } = await fixture();
+  const stateOf = async () =>
+    (await fetch(`${origin}/api/state`, { headers })).json();
+  expect(
+    (await stateOf()).evalCases.every(
+      (item: { hasRun: boolean }) => !item.hasRun,
+    ),
+  ).toBe(true);
+  const run = "archived-eval-attempts";
+  writeJson(
+    join(directory(join(root, "tests/results/evals", run)), "results.json"),
+    {
+      model: "synthetic",
+      effort: "high",
+      startedAt: "2026-09-05T00:00:00Z",
+      commit: "test",
+      dirty: false,
+      sourceFingerprints: {},
+      caseIds: [
+        "greeting",
+        "explicit-priority",
+        "question-not-commitment",
+        "hypothetical",
+        "revise-existing",
+      ],
+      results: [
+        { caseId: "greeting", outcome: "checks-passed" },
+        { caseId: "explicit-priority", outcome: "checks-failed" },
+        { caseId: "question-not-commitment", outcome: "run-error" },
+        { caseId: "hypothetical", outcome: "not-run" },
+      ].map((record) => ({
+        ...record,
+        repetition: 1,
+        rubric: "Fixture",
+        checks: {},
+        error: null,
+        input: null,
+        reply: null,
+        before: {},
+        after: {},
+      })),
+    },
+  );
+  archiveRun(root, run, loadReport(root, run).hash, true);
+  const state = await stateOf();
+  expect(state.reports[0].archived).toBe(true);
+  expect(
+    state.evalCases
+      .filter((item: { hasRun: boolean }) => item.hasRun)
+      .map((item: { id: string }) => item.id),
+  ).toEqual(["greeting", "explicit-priority", "question-not-commitment"]);
+  expect(
+    state.evalCases.every(
+      (item: { category: string }) => item.category.length > 0,
+    ),
+  ).toBe(true);
+  expect(launch).not.toHaveBeenCalled();
+});
+
 it("judges a finished live run automatically only when asked, with the same model settings", async () => {
   const { root, origin, headers, launch } = await fixture();
   const post = (path: string, body: unknown) =>

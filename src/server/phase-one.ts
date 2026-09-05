@@ -376,7 +376,9 @@ function buildViewSummary(application: ApplicationRecord) {
     `Repository: ${application.repositoryUrl}`,
     "Environment: Production",
     `Permission policy: ${APPROVAL_MODES[application.approvalMode].label}`,
-    `Checks: ${checks.map((check) => `${check.label}=${check.status}`).join("; ")}`,
+    // Public current results, not raw provider payloads or credential records.
+    // Old observations must not masquerade as evidence for the current login.
+    `Checks:\n${checks.map((check) => `- ${check.label}=${check.status}; result=${JSON.stringify(check.result)}`).join("\n")}`,
     `Upcoming requirements: ${upcoming
       .map(
         (requirement) =>

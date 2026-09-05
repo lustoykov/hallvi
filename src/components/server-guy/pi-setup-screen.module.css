@@ -52,6 +52,11 @@
 .settingsNav a:hover {
   color: #2852a6;
 }
+.settingsNav .testingLink {
+  margin-left: auto;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .choiceActions {
   display: flex;
   flex-wrap: wrap;

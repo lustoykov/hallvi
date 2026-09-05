@@ -107,16 +107,13 @@ export function CheckDrawer({
           </section>
 
           <section>
-            <span className="sg-eyebrow">What this checks</span>
+            <span className="sg-eyebrow">What this means</span>
             <p className="sg-drawer-rule">{check.definition}</p>
           </section>
 
           <section>
-            <span className="sg-eyebrow">Verify it yourself</span>
-            <p>
-              Server Guy derives this result from the records below. Open one to
-              see exactly what was recorded.
-            </p>
+            <span className="sg-eyebrow">Saved details</span>
+            <p>Open a record to see what this result is based on.</p>
             {check.evidence.length ? (
               <div className="sg-evidence-list">
                 {check.evidence.map((evidence) => (
@@ -137,7 +134,7 @@ export function CheckDrawer({
               </div>
             ) : (
               <p className="sg-evidence-empty">
-                No relevant evidence has been recorded yet.
+                No details saved for this check yet.
               </p>
             )}
           </section>

@@ -16,6 +16,17 @@ export function SettingsNav({ current }: { current: "pi" | "github" }) {
       >
         GitHub
       </Link>
+      {process.env.NODE_ENV === "development" && (
+        <a
+          className={s.testingLink}
+          href="http://127.0.0.1:4317/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Testing dashboard (opens in a new tab)"
+        >
+          Testing dashboard
+        </a>
+      )}
     </nav>
   );
 }

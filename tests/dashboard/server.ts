@@ -26,7 +26,7 @@ import { guidePage, renderMarkdown } from "./markdown.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 4;
+export const API_VERSION = 5;
 const currentRubrics = Object.fromEntries(
   phaseOneCases.map((item) => [item.id, item.rubric]),
 );
@@ -470,6 +470,15 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         } catch {
           /* No saved settings: display defaults, not an authenticated claim. */
         }
+        const reports = listReports(root, currentRubrics);
+        // Archived runs count too. Planned/skipped cases are not attempts.
+        const attempted = new Set(
+          reports.flatMap((report) =>
+            report.results
+              .filter((record) => record.outcome !== "not-run")
+              .map((record) => record.caseId),
+          ),
+        );
         json({
           apiVersion: API_VERSION,
           suites: suites.map((suite) => ({
@@ -477,10 +486,13 @@ export function createDashboard(root: string, launch: Launch = spawn) {
             guide: suiteGuides[suite.id],
           })),
           journeys: browserJourneys,
-          evalCases: phaseOneCases,
+          evalCases: phaseOneCases.map((item) => ({
+            ...item,
+            hasRun: attempted.has(item.id),
+          })),
           active,
           history: history(),
-          reports: listReports(root, currentRubrics),
+          reports,
           defaults,
         });
         return;

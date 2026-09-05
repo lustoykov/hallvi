@@ -24,6 +24,10 @@ export function checkPhaseOne(
     ? before.decisions[0]?.id
     : undefined;
   return {
+    "repository evidence and gate results unchanged by chat":
+      JSON.stringify(after.observations) ===
+        JSON.stringify(before.observations) &&
+      JSON.stringify(after.checks) === JSON.stringify(before.checks),
     "expected proposal count": proposals.length === scenario.expectedProposals,
     "supported nonempty values": proposals.every(
       (p) =>

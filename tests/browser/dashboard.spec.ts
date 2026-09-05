@@ -13,6 +13,7 @@ import {
 } from "../dashboard/results";
 import { browserJourneys, journey } from "./journeys";
 import { JUDGE_PROMPT_VERSION } from "../evals/judge-policy";
+import { phaseOneCases } from "../evals/phase-one-cases";
 
 test(
   "dashboard reviews saved answers without model calls or changing source results",
@@ -285,7 +286,7 @@ test(
       await page.getByRole("button", { name: "Choose cases…" }).click();
       await expect(page.getByLabel("Repetitions per case")).toHaveValue("1");
       await expect(page.locator("#eval-count")).toHaveText(
-        "8 cases × 1 repetition = 8 planned answers",
+        `${phaseOneCases.length - 1} cases × 1 repetition = ${phaseOneCases.length - 1} planned answers`,
       );
       await page
         .getByRole("button", { name: "Clear cases", exact: true })

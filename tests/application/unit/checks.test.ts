@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { computeChecks } from "../../../src/server/phase-one-spec";
+import {
+  computeChecks,
+  phaseOneCheckListForPrompt,
+} from "../../../src/server/phase-one-spec";
 import type {
   ApplicationRecord,
   GateCheck,
@@ -38,6 +41,23 @@ const statuses = (checks: GateCheck[]) =>
   Object.fromEntries(checks.map((check) => [check.key, check.status]));
 
 describe("computeChecks", () => {
+  it("uses plain-language check labels in both the UI records and Pi's checklist", () => {
+    const checks = computeChecks(application, null, "github-connection");
+    expect(checks.map((check) => check.label)).toEqual([
+      "Application details",
+      "GitHub repository access",
+      "Deployment environment",
+      "When Pi asks for approval",
+    ]);
+    for (const check of checks)
+      expect(phaseOneCheckListForPrompt()).toContain(check.label);
+    expect(checks[1].definition).toContain(
+      "does not review or deploy the code",
+    );
+    expect(checks[2].definition).toContain(
+      "hosting provider and server are chosen later",
+    );
+  });
   it("evaluates configuration independently while waiting for repository evidence", () => {
     expect(
       statuses(computeChecks(application, null, "github-connection")),
@@ -83,7 +103,7 @@ describe("computeChecks", () => {
       expect.objectContaining({
         recordType: "observation",
         recordId: "observation",
-        role: "Latest repository access result",
+        role: "Latest repository check",
       }),
     ]);
   });

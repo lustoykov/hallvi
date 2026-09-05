@@ -21,12 +21,9 @@ import type {
 } from "../../src/server/types";
 import { pushTestDatabase } from "../test-database";
 import { checkPhaseOne } from "./check-phase-one";
-import {
-  evalRepeatCount,
-  selectPhaseOneCases,
-  type PhaseOneEvalCase,
-} from "./phase-one-cases";
+import { evalRepeatCount, selectPhaseOneCases } from "./phase-one-cases";
 import { createEvalScratch, releaseEvalScratch } from "./scratch";
+import { seedPhaseOneEvalCase } from "./seed-phase-one";
 
 // This file is deliberately .eval.ts, excluded by Vitest's normal test
 // discovery.
@@ -45,6 +42,7 @@ const sourceFiles = [
   "src/server/github-connection.ts",
   "src/server/github-api.ts",
   "tests/evals/phase-one-cases.ts",
+  "tests/evals/seed-phase-one.ts",
   "tests/evals/check-phase-one.ts",
   "tests/evals/phase-one.eval.ts",
   "tests/evals/vitest.config.ts",
@@ -112,7 +110,7 @@ beforeAll(() => {
   );
   initialFingerprints = fingerprints();
   metadata = {
-    suite: "phase-one-decisions-v1",
+    suite: "phase-one-v2",
     startedAt: new Date().toISOString(),
     repeats,
     caseIds: selectedCases.map((scenario) => scenario.id),
@@ -147,47 +145,10 @@ beforeAll(() => {
   );
 });
 
-function seed(scenario: PhaseOneEvalCase, repetition: number) {
-  const name = `${scenario.id}-${repetition}`;
-  const application = database.insertApplication({
-    name,
-    repositoryUrl: `https://github.com/qa/${name}`,
-    repositoryOwner: "qa",
-    repositoryName: name,
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Current application launch",
-  });
-  const workspace = database.insertWorkspace(application.id);
-  const chat = database.insertChat(workspace.id, "Launch Brief", true);
-  if (scenario.existingPriority) {
-    const source = database.insertMessage(
-      chat.id,
-      "user",
-      scenario.existingPriority,
-      "user",
-    );
-    database.insertMessage(
-      chat.id,
-      "assistant",
-      "Your launch priority is recorded.",
-      "pi",
-    );
-    database.insertDecision({
-      applicationId: application.id,
-      sourceMessageId: source.id,
-      kind: "launch-priority",
-      label: "Additional launch priority",
-      value: scenario.existingPriority,
-    });
-  }
-  return getPhaseOneOperatorView(application.id, chat.id);
-}
-
 for (let repetition = 1; repetition <= repeats; repetition++) {
   for (const scenario of selectedCases) {
     it(`${scenario.id} / repetition ${repetition}`, async (context) => {
-      const before = seed(scenario, repetition);
+      const before = seedPhaseOneEvalCase(scenario, repetition);
       const record: (typeof results)[number] = {
         caseId: scenario.id,
         repetition,

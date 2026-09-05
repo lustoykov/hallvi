@@ -52,7 +52,7 @@ test(
       page.getByRole("button", { name: "Archive chat", exact: true }),
     ).toBeEnabled();
     await page
-      .getByRole("button", { name: /Check 2 Repository readable/ })
+      .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
     await page
       .getByRole("button", { name: "Re-run repository check", exact: true })
@@ -92,7 +92,7 @@ test(
       page.getByText("[QA fixture reply] Separate chat draft", { exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: /Check 1 Application identity/ })
+      .getByRole("button", { name: /Check 1 Application details/ })
       .click();
     await page
       .getByRole("button", { name: "Ask Pi about this check", exact: true })
@@ -100,7 +100,7 @@ test(
     await expect(composer).toBeEnabled();
     await expect(composer).toBeFocused();
     await expect(composer).toHaveValue(
-      "Explain “Application identity recorded”, its current result, and what I can verify myself.",
+      "Explain “Application details”, its current result, and what I can verify myself.",
     );
   },
 );

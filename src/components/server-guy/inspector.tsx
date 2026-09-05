@@ -87,7 +87,7 @@ export function Inspector({
                 <span>
                   {view.workspace?.status === "ready"
                     ? "Ready for review"
-                    : "Working toward the exit gate"}
+                    : "Checks remaining"}
                 </span>
               </div>
               <div

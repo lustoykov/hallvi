@@ -144,7 +144,7 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Desktop automation and CI policy
 
-The [shared catalog](../../tests/browser/journeys.ts) contains ten selectable groups: eight original application groups, [GitHub connection](../../tests/browser/github.spec.ts) and dashboard testing. The complete suite currently has sixteen test cases; one group can contain several tests. These cover selected contract branches, not every branch of all eighteen acceptance cases. Further fresh Pi setup/device-code variants, evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
+The [shared catalog](../../tests/browser/journeys.ts) contains eleven selectable groups: nine application groups, [GitHub connection](../../tests/browser/github.spec.ts) and dashboard testing. One group can contain several tests; see the dated verification below for the tested case count. These cover selected contract branches, not every branch of the acceptance cases. Further fresh Pi setup/device-code variants, evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
 
 The dashboard's **Choose journeys** dialog describes each scenario and runs only the selected stable tags from [the shared catalog](../../tests/browser/journeys.ts), without scrolling away from the suite table. Empty, duplicate and unknown selections are rejected. Browser smoke remains the two tagged smoke journeys; selecting a local subset does not change CI.
 
@@ -162,13 +162,21 @@ The [workflow](../../.github/workflows/checks.yml) uploads only synthetic browse
 
 ## Real Pi casebook and remaining Phase 1 gates
 
-The runnable [casebook](../../tests/evals/phase-one-cases.ts) contains eight fixed inputs and meaning rubrics: greeting, explicit priority, question versus commitment, hypothetical, exact revision, unresolved conflict, same-message retraction, and quoted untrusted instructions. This is a small regression set, not a broad reliability benchmark.
+The runnable [casebook](../../tests/evals/phase-one-cases.ts) contains eleven fixed inputs and meaning rubrics: greeting, explicit priority, question versus commitment, hypothetical, exact revision, unresolved conflict, same-message retraction, quoted untrusted instructions, and three GitHub evidence cases. This is a small regression set, not a broad reliability benchmark.
+
+The GitHub cases use a synthetic saved connection and real SQLite observations, not real GitHub credentials or calls:
+
+| Case | Starting state | Required explanation |
+| --- | --- | --- |
+| `github-connected-not-readable` | Connected login; exact repository not allowed in the App installation | Authentication does not prove repository access; explain the recorded remedy, without claiming success. |
+| `github-reconnected-stale-success` | Old passing observation and assistant message; a new GitHub connection has not yet completed its check | The current not-verified state wins over old chat. This covers the interval before automatic rechecking succeeds, not a requirement to always retry manually. |
+| `github-verified-not-audited` | Current connection verified the repository at `main` / `abcdef12…` | Repository readability at a recorded commit does not prove code quality, test execution or deployment. This is a preventive leading-question case, not a known production hallucination. |
 
 ```sh
-# Eight real Pi turns using your saved Server Guy model/effort and subscription.
+# Eleven real Pi turns using your saved Server Guy model/effort and subscription.
 SERVER_GUY_LIVE_EVALS=1 npm run eval:pi
 
-# Repeat each case to expose variation: 16 turns, sequentially.
+# Repeat each case to expose variation: 22 turns, sequentially.
 SERVER_GUY_LIVE_EVALS=1 PI_EVAL_REPEATS=2 npm run eval:pi
 
 # Only two cases, once each. The dashboard also offers this selection.
@@ -178,13 +186,13 @@ SERVER_GUY_LIVE_EVALS=1 PI_EVAL_CASES=greeting,hypothetical npm run eval:pi
 SERVER_GUY_LIVE_EVALS=1 PI_EVAL_CASES=greeting npm run eval:pi
 ```
 
-Without opt-in, the command fails before running the suite. Repeats default to one and are limited to 1–5 (8–40 turns with all eight cases selected). Unknown, duplicate or empty case selections fail before provider work. The dashboard shows selected cases × repetitions before spending confirmation. A turn may involve multiple model requests because of tool calls. `npm test` never discovers the `.eval.ts` file and never calls the provider. No additional eval library or API key is needed.
+Without opt-in, the command fails before running the suite. Repeats default to one and are limited to 1–5 (11–55 turns with all eleven cases selected). Unknown, duplicate or empty case selections fail before provider work. The dashboard shows selected cases × repetitions before spending confirmation. A turn may involve multiple model requests because of tool calls. `npm test` never discovers the `.eval.ts` file and never calls the provider. No additional eval library or API key is needed.
 
-The [runner](../../tests/evals/phase-one.eval.ts) seeds a private temporary SQLite database, snapshots the saved model preferences and invokes the real `sendChatMessage → askPi → SQLite transaction` path. It does not read your existing applications/transcripts or contact GitHub. The configured credential file remains the auth source; normal Pi OAuth refresh may update it. Credentials are not copied into temporary configuration or reports. The runner does not retry cases or change models/billing; a Pi runtime/provider failure stops later turns. **Pi's existing internal retries remain active in the actual application adapter**, so tool calls and retries can produce multiple requests per turn. Eight cases does not mean eight requests.
+The [runner](../../tests/evals/phase-one.eval.ts) seeds a private temporary SQLite database, snapshots the saved model preferences and invokes the real `sendChatMessage → askPi → SQLite transaction` path. It does not read your existing applications/transcripts or contact GitHub. The configured credential file remains the auth source; normal Pi OAuth refresh may update it. Real credentials are not copied into temporary configuration or reports. The GitHub seed uses an invented, unusable token and resets the scratch connection between cases. The runner does not retry cases or change models/billing; a Pi runtime/provider failure stops later turns. **Pi's existing internal retries remain active in the actual application adapter**, so tool calls and retries can produce multiple requests per turn. Eleven cases does not mean eleven requests.
 
 Each run creates a git-ignored `tests/results/evals/<run>/results.json` and `review.md`: fixed inputs, current context, accepted tool proposals, resulting records, timings, model/effort, Pi version, commit/dirty flag and source hashes. It records accepted proposals, not a full SDK trace. The scratch database directory under `/tmp/server-guy-pi-eval-*` is deleted once the reports are written and SQLite closes; the reports are what remain. Never publish results containing real private data.
 
-The [exact checks](../../tests/evals/check-phase-one.ts) verify proposal count, supported shape, replacement IDs, source-message provenance, one persisted message pair and supersession. Meaning is assessed separately against each case's rubric, using optional judge-first triage and human review. Exit code zero means the automated checks passed, not that the model is semantically correct or the phase complete. LLM clearance is not human sign-off. Open **Live agent evals → View saved runs** to judge answers or save human pass/fail/needs-discussion with your name and reason. Do not assert exact generated wording.
+The [exact checks](../../tests/evals/check-phase-one.ts) verify proposal count, supported shape, replacement IDs, source-message provenance, one persisted message pair, supersession, and that chat leaves repository observations/gate results unchanged. Meaning is assessed separately against each case's rubric, using optional judge-first triage and human review. Exit code zero means the automated checks passed, not that the model is semantically correct or the phase complete. LLM clearance is not human sign-off. Open **Live agent evals → View saved runs** to judge answers or save human pass/fail/needs-discussion with your name and reason. Do not assert exact generated wording.
 
 The answer card's **Run case again…** starts only that current case, once, after confirming model/effort and subscription usage. It uses today's code and case definition, not a replay of historical saved input. Each start creates a new run; old answers and reviews remain unchanged. A failed case can be rerun even without a saved reply. Removed case IDs stay readable but cannot be rerun. This does not invoke the judge.
 
@@ -226,6 +234,8 @@ Before declaring the complete Phase 1 follow-up sequence done, also prove:
 Deployment, infrastructure provisioning, monitoring automations, and Phase 2 work remain outside this Phase 1 acceptance contract. Workflow DevKit is still a later complexity-triggered choice, not a test runner.
 
 ## Latest verification
+
+**2026-09-05 — PR #12 final merge verification:** **358 Vitest tests in 30 files**, **all 20 desktop-browser tests** (1.6 minutes), the full lint/format check, TypeScript and production build passed. This covers the combined GitHub integration, simplified check copy, development-only testing shortcut, three new GitHub eval fixtures, and searchable/category-based unrun-case selection. Browser tests use disposable local state and synthetic providers; this verification made no live model or GitHub calls. Existing saved live answers and judgments remain local and unchanged. The two revised GitHub rubrics have not yet been rejudged; earlier verdicts are flagged as older wording, not silently replaced. The successful dashboard auto-judge handoff is verified separately from the pending failed-run recovery follow-up in [ROADMAP.md](../../ROADMAP.md).
 
 **2026-09-05 — automatic repository verification after reconnect:** **344 Vitest tests in 28 files** and **all 19 desktop-browser tests** passed on the combined checkout including the incoming drawer/menu design changes. TypeScript and ESLint passed; ESLint excluded `.claude/**` because a separate worker's nested worktree contains generated Next.js output. The ordinary unfiltered lint command currently includes those unrelated generated files.
 

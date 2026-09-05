@@ -79,27 +79,27 @@ export const PHASE_ONE = PHASES[0];
 export const PHASE_ONE_CHECKS = [
   {
     key: "application-identity",
-    label: "Application identity recorded",
+    label: "Application details",
     definition:
-      "The application has a durable name, repository identity, and Server Guy application ID.",
+      "Your application’s name and GitHub repository are saved in Server Guy.",
   },
   {
     key: "repository-readable",
-    label: "Repository readable at a recorded identity",
+    label: "GitHub repository access",
     definition:
-      "Server Guy has successfully read the repository and recorded its default branch and exact commit SHA.",
+      "Checks whether Server Guy can read this repository, and saves its default branch and exact version (commit). This does not review or deploy the code.",
   },
   {
     key: "target-environment",
-    label: "Target environment explicit",
+    label: "Deployment environment",
     definition:
-      "The intended deployment environment is recorded rather than inferred from repository content.",
+      "Production means the app is intended for real use, not testing. That choice is saved here; the hosting provider and server are chosen later.",
   },
   {
     key: "approval-authority",
-    label: "Permission policy explicit",
+    label: "When Pi asks for approval",
     definition:
-      "The user has chosen how Pi should decide when to ask before an external change.",
+      "Your choice of when Pi should ask you before changing code or infrastructure is saved. Phase 1 makes no external changes.",
   },
 ] as const;
 
@@ -224,10 +224,7 @@ export function computeChecks(
         ? `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`
         : "The application identity is incomplete.",
       evidence: [
-        applicationEvidence(
-          application,
-          "Application identity and repository selection",
-        ),
+        applicationEvidence(application, "Saved application and repository"),
       ],
       canRerun: false,
     },
@@ -239,7 +236,7 @@ export function computeChecks(
           ? "Run the repository check with your current GitHub connection."
           : (repository?.summary ?? "The repository has not been checked yet."),
       evidence: repository
-        ? [observationEvidence(repository, "Latest repository access result")]
+        ? [observationEvidence(repository, "Latest repository check")]
         : [],
       canRerun: true,
     },
@@ -249,7 +246,7 @@ export function computeChecks(
         ? "Production"
         : "Choose a target environment.",
       evidence: [
-        applicationEvidence(application, "Selected target environment"),
+        applicationEvidence(application, "Saved deployment environment"),
       ],
       canRerun: false,
     },
@@ -258,9 +255,7 @@ export function computeChecks(
       result: approvalExplicit
         ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
         : "Choose how Pi should ask before external changes.",
-      evidence: [
-        applicationEvidence(application, "Selected permission policy"),
-      ],
+      evidence: [applicationEvidence(application, "Saved approval settings")],
       canRerun: false,
     },
   } satisfies Record<

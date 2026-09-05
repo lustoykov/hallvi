@@ -1599,6 +1599,43 @@ dialog .form-row {
   font-weight: 600;
   color: var(--muted);
 }
+
+.eval-search {
+  margin-top: 14px;
+  font-size: 13px;
+}
+.eval-category {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.eval-category > summary {
+  padding: 4px 0;
+  font-size: 14px;
+}
+.category-count {
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.category-select {
+  margin: 8px 0 0 20px;
+  font-size: 12px;
+}
+.eval-option {
+  margin-left: 20px;
+}
+.eval-option .selection-copy {
+  font-weight: 600;
+}
+.eval-option .case-history {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.case-input {
+  white-space: pre-wrap;
+}
 .repeat-control select {
   width: 115px;
   border: 1px solid var(--line-strong);

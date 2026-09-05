@@ -98,7 +98,7 @@ test(
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
     await page
-      .getByRole("button", { name: /Check 2 Repository readable/ })
+      .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
     const summary = page.getByRole("dialog").locator(".sg-drawer-summary");
     await expect(summary).toContainText(
@@ -159,7 +159,9 @@ test(
     ).toEqual(refreshed.observations);
     await page.goto(path);
     await expect(
-      page.getByRole("button", { name: /Check 2 Repository readable.*Passed/ }),
+      page.getByRole("button", {
+        name: /Check 2 GitHub repository access.*Passed/,
+      }),
     ).toBeVisible();
   },
 );
@@ -354,10 +356,12 @@ test(
     const old = expireAccess();
     await page.reload();
     await expect(
-      page.getByRole("button", { name: /Check 2 Repository readable.*Passed/ }),
+      page.getByRole("button", {
+        name: /Check 2 GitHub repository access.*Passed/,
+      }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: /Check 2 Repository readable/ })
+      .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
     await page
       .getByRole("button", { name: "Re-run repository check", exact: true })
@@ -390,7 +394,7 @@ test(
     );
     await page.goto(appUrl);
     await page
-      .getByRole("button", { name: /Check 2 Repository readable/ })
+      .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
     await page
       .getByRole("button", { name: "Re-run repository check", exact: true })

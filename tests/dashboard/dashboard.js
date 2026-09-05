@@ -11,6 +11,8 @@ let pendingRun = null;
 let returnToEvalPicker = false;
 let judgePreferences = null;
 let selectorsReady = false;
+let evalCatalogSignature = "";
+let evalSelectionEdited = false;
 let busy = false;
 const notes = new Map();
 const openReasoning = new Set();
@@ -240,7 +242,7 @@ async function refresh() {
     if (signature === stateSignature) return;
     stateSignature = signature;
     state = nextState;
-    $("stale").hidden = (state.apiVersion ?? 0) >= 4; // The page can outrun the server process behind it.
+    $("stale").hidden = (state.apiVersion ?? 0) >= 5; // The page can outrun the server process behind it.
     $("active").hidden = !state.active;
     tick();
     $("suites").replaceChildren(
@@ -1138,13 +1140,9 @@ $("archive-run").addEventListener("click", async () => {
 });
 
 function initializeSelectors() {
-  if (selectorsReady) return;
-  for (const [prefix, items] of [
-    ["journey", state.journeys],
-    ["eval", state.evalCases],
-  ]) {
-    $(`${prefix}-options`).replaceChildren(
-      ...items.map((item) => {
+  if (!selectorsReady) {
+    $("journey-options").replaceChildren(
+      ...state.journeys.map((item) => {
         const row = element("div", "", "selection-option");
         const label = document.createElement("label");
         const input = document.createElement("input");
@@ -1172,6 +1170,137 @@ function initializeSelectors() {
     );
   }
   selectorsReady = true;
+  initializeEvalSelector();
+}
+function initializeEvalSelector() {
+  const signature = JSON.stringify(
+    state.evalCases.map((item) => [
+      item.id,
+      item.name,
+      item.category,
+      item.rubric,
+      item.message,
+    ]),
+  );
+  if (signature !== evalCatalogSignature) {
+    const previous = new Set(selectedOptions("eval"));
+    const open = new Map(
+      Array.from($("eval-options").children).map((group) => [
+        group.dataset.category,
+        group.open,
+      ]),
+    );
+    evalCatalogSignature = signature;
+    const categories = [
+      ...new Set(state.evalCases.map((item) => item.category || "Other")),
+    ];
+    $("eval-options").replaceChildren(
+      ...categories.map((category) => {
+        const items = state.evalCases.filter(
+          (item) => (item.category || "Other") === category,
+        );
+        const group = element("details", "", "eval-category");
+        group.dataset.category = category;
+        group.open =
+          open.get(category) ?? items.some((item) => item.hasRun === false);
+        const summary = element("summary");
+        summary.append(
+          element("strong", category),
+          element("span", "", "category-count"),
+        );
+        const select = element(
+          "button",
+          "Select category",
+          "text-button category-select",
+        );
+        select.type = "button";
+        select.addEventListener("click", () => {
+          const inputs = Array.from(
+            group.querySelectorAll('input[type="checkbox"]'),
+          );
+          const checked = !inputs.every((input) => input.checked);
+          for (const input of inputs) input.checked = checked;
+          evalSelectionEdited = true;
+          updateSelections();
+        });
+        group.append(summary, select);
+        for (const item of items) {
+          const row = element("div", "", "selection-option eval-option");
+          row.dataset.caseId = item.id;
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = item.id;
+          input.checked = evalSelectionEdited
+            ? previous.has(item.id)
+            : item.hasRun === false;
+          input.addEventListener("change", () => {
+            evalSelectionEdited = true;
+            updateSelections();
+          });
+          label.append(
+            input,
+            element("span", item.name, "selection-copy"),
+            element("small", "", "case-history"),
+          );
+          const details = document.createElement("details");
+          details.append(
+            element("summary", "Expected behavior & input"),
+            element("p", item.rubric),
+            element("p", item.message, "case-input"),
+          );
+          row.append(label, details);
+          group.append(row);
+        }
+        return group;
+      }),
+    );
+  }
+  const inputs = new Map(
+    Array.from(
+      $("eval-options").querySelectorAll('input[type="checkbox"]'),
+    ).map((input) => [input.value, input]),
+  );
+  for (const item of state.evalCases) {
+    const input = inputs.get(item.id);
+    if (!input) continue;
+    if (!evalSelectionEdited) input.checked = item.hasRun === false;
+    const badge = input.closest(".eval-option").querySelector(".case-history");
+    badge.textContent =
+      item.hasRun === false
+        ? "Not run"
+        : item.hasRun
+          ? "Run before"
+          : "History unavailable";
+  }
+  const unrun = state.evalCases.filter((item) => item.hasRun === false).length;
+  $("eval-history").textContent =
+    (state.apiVersion ?? 0) < 5
+      ? "Restart the dashboard to load saved run history."
+      : unrun
+        ? `${plural(unrun, "case")} not run yet. Only unrun cases are selected by default.`
+        : "All cases have been run. Select a category or individual cases to run again.";
+  filterEvalCases();
+}
+function filterEvalCases() {
+  const query = $("eval-search").value.trim().toLowerCase();
+  const items = new Map(state.evalCases.map((item) => [item.id, item]));
+  let matches = 0;
+  for (const group of $("eval-options").children) {
+    let visible = 0;
+    for (const row of group.querySelectorAll(".eval-option")) {
+      const item = items.get(row.dataset.caseId);
+      row.hidden =
+        !`${item.id} ${item.name} ${item.category} ${item.rubric} ${item.message}`
+          .toLowerCase()
+          .includes(query);
+      if (!row.hidden) visible++;
+    }
+    group.hidden = !visible;
+    if (query && visible) group.open = true;
+    matches += visible;
+  }
+  $("eval-no-matches").hidden = matches > 0;
 }
 function selectedOptions(prefix) {
   return Array.from(
@@ -1188,9 +1317,24 @@ function updateSelections() {
     `${plural(cases, "case")} × ${plural(repeats, "repetition")} = ${plural(cases * repeats, "planned answer")}`;
   $("run-journeys").disabled = Boolean(state.active) || !journeys;
   $("run-evals").disabled = Boolean(state.active) || !cases;
+  const unavailable = (state.apiVersion ?? 0) < 5;
+  if (unavailable) $("run-evals").disabled = true;
+  for (const group of $("eval-options").children) {
+    const inputs = Array.from(group.querySelectorAll('input[type="checkbox"]'));
+    const selected = inputs.filter((input) => input.checked).length;
+    group.querySelector(".category-count").textContent =
+      `${selected} / ${inputs.length} selected`;
+    const button = group.querySelector(".category-select");
+    const action = selected === inputs.length ? "Clear" : "Select";
+    button.textContent = `${action} category (${inputs.length})`;
+    button.setAttribute("aria-label", `${action} ${group.dataset.category}`);
+  }
   for (const picker of ["journey-picker", "eval-picker"])
-    for (const control of $(picker).querySelectorAll("input,select"))
-      control.disabled = Boolean(state.active);
+    for (const control of $(picker).querySelectorAll(
+      "input,select,.selection-actions button,.category-select",
+    ))
+      control.disabled =
+        Boolean(state.active) || (picker === "eval-picker" && unavailable);
 }
 for (const [prefix, buttons] of [
   ["journey", "journeys"],
@@ -1198,11 +1342,20 @@ for (const [prefix, buttons] of [
 ])
   for (const action of ["all", "clear"]) {
     $(`${buttons}-${action}`).addEventListener("click", () => {
+      if (prefix === "eval") evalSelectionEdited = true;
       for (const input of $(`${prefix}-options`).querySelectorAll("input"))
         input.checked = action === "all";
       updateSelections();
     });
   }
+$("evals-unrun").addEventListener("click", () => {
+  evalSelectionEdited = false;
+  initializeEvalSelector();
+  for (const group of $("eval-options").children)
+    group.open = Boolean(group.querySelector("input:checked"));
+  updateSelections();
+});
+$("eval-search").addEventListener("input", filterEvalCases);
 $("eval-repeats").addEventListener("change", updateSelections);
 $("run-journeys").addEventListener("click", () => {
   $("journey-picker").close();
