@@ -13,6 +13,7 @@ import {
 } from "vitest";
 
 import { pushTestDatabase } from "../../test-database";
+import { executePiTurn } from "../../execute-pi-turn";
 import { saveGithubConnection } from "../../../src/server/github-connection";
 
 const mocks = vi.hoisted(() => ({
@@ -27,7 +28,8 @@ vi.mock("../../../src/server/github", async () => {
   return { ...actual, inspectGithubRepository: mocks.inspectGithubRepository };
 });
 
-vi.mock("../../../src/server/pi", () => ({
+vi.mock("../../../src/server/pi", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi")>()),
   askPi: mocks.askPi,
   PiUnavailableError: class extends Error {},
 }));
@@ -284,7 +286,7 @@ describe("Phase 1 application workspace", () => {
       message: "First",
       decisionProposals: [{ kind: "launch-priority", value: "First" }],
     });
-    const first = await phaseOne.sendChatMessage(id, chatId, "First priority");
+    const first = await executePiTurn(id, chatId, "First priority");
     mocks.askPi.mockResolvedValueOnce({
       message: "Second",
       decisionProposals: [
@@ -295,7 +297,7 @@ describe("Phase 1 application workspace", () => {
         },
       ],
     });
-    await phaseOne.sendChatMessage(id, chatId, "Replace priority");
+    await executePiTurn(id, chatId, "Replace priority");
     const other = await phaseOne.createPhaseOneApplication({
       repositoryUrl: "https://github.com/example/other",
       environment: "production",
@@ -326,12 +328,13 @@ describe("Phase 1 application workspace", () => {
           finish = resolve;
         }),
     );
-    const pending = phaseOne.sendChatMessage(
+    const pending = executePiTurn(
       view.application!.id,
       view.selectedChatId!,
       "Old message",
     );
     const rejected = expect(pending).rejects.toThrow();
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
     phaseOne.removeApplication(view.application!.id, "lustoykov/todo-fastapi");
     const fresh = await createApplication();
     finish({ message: "Old reply", decisionProposals: [] });
@@ -432,11 +435,7 @@ describe("Phase 1 application workspace", () => {
       ],
     });
 
-    await phaseOne.sendChatMessage(
-      applicationId,
-      primaryChatId,
-      "Recovery matters.",
-    );
+    await executePiTurn(applicationId, primaryChatId, "Recovery matters.");
     const secondChat = phaseOne.createChat(applicationId, "Cost questions");
 
     expect(secondChat.decisions.map((decision) => decision.value)).toEqual([
@@ -458,7 +457,7 @@ describe("Phase 1 application workspace", () => {
         { kind: "launch-priority", value: "Recover quickly" },
       ],
     });
-    const firstView = await phaseOne.sendChatMessage(
+    const firstView = await executePiTurn(
       applicationId,
       chatId,
       "Recovery matters.",
@@ -475,7 +474,7 @@ describe("Phase 1 application workspace", () => {
       ],
     });
 
-    const revised = await phaseOne.sendChatMessage(
+    const revised = await executePiTurn(
       applicationId,
       chatId,
       "Actually, predictable cost matters more.",
@@ -493,7 +492,7 @@ describe("Phase 1 application workspace", () => {
     expect(sourceMessage.body).toBe("Actually, predictable cost matters more.");
   });
 
-  it("rejects an invalid Decision replacement without committing a partial transcript", async () => {
+  it("keeps accepted intent but no completed answer or Decisions after an invalid replacement", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
     const chatId = created.view.selectedChatId!;
@@ -510,21 +509,19 @@ describe("Phase 1 application workspace", () => {
     });
 
     await expect(
-      phaseOne.sendChatMessage(
-        applicationId,
-        chatId,
-        "Replace the old priority.",
-      ),
-    ).rejects.toThrow(
-      "missing, already replaced, or belongs to another application",
-    );
+      executePiTurn(applicationId, chatId, "Replace the old priority."),
+    ).rejects.toThrow("no Decisions were saved");
 
     const after = phaseOne.getPhaseOneOperatorView(applicationId, chatId);
-    expect(after.messages).toEqual(before);
+    expect(after.messages.slice(0, before.length)).toEqual(before);
+    expect(after.messages.slice(before.length)).toMatchObject([
+      { role: "user", body: "Replace the old priority." },
+      { role: "assistant", status: "failed" },
+    ]);
     expect(after.decisions).toEqual([]);
   });
 
-  it("keeps a failed Pi turn out of the transcript", async () => {
+  it("keeps a failed attempt visible without treating it as a completed answer", async () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
     const chatId = created.view.selectedChatId!;
@@ -533,11 +530,16 @@ describe("Phase 1 application workspace", () => {
     );
 
     await expect(
-      phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters."),
-    ).rejects.toThrow("Pi is unavailable");
+      executePiTurn(applicationId, chatId, "Recovery matters."),
+    ).rejects.toThrow("no Decisions were saved");
 
     const view = phaseOne.getPhaseOneOperatorView(applicationId, chatId);
-    expect(view.messages.map((message) => message.role)).toEqual(["assistant"]);
+    expect(view.messages.map((message) => message.role)).toEqual([
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+    expect(view.messages.at(-1)?.status).toBe("failed");
   });
 
   it("derives readiness from the latest result without treating unavailability as failure", async () => {

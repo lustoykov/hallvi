@@ -30,6 +30,7 @@ const root = createTemporaryRoot("/tmp/server-guy-e2e-");
 // after a setup failure.
 // Only a hard kill (SIGKILL) skips this, because no handler runs then.
 let child = null;
+let worker = null;
 process.on("exit", () => {
   try {
     removeTemporaryRoot(root);
@@ -39,8 +40,10 @@ process.on("exit", () => {
 });
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => {
-    if (child) child.kill(signal);
-    else process.exit(143);
+    if (child) {
+      child.kill(signal);
+      worker?.kill(signal);
+    } else process.exit(143);
   });
 const app = join(root, "app");
 const state = join(root, "state");
@@ -171,6 +174,11 @@ const manifest = {
 };
 writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log(JSON.stringify(manifest));
+worker = spawn(process.execPath, ["--import", "tsx", "src/worker.ts"], {
+  cwd: app,
+  env,
+  stdio: "inherit",
+});
 child = spawn(
   process.execPath,
   [
@@ -187,7 +195,18 @@ child = spawn(
 // Playwright can die before worker teardown runs. Stop this detached fixture's
 // Next child even if the parent disappeared while database setup was running.
 const orphanWatch = setInterval(() => {
-  if (process.ppid !== parentPid) child.kill("SIGTERM");
+  if (process.ppid !== parentPid) {
+    child.kill("SIGTERM");
+    worker?.kill("SIGTERM");
+  }
 }, 250);
 orphanWatch.unref();
-child.on("exit", (code) => process.exit(code ?? 0));
+worker.on("exit", (code) => {
+  if (code) child.kill("SIGTERM");
+});
+child.on("exit", (code) => {
+  if (worker.exitCode !== null || worker.signalCode !== null)
+    process.exit(code ?? 0);
+  worker.once("exit", () => process.exit(code ?? 0));
+  worker.kill("SIGTERM");
+});

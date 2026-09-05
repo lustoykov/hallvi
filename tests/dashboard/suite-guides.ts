@@ -4,12 +4,12 @@
  */
 const browserGuide = {
   execution:
-    "Playwright drives Chromium against a disposable Next.js app. The dashboard journey starts its own temporary testing dashboard.",
+    "Playwright drives Chromium against a disposable Next.js app and a separate Pi worker using the same temporary database. The dashboard journey starts its own temporary testing dashboard.",
   real: "Browser, UI, HTTP routes, domain logic and SQLite. Clicks, reloads and error handling run through real application code.",
   mocked:
     "Pi replies and ChatGPT login responses are synthetic. GitHub API responses and credential discovery are synthetic, but its setup routes and login coordinator are real. Dashboard tests simulate runner launches and saved answers; no model or provider calls.",
   isolation:
-    "Product journeys start one disposable Server Guy app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js stops and the whole /tmp/server-guy-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
+    "Product journeys start one disposable Server Guy app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js and the Pi worker stop and the whole /tmp/server-guy-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
   checks:
     "Code assertions check visible UI and saved state: for example, send a priority, reload, and verify its message and Decision. No human or LLM grading.",
   limits:
@@ -29,7 +29,7 @@ export const suiteGuides = {
     purpose:
       "Unit and integration tests, not just unit tests: check predictable application behavior without calling a model.",
     execution:
-      "Vitest runs tests/application/unit/ and tests/application/integration/ in Node.js. No Next.js server or browser is started.",
+      "Vitest runs tests/application/unit/ and tests/application/integration/ in Node.js. Durable-request tests also start and crash a real worker process with synthetic Pi. No Next.js server or browser is started.",
     real: "Schemas, domain rules, database queries and SQLite constraints in integration tests; adapter code tested against controlled inputs.",
     mocked:
       "Pi, GitHub and OAuth/provider boundaries are replaced with test responses. Route tests stub domain calls when testing the HTTP boundary alone.",
@@ -52,7 +52,7 @@ export const suiteGuides = {
     purpose:
       "The small automatic subset: add an application and save a priority; then check settings, privacy help and saved effort.",
     execution:
-      "Playwright drives Chromium against a disposable Next.js app. Only the two journeys tagged @smoke run.",
+      "Playwright drives Chromium against a disposable Next.js app and Pi worker. Only the two journeys tagged @smoke run.",
     mocked:
       "Pi replies, GitHub and login responses are synthetic. No model or provider calls.",
     limits:
@@ -67,7 +67,7 @@ export const suiteGuides = {
     purpose:
       "Exercise the real Server Guy agent, then evaluate both its answer and the state it saved.",
     execution:
-      "Vitest calls sendChatMessage() directly in Node.js. No Next.js server, HTTP request or browser is involved.",
+      "Vitest enqueues a saved message, claims its Pi Run, and executes the same worker code in Node.js. No Next.js server, HTTP request or browser is involved.",
     real: "Pi, the configured model, tool proposals, domain validation and the SQLite transaction. Uses your configured ChatGPT subscription.",
     mocked:
       "Application data and existing Decisions are seeded examples. GitHub inspection is blocked; model replies are not mocked.",

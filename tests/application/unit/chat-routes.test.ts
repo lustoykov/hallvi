@@ -10,6 +10,8 @@ vi.mock("../../../src/server/phase-one", () => ({
   ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createChat: mocks.createChat,
+}));
+vi.mock("../../../src/server/pi-runs", () => ({
   sendChatMessage: mocks.sendChatMessage,
 }));
 
@@ -93,15 +95,17 @@ describe("Phase 1 Chat request validation", () => {
     const response = await sendMessage(
       request("/api/applications/application-id/chats/chat-id/messages", {
         message: "  Recovery matters.  ",
+        requestKey: "00000000-0000-4000-8000-000000000001",
       }),
       chatContext,
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(mocks.sendChatMessage).toHaveBeenCalledWith(
       "application-id",
       "chat-id",
       "Recovery matters.",
+      "00000000-0000-4000-8000-000000000001",
     );
   });
 
@@ -115,7 +119,11 @@ describe("Phase 1 Chat request validation", () => {
     ],
     [
       "unknown field",
-      { message: "Ship it", approval: true },
+      {
+        message: "Ship it",
+        requestKey: "00000000-0000-4000-8000-000000000001",
+        approval: true,
+      },
       "Unrecognized key",
     ],
   ])("rejects a %s", async (_label, body, message) => {

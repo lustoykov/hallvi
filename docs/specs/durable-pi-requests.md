@@ -1,12 +1,12 @@
 # Durable Pi requests
 
-Status: implementation plan, not shipped. This is development milestone 6, still within Launch Phase 1. [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status.
+Status: implemented on `codex/durable-pi-requests`, pending PR review. This is development milestone 6, still within Launch Phase 1. [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status.
 
 ## Outcome
 
 Sending a message records the engineer's intent immediately. Closing the tab does not cancel accepted work; reopening the Chat reconstructs its progress or outcome from SQLite. A worker restart exposes an interrupted attempt instead of silently repeating it.
 
-Today, `sendChatMessage` waits for `askPi` inside the HTTP request and then saves both messages and accepted Decisions together. The browser's pending message is only local presentation. This milestone changes acceptance, not the requirement that Decisions pass validation before commit.
+Previously, `sendChatMessage` waited for `askPi` inside the HTTP request and then saved both messages and accepted Decisions together. The browser's pending message was only local presentation. This milestone changes acceptance, not the requirement that Decisions pass validation before commit.
 
 ```text
 Browser POST
@@ -71,3 +71,12 @@ The summary is model-authored context, never new authorization or a replacement 
 Use disposable databases and synthetic Pi for deterministic and desktop tests. Cover duplicate submission, multiple Chats in one workspace, independent applications, stale completions, removal during execution, cancellation/completion races, timeout, worker restart and reconnect after the final commit. Preserve old accepted data when applying the new schema; never reset the user's live database as a test setup step.
 
 Real Pi verification remains opt-in and separately reported. Do not treat fixture success as proof of provider streaming behavior or semantic quality. Keep Phase 2, provider mutations, distributed workers, OpenTelemetry and Langfuse out of this milestone; tracing follows under its [own spec](action-history-and-tracing.md).
+
+## Implemented boundaries
+
+- `src/server/pi-runs.ts` owns enqueue, claim and terminal transitions. Runs use accepted insertion order; retries have new assistant placeholders and preserve their original user-message ID.
+- `src/server/pi-worker.ts` owns one execution at a time. A separate SQLite sidecar holds an OS-released exclusive lock, without locking application writes. The 120-second execution deadline includes summarization. Progress snapshots are written at most every 250ms; SSE reads saved state every 500ms and releases timers on disconnect.
+- `src/server/pi-context.ts` keeps up to eight recent completed exchanges, bounded to 16,000 characters. Summary inputs are at most 20,000 characters plus a 6,000-character previous summary. All active Decisions must fit 24,000 serialized characters; current checks have a separate 12,000-character budget. A budget or summary failure is visible, never an unlimited fallback. These are character budgets, not exact provider token counts.
+- Summaries record their last covered message. Cancelled/failed attempts and their unpaired user inputs are excluded from completed context. Successful retries enter context at the position of their new answer, so they cannot disappear behind an older summary marker. Summary updates commit only after successful generation and while the owning run remains active.
+- `piCalls` counts Pi adapter sessions, including summary calls. It is not a provider-request or billing count: tools and SDK retries can make additional provider requests within a session.
+- Schema v5 preserves legacy messages as completed with revision 0. The pre-push v4 upgrade backs up the database and adds columns in place, avoiding Drizzle's message-table rebuild cascading into Decisions. Drizzle remains the authoritative table definition.

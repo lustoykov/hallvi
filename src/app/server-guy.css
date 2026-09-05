@@ -692,6 +692,21 @@
   color: #53617a;
   font-size: 13px;
 }
+
+.sg-run-progress {
+  display: grid;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.sg-run-progress > p {
+  color: #53617a;
+  font-size: 14px;
+}
+
+.sg-run-progress > button {
+  justify-self: start;
+}
 .sg-launch-card {
   margin-left: 35px;
   border: 1px solid #ccd6e5;

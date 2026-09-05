@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { CaretDown, Check, Plus, Trash } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
 import { APPROVAL_MODES } from "@/server/types";
@@ -11,6 +17,8 @@ import type {
   ApplicationRecord,
   GateCheck,
   PhaseOneOperatorView,
+  PiRun,
+  ChatMessage,
 } from "@/server/types";
 
 import { api } from "./api";
@@ -20,6 +28,35 @@ import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { Inspector } from "./inspector";
 import { PhaseRail } from "./phase-rail";
+
+function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  const received = new Set(incoming.map((message) => message.id));
+  return [
+    ...incoming.map((message) => {
+      const previous = byId.get(message.id);
+      return previous && previous.revision > message.revision
+        ? previous
+        : message;
+    }),
+    ...current.filter((message) => !received.has(message.id)),
+  ];
+}
+
+function readSubmission(chatId: string) {
+  try {
+    const value = JSON.parse(
+      sessionStorage.getItem(`pi-submission:${chatId}`) ?? "null",
+    );
+    return value &&
+      typeof value.message === "string" &&
+      typeof value.key === "string"
+      ? (value as { message: string; key: string })
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 export function OperatorShell({
   initialView,
@@ -38,12 +75,15 @@ export function OperatorShell({
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [runs, setRuns] = useState<PiRun[]>([]);
+  const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const applicationPicker = useRef<HTMLButtonElement>(null);
   const focusComposerAfterClose = useRef(false);
+  const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
   const checks = view.checks;
@@ -53,6 +93,79 @@ export function OperatorShell({
   const selectedCheck =
     checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
+  const applicationId = application?.id;
+  const selectedChatId = view.selectedChatId;
+
+  useEffect(() => {
+    if (!applicationId || !selectedChatId) return;
+    let active = true;
+    let outcomeVersion = "";
+    const stream = new EventSource(
+      `/api/applications/${applicationId}/chats/${selectedChatId}/events`,
+    );
+    stream.onopen = () => setReconnecting(false);
+    stream.onerror = () => setReconnecting(true);
+    stream.onmessage = (event) => {
+      if (!active) return;
+      const snapshot = JSON.parse(event.data) as {
+        messages: ChatMessage[];
+        runs: PiRun[];
+      };
+      setRuns(snapshot.runs);
+      setView((current) =>
+        current.selectedChatId === selectedChatId
+          ? {
+              ...current,
+              messages: mergeMessages(current.messages, snapshot.messages),
+            }
+          : current,
+      );
+      const pending = readSubmission(selectedChatId);
+      if (pending) {
+        if (snapshot.runs.some((run) => run.requestKey === pending.key)) {
+          sessionStorage.removeItem(`pi-submission:${selectedChatId}`);
+          setDrafts((current) =>
+            current[selectedChatId] === pending.message
+              ? { ...current, [selectedChatId]: "" }
+              : current,
+          );
+        } else if (submittingChat.current !== selectedChatId) {
+          setDrafts((current) =>
+            current[selectedChatId]
+              ? current
+              : { ...current, [selectedChatId]: pending.message },
+          );
+        }
+      }
+      const nextVersion = snapshot.runs
+        .filter((run) => run.finishedAt)
+        .map((run) => `${run.id}:${run.revision}`)
+        .join(";");
+      if (nextVersion !== outcomeVersion) {
+        outcomeVersion = nextVersion;
+        void api
+          .view(applicationId, selectedChatId)
+          .then((next) => {
+            if (active)
+              setView((current) =>
+                current.selectedChatId === selectedChatId
+                  ? {
+                      ...next,
+                      messages: mergeMessages(current.messages, next.messages),
+                    }
+                  : current,
+              );
+          })
+          .catch(() => {
+            if (active) setReconnecting(true);
+          });
+      }
+    };
+    return () => {
+      active = false;
+      stream.close();
+    };
+  }, [applicationId, selectedChatId]);
 
   useLayoutEffect(() => {
     if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
@@ -77,7 +190,11 @@ export function OperatorShell({
   }
 
   function applyView(next: PhaseOneOperatorView) {
-    setView(next);
+    setView((current) =>
+      current.selectedChatId === next.selectedChatId
+        ? { ...next, messages: mergeMessages(current.messages, next.messages) }
+        : next,
+    );
     // The transcript is navigable state; keep it when this page is refreshed.
     const url = new URL(window.location.href);
     if (next.selectedChatId) url.searchParams.set("chat", next.selectedChatId);
@@ -126,7 +243,10 @@ export function OperatorShell({
       );
       await recover?.();
     } finally {
-      if (label === "message") setPendingMessage(null);
+      if (label === "message") {
+        setPendingMessage(null);
+        submittingChat.current = null;
+      }
       setBusy(null);
     }
   }
@@ -157,21 +277,55 @@ export function OperatorShell({
     )
       return;
     setPendingMessage(message);
+    submittingChat.current = activeChat.id;
     setComposer("");
+    const previous = readSubmission(activeChat.id);
+    const key =
+      previous?.message === message ? previous.key : crypto.randomUUID();
+    let accepted = false;
     void run(
       "message",
-      () => api.sendMessage(application.id, activeChat.id, message),
       async () => {
-        setDrafts((current) => ({
-          ...current,
-          [activeChat.id]: current[activeChat.id] || message,
-        }));
+        // Keep the key across a lost HTTP response and reload. Resubmitting the
+        // same draft cannot create two accepted requests.
+        sessionStorage.setItem(
+          `pi-submission:${activeChat.id}`,
+          JSON.stringify({ key, message }),
+        );
+        await api.sendMessage(application.id, activeChat.id, message, key);
+        accepted = true;
+        sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
+        return api.view(application.id, activeChat.id);
+      },
+      async () => {
+        const snapshot = await api
+          .runSnapshot(application.id, activeChat.id)
+          .catch(() => null);
+        accepted ||= Boolean(
+          snapshot?.runs.some((run) => run.requestKey === key),
+        );
+        if (accepted) {
+          sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
+          setError("Your message was saved. Reconnecting to its progress…");
+        } else
+          setDrafts((current) => ({
+            ...current,
+            [activeChat.id]: current[activeChat.id] || message,
+          }));
         const refreshed = await api
           .view(application.id, activeChat.id)
           .catch(() => null);
         if (refreshed) applyView(refreshed);
       },
     );
+  }
+
+  function runAction(runId: string, action: "cancel" | "retry") {
+    if (!application || !activeChat) return;
+    void run(action, async () => {
+      await api.runAction(application.id, activeChat.id, runId, action);
+      return api.view(application.id, activeChat.id);
+    });
   }
 
   function rerunRepositoryCheck() {
@@ -345,6 +499,9 @@ export function OperatorShell({
           onArchive={archiveActiveChat}
           onComposerChange={setComposer}
           onSend={sendMessage}
+          runs={runs.filter((run) => run.chatId === activeChat?.id)}
+          reconnecting={reconnecting}
+          onRunAction={runAction}
           view={view}
         />
         <Inspector

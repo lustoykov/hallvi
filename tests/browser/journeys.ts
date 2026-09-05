@@ -19,7 +19,7 @@ export const browserJourneys = [
     id: "provider-failure",
     name: "Recover from a provider failure",
     description:
-      "Show an error without a partial conversation, then retry successfully.",
+      "Keep the accepted message after failure, then retry its reply without duplicating the message or saving partial Decisions.",
     smoke: false,
   },
   {
@@ -69,6 +69,13 @@ export const browserJourneys = [
     name: "Connect GitHub and verify repository access",
     description:
       "Reuse a login with consent, authorize or cancel a separate account, verify repository permissions, disconnect and re-check.",
+    smoke: false,
+  },
+  {
+    id: "durable-requests",
+    name: "Reconnect and cancel durable replies",
+    description:
+      "Close the browser while Pi works, recover saved progress, cancel a request and explicitly retry its reply.",
     smoke: false,
   },
   {

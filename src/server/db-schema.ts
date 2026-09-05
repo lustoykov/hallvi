@@ -16,6 +16,7 @@ import type {
   Decision,
   Observation,
   PhaseWorkspaceRecord,
+  PiRun,
 } from "./types";
 
 export const applications = sqliteTable("applications", {
@@ -73,10 +74,64 @@ export const messages = sqliteTable(
     role: text("role").$type<ChatMessage["role"]>().notNull(),
     body: text("body").notNull(),
     source: text("source").$type<ChatMessage["source"]>().notNull(),
+    status: text("status")
+      .$type<ChatMessage["status"]>()
+      .notNull()
+      .default("completed"),
+    revision: integer("revision").notNull().default(0),
     createdAt: text("created_at").notNull(),
   },
   (table) => [index("idx_messages_chat").on(table.chatId, table.createdAt)],
 );
+
+export const piRuns = sqliteTable(
+  "pi_runs",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chats.id, { onDelete: "cascade" }),
+    userMessageId: text("user_message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    assistantMessageId: text("assistant_message_id")
+      .notNull()
+      .unique()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    requestKey: text("request_key").notNull(),
+    // Retain lineage without a self-FK interfering with application cascades.
+    retryOfId: text("retry_of_id").unique(),
+    status: text("status").$type<PiRun["status"]>().notNull(),
+    revision: integer("revision").notNull().default(0),
+    error: text("error"),
+    piCalls: integer("pi_calls").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    startedAt: text("started_at"),
+    finishedAt: text("finished_at"),
+  },
+  (table) => [
+    unique().on(table.chatId, table.requestKey),
+    index("idx_pi_runs_queue").on(table.status, table.createdAt),
+    index("idx_pi_runs_chat").on(table.chatId),
+  ],
+);
+
+export const chatSummaries = sqliteTable("chat_summaries", {
+  chatId: text("chat_id")
+    .primaryKey()
+    .references(() => chats.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  coveredMessageId: text("covered_message_id")
+    .notNull()
+    .references(() => messages.id, { onDelete: "cascade" }),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const decisions = sqliteTable(
   "decisions",
@@ -160,6 +215,7 @@ export type DatabaseRowTypes = {
   >;
   chat: AssertExtends<Chat, typeof chats.$inferSelect>;
   message: AssertExtends<ChatMessage, typeof messages.$inferSelect>;
+  run: AssertExtends<PiRun, typeof piRuns.$inferSelect>;
   decision: AssertExtends<Decision, typeof decisions.$inferSelect>;
   observation: AssertExtends<Observation, typeof observations.$inferSelect>;
   activity: AssertExtends<ActivityEvent, typeof activityEvents.$inferSelect>;

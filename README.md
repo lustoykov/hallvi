@@ -18,7 +18,7 @@ Launch phases are product steps; development milestones are implementation work 
 
 ## Architecture
 
-Phase 1 is one full-stack Next.js modular monolith:
+Phase 1 is one codebase with a Next.js web process and one local Pi worker:
 
 ```text
 Next.js
@@ -26,11 +26,15 @@ Next.js
 ├── Route Handlers
 ├── Phase 1 domain logic
 ├── SQLite durable records
-├── GitHub adapter
-└── Pi SDK adapter
+└── GitHub adapter
+
+Local Node worker
+├── Same SQLite database: queued Pi Runs, messages and Decisions
+├── Pi SDK adapter
+└── Bounded Chat context and durable summaries
 ```
 
-There is no separate API service or worker. The first real intake repository is `lustoykov/todo-fastapi`.
+There is no separate API service, distributed queue or workflow engine. The first real intake repository is `lustoykov/todo-fastapi`.
 
 The permission scope is recorded as **Current application launch** in this slice. That is an explicit Phase 1 implementation boundary, not a decision about the eventual global policy model.
 
@@ -45,6 +49,10 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:3000>.
+
+In a second terminal, run `npm run worker`. Keep both processes running from this checkout with the same database/configuration. The worker reads `.env` and `.env.local`; `SERVER_GUY_DB_PATH` selects the database for both. A second worker for the same database is rejected.
+
+Sending returns immediately after the message is saved. You can leave the page and return to its saved progress. Cancellation and Retry are beside the attempt. An interrupted/failed attempt saves no Decisions; Retry uses the original user message. Without a worker, requests stay visibly queued. Stop the app and worker before applying schema changes. A v4 → v5 upgrade automatically keeps a `.db.pre-v5-*.backup` beside the database and adds message columns without rebuilding it; do not delete this backup until you have verified your records.
 
 Open **Settings → ChatGPT & model** to configure Pi, and **Settings → GitHub** before adding a repository. A detected login is never silently adopted. For a separate GitHub login, follow the [GitHub App registration guide](docs/integrations/github.md); only a public client ID and App slug go in local configuration, never an App private key or client secret.
 

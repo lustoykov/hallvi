@@ -29,6 +29,9 @@ vi.mock("../../../src/server/pi-setup", () => ({
   getPiSetupStatus: () => ({}),
   piLoginCoordinator: effects,
 }));
+vi.mock("../../../src/server/pi-runs", () => ({
+  sendChatMessage: effects.sendChatMessage,
+}));
 
 import { POST as application } from "../../../src/app/api/applications/route";
 import { DELETE as remove } from "../../../src/app/api/applications/[applicationId]/route";
@@ -67,7 +70,10 @@ const routes = [
     name: "message",
     method: "POST",
     handler: message,
-    body: { message: "Hello" },
+    body: {
+      message: "Hello",
+      requestKey: "00000000-0000-4000-8000-000000000001",
+    },
   },
   { name: "archive", method: "POST", handler: archive },
   { name: "rerun", method: "POST", handler: rerun },

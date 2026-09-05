@@ -33,7 +33,6 @@ import {
   computeChecks,
   deriveUpcomingRequirements,
 } from "./phase-one-spec";
-import { askPi } from "./pi";
 import { APPROVAL_MODES, isApprovalMode } from "./types";
 import type {
   ApplicationRecord,
@@ -58,7 +57,7 @@ function loadWorkspace(applicationId: string) {
   return { application, workspace };
 }
 
-function loadChat(applicationId: string, chatId: string) {
+export function loadChat(applicationId: string, chatId: string) {
   const { application, workspace } = loadWorkspace(applicationId);
   const chat = getChat(chatId);
   if (!chat || chat.workspaceId !== workspace.id) {
@@ -368,7 +367,7 @@ function decisionLabel(decision: PiDecision) {
   return { "launch-priority": "Additional launch priority" }[decision.kind];
 }
 
-function buildViewSummary(application: ApplicationRecord) {
+export function buildViewSummary(application: ApplicationRecord) {
   const checks = currentChecks(application);
   const upcoming = deriveUpcomingRequirements();
   return [
@@ -388,71 +387,50 @@ function buildViewSummary(application: ApplicationRecord) {
   ].join("\n");
 }
 
-export async function sendChatMessage(
+// Called only inside the worker's final transaction. Model text is not a
+// Decision: every proposal must still match the current durable domain state.
+export function savePiDecisions(
   applicationId: string,
-  chatId: string,
-  body: string,
+  workspaceId: string,
+  sourceMessageId: string,
+  proposals: PiDecision[],
 ) {
-  const { application, workspace, chat } = loadChat(applicationId, chatId);
-  if (chat.archivedAt) throw new Error("This Chat is archived.");
-  const userMessage = body.trim();
-  if (!userMessage) throw new Error("Write a message first.");
-  if (userMessage.length > 5_000)
-    throw new Error("Keep this message under 5,000 characters.");
-
-  const decisions = listActiveDecisions(application.id);
-  const reply = await askPi({
-    userMessage,
-    messages: listMessages(chat.id),
-    decisions,
-    viewSummary: buildViewSummary(application),
-  });
-
-  withTransaction(() => {
-    const sourceMessage = insertMessage(chat.id, "user", userMessage, "user");
-    insertMessage(chat.id, "assistant", reply.message, "pi");
-
-    for (const proposed of reply.decisionProposals) {
-      const previous = proposed.replaces
-        ? getDecision(proposed.replaces)
-        : null;
-      if (
-        proposed.replaces &&
-        (!previous ||
-          previous.applicationId !== application.id ||
-          previous.supersededById !== null)
-      ) {
-        throw new Error(
-          "Pi referenced a Decision that is missing, already replaced, or belongs to another application.",
-        );
-      }
-
-      const decision = insertDecision({
-        applicationId: application.id,
-        sourceMessageId: sourceMessage.id,
-        kind: proposed.kind,
-        label: decisionLabel(proposed),
-        value: proposed.value,
-      });
-
-      if (previous) {
-        supersedeDecision(application.id, previous.id, decision.id);
-        insertActivity(
-          workspace.id,
-          "decision-revised",
-          "Decision revised from Chat",
-          `${previous.value} → ${decision.value}`,
-        );
-      } else {
-        insertActivity(
-          workspace.id,
-          "decision-recorded",
-          "Decision recorded from Chat",
-          `${decision.label}: ${decision.value}`,
-        );
-      }
+  for (const proposed of proposals) {
+    const previous = proposed.replaces ? getDecision(proposed.replaces) : null;
+    if (
+      proposed.replaces &&
+      (!previous ||
+        previous.applicationId !== applicationId ||
+        previous.supersededById !== null)
+    ) {
+      throw new Error(
+        "Pi referenced a Decision that is missing, already replaced, or belongs to another application.",
+      );
     }
-  });
 
-  return getPhaseOneOperatorView(application.id, chat.id);
+    const decision = insertDecision({
+      applicationId,
+      sourceMessageId,
+      kind: proposed.kind,
+      label: decisionLabel(proposed),
+      value: proposed.value,
+    });
+
+    if (previous) {
+      supersedeDecision(applicationId, previous.id, decision.id);
+      insertActivity(
+        workspaceId,
+        "decision-revised",
+        "Decision revised from Chat",
+        `${previous.value} → ${decision.value}`,
+      );
+    } else {
+      insertActivity(
+        workspaceId,
+        "decision-recorded",
+        "Decision recorded from Chat",
+        `${decision.label}: ${decision.value}`,
+      );
+    }
+  }
 }

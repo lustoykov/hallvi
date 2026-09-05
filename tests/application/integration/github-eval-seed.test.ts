@@ -13,14 +13,17 @@ import {
 import * as database from "../../../src/server/db";
 import { currentGithubConnectionId } from "../../../src/server/github-connection";
 import * as api from "../../../src/server/github-api";
-import { sendChatMessage } from "../../../src/server/phase-one";
+import { executePiTurn } from "../../execute-pi-turn";
 import { checkPhaseOne } from "../../evals/check-phase-one";
 import { phaseOneCases } from "../../evals/phase-one-cases";
 import { seedPhaseOneEvalCase } from "../../evals/seed-phase-one";
 import { pushTestDatabase } from "../../test-database";
 
 const mocks = vi.hoisted(() => ({ askPi: vi.fn() }));
-vi.mock("../../../src/server/pi", () => ({ askPi: mocks.askPi }));
+vi.mock("../../../src/server/pi", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi")>()),
+  askPi: mocks.askPi,
+}));
 vi.mock("../../../src/server/github-api", async (original) => ({
   ...(await original<typeof api>()),
   githubJson: vi.fn(() => {
@@ -95,7 +98,7 @@ describe("GitHub eval scenarios use real local state with no GitHub or model cal
           connectionId: currentGithubConnectionId(),
         });
       }
-      const after = await sendChatMessage(
+      const after = await executePiTurn(
         before.application!.id,
         before.selectedChatId!,
         scenario.message,
