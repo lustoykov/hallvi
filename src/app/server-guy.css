@@ -42,17 +42,22 @@
   align-items: center;
 }
 
-.sg-app-identity { gap: 12px; }
-.sg-all-applications { color: #dce5f3; font-size: 13px; text-underline-offset: 4px; margin-right: 8px; }
-.sg-application-picker { display: flex; align-items: center; gap: 10px; max-width: 300px; height: 38px; padding: 0 10px 0 12px; border: 1px solid #4a586f; border-radius: 8px; color: #fff; background: #22304a; cursor: pointer; transition: background-color .15s ease-out, border-color .15s ease-out; }
+.sg-app-identity { gap: 14px; min-width: 0; }
+.sg-brand { display: inline-flex; border-radius: 9px; color: #fff; text-decoration: none; }
+.sg-breadcrumb { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.sg-crumb { padding: 6px; border-radius: 6px; color: #aeb8ca; font-size: 14px; text-decoration: none; transition: color .15s ease-out; }
+.sg-crumb:hover { color: #fff; }
+.sg-crumb-separator { color: #56647d; font-size: 16px; }
+/* The current application is a text-style crumb that opens the switcher; no select-box chrome at rest. */
+.sg-application-picker { display: inline-flex; align-items: center; gap: 8px; max-width: 300px; height: 34px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px; color: #fff; background: transparent; cursor: pointer; transition: background-color .15s ease-out, border-color .15s ease-out; }
 .sg-application-picker strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
 .sg-application-picker svg { flex-shrink: 0; width: 14px; height: 14px; color: #aeb8ca; transition: transform .15s ease-out; }
-.sg-application-picker:hover { background: #2b3b58; border-color: #5d6c86; }
-.sg-application-picker:has(~ .sg-application-menu:popover-open) { background: #2b3b58; border-color: #7f8fab; }
+.sg-application-picker:hover { background: rgb(255 255 255 / 8%); }
+.sg-application-picker:has(~ .sg-application-menu:popover-open) { background: rgb(255 255 255 / 10%); border-color: rgb(255 255 255 / 14%); }
 .sg-application-picker:has(~ .sg-application-menu:popover-open) svg { transform: rotate(180deg); }
 .sg-application-picker:disabled { opacity: .65; cursor: wait; }
-.sg-application-picker:focus-visible, .sg-all-applications:focus-visible { outline: 2px solid #b1c8ff; outline-offset: 3px; }
-.sg-app-identity .sg-environment-label { color: #d0d9e8; font-size: 12px; }
+.sg-application-picker:focus-visible, .sg-crumb:focus-visible, .sg-brand:focus-visible { outline: 2px solid #b1c8ff; outline-offset: 3px; }
+.sg-environment-label { margin-left: 6px; padding: 3px 8px; border: 1px solid #46546b; border-radius: 999px; color: #d0d9e8; font-size: 11px; line-height: 1.4; white-space: nowrap; }
 /* Top-layer menu: the picker positions it on open (see positionApplicationMenu); inset is only a fallback. */
 .sg-application-menu { position: fixed; inset: 58px auto auto 150px; width: 320px; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0; padding: 6px; border: 1px solid #d3dbe7; border-radius: 10px; background: #fff; color: #192338; box-shadow: 0 16px 36px -12px rgb(23 34 56 / 32%), 0 3px 8px rgb(23 34 56 / 8%); opacity: 1; transform: translateY(0); transition: opacity .14s ease-out, transform .14s ease-out; }
 @starting-style { .sg-application-menu:popover-open { opacity: 0; transform: translateY(-4px); } }
@@ -81,9 +86,6 @@
   font-family: var(--font-geist-mono);
   font-size: 12px;
 }
-.sg-app-identity div { display: grid; gap: 3px; }
-.sg-app-identity strong { font-size: 18px; }
-.sg-app-identity span:last-child { color: #aeb8ca; font-size: 12px; }
 .sg-topbar-meta { gap: 14px; font-size: 12px; }
 .sg-topbar-meta .sg-eyebrow { color: #9faabd; }
 .sg-topbar-meta > strong { font-weight: 550; }
@@ -280,6 +282,7 @@
 
 .sg-chat-pane { display: grid; grid-template-rows: 58px 1fr auto; background: #fff; }
 .sg-chat-title { padding-left: 28px; padding-right: 28px; }
+.sg-chat-title .sg-eyebrow.ready { color: var(--green); }
 .sg-text-button {
   display: flex;
   gap: 6px;
@@ -378,11 +381,6 @@
 .sg-primary-button:hover:not(:disabled) { background: #2350c4; border-color: #2350c4; }
 .sg-secondary-button:hover:not(:disabled) { background: #f4f7fb; border-color: #b4c2d6; }
 .sg-error { padding: 10px 12px; border: 1px solid #efb9b5; background: #fff1f0; color: #983933; border-radius: 7px; font-size: 11px; }
-.sg-ready-card { margin-left: 35px; border: 1px solid #a9ddc5; background: var(--green-soft); border-radius: 9px; padding: 14px; display: flex; gap: 11px; }
-.sg-ready-icon { width: 28px; height: 28px; border-radius: 50%; background: var(--green); color: white; display: grid; place-items: center; }
-.sg-ready-icon svg { width: 15px; }
-.sg-ready-card strong { font-size: 13px; }
-.sg-ready-card p { margin: 4px 0 0; color: #49715f; font-size: 11px; }
 .sg-pi-required {
   margin-left: 35px;
   border: 1px solid #e7bd8d;

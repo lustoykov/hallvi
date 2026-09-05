@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
+import { Archive, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 
 import {
@@ -40,12 +40,14 @@ export function ChatPane({
   onArchive: () => void;
 }) {
   const application = view.application;
+  // The gate's state lives in the pane header (and the top bar), not as a standing message in the transcript.
+  const ready = Boolean(application) && view.workspace?.status === "ready";
 
   return (
     <section className="sg-chat-pane">
       <header className="sg-pane-title sg-chat-title">
         <div>
-          <span className="sg-eyebrow">Working toward</span>
+          <span className={`sg-eyebrow${ready ? " ready" : ""}`}>{ready ? "Ready for review" : "Working toward"}</span>
           <strong>Launch Brief</strong>
         </div>
         {activeChat && !activeChat.isPrimary && !activeChat.archivedAt && (
@@ -91,15 +93,6 @@ export function ChatPane({
             </>
           )}
 
-          {application && view.workspace?.status === "ready" && (
-            <div className="sg-ready-card">
-              <span className="sg-ready-icon"><Check weight="bold" /></span>
-              <div>
-                <strong>Launch Brief ready</strong>
-                <p>All four launch checks pass. Your app is not deployed; later launch steps are not available yet.</p>
-              </div>
-            </div>
-          )}
           {application && !piReady && (
             <div className="sg-pi-required">
               <WarningCircle weight="bold" />

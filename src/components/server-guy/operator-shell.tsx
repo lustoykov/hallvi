@@ -171,28 +171,33 @@ export function OperatorShell({
     <main className="sg-shell">
       <header className="sg-topbar">
         <div className="sg-app-identity">
-          <Link className="sg-all-applications" href="/applications">All applications</Link>
-          <button ref={applicationPicker} className="sg-application-picker" type="button" popoverTarget="application-picker" disabled={busy !== null} aria-label={`Switch application: ${application?.name}`}>
-            <strong>{application?.name}</strong><CaretDown aria-hidden="true" />
-          </button>
-          <span className="sg-environment-label">Production</span>
-          <nav
-            id="application-picker"
-            popover="auto"
-            className="sg-application-menu"
-            aria-label="Applications"
-            onBeforeToggle={(event) => { if (event.newState === "open") positionApplicationMenu(event.currentTarget); }}
-          >
-            <span className="sg-eyebrow sg-application-menu-label">Switch application</span>
-            {applications.map((item) => <Link key={item.id} href={`/applications/${item.id}`} aria-current={item.id === application?.id ? "page" : undefined} onClick={(event) => event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover()}>
-              <span aria-hidden="true" className="sg-application-menu-mark">{item.repositoryName.slice(0, 1).toUpperCase()}</span>
-              <div><strong>{item.repositoryName}</strong><small>{item.repositoryOwner}/{item.repositoryName}</small></div>
-              {item.id === application?.id && <Check aria-label="Current application" weight="bold" />}
-            </Link>)}
-            <Link className="sg-application-menu-action" href="/applications/new"><Plus /> Add application</Link>
-            <hr />
-            <button type="button" className="sg-remove-application" disabled={busy !== null} onClick={(event) => { event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); setRemoveError(null); setConfirmRemove(true); }}><Trash /> Remove application…</button>
-          </nav>
+          <Link className="sg-brand" href="/applications" aria-label="Server Guy, all applications"><span className="sg-app-mark">SG</span></Link>
+          {/* Breadcrumb: the current application is the last crumb and doubles as the switcher. */}
+          <div className="sg-breadcrumb">
+            <Link className="sg-crumb" href="/applications">Applications</Link>
+            <span aria-hidden="true" className="sg-crumb-separator">/</span>
+            <button ref={applicationPicker} className="sg-application-picker" type="button" popoverTarget="application-picker" disabled={busy !== null} aria-label={`Switch application: ${application?.name}`}>
+              <strong>{application?.name}</strong><CaretDown aria-hidden="true" />
+            </button>
+            <span className="sg-environment-label">Production</span>
+            <nav
+              id="application-picker"
+              popover="auto"
+              className="sg-application-menu"
+              aria-label="Applications"
+              onBeforeToggle={(event) => { if (event.newState === "open") positionApplicationMenu(event.currentTarget); }}
+            >
+              <span className="sg-eyebrow sg-application-menu-label">Switch application</span>
+              {applications.map((item) => <Link key={item.id} href={`/applications/${item.id}`} aria-current={item.id === application?.id ? "page" : undefined} onClick={(event) => event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover()}>
+                <span aria-hidden="true" className="sg-application-menu-mark">{item.repositoryName.slice(0, 1).toUpperCase()}</span>
+                <div><strong>{item.repositoryName}</strong><small>{item.repositoryOwner}/{item.repositoryName}</small></div>
+                {item.id === application?.id && <Check aria-label="Current application" weight="bold" />}
+              </Link>)}
+              <Link className="sg-application-menu-action" href="/applications/new"><Plus /> Add application</Link>
+              <hr />
+              <button type="button" className="sg-remove-application" disabled={busy !== null} onClick={(event) => { event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); setRemoveError(null); setConfirmRemove(true); }}><Trash /> Remove application…</button>
+            </nav>
+          </div>
         </div>
         <div className="sg-topbar-meta">
           <Link
