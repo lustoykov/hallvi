@@ -52,6 +52,14 @@ _Avoid_: Decision, manual checkbox, confidence judgment, internal reference as t
 A durable, revisable choice or constraint recognized from a Chat and stored with its originating message and affected application. A replacement supersedes the prior Decision without erasing its history.
 _Avoid_: Chat message, Gate Check, application configuration, product rule, permanent preference
 
+**Active Decision**:
+A saved Decision that has not been superseded. Its age does not determine whether it is current.
+_Avoid_: Recently created Decision, pending proposal
+
+**Decision Proposal**:
+A model-suggested new or replacement choice awaiting acceptance as a Decision. It does not establish that a Decision has been recorded.
+_Avoid_: Saved Decision, committed change
+
 **Control Point**:
 A user-facing path from a Decision, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.
 _Avoid_: Help tooltip, status override

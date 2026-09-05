@@ -6,7 +6,9 @@ Status: proposed design; no runtime changes in this document. Baseline: [PR #13]
 
 Let Pi own the conversation and the tool loop. Let Server Guy own the authority to cause effects and the durable record of those effects.
 
-Use one persistent native Pi session per Chat, reopened by the existing worker for each Pi Run. Replace flattened history and Server Guy's custom summarizer with Pi's native history and compaction. Keep the first migration's tool permissions and atomic Decision-commit semantics unchanged.
+Use one persistent native Pi session per Chat, reopened by the existing worker for each Pi Run. Replace flattened history and Server Guy's custom summarizer with Pi's native history and compaction. Keep existing resource boundaries, Approval Modes and atomic Decision-commit semantics. Add a scoped read-only Decision lookup, not broader external capabilities.
+
+**Latest user-directed revision, September 5:** keep system instructions stable and let Pi look up saved Decisions as needed. Do not inject all active Decisions into every message, move the same repeated dump to the end, or rewrite the system prompt whenever a Decision changes. This replaces the earlier per-Run system-prompt snapshot proposal; the current application still uses the old injection path until the implementation PR.
 
 The Bitter Lesson favors general methods that benefit from more computation over hand-built reasoning strategies. Applying that idea here is an architectural judgment, not a claim that the essay prescribes an authorization system: provide useful tools, observations and feedback instead of programming Pi's reasoning sequence. Authorization, data integrity and recorded outcomes remain ordinary software responsibilities. [Rich Sutton's essay](https://www.cs.utexas.edu/~eunsol/courses/data/bitter_lesson.pdf).
 
@@ -79,7 +81,7 @@ The final transaction still uses a guarded mutation. These are two different job
 
 **Deferred alternative, not a scheduled second milestone:** make Decision recording a committing tool that returns the actual saved result. This simplifies tool feedback but means a saved Decision survives a later narration failure or cancellation. The UI would need to show the effect beside the failed/cancelled Run. Each tool transaction would require its Run to still be running and its Chat writable: if cancellation wins, a late callback cannot save anything; if the tool commit wins, later cancellation does not undo it.
 
-If that alternative is adopted, atomically save a stable operation identity/receipt with the Decision and Activity Event. Reuse the receipt on redelivery; saving it separately would leave a duplicate-write crash window. A fresh model-generated call ID by itself cannot deduplicate every semantic retry. Rebuild current Decisions before retrying; never re-execute an old tool call merely because it appears in history. Implement this only when independently committing tool effects are actually required, with an explicit review of the changed semantics.
+If that alternative is adopted, atomically save a stable operation identity/receipt with the Decision and Activity Event. Reuse the receipt on redelivery; saving it separately would leave a duplicate-write crash window. A fresh model-generated call ID by itself cannot deduplicate every semantic retry. Read current saved state when reconciling a retry; never re-execute an old tool call merely because it appears in history. Implement this only when independently committing tool effects are actually required, with an explicit review of the changed semantics.
 
 No generic `execute_anything` tool, permission DSL, workflow engine, second agent supervisor, model-risk classifier or unrestricted Pi tool bundle is needed for the next PR. A working directory is not a filesystem sandbox.
 
@@ -97,30 +99,52 @@ The `AgentSession` object can be short-lived. Reopening the same native session 
 
 1. Claim the Run with the existing single worker.
 2. Open the Chat's own native session and restore its messages and compaction state.
-3. Supply current application facts and the actual prior attempt outcome separately from historical conversation.
+3. Prepare current application scope/checks and the actual prior attempt outcome as bounded native context, without a Decision dump. Make scoped Decision lookup available to the model.
 4. Call `session.prompt` with only the new engineer message, not a rebuilt transcript.
 5. Let Pi perform its model/tool loop and native compaction; stream progress through the existing message snapshots/SSE.
 6. Keep the existing final SQLite transaction for answer, staged Decisions, Activity and Run success.
 7. Dispose the SDK session only after prompt/abort processing has settled; then claim another Run.
 
-### Fresh facts must remain separate from compacted history
+### Stable instructions, on-demand Decisions
 
-Reuse the existing per-Run resource loader's `systemPromptOverride`: stable instructions followed by a separately delimited, timestamped application snapshot. Prepare and validate it before the model starts. It contains the application identity, current saved Decisions/checks, current approval mode and relevant preceding Run outcome. User-authored values within that snapshot are data, not instructions; do not promote a legacy transcript or model-generated summary into this channel.
+Use `systemPromptOverride` for stable behavior instructions, including when to consult saved records and how to distinguish evidence from conversation. Do not put per-Run timestamps, changing Decisions or the preceding Run's status into this prefix. Preserve native history and append new context through Pi's public native message APIs; no context extension is required for this slice.
 
-The system prompt is rebuilt for each Run and is not a persisted conversation entry. Pi's native compaction therefore does not replace it with an old conversation summary. The engineer message is sent separately as a normal user message. Include a lightweight Run marker in native history for correlation, not a full copy of the Operator View on every model call or a new event store.
+Add one read-only `search_decisions` tool bound to the current application by the worker, not by a model-supplied application ID. It queries SQLite when called. An optional text query narrows current Decisions; omitting it lists current Decisions in bounded pages, and history/provenance is available explicitly. Start with ordinary scoped database queries, not embeddings, a vector store or a separate retrieval service.
 
-These facts are current as of Run start; final effect boundaries still check current database state. A future requirement to refresh facts within a long Run may justify Pi's public `context` hook, but slice 1 does not need that extension. Its exceptions can be swallowed by the SDK, so it must not become the sole place for mandatory validation. The existing per-Run path is smaller and fails before a model request if context cannot be prepared.
+**Current means active, not recently created.** A months-old constraint that has not been superseded remains eligible. Do not use a recent-message window or creation-time cutoff as a substitute for active state. A query with no matches does not prove the application has no Decisions; Pi can broaden it or list current records. A failed lookup is a tool error, not an empty successful result. Mark bounded/truncated results and provide a way to continue rather than silently omitting records.
 
-Example after a cancelled attempt:
+Return exact record IDs, labels/values, active or superseded status, and bounded source/replacement references in model-visible tool content. Keep this Run's pending proposals clearly separate from saved results. `propose_decision` still stages a proposal and returns its content with a pending/not-yet-saved status; it does not commit early. Pi already sees a proposal it just made, and can read back the actual saved result when needed on a later Run.
+
+Stable instructions should direct Pi to consult the tool when answering what was agreed, explaining a choice, or finding a current replacement target. Let it choose the relevant query and next step; do not mechanically call it on every greeting or pretend a remembered/summarized Decision is guaranteed current. The final guarded writes still check current database state, even after a successful lookup.
+
+The disclaimer belongs in those stable instructions, not above a frozen Decision list in the system prompt: **“Decisions mentioned in conversation or earlier tool results may be outdated. When an answer depends on current saved choices, use the Decision lookup tool.”** Old Decision content remains in native conversation/tool history; new choices enter through `propose_decision` as pending proposals and become searchable saved Decisions only after a successful final commit.
+
+Example (illustrative tool interface):
 
 ```text
-Application: todo-fastapi
-Previous attempt: cancelled. Its staged Decisions were not committed.
-Current saved priority: keep operating cost low.
-Repository access: verified at the recorded commit and time.
+Engineer: Why did we prioritize reliability?
+Pi -> search_decisions({ query: "reliability" })
+Tool -> current saved Decision + source reference + replacement reference
+Pi -> explains the recorded choice using that evidence
 ```
 
-Bound this application-context payload. Keep room for it in the context budget, retain native overflow recovery, and test a near-context-limit request, including a materially changed snapshot. Do not claim that character estimates are exact tokens or that prompt-cache effects are known without measuring them.
+This design does not automatically inject all Decisions, a per-message Decision delta, or a background change feed. Fresh Decision content enters the model input through a relevant lookup or proposal result. No per-Chat synchronization cursor is needed. Older tool results remain historical observations; a new lookup reads the current records, including after compaction or a change made in another Chat.
+
+### Minimal Run context and failure truth
+
+The worker still prepares and validates the application's scope, current Approval Mode/checks and relevant prior-attempt outcome before starting the model. These are operational context, not a list of Decisions. Append a bounded, clearly labeled native custom message near the new engineer message, using `sendCustomMessage` without triggering a turn. It can carry the Run correlation marker as well; do not add an extra event store. The engineer's message remains a normal user message.
+
+For example, after cancellation: `Previous attempt: cancelled. Its staged Decisions were not committed.` This prevents an uncommitted answer in native history from being presented as a saved effect without repeatedly listing every Decision. Prepare this context before model execution; if mandatory state cannot be read, fail before the request. User-authored values and legacy summaries remain data, not new instructions or authority. Final effect boundaries always use current server-side state.
+
+Native custom messages/tool results become part of saved history and may later be compacted. They are not permanently current or exempt from summarization. Bound their size, label when they were observed, retain native overflow recovery, and retrieve records again when current evidence is needed. Compaction does not delete authoritative Decisions from SQLite.
+
+### Cache reuse and attention must be measured
+
+Changing early prompt content can prevent reuse of the later cached prefix; resending an identical prefix is not itself invalidation. Keep instructions and earlier native messages stable, with new context/tool results appended later. Compaction and genuine instruction/model changes may still change the prefix. A stable native session ID also preserves the SDK's session-based cache key, but a key is not a cache-hit guarantee. [OpenAI prompt-caching guidance](https://developers.openai.com/api/docs/guides/prompt-caching#preserve-conversation-history).
+
+On-demand retrieval reduces mandatory Decision context but can require another model/tool round trip. It can also fail because Pi never searches or chooses a poor query. Neither persistence, a retrieval tool nor prompt placement guarantees attention. Measure reported cached/input tokens and latency where available; the subscription-backed provider's credit effects remain unmeasured. Do not claim exact token budgets from character counts or guaranteed savings.
+
+Make the user's “lost in the middle” concern an explicit eval: bury the original Decision in long history, compact it, then ask something whose correct answer depends on that still-active Decision. Verify the model actually retrieves and follows the evidence. Include an old active constraint, a superseded choice, and a Decision changed in another Chat. A synthetic tool/persistence test proves plumbing, not retrieval judgment. If the model misses important records, revise tool guidance or retrieval behavior based on those failures; do not silently restore full per-message injection against the user's chosen design.
 
 ### Storage and initialization
 
@@ -159,20 +183,22 @@ Delete the active custom summarization/replay path once the native replacement a
 
 ## Implementation slices and acceptance
 
-1. **Next PR — native sessions, unchanged authority/commit semantics:** session identity/storage, native history/compaction, current per-Run context, settlement fix, legacy import and early Decision-proposal feedback with guarded final writes.
+1. **Next PR — native sessions and scoped Decision retrieval, unchanged external authority/commit semantics:** session identity/storage, native history/compaction, stable instructions, read-only Decision search, minimal native Run context, settlement fix, legacy import and early Decision-proposal feedback with guarded final writes.
 2. **Then resume inspectability and later operations:** trace native model/tool events under the existing Run ID; add actual approval enforcement with the first external mutation. Independently committed tools remain a separate semantic choice, not a dependency of native sessions. No new orchestration service.
 
 Required tests for slice 1:
 
 - Continue the same Chat across Runs and worker restarts; keep two Chats' histories isolated while sharing current application Decisions.
-- Reopen a compacted native session without a custom summary call; expose updated Decisions/checks even after compaction.
-- Fail before making a model request if mandatory application context cannot be prepared; verify snapshot values remain data rather than tool authority.
+- Reopen a compacted native session without a custom summary call; a Decision lookup returns current records and Run context exposes updated checks even after compaction.
+- Prove no full Decision list is automatically injected into ordinary prompts; unchanged instructions stay stable and new context/results append without rewriting history.
+- Verify application-scoped search/list/history behavior, old active records, superseded records, provenance, bounded pagination, lookup failure and the distinction between saved records and pending proposals.
+- Fail before making a model request if mandatory Run context cannot be prepared; verify context and tool-result values remain data rather than tool authority.
 - Cancel during generation, a tool call and compaction; prove no overlapping session writer or late successful commit.
 - Crash after proposal collection, after native final output and after SQLite success; prove truthful outcomes and no blind replay.
 - Exercise orphaned tool-call history through the actual SDK conversion with a synthetic provider; no real credentials required for deterministic tests.
 - Detect missing/mismatched established files; cover initial-file and association interruption, partial trailing writes and explicit legacy import.
 - Verify a recoverable tool error returns to Pi; separately verify final domain rejection still rolls back the entire first-slice transaction.
-- Retain desktop send/reload/cancel/retry journeys; live model checks remain separate, opt-in evals for continuity, recovery and truthful saved-state claims.
+- Retain desktop send/reload/cancel/retry journeys; live model checks remain separate, opt-in evals for continuity, recovery, truthful saved-state claims and Decision retrieval/use in long or compacted conversations.
 
 ## Installed-source reference map
 
@@ -181,18 +207,21 @@ Verified against `@earendil-works/pi-coding-agent` 0.84.4, not an assumed future
 - Application adapter: [`src/server/pi.ts`](../../src/server/pi.ts); old context policy: [`src/server/pi-context.ts`](../../src/server/pi-context.ts).
 - Run completion/cancellation: [`src/server/pi-runs.ts`](../../src/server/pi-runs.ts); single-worker lifecycle: [`src/server/pi-worker.ts`](../../src/server/pi-worker.ts).
 - SDK `dist/core/sdk.js`: restores `sessionManager.buildSessionContext()` and exposes `transformContext` through the extension runner.
-- SDK `dist/core/resource-loader.d.ts`: supports the existing `systemPromptOverride` path. Inline extensions and their `context` hook were considered but are not needed for the next PR.
+- SDK `dist/core/resource-loader.d.ts`: supports the existing `systemPromptOverride` path for stable instructions. Inline extensions and their `context` hook were considered but are not needed for the next PR.
 - SDK `dist/core/session-manager.js`: public `open`, `getSessionId`, append/custom-message and compaction APIs; initial write behavior and JSONL loading.
-- SDK `dist/core/agent-session.js`: native message persistence, compaction, abort and session disposal.
+- SDK `dist/core/agent-session.js` / `.d.ts`: native message persistence, `sendCustomMessage` without triggering a turn, compaction, abort and session disposal.
 - Installed `pi-ai/dist/api/transform-messages.js`: provider replay handling for errored assistants and orphaned tool calls.
+- Installed `pi-ai/dist/api/openai-codex-responses.js`: `instructions` and session-based `prompt_cache_key`; instruction changes also prevent WebSocket incremental continuation, which is distinct from backend token-cache reuse.
 
 ## Fable review
 
 Reviewed with Fable in two CLI rounds on September 5, 2026, against repository code and installed SDK sources. Fable made no repository changes. Session: `1828e643-c348-4360-880e-5b8f89e23e97` (resume with `claude --resume 1828e643-c348-4360-880e-5b8f89e23e97`).
 
-The exchange changed the proposal:
+**Historical review boundary:** the two Fable rounds preceded the user's cache and on-demand-retrieval corrections. Fable has not reviewed this revised context/retrieval design. The old agreement to put a changing snapshot in the system prompt is superseded, not current guidance.
 
-- **Accepted Fable's simplification:** reuse the existing per-Run system prompt instead of adding a context extension; retain atomic final Decision saves instead of scheduling a second committing-tool milestone.
+The earlier exchange changed the proposal:
+
+- **Then accepted Fable's simplification:** reuse the existing per-Run system prompt instead of adding a context extension; the dynamic-snapshot placement is now superseded above. Retaining atomic final Decision saves instead of scheduling a second committing-tool milestone still stands.
 - **Accepted Fable's lifecycle finding:** worker shutdown needs the same abort-and-settle discipline as cancellation and timeout. Cancelling compaction is a separate SDK operation.
 - **Rejected silent reconstruction:** a lost native session is not just a cache miss because SQLite cannot recreate its tool history. Fable agreed a nullable native session ID and an explicit rebuild action are the smallest way to distinguish first migration from lost history.
 - **Corrected two overclaims:** an established JSONL file can already contain a failed attempt's user/tool messages; early validation does not guarantee a later commit. The design preserves attempted history and checks current state at the write.

@@ -28,7 +28,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 
 Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
 
-Proposed follow-up before expanding tracing: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Replace custom conversation replay/compaction and improve in-loop tool feedback while retaining current tool authority and atomic Decision commits. Independently committed tools remain deferred. This is a design proposal, not implemented functionality or a new launch phase.
+Proposed follow-up before expanding tracing: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Replace custom conversation replay/compaction, let Pi look up saved Decisions through a scoped read-only tool instead of injecting them into every request, and improve in-loop proposal feedback. Keep external authority and atomic Decision commits unchanged; independently committed tools remain deferred. This is a design proposal, not implemented functionality or a new launch phase.
 
 ## Phase 1 implementation backlog
 
