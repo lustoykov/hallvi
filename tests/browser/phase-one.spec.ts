@@ -65,11 +65,17 @@ test(
       page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
 
-    await page.getByRole("textbox").fill("Cancel me [slow-cancel]");
+    await page.getByRole("textbox").fill("Cancel **me** [slow-cancel]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Cancel request" }),
     ).toBeVisible();
+    await expect(page.locator(".sg-run-progress strong")).toHaveText(
+      "Reply in progress…",
+    );
+    // The HTTP acceptance has finished, but the saved run is still active.
+    await expect(page.getByRole("textbox")).toBeEnabled();
+    await expect(page.locator(".sg-busy-bar")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
       fullPage: true,
@@ -85,6 +91,12 @@ test(
     await expect(
       page.getByRole("button", { name: "Retry reply" }),
     ).toBeVisible();
+    await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
+    await page.getByText("Show unfinished draft", { exact: true }).click();
+    await expect(page.locator(".sg-run-progress details strong")).toHaveText(
+      "Reply in progress…",
+    );
+    await page.getByText("Show unfinished draft", { exact: true }).click();
     await page.screenshot({
       path: testInfo.outputPath("durable-cancelled-reply.png"),
       fullPage: true,
@@ -100,6 +112,11 @@ test(
         .locator(".sg-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
     ).toHaveCount(1);
+    await expect(
+      page
+        .locator(".sg-messages .sg-message-response strong")
+        .filter({ hasText: /^me$/ }),
+    ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();
     expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([
       "succeeded",

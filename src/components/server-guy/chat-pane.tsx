@@ -80,6 +80,9 @@ export function ChatPane({
   ).length;
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || archived;
+  const requestPending = view.messages.some(
+    (message) => message.status === "queued" || message.status === "running",
+  );
 
   return (
     <section className="sg-chat-pane">
@@ -105,7 +108,9 @@ export function ChatPane({
           </button>
         )}
       </header>
-      {busy !== null && <div className="sg-busy-bar" aria-hidden="true" />}
+      {(busy !== null || requestPending) && (
+        <div className="sg-busy-bar" aria-hidden="true" />
+      )}
 
       <Conversation className="sg-conversation">
         <ConversationContent className="sg-messages">
