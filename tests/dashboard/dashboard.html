@@ -37,13 +37,13 @@
       <section class="about-block" aria-labelledby="usage-title"><h2 id="usage-title">AI usage &amp; automatic runs</h2>
         <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
         <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM judgments are local-only; this dashboard confirms before using your ChatGPT subscription, and one confirmation covers a run and judging its answers.</p>
-        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
+        <p>Browser tests run the native Pi SDK with synthetic model, GitHub and login responses. No AI calls; GitHub-hosted runs still consume Actions minutes.</p>
       </section>
       <section class="about-block" aria-labelledby="files-title"><h2 id="files-title">Where everything lives</h2><dl><dt>Application tests</dt><dd><code>tests/application/unit/</code> and <code>tests/application/integration/</code></dd><dt>Browser smoke &amp; journeys</dt><dd><code>tests/browser/</code> · smoke selects <code>@smoke</code> tags · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></section>
     </section>
 
     <section id="reviews-panel" aria-labelledby="reviews-title" hidden>
-      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval runs</h1><p>Saved Server Guy answers from live agent evals, not browser test results. New runs are judged by a model as they finish; you look at what still needs attention.</p></div></div>
+      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval runs</h1><p>Saved Server Guy answers, not browser test results. Runs started here are judged automatically. For command-line runs, use the judge button below or review the answers yourself.</p></div></div>
       <p id="bulk-result" class="notice" role="status"></p>
       <div id="empty-reviews" class="empty" hidden><p>No saved live eval answers yet.</p><p class="footnote">Run Live agent evals to create the first run; its answers are judged automatically when it finishes.</p><button id="empty-choose" class="secondary" type="button">Choose cases to run…</button></div>
       <div id="review-content" class="review-layout" hidden>

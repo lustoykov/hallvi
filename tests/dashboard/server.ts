@@ -53,7 +53,7 @@ export const suites = [
     id: "e2e",
     name: "Browser journeys",
     command: "npm run test:e2e",
-    scope: `${browserJourneys.length} selectable journeys · simulated Pi, GitHub and login`,
+    scope: `${browserJourneys.length} selectable journeys · native Pi SDK, synthetic model and services`,
     cost: "No AI calls",
     ci: `${browserJourneys.filter((journey) => journey.smoke).length} of ${browserJourneys.length} per PR`,
     ciDetail: `All ${browserJourneys.length} on demand`,

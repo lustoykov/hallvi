@@ -25,4 +25,4 @@ Explanations by PR, oldest first:
 - [PR 8 — Drizzle over the existing SQLite persistence layer](pr-008-drizzle-sqlite.html)
 - [PR 9 — explicit Pi setup and fixed Phase 1 runtime](pr-009-explicit-pi-setup.html)
 - [PR 10 — real Pi evals, exact state checks and human meaning review](pr-010-phase-one-evals.html)
-- [Native Pi sessions — conversation history versus saved Decisions](native-pi-sessions.html)
+- [PR 15 — native Pi conversation history versus saved Decisions](pr-015-native-pi-sessions.html)
