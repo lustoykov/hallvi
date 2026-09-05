@@ -50,7 +50,7 @@ export function ChatList({
               onClick={() => onSelect(chat.id)}
               type="button"
             >
-              <span className="sg-session-mark">Pi</span>
+              <span className="sg-session-mark">SG</span>
               <span>
                 <strong>{chat.title}</strong>
                 <span className="sg-session-meta">
@@ -64,7 +64,7 @@ export function ChatList({
           ))
         ) : (
           <div className="sg-session muted">
-            <span className="sg-session-mark">Pi</span>
+            <span className="sg-session-mark">SG</span>
             <span>
               <strong>Launch Brief</strong>
               <span className="sg-session-meta">

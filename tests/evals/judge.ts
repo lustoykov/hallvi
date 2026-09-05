@@ -47,6 +47,7 @@ export function judgePrompt(record: SavedCase) {
     },
     before: record.before,
     after: record.after,
+    nativeEvidence: record.nativeEvidence,
   });
 }
 

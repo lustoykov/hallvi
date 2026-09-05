@@ -154,8 +154,8 @@ export function Inspector({
                 </div>
               ) : (
                 <p>
-                  No decisions recorded yet. Tell Pi a launch priority to save
-                  one.
+                  No decisions recorded yet. Tell Server Guy a launch priority
+                  to save one.
                 </p>
               )}
             </section>
@@ -171,7 +171,11 @@ export function Inspector({
                   <span className="sg-event-dot" />
                   <div>
                     <strong>{event.summary}</strong>
-                    <p>{event.detail}</p>
+                    <p>
+                      {event.kind === "chat-history-rebuilt"
+                        ? `${view.chats.find((chat) => chat.id === event.detail)?.title ?? "Saved chat"} · messages and Decisions kept.`
+                        : event.detail}
+                    </p>
                     <LocalTime value={event.createdAt} />
                   </div>
                 </article>

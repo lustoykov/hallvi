@@ -47,7 +47,7 @@ describe("computeChecks", () => {
       "Application details",
       "GitHub repository access",
       "Deployment environment",
-      "When Pi asks for approval",
+      "When Server Guy asks for approval",
     ]);
     for (const check of checks)
       expect(phaseOneCheckListForPrompt()).toContain(check.label);

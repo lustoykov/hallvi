@@ -1,7 +1,7 @@
 export const APPROVAL_MODES = {
   "pi-decides": {
-    label: "Pi decides",
-    hint: "Pi asks when the consequence warrants it.",
+    label: "Let Server Guy decide",
+    hint: "Server Guy asks when the consequence warrants it.",
   },
   "always-ask": {
     label: "Always ask",

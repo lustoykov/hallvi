@@ -23,6 +23,12 @@ import { checkPhaseOne } from "./check-phase-one";
 import { evalRepeatCount, selectPhaseOneCases } from "./phase-one-cases";
 import { createEvalScratch, releaseEvalScratch } from "./scratch";
 import { seedPhaseOneEvalCase } from "./seed-phase-one";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import {
+  nativeEvalCompaction,
+  nativeEvalEvidence,
+  seedNativeScenario,
+} from "./native-scenarios";
 
 // This file is deliberately .eval.ts, excluded by Vitest's normal test
 // discovery.
@@ -34,7 +40,9 @@ const selectedCases = selectPhaseOneCases(process.env.PI_EVAL_CASES);
 const sourceFiles = [
   "src/server/pi.ts",
   "src/server/pi-runs.ts",
-  "src/server/pi-context.ts",
+  "src/server/pi-run-context.ts",
+  "src/server/pi-sessions.ts",
+  "src/server/pi-decisions.ts",
   "src/server/pi-worker.ts",
   "tests/execute-pi-turn.ts",
   "src/server/phase-one.ts",
@@ -46,6 +54,7 @@ const sourceFiles = [
   "src/server/github-api.ts",
   "tests/evals/phase-one-cases.ts",
   "tests/evals/seed-phase-one.ts",
+  "tests/evals/native-scenarios.ts",
   "tests/evals/check-phase-one.ts",
   "tests/evals/phase-one.eval.ts",
   "tests/evals/vitest.config.ts",
@@ -74,6 +83,7 @@ const results: Array<{
   error: string | null;
   outcome: "checks-passed" | "checks-failed" | "run-error" | "not-run";
   semanticReview: "pending" | "not-applicable";
+  nativeEvidence?: ReturnType<typeof nativeEvalEvidence>;
 }> = [];
 let runDirectory: string | undefined;
 let state: string | undefined;
@@ -131,7 +141,7 @@ beforeAll(() => {
     database: join(state, "eval.db"),
     databaseRetained: false,
     coverage:
-      "Real Pi adapter and SQLite transaction; synthetic application/context; no GitHub calls. Only accepted tool proposals are captured, not a full SDK trace.",
+      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Native tool evidence is retained; this is not a production context-window benchmark.",
   };
   vi.stubEnv("SERVER_GUY_DB_PATH", join(state, "eval.db"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(state, "config"));
@@ -152,7 +162,7 @@ beforeAll(() => {
 for (let repetition = 1; repetition <= repeats; repetition++) {
   for (const scenario of selectedCases) {
     it(`${scenario.id} / repetition ${repetition}`, async (context) => {
-      const before = seedPhaseOneEvalCase(scenario, repetition);
+      let before = seedPhaseOneEvalCase(scenario, repetition);
       const record: (typeof results)[number] = {
         caseId: scenario.id,
         repetition,
@@ -175,6 +185,23 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
         context.skip();
         return;
       }
+      let restoreSettings: (() => void) | undefined;
+      if (scenario.nativeScenario) {
+        before = await seedNativeScenario(
+          scenario,
+          before,
+          readPiConfiguration()!,
+        );
+        record.before = before;
+        record.after = before;
+        const inMemory = SettingsManager.inMemory.bind(SettingsManager);
+        const settingsSpy = vi
+          .spyOn(SettingsManager, "inMemory")
+          .mockImplementation(() =>
+            inMemory({ compaction: nativeEvalCompaction }),
+          );
+        restoreSettings = () => settingsSpy.mockRestore();
+      }
       // Pass-through spy: the actual adapter executes. No fake model response.
       const turn = vi.spyOn(pi, "askPi");
       const start = performance.now();
@@ -193,6 +220,19 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
           record.reply!,
           before.decisions.map((decision) => database.getDecision(decision.id)),
         );
+        if (scenario.nativeScenario) {
+          record.nativeEvidence = nativeEvalEvidence(
+            before.application!.id,
+            before.selectedChatId!,
+            record.input!.run.id,
+          );
+          Object.assign(record.checks, record.nativeEvidence.checks);
+          if (scenario.nativeScenario !== "cancelled") {
+            record.checks[
+              "native compaction ran after fresh context was appended"
+            ] = record.nativeEvidence.compactions.length > 0;
+          }
+        }
         record.outcome = Object.values(record.checks).every(Boolean)
           ? "checks-passed"
           : "checks-failed";
@@ -219,6 +259,7 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
         ).runs.reduce((sum, run) => sum + run.piCalls, 0);
         record.elapsedMs = Math.round(performance.now() - start);
         turn.mockRestore();
+        restoreSettings?.();
       }
       expect(record.error, scenario.id).toBeNull();
       expect(

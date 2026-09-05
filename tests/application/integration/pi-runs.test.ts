@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  cpSync,
+  symlinkSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -15,22 +23,25 @@ import {
 } from "vitest";
 import * as store from "../../../src/server/db";
 import * as runs from "../../../src/server/pi-runs";
-import { acquireWorkerLock, executePiRun } from "../../../src/server/pi-worker";
 import {
-  boundedChatContext,
-  CONTEXT_LIMITS,
-} from "../../../src/server/pi-context";
+  acquireWorkerLock,
+  executePiRun,
+  PiWorkerDrainError,
+} from "../../../src/server/pi-worker";
+import { buildPiRunContext } from "../../../src/server/pi-run-context";
+import { openNativeChatSession } from "../../../src/server/pi-sessions";
 import {
   createChat,
   getPhaseOneOperatorView,
+  removeApplication,
 } from "../../../src/server/phase-one";
+import { savePiConfiguration } from "../../../src/server/pi-configuration";
 import { pushTestDatabase } from "../../test-database";
 
-const mocks = vi.hoisted(() => ({ ask: vi.fn(), summary: vi.fn() }));
+const mocks = vi.hoisted(() => ({ ask: vi.fn() }));
 vi.mock("../../../src/server/pi", async (original) => ({
   ...(await original<typeof import("../../../src/server/pi")>()),
   askPi: mocks.ask,
-  summarizePiChat: mocks.summary,
 }));
 let root: string;
 let applicationId: string;
@@ -54,12 +65,10 @@ beforeEach(() => {
   });
   applicationId = app.id;
   chatId = store.insertChat(store.insertWorkspace(app.id).id, "Main", true).id;
-  mocks.ask
-    .mockReset()
-    .mockResolvedValue({ message: "Done", decisionProposals: [] });
-  mocks.summary
-    .mockReset()
-    .mockResolvedValue("A summary of the supplied older exchanges.");
+  mocks.ask.mockReset().mockImplementation(async (_input, options) => {
+    options.onModelCall?.();
+    return { message: "Done", decisionProposals: [] };
+  });
 });
 afterAll(() => {
   globalThis.__serverGuyDb?.$client.close();
@@ -93,7 +102,7 @@ describe("durable Pi acceptance and outcomes", () => {
     ]);
     expect(mocks.ask).not.toHaveBeenCalled();
   });
-  it("serializes chats and loads shared Decisions at execution, not acceptance", async () => {
+  it("serializes Chats, shares saved Decisions and sends only scoped operational context", async () => {
     const second = createChat(applicationId, "Second").selectedChatId!;
     enqueue("priority: recover");
     const later = enqueue("What priority?", second);
@@ -108,14 +117,25 @@ describe("durable Pi acceptance and outcomes", () => {
     await executePiRun(first);
     expect(claimed().id).toBe(later.run.id);
     await executePiRun(runs.getPiRun(later.run.id)!);
-    expect(mocks.ask.mock.calls[1][0].decisions).toMatchObject([
+    expect(store.listActiveDecisions(applicationId)).toMatchObject([
       { value: "Recover quickly" },
     ]);
-    expect(
-      mocks.ask.mock.calls[1][0].messages.every(
-        (message: { chatId: string }) => message.chatId === second,
-      ),
-    ).toBe(true);
+    const secondInput = mocks.ask.mock.calls[1][0];
+    expect(secondInput).toMatchObject({
+      run: { chatId: second, applicationId },
+      userMessage: "What priority?",
+    });
+    expect(Object.keys(secondInput).sort()).toEqual([
+      "run",
+      "runContext",
+      "userMessage",
+    ]);
+    expect(JSON.parse(secondInput.runContext)).toMatchObject({
+      chatId: second,
+      applicationId,
+      previousAttempt: null,
+    });
+    expect(secondInput.runContext).not.toContain("Recover quickly");
   });
   it("rolls back all Decisions and final text if a later proposal is invalid", async () => {
     const before = getPhaseOneOperatorView(applicationId);
@@ -196,6 +216,7 @@ describe("durable Pi acceptance and outcomes", () => {
   it("persists increasing public draft revisions, then atomically completes", async () => {
     let finish!: (reply: { message: string; decisionProposals: [] }) => void;
     mocks.ask.mockImplementationOnce((_input, options) => {
+      options.onModelCall();
       options.onText("Public draft");
       return new Promise((resolve) => {
         finish = resolve;
@@ -246,77 +267,178 @@ describe("durable Pi acceptance and outcomes", () => {
   });
 });
 
-describe("bounded completed Chat context", () => {
-  function history() {
-    for (let index = 0; index < 12; index++) {
-      store.insertMessage(chatId, "user", `Question ${index}`, "user");
-      store.insertMessage(chatId, "assistant", `Answer ${index}`, "pi");
-    }
-  }
-  it("persists coverage, never summarizes a range twice, retains full transcript and isolates Chats", async () => {
-    history();
-    const before = store.listMessages(chatId);
-    enqueue("Current question");
-    const run = claimed();
-    const context = await boundedChatContext(run, new AbortController().signal);
-    expect(context.summary).toContain("summary");
-    expect(context.messages.length).toBeLessThanOrEqual(
-      CONTEXT_LIMITS.recentExchanges * 2,
-    );
-    const summarized = mocks.summary.mock.calls[0][1] as string;
-    for (const message of before)
-      expect(
-        summarized.includes(message.body) ||
-          context.messages.some((part) => part.id === message.id),
-      ).toBe(true);
-    await boundedChatContext(run, new AbortController().signal);
-    expect(mocks.summary).toHaveBeenCalledTimes(1);
-    expect(store.listMessages(chatId)).toHaveLength(before.length + 2);
-    runs.finishPiRun(run.id, "cancelled", "Test finished");
-    const other = createChat(applicationId, "Isolated").selectedChatId!;
-    enqueue("Hello", other);
-    const otherContext = await boundedChatContext(
-      claimed(),
-      new AbortController().signal,
-    );
-    expect(otherContext.summary).toBe("");
-    expect(
-      otherContext.messages.every((message) => message.chatId === other),
-    ).toBe(true);
-  });
-  it("summary failure leaves its coverage untouched and does not replay an unlimited transcript", async () => {
-    history();
-    mocks.summary.mockRejectedValueOnce(new Error("Secret provider payload"));
-    const accepted = enqueue();
+describe("minimal native Run context", () => {
+  it.each(["failed", "cancelled", "interrupted", "timed-out"] as const)(
+    "carries the actual %s attempt outcome without treating its history as saved effects",
+    async (status) => {
+      const previous = enqueue("An attempted change");
+      claimed();
+      runs.finishPiRun(previous.run.id, status, "Synthetic terminal outcome");
+      enqueue("What is saved now?");
+      await executePiRun(claimed());
+      const context = JSON.parse(mocks.ask.mock.calls[0][0].runContext);
+      expect(context).toMatchObject({
+        applicationId,
+        chatId,
+        previousAttempt: { runId: previous.run.id, status },
+      });
+      expect(context.previousAttempt.savedOutcome).toContain(
+        "pending, not saved; none were committed",
+      );
+      expect(context.currentApplication).toContain("Checks:");
+      expect(context).not.toHaveProperty("decisions");
+    },
+  );
+  it("identifies a committed previous answer and excludes other Chats' outcomes", async () => {
+    const previous = enqueue();
     await executePiRun(claimed());
-    expect(mocks.ask).not.toHaveBeenCalled();
-    expect(
-      store.db().$client.prepare("SELECT * FROM chat_summaries").all(),
-    ).toEqual([]);
-    expect(runs.getPiRun(accepted.run.id)).toMatchObject({
-      status: "failed",
-      piCalls: 1,
+    enqueue("Next");
+    const next = claimed();
+    const context = JSON.parse(buildPiRunContext(next, "Current checks"));
+    expect(context.previousAttempt).toMatchObject({
+      runId: previous.run.id,
+      status: "succeeded",
     });
-    expect(runs.getPiRun(accepted.run.id)?.error).not.toContain("Secret");
+    expect(context.previousAttempt.savedOutcome).toContain("were committed");
+    runs.finishPiRun(next.id, "cancelled", "Stop test");
+    const other = createChat(applicationId, "Other").selectedChatId!;
+    enqueue("Fresh Chat", other);
+    expect(
+      JSON.parse(buildPiRunContext(claimed(), "Other checks")).previousAttempt,
+    ).toBeNull();
   });
-  it("excludes unsuccessful attempts but includes every active Decision or fails visibly", async () => {
-    const unsuccessful = enqueue("Failed user intent");
-    runs.cancelPiRun(applicationId, chatId, unsuccessful.run.id);
-    enqueue();
-    await executePiRun(claimed());
-    expect(mocks.ask.mock.calls[0][0].messages).toEqual([]);
-    const source = store.listMessages(chatId)[0];
+  it("does not inject large Decision collections, legacy summaries or completed transcripts", async () => {
+    const source = store.insertMessage(
+      chatId,
+      "user",
+      "Original historical text",
+      "user",
+    );
     for (let index = 0; index < 100; index++)
       store.insertDecision({
         applicationId,
         sourceMessageId: source.id,
         kind: "launch-priority",
         label: "Priority",
-        value: `Priority ${index} ${"x".repeat(280)}`,
+        value: `Decision-${index} ${"x".repeat(280)}`,
       });
-    enqueue("Too much context");
+    store
+      .db()
+      .$client.prepare("INSERT INTO chat_summaries VALUES (?, ?, ?, ?)")
+      .run(chatId, "Old model-authored summary", source.id, "2026-09-05");
+    enqueue("Hello");
     await executePiRun(claimed());
-    expect(mocks.ask).toHaveBeenCalledTimes(1);
+    expect(mocks.ask).toHaveBeenCalledOnce();
+    const passed = mocks.ask.mock.calls[0][0];
+    expect(passed.userMessage).toBe("Hello");
+    expect(passed.runContext).not.toContain("Decision-");
+    expect(passed.runContext).not.toContain("Old model-authored summary");
+    expect(passed.runContext).not.toContain("Original historical text");
+    expect(
+      store.db().$client.prepare("SELECT body FROM chat_summaries").get(),
+    ).toEqual({ body: "Old model-authored summary" });
+  });
+  it("fails before model execution when mandatory current context cannot fit", async () => {
+    store
+      .db()
+      .$client.prepare("UPDATE applications SET name = ? WHERE id = ?")
+      .run("x".repeat(12_001), applicationId);
+    const accepted = enqueue();
+    await executePiRun(claimed());
+    expect(mocks.ask).not.toHaveBeenCalled();
+    expect(runs.getPiRun(accepted.run.id)).toMatchObject({
+      status: "failed",
+      piCalls: 0,
+      error: expect.stringContaining("No model request was started"),
+    });
+  });
+  it("counts tool-loop and compaction model calls from adapter events", async () => {
+    mocks.ask.mockImplementationOnce(async (_input, options) => {
+      options.onModelCall();
+      options.onModelCall();
+      options.onModelCall();
+      return { message: "Done", decisionProposals: [] };
+    });
+    const accepted = enqueue();
+    await executePiRun(claimed());
+    expect(runs.getPiRun(accepted.run.id)).toMatchObject({
+      status: "succeeded",
+      piCalls: 3,
+    });
+  });
+});
+
+describe("worker settlement", () => {
+  it.each(["cancel", "shutdown"] as const)(
+    "waits for an unsettled adapter after %s and rejects late Decisions",
+    async (action) => {
+      let finish!: (reply: {
+        message: string;
+        decisionProposals: Array<{ kind: "launch-priority"; value: string }>;
+      }) => void;
+      mocks.ask.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const accepted = enqueue();
+      const controller = new AbortController();
+      let settled = false;
+      const work = executePiRun(claimed(), { signal: controller.signal }).then(
+        (result) => {
+          settled = true;
+          return result;
+        },
+      );
+      await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+      if (action === "cancel")
+        runs.cancelPiRun(applicationId, chatId, accepted.run.id);
+      else controller.abort();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(settled).toBe(false);
+      finish({
+        message: "Late claimed success",
+        decisionProposals: [
+          { kind: "launch-priority", value: "Must not be saved" },
+        ],
+      });
+      await work;
+      expect(store.listActiveDecisions(applicationId)).toEqual([]);
+      expect(runs.getPiRun(accepted.run.id)?.status).toBe(
+        action === "cancel" ? "cancelled" : "interrupted",
+      );
+    },
+  );
+  it("throws a fatal drain error for unresponsive SDK work, retaining the terminal timeout", async () => {
+    let finish!: (reply: { message: string; decisionProposals: [] }) => void;
+    mocks.ask.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const accepted = enqueue();
+    await expect(
+      executePiRun(claimed(), { timeoutMs: 10, drainTimeoutMs: 10 }),
+    ).rejects.toBeInstanceOf(PiWorkerDrainError);
+    expect(runs.getPiRun(accepted.run.id)?.status).toBe("timed-out");
+    finish({ message: "Late output", decisionProposals: [] });
+    await Promise.resolve();
+    expect(store.listMessages(chatId).at(-1)?.body).toBe("");
+  });
+  it("requires the production application-removal path to wait for the native writer", async () => {
+    const native = await openNativeChatSession(applicationId, chatId);
+    try {
+      expect(() => removeApplication(applicationId, "qa/test")).toThrow(
+        "still running",
+      );
+      expect(store.getApplication(applicationId)).not.toBeNull();
+    } finally {
+      native.release();
+    }
+    removeApplication(applicationId, "qa/test");
+    expect(store.getApplication(applicationId)).toBeNull();
   });
 });
 
@@ -347,17 +469,44 @@ it("starts the real SDK worker without credentials or model calls when the queue
   }
 }, 15_000);
 
-it("a real worker process saves drafts, survives browser absence and exposes a crash without repeating it", async () => {
-  const copy = join(root, "process-app");
+function createWorkerFixture(name: string) {
+  const copy = join(root, name);
   mkdirSync(copy);
   cpSync("src", join(copy, "src"), { recursive: true });
-  cpSync("tests/browser-fixtures/pi.ts.txt", join(copy, "src/server/pi.ts"));
+  cpSync(
+    join(copy, "src/server/pi-configuration.ts"),
+    join(copy, "src/server/pi-configuration-real.ts"),
+  );
+  cpSync(
+    "tests/browser-fixtures/pi-configuration.ts.txt",
+    join(copy, "src/server/pi-configuration.ts"),
+  );
+  const authPath = join(root, "synthetic-auth.json");
+  writeFileSync(
+    authPath,
+    JSON.stringify({
+      "openai-codex": { type: "api_key", key: "QA-NO-NETWORK" },
+    }),
+    { mode: 0o600 },
+  );
+  savePiConfiguration({
+    mode: "separate",
+    authPath,
+    providerId: "openai-codex",
+    modelId: "gpt-5.6-sol",
+    reasoningEffort: "high",
+    credentialType: "api_key",
+  });
   symlinkSync(
     join(process.cwd(), "node_modules"),
     join(copy, "node_modules"),
     "dir",
   );
-  const env = { ...process.env, SERVER_GUY_QA_ROOT: root };
+  return { copy, env: { ...process.env, SERVER_GUY_QA_ROOT: root } };
+}
+
+it("a real worker process saves drafts, survives browser absence and exposes a crash without repeating it", async () => {
+  const { copy, env } = createWorkerFixture("process-app");
   const start = () =>
     spawn(process.execPath, ["--import", "tsx", "src/worker.ts"], {
       cwd: copy,
@@ -373,7 +522,9 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
       { timeout: 10_000 },
     );
     await vi.waitFor(() =>
-      expect(store.listMessages(chatId).at(-1)?.body).toContain("QA draft"),
+      expect(store.listMessages(chatId).at(-1)?.body).toContain(
+        "[QA fixture reply]",
+      ),
     );
     const duplicate = start();
     const [code] = await once(duplicate, "close");
@@ -393,6 +544,23 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
         .listMessages(chatId)
         .filter((message) => message.body === "Hello [slow]"),
     ).toHaveLength(1);
+    const recall = enqueue("recall: Hello [slow]");
+    await vi.waitFor(
+      () => expect(runs.getPiRun(recall.run.id)?.status).toBe("succeeded"),
+      { timeout: 10_000 },
+    );
+    expect(store.listMessages(chatId).at(-1)?.body).toBe(
+      "[QA native history] found: Hello [slow]",
+    );
+    const nativePath = join(
+      root,
+      "pi-sessions",
+      applicationId,
+      `${chatId}.jsonl`,
+    );
+    const native = readFileSync(nativePath, "utf8");
+    expect(native).toContain("server-guy-run");
+    expect(native).toContain("interrupted");
   } finally {
     for (const child of [first, second])
       if (child && child.exitCode === null && child.signalCode === null) {
@@ -402,3 +570,66 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
       }
   }
 }, 30_000);
+
+it("a poisoned real worker retains its OS locks through garbage collection until process exit", async () => {
+  const { copy, env } = createWorkerFixture("unresponsive-app");
+  const accepted = enqueue("Hello [unresponsive]");
+  const child = spawn(
+    process.execPath,
+    [
+      "--expose-gc",
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `
+    import { runPiWorker, PiWorkerDrainError } from './src/server/pi-worker.ts';
+    const controller = new AbortController();
+    process.on('SIGTERM', () => controller.abort());
+    setInterval(() => global.gc(), 50);
+    runPiWorker(controller.signal).catch(error => {
+      if (!(error instanceof PiWorkerDrainError)) { console.error(error); process.exit(2); }
+      process.stdout.write('drain-failed');
+    });
+  `,
+    ],
+    { cwd: copy, env, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  let output = "";
+  child.stdout.on("data", (data) => {
+    output += data;
+  });
+  child.stderr.on("data", (data) => {
+    output += data;
+  });
+  try {
+    await vi.waitFor(
+      () =>
+        expect(store.listMessages(chatId).at(-1)?.body).toContain(
+          "[QA fixture reply]",
+        ),
+      { timeout: 10_000 },
+    );
+    child.kill("SIGTERM");
+    await vi.waitFor(() => expect(output).toContain("drain-failed"), {
+      timeout: 8_000,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(child.exitCode).toBeNull();
+    expect(runs.getPiRun(accepted.run.id)?.status).toBe("interrupted");
+    expect(() => acquireWorkerLock()).toThrow("already running");
+    await expect(
+      openNativeChatSession(applicationId, chatId),
+    ).rejects.toMatchObject({ code: "busy" });
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      const closed = once(child, "close");
+      child.kill("SIGKILL");
+      await closed;
+    }
+  }
+  const release = acquireWorkerLock();
+  release();
+  const resumed = await openNativeChatSession(applicationId, chatId);
+  resumed.release();
+}, 25_000);

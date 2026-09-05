@@ -1,6 +1,6 @@
 # Native Pi sessions and permission boundaries
 
-Status: proposed design; no runtime changes in this document. Baseline: [PR #13](https://github.com/lustoykov/server-guy/pull/13), merged September 5, 2026. Build order belongs in [ROADMAP.md](../../ROADMAP.md).
+Status: slice 1 implemented on this branch, awaiting PR review. This is the current native-session contract; external mutation/approval enforcement remains a later slice. Baseline: [PR #13](https://github.com/lustoykov/server-guy/pull/13), merged September 5, 2026. Build order belongs in [ROADMAP.md](../../ROADMAP.md).
 
 ## Recommendation
 
@@ -8,7 +8,7 @@ Let Pi own the conversation and the tool loop. Let Server Guy own the authority 
 
 Use one persistent native Pi session per Chat, reopened by the existing worker for each Pi Run. Replace flattened history and Server Guy's custom summarizer with Pi's native history and compaction. Keep existing resource boundaries, Approval Modes and atomic Decision-commit semantics. Add a scoped read-only Decision lookup, not broader external capabilities.
 
-**Latest user-directed revision, September 5:** keep system instructions stable and let Pi look up saved Decisions as needed. Do not inject all active Decisions into every message, move the same repeated dump to the end, or rewrite the system prompt whenever a Decision changes. This replaces the earlier per-Run system-prompt snapshot proposal; the current application still uses the old injection path until the implementation PR.
+**User-directed revision, September 5:** keep system instructions stable and let Pi look up saved Decisions as needed. Do not inject all active Decisions into every message, move the same repeated dump to the end, or rewrite the system prompt whenever a Decision changes. This replaces the earlier per-Run system-prompt snapshot proposal and is implemented in this branch.
 
 The Bitter Lesson favors general methods that benefit from more computation over hand-built reasoning strategies. Applying that idea here is an architectural judgment, not a claim that the essay prescribes an authorization system: provide useful tools, observations and feedback instead of programming Pi's reasoning sequence. Authorization, data integrity and recorded outcomes remain ordinary software responsibilities. [Rich Sutton's essay](https://www.cs.utexas.edu/~eunsol/courses/data/bitter_lesson.pdf).
 
@@ -31,7 +31,7 @@ Keep **ChatGPT** and **GitHub** where they identify the account being connected 
 
 Preserve the distinction between an AI-generated reply and a **Recorded event**; one brand does not make a model's claim verified evidence. Tell the embedded model to introduce itself as Server Guy and translate runtime failures into actionable product language, with technical details available separately. Do not rewrite historical chat text or raw diagnostic evidence.
 
-Include this terminology pass in the next implementation PR, covering labels, accessible names, generated replies and error states. Ordinary journeys should require no knowledge of Pi; the credential-reuse path should still accurately explain the shared login. This section specifies the proposed copy; the current UI has not been changed by this design document.
+This branch includes the terminology pass across labels, accessible names, generated replies and error states. Ordinary journeys require no knowledge of Pi; the credential-reuse path still accurately explains the shared login. Historical messages and technical identifiers are unchanged.
 
 ## 1. Permission design: constrain effects, not reasoning
 
@@ -53,7 +53,7 @@ Three questions must remain separate:
 
 None of these modes grants access to another application, expands credentials, removes a user's explicit limit, or lets Pi change its own mode. Recording messages, Observations and an explicitly stated Decision is internal bookkeeping, not a separate external-change approval.
 
-Today these modes are recorded preferences. Phase 1 exposes only `propose_decision`; it has no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
+Today these modes are recorded preferences. Phase 1 exposes only `search_decisions` and `propose_decision`; it has no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
 
 ### Enforce the scope at the operation
 
@@ -190,11 +190,11 @@ Retry remains a new, linked Run. Under the first slice's unchanged atomic semant
 
 Existing SQLite text cannot recreate genuine native tool calls, provider metadata or compaction entries. On first native use, import a clearly labeled legacy-context note from the existing summary and bounded completed history, keeping all original UI messages intact. Do not fabricate native assistant/tool records. Only this one-time transition may use the old text representation; subsequent Runs continue the native session.
 
-Delete the active custom summarization/replay path once the native replacement and migration tests pass. Keep old persisted summary data readable during transition; do not erase it as part of this design-only work.
+The active custom summarization/replay path is removed. Old persisted summary data remains readable for the bounded one-time transition; it is not updated or erased by this migration.
 
 ## Implementation slices and acceptance
 
-1. **Next PR — native sessions and scoped Decision retrieval, unchanged external authority/commit semantics:** session identity/storage, native history/compaction, stable instructions, read-only Decision search, minimal native Run context, settlement fix, legacy import and early Decision-proposal feedback with guarded final writes.
+1. **Implemented on this branch — native sessions and scoped Decision retrieval, unchanged external authority/commit semantics:** session identity/storage, native history/compaction, stable instructions, read-only Decision search, minimal native Run context, settlement fix, legacy import and early Decision-proposal feedback with guarded final writes.
 2. **Then resume inspectability and later operations:** trace native model/tool events under the existing Run ID; add actual approval enforcement with the first external mutation. Independently committed tools remain a separate semantic choice, not a dependency of native sessions. No new orchestration service.
 
 Required tests for slice 1:
@@ -224,7 +224,7 @@ Before merging the native-session migration, run and review this small live beha
 
 Verified against `@earendil-works/pi-coding-agent` 0.84.4, not an assumed future SDK:
 
-- Application adapter: [`src/server/pi.ts`](../../src/server/pi.ts); old context policy: [`src/server/pi-context.ts`](../../src/server/pi-context.ts).
+- Application adapter: [`src/server/pi.ts`](../../src/server/pi.ts); native storage/recovery: [`pi-sessions.ts`](../../src/server/pi-sessions.ts); minimal Run context: [`pi-run-context.ts`](../../src/server/pi-run-context.ts); scoped tools: [`pi-decisions.ts`](../../src/server/pi-decisions.ts). The old `pi-context.ts` replay policy is removed (retained in Git history).
 - Run completion/cancellation: [`src/server/pi-runs.ts`](../../src/server/pi-runs.ts); single-worker lifecycle: [`src/server/pi-worker.ts`](../../src/server/pi-worker.ts).
 - SDK `dist/core/sdk.js`: restores `sessionManager.buildSessionContext()` and exposes `transformContext` through the extension runner.
 - SDK `dist/core/resource-loader.d.ts`: supports the existing `systemPromptOverride` path for stable instructions. Inline extensions and their `context` hook were considered but are not needed for the next PR.

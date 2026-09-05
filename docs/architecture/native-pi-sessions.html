@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Guy — one conversation, many requests</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :root { --paper: #f7f9fc; --ink: #192338; --muted: #59667b; --accent: #285ad8; --rule: #cbd5e5; }
+      body { margin: 0; padding: 48px 32px; color: var(--ink); background: var(--paper); font: 16px/1.6 "Geist", system-ui, sans-serif; }
+      main { max-width: 1100px; margin: auto; }
+      .eyebrow, code { font-family: "Geist Mono", ui-monospace, monospace; }
+      .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { font: 400 40px/1.15 "Instrument Serif", Georgia, serif; margin: 12px 0 16px; }
+      h2 { font-size: 20px; margin: 32px 0 12px; }
+      p { max-width: 880px; margin: 8px 0 20px; }
+      a { color: var(--accent); text-underline-offset: 4px; }
+      svg { display: block; width: 100%; height: auto; }
+      svg text { font-family: "Geist", system-ui, sans-serif; fill: var(--ink); }
+      svg .name { font-size: 16px; font-weight: 600; }
+      svg .small { font-size: 12px; fill: var(--muted); }
+      svg .tech { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; fill: var(--muted); }
+      table { width: 100%; border-collapse: collapse; font-size: 16px; }
+      th, td { padding: 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+      th { background: #edf3ff; }
+      .note { border-left: 4px solid var(--accent); padding-left: 20px; }
+      footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Server Guy · Native sessions · PR architecture snapshot</p>
+      <h1>One conversation, many requests.</h1>
+      <p>Pi now retains each chat’s native messages, tool results and compaction history. Server Guy still records which requests actually succeeded and which Decisions were saved.</p>
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="native-pi-title native-pi-desc">
+        <title id="native-pi-title">Native conversation and committed application state</title>
+        <desc id="native-pi-desc">A saved request reaches the single worker, which reopens the chat’s native Pi history, provides scoped Decision tools and commits the final answer and staged Decisions together only on success.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b" /></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8" /></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8" /></marker>
+        </defs>
+        <rect width="1280" height="720" fill="#f7f9fc" />
+        <path d="M 280 148 H 392" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <path d="M 712 148 H 824" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <path d="M 984 208 V 312" fill="none" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+        <path d="M 552 208 V 312" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <path d="M 472 432 V 536" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <path d="M 632 432 V 460 Q 632 468 640 468 H 976 Q 984 468 984 476 V 536" fill="none" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+        <path d="M 824 584 H 632" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <g>
+          <rect x="292" y="116" width="88" height="24" fill="#f7f9fc" /><text class="tech" x="336" y="132" text-anchor="middle">CLAIM</text>
+          <rect x="724" y="116" width="88" height="24" fill="#f7f9fc" /><text class="tech" x="768" y="132" text-anchor="middle">REOPEN</text>
+          <rect x="1000" y="248" width="144" height="24" fill="#f7f9fc" /><text class="tech" x="1008" y="264">APPEND / COMPACT</text>
+          <rect x="568" y="248" width="128" height="24" fill="#f7f9fc" /><text class="tech" x="576" y="264">EXPOSE TO PI</text>
+          <rect x="288" y="472" width="168" height="24" fill="#f7f9fc" /><text class="tech" x="296" y="488">SEARCH: READ ONLY</text>
+          <rect x="704" y="436" width="240" height="24" fill="#f7f9fc" /><text class="tech" x="824" y="452" text-anchor="middle">PROPOSE: STAGE IN MEMORY</text>
+          <rect x="656" y="552" width="144" height="24" fill="#f7f9fc" /><text class="tech" x="728" y="568" text-anchor="middle">COMMIT</text>
+        </g>
+        <rect x="40" y="88" width="240" height="120" rx="8" fill="#ffffff" stroke="#192338" />
+        <text class="name" x="64" y="120">Accepted request</text>
+        <text class="small" x="64" y="152">User message + queued Run</text>
+        <text class="small" x="64" y="180">Already saved in SQLite</text>
+        <rect x="392" y="88" width="320" height="120" rx="8" fill="#ffffff" stroke="#192338" />
+        <text class="name" x="416" y="120">Single local worker</text>
+        <text class="small" x="416" y="152">Fresh checks + attempt outcome</text>
+        <text class="small" x="416" y="180">Only the new user message is prompted</text>
+        <rect x="824" y="88" width="320" height="120" rx="8" fill="#ffffff" stroke="#192338" />
+        <text class="name" x="848" y="120">Native Pi conversation</text>
+        <text class="small" x="848" y="152">Stable instructions; model/tool loop</text>
+        <text class="small" x="848" y="180">Same session identity across requests</text>
+        <rect x="824" y="312" width="320" height="120" rx="8" fill="#edf3ff" stroke="#285ad8" />
+        <text class="name" x="848" y="344">Per-chat JSONL history</text>
+        <text class="small" x="848" y="376">Messages, tool results, compaction</text>
+        <text class="small" x="848" y="404">An attempted answer is not a receipt</text>
+        <rect x="392" y="312" width="320" height="120" rx="8" fill="#ffffff" stroke="#192338" />
+        <text class="name" x="416" y="344">Application-scoped tools</text>
+        <text class="tech" x="416" y="376">search_decisions</text>
+        <text class="tech" x="416" y="404">propose_decision</text>
+        <rect x="312" y="536" width="320" height="96" rx="8" fill="#eef0f3" stroke="#59667b" />
+        <text class="name" x="336" y="568">Current saved Decisions</text>
+        <text class="small" x="336" y="600">SQLite · shared across this app’s chats</text>
+        <rect x="824" y="536" width="320" height="96" rx="8" fill="#edf3ff" stroke="#285ad8" />
+        <text class="name" x="848" y="568">Successful completion only</text>
+        <text class="small" x="848" y="596">One SQLite transaction saves the answer,</text>
+        <text class="small" x="848" y="616">accepted Decisions and Run success</text>
+        <line x1="40" y1="664" x2="1240" y2="664" stroke="#cbd5e5" />
+        <text class="small" x="40" y="696">Blue: changed persistence boundary · White: execution · Grey: authoritative saved records</text>
+      </svg>
+      <p class="note"><strong>Cancellation does not erase your message.</strong> It saves a cancelled attempt, commits none of its staged Decisions, and stops both reply generation and compaction. The worker cannot hand off its writer slot until the SDK settles; if it cannot stop, the worker exits.</p>
+      <h2>Before → after</h2>
+      <table>
+        <thead><tr><th>Concern</th><th>Before this PR</th><th>With this PR</th></tr></thead>
+        <tbody>
+          <tr><td>Conversation</td><td>Fresh session; reconstructed text history and a custom summarizer.</td><td><a href="../../src/server/pi-sessions.ts">Reopen native per-chat history</a>; let Pi compact it.</td></tr>
+          <tr><td>Saved choices</td><td>Inject every current Decision each request.</td><td><a href="../../src/server/pi-decisions.ts">Search current records when relevant</a>; old active choices remain discoverable.</td></tr>
+          <tr><td>Bad replacement ID</td><td>Can fail after the model finishes.</td><td>Early tool feedback lets the model correct it. The <a href="../../src/server/phase-one.ts">final guarded write</a> still protects against changed state.</td></tr>
+          <tr><td>Missing native history</td><td>No native history to restore.</td><td>Explicit recovery; preserve the old file and <a href="../../src/server/pi-sessions.ts">rebuild from saved chat</a>. Never auto-retry.</td></tr>
+          <tr><td>External authority</td><td>No shell, deployment or repository-write tool.</td><td>Unchanged. Approval modes remain preferences until external changes are implemented.</td></tr>
+        </tbody>
+      </table>
+      <h2>Read these four files first</h2>
+      <p><a href="../../src/server/pi.ts">pi.ts</a> — native model/tool loop · <a href="../../src/server/pi-sessions.ts">pi-sessions.ts</a> — identity, private storage and recovery · <a href="../../src/server/pi-decisions.ts">pi-decisions.ts</a> — current Decision lookup and early feedback · <a href="../../src/server/pi-worker.ts">pi-worker.ts</a> — cancellation and writer settlement.</p>
+      <footer>Implementation snapshot · September 5, 2026 · Architecture, doc-wide, static, Server Guy profile. Simplified to seven nodes; provider authentication, browser SSE and migration SQL omitted. See the <a href="../specs/native-pi-and-permissions.md">full contract</a> and <a href="../../tests/README.md">test map</a>. Fonts fall back to system sans/serif/monospace offline.</footer>
+    </main>
+  </body>
+</html>

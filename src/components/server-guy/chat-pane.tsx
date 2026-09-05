@@ -55,6 +55,7 @@ export function ChatPane({
   runs,
   reconnecting,
   onRunAction,
+  onRebuildChat,
 }: {
   view: PhaseOneOperatorView;
   activeChat: Chat | null;
@@ -69,6 +70,7 @@ export function ChatPane({
   runs: PiRun[];
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
+  onRebuildChat: () => void;
 }) {
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
@@ -131,6 +133,20 @@ export function ChatPane({
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
+            const recovered =
+              run?.status === "failed" &&
+              run.error?.startsWith("Conversation history unavailable.") &&
+              run.finishedAt !== null &&
+              view.activity.some(
+                (event) =>
+                  event.kind === "chat-history-rebuilt" &&
+                  event.detail === run.chatId &&
+                  event.createdAt >= run.finishedAt!,
+              );
+            const historyUnavailable =
+              run?.status === "failed" &&
+              run.error?.startsWith("Conversation history unavailable.") &&
+              !recovered;
             return (
               <Message
                 className={
@@ -148,9 +164,11 @@ export function ChatPane({
                     className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
                     aria-hidden="true"
                   >
-                    {message.role === "user" ? "You" : "Pi"}
+                    {message.role === "user" ? "You" : "SG"}
                   </span>
-                  <strong>{message.role === "user" ? "You" : "Pi"}</strong>
+                  <strong>
+                    {message.role === "user" ? "You" : "Server Guy"}
+                  </strong>
                   {message.source === "server-guy" && (
                     <span className="sg-source-tag">Recorded event</span>
                   )}
@@ -178,10 +196,16 @@ export function ChatPane({
                         {message.status === "queued"
                           ? "Message saved. Waiting for the worker…"
                           : message.status === "running"
-                            ? "Pi is replying… Decisions are saved only when it finishes."
+                            ? "Replying… Decisions are saved only when the reply finishes."
                             : (run?.error ??
                               "This attempt did not finish. No Decisions were saved.")}
                       </p>
+                      {recovered && !retried && (
+                        <p className="sg-run-status" role="status">
+                          Conversation rebuilt from saved chat. Retry the reply
+                          when ready.
+                        </p>
+                      )}
                       {message.body && !inProgress && (
                         <details className="sg-run-draft">
                           <summary>Show unfinished draft</summary>
@@ -194,9 +218,14 @@ export function ChatPane({
                         <button
                           className={`sg-run-action ${inProgress ? "sg-secondary-button" : "sg-primary-button"}`}
                           disabled={busy !== null}
-                          onClick={() =>
-                            onRunAction(run.id, inProgress ? "cancel" : "retry")
-                          }
+                          onClick={() => {
+                            if (historyUnavailable) onRebuildChat();
+                            else
+                              onRunAction(
+                                run.id,
+                                inProgress ? "cancel" : "retry",
+                              );
+                          }}
                           type="button"
                         >
                           {inProgress ? (
@@ -204,7 +233,11 @@ export function ChatPane({
                           ) : (
                             <ArrowClockwise aria-hidden="true" weight="bold" />
                           )}
-                          {inProgress ? "Cancel request" : "Retry reply"}
+                          {inProgress
+                            ? "Cancel request"
+                            : historyUnavailable
+                              ? "Rebuild conversation from saved chat"
+                              : "Retry reply"}
                         </button>
                       )}
                     </div>
@@ -279,7 +312,7 @@ export function ChatPane({
           <textarea
             disabled={composerDisabled}
             id="pi-composer"
-            aria-label="Message Pi"
+            aria-label="Message Server Guy"
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {
               if (
@@ -297,7 +330,7 @@ export function ChatPane({
                 : !piReady
                   ? "Connect ChatGPT in Settings to chat"
                   : application
-                    ? "Ask Pi, correct a decision, or add context…"
+                    ? "Ask Server Guy, correct a decision, or add context…"
                     : "Create the application workspace to start chatting"
             }
             rows={2}

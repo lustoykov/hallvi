@@ -85,12 +85,15 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
         createdAt: application.createdAt,
       },
     ],
-    decisions: reply.decisionProposals.map((p) => ({
-      ...prior,
-      id: "new",
-      sourceMessageId: "user",
-      value: p.value,
-    })),
+    decisions: [
+      ...(scenario.replacesExisting ? [] : before.decisions),
+      ...reply.decisionProposals.map((p) => ({
+        ...prior,
+        id: "new",
+        sourceMessageId: "user",
+        value: p.value,
+      })),
+    ],
   };
   const history = before.decisions.map((d) => ({
     ...d,
@@ -101,13 +104,13 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
 }
 
 describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
-  it("has eleven uniquely named cases with explicit semantic rubrics", () => {
-    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(11);
+  it("has eighteen uniquely named cases with explicit semantic rubrics", () => {
+    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(18);
     expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
   });
 
   it("selects a case subset without silently expanding invalid selections", () => {
-    expect(selectPhaseOneCases().length).toBe(11);
+    expect(selectPhaseOneCases().length).toBe(18);
     expect(
       selectPhaseOneCases("greeting,hypothetical").map((c) => c.id),
     ).toEqual(["greeting", "hypothetical"]);

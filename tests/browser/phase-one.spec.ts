@@ -70,8 +70,8 @@ test(
     await expect(
       page.getByRole("button", { name: "Cancel request" }),
     ).toBeVisible();
-    await expect(page.locator(".sg-run-progress strong")).toHaveText(
-      "Reply in progress…",
+    await expect(page.locator(".sg-run-progress")).toContainText(
+      "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(page.getByRole("textbox")).toBeEnabled();
@@ -93,8 +93,8 @@ test(
     ).toBeVisible();
     await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
-    await expect(page.locator(".sg-run-progress details strong")).toHaveText(
-      "Reply in progress…",
+    await expect(page.locator(".sg-run-progress details")).toContainText(
+      "[QA fixture reply]",
     );
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await page.screenshot({
@@ -128,6 +128,7 @@ test(
       path: testInfo.outputPath("durable-retried-reply.png"),
       fullPage: true,
     });
+    await send(page, "Continue after cancellation");
   },
 );
 
@@ -190,7 +191,7 @@ test(
     await page.getByRole("textbox").fill("Hello [fail-once]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
-      page.getByText(/Pi could not finish this attempt/),
+      page.getByText(/Server Guy could not finish this attempt/),
     ).toBeVisible();
     await expect(page.getByRole("textbox")).toHaveValue("");
     await expect(
@@ -233,7 +234,7 @@ test(
 );
 
 test(
-  "P1-06/07 revision replaces exactly; fabricated replacement rolls back",
+  "P1-06/07 revision uses lookup; fabricated replacement returns a recoverable tool error",
   journey("revision"),
   async ({ page }) => {
     await addApplication(page, "revision-app");
@@ -247,7 +248,10 @@ test(
     await page.getByRole("textbox").fill("invalid-replacement: reject this");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
-      page.getByText(/Pi could not finish this attempt/),
+      page.getByText(
+        "[QA fixture reply] Replacement rejected; no Decision was staged.",
+        { exact: true },
+      ),
     ).toBeVisible();
     expect((await view(page)).messages).toHaveLength(
       revised.messages.length + 2,

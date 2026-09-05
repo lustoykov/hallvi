@@ -30,6 +30,7 @@ const caseSchema = z.object({
     .nullable(),
   before: z.unknown(),
   after: z.unknown(),
+  nativeEvidence: z.unknown().optional(),
 });
 export const reportSchema = z.object({
   model: z.string(),

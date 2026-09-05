@@ -75,7 +75,14 @@ export const browserJourneys = [
     id: "durable-requests",
     name: "Reconnect and cancel durable replies",
     description:
-      "Close the browser while Pi works, recover saved progress, cancel a request and explicitly retry its reply.",
+      "Close the browser while Server Guy works, recover saved progress, cancel a request and explicitly retry its reply.",
+    smoke: false,
+  },
+  {
+    id: "native-history",
+    name: "Continue and rebuild conversation history",
+    description:
+      "Continue native history across reloads, isolate Chats while sharing saved Decisions, and explicitly rebuild missing history before retrying.",
     smoke: false,
   },
   {

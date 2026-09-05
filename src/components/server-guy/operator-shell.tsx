@@ -87,6 +87,8 @@ export function OperatorShell({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [rebuildChatId, setRebuildChatId] = useState<string | null>(null);
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
   const applicationPicker = useRef<HTMLButtonElement>(null);
   const focusComposerAfterClose = useRef(false);
   const submittingChat = useRef<string | null>(null);
@@ -336,6 +338,27 @@ export function OperatorShell({
     });
   }
 
+  async function rebuildConversation() {
+    if (!application || !rebuildChatId || busy) return;
+    setBusy("rebuild");
+    setRebuildError(null);
+    try {
+      applyView(await api.rebuildChat(application.id, rebuildChatId));
+      setRebuildChatId(null);
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus();
+      });
+    } catch (caught) {
+      setRebuildError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not rebuild this conversation. Try again.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function rerunRepositoryCheck() {
     if (!application) return;
     void run("rerun", async () => {
@@ -479,7 +502,7 @@ export function OperatorShell({
             title={
               initialPiSetup.ready
                 ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                : "Connect ChatGPT to chat with Pi"
+                : "Connect ChatGPT to chat with Server Guy"
             }
           >
             <span
@@ -515,6 +538,11 @@ export function OperatorShell({
           runs={runs.filter((run) => run.chatId === activeChat?.id)}
           reconnecting={reconnecting}
           onRunAction={runAction}
+          onRebuildChat={() => {
+            if (!activeChat || busy) return;
+            setRebuildError(null);
+            setRebuildChatId(activeChat.id);
+          }}
           view={view}
         />
         <Inspector
@@ -546,6 +574,17 @@ export function OperatorShell({
             requestAnimationFrame(() => applicationPicker.current?.focus());
           }}
           onConfirm={() => void removeApplication()}
+        />
+      )}
+      {rebuildChatId && (
+        <ConfirmActionDialog
+          title="Rebuild conversation from saved chat?"
+          description="Saved messages and Decisions are retained. Native tool history may be lost; the previous conversation file is preserved for recovery. Rebuilding does not send a message or retry the failed reply."
+          action="Rebuild conversation"
+          busy={busy === "rebuild"}
+          error={rebuildError}
+          onCancel={() => setRebuildChatId(null)}
+          onConfirm={() => void rebuildConversation()}
         />
       )}
     </main>

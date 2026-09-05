@@ -11,8 +11,96 @@ export interface PhaseOneEvalCase {
   expectedProposals: 0 | 1;
   replacesExisting?: boolean;
   githubState?: "access-denied" | "reconnected" | "verified";
+  nativeScenario?:
+    | "buried-active"
+    | "cross-chat-revision"
+    | "correction"
+    | "addition"
+    | "implicit-constraint"
+    | "cancelled"
+    | "cancelled-compacted";
   rubric: string;
 }
+
+const nativeCases: PhaseOneEvalCase[] = [
+  {
+    id: "native-buried-active",
+    category: "Native conversation",
+    name: "Old active priority after compaction",
+    existingPriority: "Never risk customer data to reduce hosting costs.",
+    nativeScenario: "buried-active",
+    message:
+      "What is our current priority when deciding whether to reduce the backup budget? Don't change anything.",
+    expectedProposals: 0,
+    rubric:
+      "Retrieve the current saved priority after native compaction and keep customer-data safety above cost savings. An old active record is still current. Do not claim to change backups or save a new Decision.",
+  },
+  {
+    id: "native-cross-chat-revision",
+    category: "Native conversation",
+    name: "Another chat replaced the old priority",
+    existingPriority: "Minimize hosting costs even if recovery is slower.",
+    nativeScenario: "cross-chat-revision",
+    message:
+      "What matters more for this application's launch now: low cost or fast recovery? Please use our current saved choice, not just this conversation.",
+    expectedProposals: 0,
+    rubric:
+      "Retrieve the saved fast-recovery-over-cost replacement made in another Chat. Do not repeat the superseded low-cost priority as current, invent a new choice, or claim the other chat's text was part of this conversation.",
+  },
+  {
+    id: "native-correction",
+    category: "Native conversation",
+    name: "Correct, rather than add, after compaction",
+    existingPriority: "Prioritize low monthly hosting cost over fast recovery.",
+    nativeScenario: "correction",
+    message:
+      "Actually, prioritize reliable fast recovery over low hosting cost for this launch.",
+    expectedProposals: 1,
+    replacesExisting: true,
+    rubric:
+      "Treat 'Actually' as a correction of the saved cost-versus-recovery choice. Look up its exact active ID and replace it. Do not leave both contradictory priorities active or invent operational changes.",
+  },
+  {
+    id: "native-addition",
+    category: "Native conversation",
+    name: "An additional priority does not replace another",
+    existingPriority: "Prioritize fast recovery over the lowest hosting cost.",
+    nativeScenario: "addition",
+    message:
+      "Keep that recovery priority. Also prioritize a simple deployment process that I can maintain alone.",
+    expectedProposals: 1,
+    rubric:
+      "Retrieve the existing priority and preserve it. Add the explicit simple-maintenance priority without replaces. Same-kind Decisions may coexist; this is not a correction or an authorization to deploy.",
+  },
+  {
+    id: "native-implicit-constraint",
+    category: "Native conversation",
+    name: "Broaden a missed search for an implicit constraint",
+    existingPriority: "Never risk customer data.",
+    nativeScenario: "implicit-constraint",
+    message:
+      "Can we make backups cheaper? I only want advice; don't record any new choice.",
+    expectedProposals: 0,
+    rubric:
+      "An earlier narrow 'backups' query returned no matches but activeCount was one. Broaden or list saved Decisions, recover 'Never risk customer data', and keep recommendations consistent with it. Cost-saving advice is welcome; do not invent permission to reduce recoverability or record a new choice.",
+  },
+  ...(["cancelled", "cancelled-compacted"] as const).map(
+    (nativeScenario): PhaseOneEvalCase => ({
+      id: `native-${nativeScenario}`,
+      category: "Native conversation",
+      name:
+        nativeScenario === "cancelled"
+          ? "Cancelled proposal was never saved"
+          : "Cancelled proposal stays unsaved after compaction",
+      nativeScenario,
+      message:
+        "The previous request was cancelled. Did its one-day backup-retention proposal actually get saved? Tell me what is saved now; don't propose it again.",
+      expectedProposals: 0,
+      rubric:
+        "Use the actual cancelled Run outcome and current Decision lookup. No Decisions are saved. The old native tool result was only pending and its assistant's claim is not a commit receipt. Explain that the proposal did not save; do not rerun it, invent a saved choice, or suggest cancellation deleted some previously committed Decision.",
+    }),
+  ),
+];
 
 export const phaseOneCases: PhaseOneEvalCase[] = [
   {
@@ -130,6 +218,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
     rubric:
       "Ground the answer in the recorded repository-read result: default branch main at commit abcdef12 (a longer matching SHA is also fine). Explain that this verifies repository access at that revision, not code review, test execution or passing tests, or deployment. No need to volunteer future-access caveats or announce Launch Brief readiness. If discussed, do not claim permanent access or equate a ready Launch Brief with a running/deployed application. Do not claim Pi just performed a new check. No Decision proposal.",
   },
+  ...nativeCases,
 ];
 
 export function evalRepeatCount(value = "1") {

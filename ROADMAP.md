@@ -28,7 +28,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 
 Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
 
-Proposed follow-up before expanding tracing: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Replace custom conversation replay/compaction, let Pi look up saved Decisions through a scoped read-only tool instead of injecting them into every request, and improve in-loop proposal feedback. Keep external authority and atomic Decision commits unchanged; independently committed tools remain deferred. This is a design proposal, not implemented functionality or a new launch phase.
+Implemented follow-up on this branch, awaiting PR review: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Native per-Chat history replaces custom replay/compaction, saved Decisions are retrieved through a scoped read-only tool, and invalid proposals return in-loop feedback. External authority and atomic Decision commits are unchanged; independently committed tools remain deferred. Next is action history and tracing, not a new launch phase.
 
 ## Phase 1 implementation backlog
 
@@ -95,8 +95,8 @@ Decision: offer explicit reuse of a detected GitHub CLI/environment credential o
 
 The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
 
-- [x] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
-- [x] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
+- [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; this branch replaces that path with native Pi history/compaction and a bounded one-time legacy import.
+- [x] Make all active Decisions available regardless of age. This branch replaces the repeated injected list with scoped, paginated `search_decisions`; current checks and previous attempt outcomes remain separate Run context.
 - [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
 - [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
 - [x] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
@@ -106,7 +106,7 @@ The [implementation contract](docs/specs/durable-pi-requests.md) defines the fir
 - [x] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
 - [x] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
 
-Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered this worker and bounded-context implementation. The database is authoritative: the durable summary, messages, Decisions, and Pi Run live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered the worker and bounded-context implementation. SQLite remains authoritative for saved effects, messages and Runs; native JSONL owns attempted model/tool history and compaction. Old summary rows are retained for legacy import only. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
 

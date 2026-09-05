@@ -55,7 +55,7 @@ It already provides direct practice with:
 - relational modeling, constraints, indexes, and transactions through SQLite, with Drizzle as the typed schema and query layer;
 - deterministic application state around a probabilistic model;
 - explicit Pi setup and explicit GitHub connection: credential detection without silent adoption, scoped repository verification, and source-attributed Observations;
-- durable requests: idempotent acceptance, one local worker, cancellation, timeout, interruption and linked retry, revisioned messages, reconnectable SSE, and bounded context with a durable summary;
+- durable requests: idempotent acceptance, one local worker, cancellation, timeout, interruption and linked retry, revisioned messages, reconnectable SSE, native conversation persistence/compaction and current-state retrieval;
 - schema-validated request and model boundaries, policy conflicts, provenance stability, and adversarial malformed-model-output tests;
 - desktop Playwright journeys over real Next.js, SQLite and worker processes with synthetic providers, plus opt-in real-Pi evals with exact state checks, human verdicts and an advisory LLM judge.
 

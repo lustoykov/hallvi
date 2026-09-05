@@ -774,7 +774,11 @@ function renderAnswer(saved, ordered, shown) {
     ...checks.map(([name, ok]) => element("li", name, ok ? "" : "failed")),
   );
   $("state").textContent = JSON.stringify(
-    { before: current.before, after: current.after },
+    {
+      before: current.before,
+      after: current.after,
+      nativeEvidence: current.nativeEvidence,
+    },
     null,
     2,
   );
