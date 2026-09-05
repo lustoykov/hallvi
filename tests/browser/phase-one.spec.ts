@@ -207,8 +207,10 @@ test(
     const before = await view(page);
     await page.getByRole("textbox").fill("Hello [fail-once]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
+    // The pane shows one user-safe line for any failed attempt; the worker's
+    // exact error stays in the run record.
     await expect(
-      page.getByText(/Server Guy could not finish this attempt/),
+      page.getByText("Something went wrong. Please retry.", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("textbox")).toHaveValue("");
     await expect(
