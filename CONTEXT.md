@@ -4,12 +4,16 @@ Canonical product language for Server Guy's deployment and operations domain.
 
 ## Language
 
+**Server Guy**:
+The deployment and operations product, presented to the engineer as one assistant. Its conversational replies and recorded operational facts remain distinguishable.
+_Avoid_: Pi as a second user-facing assistant, separate product and runtime personas
+
 **Model-Native Operation**:
 An operating model in which Pi handles interpretation, ambiguity, diagnosis, and plan revision while Server Guy supplies durable context, tools, observations, resumability, approval behavior, and inspectable execution. A model-native product may still use deterministic procedures wherever the next valid operation follows from explicit desired state and fresh observations.
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
 **Chat**:
-A durable conversation between the engineer and Pi inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
+A durable conversation between the engineer and Server Guy inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
 _Avoid_: Operator Session, workflow run, pipeline execution
 
 **Pi Run**:

@@ -10,6 +10,27 @@ Use one persistent native Pi session per Chat, reopened by the existing worker f
 
 The Bitter Lesson favors general methods that benefit from more computation over hand-built reasoning strategies. Applying that idea here is an architectural judgment, not a claim that the essay prescribes an authorization system: provide useful tools, observations and feedback instead of programming Pi's reasoning sequence. Authorization, data integrity and recorded outcomes remain ordinary software responsibilities. [Rich Sutton's essay](https://www.cs.utexas.edu/~eunsol/courses/data/bitter_lesson.pdf).
 
+## Product language: one assistant, Server Guy
+
+The ownership split below is for developers, not a distinction users must understand. Present one assistant named **Server Guy** throughout ordinary chat, settings, progress, approvals and recovery. Pi remains the internal runtime; there is no user-facing handoff between two assistants.
+
+| Current wording | Proposed user-facing wording |
+| --- | --- |
+| Pi (assistant name/avatar) | Server Guy / SG |
+| Message Pi | Message Server Guy |
+| Pi is replying… | Replying… |
+| Ask Pi about this check | Ask about this check |
+| Pi decides | Let Server Guy decide |
+| Pi session missing | Conversation history unavailable |
+
+The middle approval option still means Server Guy chooses when to request approval within the granted scope. This is a copy change, not a new policy. Keep internal identifiers such as `pi-decides`, `PiRun`, SDK names and existing routes; do not migrate stored data just to remove runtime branding from the UI.
+
+Keep **ChatGPT** and **GitHub** where they identify the account being connected or the service receiving data. Mention **Pi** only when relevant: the optional existing-Pi-login reuse choice, Storage & privacy, and developer diagnostics. When reusing a Pi login, explain that it shares that login file rather than implying a separate copied credential. Progressive disclosure must not hide consent, storage risks or disconnect consequences.
+
+Preserve the distinction between an AI-generated reply and a **Recorded event**; one brand does not make a model's claim verified evidence. Tell the embedded model to introduce itself as Server Guy and translate runtime failures into actionable product language, with technical details available separately. Do not rewrite historical chat text or raw diagnostic evidence.
+
+Include this terminology pass in the next implementation PR, covering labels, accessible names, generated replies and error states. Ordinary journeys should require no knowledge of Pi; the credential-reuse path should still accurately explain the shared login. This section specifies the proposed copy; the current UI has not been changed by this design document.
+
 ## 1. Permission design: constrain effects, not reasoning
 
 Three questions must remain separate:
