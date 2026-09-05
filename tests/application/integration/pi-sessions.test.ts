@@ -7,7 +7,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -18,11 +17,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import * as store from "../../../src/server/db";
-import { chats, chatSummaries } from "../../../src/server/db-schema";
+import { chats } from "../../../src/server/db-schema";
 import {
   NativeSessionError,
   openNativeChatSession,
-  rebuildNativeChatSession,
   removeNativeApplicationSessions,
 } from "../../../src/server/pi-sessions";
 import { pushTestDatabase } from "../../test-database";
@@ -96,63 +94,14 @@ it("persists a private header and SQLite identity before any assistant message, 
   separate.release();
 });
 
-it("imports bounded completed legacy data once without fabricating native assistant/tool messages or deleting old summaries", async () => {
-  const user = store.insertMessage(chatId, "user", "Original request", "user");
-  store.insertMessage(chatId, "assistant", "Legacy saved answer", "pi");
-  store.insertMessage(
-    chatId,
-    "assistant",
-    "Failed partial output",
-    "pi",
-    "failed",
-  );
-  store
-    .db()
-    .insert(chatSummaries)
-    .values({
-      chatId,
-      body: "Old summary ".repeat(2_000),
-      coveredMessageId: user.id,
-      updatedAt: "2026-09-05",
-    })
-    .run();
-  const originalSummary = store.db().select().from(chatSummaries).get();
-  for (let index = 0; index < 36; index++)
-    store.insertMessage(
-      chatId,
-      "user",
-      `Legacy ${index}: ${"x".repeat(1_000)}`,
-      "user",
-    );
-  const first = await openNativeChatSession(applicationId, chatId);
-  const imported = first.sessionManager
-    .getEntries()
-    .filter((entry) => entry.type === "custom_message");
-  expect(imported).toHaveLength(1);
-  expect(imported[0]).toMatchObject({
-    customType: "server-guy-legacy-context",
-    details: { truncated: true },
-  });
-  expect(String(imported[0].content)).toContain(
-    "historical, user/model-authored data",
-  );
-  expect(String(imported[0].content).length).toBeLessThan(23_000);
-  expect(String(imported[0].content)).not.toContain("Failed partial output");
-  expect(
-    first.sessionManager
-      .getEntries()
-      .filter((entry) => entry.type === "message"),
-  ).toEqual([]);
-  first.release();
-  const bytes = readFileSync(pathFor(), "utf8");
-  store.insertMessage(chatId, "user", "Added after import", "user");
-  const second = await openNativeChatSession(applicationId, chatId);
-  second.release();
-  expect(readFileSync(pathFor(), "utf8")).toBe(bytes);
-  expect(store.db().select().from(chatSummaries).get()).toEqual(
-    originalSummary,
-  );
-  expect(store.listMessages(chatId)).toHaveLength(40);
+it("starts with empty native context instead of importing disposable SQLite chat text", async () => {
+  store.insertMessage(chatId, "user", "Old chat text", "user");
+  store.insertMessage(chatId, "assistant", "Old answer", "pi");
+  const opened = await openNativeChatSession(applicationId, chatId);
+  expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
+  expect(opened.sessionManager.getEntries()).toEqual([]);
+  opened.release();
+  expect(store.listMessages(chatId)).toHaveLength(2);
 });
 
 it("does not duplicate the accepted user message from the first queued Run", async () => {
@@ -183,9 +132,6 @@ it("does not duplicate the accepted user message from the first queued Run", asy
   const opened = await openNativeChatSession(applicationId, chatId);
   expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
   opened.release();
-  await expect(
-    rebuildNativeChatSession(applicationId, chatId),
-  ).rejects.toMatchObject({ code: "busy" });
 });
 
 it("restores a native compaction entry and the surviving native message through the SDK", async () => {
@@ -229,12 +175,11 @@ it.each([
   "partial-tail",
   "unreadable",
 ])(
-  "fails safely for an established %s file and preserves it for explicit rebuild",
+  "fails safely for an established %s file without recreating or modifying it",
   async (damage) => {
     const initial = await openNativeChatSession(applicationId, chatId);
     const originalId = initial.sessionManager.getSessionId();
     initial.release();
-    const initialBytes = readFileSync(pathFor(), "utf8");
     if (damage === "empty") writeFileSync(pathFor(), "");
     if (damage === "missing") rmSync(pathFor());
     if (damage === "mismatched") {
@@ -258,31 +203,6 @@ it.each([
     expect(association()).toBe(originalId);
     if (damage !== "unreadable" && damage !== "missing")
       expect(readFileSync(pathFor(), "utf8")).toBe(damaged);
-    const savedBytes =
-      damage === "unreadable"
-        ? initialBytes
-        : existsSync(pathFor())
-          ? readFileSync(pathFor(), "utf8")
-          : null;
-    await rebuildNativeChatSession(applicationId, chatId);
-    expect(association()).not.toBe(originalId);
-    expect(
-      store.listActivity(store.getChat(chatId)!.workspaceId),
-    ).toMatchObject([
-      {
-        kind: "chat-history-rebuilt",
-        summary: "Conversation rebuilt from saved chat",
-        detail: chatId,
-      },
-    ]);
-    const preserved = readdirSync(dirname(pathFor())).filter((name) =>
-      name.includes(".preserved-"),
-    );
-    expect(preserved).toHaveLength(damage === "missing" ? 0 : 1);
-    if (savedBytes !== null)
-      expect(readFileSync(join(dirname(pathFor()), preserved[0]), "utf8")).toBe(
-        savedBytes,
-      );
   },
 );
 
@@ -305,36 +225,6 @@ it.each([false, true])(
     opened.release();
   },
 );
-
-it("completes interrupted legacy import after identity association, then never reimports", async () => {
-  store.insertMessage(chatId, "user", "Legacy context to retain", "user");
-  mkdirSync(dirname(pathFor()), { recursive: true, mode: 0o700 });
-  writeFileSync(pathFor(), "", { mode: 0o600 });
-  const initialized = SessionManager.open(
-    pathFor(),
-    dirname(pathFor()),
-    process.cwd(),
-  );
-  store
-    .db()
-    .update(chats)
-    .set({ nativeSessionId: initialized.getSessionId() })
-    .where(eq(chats.id, chatId))
-    .run();
-  const opened = await openNativeChatSession(applicationId, chatId);
-  expect(JSON.stringify(opened.sessionManager.getEntries())).toContain(
-    "Legacy context to retain",
-  );
-  expect(opened.sessionManager.getSessionId()).toBe(initialized.getSessionId());
-  opened.release();
-  const reopened = await openNativeChatSession(applicationId, chatId);
-  expect(
-    reopened.sessionManager
-      .getEntries()
-      .filter((entry) => entry.type === "custom_message"),
-  ).toHaveLength(1);
-  reopened.release();
-});
 
 it("releases its lock after an association failure and adopts the initialized header on retry", async () => {
   store
@@ -379,38 +269,10 @@ it("does not adopt an unassociated file that already contains a native conversat
   expect(readFileSync(pathFor(), "utf8")).toBe(original);
 });
 
-it("rolls back the association and success Activity together if recording rebuild completion fails", async () => {
-  const initial = await openNativeChatSession(applicationId, chatId);
-  const initialId = initial.sessionManager.getSessionId();
-  initial.release();
-  store
-    .db()
-    .$client.exec(
-      "CREATE TRIGGER reject_rebuild_activity BEFORE INSERT ON activity_events BEGIN SELECT RAISE(ABORT, 'synthetic activity failure'); END",
-    );
-  try {
-    await expect(
-      rebuildNativeChatSession(applicationId, chatId),
-    ).rejects.toMatchObject({ code: "history-unavailable" });
-    expect(association()).toBe(initialId);
-    expect(store.listActivity(store.getChat(chatId)!.workspaceId)).toEqual([]);
-  } finally {
-    store.db().$client.exec("DROP TRIGGER reject_rebuild_activity");
-  }
-  await rebuildNativeChatSession(applicationId, chatId);
-  expect(association()).not.toBe(initialId);
-  expect(store.listActivity(store.getChat(chatId)!.workspaceId)).toHaveLength(
-    1,
-  );
-});
-
-it("blocks a second writer, rebuild and removal until release, and retains lock files after removal", async () => {
+it("blocks a second writer and removal until release, and retains lock files after removal", async () => {
   const first = await openNativeChatSession(applicationId, chatId);
   await expect(
     openNativeChatSession(applicationId, otherChatId),
-  ).rejects.toMatchObject({ code: "busy" });
-  await expect(
-    rebuildNativeChatSession(applicationId, chatId),
   ).rejects.toMatchObject({ code: "busy" });
   const remove = vi.fn(() => store.deleteApplication(applicationId));
   expect(() => removeNativeApplicationSessions(applicationId, remove)).toThrow(

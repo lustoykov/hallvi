@@ -25,8 +25,8 @@ export interface PhaseOneEvalCase {
 const nativeCases: PhaseOneEvalCase[] = [
   {
     id: "native-buried-active",
-    category: "Native conversation",
-    name: "Old active priority after compaction",
+    category: "Conversation memory & compaction",
+    name: "Recall an older saved requirement after compaction",
     existingPriority: "Never risk customer data to reduce hosting costs.",
     nativeScenario: "buried-active",
     message:
@@ -37,8 +37,8 @@ const nativeCases: PhaseOneEvalCase[] = [
   },
   {
     id: "native-cross-chat-revision",
-    category: "Native conversation",
-    name: "Another chat replaced the old priority",
+    category: "Conversation memory & compaction",
+    name: "Use another chat's updated requirement after compaction",
     existingPriority: "Minimize hosting costs even if recovery is slower.",
     nativeScenario: "cross-chat-revision",
     message:
@@ -49,7 +49,7 @@ const nativeCases: PhaseOneEvalCase[] = [
   },
   {
     id: "native-correction",
-    category: "Native conversation",
+    category: "Conversation memory & compaction",
     name: "Correct, rather than add, after compaction",
     existingPriority: "Prioritize low monthly hosting cost over fast recovery.",
     nativeScenario: "correction",
@@ -62,8 +62,8 @@ const nativeCases: PhaseOneEvalCase[] = [
   },
   {
     id: "native-addition",
-    category: "Native conversation",
-    name: "An additional requirement does not replace another",
+    category: "Conversation memory & compaction",
+    name: "Add a requirement after compaction without replacing another",
     existingPriority: "Prioritize fast recovery over the lowest hosting cost.",
     nativeScenario: "addition",
     message:
@@ -74,8 +74,8 @@ const nativeCases: PhaseOneEvalCase[] = [
   },
   {
     id: "native-implicit-constraint",
-    category: "Native conversation",
-    name: "Broaden a missed search for an implicit constraint",
+    category: "Conversation memory & compaction",
+    name: "Find a relevant requirement after compaction and a missed search",
     existingPriority: "Never risk customer data.",
     nativeScenario: "implicit-constraint",
     message:
@@ -87,7 +87,7 @@ const nativeCases: PhaseOneEvalCase[] = [
   ...(["cancelled", "cancelled-compacted"] as const).map(
     (nativeScenario): PhaseOneEvalCase => ({
       id: `native-${nativeScenario}`,
-      category: "Native conversation",
+      category: "Conversation memory & compaction",
       name:
         nativeScenario === "cancelled"
           ? "Cancelled proposal was never saved"
@@ -246,7 +246,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
       "My hosting budget for this app is at most €30 per month. Remember that limit.",
     expectedProposals: 1,
     rubric:
-      "Save exactly one application-specific requirement preserving a maximum hosting budget of €30 per month. Do not turn the cap into a target, infer willingness to sacrifice data safety, ask the user to rank generic priorities, or claim to provision or change hosting.",
+      "Save exactly one application-specific requirement preserving a maximum hosting budget of €30 per month. Confirm it naturally as saved when the after-state proves persistence; do not expose Runs, staged proposals or pending-save mechanics, imply another confirmation is needed, or tell the user to wait for saving. Do not turn the cap into a target, infer willingness to sacrifice data safety, ask the user to rank generic priorities, or claim to enforce the cap, provision or change hosting.",
   },
   {
     id: "explicit-data-residency",
@@ -256,7 +256,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
       "All customer data for this app must stay in the EU. Remember this requirement.",
     expectedProposals: 1,
     rubric:
-      "Save exactly one requirement that all customer data stays in the EU. Do not narrow it to only the database, invent a provider, claim current compliance was verified, or demand a priority ranking. The reply must agree with the saved requirement.",
+      "Save exactly one requirement that all customer data stays in the EU. Confirm it naturally as saved when the after-state proves persistence; do not expose Runs, staged proposals or pending-save mechanics, imply another confirmation is needed, or tell the user to wait for saving. Do not narrow it to only the database, invent a provider, claim current compliance was verified, or demand a priority ranking. The reply must agree with the saved requirement.",
   },
   ...nativeCases,
 ];

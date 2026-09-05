@@ -10,7 +10,7 @@ import type {
 
 const failedAt = "2026-09-05T10:00:00.000Z";
 const historyError =
-  "Conversation history unavailable. Rebuild conversation from saved chat to continue.";
+  "Conversation history unavailable. Start a new chat to continue.";
 const chat: Chat = {
   id: "chat-one",
   workspaceId: "workspace-one",
@@ -41,10 +41,14 @@ function render({
   error = historyError,
   archived = false,
   activity = [],
+  status = "failed",
+  body = "",
 }: {
   error?: string;
   archived?: boolean;
   activity?: PhaseOneOperatorView["activity"];
+  status?: "queued" | "running" | "failed" | "cancelled";
+  body?: string;
 } = {}) {
   const view: PhaseOneOperatorView = {
     application: {
@@ -76,9 +80,9 @@ function render({
         chatId: chat.id,
         role: "assistant",
         source: "pi",
-        body: "",
+        body,
         createdAt: failedAt,
-        status: "failed",
+        status,
         revision: 2,
       },
     ],
@@ -100,66 +104,59 @@ function render({
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
       onArchive={vi.fn()}
-      runs={[{ ...run, error }]}
+      runs={[{ ...run, error, status }]}
       reconnecting={false}
       onRunAction={vi.fn()}
-      onRebuildChat={vi.fn()}
+      onNewChat={vi.fn()}
     />,
   );
 }
 
-function rebuilt(chatId = chat.id, createdAt = "2026-09-05T10:01:00.000Z") {
-  return {
-    id: "rebuild-event",
-    workspaceId: chat.workspaceId,
-    kind: "chat-history-rebuilt",
-    summary: "Conversation rebuilt from saved chat",
-    detail: chatId,
-    createdAt,
-  };
-}
-
 describe("conversation recovery and assistant branding", () => {
-  it("offers explicit rebuild for a history failure and preserves ordinary retry for other failures", () => {
-    const unavailable = render();
-    expect(unavailable).toContain(
-      "Rebuild conversation from saved chat</button>",
+  it.each([
+    ["queued", "Waiting to reply…"],
+    ["running", "Replying…"],
+    ["failed", "Something went wrong. Please retry."],
+    ["cancelled", "Reply cancelled."],
+  ] as const)("keeps %s status user-facing", (status, expected) => {
+    const html = render({
+      status,
+      error: "Transaction failed for internal Run id.",
+    });
+    expect(html).toContain(expected);
+    expect(html).not.toContain("Transaction failed");
+    expect(html).not.toContain("Waiting for the worker");
+    expect(html).not.toContain("Decisions are saved only");
+  });
+
+  it("keeps an unsuccessful save confirmation inside a collapsed unfinished draft", () => {
+    const html = render({
+      error: "Commit failed",
+      body: "Saved: hosting budget €30/month.",
+    });
+    expect(html).toContain("Something went wrong. Please retry.");
+    expect(html).toMatch(
+      /<details class="sg-run-draft"><summary>Show unfinished draft<\/summary>/,
     );
+    expect(html).toContain("Saved: hosting budget €30/month.");
+    expect(html).not.toContain("Commit failed");
+    expect(html).toContain("Retry reply</button>");
+  });
+
+  it("offers a new chat for a history failure and preserves ordinary retry for other failures", () => {
+    const unavailable = render();
+    expect(unavailable).toContain("Start a new chat</button>");
     expect(unavailable).not.toContain("Retry reply</button>");
     const ordinary = render({
       error: "Server Guy could not finish this attempt.",
     });
     expect(ordinary).toContain("Retry reply</button>");
-    expect(ordinary).not.toContain(
-      "Rebuild conversation from saved chat</button>",
-    );
+    expect(ordinary).not.toContain("Start a new chat</button>");
   });
-
-  it("derives recovered state from durable Activity when a refreshed page mounts", () => {
-    const html = render({ activity: [rebuilt()] });
-    expect(html).toContain("Retry reply</button>");
-    expect(html).toContain(
-      "Conversation rebuilt from saved chat. Retry the reply when ready.",
-    );
-    expect(html).not.toContain("Rebuild conversation from saved chat</button>");
-    expect(html).toContain(historyError);
-  });
-
-  it.each([
-    rebuilt("another-chat"),
-    rebuilt(chat.id, "2026-09-05T09:59:00.000Z"),
-  ])(
-    "does not treat an unrelated or old rebuild event as recovery",
-    (event) => {
-      expect(render({ activity: [event] })).toContain(
-        "Rebuild conversation from saved chat</button>",
-      );
-    },
-  );
 
   it("offers no recovery mutation in an archived Chat", () => {
     const html = render({ archived: true });
-    expect(html).not.toContain("Rebuild conversation from saved chat</button>");
+    expect(html).not.toContain("Start a new chat</button>");
     expect(html).not.toContain("Retry reply</button>");
   });
 

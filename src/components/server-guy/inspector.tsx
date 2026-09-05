@@ -165,11 +165,7 @@ export function Inspector({
                   <span className="sg-event-dot" />
                   <div>
                     <strong>{event.summary}</strong>
-                    <p>
-                      {event.kind === "chat-history-rebuilt"
-                        ? `${view.chats.find((chat) => chat.id === event.detail)?.title ?? "Saved chat"} · messages and Decisions kept.`
-                        : event.detail}
-                    </p>
+                    <p>{event.detail}</p>
                     <LocalTime value={event.createdAt} />
                   </div>
                 </article>

@@ -80,9 +80,9 @@ export const browserJourneys = [
   },
   {
     id: "native-history",
-    name: "Continue and rebuild conversation history",
+    name: "Continue conversation history and recover from loss",
     description:
-      "Continue native history across reloads, isolate Chats while sharing saved Decisions, and explicitly rebuild missing history before retrying.",
+      "Continue native history across reloads, isolate Chats while sharing saved Decisions, and start a fresh Chat when native history is missing.",
     smoke: false,
   },
   {

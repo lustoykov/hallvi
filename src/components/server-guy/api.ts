@@ -76,12 +76,6 @@ export const api = {
       {},
     );
   },
-  rebuildChat(applicationId: string, chatId: string) {
-    return post(
-      `/api/applications/${applicationId}/chats/${chatId}/rebuild`,
-      {},
-    );
-  },
   sendMessage(
     applicationId: string,
     chatId: string,

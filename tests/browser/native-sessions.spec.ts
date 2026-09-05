@@ -126,9 +126,9 @@ test(
 );
 
 test(
-  "missing native history requires explicit rebuild, survives reload and never retries automatically",
+  "missing native history offers a fresh chat without rebuilding or retrying the old one",
   journey("native-history"),
-  async ({ page, fixture }) => {
+  async ({ page, fixture }, testInfo) => {
     const initial = await addApplication(page, "native-recovery");
     await send(page, "priority: Preserve these saved records");
     const before = await snapshot(page);
@@ -136,77 +136,57 @@ test(
       fixture.state,
       "pi-sessions",
       initial.application.id,
-      `${initial.selectedChatId}.jsonl`,
+      initial.selectedChatId + ".jsonl",
     );
-    const oldId = JSON.parse(
-      readFileSync(nativePath, "utf8").split("\n")[0],
-    ).id;
-    // Move only this test's generated fixture file; preserve it for evidence.
-    renameSync(nativePath, `${nativePath}.qa-preserved`);
+    renameSync(nativePath, nativePath + ".qa-preserved");
     await page
       .getByRole("textbox", { name: "Message Server Guy" })
       .fill("Continue after history loss");
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    const rebuild = page.getByRole("button", {
-      name: "Rebuild conversation from saved chat",
+    const startChat = page.getByRole("button", {
+      name: "Start a new chat",
       exact: true,
     });
-    await expect(rebuild).toBeVisible();
-    const endpoint = `/api/applications/${initial.application.id}/chats/${initial.selectedChatId}/messages`;
+    await expect(startChat).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Retry reply", exact: true }),
+    ).toHaveCount(0);
+    const endpoint =
+      "/api/applications/" +
+      initial.application.id +
+      "/chats/" +
+      initial.selectedChatId +
+      "/messages";
     const failed = await (await page.request.get(endpoint)).json();
     expect(failed.runs.at(-1)).toMatchObject({ status: "failed", piCalls: 0 });
     expect((await snapshot(page)).decisions).toEqual(before.decisions);
     expect(existsSync(nativePath)).toBe(false);
-
-    await rebuild.click();
-    const confirmation = page.getByRole("dialog");
-    await expect(confirmation).toContainText(
-      "Saved messages and Decisions are retained.",
-    );
-    await expect(confirmation).toContainText("Native tool history may be lost");
-    await expect(confirmation).toContainText(
-      "does not send a message or retry the failed reply",
-    );
-    await confirmation
-      .getByRole("button", { name: "Cancel", exact: true })
-      .click();
-    await expect(rebuild).toBeFocused();
-    expect(existsSync(nativePath)).toBe(false);
-    await rebuild.click();
-    await confirmation
-      .getByRole("button", { name: "Rebuild conversation", exact: true })
-      .click();
-    await expect(confirmation).not.toBeVisible();
+    await page.reload();
+    await expect(startChat).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("missing-history-start-new-chat.png"),
+      fullPage: true,
+    });
+    await startChat.click();
     await expect(
-      page.getByText(
-        "Conversation rebuilt from saved chat. Retry the reply when ready.",
-        { exact: true },
-      ),
-    ).toBeVisible();
-    const rebuilt = await snapshot(page);
-    expect(rebuilt.decisions).toEqual(before.decisions);
-    expect(rebuilt.messages).toEqual(failed.messages);
+      page.getByRole("button", { name: "Archive chat", exact: true }),
+    ).toBeEnabled();
+    const fresh = await snapshot(page);
+    expect(fresh.selectedChatId).not.toBe(initial.selectedChatId);
+    expect(fresh.decisions).toEqual(before.decisions);
+    // A new chat has only the app's welcome note, not imported conversation.
+    expect(fresh.messages).toHaveLength(1);
+    expect(fresh.messages[0]).toMatchObject({ source: "server-guy" });
     expect((await (await page.request.get(endpoint)).json()).runs).toEqual(
       failed.runs,
     );
-    expect(
-      JSON.parse(readFileSync(nativePath, "utf8").split("\n")[0]).id,
-    ).not.toBe(oldId);
-    expect(existsSync(`${nativePath}.qa-preserved`)).toBe(true);
-    await page.reload();
-    await expect(rebuild).not.toBeVisible();
-    await page.getByRole("tab", { name: "Activity", exact: true }).click();
-    await expect(
-      page.getByRole("tabpanel", { name: "Activity", exact: true }),
-    ).toContainText("Launch Brief · messages and Decisions kept.");
-    await page
-      .getByRole("button", { name: "Retry reply", exact: true })
-      .click();
-    await expect(
-      page.getByText("[QA fixture reply] Continue after history loss", {
-        exact: true,
-      }),
-    ).toBeVisible();
-    expect((await snapshot(page)).decisions).toEqual(before.decisions);
+    expect(existsSync(nativePath)).toBe(false);
+    expect(existsSync(nativePath + ".qa-preserved")).toBe(true);
+    await send(page, "Hello from a new chat");
+    await send(
+      page,
+      "lookup-decisions",
+      "[QA saved Decisions] Preserve these saved records",
+    );
   },
 );

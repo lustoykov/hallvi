@@ -42,7 +42,7 @@ Finish the required [Phase 1 acceptance gates](docs/testing/phase-one-acceptance
 - [x] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
 - [x] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
 
-Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or intentionally nuking the local database.
+Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or explicitly resetting a disposable local database. Version mismatches stop setup rather than migrate data. Before the first release with user-data retention promises, implement and test schema migrations and backup/restore; until then, development chats are disposable.
 
 ### Configure Pi explicitly
 
@@ -95,7 +95,7 @@ Decision: offer explicit reuse of a detected GitHub CLI/environment credential o
 
 The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
 
-- [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; this branch replaces that path with native Pi history/compaction and a bounded one-time legacy import.
+- [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; this branch replaces that path with native Pi history/compaction. Prototype chats are disposable; no legacy import.
 - [x] Make all active Decisions available regardless of age. This branch replaces the repeated injected list with scoped, paginated `search_decisions`; current checks and previous attempt outcomes remain separate Run context.
 - [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
 - [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
@@ -106,7 +106,7 @@ The [implementation contract](docs/specs/durable-pi-requests.md) defines the fir
 - [x] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
 - [x] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
 
-Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered the worker and bounded-context implementation. SQLite remains authoritative for saved effects, messages and Runs; native JSONL owns attempted model/tool history and compaction. Old summary rows are retained for legacy import only. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered the worker and bounded-context implementation. SQLite remains authoritative for saved effects, messages and Runs; native JSONL owns attempted model/tool history and compaction. Old summary rows are unused; no import or reconstruction runs. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
 

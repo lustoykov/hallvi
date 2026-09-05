@@ -96,7 +96,7 @@
           <tr><td>Conversation</td><td>Fresh session; reconstructed text history and a custom summarizer.</td><td><a href="../../src/server/pi-sessions.ts">Reopen native per-chat history</a>; let Pi compact it.</td></tr>
           <tr><td>Saved choices</td><td>Inject every current Decision each request.</td><td><a href="../../src/server/pi-decisions.ts">Search current records when relevant</a>; old active choices remain discoverable.</td></tr>
           <tr><td>Bad replacement ID</td><td>Can fail after the model finishes.</td><td>Early tool feedback lets the model correct it. The <a href="../../src/server/phase-one.ts">final guarded write</a> still protects against changed state.</td></tr>
-          <tr><td>Missing native history</td><td>No native history to restore.</td><td>Explicit recovery; preserve the old file and <a href="../../src/server/pi-sessions.ts">rebuild from saved chat</a>. Never auto-retry.</td></tr>
+          <tr><td>Missing native history</td><td>No native history to restore.</td><td>Show an error and offer <a href="../../src/server/pi-sessions.ts">Start a new chat</a>. No reconstruction or automatic retry.</td></tr>
           <tr><td>External authority</td><td>No shell, deployment or repository-write tool.</td><td>Unchanged. Approval modes remain preferences until external changes are implemented.</td></tr>
         </tbody>
       </table>

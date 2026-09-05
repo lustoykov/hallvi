@@ -193,6 +193,25 @@ describe("assistant output and errors", () => {
     expect(SYSTEM_PROMPT).not.toContain("durable launch priority");
   });
 
+  it("confirms successful saves without leaking persistence mechanics or hiding failed proposals", () => {
+    expect(SYSTEM_PROMPT).toContain(
+      "Write the final answer for successful completion",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "Saved: your hosting budget is at most €30 per month.",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "Do not expose Runs, staged proposals, pending saves",
+    );
+    expect(SYSTEM_PROMPT).toContain("Do not ask for another confirmation");
+    expect(SYSTEM_PROMPT).toContain(
+      "never claim a rejected proposal was saved",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "Never claim a failed or cancelled request saved a requirement",
+    );
+  });
+
   it("normalizes conversational text and rejects empty or oversized output", () => {
     expect(normalizePiAssistantMessage("  Looks good.  ")).toBe("Looks good.");
     expect(() => normalizePiAssistantMessage("   ")).toThrow(
@@ -666,7 +685,7 @@ describe("native Pi adapter", () => {
   });
   it("preserves native recovery errors and does not start auth/model setup for unavailable history", async () => {
     const error = new Error(
-      "Conversation history unavailable. Rebuild conversation from saved chat.",
+      "Conversation history unavailable. Start a new chat.",
     );
     mocks.open.mockRejectedValue(error);
     await expect(askPi(input)).rejects.toBe(error);

@@ -97,7 +97,7 @@ Pi may respond to a denied or invalid tool call by correcting it, asking the eng
 
 Current behavior is `collect proposals → Pi finishes → one SQLite transaction saves answer + Decisions + Run success`. A tool saying “collected” is not a receipt that a Decision was saved.
 
-The native-session migration retains this contract. TypeBox/tool-execution errors already return through Pi's tool loop. Add a small application-scoped active-Decision lookup during proposal collection, plus detection of conflicting staged replacements within the same Run. A bad replacement then returns a useful tool error while Pi can still correct it. Only successful proposals enter the staging collection.
+The native-session implementation retains this contract. TypeBox/tool-execution errors already return through Pi's tool loop. Add a small application-scoped active-Decision lookup during proposal collection, plus detection of conflicting staged replacements within the same Run. A bad replacement then returns a useful tool error while Pi can still correct it. Only successful proposals enter the staging collection.
 
 The final transaction still uses a guarded mutation. These are two different jobs: an early read supplies feedback to Pi; the conditional write protects the commit against stale state. Do not duplicate a whole validation framework, but do not claim an earlier read guarantees a later write. A late domain failure still fails the Run and rolls back the staged batch; native sessions alone do not make every final failure repairable inside the same turn.
 
@@ -146,6 +146,8 @@ All listed records are active saved Decisions; historical content appears only i
 
 Return these records and bounded source/replacement references in model-visible tool content. Keep this Run's pending proposals clearly separate from saved results. `propose_decision` still stages a proposal and returns its content with an explicit **"pending, not saved"** status; it does not commit early. Pi already sees a proposal it just made, and can read back the actual saved result when needed on a later Run.
 
+Ordinary replies must not expose that internal staging lifecycle. After a successful proposal, write the final confirmation for successful completion: for example, **“Saved: your hosting budget is at most €30 per month.”** No additional user confirmation is required. The application marks that reply complete only when the final transaction succeeds. Streaming text remains provisional; on failure, show a plain error and retry action, with any unfinished draft collapsed. Never confirm rejected proposals or claim a failed/cancelled request saved anything. Internal tool results and previous-attempt context must still report the actual persistence status truthfully.
+
 Stable instructions should direct Pi to consult the tool when answering what was agreed, explaining a choice, or finding a current replacement target. Also consult it before adding or revising a priority when existing choices matter, and before recommending a change that could affect a saved constraint—even if the engineer does not mention Decisions. For example, **"Can we make backups cheaper?"** may depend on **"Never risk customer data."** A narrow query may miss that wording; broaden the query or list active records when needed. Let Pi choose the relevant query and next step; do not mechanically call it on every greeting or pretend a remembered/summarized Decision is guaranteed current.
 
 Replace the existing `CURRENT DECISIONS` ID-copying instructions in both the system prompt and proposal-tool guidelines with instructions to obtain exact active IDs from lookup results. Multiple priorities of the same kind can legitimately coexist; same-kind presence is not itself a conflict. Do not add a semantic conflict classifier or a new pre-staging approval protocol. Feedback after accepting a proposal cannot retract it. Start with lookup guidance and the correction-versus-addition eval below; retain the proposal-time replacement checks specified above and the final guarded writes.
@@ -183,15 +185,19 @@ Make the user's “lost in the middle” concern an explicit acceptance gate usi
 
 Store native session files under Server Guy's private data directory, for example `.server-guy/pi-sessions/<application-id>/<chat-id>.jsonl`. Respect the configured data directory; derive paths from validated server-side identities, never a model-supplied path. Do not mix these files with the user's interactive Pi sessions or load their global tools/extensions/instructions.
 
-Associate the Chat with its expected native session ID. Establish the file and association before the first model request. On resume, a previously established but missing, empty, mismatched or unreadable session is an explicit recovery error, not permission to silently start an empty conversation. Offer **Rebuild conversation from saved chat** as an explicit recovery choice and explain that native tool history may be lost; preserve damaged files. Use owner-only storage; exclude it from Git and static serving.
+Associate the Chat with its expected native session ID. Establish the file and association before the first model request. On resume, a previously established but missing, empty, mismatched or unreadable session is an explicit recovery error, not permission to silently start an empty conversation. Offer **Start a new chat** using the existing chat-creation flow. Do not reconstruct conversation history from SQLite; leave damaged files and old chat records untouched. Use owner-only storage; exclude it from Git and static serving.
 
 Installed Pi 0.84.4 defers the first normal file write until an assistant message exists, and `SessionManager.open` can create a missing file. Initialization must account for this: exclusively create the new private file, let the public SDK initialize its header, then associate its native ID. An interruption before association may adopt the same valid header-only file; an existing association must never be silently overwritten.
 
-The SDK tolerates an interrupted final JSONL line and can skip malformed lines. That is not a promise to detect every corruption. Add focused persistence tests; preserve a damaged established file for inspection and provide an explicit recovery action rather than automatically discarding history. JSONL writes and SQLite commits are not one transaction, and ordinary append operations do not imply a power-loss `fsync` guarantee.
+The SDK tolerates an interrupted final JSONL line and can skip malformed lines. That is not a promise to detect every corruption. Add focused persistence tests; preserve a damaged established file for inspection and offer a new chat rather than automatically discarding history. JSONL writes and SQLite commits are not one transaction, and ordinary append operations do not imply a power-loss `fsync` guarantee.
 
 Backup/restore must include both SQLite and associated session files. During an explicit application reset/removal, stop and settle its Run before cleaning up its sessions. The native log grows even when model context is compacted; compaction is not disk retention. No scheduled cleanup service is needed now.
 
 ### Cancellation, crash and retry
+
+**Accepted streaming trade-off (September 5, 2026):** show partial replies before Pi has persisted the corresponding native message. SQLite draft writes are separate, already-committed transactions; they do not wait for the final answer/Decision/Run-success transaction. After a worker crash, SQLite may retain a visible draft that is absent from Pi's native history. Newer fragments held only in memory may be lost. This is acceptable: preserve the saved draft with an interrupted outcome and let the user retry, rather than withholding streaming or adding cross-store synchronization machinery.
+
+Conversely, Pi may persist a complete native answer before the final SQLite transaction succeeds. Native text alone must not mark the Run successful or prove that a requirement was saved. Keep the existing final transaction, interruption handling and next-Run outcome context; do not reconstruct or replay the unfinished answer into Pi merely to make both stores match. Browser reconnection still reads the latest saved UI state. This decision accepts divergence in attempted output, not silent loss of accepted requirements or duplicate external effects. No failure frequency has been measured; the user's “1%” was a tolerance statement, not an observed rate.
 
 Keep native attempted history rather than rolling every failed attempt back to a successful leaf. A record of an unsuccessful conversation can be useful; current database facts determine what was actually saved.
 
@@ -210,13 +216,13 @@ Retry remains a new, linked Run. Under the first slice's unchanged atomic semant
 
 ### Existing Chats
 
-Existing SQLite text cannot recreate genuine native tool calls, provider metadata or compaction entries. On first native use, import a clearly labeled legacy-context note from the existing summary and bounded completed history, keeping all original UI messages intact. Do not fabricate native assistant/tool records. Only this one-time transition may use the old text representation; subsequent Runs continue the native session.
+Existing SQLite text cannot recreate genuine native tool calls, provider metadata or compaction entries. During prototyping, do not import old conversation text. A chat without a native-session association starts with empty native history; only subsequent native messages provide conversation context. Existing SQLite text is not deleted automatically, but its presence in the UI does not imply the agent remembers it. Use a new chat or explicitly reset disposable application data after a breaking change.
 
-The active custom summarization/replay path is removed. Old persisted summary data remains readable for the bounded one-time transition; it is not updated or erased by this migration.
+The active custom summarization/replay path is removed. Old persisted summary rows are unused. Development chats are disposable: no legacy-text import or rebuild endpoint is supported. Schema changes use a fresh prototype database instead of compatibility upgrades. Introduce tested migrations before the first release that promises to retain user data. Credentials and saved eval results are outside this reset boundary.
 
 ## Implementation slices and acceptance
 
-1. **Implemented on this branch — native sessions and scoped Decision retrieval, unchanged external authority/commit semantics:** session identity/storage, native history/compaction, stable instructions, read-only Decision search, minimal native Run context, settlement fix, legacy import and early Decision-proposal feedback with guarded final writes.
+1. **Implemented on this branch — native sessions and scoped Decision retrieval, unchanged external authority/commit semantics:** session identity/storage, native history/compaction, stable instructions, read-only Decision search, minimal native Run context, settlement fix and early Decision-proposal feedback with guarded final writes.
 2. **Then resume inspectability and later operations:** trace native model/tool events under the existing Run ID; add actual approval enforcement with the first external mutation. Independently committed tools remain a separate semantic choice, not a dependency of native sessions. No new orchestration service.
 
 Required tests for slice 1:
@@ -229,7 +235,7 @@ Required tests for slice 1:
 - Cancel during generation, a tool call and compaction; prove no overlapping session writer or late successful commit.
 - Crash after proposal collection, after native final output and after SQLite success; prove truthful outcomes and no blind replay.
 - Exercise orphaned tool-call history through the actual SDK conversion with a synthetic provider; no real credentials required for deterministic tests.
-- Detect missing/mismatched established files; cover initial-file and association interruption, partial trailing writes and explicit legacy import.
+- Detect missing/mismatched established files; cover initial-file and association interruption, partial trailing writes and starting a new chat after history loss.
 - Verify a recoverable tool error returns to Pi; separately verify final domain rejection still rolls back the entire first-slice transaction.
 - Retain desktop send/reload/cancel/retry journeys; live model checks remain separate, opt-in evals for continuity, recovery, truthful saved-state claims and Decision retrieval/use in long or compacted conversations.
 
@@ -272,8 +278,8 @@ The earlier exchange changed the proposal:
 
 - **Then accepted Fable's simplification:** reuse the existing per-Run system prompt instead of adding a context extension; the dynamic-snapshot placement is now superseded above. Retaining atomic final Decision saves instead of scheduling a second committing-tool milestone still stands.
 - **Accepted Fable's lifecycle finding:** worker shutdown needs the same abort-and-settle discipline as cancellation and timeout. Cancelling compaction is a separate SDK operation.
-- **Rejected silent reconstruction:** a lost native session is not just a cache miss because SQLite cannot recreate its tool history. Fable agreed a nullable native session ID and an explicit rebuild action are the smallest way to distinguish first migration from lost history.
+- **Rejected silent reconstruction:** a lost native session is not just a cache miss because SQLite cannot recreate its tool history. The original review proposed an explicit rebuild action. Superseded by the September 5 simplification: keep the nullable native session ID to detect lost history, remove legacy import/rebuild, and offer a fresh chat.
 - **Corrected two overclaims:** an established JSONL file can already contain a failed attempt's user/tool messages; early validation does not guarantee a later commit. The design preserves attempted history and checks current state at the write.
-- **Settled the remaining choices:** keep compaction within the Run deadline until measured; import bounded legacy summary and completed text once, without deleting the old persisted records.
+- **Settled the remaining choices:** keep compaction within the Run deadline until measured. The earlier legacy-import plan is superseded by the disposable-prototype policy above.
 
 A separate disposable SDK probe verified private-file initialization, session/entry identity across reopening, a synthetic compaction checkpoint, custom-message conversion, orphaned tool-call repair and omission of aborted assistant output. It used no model calls, credentials or product database. The compaction entry was manually constructed: this is feasibility evidence, not proof of model-generated compaction, crash recovery or concurrent-writer safety. The acceptance tests above remain required before implementation can be considered complete.

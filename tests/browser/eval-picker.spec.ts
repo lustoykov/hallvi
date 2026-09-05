@@ -113,6 +113,20 @@ test(
       });
 
       await expect(groupCheck("GitHub access")).toBeChecked();
+      await expect(category("Conversation memory & compaction")).toBeVisible();
+      await category("Conversation memory & compaction")
+        .locator(":scope > summary")
+        .click();
+      await expect(
+        page.getByRole("checkbox", {
+          name: /^Recall an older saved requirement after compaction/,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("checkbox", {
+          name: /^Use another chat's updated requirement after compaction/,
+        }),
+      ).toBeVisible();
       await groupCheck("GitHub access").uncheck();
       await expect(page.locator("#run-evals")).toBeDisabled();
       await page.getByLabel("Search cases").fill("ordinary greeting");
