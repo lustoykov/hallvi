@@ -65,7 +65,7 @@ test(
     });
     const selected = () =>
       page
-        .locator("#eval-options input:checked")
+        .locator("#eval-options .eval-option input:checked")
         .evaluateAll((inputs) =>
           inputs.map((input) => (input as HTMLInputElement).value),
         );
@@ -73,7 +73,9 @@ test(
       .filter((item) => item.githubState)
       .map((item) => item.id);
     const category = (name: string) =>
-      page.locator(`.eval-category[data-category="${name}"]`);
+      page.locator(`.eval-category[data-category="${name}"] > details`);
+    const groupCheck = (name: string) =>
+      page.getByRole("checkbox", { name: `Select all cases in ${name}` });
     try {
       await page.goto(`http://127.0.0.1:${address.port}/`);
       await page
@@ -105,9 +107,8 @@ test(
         fullPage: true,
       });
 
-      await page
-        .getByRole("button", { name: "Clear GitHub access", exact: true })
-        .click();
+      await expect(groupCheck("GitHub access")).toBeChecked();
+      await groupCheck("GitHub access").uncheck();
       await expect(page.locator("#run-evals")).toBeDisabled();
       await page.getByLabel("Search cases").fill("ordinary greeting");
       await expect(category("GitHub access")).toBeHidden();
@@ -197,6 +198,32 @@ test(
       );
       await expect.poll(selected).toEqual([]);
       await expect(page.locator("#run-evals")).toBeDisabled();
+      // A collapsed category is picked in one click, without expanding it.
+      const decisionIds = phaseOneCases
+        .filter((item) => item.category === "Decision handling")
+        .map((item) => item.id);
+      await expect(category("Decision handling")).not.toHaveAttribute(
+        "open",
+        "",
+      );
+      await groupCheck("Decision handling").check();
+      await expect.poll(selected).toEqual(decisionIds);
+      await expect(category("Decision handling")).not.toHaveAttribute(
+        "open",
+        "",
+      );
+      await expect(page.locator("#eval-count")).toContainText(
+        `${decisionIds.length} planned answers`,
+      );
+      await category("Decision handling").locator(":scope > summary").click();
+      await page
+        .locator(`#eval-options .eval-option input[value="${decisionIds[0]}"]`)
+        .uncheck();
+      expect(
+        await groupCheck("Decision handling").evaluate(
+          (input) => (input as HTMLInputElement).indeterminate,
+        ),
+      ).toBe(true);
       await page.screenshot({
         path: testInfo.outputPath("all-cases-already-run.png"),
         fullPage: true,

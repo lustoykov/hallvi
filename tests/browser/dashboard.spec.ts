@@ -751,8 +751,8 @@ test(
       expect(listReports(root).find((r) => r.run === run)?.archived).toBe(
         false,
       );
-      // A full 16-answer run expands in normal page flow, without a nested
-      // sidebar scroller.
+      // A full 16-answer run scrolls inside the sticky sidebar, so the open
+      // answer stays in view while the queue is browsed.
       const fullRun = "sixteen-answer-run";
       const caseIds = Array.from(
         { length: 8 },
@@ -783,27 +783,24 @@ test(
         "8 cases × 2 repetitions = 16 planned · 16 answers saved",
       );
       await expect(page.locator("#answer-list .answer-open")).toHaveCount(16);
+      await expect(page.locator(".review-sidebar")).toHaveCSS(
+        "position",
+        "sticky",
+      );
       for (const container of [
         page.locator("#answer-list"),
-        page.locator(".review-sidebar"),
-      ]) {
-        await expect(container).toHaveCSS("max-height", "none");
-        await expect(container).toHaveCSS("overflow-y", "visible");
-        expect(
-          await container.evaluate(
-            (element) => element.scrollHeight <= element.clientHeight + 1,
-          ),
-        ).toBe(true);
-      }
+        page.locator(".runs-scroll"),
+      ])
+        await expect(container).toHaveCSS("overflow-y", "auto");
       const lastAnswer = answer("layout-case-8:2");
       await lastAnswer.scrollIntoViewIfNeeded();
       await expect(lastAnswer).toBeInViewport();
-      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
       expect(
         await page
-          .locator(".review-sidebar")
+          .locator("#answer-list")
           .evaluate((element) => element.scrollTop),
-      ).toBe(0);
+      ).toBeGreaterThan(0);
+      await expect(page.locator("#case-title")).toBeInViewport();
       await lastAnswer.click();
       await page.screenshot({
         path: testInfo.outputPath("dashboard-sixteen-answers.png"),

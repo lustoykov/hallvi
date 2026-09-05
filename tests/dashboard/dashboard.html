@@ -49,9 +49,11 @@
       <div id="review-content" class="review-layout" hidden>
         <aside class="review-sidebar" aria-label="Runs and answers">
           <h2 class="side-heading">Runs</h2>
-          <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
-          <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
-          <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          <div class="runs-scroll">
+            <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
+            <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
+            <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          </div>
           <div id="answers-block" class="answers-block">
             <div class="answers-heading"><h2>Answers</h2><span id="answers-total"></span></div>
             <div class="filters" role="group" aria-label="Filter answers"><button type="button" data-filter="attention" aria-pressed="true">Attention <span></span></button><button type="button" data-filter="failures" aria-pressed="false">Failed <span></span></button><button type="button" data-filter="cleared" aria-pressed="false">Cleared <span></span></button><button type="button" data-filter="reviewed" aria-pressed="false">Reviewed <span></span></button><button type="button" data-filter="all" aria-pressed="false">All <span></span></button></div>

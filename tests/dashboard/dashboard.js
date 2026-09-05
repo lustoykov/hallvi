@@ -76,6 +76,8 @@ function configureNewEvalsButton(button) {
   button.textContent = count
     ? `Run new evals only (${count})…`
     : "No new evals to run";
+  button.classList.toggle("primary", count > 0);
+  button.classList.toggle("secondary", count === 0);
   button.disabled =
     !count || Boolean(state.active) || (state.apiVersion ?? 0) < 5;
   button.title =
@@ -1220,7 +1222,7 @@ function initializeEvalSelector() {
     const open = new Map(
       Array.from($("eval-options").children).map((group) => [
         group.dataset.category,
-        group.open,
+        group.querySelector("details").open,
       ]),
     );
     evalCatalogSignature = signature;
@@ -1232,31 +1234,30 @@ function initializeEvalSelector() {
         const items = state.evalCases.filter(
           (item) => (item.category || "Other") === category,
         );
-        const group = element("details", "", "eval-category");
+        const group = element("div", "", "eval-category");
         group.dataset.category = category;
-        group.open =
+        // The checkbox sits beside the disclosure, outside the <details>, so a
+        // collapsed group is picked in one click without toggling it open.
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "category-check";
+        check.setAttribute("aria-label", `Select all cases in ${category}`);
+        check.addEventListener("change", () => {
+          for (const input of visibleCaseInputs(group))
+            input.checked = check.checked;
+          evalSelectionEdited = true;
+          updateSelections();
+        });
+        const panel = element("details", "", "category-details");
+        panel.open =
           open.get(category) ?? items.some((item) => item.hasRun === false);
         const summary = element("summary");
         summary.append(
           element("strong", category),
           element("span", "", "category-count"),
         );
-        const select = element(
-          "button",
-          "Select category",
-          "text-button category-select",
-        );
-        select.type = "button";
-        select.addEventListener("click", () => {
-          const inputs = Array.from(
-            group.querySelectorAll('input[type="checkbox"]'),
-          );
-          const checked = !inputs.every((input) => input.checked);
-          for (const input of inputs) input.checked = checked;
-          evalSelectionEdited = true;
-          updateSelections();
-        });
-        group.append(summary, select);
+        panel.append(summary);
+        group.append(check, panel);
         for (const item of items) {
           const row = element("div", "", "selection-option eval-option");
           row.dataset.caseId = item.id;
@@ -1283,7 +1284,7 @@ function initializeEvalSelector() {
             element("p", item.message, "case-input"),
           );
           row.append(label, details);
-          group.append(row);
+          panel.append(row);
         }
         return group;
       }),
@@ -1291,7 +1292,7 @@ function initializeEvalSelector() {
   }
   const inputs = new Map(
     Array.from(
-      $("eval-options").querySelectorAll('input[type="checkbox"]'),
+      $("eval-options").querySelectorAll('.eval-option input[type="checkbox"]'),
     ).map((input) => [input.value, input]),
   );
   for (const item of state.evalCases) {
@@ -1330,14 +1331,33 @@ function filterEvalCases() {
       if (!row.hidden) visible++;
     }
     group.hidden = !visible;
-    if (query && visible) group.open = true;
+    if (query && visible) group.querySelector("details").open = true;
     matches += visible;
   }
   $("eval-no-matches").hidden = matches > 0;
+  updateCategoryChecks();
+}
+function visibleCaseInputs(group) {
+  return Array.from(
+    group.querySelectorAll('.eval-option:not([hidden]) input[type="checkbox"]'),
+  );
+}
+// The category checkbox and count describe the rows currently shown, so a
+// search narrows what one click selects.
+function updateCategoryChecks() {
+  for (const group of $("eval-options").children) {
+    const inputs = visibleCaseInputs(group);
+    const selected = inputs.filter((input) => input.checked).length;
+    group.querySelector(".category-count").textContent =
+      `${selected} / ${inputs.length} selected`;
+    const check = group.querySelector(".category-check");
+    check.checked = inputs.length > 0 && selected === inputs.length;
+    check.indeterminate = selected > 0 && selected < inputs.length;
+  }
 }
 function selectedOptions(prefix) {
   return Array.from(
-    $(`${prefix}-options`).querySelectorAll("input:checked"),
+    $(`${prefix}-options`).querySelectorAll(".selection-option input:checked"),
   ).map((input) => input.value);
 }
 function updateSelections() {
@@ -1352,19 +1372,10 @@ function updateSelections() {
   $("run-evals").disabled = Boolean(state.active) || !cases;
   const unavailable = (state.apiVersion ?? 0) < 5;
   if (unavailable) $("run-evals").disabled = true;
-  for (const group of $("eval-options").children) {
-    const inputs = Array.from(group.querySelectorAll('input[type="checkbox"]'));
-    const selected = inputs.filter((input) => input.checked).length;
-    group.querySelector(".category-count").textContent =
-      `${selected} / ${inputs.length} selected`;
-    const button = group.querySelector(".category-select");
-    const action = selected === inputs.length ? "Clear" : "Select";
-    button.textContent = `${action} category (${inputs.length})`;
-    button.setAttribute("aria-label", `${action} ${group.dataset.category}`);
-  }
+  updateCategoryChecks();
   for (const picker of ["journey-picker", "eval-picker"])
     for (const control of $(picker).querySelectorAll(
-      "input,select,.selection-actions button,.category-select",
+      "input,select,.selection-actions button",
     ))
       control.disabled =
         Boolean(state.active) || (picker === "eval-picker" && unavailable);
@@ -1385,7 +1396,9 @@ $("evals-unrun").addEventListener("click", () => {
   evalSelectionEdited = false;
   initializeEvalSelector();
   for (const group of $("eval-options").children)
-    group.open = Boolean(group.querySelector("input:checked"));
+    group.querySelector("details").open = Boolean(
+      group.querySelector(".eval-option input:checked"),
+    );
   updateSelections();
 });
 $("eval-search").addEventListener("input", filterEvalCases);

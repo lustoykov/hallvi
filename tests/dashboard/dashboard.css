@@ -826,9 +826,46 @@ dd {
   gap: 32px;
   align-items: start;
 }
+/* The sidebar sticks to the viewport and scrolls in two regions (runs, then
+   the answer queue) so the open answer stays in view while browsing. */
 .review-sidebar {
   min-width: 0;
   padding-right: 6px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.runs-scroll {
+  flex-shrink: 0;
+  min-height: 0;
+  max-height: 36vh;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+/* Always-visible thin scrollbars on the two regions, so a queue that
+   continues below the fold is obvious even with overlay scrollbars. The
+   standard properties must be auto here or Chromium ignores these rules. */
+.runs-scroll,
+.answer-list {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+.runs-scroll::-webkit-scrollbar,
+.answer-list::-webkit-scrollbar {
+  width: 8px;
+}
+.runs-scroll::-webkit-scrollbar-track,
+.answer-list::-webkit-scrollbar-track {
+  background: var(--panel);
+  border-radius: 4px;
+}
+.runs-scroll::-webkit-scrollbar-thumb,
+.answer-list::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
 }
 .review-main {
   min-width: 0;
@@ -925,6 +962,10 @@ dd {
   margin-top: 20px;
   border-top: 1px solid var(--line);
   padding-top: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .answers-heading {
   display: flex;
@@ -968,10 +1009,15 @@ dd {
 .answer-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 4px 0 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: 1px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .answer-row {
   display: flex;
@@ -1611,12 +1657,27 @@ dialog .form-row {
   margin-top: 14px;
   font-size: 13px;
 }
+/* One checkbox per category sits beside the disclosure so a whole group can
+   be picked without expanding it. */
 .eval-category {
   margin: 0;
-  padding: 12px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
 }
-.eval-category > summary {
+.eval-category > .category-check {
+  width: 16px;
+  height: 16px;
+  margin: 7px 0 0;
+  accent-color: var(--blue);
+}
+.eval-category > details {
+  min-width: 0;
+}
+.eval-category summary {
   padding: 4px 0;
   font-size: 14px;
 }
@@ -1625,10 +1686,6 @@ dialog .form-row {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
-}
-.category-select {
-  margin: 8px 0 0 20px;
-  font-size: 12px;
 }
 .eval-option {
   margin-left: 20px;
