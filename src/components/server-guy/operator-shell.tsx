@@ -20,11 +20,12 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
+import { ChatList } from "./chat-list";
 import { ChatPane } from "./chat-pane";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { Inspector } from "./inspector";
-import { LaunchSidebar } from "./launch-sidebar";
+import { PhaseRail } from "./phase-rail";
 
 export function OperatorShell({
   initialView,
@@ -336,14 +337,15 @@ export function OperatorShell({
         </div>
       </header>
 
+      <PhaseRail checks={checks} />
+
       <section className="sg-workspace">
-        <LaunchSidebar
+        <ChatList
           busy={busy !== null}
           chats={view.chats}
-          checks={checks}
           hasApplication={application !== null}
-          onCreateChat={createChat}
-          onSelectChat={selectChat}
+          onCreate={createChat}
+          onSelect={selectChat}
           selectedChatId={view.selectedChatId}
         />
         <ChatPane
