@@ -185,19 +185,19 @@ Codex, Claude, or another independent agent that uses Server Guy through MCP whi
 _Avoid_: Embedded runtime, Pi worker
 
 **Approval Mode**:
-The explicit user-selected rule governing whether Pi must request approval before state-changing operations.
+The explicit user-selected rule governing whether Pi must request approval before external changes within the resources and actions the engineer has granted. It does not itself expand that scope; recording Chat messages, Observations and explicit Decisions is internal bookkeeping.
 _Avoid_: Permission template, Operational Mandate
 
 **Full Autonomy**:
-An Approval Mode in which Pi may perform state-changing operations without required user approval.
+An Approval Mode in which Pi may perform external changes within the granted scope and explicit user limits without required per-action approval.
 _Avoid_: Bypass permissions
 
 **Pi Decides**:
-An Approval Mode in which Pi decides whether a state-changing operation warrants user approval.
+An Approval Mode in which Pi decides whether an external change within the granted scope warrants user approval.
 _Avoid_: Auto-approve, ask when risky
 
 **Always Ask**:
-An Approval Mode in which user approval is required before every state-changing operation; read-only observation remains automatic.
+An Approval Mode in which user approval is required before every external change within the granted scope; read-only observation remains automatic.
 _Avoid_: Restricted mode
 
 **Approval Record**:

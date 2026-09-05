@@ -15,7 +15,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
-| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Implemented on `codex/durable-pi-requests`, pending PR review. Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
+| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
 | 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
@@ -27,6 +27,8 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 15 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
 
 Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
+
+Proposed follow-up before expanding tracing: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Replace custom conversation replay/compaction and improve in-loop tool feedback while retaining current tool authority and atomic Decision commits. Independently committed tools remain deferred. This is a design proposal, not implemented functionality or a new launch phase.
 
 ## Phase 1 implementation backlog
 
