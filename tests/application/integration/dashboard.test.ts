@@ -317,6 +317,9 @@ it("judges a finished live run automatically only when asked, with the same mode
   ).toBe(202);
   await vi.waitFor(async () => expect((await stateOf()).active).toBeNull());
   expect(launch).toHaveBeenCalledTimes(1);
+  // Both the live run and the judge it hands off to exit at once, so the
+  // server is idle again for the failed-runner scenario below.
+  launch.mockImplementationOnce(exitQuickly);
   launch.mockImplementationOnce(exitQuickly);
   expect(
     (
@@ -351,6 +354,69 @@ it("judges a finished live run automatically only when asked, with the same mode
   expect(() =>
     commandFor({ suite: "judge", judgeAfter: true, consent: true } as never),
   ).toThrow();
+
+  // A runner that exits non-zero after saving answers still gets them judged,
+  // and its log says what the failure meant for the answers.
+  writeJson(
+    join(
+      directory(join(root, "tests/results/evals", "after-failure")),
+      "results.json",
+    ),
+    {
+      model: "gpt-5.6-sol",
+      effort: "high",
+      startedAt: new Date(Date.now() + 120_000).toISOString(),
+      commit: "test",
+      dirty: false,
+      sourceFingerprints: {},
+      plannedCases: 2,
+      sourcesUnchanged: false,
+      results: [
+        {
+          caseId: "greeting",
+          repetition: 1,
+          rubric: "No invented choice",
+          outcome: "checks-passed",
+          checks: { count: true },
+          error: null,
+          input: { userMessage: "Hello" },
+          reply: { message: "Hello", decisionProposals: [] },
+          before: {},
+          after: {},
+        },
+      ],
+    },
+  );
+  await vi.waitFor(async () => expect((await stateOf()).active).toBeNull());
+  launch.mockImplementationOnce((_command, _args, options) =>
+    spawn(process.execPath, ["-e", "process.exit(1)"], options),
+  );
+  expect(
+    (
+      await post("/api/start", {
+        suite: "live",
+        cases: ["greeting"],
+        consent: true,
+        model: "gpt-5.6-sol",
+        effort: "high",
+        judgeAfter: true,
+      })
+    ).status,
+  ).toBe(202);
+  await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(5));
+  expect(launch.mock.calls[4][2].env).toMatchObject({
+    SERVER_GUY_LIVE_JUDGE: "1",
+    PI_JUDGE_RUN: "after-failure",
+    PI_JUDGE_CASES: '["greeting:1"]',
+  });
+  const failed = (await stateOf()).history.find(
+    (run: { suite: string; status: string }) =>
+      run.suite === "live" && run.status === "failed",
+  );
+  expect(failed.log).toContain(
+    "1 of 2 planned answers were saved; all of them passed their checks; source files changed while it ran, so the runner refused to call it a clean baseline.",
+  );
+  expect(failed.log).toContain("Judging 1 saved answer automatically");
 });
 it("maps a closed set of suites to fixed arguments and requires explicit spend consent", () => {
   expect(commandFor({ suite: "smoke" })).toEqual({

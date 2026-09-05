@@ -226,10 +226,6 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     if (active)
       throw new Error("A check is already running. Wait for it to finish.");
     const command = commandFor(input);
-    const previousReports =
-      input.suite === "live"
-        ? new Set(listReports(root).map((report) => report.run))
-        : null;
     if (input.suite === "judge")
       for (const key of input.keys ?? [input.key!])
         findCase(root, input.run!, input.hash!, key);
@@ -333,24 +329,56 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       run.exitCode = code;
       run.finishedAt = new Date().toISOString();
       if (paid) {
-        const noReport =
-          previousReports &&
-          !listReports(root).some((report) => !previousReports.has(report.run));
+        // Same match as the judge handoff: the report this run wrote starts
+        // after the dashboard run did.
+        const saved = listReports(root).find(
+          (report) => report.startedAt >= run.startedAt,
+        );
         run.log =
           code === 0
             ? "Run completed. Open Eval runs to inspect answers and judgments. Runner completion is not semantic acceptance.\n"
-            : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${noReport ? "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made." : "Earlier saved answers and verdicts remain; remaining items may not have run."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
+            : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${saved ? failureSummary(saved) : "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
       }
       writeJson(path, run);
       active = null;
       child = null;
       cancelActive = null;
-      if (input.suite === "live" && input.judgeAfter && code === 0)
+      // Saved answers are judged even when the runner exited non-zero: a
+      // failed check or a source change mid-run is not a reason to leave the
+      // answers unjudged. A stopped run is the user's call and stays as is.
+      if (
+        input.suite === "live" &&
+        input.judgeAfter &&
+        run.status !== "cancelled"
+      )
         judgeAfterRun(run, path, input);
     };
     child.on("error", () => finish(null));
     child.on("close", finish);
     return run;
+  }
+  // What a non-zero exit meant for the answers: the runner's own output is
+  // hidden, so say what was saved, what failed its checks, and whether the
+  // sources changed under it.
+  function failureSummary(report: ReturnType<typeof listReports>[number]) {
+    const planned = report.plannedCases ?? report.results.length;
+    const answered = report.results.filter((record) => record.reply).length;
+    const failed = report.results.filter(
+      (record) =>
+        record.outcome === "checks-failed" || record.outcome === "run-error",
+    ).length;
+    const parts = [
+      `${answered} of ${planned} planned answers were saved`,
+      failed
+        ? `${failed} failed their checks or errored`
+        : answered
+          ? "all of them passed their checks"
+          : "",
+      report.sourcesUnchanged === false
+        ? "source files changed while it ran, so the runner refused to call it a clean baseline"
+        : "",
+    ].filter(Boolean);
+    return `${parts.join("; ")}. The saved answers are reviewable under Eval runs.`;
   }
   // The one confirmation for a live run also covers judging its answers with
   // the same model once they are saved.

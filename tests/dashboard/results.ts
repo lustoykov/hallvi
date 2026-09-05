@@ -42,6 +42,9 @@ export const reportSchema = z.object({
   caseIds: z.array(safeName).optional(),
   repeats: z.number().int().min(1).max(5).optional(),
   plannedCases: z.number().int().nonnegative().optional(),
+  // False when the runner saw fingerprinted sources change while it ran; it
+  // then exits non-zero even if every answer passed its checks.
+  sourcesUnchanged: z.boolean().optional(),
   results: z.array(caseSchema).max(100),
 });
 export type SavedCase = z.infer<typeof caseSchema>;

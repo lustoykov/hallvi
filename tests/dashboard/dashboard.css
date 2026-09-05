@@ -969,6 +969,10 @@ dd {
   color: var(--green);
   font-weight: 600;
 }
+.run-card .judging {
+  color: var(--blue);
+  font-weight: 600;
+}
 .archived-runs {
   margin-top: 12px;
 }

@@ -207,6 +207,20 @@ function shownResults(saved) {
     matchesFilter(saved, c, answerFilter),
   );
 }
+// The active judge run for a saved run, with the answer keys it is grading;
+// null when nothing is judging that run right now.
+function judgingNow(saved) {
+  const command = state.active?.command ?? "";
+  if (state.active?.suite !== "judge") return null;
+  if (command.match(/PI_JUDGE_RUN='?([\w.-]+)/)?.[1] !== saved.run) return null;
+  try {
+    return new Set(
+      JSON.parse(command.match(/PI_JUDGE_CASES='(\[[^']*\])'/)?.[1] ?? "[]"),
+    );
+  } catch {
+    return new Set();
+  }
+}
 function triageCounts(saved) {
   const counts = {
     failures: 0,
@@ -614,16 +628,19 @@ function runCard(r) {
   const human = r.results.filter(
     (c) => c.reply && reviewFor(r, "human", keyOf(c)),
   ).length;
+  const judging = judgingNow(r);
   const summary = element("small");
   summary.append(
     element(
       "span",
-      pending
-        ? `${pending} need attention`
-        : answers
-          ? "Nothing needs attention"
-          : "No saved answers",
-      pending ? "todo" : answers ? "done" : "",
+      judging
+        ? "Judging now"
+        : pending
+          ? `${pending} need attention`
+          : answers
+            ? "Nothing needs attention"
+            : "No saved answers",
+      judging ? "judging" : pending ? "todo" : answers ? "done" : "",
     ),
   );
   if (answers)
@@ -814,9 +831,16 @@ function renderRunHeader(saved, shown) {
   const humanReviewed = saved.results.filter(
     (c) => c.reply && reviewFor(saved, "human", keyOf(c)),
   ).length;
+  const judging = judgingNow(saved);
   const parts = [
     attention ? `${attention} need attention` : "Nothing needs attention",
   ];
+  if (judging) {
+    const done = [...judging].filter(
+      (key) => saved.triage[key] && saved.triage[key].status !== "needs-judge",
+    ).length;
+    parts.unshift(`Judging now · ${done} of ${judging.size} judged`);
+  }
   if (counts.cleared) parts.push(`${counts.cleared} LLM-cleared`);
   parts.push(`${humanReviewed} of ${answers} human-reviewed`);
   const compared = saved.results
@@ -830,6 +854,13 @@ function renderRunHeader(saved, shown) {
     ? parts.join(" · ")
     : "No answers to review";
   $("progress-bar").setAttribute("aria-label", $("progress-text").textContent);
+  // The runner's exit status lives under Run checks; the one failure that says
+  // nothing about the answers is worth repeating here.
+  $("run-notice").hidden = saved.sourcesUnchanged !== false;
+  $("run-notice").textContent =
+    saved.sourcesUnchanged === false
+      ? "Source files changed while this run was in progress, so the runner reported a failure. The answers were saved and are reviewable; treat the run as a mixed-code baseline."
+      : "";
 }
 
 function renderAnswer(saved, ordered, shown) {
@@ -843,18 +874,21 @@ function renderAnswer(saved, ordered, shown) {
   $("triage-chip").className = `chip ${triageKinds[triage.status]}`;
   const agrees = agreement(saved, current);
   const llmVerdict = reviewFor(saved, "llm", key)?.verdict;
+  const judging = judgingNow(saved);
   $("triage-reason").textContent =
     triage.status === "cleared"
       ? "Current judge policy and recorded code checks passed. Not human-approved."
-      : triage.status === "needs-judge" || triage.label === "Failed checks"
-        ? triage.reason
-        : agrees === true
-          ? "The judge agrees with your verdict."
-          : agrees === false
-            ? `The judge said ${VERDICTS[llmVerdict][0].toLowerCase()}; your verdict wins.`
-            : triage.status === "reviewed"
-              ? "Not judged by the LLM under the current policy."
-              : "See the judgment and verdict below for the supporting evidence.";
+      : triage.status === "needs-judge" && judging?.has(key)
+        ? "The judge is working through this run now; this answer is still in its queue."
+        : triage.status === "needs-judge" || triage.label === "Failed checks"
+          ? triage.reason
+          : agrees === true
+            ? "The judge agrees with your verdict."
+            : agrees === false
+              ? `The judge said ${VERDICTS[llmVerdict][0].toLowerCase()}; your verdict wins.`
+              : triage.status === "reviewed"
+                ? "Not judged by the LLM under the current policy."
+                : "See the judgment and verdict below for the supporting evidence.";
   const index = shown.findIndex((c) => keyOf(c) === key);
   $("answer-position").textContent =
     index >= 0 ? `${index + 1} of ${shown.length}` : "";

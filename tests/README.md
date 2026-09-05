@@ -2,7 +2,7 @@
 
 **Start here:** `npm run test:dashboard` → [local testing page](http://127.0.0.1:4317).
 
-Run checks, see model usage/CI policy, inspect recent runs, and review saved **live agent eval** answers. Nothing runs just by opening it. Live agent evals and LLM judgments use your subscription, so they start from one confirmation dialog; a live run that finishes successfully judges its own answers unless you untick that; after a failed or cancelled runner, use Judge in the run header. Human verdicts and LLM judgments remain separate records.
+Run checks, see model usage/CI policy, inspect recent runs, and review saved **live agent eval** answers. Nothing runs just by opening it. Live agent evals and LLM judgments use your subscription, so they start from one confirmation dialog; a live run judges its own answers when it finishes unless you untick that, even when the runner exits with an error after saving them; after Stop, use Judge in the run header. Human verdicts and LLM judgments remain separate records.
 
 - **Run checks:** the suite table shows each suite's scope, model usage, CI policy and its last recorded result. Recent runs list status, scope (selected journeys, cases × repetitions, or judged answers), commit, start time and duration; clicking a run expands its command and bounded output inline. A running check shows a live elapsed time and a Stop control.
 - **Choose journeys:** opens a dialog beside the run action, without scrolling the page. Inspect descriptions and select any of thirteen desktop journey groups (twelve product groups, including GitHub, durable requests and native history, plus the dashboard). A group can contain several test cases. The shared catalog and exact test tags live in [browser/journeys.ts](browser/journeys.ts). Smoke still runs just two.
@@ -65,7 +65,7 @@ Four cases in **Defaults and requirements** check that the model balances ordina
 | Interactive Playwright | `npm run test:e2e:ui` | None |
 | Saved browser report | `npx playwright show-report tests/results/browser-report` | None |
 | Twenty-two real agent eval cases | `SERVER_GUY_LIVE_EVALS=1 npm run eval:pi` | ChatGPT subscription via configured Pi |
-| Judge saved answers | Automatic after a successful dashboard live run; otherwise Eval runs → Judge in the run header | Separate opt-in Pi session per answer |
+| Judge saved answers | Automatic after a dashboard live run, including one whose runner failed after saving answers; otherwise Eval runs → Judge in the run header | Separate opt-in Pi session per answer |
 
 Install Chromium once with `npx playwright install chromium`. Desktop only. Browser scenarios launch disposable Next.js fixtures on 3180+, never use/reset the app on port 3000 and block external browser requests. Their synthetic model responses prove UI/state behavior, not model quality.
 
