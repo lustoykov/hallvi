@@ -833,14 +833,17 @@ dd {
   padding-right: 6px;
   position: sticky;
   top: 16px;
-  max-height: calc(100vh - 32px);
+  /* --sidebar-offset is the layout's distance from the page top, set by
+     fitSidebar() in dashboard.js, so the whole sidebar fits below the heading
+     at scroll position zero instead of running below the fold. */
+  max-height: calc(100vh - var(--sidebar-offset, 180px) - 16px);
   display: flex;
   flex-direction: column;
 }
 .runs-scroll {
   flex-shrink: 0;
   min-height: 0;
-  max-height: 36vh;
+  max-height: 32vh;
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding-right: 4px;

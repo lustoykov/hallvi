@@ -498,7 +498,20 @@ function renderReview() {
   renderAnswerList(saved, ordered, shown);
   renderRunHeader(saved, shown);
   renderAnswer(saved, ordered, shown);
+  fitSidebar();
 }
+// The sticky sidebar may only use the viewport space below its natural top,
+// so the runs and answer queue scroll in place at scroll position zero. When
+// the page scrolls for a long answer, the sidebar sticks 16px from the top.
+function fitSidebar() {
+  const layout = $("review-content");
+  if (layout.hidden) return;
+  const offset = Math.round(
+    layout.getBoundingClientRect().top + window.scrollY,
+  );
+  document.documentElement.style.setProperty("--sidebar-offset", `${offset}px`);
+}
+window.addEventListener("resize", fitSidebar);
 
 function runCard(r) {
   const li = document.createElement("li");
