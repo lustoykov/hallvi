@@ -24,6 +24,16 @@ Optional **saved requirements** are explicit application-specific constraints or
 
 The stable system prompt owns these operating instructions. The old unused `PRODUCTION_BASELINE` catalog is removed rather than maintained as a second, disconnected policy. Four live evals under **Defaults and requirements** check no ranking questionnaire, no saved default goals, and correctly saved explicit budget/residency requirements; passing deterministic tests alone does not establish model behavior.
 
+### Agreed follow-up: structured settings versus text requirements
+
+**Design refinement agreed September 5; not implemented in this PR.** Use structured settings for values the application calculates against or enforces. Keep text records for explicit requirements without dedicated application behavior. Chat is an input method, not a reason to store every requirement as prose.
+
+For example, a monthly hosting limit should become an amount and currency when budget comparison or enforcement is implemented, rather than requiring a model to reinterpret "Hosting must cost at most €50/month." A Settings edit should call deterministic validation and persistence directly. A chat request may use the model to interpret the user's intent, then call that same settings operation. Code performs the comparison and update; the model should not choose a historical Decision ID just to edit a known setting.
+
+Keep optional controls out of first-run setup: sensible defaults first, explicit preferences available when wanted. Do not introduce a universal settings framework or convert every text requirement preemptively. Add a dedicated field when a concrete feature needs it. At that point, make the structured value authoritative and deliberately handle any existing text record so the two do not become conflicting sources of truth.
+
+The current implementation still stores requirements as text-valued Decisions and validates their replacement references. Saving a budget sentence does **not** enforce a spending limit. This refinement records the future direction; it does not authorize budget enforcement, a migration, or new settings UI in the current slice.
+
 ### Assistant identity
 
 The ownership split below is for developers, not a distinction users must understand. Present one assistant named **Server Guy** throughout ordinary chat, settings, progress, approvals and recovery. Pi remains the internal runtime; there is no user-facing handoff between two assistants.
