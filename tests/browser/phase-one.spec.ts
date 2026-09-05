@@ -22,7 +22,24 @@ async function view(page: Page) {
 }
 async function send(page: Page, message: string) {
   await page.getByRole("textbox").fill(message);
-  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const applicationUrl = new URL(page.url());
+  // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
+  const [accepted] = await Promise.all([
+    page.waitForResponse(
+      (response) => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === "POST" &&
+          url.origin === applicationUrl.origin &&
+          url.pathname.startsWith(`/api${applicationUrl.pathname}/chats/`) &&
+          /\/chats\/[\da-f-]{36}\/messages$/.test(url.pathname)
+        );
+      },
+      { timeout: 30_000 },
+    ),
+    page.getByRole("button", { name: "Send", exact: true }).click(),
+  ]);
+  expect(accepted.status()).toBe(202);
   await expect(
     page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
   ).toBeVisible();
@@ -136,9 +153,9 @@ test(
   "P1-04/06 add an application, record a priority, reload",
   journey("add-application"),
   async ({ page }) => {
-    // This first journey compiles the dev routes; CI spent ~60s before its
-    // final state check.
-    test.setTimeout(90_000);
+    // Cold CI navigation took ~60s; leave room for 30s HTTP acceptance and the
+    // unchanged 10s reply assertion, plus the final reload and state check.
+    test.setTimeout(120_000);
     await page.goto("/");
     await expect(page).toHaveURL(/\/applications$/);
     await addApplication(page, "smoke-app");

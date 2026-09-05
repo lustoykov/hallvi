@@ -194,6 +194,22 @@ function streamSynthetic(
         delta: prefix,
         partial: message,
       });
+      // Deterministic crash barrier: stay after the persisted draft until the
+      // process is killed or cancellation settles normally. Match only a prefix
+      // so a later "recall: ..." request can quote this marker without pausing.
+      if (userMessage.startsWith("[pause-after-draft]")) {
+        const signal = options?.signal;
+        if (!signal)
+          throw new Error("The draft barrier requires cancellation.");
+        await new Promise<never>((_resolve, reject) => {
+          const abort = () => {
+            signal.removeEventListener("abort", abort);
+            reject(new Error("Synthetic generation cancelled."));
+          };
+          signal.addEventListener("abort", abort, { once: true });
+          if (signal.aborted) abort();
+        });
+      }
       // The process-lifecycle regression deliberately models a provider that
       // never settles, even after cancellation. Used only in a disposable child.
       if (userMessage.includes("[unresponsive]")) {

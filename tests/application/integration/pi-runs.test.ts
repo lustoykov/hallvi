@@ -513,7 +513,8 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
-  const accepted = enqueue("Hello [slow]");
+  const interruptedMessage = "[pause-after-draft] Hello";
+  const accepted = enqueue(interruptedMessage);
   const first = start();
   let second: ReturnType<typeof start> | undefined;
   try {
@@ -529,6 +530,7 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
     const duplicate = start();
     const [code] = await once(duplicate, "close");
     expect(code).toBe(1);
+    expect(runs.getPiRun(accepted.run.id)?.status).toBe("running");
     const closed = once(first, "close");
     first.kill("SIGKILL");
     await closed;
@@ -542,15 +544,15 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
     expect(
       store
         .listMessages(chatId)
-        .filter((message) => message.body === "Hello [slow]"),
+        .filter((message) => message.body === interruptedMessage),
     ).toHaveLength(1);
-    const recall = enqueue("recall: Hello [slow]");
+    const recall = enqueue(`recall: ${interruptedMessage}`);
     await vi.waitFor(
       () => expect(runs.getPiRun(recall.run.id)?.status).toBe("succeeded"),
       { timeout: 10_000 },
     );
     expect(store.listMessages(chatId).at(-1)?.body).toBe(
-      "[QA native history] found: Hello [slow]",
+      `[QA native history] found: ${interruptedMessage}`,
     );
     const nativePath = join(
       root,
@@ -561,6 +563,19 @@ it("a real worker process saves drafts, survives browser absence and exposes a c
     const native = readFileSync(nativePath, "utf8");
     expect(native).toContain("server-guy-run");
     expect(native).toContain("interrupted");
+    // Exercise normal teardown while the same barrier is waiting. It must
+    // settle on abort, unlike the separate deliberately unresponsive fixture.
+    const shutdown = enqueue("[pause-after-draft] Graceful shutdown");
+    await vi.waitFor(() =>
+      expect(store.listMessages(chatId).at(-1)?.body).toContain(
+        "[QA fixture reply]",
+      ),
+    );
+    expect(runs.getPiRun(shutdown.run.id)?.status).toBe("running");
+    const stopped = once(second, "close");
+    second.kill("SIGTERM");
+    expect((await stopped)[0]).toBe(0);
+    expect(runs.getPiRun(shutdown.run.id)?.status).toBe("interrupted");
   } finally {
     for (const child of [first, second])
       if (child && child.exitCode === null && child.signalCode === null) {
