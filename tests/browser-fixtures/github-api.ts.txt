@@ -15,13 +15,18 @@ export async function readGithubCliCredential() {
   if (current.credential === "missing") return null;
   return { token: current.credential === "changed" ? "QA-CHANGED" : "QA-GITHUB-TOKEN", source: "gh" as const };
 }
-export async function githubDeviceRequest(path: string) {
+export async function githubDeviceRequest(path: string, body: Record<string, string>) {
   const current = scenario();
   if (path === "/login/device/code") return { device_code: "QA-DEVICE-SECRET", user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 1 };
+  if (body.grant_type === "refresh_token") {
+    if (current.refresh === "revoked") return { error: "bad_refresh_token", error_description: "QA-SECRET-PROVIDER-ERROR" };
+    if (current.refresh === "offline") throw new GithubAccessError("Could not contact GitHub. Try again.");
+    return { access_token: "ghu_QA-RENEWED", token_type: "bearer", expires_in: 28800, refresh_token: "ghr_QA-RENEWED", refresh_token_expires_in: 15897600 };
+  }
   if (current.login === "pending") return { error: "authorization_pending" };
   if (current.login === "denied") return { error: "access_denied" };
   if (current.login === "expired") return { error: "expired_token" };
-  return { access_token: "ghu_QA-SYNTHETIC", token_type: "bearer", expires_in: 28800 };
+  return { access_token: "ghu_QA-SYNTHETIC", token_type: "bearer", expires_in: 28800, refresh_token: "ghr_QA-SYNTHETIC", refresh_token_expires_in: 15897600 };
 }
 export async function githubJson(path: string) {
   const current = scenario();

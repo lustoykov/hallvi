@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
@@ -105,4 +105,50 @@ test("GitHub repository permission denial remains an unmet check and can recover
   const passed = await (await page.request.get(`/api${path}`)).json();
   expect(passed.checks.find((check: { key: string }) => check.key === "repository-readable").status).toBe("passed");
   expect(passed.observations[0].raw.installationId).toBe(7);
+});
+
+test("GitHub renews expired access without another login and recovers from revoked refresh access", journey("github-connection"), async ({ page, fixture }, testInfo) => {
+  const connectionPath = join(fixture.state, "github-connection.json");
+  const expireAccess = () => {
+    const saved = JSON.parse(readFileSync(connectionPath, "utf8"));
+    saved.expiresAt = new Date(Date.now() - 1000).toISOString();
+    writeFileSync(connectionPath, JSON.stringify(saved));
+    return saved;
+  };
+  await page.goto("/setup/github");
+  await page.getByRole("button", { name: "Change", exact: true }).click();
+  await page.getByRole("button", { name: "Connect another account" }).click();
+  await expect(page.getByText("Access renews automatically.", { exact: true })).toBeVisible();
+  await page.goto("/applications/new");
+  await page.getByLabel("GitHub repository", { exact: true }).fill("https://github.com/qa/renewed-access");
+  await page.getByRole("button", { name: "Add application", exact: true }).click();
+  await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30_000 });
+  const appUrl = page.url();
+  const old = expireAccess();
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Check 2 Repository readable.*Passed/ })).toBeVisible();
+  await page.getByRole("button", { name: /Check 2 Repository readable/ }).click();
+  await page.getByRole("button", { name: "Re-run repository check", exact: true }).click();
+  await expect(page.getByRole("dialog").locator(".sg-drawer-summary")).toContainText("Passed");
+  await expect.poll(() => JSON.parse(readFileSync(connectionPath, "utf8")).token).toBe("ghu_QA-RENEWED");
+  const renewed = JSON.parse(readFileSync(connectionPath, "utf8"));
+  expect(renewed.id).toBe(old.id);
+  expect(renewed.refresh.token).toBe("ghr_QA-RENEWED");
+  const publicStatus = await (await page.request.get("/api/github/setup")).text();
+  expect(publicStatus).not.toMatch(/ghu_|ghr_/);
+  await page.goto("/setup/github");
+  await expect(page.getByText("Access renews automatically.", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("github-automatic-renewal.png"), fullPage: true });
+  expireAccess();
+  writeFileSync(join(fixture.state, "github-scenario.json"), JSON.stringify({ refresh: "revoked" }));
+  await page.goto(appUrl);
+  await page.getByRole("button", { name: /Check 2 Repository readable/ }).click();
+  await page.getByRole("button", { name: "Re-run repository check", exact: true }).click();
+  await expect(page.getByRole("dialog").locator(".sg-drawer-summary")).toContainText("Not yet");
+  await page.getByRole("link", { name: "Open GitHub settings", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Sign in again");
+  await expect(page.getByRole("main").getByRole("alert")).not.toContainText("QA-SECRET");
+  await page.getByRole("button", { name: "Connect another account" }).click();
+  await expect(page.getByText("Access renews automatically.", { exact: true })).toBeVisible();
+  expect(JSON.parse(readFileSync(connectionPath, "utf8")).id).not.toBe(old.id);
 });

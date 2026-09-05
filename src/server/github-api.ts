@@ -34,7 +34,9 @@ export async function githubDeviceRequest(path: "/login/device/code" | "/login/o
       method: "POST", headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(body), signal: AbortSignal.timeout(20_000), cache: "no-store", redirect: "error",
     });
-    if (!response.ok) throw new Error("Provider request failed");
+    // OAuth can return an invalid refresh grant as HTTP 400/401. Let the
+    // credential boundary interpret only the error code, never its description.
+    if (!response.ok && !(body.grant_type === "refresh_token" && [400, 401].includes(response.status))) throw new Error("Provider request failed");
     return await response.json();
   } catch {
     throw new GithubAccessError("Could not contact GitHub to sign in. Try again.");
