@@ -14,8 +14,8 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 2 | Add Drizzle over the existing SQLite database. | Merged: [PR #8](https://github.com/lustoykov/server-guy/pull/8). [Checklist](#add-drizzle-over-the-existing-sqlite-database). |
 | 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
-| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | In review: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
-| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Planned: [checklist](#make-pi-requests-durable). |
+| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
+| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Next: implementation plan prepared on `codex/durable-pi-requests`; runtime changes not implemented yet. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
 | 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
@@ -90,6 +90,8 @@ Decision: offer explicit reuse of a detected GitHub CLI/environment credential o
 - [x] Save and rotate GitHub device-flow refresh tokens so the eight-hour access-token expiry does not require routine sign-in. Preserve the connection ID on refresh; handle concurrent refresh in the local Node process, disconnect/replacement during refresh, refresh rejection/expiry, atomic storage and secret redaction. Existing logins need one new sign-in because their refresh token was not retained.
 
 ### Make Pi requests durable
+
+The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
 
 - [ ] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
 - [ ] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
