@@ -56,6 +56,16 @@ export function OperatorShell({
     setDrafts((current) => ({ ...current, [activeChat.id]: value }));
   }
 
+  // The menu lives in the top layer, so it cannot be positioned by its parent; hang it under the picker.
+  function positionApplicationMenu(menu: HTMLElement) {
+    const anchor = applicationPicker.current?.getBoundingClientRect();
+    if (!anchor) return;
+    const width = 320;
+    menu.style.top = `${anchor.bottom + 6}px`;
+    menu.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12))}px`;
+    menu.style.minWidth = `${anchor.width}px`;
+  }
+
   function applyView(next: PhaseOneOperatorView) {
     setView(next);
     // The transcript is navigable state; keep it when this page is refreshed.
@@ -166,13 +176,21 @@ export function OperatorShell({
             <strong>{application?.name}</strong><CaretDown aria-hidden="true" />
           </button>
           <span className="sg-environment-label">Production</span>
-          <nav id="application-picker" popover="auto" className="sg-application-menu" aria-label="Applications">
-            <h2>Switch application</h2>
+          <nav
+            id="application-picker"
+            popover="auto"
+            className="sg-application-menu"
+            aria-label="Applications"
+            onBeforeToggle={(event) => { if (event.newState === "open") positionApplicationMenu(event.currentTarget); }}
+          >
+            <span className="sg-eyebrow sg-application-menu-label">Switch application</span>
             {applications.map((item) => <Link key={item.id} href={`/applications/${item.id}`} aria-current={item.id === application?.id ? "page" : undefined} onClick={(event) => event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover()}>
+              <span aria-hidden="true" className="sg-application-menu-mark">{item.repositoryName.slice(0, 1).toUpperCase()}</span>
               <div><strong>{item.repositoryName}</strong><small>{item.repositoryOwner}/{item.repositoryName}</small></div>
-              {item.id === application?.id && <Check aria-label="Current application" />}
+              {item.id === application?.id && <Check aria-label="Current application" weight="bold" />}
             </Link>)}
             <Link className="sg-application-menu-action" href="/applications/new"><Plus /> Add application</Link>
+            <hr />
             <button type="button" className="sg-remove-application" disabled={busy !== null} onClick={(event) => { event.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover(); setRemoveError(null); setConfirmRemove(true); }}><Trash /> Remove application…</button>
           </nav>
         </div>
