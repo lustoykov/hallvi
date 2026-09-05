@@ -145,7 +145,7 @@ export function computeChecks(
     },
     "repository-readable": {
       status: currentRepository ? repositoryStatus(repository) : "not-yet",
-      result: !githubConnectionId ? "Connect GitHub in Settings, then run the repository check."
+      result: !githubConnectionId ? "Connect GitHub, then run the repository check."
         : !currentRepository ? "Run the repository check with your current GitHub connection."
         : repository?.summary ?? "The repository has not been checked yet.",
       evidence: repository

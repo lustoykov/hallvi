@@ -96,22 +96,23 @@ export function Inspector({
                 <p>No decisions recorded yet.</p>
               )}
             </section>
-            <section className="sg-record-section">
-              <span className="sg-eyebrow">Upcoming requirements</span>
+            <details className="sg-record-section sg-later-requirements">
+              <summary>Later phases (5–6)</summary>
+              <p>Planning reminders only. These do not block Phase 1.</p>
               {view.upcomingRequirements.length ? (
                 <div className="sg-prerequisite-list">
                   {view.upcomingRequirements.map((requirement) => (
                     <article key={requirement.key}>
-                      <span className={requirement.status}>{requirement.status}</span>
+                      <span>Phase {requirement.requiredBeforePhase}</span>
                       <strong>{requirement.label}</strong>
-                      <small>{requirement.resolutionPath} Owner: {requirement.owner}.</small>
+                      <small>{requirement.resolutionPath}</small>
                     </article>
                   ))}
                 </div>
               ) : (
                 <p>No later requirement needs attention.</p>
               )}
-            </section>
+            </details>
           </>
         )}
 

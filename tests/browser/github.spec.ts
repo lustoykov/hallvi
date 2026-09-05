@@ -39,6 +39,15 @@ test("GitHub consent, exact repository evidence, disconnect and re-verification"
   const disconnected = await (await page.request.get(`/api${path}`)).json();
   expect(disconnected.checks.find((check: { key: string }) => check.key === "repository-readable").status).toBe("not-yet");
   expect(disconnected.messages).toEqual(before.messages);
+  await page.goto(path);
+  await page.getByRole("button", { name: /Check 2 Repository readable/ }).click();
+  const summary = page.getByRole("dialog").locator(".sg-drawer-summary");
+  await expect(summary).toContainText("Connect GitHub, then run the repository check.");
+  const settings = summary.getByRole("link", { name: "Open GitHub settings", exact: true });
+  await expect(settings).toHaveAttribute("href", "/setup/github");
+  await page.screenshot({ path: testInfo.outputPath("github-recovery-action.png"), fullPage: true });
+  await settings.click();
+  await expect(page).toHaveURL(/\/setup\/github$/);
   await page.getByRole("button", { name: "Use existing login" }).click();
   await expect(page.getByText("Connected as qa-fixture-user")).toBeVisible();
   const reconnected = await (await page.request.get(`/api${path}`)).json();

@@ -58,7 +58,14 @@ export function CheckDrawer({
           <span className={`sg-check-icon ${check.status}`}>
             {check.status === "passed" ? <Check weight="bold" /> : <Circle weight="bold" />}
           </span>
-          <div><span>Current result</span><strong>{statusLabel(check.status)}</strong><p>{check.result}</p></div>
+          <div>
+            <span>Current result</span>
+            <strong>{statusLabel(check.status)}</strong>
+            <p>{check.result}</p>
+            {check.key === "repository-readable" && (
+              <Link className="sg-secondary-button sg-drawer-settings" href="/setup/github">Open GitHub settings</Link>
+            )}
+          </div>
         </section>
         <section>
           <span className="sg-eyebrow">What this checks</span>
@@ -93,7 +100,6 @@ export function CheckDrawer({
               Re-run repository check
             </button>
           )}
-          {check.key === "repository-readable" && <p><Link href="/setup/github">GitHub connection settings</Link></p>}
         </section>
       </aside>
     </dialog>
