@@ -26,7 +26,7 @@ import { guidePage, renderMarkdown } from "./markdown.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 5;
+export const API_VERSION = 6;
 const currentRubrics = Object.fromEntries(
   phaseOneCases.map((item) => [item.id, item.rubric]),
 );
@@ -479,6 +479,33 @@ export function createDashboard(root: string, launch: Launch = spawn) {
               .map((record) => record.caseId),
           ),
         );
+        // The newest attempt of each case, summarised for the picker: its
+        // triage status, when it ran, and whether the rubric wording has
+        // changed since. Reports are newest first.
+        const lastAttempt = (item: (typeof phaseOneCases)[number]) => {
+          for (const report of reports) {
+            const records = report.results.filter(
+              (record) =>
+                record.caseId === item.id && record.outcome !== "not-run",
+            );
+            if (!records.length) continue;
+            const statuses = records.map(
+              (record) => report.triage[caseKey(record)].status,
+            );
+            return {
+              run: report.run,
+              startedAt: report.startedAt,
+              status:
+                ["failures", "needs-review", "needs-judge", "reviewed"].find(
+                  (status) => statuses.includes(status),
+                ) ?? "cleared",
+              rubricChanged: records.some(
+                (record) => record.rubric !== item.rubric,
+              ),
+            };
+          }
+          return null;
+        };
         json({
           apiVersion: API_VERSION,
           suites: suites.map((suite) => ({
@@ -489,6 +516,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           evalCases: phaseOneCases.map((item) => ({
             ...item,
             hasRun: attempted.has(item.id),
+            last: lastAttempt(item),
           })),
           active,
           history: history(),

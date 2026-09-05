@@ -241,6 +241,21 @@ it("marks attempted cases across archived runs, without treating skipped or mere
       .filter((item: { hasRun: boolean }) => item.hasRun)
       .map((item: { id: string }) => item.id),
   ).toEqual(["greeting", "explicit-priority", "question-not-commitment"]);
+  const last = Object.fromEntries(
+    state.evalCases.map((item: { id: string; last: unknown }) => [
+      item.id,
+      item.last,
+    ]),
+  );
+  expect(last.greeting).toEqual({
+    run,
+    startedAt: "2026-09-05T00:00:00Z",
+    status: "needs-judge",
+    rubricChanged: true,
+  });
+  expect(last["explicit-priority"]).toMatchObject({ status: "failures" });
+  expect(last["question-not-commitment"]).toMatchObject({ status: "failures" });
+  expect(last.hypothetical).toBeNull();
   expect(
     state.evalCases.every(
       (item: { category: string }) => item.category.length > 0,

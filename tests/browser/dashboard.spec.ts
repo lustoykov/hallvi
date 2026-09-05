@@ -675,7 +675,13 @@ test(
         page.locator("#run-list").locator(runCard(run)),
       ).toBeVisible();
       await expect(page.locator("#archived-runs")).toBeHidden();
-      await expect(page.locator("#empty-answers")).toBeVisible();
+      // Landing on a run with nothing needing attention shows every answer
+      // instead of an empty queue.
+      await expect(page.locator("#filter-note")).toHaveText(
+        "Nothing needs attention, so all answers are shown.",
+      );
+      await expect(page.locator("#answer-detail")).toBeVisible();
+      await expect(filterCount("all")).toHaveText("4");
       expect(launches).toBe(0);
       expect(loadReport(root, run).hash).toBe(hash);
       const savedReviews = listReports(root)[0].reviews;

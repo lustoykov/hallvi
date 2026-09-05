@@ -507,12 +507,24 @@ textarea {
   gap: 14px;
   align-items: center;
 }
-.suites .eval-suite-actions button + button {
-  margin-top: 8px;
+.suites .eval-suite-actions {
+  display: grid;
+  gap: 8px;
 }
-#run-new-evals {
+.suites .eval-suite-actions small {
+  text-align: center;
+}
+.new-evals {
   flex-shrink: 0;
   align-self: flex-start;
+  text-align: right;
+}
+.new-evals p {
+  margin-top: 6px;
+}
+.case-history.failed {
+  color: var(--red);
+  font-weight: 600;
 }
 .suites .usage-free {
   background: transparent;
@@ -554,6 +566,13 @@ textarea {
 }
 .history-row:hover {
   background: var(--panel);
+}
+.history-more {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 8px;
+  font-size: 13px;
 }
 .history-row[aria-current="true"] {
   background: var(--blue-bg);
@@ -929,6 +948,11 @@ dd {
 .run-card[aria-current="true"] {
   background: var(--blue-bg);
   border-color: var(--blue-line);
+}
+.run-card.running {
+  border-style: dashed;
+  border-color: var(--blue-line);
+  background: var(--blue-bg);
 }
 .run-card strong {
   font-size: 13px;

@@ -23,13 +23,18 @@ test(
       launches++;
       throw new Error("No real runners in picker tests");
     });
-    const save = (run: string, ids: string[]) =>
+    const save = (
+      run: string,
+      ids: string[],
+      outcome = "checks-passed",
+      startedAt = "2026-09-05T00:00:00Z",
+    ) =>
       writeJson(
         join(directory(join(root, "tests/results/evals", run)), "results.json"),
         {
           model: "synthetic",
           effort: "high",
-          startedAt: "2026-09-05T00:00:00Z",
+          startedAt,
           commit: "test",
           dirty: false,
           sourceFingerprints: {},
@@ -37,7 +42,7 @@ test(
             caseId,
             repetition: 1,
             rubric: "Fixture",
-            outcome: "checks-passed",
+            outcome,
             checks: { count: true },
             error: null,
             input: { userMessage: "Fixture" },
@@ -185,13 +190,15 @@ test(
         });
 
       save("finished", githubIds);
+      // With nothing new, the button gives way to a status line.
+      const allSaved = `All ${phaseOneCases.length} cases have a saved answer`;
+      await expect(page.locator("#new-evals-status")).toHaveText(allSaved);
+      await expect(page.locator("#new-evals-status")).toBeVisible();
       await expect(
-        page.getByRole("button", { name: "No new evals to run" }),
-      ).toBeDisabled();
+        page.getByRole("button", { name: /^Run new evals only/ }),
+      ).toBeHidden();
       await page.goto(`http://127.0.0.1:${address.port}/`);
-      await expect(
-        page.getByRole("button", { name: "No new evals to run" }),
-      ).toBeDisabled();
+      await expect(page.locator("#suites").getByText(allSaved)).toBeVisible();
       await page.getByRole("button", { name: "Choose cases…" }).click();
       await expect(page.locator("#eval-history")).toContainText(
         "All cases have been run",
@@ -234,6 +241,38 @@ test(
       await expect(page.locator("#eval-count")).toContainText(
         `${phaseOneCases.length} planned answers`,
       );
+      // History presets: nothing has failed yet, every saved rubric differs
+      // from today's wording, and a later failure becomes selectable.
+      await expect(
+        page.getByRole("button", { name: "Select failed last time (0)" }),
+      ).toBeDisabled();
+      await page
+        .getByRole("button", { name: "Clear cases", exact: true })
+        .click();
+      await page
+        .getByRole("button", {
+          name: `Select rubric changed (${phaseOneCases.length})`,
+        })
+        .click();
+      await expect.poll(selected).toEqual(phaseOneCases.map((item) => item.id));
+      await expect(
+        page.locator('.eval-option[data-case-id="greeting"] .case-history'),
+      ).toHaveText(/^Not judged · .+ · rubric changed$/);
+      save(
+        "failing",
+        githubIds.slice(0, 1),
+        "checks-failed",
+        "2026-09-06T00:00:00Z",
+      );
+      await page
+        .getByRole("button", { name: "Select failed last time (1)" })
+        .click();
+      await expect.poll(selected).toEqual(githubIds.slice(0, 1));
+      await expect(
+        page.locator(
+          `.eval-option[data-case-id="${githubIds[0]}"] .case-history`,
+        ),
+      ).toHaveText(/^Failed · /);
       expect(launches).toBe(0);
       expect(errors).toEqual([]);
     } finally {
