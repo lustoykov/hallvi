@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { GithubAccessError, githubDeviceRequest, githubJson } from "./github-api";
-import { detectGithubCliLogin, githubAccountSchema, githubAppRegistration, githubConnectionIssue, githubConnectionPath, readGithubConnection, saveGithubConnection } from "./github-connection";
+import { canRefreshGithubConnection, detectGithubCliLogin, githubAccountSchema, githubAppRegistration, githubConnectionIssue, githubConnectionPath, parseGithubTokenResponse, readGithubConnection, saveGithubConnection } from "./github-connection";
 
 export const useGithubCliSchema = z.strictObject({ candidateId: z.string().length(64) });
 export const emptyGithubRequestSchema = z.strictObject({});
@@ -50,7 +50,7 @@ export async function getGithubSetupStatus() {
       if (saved.mode === "cli") expectedCliFingerprint = saved.fingerprint;
       issue = githubConnectionIssue(saved);
       connection = { id: saved.id, mode: saved.mode, account: saved.account, connectedAt: saved.connectedAt,
-        source: saved.mode === "cli" ? saved.source : "Server Guy", expiresAt: saved.mode === "app" ? saved.expiresAt : null,
+        source: saved.mode === "cli" ? saved.source : "Server Guy", expiresAt: saved.mode === "app" ? saved.expiresAt : null, automaticRenewal: canRefreshGithubConnection(saved),
         accessUrl: saved.mode === "app" ? `https://github.com/apps/${saved.slug}/installations/new` : "https://github.com/settings/applications" };
     }
   } catch (error) { issue = error instanceof GithubAccessError ? error.message : "GitHub settings are unavailable."; }
@@ -138,12 +138,11 @@ export async function pollGithubLogin(id: string): Promise<GithubLoginAttempt> {
         attempt.deviceCode = undefined;
         return publicAttempt(attempt);
       }
-      const token = z.object({ access_token: z.string().startsWith("ghu_"), token_type: z.literal("bearer"), expires_in: z.number().int().positive().max(86_400).optional() }).safeParse(data);
-      if (!token.success) throw new GithubAccessError("GitHub returned an unsupported login. Check that Server Guy uses a GitHub App.");
-      const account = githubAccountSchema.safeParse((await githubJson("/user", token.data.access_token)).data);
+      const credentials = parseGithubTokenResponse(data);
+      const account = githubAccountSchema.safeParse((await githubJson("/user", credentials.token)).data);
       if (!account.success) throw new GithubAccessError("GitHub returned an unreadable account.");
       if (state.version !== version || publicAttempt(attempt).status !== "waiting") return publicAttempt(attempt);
-      saveGithubConnection({ id: randomUUID(), mode: "app", token: token.data.access_token, clientId: attempt.clientId, slug: attempt.slug, account: account.data, connectedAt: new Date().toISOString(), expiresAt: token.data.expires_in ? new Date(Date.now() + token.data.expires_in * 1000).toISOString() : null });
+      saveGithubConnection({ id: randomUUID(), mode: "app", ...credentials, clientId: attempt.clientId, slug: attempt.slug, account: account.data, connectedAt: new Date().toISOString() });
       attempt.view.status = "connected"; attempt.deviceCode = undefined;
     } catch (error) {
       if (state.version === version && attempt.view.status === "waiting") {

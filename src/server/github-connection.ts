@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
-import { GithubAccessError, githubJson, readGithubCliCredential } from "./github-api";
+import { GithubAccessError, githubDeviceRequest, githubJson, readGithubCliCredential } from "./github-api";
 
 export const githubAccountSchema = z.object({ id: z.number().int().positive(), login: z.string().min(1).max(100) });
 const common = {
@@ -12,10 +12,32 @@ const common = {
 };
 const connectionSchema = z.discriminatedUnion("mode", [
   z.object({ ...common, mode: z.literal("cli"), source: z.enum(["GH_TOKEN", "GITHUB_TOKEN", "gh"]), fingerprint: z.string().length(64) }),
-  z.object({ ...common, mode: z.literal("app"), clientId: z.string().min(1), slug: z.string().regex(/^[a-z0-9-]+$/), token: z.string().startsWith("ghu_"), expiresAt: z.iso.datetime().nullable() }),
+  z.object({ ...common, mode: z.literal("app"), clientId: z.string().min(1), slug: z.string().regex(/^[a-z0-9-]+$/), token: z.string().startsWith("ghu_"), expiresAt: z.iso.datetime().nullable(),
+    refresh: z.object({ token: z.string().startsWith("ghr_"), expiresAt: z.iso.datetime() }).optional() }),
 ]);
 export type GithubConnection = z.infer<typeof connectionSchema>;
 export type GithubAccount = z.infer<typeof githubAccountSchema>;
+type AppConnection = Extract<GithubConnection, { mode: "app" }>;
+
+const tokenResponseSchema = z.object({ access_token: z.string().startsWith("ghu_"), token_type: z.literal("bearer") }).and(z.union([
+  z.object({ expires_in: z.number().int().positive().max(86_400), refresh_token: z.string().startsWith("ghr_"), refresh_token_expires_in: z.number().int().positive().max(366 * 86_400) }),
+  z.object({ expires_in: z.undefined().optional(), refresh_token: z.undefined().optional(), refresh_token_expires_in: z.undefined().optional() }),
+]));
+
+/** Only validated credentials enter the owned file; never expose parser/provider details. */
+export function parseGithubTokenResponse(value: unknown): Pick<AppConnection, "token" | "expiresAt" | "refresh"> {
+  const result = tokenResponseSchema.safeParse(value);
+  if (!result.success) throw new GithubAccessError("GitHub returned an incomplete login. Sign in again.", "auth");
+  const data = result.data;
+  const issuedAt = Date.now();
+  return { token: data.access_token,
+    expiresAt: data.expires_in ? new Date(issuedAt + data.expires_in * 1000).toISOString() : null,
+    refresh: data.refresh_token ? { token: data.refresh_token, expiresAt: new Date(issuedAt + data.refresh_token_expires_in * 1000).toISOString() } : undefined };
+}
+
+export function canRefreshGithubConnection(connection: GithubConnection) {
+  return connection.mode === "app" && !connection.invalidReason && Boolean(connection.refresh && Date.parse(connection.refresh.expiresAt) > Date.now());
+}
 
 export function githubConnectionPath() {
   return join(resolve(/* turbopackIgnore: true */ process.env.SERVER_GUY_CONFIG_DIR ?? join(process.cwd(), ".server-guy")), "github-connection.json");
@@ -49,7 +71,9 @@ export function saveGithubConnection(connection: GithubConnection | null) {
 
 export function githubConnectionIssue(connection: GithubConnection): string | null {
   if (connection.invalidReason) return connection.invalidReason;
-  if (connection.mode === "app" && connection.expiresAt && Date.parse(connection.expiresAt) <= Date.now()) return "Your GitHub login has expired. Sign in again.";
+  if (connection.mode === "app" && connection.expiresAt && Date.parse(connection.expiresAt) <= Date.now() && !canRefreshGithubConnection(connection)) {
+    return connection.refresh ? "Your GitHub login has expired. Sign in again." : "Sign in to GitHub once more to enable automatic renewal for this older login.";
+  }
   return null;
 }
 
@@ -85,8 +109,53 @@ export async function detectGithubCliLogin() {
 }
 
 export function invalidateGithubConnection(connection: GithubConnection, reason: string) {
-  // An older request must never disable a newer login.
-  if (readGithubConnection()?.id === connection.id) saveGithubConnection({ ...connection, invalidReason: reason });
+  // An older request must never disable a replacement login or a rotated token.
+  const current = readGithubConnection();
+  if (current?.id === connection.id && current.mode === connection.mode &&
+    (current.mode !== "app" || (connection.mode === "app" && current.token === connection.token))) {
+    saveGithubConnection({ ...current, invalidReason: reason });
+  }
+}
+
+// Share a single-use refresh across route bundles and concurrent requests in this
+// local Node process. The file remains authoritative; no background timer is needed.
+declare global { var __serverGuyGithubRefreshes: Map<string, { token: string; id: string; promise: Promise<AppConnection> }> | undefined }
+async function refreshGithubConnection(connection: AppConnection): Promise<AppConnection> {
+  const path = githubConnectionPath();
+  const all = globalThis.__serverGuyGithubRefreshes ??= new Map();
+  const pending = all.get(path);
+  if (pending?.id === connection.id && pending.token === connection.token) return pending.promise;
+  const promise = (async () => {
+    try {
+      const data = await githubDeviceRequest("/login/oauth/access_token", {
+        client_id: connection.clientId, grant_type: "refresh_token", refresh_token: connection.refresh!.token,
+      });
+      const failure = z.object({ error: z.string() }).safeParse(data);
+      if (failure.success) {
+        if (["bad_refresh_token", "expired_token", "invalid_grant", "access_denied"].includes(failure.data.error)) {
+          throw new GithubAccessError("GitHub could not renew this login. Sign in again.", "auth");
+        }
+        throw new GithubAccessError("GitHub could not renew access right now. Try the repository check again.");
+      }
+      const credentials = parseGithubTokenResponse(data);
+      // Do not resurrect a disconnected account, overwrite a new login, or
+      // replace credentials already rotated elsewhere while the request waited.
+      const current = readGithubConnection();
+      if (current?.id !== connection.id || current.mode !== "app" || current.token !== connection.token || current.invalidReason) {
+        throw new GithubAccessError("The GitHub connection changed during renewal. Try again.");
+      }
+      const refreshed = { ...current, ...credentials };
+      saveGithubConnection(refreshed);
+      return refreshed;
+    } catch (error) {
+      if (error instanceof GithubAccessError && error.kind === "auth") invalidateGithubConnection(connection, error.message);
+      if (error instanceof GithubAccessError) throw error;
+      throw new GithubAccessError("GitHub access could not be renewed. Try again.");
+    }
+  })();
+  all.set(path, { token: connection.token, id: connection.id, promise });
+  try { return await promise; }
+  finally { if (all.get(path)?.promise === promise) all.delete(path); }
 }
 
 export async function connectedGithubCredential() {
@@ -94,7 +163,11 @@ export async function connectedGithubCredential() {
   if (!connection) throw new GithubAccessError("Connect GitHub in Settings before checking a repository.", "auth");
   const issue = githubConnectionIssue(connection);
   if (issue) throw new GithubAccessError(issue, "auth");
-  if (connection.mode === "app") return { connection, token: connection.token };
+  if (connection.mode === "app") {
+    const refreshDue = connection.expiresAt && Date.parse(connection.expiresAt) <= Date.now() + 60_000;
+    const current = refreshDue && canRefreshGithubConnection(connection) ? await refreshGithubConnection(connection) : connection;
+    return { connection: current, token: current.token };
+  }
   const credential = await readGithubCliCredential();
   if (!credential || credential.source !== connection.source || credentialFingerprint(credential.token, credential.source) !== connection.fingerprint) {
     const reason = "Your GitHub CLI login changed or is missing. Choose a connection again in Settings → GitHub.";

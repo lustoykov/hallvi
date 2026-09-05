@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { GithubAccessError, githubJson } from "./github-api";
-import { connectedGithubCredential, currentGithubConnectionId, githubAccountSchema, invalidateGithubConnection } from "./github-connection";
+import { connectedGithubCredential, currentGithubConnectionId, githubAccountSchema, invalidateGithubConnection, readGithubConnection } from "./github-connection";
 import type { GithubConnection } from "./github-connection";
 
 export interface RepositoryIdentity {
@@ -113,6 +113,10 @@ export async function inspectGithubRepository(
   repository: RepositoryIdentity,
   expectedRepositoryId?: number,
 ): Promise<GithubInspection> {
+  return inspectGithubRepositoryAttempt(repository, expectedRepositoryId, true);
+}
+
+async function inspectGithubRepositoryAttempt(repository: RepositoryIdentity, expectedRepositoryId: number | undefined, retryAfterRotation: boolean): Promise<GithubInspection> {
   const sourceUrl = repository.canonicalUrl;
   const fullName = `${repository.owner}/${repository.name}`;
   const checkedAt = new Date().toISOString();
@@ -156,6 +160,14 @@ export async function inspectGithubRepository(
       },
     };
   } catch (error) {
+    // Refresh invalidates the previous access token. A check already using it
+    // may race renewal; retry once, only for the same consented connection.
+    if (retryAfterRotation && connection?.mode === "app" && error instanceof GithubAccessError && error.kind === "auth") {
+      const current = readGithubConnection();
+      if (current?.mode === "app" && current.id === connection.id && current.token !== connection.token && !current.invalidReason) {
+        return inspectGithubRepositoryAttempt(repository, expectedRepositoryId, false);
+      }
+    }
     if (connection && error instanceof GithubAccessError && error.kind === "auth") invalidateGithubConnection(connection, error.message);
     const failure = classifyGithubFailure(error);
     return {

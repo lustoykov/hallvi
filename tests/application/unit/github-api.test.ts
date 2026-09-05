@@ -24,3 +24,19 @@ it("honors GitHub CLI environment precedence and records the source", async () =
   vi.stubEnv("GH_TOKEN", "");
   expect(await readGithubCliCredential()).toEqual({ token: "github-token", source: "GITHUB_TOKEN" });
 });
+
+it.each([200, 400, 401])("passes refresh grant results from HTTP %s to validation without putting secrets in the URL", async (status) => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "bad_refresh_token" }), { status }));
+  vi.stubGlobal("fetch", fetcher);
+  expect(await githubDeviceRequest("/login/oauth/access_token", { client_id: "public-client", grant_type: "refresh_token", refresh_token: "ghr_secret" })).toEqual({ error: "bad_refresh_token" });
+  const [url, request] = fetcher.mock.calls[0];
+  expect(url).toBe("https://github.com/login/oauth/access_token");
+  expect(request).toMatchObject({ method: "POST", redirect: "error", cache: "no-store" });
+  expect(request.body.get("refresh_token")).toBe("ghr_secret");
+  expect(request.body.has("client_secret")).toBe(false);
+});
+
+it("treats a refresh server failure as retryable without exposing its body", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("ghr_private-provider-error", { status: 503 })));
+  await expect(githubDeviceRequest("/login/oauth/access_token", { grant_type: "refresh_token", refresh_token: "ghr_secret" })).rejects.toMatchObject({ kind: "unavailable" });
+});
