@@ -19,9 +19,14 @@ export function Conversation({ className = "", ...props }: ConversationProps) {
   );
 }
 
-export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>;
+export type ConversationContentProps = ComponentProps<
+  typeof StickToBottom.Content
+>;
 
-export function ConversationContent({ className = "", ...props }: ConversationContentProps) {
+export function ConversationContent({
+  className = "",
+  ...props
+}: ConversationContentProps) {
   return <StickToBottom.Content className={className} {...props} />;
 }
 

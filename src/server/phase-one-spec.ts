@@ -9,15 +9,69 @@ import type {
 import { APPROVAL_MODES } from "./types";
 
 export const PHASES = [
-  { key: "start", number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
-  { key: "inspect-app", number: 2, name: "Inspect app", deliverable: "Application Contract", group: "plan" },
-  { key: "make-launch-ready", number: 3, name: "Make launch-ready", deliverable: "Conformance Result", group: "plan" },
-  { key: "review-launch-plan", number: 4, name: "Review launch plan", deliverable: "Launch Plan", group: "plan" },
-  { key: "set-up-server", number: 5, name: "Set up server", deliverable: "Host Record", group: "setup" },
-  { key: "connect-domain", number: 6, name: "Connect domain", deliverable: "Domain Route", group: "setup" },
-  { key: "configure-protect", number: 7, name: "Configure and protect", deliverable: "Operational Baseline", group: "setup" },
-  { key: "go-live", number: 8, name: "Go live", deliverable: "Verified Release", group: "live" },
-  { key: "handoff", number: 9, name: "Handoff", deliverable: "Operations Handoff", group: "live" },
+  {
+    key: "start",
+    number: 1,
+    name: "Start",
+    deliverable: "Launch Brief",
+    group: "plan",
+  },
+  {
+    key: "inspect-app",
+    number: 2,
+    name: "Inspect app",
+    deliverable: "Application Contract",
+    group: "plan",
+  },
+  {
+    key: "make-launch-ready",
+    number: 3,
+    name: "Make launch-ready",
+    deliverable: "Conformance Result",
+    group: "plan",
+  },
+  {
+    key: "review-launch-plan",
+    number: 4,
+    name: "Review launch plan",
+    deliverable: "Launch Plan",
+    group: "plan",
+  },
+  {
+    key: "set-up-server",
+    number: 5,
+    name: "Set up server",
+    deliverable: "Host Record",
+    group: "setup",
+  },
+  {
+    key: "connect-domain",
+    number: 6,
+    name: "Connect domain",
+    deliverable: "Domain Route",
+    group: "setup",
+  },
+  {
+    key: "configure-protect",
+    number: 7,
+    name: "Configure and protect",
+    deliverable: "Operational Baseline",
+    group: "setup",
+  },
+  {
+    key: "go-live",
+    number: 8,
+    name: "Go live",
+    deliverable: "Verified Release",
+    group: "live",
+  },
+  {
+    key: "handoff",
+    number: 9,
+    name: "Handoff",
+    deliverable: "Operations Handoff",
+    group: "live",
+  },
 ] as const;
 
 export const PHASE_ONE = PHASES[0];
@@ -50,9 +104,21 @@ export const PHASE_ONE_CHECKS = [
 ] as const;
 
 export const PRODUCTION_BASELINE = [
-  { key: "protect-database", label: "Protect database data", rule: "Required for every production launch" },
-  { key: "minimize-downtime", label: "Minimize downtime", rule: "Prefer changes that preserve availability" },
-  { key: "keep-cost-low", label: "Keep infrastructure cost low", rule: "Use the smallest credible infrastructure" },
+  {
+    key: "protect-database",
+    label: "Protect database data",
+    rule: "Required for every production launch",
+  },
+  {
+    key: "minimize-downtime",
+    label: "Minimize downtime",
+    rule: "Prefer changes that preserve availability",
+  },
+  {
+    key: "keep-cost-low",
+    label: "Keep infrastructure cost low",
+    rule: "Use the smallest credible infrastructure",
+  },
 ] as const;
 
 export const UPCOMING_REQUIREMENTS = [
@@ -74,13 +140,16 @@ export const UPCOMING_REQUIREMENTS = [
     key: "domain-starting-state",
     label: "Domain starting state",
     owner: "engineer" as const,
-    resolutionPath: "Tell Pi whether the domain is already owned before Connect domain.",
+    resolutionPath:
+      "Tell Pi whether the domain is already owned before Connect domain.",
     requiredBeforePhase: 6,
   },
 ] as const;
 
 export function phaseOneCheckListForPrompt() {
-  return PHASE_ONE_CHECKS.map((check, index) => `${index + 1}. ${check.label}.`).join("\n");
+  return PHASE_ONE_CHECKS.map(
+    (check, index) => `${index + 1}. ${check.label}.`,
+  ).join("\n");
 }
 
 function applicationEvidence(
@@ -97,7 +166,10 @@ function applicationEvidence(
   };
 }
 
-function observationEvidence(observation: Observation, role: string): EvidenceReference {
+function observationEvidence(
+  observation: Observation,
+  role: string,
+): EvidenceReference {
   return {
     recordType: "observation",
     recordId: observation.id,
@@ -114,8 +186,10 @@ function repositoryStatus(repository: Observation | null): GateStatus {
 }
 
 /**
- * Evaluates the Phase 1 Exit Gate from current records. Gate results are projections:
- * they are never stored and they never fall back to an older passing Observation.
+ * Evaluates the Phase 1 Exit Gate from current records. Gate results are
+ * projections:
+ * they are never stored and they never fall back to an older passing
+ * Observation.
  */
 export function computeChecks(
   application: ApplicationRecord,
@@ -123,16 +197,25 @@ export function computeChecks(
   githubConnectionId: string | null,
 ): GateCheck[] {
   const raw = repository?.raw;
-  const currentRepository = Boolean(githubConnectionId && raw && typeof raw === "object" && "connectionId" in raw && raw.connectionId === githubConnectionId);
+  const currentRepository = Boolean(
+    githubConnectionId &&
+    raw &&
+    typeof raw === "object" &&
+    "connectionId" in raw &&
+    raw.connectionId === githubConnectionId,
+  );
   const identityComplete = Boolean(
     application.id &&
-      application.name &&
-      application.repositoryUrl &&
-      application.repositoryOwner &&
-      application.repositoryName,
+    application.name &&
+    application.repositoryUrl &&
+    application.repositoryOwner &&
+    application.repositoryName,
   );
   const environmentExplicit = application.environment === "production";
-  const approvalExplicit = Object.hasOwn(APPROVAL_MODES, application.approvalMode);
+  const approvalExplicit = Object.hasOwn(
+    APPROVAL_MODES,
+    application.approvalMode,
+  );
 
   const values = {
     "application-identity": {
@@ -140,14 +223,21 @@ export function computeChecks(
       result: identityComplete
         ? `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`
         : "The application identity is incomplete.",
-      evidence: [applicationEvidence(application, "Application identity and repository selection")],
+      evidence: [
+        applicationEvidence(
+          application,
+          "Application identity and repository selection",
+        ),
+      ],
       canRerun: false,
     },
     "repository-readable": {
       status: currentRepository ? repositoryStatus(repository) : "not-yet",
-      result: !githubConnectionId ? "Connect GitHub, then run the repository check."
-        : !currentRepository ? "Run the repository check with your current GitHub connection."
-        : repository?.summary ?? "The repository has not been checked yet.",
+      result: !githubConnectionId
+        ? "Connect GitHub, then run the repository check."
+        : !currentRepository
+          ? "Run the repository check with your current GitHub connection."
+          : (repository?.summary ?? "The repository has not been checked yet."),
       evidence: repository
         ? [observationEvidence(repository, "Latest repository access result")]
         : [],
@@ -155,8 +245,12 @@ export function computeChecks(
     },
     "target-environment": {
       status: environmentExplicit ? "passed" : "not-yet",
-      result: environmentExplicit ? "Production" : "Choose a target environment.",
-      evidence: [applicationEvidence(application, "Selected target environment")],
+      result: environmentExplicit
+        ? "Production"
+        : "Choose a target environment.",
+      evidence: [
+        applicationEvidence(application, "Selected target environment"),
+      ],
       canRerun: false,
     },
     "approval-authority": {
@@ -164,7 +258,9 @@ export function computeChecks(
       result: approvalExplicit
         ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
         : "Choose how Pi should ask before external changes.",
-      evidence: [applicationEvidence(application, "Selected permission policy")],
+      evidence: [
+        applicationEvidence(application, "Selected permission policy"),
+      ],
       canRerun: false,
     },
   } satisfies Record<

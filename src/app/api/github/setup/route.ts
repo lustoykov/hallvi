@@ -1,12 +1,21 @@
 import { handle } from "@/server/http";
 import { assertSameOrigin, parseJsonRequest } from "@/server/schemas";
-import { adoptGithubCliLogin, disconnectGithub, disconnectGithubSchema, getGithubSetupStatus, useGithubCliSchema } from "@/server/github-setup";
+import {
+  adoptGithubCliLogin,
+  disconnectGithub,
+  disconnectGithubSchema,
+  getGithubSetupStatus,
+  useGithubCliSchema,
+} from "@/server/github-setup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  return handle(async () => { assertSameOrigin(request); return getGithubSetupStatus(); });
+  return handle(async () => {
+    assertSameOrigin(request);
+    return getGithubSetupStatus();
+  });
 }
 export async function POST(request: Request) {
   return handle(async () => {

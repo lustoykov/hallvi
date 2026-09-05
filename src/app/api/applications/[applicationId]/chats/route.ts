@@ -14,6 +14,8 @@ export async function POST(
   return handle(async () => {
     const { applicationId } = await context.params;
     const body = await parseJsonRequest(request, createChatRequestSchema);
-    return NextResponse.json(createChat(applicationId, body.title), { status: 201 });
+    return NextResponse.json(createChat(applicationId, body.title), {
+      status: 201,
+    });
   });
 }

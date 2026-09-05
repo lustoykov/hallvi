@@ -11,28 +11,44 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
     try {
       body = JSON.parse(text) as T & { error?: string };
     } catch {
-      if (response.ok) throw new Error("Server Guy returned an unreadable response.");
+      if (response.ok)
+        throw new Error("Server Guy returned an unreadable response.");
     }
   }
   if (!response.ok) {
-    throw new Error(body?.error ?? (text || "Server Guy could not complete that request."));
+    throw new Error(
+      body?.error ?? (text || "Server Guy could not complete that request."),
+    );
   }
   if (!body) throw new Error("Server Guy returned an empty response.");
   return body;
 }
 
 function post(url: string, body: unknown) {
-  return jsonRequest<PhaseOneOperatorView>(url, { method: "POST", body: JSON.stringify(body) });
+  return jsonRequest<PhaseOneOperatorView>(url, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
-/** Workspace reads/edits return the whole view; removal returns the removed identity. */
+/**
+ * Workspace reads/edits return the whole view; removal returns the removed
+ * identity.
+ */
 export const api = {
   removeApplication(applicationId: string, repository: string) {
-    return jsonRequest<{ removedApplicationId: string }>(`/api/applications/${applicationId}`, {
-      method: "DELETE", body: JSON.stringify({ repository }),
-    });
+    return jsonRequest<{ removedApplicationId: string }>(
+      `/api/applications/${applicationId}`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({ repository }),
+      },
+    );
   },
-  createApplication(input: { repositoryUrl: string; approvalMode: ApprovalMode }) {
+  createApplication(input: {
+    repositoryUrl: string;
+    approvalMode: ApprovalMode;
+  }) {
     return post("/api/applications", input);
   },
   view(applicationId: string, chatId: string) {
@@ -44,12 +60,20 @@ export const api = {
     return post(`/api/applications/${applicationId}/chats`, {});
   },
   archiveChat(applicationId: string, chatId: string) {
-    return post(`/api/applications/${applicationId}/chats/${chatId}/archive`, {});
+    return post(
+      `/api/applications/${applicationId}/chats/${chatId}/archive`,
+      {},
+    );
   },
   sendMessage(applicationId: string, chatId: string, message: string) {
-    return post(`/api/applications/${applicationId}/chats/${chatId}/messages`, { message });
+    return post(`/api/applications/${applicationId}/chats/${chatId}/messages`, {
+      message,
+    });
   },
   rerunRepositoryCheck(applicationId: string) {
-    return post(`/api/applications/${applicationId}/checks/repository-readable/rerun`, {});
+    return post(
+      `/api/applications/${applicationId}/checks/repository-readable/rerun`,
+      {},
+    );
   },
 };

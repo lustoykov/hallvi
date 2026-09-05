@@ -1,6 +1,10 @@
 import { handle } from "@/server/http";
 import { parseJsonRequest } from "@/server/schemas";
-import { cancelGithubLogin, emptyGithubRequestSchema, pollGithubLogin } from "@/server/github-setup";
+import {
+  cancelGithubLogin,
+  emptyGithubRequestSchema,
+  pollGithubLogin,
+} from "@/server/github-setup";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ attemptId: string }> };

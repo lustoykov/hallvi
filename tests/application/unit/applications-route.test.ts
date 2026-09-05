@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../src/server/phase-one", () => ({
-  ExistingApplicationConflictError: class ExistingApplicationConflictError extends Error {},
+  ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createPhaseOneApplication: mocks.createPhaseOneApplication,
 }));
@@ -58,20 +58,23 @@ describe("POST /api/applications", () => {
   it.each([
     ["missing", undefined],
     ["unsupported", "sometimes-ask"],
-  ])("rejects a %s permission policy instead of silently defaulting it", async (_label, approvalMode) => {
-    const response = await POST(
-      request({
-        repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
-        ...(approvalMode === undefined ? {} : { approvalMode }),
-      }),
-    );
+  ])(
+    "rejects a %s permission policy instead of silently defaulting it",
+    async (_label, approvalMode) => {
+      const response = await POST(
+        request({
+          repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
+          ...(approvalMode === undefined ? {} : { approvalMode }),
+        }),
+      );
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      error: "Choose a valid permission policy.",
-    });
-    expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Choose a valid permission policy.",
+      });
+      expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     [
@@ -102,7 +105,9 @@ describe("POST /api/applications", () => {
     const response = await POST(request(body));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: expect.stringContaining(message) });
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining(message),
+    });
     expect(mocks.createPhaseOneApplication).not.toHaveBeenCalled();
   });
 

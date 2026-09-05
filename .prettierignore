@@ -1,0 +1,20 @@
+# Build output and dependencies
+.next
+node_modules
+out
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# Local state and generated results
+.server-guy
+data
+tests/results
+
+# Lockfile and fixture sources copied verbatim into disposable apps
+package-lock.json
+tests/browser-fixtures
+
+# Prose, design documents, and hand-built HTML pages keep their own layout
+*.md
+*.html

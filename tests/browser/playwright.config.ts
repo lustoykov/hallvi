@@ -10,7 +10,18 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   outputDir: "../results/browser-artifacts",
-  reporter: [["list"], ["html", { open: "never", outputFolder: fileURLToPath(new URL("../results/browser-report", import.meta.url)) }]],
+  reporter: [
+    ["list"],
+    [
+      "html",
+      {
+        open: "never",
+        outputFolder: fileURLToPath(
+          new URL("../results/browser-report", import.meta.url),
+        ),
+      },
+    ],
+  ],
   use: {
     browserName: "chromium",
     viewport: { width: 1440, height: 1000 },

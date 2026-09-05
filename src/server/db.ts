@@ -61,11 +61,16 @@ function createDatabase(): ServerGuyDatabase {
   }
 }
 
-function assertCurrentSchema(client: InstanceType<typeof Database>, databasePath: string) {
+function assertCurrentSchema(
+  client: InstanceType<typeof Database>,
+  databasePath: string,
+) {
   const version = client.pragma("user_version", { simple: true }) as number;
   const initialized = Boolean(
     client
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'applications'")
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'applications'",
+      )
       .get(),
   );
   if (!initialized) {
@@ -87,26 +92,39 @@ const rowId = sql<number>`rowid`;
 // Applications
 
 export function listApplications() {
-  return db().select().from(applications).orderBy(desc(applications.createdAt), desc(rowId)).all();
+  return db()
+    .select()
+    .from(applications)
+    .orderBy(desc(applications.createdAt), desc(rowId))
+    .all();
 }
 
 export function getApplication(id: string) {
-  return db().select().from(applications).where(eq(applications.id, id)).get() ?? null;
+  return (
+    db().select().from(applications).where(eq(applications.id, id)).get() ??
+    null
+  );
 }
 
 export function deleteApplication(id: string) {
-  // Foreign keys remove only this application's workspace and dependent records.
+  // Foreign keys remove only this application's workspace and dependent
+  // records.
   db().delete(applications).where(eq(applications.id, id)).run();
 }
 
 export function getApplicationByRepository(repositoryUrl: string) {
   return (
-    db().select().from(applications).where(eq(applications.repositoryUrl, repositoryUrl)).get() ??
-    null
+    db()
+      .select()
+      .from(applications)
+      .where(eq(applications.repositoryUrl, repositoryUrl))
+      .get() ?? null
   );
 }
 
-export function insertApplication(input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">) {
+export function insertApplication(
+  input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">,
+) {
   const timestamp = now();
   const application: ApplicationRecord = {
     ...input,
@@ -148,7 +166,11 @@ export function getWorkspace(applicationId: string) {
 
 // Chats and messages
 
-export function insertChat(workspaceId: string, title: string, isPrimary = false) {
+export function insertChat(
+  workspaceId: string,
+  title: string,
+  isPrimary = false,
+) {
   const chat: Chat = {
     id: randomUUID(),
     workspaceId,
@@ -229,7 +251,9 @@ export function insertDecision(input: {
 }
 
 export function getDecision(id: string) {
-  return db().select().from(decisions).where(eq(decisions.id, id)).get() ?? null;
+  return (
+    db().select().from(decisions).where(eq(decisions.id, id)).get() ?? null
+  );
 }
 
 export function listActiveDecisions(applicationId: string) {
@@ -237,13 +261,20 @@ export function listActiveDecisions(applicationId: string) {
     .select()
     .from(decisions)
     .where(
-      and(eq(decisions.applicationId, applicationId), isNull(decisions.supersededById)),
+      and(
+        eq(decisions.applicationId, applicationId),
+        isNull(decisions.supersededById),
+      ),
     )
     .orderBy(asc(decisions.createdAt), asc(rowId))
     .all();
 }
 
-export function supersedeDecision(applicationId: string, previousId: string, replacementId: string) {
+export function supersedeDecision(
+  applicationId: string,
+  previousId: string,
+  replacementId: string,
+) {
   const result = db()
     .update(decisions)
     .set({ supersededById: replacementId })
@@ -264,7 +295,9 @@ export function supersedeDecision(applicationId: string, previousId: string, rep
 
 // Observations
 
-export function insertObservation(input: Omit<Observation, "id" | "observedAt">) {
+export function insertObservation(
+  input: Omit<Observation, "id" | "observedAt">,
+) {
   const observation: Observation = {
     ...input,
     id: randomUUID(),
@@ -275,7 +308,10 @@ export function insertObservation(input: Omit<Observation, "id" | "observedAt">)
 }
 
 export function getObservation(id: string) {
-  return db().select().from(observations).where(eq(observations.id, id)).get() ?? null;
+  return (
+    db().select().from(observations).where(eq(observations.id, id)).get() ??
+    null
+  );
 }
 
 export function latestObservation(applicationId: string, kind: string) {
@@ -283,7 +319,12 @@ export function latestObservation(applicationId: string, kind: string) {
     db()
       .select()
       .from(observations)
-      .where(and(eq(observations.applicationId, applicationId), eq(observations.kind, kind)))
+      .where(
+        and(
+          eq(observations.applicationId, applicationId),
+          eq(observations.kind, kind),
+        ),
+      )
       .orderBy(desc(observations.observedAt), desc(rowId))
       .limit(1)
       .get() ?? null
@@ -301,7 +342,12 @@ export function listObservations(applicationId: string) {
 
 // Activity
 
-export function insertActivity(workspaceId: string, kind: string, summary: string, detail: string) {
+export function insertActivity(
+  workspaceId: string,
+  kind: string,
+  summary: string,
+  detail: string,
+) {
   const activity: ActivityEvent = {
     id: randomUUID(),
     workspaceId,

@@ -10,14 +10,20 @@ export function PhaseRail({ checks }: { checks: GateCheck[] }) {
     <section className="sg-phase-rail" aria-label="Application launch progress">
       <div className="sg-phase-list">
         {PHASES.map((phase) => (
-          <div className={`sg-phase ${phase.number === 1 ? "active" : "future"}`} key={phase.number}>
+          <div
+            className={`sg-phase ${phase.number === 1 ? "active" : "future"}`}
+            key={phase.number}
+          >
             <span className="sg-phase-number">{phase.number}</span>
             <span className="sg-phase-copy">
               <strong>{phase.name}</strong>
               {phase.number === 1 && <small>{phase.deliverable}</small>}
             </span>
             {phase.number === 1 && (
-              <span className="sg-phase-dots" aria-label={`${passed} of ${checks.length} checks complete`}>
+              <span
+                className="sg-phase-dots"
+                aria-label={`${passed} of ${checks.length} checks complete`}
+              >
                 {checks.map((check) => (
                   <i className={check.status} key={check.key} />
                 ))}

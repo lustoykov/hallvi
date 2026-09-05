@@ -2,7 +2,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { pushTestDatabase } from "../../test-database";
 import { saveGithubConnection } from "../../../src/server/github-connection";
@@ -13,13 +21,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../src/server/github", async () => {
-  const actual = await vi.importActual<typeof import("../../../src/server/github")>(
-    "../../../src/server/github",
-  );
+  const actual = await vi.importActual<
+    typeof import("../../../src/server/github")
+  >("../../../src/server/github");
   return { ...actual, inspectGithubRepository: mocks.inspectGithubRepository };
 });
 
-vi.mock("../../../src/server/pi", () => ({ askPi: mocks.askPi, PiUnavailableError: class extends Error {} }));
+vi.mock("../../../src/server/pi", () => ({
+  askPi: mocks.askPi,
+  PiUnavailableError: class extends Error {},
+}));
 
 let databaseDirectory: string;
 let databasePath: string;
@@ -46,7 +57,14 @@ beforeAll(async () => {
   databasePath = join(databaseDirectory, "test.db");
   process.env.SERVER_GUY_DB_PATH = databasePath;
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", databaseDirectory);
-  saveGithubConnection({ id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "fixture" }, connectedAt: new Date().toISOString() });
+  saveGithubConnection({
+    id: passingInspection.raw.connectionId,
+    mode: "cli",
+    source: "gh",
+    fingerprint: "0".repeat(64),
+    account: { id: 1, login: "fixture" },
+    connectedAt: new Date().toISOString(),
+  });
   pushTestDatabase(databasePath);
   delete globalThis.__serverGuyDb;
   database = await import("../../../src/server/db");
@@ -54,7 +72,14 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  saveGithubConnection({ id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "fixture" }, connectedAt: new Date().toISOString() });
+  saveGithubConnection({
+    id: passingInspection.raw.connectionId,
+    mode: "cli",
+    source: "gh",
+    fingerprint: "0".repeat(64),
+    account: { id: 1, login: "fixture" },
+    connectedAt: new Date().toISOString(),
+  });
   database.db().$client.exec("DELETE FROM applications");
   mocks.askPi.mockReset();
   mocks.inspectGithubRepository.mockReset();
@@ -69,7 +94,9 @@ afterAll(() => {
   rmSync(databaseDirectory, { recursive: true, force: true });
 });
 
-async function createApplication(approvalMode: "pi-decides" | "always-ask" = "pi-decides") {
+async function createApplication(
+  approvalMode: "pi-decides" | "always-ask" = "pi-decides",
+) {
   return phaseOne.createPhaseOneApplication({
     repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
     environment: "production",
@@ -80,21 +107,37 @@ async function createApplication(approvalMode: "pi-decides" | "always-ask" = "pi
 describe("repository verification after reconnecting", () => {
   const connectionId = "00000000-0000-4000-8000-000000000002";
   function reconnect() {
-    saveGithubConnection({ id: connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 2, login: "new-login" }, connectedAt: new Date().toISOString() });
-    mocks.inspectGithubRepository.mockResolvedValue({ ...passingInspection, raw: { ...passingInspection.raw, connectionId } });
+    saveGithubConnection({
+      id: connectionId,
+      mode: "cli",
+      source: "gh",
+      fingerprint: "0".repeat(64),
+      account: { id: 2, login: "new-login" },
+      connectedAt: new Date().toISOString(),
+    });
+    mocks.inspectGithubRepository.mockResolvedValue({
+      ...passingInspection,
+      raw: { ...passingInspection.raw, connectionId },
+    });
     mocks.inspectGithubRepository.mockClear();
   }
 
   it("checks each existing application with the new connection, preserving chats and avoiding model calls", async () => {
     const first = await createApplication();
-    await phaseOne.createPhaseOneApplication({ repositoryUrl: "https://github.com/example/second", environment: "production", approvalMode: "always-ask" });
+    await phaseOne.createPhaseOneApplication({
+      repositoryUrl: "https://github.com/example/second",
+      environment: "production",
+      approvalMode: "always-ask",
+    });
     reconnect();
     const results = await phaseOne.recheckGithubRepositories(connectionId);
     expect(results).toHaveLength(2);
     expect(results.every((result) => result.status === "passed")).toBe(true);
     expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(2);
     expect(mocks.askPi).not.toHaveBeenCalled();
-    expect(phaseOne.getPhaseOneOperatorView(first.view.application!.id).messages).toEqual(first.view.messages);
+    expect(
+      phaseOne.getPhaseOneOperatorView(first.view.application!.id).messages,
+    ).toEqual(first.view.messages);
     await phaseOne.recheckGithubRepositories(connectionId);
     expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(2);
   });
@@ -108,18 +151,32 @@ describe("repository verification after reconnecting", () => {
   it("records denial without automatic retry loops, and keeps manual retry available", async () => {
     const { view } = await createApplication();
     reconnect();
-    mocks.inspectGithubRepository.mockResolvedValueOnce({ status: "failed", summary: "Grant repository access, then retry.", sourceUrl: null, raw: { connectionId } });
-    expect(await phaseOne.recheckGithubRepositories(connectionId)).toMatchObject([{ status: "blocked", result: "Grant repository access, then retry." }]);
+    mocks.inspectGithubRepository.mockResolvedValueOnce({
+      status: "failed",
+      summary: "Grant repository access, then retry.",
+      sourceUrl: null,
+      raw: { connectionId },
+    });
+    expect(
+      await phaseOne.recheckGithubRepositories(connectionId),
+    ).toMatchObject([
+      { status: "blocked", result: "Grant repository access, then retry." },
+    ]);
     await phaseOne.recheckGithubRepositories(connectionId);
     expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(1);
     await phaseOne.observeRepository(view.application!.id);
-    expect(phaseOne.getPhaseOneOperatorView(view.application!.id).checks[1].status).toBe("passed");
+    expect(
+      phaseOne.getPhaseOneOperatorView(view.application!.id).checks[1].status,
+    ).toBe("passed");
   });
 
   it("shares simultaneous reconnect checks instead of writing duplicate observations", async () => {
     const { view } = await createApplication();
     reconnect();
-    const results = await Promise.all([phaseOne.recheckGithubRepositories(connectionId), phaseOne.recheckGithubRepositories(connectionId)]);
+    const results = await Promise.all([
+      phaseOne.recheckGithubRepositories(connectionId),
+      phaseOne.recheckGithubRepositories(connectionId),
+    ]);
     expect(results[0]).toEqual(results[1]);
     expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(1);
     expect(database.listObservations(view.application!.id)).toHaveLength(2);
@@ -128,33 +185,76 @@ describe("repository verification after reconnecting", () => {
   it("rejects a stale connection before sending any provider request", async () => {
     await createApplication();
     mocks.inspectGithubRepository.mockClear();
-    await expect(phaseOne.recheckGithubRepositories(connectionId)).rejects.toThrow("connection changed");
+    await expect(
+      phaseOne.recheckGithubRepositories(connectionId),
+    ).rejects.toThrow("connection changed");
     expect(mocks.inspectGithubRepository).not.toHaveBeenCalled();
   });
 
-  it.each(["disconnect", "replace"])("discards a late observation after %s", async (operation) => {
-    const { view } = await createApplication();
-    reconnect();
-    let finish!: (value: typeof passingInspection) => void;
-    mocks.inspectGithubRepository.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    const pending = phaseOne.recheckGithubRepositories(connectionId);
-    const rejected = expect(pending).rejects.toThrow("connection changed");
-    saveGithubConnection(operation === "disconnect" ? null : { id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "replacement" }, connectedAt: new Date().toISOString() });
-    const observations = database.listObservations(view.application!.id);
-    finish({ ...passingInspection, raw: { ...passingInspection.raw, connectionId } });
-    await rejected;
-    expect(database.listObservations(view.application!.id)).toEqual(observations);
-  });
+  it.each(["disconnect", "replace"])(
+    "discards a late observation after %s",
+    async (operation) => {
+      const { view } = await createApplication();
+      reconnect();
+      let finish!: (value: typeof passingInspection) => void;
+      mocks.inspectGithubRepository.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const pending = phaseOne.recheckGithubRepositories(connectionId);
+      const rejected = expect(pending).rejects.toThrow("connection changed");
+      saveGithubConnection(
+        operation === "disconnect"
+          ? null
+          : {
+              id: passingInspection.raw.connectionId,
+              mode: "cli",
+              source: "gh",
+              fingerprint: "0".repeat(64),
+              account: { id: 1, login: "replacement" },
+              connectedAt: new Date().toISOString(),
+            },
+      );
+      const observations = database.listObservations(view.application!.id);
+      finish({
+        ...passingInspection,
+        raw: { ...passingInspection.raw, connectionId },
+      });
+      await rejected;
+      expect(database.listObservations(view.application!.id)).toEqual(
+        observations,
+      );
+    },
+  );
 
   it("validates same-origin requests and the exact saved connection before running checks", async () => {
-    const { POST } = await import("../../../src/app/api/github/setup/repositories/route");
+    const { POST } =
+      await import("../../../src/app/api/github/setup/repositories/route");
     await createApplication();
     reconnect();
-    const request = (body: object, origin = "http://localhost:3000") => new Request("http://localhost:3000/api/github/setup/repositories", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify(body) });
-    expect((await POST(request({ connectionId }, "https://attacker.example"))).status).toBe(400);
+    const request = (body: object, origin = "http://localhost:3000") =>
+      new Request("http://localhost:3000/api/github/setup/repositories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify(body),
+      });
+    expect(
+      (await POST(request({ connectionId }, "https://attacker.example")))
+        .status,
+    ).toBe(400);
     expect((await POST(request({ connectionId: "invalid" }))).status).toBe(400);
-    expect((await POST(request({ connectionId, extra: true }))).status).toBe(400);
-    expect((await POST(request({ connectionId: passingInspection.raw.connectionId }))).status).toBe(400);
+    expect((await POST(request({ connectionId, extra: true }))).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await POST(
+          request({ connectionId: passingInspection.raw.connectionId }),
+        )
+      ).status,
+    ).toBe(400);
     expect(mocks.inspectGithubRepository).not.toHaveBeenCalled();
     const response = await POST(request({ connectionId }));
     expect(response.status).toBe(200);
@@ -165,20 +265,42 @@ describe("repository verification after reconnecting", () => {
 describe("Phase 1 application workspace", () => {
   it("requires the exact repository before removing anything", async () => {
     const { view } = await createApplication();
-    expect(() => phaseOne.removeApplication(view.application!.id, "wrong/repo")).toThrow("exact repository");
-    expect(phaseOne.getPhaseOneOperatorView(view.application!.id)).toEqual(view);
-    expect(() => phaseOne.removeApplication("unknown", "lustoykov/todo-fastapi")).toThrow(phaseOne.NotFoundError);
+    expect(() =>
+      phaseOne.removeApplication(view.application!.id, "wrong/repo"),
+    ).toThrow("exact repository");
+    expect(phaseOne.getPhaseOneOperatorView(view.application!.id)).toEqual(
+      view,
+    );
+    expect(() =>
+      phaseOne.removeApplication("unknown", "lustoykov/todo-fastapi"),
+    ).toThrow(phaseOne.NotFoundError);
   });
 
   it("removes only the selected application, including superseded decisions, then permits a fresh start", async () => {
     const { view } = await createApplication();
     const id = view.application!.id;
     const chatId = view.selectedChatId!;
-    mocks.askPi.mockResolvedValueOnce({ message: "First", decisionProposals: [{ kind: "launch-priority", value: "First" }] });
+    mocks.askPi.mockResolvedValueOnce({
+      message: "First",
+      decisionProposals: [{ kind: "launch-priority", value: "First" }],
+    });
     const first = await phaseOne.sendChatMessage(id, chatId, "First priority");
-    mocks.askPi.mockResolvedValueOnce({ message: "Second", decisionProposals: [{ kind: "launch-priority", value: "Second", replaces: first.decisions[0].id }] });
+    mocks.askPi.mockResolvedValueOnce({
+      message: "Second",
+      decisionProposals: [
+        {
+          kind: "launch-priority",
+          value: "Second",
+          replaces: first.decisions[0].id,
+        },
+      ],
+    });
     await phaseOne.sendChatMessage(id, chatId, "Replace priority");
-    const other = await phaseOne.createPhaseOneApplication({ repositoryUrl: "https://github.com/example/other", environment: "production", approvalMode: "always-ask" });
+    const other = await phaseOne.createPhaseOneApplication({
+      repositoryUrl: "https://github.com/example/other",
+      environment: "production",
+      approvalMode: "always-ask",
+    });
     phaseOne.removeApplication(id, "lustoykov/todo-fastapi");
     expect(database.getApplication(id)).toBeNull();
     expect(database.getChat(chatId)).toBeNull();
@@ -186,7 +308,9 @@ describe("Phase 1 application workspace", () => {
     expect(database.getDecision(first.decisions[0].id)).toBeNull();
     expect(database.listObservations(id)).toEqual([]);
     expect(database.listActivity(view.workspace!.id)).toEqual([]);
-    expect(phaseOne.getPhaseOneOperatorView(other.view.application!.id)).toEqual(other.view);
+    expect(
+      phaseOne.getPhaseOneOperatorView(other.view.application!.id),
+    ).toEqual(other.view);
     const fresh = await createApplication();
     expect(fresh.view.application!.id).not.toBe(id);
     expect(fresh.view.messages).toHaveLength(1);
@@ -196,14 +320,25 @@ describe("Phase 1 application workspace", () => {
   it("cannot save an old in-flight Pi turn into a recreated application", async () => {
     const { view } = await createApplication();
     let finish!: (value: { message: string; decisionProposals: [] }) => void;
-    mocks.askPi.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    const pending = phaseOne.sendChatMessage(view.application!.id, view.selectedChatId!, "Old message");
+    mocks.askPi.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = phaseOne.sendChatMessage(
+      view.application!.id,
+      view.selectedChatId!,
+      "Old message",
+    );
     const rejected = expect(pending).rejects.toThrow();
     phaseOne.removeApplication(view.application!.id, "lustoykov/todo-fastapi");
     const fresh = await createApplication();
     finish({ message: "Old reply", decisionProposals: [] });
     await rejected;
-    expect(phaseOne.getPhaseOneOperatorView(fresh.view.application!.id)).toEqual(fresh.view);
+    expect(
+      phaseOne.getPhaseOneOperatorView(fresh.view.application!.id),
+    ).toEqual(fresh.view);
   });
 
   it("lists no applications before any have been added", () => {
@@ -213,23 +348,37 @@ describe("Phase 1 application workspace", () => {
   it("lists every application with its own derived checks, newest first", async () => {
     const first = await createApplication();
     mocks.inspectGithubRepository.mockResolvedValueOnce({
-      status: "blocked", summary: "Repository unavailable.", sourceUrl: null, raw: {},
+      status: "blocked",
+      summary: "Repository unavailable.",
+      sourceUrl: null,
+      raw: {},
     });
     const second = await phaseOne.createPhaseOneApplication({
-      repositoryUrl: "https://github.com/example/another-app", environment: "production", approvalMode: "always-ask",
+      repositoryUrl: "https://github.com/example/another-app",
+      environment: "production",
+      approvalMode: "always-ask",
     });
     const summaries = phaseOne.listApplicationSummaries();
-    expect(summaries.map(({ application }) => application.id)).toEqual([second.view.application!.id, first.view.application!.id]);
+    expect(summaries.map(({ application }) => application.id)).toEqual([
+      second.view.application!.id,
+      first.view.application!.id,
+    ]);
     expect(summaries[0].passedChecks).toBeLessThan(summaries[0].totalChecks);
     expect(summaries[1]).toMatchObject({ passedChecks: 4, totalChecks: 4 });
     expect(summaries[0]).not.toHaveProperty("messages");
-    expect(phaseOne.getPhaseOneOperatorView(first.view.application!.id)).toEqual(first.view);
-    expect(phaseOne.getPhaseOneOperatorView(second.view.application!.id).chats).not.toEqual(first.view.chats);
+    expect(
+      phaseOne.getPhaseOneOperatorView(first.view.application!.id),
+    ).toEqual(first.view);
+    expect(
+      phaseOne.getPhaseOneOperatorView(second.view.application!.id).chats,
+    ).not.toEqual(first.view.chats);
   });
 
   it("rejects an unknown application instead of opening another workspace", async () => {
     await createApplication();
-    expect(() => phaseOne.getPhaseOneOperatorView("unknown")).toThrow(phaseOne.NotFoundError);
+    expect(() => phaseOne.getPhaseOneOperatorView("unknown")).toThrow(
+      phaseOne.NotFoundError,
+    );
   });
 
   it("stores durable inputs and derives four passing checks plus later requirements", async () => {
@@ -237,12 +386,18 @@ describe("Phase 1 application workspace", () => {
 
     expect(result.created).toBe(true);
     expect(result.view.checks).toHaveLength(4);
-    expect(result.view.checks.every((check) => check.status === "passed")).toBe(true);
+    expect(result.view.checks.every((check) => check.status === "passed")).toBe(
+      true,
+    );
     expect(result.view.upcomingRequirements).toHaveLength(3);
-    expect(result.view.upcomingRequirements.every((item) => item.status === "missing")).toBe(true);
-    expect(result.view.observations.map((observation) => observation.kind)).toEqual([
-      "github-repository-identity",
-    ]);
+    expect(
+      result.view.upcomingRequirements.every(
+        (item) => item.status === "missing",
+      ),
+    ).toBe(true);
+    expect(
+      result.view.observations.map((observation) => observation.kind),
+    ).toEqual(["github-repository-identity"]);
     expect(result.view.application?.approvalMode).toBe("pi-decides");
     expect(result.view.workspace).toEqual(
       expect.objectContaining({
@@ -272,14 +427,24 @@ describe("Phase 1 application workspace", () => {
     const primaryChatId = created.view.selectedChatId!;
     mocks.askPi.mockResolvedValueOnce({
       message: "I recorded fast recovery.",
-      decisionProposals: [{ kind: "launch-priority", value: "Recover quickly" }],
+      decisionProposals: [
+        { kind: "launch-priority", value: "Recover quickly" },
+      ],
     });
 
-    await phaseOne.sendChatMessage(applicationId, primaryChatId, "Recovery matters.");
+    await phaseOne.sendChatMessage(
+      applicationId,
+      primaryChatId,
+      "Recovery matters.",
+    );
     const secondChat = phaseOne.createChat(applicationId, "Cost questions");
 
-    expect(secondChat.decisions.map((decision) => decision.value)).toEqual(["Recover quickly"]);
-    expect(secondChat.messages.map((message) => message.role)).toEqual(["assistant"]);
+    expect(secondChat.decisions.map((decision) => decision.value)).toEqual([
+      "Recover quickly",
+    ]);
+    expect(secondChat.messages.map((message) => message.role)).toEqual([
+      "assistant",
+    ]);
     expect(secondChat.chats).toHaveLength(2);
   });
 
@@ -289,9 +454,15 @@ describe("Phase 1 application workspace", () => {
     const chatId = created.view.selectedChatId!;
     mocks.askPi.mockResolvedValueOnce({
       message: "I recorded fast recovery.",
-      decisionProposals: [{ kind: "launch-priority", value: "Recover quickly" }],
+      decisionProposals: [
+        { kind: "launch-priority", value: "Recover quickly" },
+      ],
     });
-    const firstView = await phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters.");
+    const firstView = await phaseOne.sendChatMessage(
+      applicationId,
+      chatId,
+      "Recovery matters.",
+    );
     const first = firstView.decisions[0];
     mocks.askPi.mockResolvedValueOnce({
       message: "I replaced that priority.",
@@ -312,8 +483,7 @@ describe("Phase 1 application workspace", () => {
     const replacement = revised.decisions[0];
     const sourceMessage = database
       .db()
-      .$client
-      .prepare("SELECT body FROM messages WHERE id = ?")
+      .$client.prepare("SELECT body FROM messages WHERE id = ?")
       .get(replacement.sourceMessageId) as { body: string };
 
     expect(revised.decisions.map((decision) => decision.value)).toEqual([
@@ -340,8 +510,14 @@ describe("Phase 1 application workspace", () => {
     });
 
     await expect(
-      phaseOne.sendChatMessage(applicationId, chatId, "Replace the old priority."),
-    ).rejects.toThrow("missing, already replaced, or belongs to another application");
+      phaseOne.sendChatMessage(
+        applicationId,
+        chatId,
+        "Replace the old priority.",
+      ),
+    ).rejects.toThrow(
+      "missing, already replaced, or belongs to another application",
+    );
 
     const after = phaseOne.getPhaseOneOperatorView(applicationId, chatId);
     expect(after.messages).toEqual(before);
@@ -352,7 +528,9 @@ describe("Phase 1 application workspace", () => {
     const created = await createApplication();
     const applicationId = created.view.application!.id;
     const chatId = created.view.selectedChatId!;
-    mocks.askPi.mockRejectedValueOnce(new Error("Pi is unavailable: no model is configured."));
+    mocks.askPi.mockRejectedValueOnce(
+      new Error("Pi is unavailable: no model is configured."),
+    );
 
     await expect(
       phaseOne.sendChatMessage(applicationId, chatId, "Recovery matters."),
@@ -369,13 +547,18 @@ describe("Phase 1 application workspace", () => {
       status: "failed",
       summary: "Repository not found.",
       sourceUrl: "https://github.com/lustoykov/todo-fastapi",
-      raw: { repository: "lustoykov/todo-fastapi", error: "Not Found", connectionId: passingInspection.raw.connectionId },
+      raw: {
+        repository: "lustoykov/todo-fastapi",
+        error: "Not Found",
+        connectionId: passingInspection.raw.connectionId,
+      },
     });
     await phaseOne.observeRepository(applicationId);
     const failed = phaseOne.getPhaseOneOperatorView(applicationId);
 
     expect(
-      failed.checks.find((check) => check.key === "repository-readable")?.status,
+      failed.checks.find((check) => check.key === "repository-readable")
+        ?.status,
     ).toBe("blocked");
     expect(failed.workspace?.status).toBe("in-progress");
 
@@ -383,16 +566,23 @@ describe("Phase 1 application workspace", () => {
       status: "unavailable",
       summary: "GitHub inspection timed out.",
       sourceUrl: "https://github.com/lustoykov/todo-fastapi",
-      raw: { repository: "lustoykov/todo-fastapi", error: "timeout", connectionId: passingInspection.raw.connectionId },
+      raw: {
+        repository: "lustoykov/todo-fastapi",
+        error: "timeout",
+        connectionId: passingInspection.raw.connectionId,
+      },
     });
-    const unavailableObservation = await phaseOne.observeRepository(applicationId);
+    const unavailableObservation =
+      await phaseOne.observeRepository(applicationId);
     const unavailable = phaseOne.getPhaseOneOperatorView(applicationId);
     const repositoryCheck = unavailable.checks.find(
       (check) => check.key === "repository-readable",
     )!;
 
     expect(repositoryCheck.status).toBe("not-yet");
-    expect(repositoryCheck.evidence[0].recordId).toBe(unavailableObservation.id);
+    expect(repositoryCheck.evidence[0].recordId).toBe(
+      unavailableObservation.id,
+    );
     expect(unavailable.workspace?.status).toBe("in-progress");
   });
 });
