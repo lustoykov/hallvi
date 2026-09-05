@@ -2,7 +2,7 @@
 
 **Status:** Living learning guide
 
-**Last revised:** 2026-09-04
+**Last revised:** 2026-09-05
 
 **Canonical stack:** [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
 
@@ -47,37 +47,27 @@ There are therefore two learning surfaces:
 
 ## Current baseline
 
-The implemented Phase 1 is a full-stack Next.js modular monolith:
-
-```text
-Next.js
-├── Operator UI
-├── Route Handlers
-├── Phase 1 domain logic
-├── SQLite durable records
-├── GitHub adapter
-└── Pi SDK adapter
-```
+The implemented Phase 1 is a Next.js modular monolith plus one local Node worker. The [README architecture section](../../README.md#architecture) shows the current shape and the [roadmap](../../ROADMAP.md#development-sequence) owns what is merged, open or planned; this guide does not repeat that status.
 
 It already provides direct practice with:
 
 - React, Next.js App Router, TypeScript, Node, Zod, and Vitest;
-- relational modeling, constraints, indexes, and transactions through SQLite;
+- relational modeling, constraints, indexes, and transactions through SQLite, with Drizzle as the typed schema and query layer;
 - deterministic application state around a probabilistic model;
-- GitHub integration and source-attributed Observations;
-- schema-validated request and model boundaries, idempotent intake, policy conflicts, provenance stability, and adversarial malformed-model-output tests.
+- explicit Pi setup and explicit GitHub connection: credential detection without silent adoption, scoped repository verification, and source-attributed Observations;
+- durable requests: idempotent acceptance, one local worker, cancellation, timeout, interruption and linked retry, revisioned messages, reconnectable SSE, and bounded context with a durable summary;
+- schema-validated request and model boundaries, policy conflicts, provenance stability, and adversarial malformed-model-output tests;
+- desktop Playwright journeys over real Next.js, SQLite and worker processes with synthetic providers, plus opt-in real-Pi evals with exact state checks, human verdicts and an advisory LLM judge.
 
-Pi is Server Guy's only model and agent runtime. The [explicit Pi setup](../../ROADMAP.md#configure-pi-explicitly) detects existing provider/model/effort and credential presence without using them. The user chooses whether to reuse that shared credential store and snapshot the displayed preferences, or sign in separately with editable defaults of `openai-codex` / `gpt-5.6-sol` / `high`. Each new login uses its own OAuth file; only successful sign-in activates it, so cancellation or failure preserves the previous connection. Only ChatGPT subscription OAuth is supported. Model and reasoning dropdowns use Pi’s supported catalog/levels, and changes persist only in Server Guy’s preferences for subsequent turns. A short storage notice links to exact paths and technical details in a separate help panel. Server Guy does not import machine tools/extensions/instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing. The setup screen checks local configuration; provider validity and quota are checked on send.
+Pi is Server Guy's only model and agent runtime. The [roadmap's Pi setup decision](../../ROADMAP.md#configure-pi-explicitly) records how login, model and effort are chosen and stored. Server Guy does not import machine tools, extensions or instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing.
 
-The [applications overview](../testing/phase-one-acceptance.md#current-entry-points-and-setup-rules) is now the entry point after home or Pi setup. Users explicitly add or choose an application instead of automatically opening the newest one. Pi configuration remains installation-wide; chats, Decisions, and checks stay application-scoped, and switching resets transient UI state. This extends the existing routes and SQLite records without a schema change; overview readiness describes the Phase 1 Launch Brief, not deployment.
+The [Phase 1 acceptance contract](../testing/phase-one-acceptance.md) turns the journey into observable pass/fail cases: Vitest for rules and atomic writes, checked-in desktop Playwright journeys for navigation and recovery, and separate opt-in real-Pi cases for model behavior. A passing synthetic test proves UI and state behavior, not live model quality.
 
-The [Phase 1 acceptance contract](../testing/phase-one-acceptance.md) turns this journey into observable pass/fail cases: Vitest for rules and atomic writes, proposed desktop Playwright Test for navigation/recovery, and separate opt-in real-Pi cases for model behavior. A passing synthetic UI test does not prove live model quality or completion of the pending GitHub and durable-worker follow-ups.
+The [real-Pi casebook](../testing/phase-one-acceptance.md#real-pi-casebook-and-remaining-phase-1-gates) makes that distinction executable. Course exercise: show that a structurally valid, correctly persisted Decision can still misrepresent a question as a commitment; write an eval for that mistake, run the real model, review meaning, then measure a change against the same cases. Add evals alongside each phase instead of postponing them to a final testing chapter. The runner is Vitest with exact state checks; human verdicts and the optional advisory judge live in the local testing dashboard, not a new eval platform, and LLM advice never counts as human sign-off.
 
-The [real-Pi casebook](../testing/phase-one-acceptance.md#real-pi-casebook-and-remaining-phase-1-gates) now makes that distinction executable. Course exercise: show that a structurally valid, correctly persisted Decision can still misrepresent a question as a commitment; write an eval for that mistake, run the real model, review meaning, then measure a change against the same cases. Add evals alongside each phase instead of postponing them to a final testing chapter. The initial runner uses Vitest with exact state checks and pending human verdicts, not an LLM judge or a new eval platform.
+Server Guy does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm and Biome. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-It now provides direct practice with Drizzle over SQLite, but it does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm, Biome, and Playwright. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
-
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together. [Drizzle now owns the existing SQLite schema and typed query layer](../../ROADMAP.md#add-drizzle-over-the-existing-sqlite-database) without changing the domain model. [Durable Pi requests](../../ROADMAP.md#make-pi-requests-durable) now use one local Node worker, queued SQLite records and bounded Chat context. Accepted messages outlive HTTP requests. Do not add a separate general-purpose API service.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together, and do not add a separate general-purpose API service. Treat independent worker processes as the [horizontal worker scaling study](../../ROADMAP.md#later-architecture-study--horizontal-workers-and-durable-queues), not hidden scope.
 
 ## Map the Server Guy journey to the stack
 
@@ -125,7 +115,7 @@ Test at least these cases:
 
 Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. The Pi SDK validates Decision arguments with TypeBox; application code normalizes accepted values, validates the final message, checks Decision domain rules, and commits the completed assistant answer and Decisions together; the user message was already saved at acceptance. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
-Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs will use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
+Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint; the [durable requests contract](../specs/durable-pi-requests.md) owns that behavior. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 
 ## The central reliability exercise: one durable Operation
 
@@ -192,7 +182,7 @@ Develop the UI and deterministic domain behavior. `npm run dev` is a development
 
 ### 2. Production-like local Docker
 
-Run the controller, database, and, once it exists, the Node worker with declared ports, health checks, validated configuration, persistent volumes, migrations, structured logs, and restart tests.
+Run the controller, database, and Node worker with declared ports, health checks, validated configuration, persistent volumes, migrations, structured logs, and restart tests.
 
 ### 3. Always-on user-owned or home server
 
@@ -244,9 +234,9 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | --- | --- |
 | **Drizzle over SQLite** | Introduced as the typed schema/query layer before durable Pi state. SQLite, `better-sqlite3`, WAL, foreign keys, transactions, and the prototype reset policy remain; `drizzle-kit push` explicitly applies the TypeScript schema. |
 | **PostgreSQL** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same Drizzle domain schema and invariants where the database differences allow it, and rerun the same tests. |
-| **SQLite + Node worker** | Introduce when a Pi turn outlives one request: persist Pi Run and assistant-message state, schedule work through one local worker process, and recover after disconnects or process restarts. Start without leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
+| **SQLite + Node worker** | Introduced with [durable Pi requests](../specs/durable-pi-requests.md) because a Pi turn outlives one request: Pi Run and assistant-message state persist, one local worker process schedules work, and disconnects or process restarts recover from saved state. No leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
 | **Workflow DevKit** | Re-evaluate when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate. Durable application records remain authoritative. |
-| **Run-ID streaming** | Introduce with the durable Pi worker: the request returns a run ID, the UI reloads the current message revision and reconnects to SSE, and state is recovered from SQLite rather than from the stream. |
+| **Run-ID streaming** | Introduced with the durable Pi worker: the request returns a run ID, the UI reloads the current message revision and reconnects to SSE, and state is recovered from SQLite rather than from the stream. |
 | **Structured logs + OpenTelemetry** | Add before the first multi-component operation; propagate one trace ID through model, domain, provider, and verification boundaries. |
 | **Langfuse** | Add for model and agent traces/evaluations after telemetry is instrumented. Installation alone does not produce useful traces. |
 | **Sentry** | Add when external users receive releases and application exceptions need release-aware grouping. |
@@ -254,7 +244,7 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | **MCP** | Add a basic, least-privilege interface when an External Agent Client needs bounded Server Guy observations or operations. |
 | **PostgreSQL full-text search** | Add when durable application records become difficult to search with ordinary queries. |
 | **pgvector** | Add only after measured retrieval quality justifies semantic or hybrid retrieval, using the stack's default embedding model; add a reranker only when measured retrieval quality justifies it. |
-| **Playwright** | Add when the Operator UI has a streaming or approval flow worth an end-to-end test, starting with the first approved Operation. |
+| **Playwright** | Introduced for checked-in desktop journeys over real Next.js, SQLite and worker processes with synthetic providers: two smoke journeys in CI, the full suite on demand. Extend it to approval flows with the first approved Operation. |
 | **pnpm and Biome** | Practice through the managed TypeScript application; do not churn Server Guy's npm and ESLint setup without a concrete reason. |
 | **Temporal** | Add only when a client already runs it or cross-service orchestration with in-flight versioning needs a workflow platform beyond Workflow DevKit. |
 | **Inngest, Braintrust, OpenTofu, Vault, Kubernetes, PostHog, deeper AWS** | Keep on demand until a current product or client requirement justifies them, as `STACK.md` defines. |

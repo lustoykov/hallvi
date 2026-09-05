@@ -1,6 +1,6 @@
 # Durable Pi requests
 
-Status: implemented on `codex/durable-pi-requests`, pending PR review. This is development milestone 6, still within Launch Phase 1. [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status.
+Status: implemented; merged as [PR #13](https://github.com/lustoykov/server-guy/pull/13) on 2026-09-05. This document is the current contract for accepted requests: durable acceptance, cancellation, retry, saved message revisions and atomic Decision commits. Keep it true when changing the code, and update it in the same PR when the behavior changes. This is development milestone 6, within Launch Phase 1; [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status. The proposed [native Pi sessions design](native-pi-and-permissions.md) would replace the custom summary in [Bounded context](#bounded-context) with Pi's native history and compaction; until that PR merges, the behavior below is what runs.
 
 ## Outcome
 
