@@ -7,13 +7,28 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export function Message({ className = "", from, ...props }: MessageProps) {
-  return <article className={`sg-message sg-message-${from} ${className}`.trim()} {...props} />;
+  return (
+    <article
+      className={`sg-message sg-message-${from} ${className}`.trim()}
+      {...props}
+    />
+  );
 }
 
-export function MessageContent({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={`sg-message-content ${className}`.trim()} {...props} />;
+export function MessageContent({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`sg-message-content ${className}`.trim()} {...props} />
+  );
 }
 
-export function MessageResponse({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={`sg-message-response ${className}`.trim()} {...props} />;
+export function MessageResponse({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`sg-message-response ${className}`.trim()} {...props} />
+  );
 }

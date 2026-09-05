@@ -7,7 +7,10 @@ import { removeTemporaryRoot } from "../../temporary-root.mjs";
 import { pushTestDatabase } from "../../test-database";
 
 let root: string | undefined;
-afterEach(() => { vi.unstubAllEnvs(); if (root && existsSync(root)) removeTemporaryRoot(root); });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  if (root && existsSync(root)) removeTemporaryRoot(root);
+});
 
 it("closes the scratch SQLite handle and deletes the scratch directory once a live run is over", () => {
   root = createEvalScratch("pi-eval");
@@ -16,8 +19,13 @@ it("closes the scratch SQLite handle and deletes the scratch directory once a li
   vi.stubEnv("SERVER_GUY_DB_PATH", path);
   pushTestDatabase(path);
   const application = database.insertApplication({
-    name: "scratch", repositoryUrl: "https://github.com/qa/scratch", repositoryOwner: "qa", repositoryName: "scratch",
-    environment: "production", approvalMode: "always-ask", approvalScope: "Current application launch",
+    name: "scratch",
+    repositoryUrl: "https://github.com/qa/scratch",
+    repositoryOwner: "qa",
+    repositoryName: "scratch",
+    environment: "production",
+    approvalMode: "always-ask",
+    approvalScope: "Current application launch",
   });
   expect(application.id).toBeTruthy();
   expect(existsSync(path)).toBe(true);
@@ -26,6 +34,7 @@ it("closes the scratch SQLite handle and deletes the scratch directory once a li
   expect(globalThis.__serverGuyDb).toBeUndefined();
   expect(existsSync(root)).toBe(false);
   expect(releaseEvalScratch(root)).toBe(false); // Releasing twice is harmless.
-  expect(releaseEvalScratch(undefined)).toBe(false); // Setup that failed before creating a root has nothing to delete.
+  // Setup that failed before creating a root has nothing to delete.
+  expect(releaseEvalScratch(undefined)).toBe(false);
   expect(() => removeTemporaryRoot(resolve("tests/results"))).toThrow(); // Saved results are never a scratch root.
 });

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { computeChecks } from "../../../src/server/phase-one-spec";
-import type { ApplicationRecord, GateCheck, Observation } from "../../../src/server/types";
+import {
+  computeChecks,
+  phaseOneCheckListForPrompt,
+} from "../../../src/server/phase-one-spec";
+import type {
+  ApplicationRecord,
+  GateCheck,
+  Observation,
+} from "../../../src/server/types";
 
 const application: ApplicationRecord = {
   id: "app",
@@ -25,7 +32,7 @@ function repositoryObservation(status: Observation["status"]): Observation {
     summary: `repository ${status}`,
     sourceLabel: "GitHub repository check",
     sourceUrl: null,
-    raw: {},
+    raw: { connectionId: "github-connection" },
     observedAt: "2026-09-01T00:00:02.000Z",
   };
 }
@@ -34,8 +41,27 @@ const statuses = (checks: GateCheck[]) =>
   Object.fromEntries(checks.map((check) => [check.key, check.status]));
 
 describe("computeChecks", () => {
+  it("uses plain-language check labels in both the UI records and Pi's checklist", () => {
+    const checks = computeChecks(application, null, "github-connection");
+    expect(checks.map((check) => check.label)).toEqual([
+      "Application details",
+      "GitHub repository access",
+      "Deployment environment",
+      "When Pi asks for approval",
+    ]);
+    for (const check of checks)
+      expect(phaseOneCheckListForPrompt()).toContain(check.label);
+    expect(checks[1].definition).toContain(
+      "does not review or deploy the code",
+    );
+    expect(checks[2].definition).toContain(
+      "hosting provider and server are chosen later",
+    );
+  });
   it("evaluates configuration independently while waiting for repository evidence", () => {
-    expect(statuses(computeChecks(application, null))).toEqual({
+    expect(
+      statuses(computeChecks(application, null, "github-connection")),
+    ).toEqual({
       "application-identity": "passed",
       "repository-readable": "not-yet",
       "target-environment": "passed",
@@ -44,18 +70,32 @@ describe("computeChecks", () => {
   });
 
   it("blocks only when the latest repository evidence refutes readability", () => {
-    const checks = computeChecks(application, repositoryObservation("failed"));
+    const checks = computeChecks(
+      application,
+      repositoryObservation("failed"),
+      "github-connection",
+    );
     expect(statuses(checks)["repository-readable"]).toBe("blocked");
   });
 
   it("does not claim a repository failure when GitHub could not be checked", () => {
-    const checks = computeChecks(application, repositoryObservation("unavailable"));
+    const checks = computeChecks(
+      application,
+      repositoryObservation("unavailable"),
+      "github-connection",
+    );
     expect(statuses(checks)["repository-readable"]).toBe("not-yet");
   });
 
   it("passes all four checks and cites the exact repository observation", () => {
-    const checks = computeChecks(application, repositoryObservation("passed"));
-    const repositoryCheck = checks.find((check) => check.key === "repository-readable")!;
+    const checks = computeChecks(
+      application,
+      repositoryObservation("passed"),
+      "github-connection",
+    );
+    const repositoryCheck = checks.find(
+      (check) => check.key === "repository-readable",
+    )!;
 
     expect(checks).toHaveLength(4);
     expect(checks.every((check) => check.status === "passed")).toBe(true);
@@ -63,9 +103,22 @@ describe("computeChecks", () => {
       expect.objectContaining({
         recordType: "observation",
         recordId: "observation",
-        role: "Latest repository access result",
+        role: "Latest repository check",
       }),
     ]);
   });
 
+  it.each([null, "new-account"])(
+    "requires re-verification after disconnect or replacement (%s)",
+    (connectionId) => {
+      const check = computeChecks(
+        application,
+        repositoryObservation("passed"),
+        connectionId,
+      ).find((item) => item.key === "repository-readable")!;
+      expect(check.status).toBe("not-yet");
+      // Historical evidence remains inspectable.
+      expect(check.evidence).toHaveLength(1);
+    },
+  );
 });

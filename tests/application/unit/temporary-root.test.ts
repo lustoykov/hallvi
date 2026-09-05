@@ -1,8 +1,17 @@
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, it } from "vitest";
-import { createTemporaryRoot, removeTemporaryRoot } from "../../temporary-root.mjs";
+import {
+  createTemporaryRoot,
+  removeTemporaryRoot,
+} from "../../temporary-root.mjs";
 
 it("creates roots only under /tmp/server-guy-* and deletes exactly that root, never through symlinks", () => {
   const keep = createTemporaryRoot("/tmp/server-guy-test-keep-");
@@ -23,10 +32,24 @@ it("creates roots only under /tmp/server-guy-* and deletes exactly that root, ne
   }
 });
 it("refuses prefixes and paths that are not Server Guy scratch roots", () => {
-  for (const prefix of ["/tmp/other-", "/var/tmp/server-guy-e2e-", "server-guy-e2e-", "/tmp/server-guy-", "/tmp/server-guy-e2e"]) {
+  for (const prefix of [
+    "/tmp/other-",
+    "/var/tmp/server-guy-e2e-",
+    "server-guy-e2e-",
+    "/tmp/server-guy-",
+    "/tmp/server-guy-e2e",
+  ]) {
     expect(() => createTemporaryRoot(prefix), prefix).toThrow();
   }
-  for (const path of ["/tmp", "/tmp/server-guy-e2e-", "/tmp/server-guy-e2e-abc123/..", "/tmp/server-guy-e2e-abc123/state", homedir(), resolve("tests/results"), resolve(".server-guy")]) {
+  for (const path of [
+    "/tmp",
+    "/tmp/server-guy-e2e-",
+    "/tmp/server-guy-e2e-abc123/..",
+    "/tmp/server-guy-e2e-abc123/state",
+    homedir(),
+    resolve("tests/results"),
+    resolve(".server-guy"),
+  ]) {
     expect(() => removeTemporaryRoot(path), path).toThrow();
   }
 });

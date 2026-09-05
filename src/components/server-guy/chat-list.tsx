@@ -49,7 +49,9 @@ export function ChatList({
               <span className="sg-session-mark">Pi</span>
               <span>
                 <strong>{chat.title}</strong>
-                <small>{chat.isPrimary ? "Main phase chat" : "Separate transcript"}</small>
+                <small>
+                  {chat.isPrimary ? "Main phase chat" : "Separate transcript"}
+                </small>
                 <em>{chat.archivedAt ? "Archived" : "Active"}</em>
               </span>
             </button>
@@ -66,7 +68,11 @@ export function ChatList({
         )}
       </div>
       <div className="sg-chat-list-footer">
-        <button disabled={!hasApplication || busy} onClick={onCreate} type="button">
+        <button
+          disabled={!hasApplication || busy}
+          onClick={onCreate}
+          type="button"
+        >
           <Plus /> New phase chat
         </button>
         <p>Chats share this phase’s Record. Their transcripts stay separate.</p>

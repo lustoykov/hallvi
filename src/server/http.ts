@@ -21,7 +21,12 @@ export async function handle(work: () => unknown): Promise<Response> {
     return result instanceof Response ? result : NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Server Guy could not complete that request." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Server Guy could not complete that request.",
+      },
       { status: statusFor(error) },
     );
   }

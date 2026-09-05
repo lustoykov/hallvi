@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
+import { Archive, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 
 import {
@@ -8,11 +8,12 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import type {
-  Chat,
-  PhaseOneOperatorView,
-} from "@/server/types";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import type { Chat, PhaseOneOperatorView } from "@/server/types";
 
 import { formatTimestamp } from "./format";
 
@@ -40,16 +41,26 @@ export function ChatPane({
   onArchive: () => void;
 }) {
   const application = view.application;
+  // The gate's state lives in the pane header (and the top bar), not as a
+  // standing message in the transcript.
+  const ready = Boolean(application) && view.workspace?.status === "ready";
 
   return (
     <section className="sg-chat-pane">
       <header className="sg-pane-title sg-chat-title">
         <div>
-          <span className="sg-eyebrow">Working toward</span>
+          <span className={`sg-eyebrow${ready ? " ready" : ""}`}>
+            {ready ? "Ready for review" : "Working toward"}
+          </span>
           <strong>Launch Brief</strong>
         </div>
         {activeChat && !activeChat.isPrimary && !activeChat.archivedAt && (
-          <button className="sg-text-button" disabled={busy !== null} onClick={onArchive} type="button">
+          <button
+            className="sg-text-button"
+            disabled={busy !== null}
+            onClick={onArchive}
+            type="button"
+          >
             <Archive /> Archive chat
           </button>
         )}
@@ -60,12 +71,18 @@ export function ChatPane({
           {view.messages.map((message) => (
             <Message from={message.role} key={message.id}>
               <div className="sg-message-heading">
-                <span className={`sg-avatar ${message.role === "user" ? "user" : ""}`}>
+                <span
+                  className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
+                >
                   {message.role === "user" ? "You" : "Pi"}
                 </span>
                 <strong>{message.role === "user" ? "You" : "Pi"}</strong>
-                {message.source === "server-guy" && <span className="sg-source-tag">Recorded event</span>}
-                <time dateTime={message.createdAt}>{formatTimestamp(message.createdAt)}</time>
+                {message.source === "server-guy" && (
+                  <span className="sg-source-tag">Recorded event</span>
+                )}
+                <time dateTime={message.createdAt}>
+                  {formatTimestamp(message.createdAt)}
+                </time>
               </div>
               <MessageContent>
                 <MessageResponse>{message.body}</MessageResponse>
@@ -86,31 +103,27 @@ export function ChatPane({
                 </MessageContent>
               </Message>
               <p className="sg-reply-pending" role="status">
-                <SpinnerGap className="spin" aria-hidden="true" /> Waiting for Pi…
+                <SpinnerGap className="spin" aria-hidden="true" /> Waiting for
+                Pi…
               </p>
             </>
           )}
 
-          {application && view.workspace?.status === "ready" && (
-            <div className="sg-ready-card">
-              <span className="sg-ready-icon"><Check weight="bold" /></span>
-              <div>
-                <strong>Launch Brief ready</strong>
-                <p>All four checks pass. Phase 2 is intentionally not implemented in this pull request.</p>
-              </div>
-            </div>
-          )}
           {application && !piReady && (
             <div className="sg-pi-required">
               <WarningCircle weight="bold" />
               <div>
-                <strong>Connect Pi before chatting</strong>
-                <p>The application workspace still works, but model turns are disabled.</p>
+                <strong>Connect ChatGPT to chat</strong>
+                <p>Your applications and chat history are still available.</p>
               </div>
-              <Link href="/setup/pi">Open Pi setup</Link>
+              <Link href="/setup/pi">Open Settings</Link>
             </div>
           )}
-          {error && application && <div className="sg-error" role="alert">{error}</div>}
+          {error && application && (
+            <div className="sg-error" role="alert">
+              {error}
+            </div>
+          )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
@@ -122,28 +135,49 @@ export function ChatPane({
           onSend();
         }}
       >
+        {activeChat?.archivedAt && (
+          <p className="sg-archived-notice">
+            This chat is archived and read-only. Choose an active chat or start
+            a new one.
+          </p>
+        )}
         <textarea
-          disabled={!piReady || !application || !activeChat || Boolean(activeChat.archivedAt)}
+          disabled={
+            !piReady ||
+            !application ||
+            !activeChat ||
+            Boolean(activeChat.archivedAt)
+          }
           id="pi-composer"
+          aria-label="Message Pi"
           onChange={(event) => onComposerChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
               event.preventDefault();
               if (!busy) event.currentTarget.form?.requestSubmit();
             }
           }}
           placeholder={
-            !piReady
-              ? "Connect Pi to ChatGPT before chatting"
-              : application
-                ? "Ask Pi, correct a decision, or add context…"
-                : "Create the application workspace to start chatting"
+            activeChat?.archivedAt
+              ? "This chat is archived"
+              : !piReady
+                ? "Connect ChatGPT in Settings to chat"
+                : application
+                  ? "Ask Pi, correct a decision, or add context…"
+                  : "Create the application workspace to start chatting"
           }
           rows={2}
           value={composer}
         />
         <div>
-          <span>Recognized Decisions are saved for the application and shown in the shared Operator View.</span>
+          <span>
+            Saved decisions appear in the Record tab and are shared across this
+            application’s chats.
+          </span>
           <button
             disabled={
               !composer.trim() ||

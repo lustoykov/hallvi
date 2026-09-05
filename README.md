@@ -36,7 +36,7 @@ The permission scope is recorded as **Current application launch** in this slice
 
 ## Run
 
-Requirements: Node.js, `gh` authenticated to GitHub, and Pi with at least one available model.
+Requirements: Node.js and a supported ChatGPT subscription for Pi. The Pi SDK is installed with the app; a separate Pi CLI installation is not required. GitHub is connected explicitly in Settings, either by choosing a detected GitHub CLI/environment login or by signing in through a configured GitHub App.
 
 ```bash
 npm install
@@ -45,6 +45,8 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:3000>.
+
+Open **Settings → ChatGPT & model** to configure Pi, and **Settings → GitHub** before adding a repository. A detected login is never silently adopted. For a separate GitHub login, follow the [GitHub App registration guide](docs/integrations/github.md); only a public client ID and App slug go in local configuration, never an App private key or client secret.
 
 Durable application records are stored in `.server-guy/server-guy.db`; the Operator View and Gate Checks are derived from them. The TypeScript schema in `src/server/db-schema.ts` is the only schema definition, and `npm run db:push` applies it directly with Drizzle Kit. Delete the database only when you intentionally want a fresh local product state. Before the first release the schema can still change; Server Guy refuses to open a missing or older schema and tells you to push a fresh one.
 

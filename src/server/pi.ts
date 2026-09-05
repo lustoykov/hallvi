@@ -14,7 +14,8 @@ export const proposeDecisionParameters = Type.Object(
       description: "The only Decision kind supported in Phase 1.",
     }),
     value: Type.String({
-      description: "A concise operating priority explicitly stated by the engineer.",
+      description:
+        "A concise operating priority explicitly stated by the engineer.",
       minLength: 1,
       maxLength: 300,
     }),
@@ -72,7 +73,10 @@ export function normalizePiAssistantMessage(input: string): string {
 }
 
 export function describePiFailure(error: unknown): string {
-  const message = error instanceof Error ? error.message : "Pi did not return an error message.";
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Pi did not return an error message.";
   const normalized = message.toLowerCase();
   if (
     normalized.includes("usage limit") ||
@@ -95,7 +99,10 @@ export function describePiFailure(error: unknown): string {
   return `Pi is unavailable: ${message}`;
 }
 
-function lastAssistantOutcome(messages: unknown[]): { text: string; error: string | null } {
+function lastAssistantOutcome(messages: unknown[]): {
+  text: string;
+  error: string | null;
+} {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index] as {
       role?: string;
@@ -103,7 +110,8 @@ function lastAssistantOutcome(messages: unknown[]): { text: string; error: strin
       errorMessage?: string;
       stopReason?: "stop" | "length" | "toolUse" | "error" | "aborted";
     };
-    if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
+    if (message.role !== "assistant" || !Array.isArray(message.content))
+      continue;
     const text = message.content
       .filter((part) => part.type === "text" && typeof part.text === "string")
       .map((part) => part.text)
@@ -153,7 +161,9 @@ export async function askPi(input: {
     SessionManager,
   } = sdk;
 
-  const { configuration, modelRuntime, model } = await configuredPiRuntime(sdk).catch((error) => {
+  const { configuration, modelRuntime, model } = await configuredPiRuntime(
+    sdk,
+  ).catch((error) => {
     throw new PiUnavailableError(describePiFailure(error));
   });
 
@@ -218,7 +228,10 @@ export async function askPi(input: {
 
   let response = "";
   const unsubscribe = session.subscribe((event) => {
-    if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+    if (
+      event.type === "message_update" &&
+      event.assistantMessageEvent.type === "text_delta"
+    ) {
       response += event.assistantMessageEvent.delta;
     }
   });
@@ -226,10 +239,17 @@ export async function askPi(input: {
 
   try {
     await Promise.race([
-      session.prompt(buildPrompt(input), { expandPromptTemplates: false, source: "rpc" }),
+      session.prompt(buildPrompt(input), {
+        expandPromptTemplates: false,
+        source: "rpc",
+      }),
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
-          reject(new Error("The configured model did not respond within 45 seconds."));
+          reject(
+            new Error(
+              "The configured model did not respond within 45 seconds.",
+            ),
+          );
           void session.abort().catch(() => undefined);
         }, 45_000);
       }),

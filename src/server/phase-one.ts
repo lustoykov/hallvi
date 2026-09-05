@@ -25,6 +25,10 @@ import {
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
 import {
+  currentGithubConnectionId,
+  readGithubConnection,
+} from "./github-connection";
+import {
   PHASE_ONE,
   computeChecks,
   deriveUpcomingRequirements,
@@ -49,7 +53,8 @@ const REPOSITORY_OBSERVATION = "github-repository-identity";
 function loadWorkspace(applicationId: string) {
   const application = getApplication(applicationId);
   const workspace = application ? getWorkspace(application.id) : null;
-  if (!application || !workspace) throw new NotFoundError("Application not found.");
+  if (!application || !workspace)
+    throw new NotFoundError("Application not found.");
   return { application, workspace };
 }
 
@@ -66,6 +71,7 @@ function currentChecks(application: ApplicationRecord) {
   return computeChecks(
     application,
     latestObservation(application.id, REPOSITORY_OBSERVATION),
+    currentGithubConnectionId(),
   );
 }
 
@@ -77,13 +83,17 @@ function workspaceView(
     ...workspace,
     phaseNumber: PHASE_ONE.number,
     deliverable: PHASE_ONE.deliverable,
-    status: checks.every((check) => check.status === "passed") ? "ready" : "in-progress",
+    status: checks.every((check) => check.status === "passed")
+      ? "ready"
+      : "in-progress",
   };
 }
 
 export async function createPhaseOneApplication(input: CreateApplicationInput) {
   if (input.environment !== "production") {
-    throw new Error("Phase 1 currently supports the production launch environment only.");
+    throw new Error(
+      "Phase 1 currently supports the production launch environment only.",
+    );
   }
   if (!isApprovalMode(input.approvalMode)) {
     throw new Error("Choose a valid permission policy.");
@@ -131,30 +141,145 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   return { view: getPhaseOneOperatorView(application.id), created: true };
 }
 
-export async function observeRepository(applicationId: string) {
+export async function observeRepository(
+  applicationId: string,
+  expectedConnectionId?: string,
+) {
+  if (
+    expectedConnectionId &&
+    currentGithubConnectionId() !== expectedConnectionId
+  ) {
+    throw new Error(
+      "The GitHub connection changed. Check repositories with the current login.",
+    );
+  }
   const { application, workspace } = loadWorkspace(applicationId);
-  const result = await inspectGithubRepository({
-    owner: application.repositoryOwner,
-    name: application.repositoryName,
-    canonicalUrl: application.repositoryUrl,
-  });
+  const recorded = listObservations(application.id).find(
+    (observation) =>
+      observation.kind === REPOSITORY_OBSERVATION &&
+      observation.status === "passed" &&
+      observation.raw &&
+      typeof observation.raw === "object" &&
+      "repositoryId" in observation.raw,
+  );
+  const expectedId =
+    recorded?.raw &&
+    typeof recorded.raw === "object" &&
+    "repositoryId" in recorded.raw &&
+    typeof recorded.raw.repositoryId === "number"
+      ? recorded.raw.repositoryId
+      : undefined;
+  const result = await inspectGithubRepository(
+    {
+      owner: application.repositoryOwner,
+      name: application.repositoryName,
+      canonicalUrl: application.repositoryUrl,
+    },
+    expectedId,
+  );
+
+  // A slow check from a previous login must not overwrite the new login's
+  // evidence.
+  if (
+    expectedConnectionId &&
+    readGithubConnection()?.id !== expectedConnectionId
+  ) {
+    throw new Error(
+      "The GitHub connection changed. Check repositories with the current login.",
+    );
+  }
 
   const observation = insertObservation({
     applicationId: application.id,
     kind: REPOSITORY_OBSERVATION,
     status: result.status,
     summary: result.summary,
-    sourceLabel: result.status === "passed" ? "GitHub commit" : "GitHub repository check",
+    sourceLabel:
+      result.status === "passed" ? "GitHub commit" : "GitHub repository check",
     sourceUrl: result.sourceUrl,
     raw: result.raw,
   });
   insertActivity(
     workspace.id,
-    result.status === "passed" ? "repository-observed" : "repository-unavailable",
-    result.status === "passed" ? "Repository identity recorded" : "Repository check did not pass",
+    result.status === "passed"
+      ? "repository-observed"
+      : "repository-unavailable",
+    result.status === "passed"
+      ? "Repository identity recorded"
+      : "Repository check did not pass",
     observation.summary,
   );
   return observation;
+}
+
+export interface GithubRepositoryCheckResult {
+  applicationId: string;
+  repository: string;
+  status: GateCheck["status"];
+  result: string;
+}
+
+const reconnectChecks = new Map<
+  string,
+  Promise<GithubRepositoryCheckResult[]>
+>();
+
+/**
+ * One bounded verification of existing applications after explicit connection
+ * consent.
+ */
+export async function recheckGithubRepositories(connectionId: string) {
+  if (currentGithubConnectionId() !== connectionId) {
+    throw new Error(
+      "The GitHub connection changed. Check repositories with the current login.",
+    );
+  }
+  const pending = reconnectChecks.get(connectionId);
+  if (pending) return pending;
+  const work = (async () => {
+    const results: GithubRepositoryCheckResult[] = [];
+    for (const application of listApplications()) {
+      if (readGithubConnection()?.id !== connectionId) {
+        throw new Error(
+          "The GitHub connection changed. Check repositories with the current login.",
+        );
+      }
+      const previous = latestObservation(
+        application.id,
+        REPOSITORY_OBSERVATION,
+      );
+      const checkedConnection =
+        previous?.raw &&
+        typeof previous.raw === "object" &&
+        "connectionId" in previous.raw
+          ? previous.raw.connectionId
+          : null;
+      // A failed check is still a completed attempt. Only explicit Retry runs
+      // it again.
+      if (
+        currentGithubConnectionId() === connectionId &&
+        checkedConnection !== connectionId
+      ) {
+        await observeRepository(application.id, connectionId);
+      }
+      const check = currentChecks(application).find(
+        (item) => item.key === "repository-readable",
+      )!;
+      results.push({
+        applicationId: application.id,
+        repository: `${application.repositoryOwner}/${application.repositoryName}`,
+        status: check.status,
+        result: check.result,
+      });
+    }
+    return results;
+  })();
+  reconnectChecks.set(connectionId, work);
+  try {
+    return await work;
+  } finally {
+    reconnectChecks.delete(connectionId);
+  }
 }
 
 export function listApplicationSummaries() {
@@ -170,8 +295,13 @@ export function listApplicationSummaries() {
 
 export function removeApplication(applicationId: string, repository: string) {
   const { application } = loadWorkspace(applicationId);
-  if (repository !== `${application.repositoryOwner}/${application.repositoryName}`) {
-    throw new Error("Type the exact repository owner/name to remove this application.");
+  if (
+    repository !==
+    `${application.repositoryOwner}/${application.repositoryName}`
+  ) {
+    throw new Error(
+      "Type the exact repository owner/name to remove this application.",
+    );
   }
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
@@ -211,7 +341,10 @@ export function getPhaseOneOperatorView(
 export function createChat(applicationId: string, title?: string) {
   const { application, workspace } = loadWorkspace(applicationId);
   const chatNumber = listChats(workspace.id).length + 1;
-  const chat = insertChat(workspace.id, title?.trim() || `Launch question ${chatNumber}`);
+  const chat = insertChat(
+    workspace.id,
+    title?.trim() || `Launch question ${chatNumber}`,
+  );
   insertMessage(
     chat.id,
     "assistant",
@@ -224,7 +357,8 @@ export function createChat(applicationId: string, title?: string) {
 
 export function archiveChat(applicationId: string, chatId: string) {
   const { application, workspace, chat } = loadChat(applicationId, chatId);
-  if (chat.isPrimary) throw new Error("The main Launch Brief Chat stays with Phase 1.");
+  if (chat.isPrimary)
+    throw new Error("The main Launch Brief Chat stays with Phase 1.");
   archiveChatRecord(chat.id);
   insertActivity(workspace.id, "chat-archived", "Chat archived", chat.title);
   return getPhaseOneOperatorView(application.id);
@@ -242,19 +376,29 @@ function buildViewSummary(application: ApplicationRecord) {
     `Repository: ${application.repositoryUrl}`,
     "Environment: Production",
     `Permission policy: ${APPROVAL_MODES[application.approvalMode].label}`,
-    `Checks: ${checks.map((check) => `${check.label}=${check.status}`).join("; ")}`,
+    // Public current results, not raw provider payloads or credential records.
+    // Old observations must not masquerade as evidence for the current login.
+    `Checks:\n${checks.map((check) => `- ${check.label}=${check.status}; result=${JSON.stringify(check.result)}`).join("\n")}`,
     `Upcoming requirements: ${upcoming
-      .map((requirement) => `${requirement.label} before Phase ${requirement.requiredBeforePhase}`)
+      .map(
+        (requirement) =>
+          `${requirement.label} before Phase ${requirement.requiredBeforePhase}`,
+      )
       .join("; ")}`,
   ].join("\n");
 }
 
-export async function sendChatMessage(applicationId: string, chatId: string, body: string) {
+export async function sendChatMessage(
+  applicationId: string,
+  chatId: string,
+  body: string,
+) {
   const { application, workspace, chat } = loadChat(applicationId, chatId);
   if (chat.archivedAt) throw new Error("This Chat is archived.");
   const userMessage = body.trim();
   if (!userMessage) throw new Error("Write a message first.");
-  if (userMessage.length > 5_000) throw new Error("Keep this message under 5,000 characters.");
+  if (userMessage.length > 5_000)
+    throw new Error("Keep this message under 5,000 characters.");
 
   const decisions = listActiveDecisions(application.id);
   const reply = await askPi({
@@ -269,7 +413,9 @@ export async function sendChatMessage(applicationId: string, chatId: string, bod
     insertMessage(chat.id, "assistant", reply.message, "pi");
 
     for (const proposed of reply.decisionProposals) {
-      const previous = proposed.replaces ? getDecision(proposed.replaces) : null;
+      const previous = proposed.replaces
+        ? getDecision(proposed.replaces)
+        : null;
       if (
         proposed.replaces &&
         (!previous ||

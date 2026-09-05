@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../src/server/phase-one", () => ({
-  ExistingApplicationConflictError: class ExistingApplicationConflictError extends Error {},
+  ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createChat: mocks.createChat,
   sendChatMessage: mocks.sendChatMessage,
@@ -29,7 +29,10 @@ const applicationContext = {
 };
 
 const chatContext = {
-  params: Promise.resolve({ applicationId: "application-id", chatId: "chat-id" }),
+  params: Promise.resolve({
+    applicationId: "application-id",
+    chatId: "chat-id",
+  }),
 };
 
 describe("Phase 1 Chat request validation", () => {
@@ -42,12 +45,17 @@ describe("Phase 1 Chat request validation", () => {
     mocks.createChat.mockReturnValue({ selectedChatId: "chat-id" });
 
     const response = await createChat(
-      request("/api/applications/application-id/chats", { title: "  Cost questions  " }),
+      request("/api/applications/application-id/chats", {
+        title: "  Cost questions  ",
+      }),
       applicationContext,
     );
 
     expect(response.status).toBe(201);
-    expect(mocks.createChat).toHaveBeenCalledWith("application-id", "Cost questions");
+    expect(mocks.createChat).toHaveBeenCalledWith(
+      "application-id",
+      "Cost questions",
+    );
   });
 
   it("keeps the current untitled Chat request valid", async () => {
@@ -73,7 +81,9 @@ describe("Phase 1 Chat request validation", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: expect.stringContaining(message) });
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining(message),
+    });
     expect(mocks.createChat).not.toHaveBeenCalled();
   });
 
@@ -98,8 +108,16 @@ describe("Phase 1 Chat request validation", () => {
   it.each([
     ["blank message", { message: "   " }, "Write a message first."],
     ["non-text message", { message: 42 }, "Write a message first."],
-    ["oversized message", { message: "x".repeat(5_001) }, "under 5,000 characters"],
-    ["unknown field", { message: "Ship it", approval: true }, "Unrecognized key"],
+    [
+      "oversized message",
+      { message: "x".repeat(5_001) },
+      "under 5,000 characters",
+    ],
+    [
+      "unknown field",
+      { message: "Ship it", approval: true },
+      "Unrecognized key",
+    ],
   ])("rejects a %s", async (_label, body, message) => {
     const response = await sendMessage(
       request("/api/applications/application-id/chats/chat-id/messages", body),
@@ -107,7 +125,9 @@ describe("Phase 1 Chat request validation", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: expect.stringContaining(message) });
+    await expect(response.json()).resolves.toEqual({
+      error: expect.stringContaining(message),
+    });
     expect(mocks.sendChatMessage).not.toHaveBeenCalled();
   });
 });

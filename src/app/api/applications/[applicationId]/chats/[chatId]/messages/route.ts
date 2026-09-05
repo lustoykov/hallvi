@@ -2,7 +2,10 @@ import type { NextRequest } from "next/server";
 
 import { handle } from "@/server/http";
 import { sendChatMessage } from "@/server/phase-one";
-import { parseJsonRequest, sendChatMessageRequestSchema } from "@/server/schemas";
+import {
+  parseJsonRequest,
+  sendChatMessageRequestSchema,
+} from "@/server/schemas";
 
 export const runtime = "nodejs";
 

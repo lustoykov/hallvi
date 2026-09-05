@@ -8,7 +8,9 @@ export const runtime = "nodejs";
 
 function missingAttempt() {
   return NextResponse.json(
-    { error: "This Pi login attempt is no longer available. Start a new login." },
+    {
+      error: "This Pi login attempt is no longer available. Start a new login.",
+    },
     { status: 404 },
   );
 }

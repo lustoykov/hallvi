@@ -7,11 +7,22 @@ import { NewApplicationScreen } from "../../../src/components/server-guy/new-app
 import type { ApplicationRecord } from "../../../src/server/types";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  redirect: mocks.redirect,
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 
 const application: ApplicationRecord = {
-  id: "app-one", name: "todo", repositoryUrl: "https://github.com/one/todo", repositoryOwner: "one", repositoryName: "todo",
-  environment: "production", approvalMode: "pi-decides", approvalScope: "Current application launch", createdAt: "2026-09-04T00:00:00Z", updatedAt: "2026-09-04T00:00:00Z",
+  id: "app-one",
+  name: "todo",
+  repositoryUrl: "https://github.com/one/todo",
+  repositoryOwner: "one",
+  repositoryName: "todo",
+  environment: "production",
+  approvalMode: "pi-decides",
+  approvalScope: "Current application launch",
+  createdAt: "2026-09-04T00:00:00Z",
+  updatedAt: "2026-09-04T00:00:00Z",
 };
 
 describe("application navigation", () => {
@@ -21,7 +32,9 @@ describe("application navigation", () => {
   });
 
   it("shows a first-application action without a fixture repository", () => {
-    const html = renderToStaticMarkup(<ApplicationsScreen applications={[]} piReady={false} />);
+    const html = renderToStaticMarkup(
+      <ApplicationsScreen applications={[]} piReady={false} />,
+    );
     expect(html).toContain("Add your first application");
     expect(html).toContain('href="/applications/new"');
     expect(html).toContain("Settings · Connect ChatGPT");
@@ -29,10 +42,23 @@ describe("application navigation", () => {
   });
 
   it("distinguishes repositories with the same name and links to the exact app", () => {
-    const html = renderToStaticMarkup(<ApplicationsScreen piReady applications={[
-      { application, passedChecks: 4, totalChecks: 4 },
-      { application: { ...application, id: "app-two", repositoryOwner: "two" }, passedChecks: 2, totalChecks: 4 },
-    ]} />);
+    const html = renderToStaticMarkup(
+      <ApplicationsScreen
+        piReady
+        applications={[
+          { application, passedChecks: 4, totalChecks: 4 },
+          {
+            application: {
+              ...application,
+              id: "app-two",
+              repositoryOwner: "two",
+            },
+            passedChecks: 2,
+            totalChecks: 4,
+          },
+        ]}
+      />,
+    );
     expect(html).toContain('href="/applications/app-one"');
     expect(html).toContain('href="/applications/app-two"');
     expect(html).toContain("one/todo");

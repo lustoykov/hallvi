@@ -1,6 +1,12 @@
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  unique,
+} from "drizzle-orm/sqlite-core";
 
 import type {
   ActivityEvent,
@@ -12,21 +18,22 @@ import type {
   PhaseWorkspaceRecord,
 } from "./types";
 
-export const applications = sqliteTable(
-  "applications",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    repositoryUrl: text("repository_url").notNull().unique(),
-    repositoryOwner: text("repository_owner").notNull(),
-    repositoryName: text("repository_name").notNull(),
-    environment: text("environment").$type<ApplicationRecord["environment"]>().notNull(),
-    approvalMode: text("approval_mode").$type<ApplicationRecord["approvalMode"]>().notNull(),
-    approvalScope: text("approval_scope").notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-  },
-);
+export const applications = sqliteTable("applications", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  repositoryUrl: text("repository_url").notNull().unique(),
+  repositoryOwner: text("repository_owner").notNull(),
+  repositoryName: text("repository_name").notNull(),
+  environment: text("environment")
+    .$type<ApplicationRecord["environment"]>()
+    .notNull(),
+  approvalMode: text("approval_mode")
+    .$type<ApplicationRecord["approvalMode"]>()
+    .notNull(),
+  approvalScope: text("approval_scope").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const phaseWorkspaces = sqliteTable(
   "phase_workspaces",
@@ -35,12 +42,12 @@ export const phaseWorkspaces = sqliteTable(
     applicationId: text("application_id")
       .notNull()
       .references(() => applications.id, { onDelete: "cascade" }),
-    phaseKey: text("phase_key").$type<PhaseWorkspaceRecord["phaseKey"]>().notNull(),
+    phaseKey: text("phase_key")
+      .$type<PhaseWorkspaceRecord["phaseKey"]>()
+      .notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [
-    unique().on(table.applicationId, table.phaseKey),
-  ],
+  (table) => [unique().on(table.applicationId, table.phaseKey)],
 );
 
 export const chats = sqliteTable("chats", {
@@ -49,7 +56,9 @@ export const chats = sqliteTable("chats", {
     .notNull()
     .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  isPrimary: integer("is_primary", { mode: "boolean" }).notNull().default(false),
+  isPrimary: integer("is_primary", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull(),
   archivedAt: text("archived_at"),
 });
@@ -87,7 +96,9 @@ export const decisions = sqliteTable(
     ),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("idx_decisions_application").on(table.applicationId, table.createdAt)],
+  (table) => [
+    index("idx_decisions_application").on(table.applicationId, table.createdAt),
+  ],
 );
 
 export const observations = sqliteTable(
@@ -127,16 +138,26 @@ export const activityEvents = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    index("idx_activity_workspace").on(table.workspaceId, sql`${table.createdAt} desc`),
+    index("idx_activity_workspace").on(
+      table.workspaceId,
+      sql`${table.createdAt} desc`,
+    ),
   ],
 );
 
 type AssertExtends<Expected, Actual extends Expected> = Actual;
 
-// This type fails compilation if any selected row drifts from its domain record.
+// This type fails compilation if any selected row drifts from its domain
+// record.
 export type DatabaseRowTypes = {
-  application: AssertExtends<ApplicationRecord, typeof applications.$inferSelect>;
-  workspace: AssertExtends<PhaseWorkspaceRecord, typeof phaseWorkspaces.$inferSelect>;
+  application: AssertExtends<
+    ApplicationRecord,
+    typeof applications.$inferSelect
+  >;
+  workspace: AssertExtends<
+    PhaseWorkspaceRecord,
+    typeof phaseWorkspaces.$inferSelect
+  >;
   chat: AssertExtends<Chat, typeof chats.$inferSelect>;
   message: AssertExtends<ChatMessage, typeof messages.$inferSelect>;
   decision: AssertExtends<Decision, typeof decisions.$inferSelect>;

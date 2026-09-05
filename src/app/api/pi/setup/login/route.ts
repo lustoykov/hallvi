@@ -8,8 +8,12 @@ import { handle } from "@/server/http";
 export const runtime = "nodejs";
 
 export function POST(request: Request) {
-  return handle(async () => NextResponse.json(
-    piLoginCoordinator.start(await parseJsonRequest(request, updatePiPreferencesSchema)),
-    { status: 202 },
-  ));
+  return handle(async () =>
+    NextResponse.json(
+      piLoginCoordinator.start(
+        await parseJsonRequest(request, updatePiPreferencesSchema),
+      ),
+      { status: 202 },
+    ),
+  );
 }

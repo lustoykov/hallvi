@@ -9,15 +9,69 @@ import type {
 import { APPROVAL_MODES } from "./types";
 
 export const PHASES = [
-  { key: "start", number: 1, name: "Start", deliverable: "Launch Brief", group: "plan" },
-  { key: "inspect-app", number: 2, name: "Inspect app", deliverable: "Application Contract", group: "plan" },
-  { key: "make-launch-ready", number: 3, name: "Make launch-ready", deliverable: "Conformance Result", group: "plan" },
-  { key: "review-launch-plan", number: 4, name: "Review launch plan", deliverable: "Launch Plan", group: "plan" },
-  { key: "set-up-server", number: 5, name: "Set up server", deliverable: "Host Record", group: "setup" },
-  { key: "connect-domain", number: 6, name: "Connect domain", deliverable: "Domain Route", group: "setup" },
-  { key: "configure-protect", number: 7, name: "Configure and protect", deliverable: "Operational Baseline", group: "setup" },
-  { key: "go-live", number: 8, name: "Go live", deliverable: "Verified Release", group: "live" },
-  { key: "handoff", number: 9, name: "Handoff", deliverable: "Operations Handoff", group: "live" },
+  {
+    key: "start",
+    number: 1,
+    name: "Start",
+    deliverable: "Launch Brief",
+    group: "plan",
+  },
+  {
+    key: "inspect-app",
+    number: 2,
+    name: "Inspect app",
+    deliverable: "Application Contract",
+    group: "plan",
+  },
+  {
+    key: "make-launch-ready",
+    number: 3,
+    name: "Make launch-ready",
+    deliverable: "Conformance Result",
+    group: "plan",
+  },
+  {
+    key: "review-launch-plan",
+    number: 4,
+    name: "Review launch plan",
+    deliverable: "Launch Plan",
+    group: "plan",
+  },
+  {
+    key: "set-up-server",
+    number: 5,
+    name: "Set up server",
+    deliverable: "Host Record",
+    group: "setup",
+  },
+  {
+    key: "connect-domain",
+    number: 6,
+    name: "Connect domain",
+    deliverable: "Domain Route",
+    group: "setup",
+  },
+  {
+    key: "configure-protect",
+    number: 7,
+    name: "Configure and protect",
+    deliverable: "Operational Baseline",
+    group: "setup",
+  },
+  {
+    key: "go-live",
+    number: 8,
+    name: "Go live",
+    deliverable: "Verified Release",
+    group: "live",
+  },
+  {
+    key: "handoff",
+    number: 9,
+    name: "Handoff",
+    deliverable: "Operations Handoff",
+    group: "live",
+  },
 ] as const;
 
 export const PHASE_ONE = PHASES[0];
@@ -25,34 +79,46 @@ export const PHASE_ONE = PHASES[0];
 export const PHASE_ONE_CHECKS = [
   {
     key: "application-identity",
-    label: "Application identity recorded",
+    label: "Application details",
     definition:
-      "The application has a durable name, repository identity, and Server Guy application ID.",
+      "Your application’s name and GitHub repository are saved in Server Guy.",
   },
   {
     key: "repository-readable",
-    label: "Repository readable at a recorded identity",
+    label: "GitHub repository access",
     definition:
-      "Server Guy has successfully read the repository and recorded its default branch and exact commit SHA.",
+      "Checks whether Server Guy can read this repository, and saves its default branch and exact version (commit). This does not review or deploy the code.",
   },
   {
     key: "target-environment",
-    label: "Target environment explicit",
+    label: "Deployment environment",
     definition:
-      "The intended deployment environment is recorded rather than inferred from repository content.",
+      "Production means the app is intended for real use, not testing. That choice is saved here; the hosting provider and server are chosen later.",
   },
   {
     key: "approval-authority",
-    label: "Permission policy explicit",
+    label: "When Pi asks for approval",
     definition:
-      "The user has chosen how Pi should decide when to ask before an external change.",
+      "Your choice of when Pi should ask you before changing code or infrastructure is saved. Phase 1 makes no external changes.",
   },
 ] as const;
 
 export const PRODUCTION_BASELINE = [
-  { key: "protect-database", label: "Protect database data", rule: "Required for every production launch" },
-  { key: "minimize-downtime", label: "Minimize downtime", rule: "Prefer changes that preserve availability" },
-  { key: "keep-cost-low", label: "Keep infrastructure cost low", rule: "Use the smallest credible infrastructure" },
+  {
+    key: "protect-database",
+    label: "Protect database data",
+    rule: "Required for every production launch",
+  },
+  {
+    key: "minimize-downtime",
+    label: "Minimize downtime",
+    rule: "Prefer changes that preserve availability",
+  },
+  {
+    key: "keep-cost-low",
+    label: "Keep infrastructure cost low",
+    rule: "Use the smallest credible infrastructure",
+  },
 ] as const;
 
 export const UPCOMING_REQUIREMENTS = [
@@ -74,13 +140,16 @@ export const UPCOMING_REQUIREMENTS = [
     key: "domain-starting-state",
     label: "Domain starting state",
     owner: "engineer" as const,
-    resolutionPath: "Tell Pi whether the domain is already owned before Connect domain.",
+    resolutionPath:
+      "Tell Pi whether the domain is already owned before Connect domain.",
     requiredBeforePhase: 6,
   },
 ] as const;
 
 export function phaseOneCheckListForPrompt() {
-  return PHASE_ONE_CHECKS.map((check, index) => `${index + 1}. ${check.label}.`).join("\n");
+  return PHASE_ONE_CHECKS.map(
+    (check, index) => `${index + 1}. ${check.label}.`,
+  ).join("\n");
 }
 
 function applicationEvidence(
@@ -97,7 +166,10 @@ function applicationEvidence(
   };
 }
 
-function observationEvidence(observation: Observation, role: string): EvidenceReference {
+function observationEvidence(
+  observation: Observation,
+  role: string,
+): EvidenceReference {
   return {
     recordType: "observation",
     recordId: observation.id,
@@ -114,22 +186,36 @@ function repositoryStatus(repository: Observation | null): GateStatus {
 }
 
 /**
- * Evaluates the Phase 1 Exit Gate from current records. Gate results are projections:
- * they are never stored and they never fall back to an older passing Observation.
+ * Evaluates the Phase 1 Exit Gate from current records. Gate results are
+ * projections:
+ * they are never stored and they never fall back to an older passing
+ * Observation.
  */
 export function computeChecks(
   application: ApplicationRecord,
   repository: Observation | null,
+  githubConnectionId: string | null,
 ): GateCheck[] {
+  const raw = repository?.raw;
+  const currentRepository = Boolean(
+    githubConnectionId &&
+    raw &&
+    typeof raw === "object" &&
+    "connectionId" in raw &&
+    raw.connectionId === githubConnectionId,
+  );
   const identityComplete = Boolean(
     application.id &&
-      application.name &&
-      application.repositoryUrl &&
-      application.repositoryOwner &&
-      application.repositoryName,
+    application.name &&
+    application.repositoryUrl &&
+    application.repositoryOwner &&
+    application.repositoryName,
   );
   const environmentExplicit = application.environment === "production";
-  const approvalExplicit = Object.hasOwn(APPROVAL_MODES, application.approvalMode);
+  const approvalExplicit = Object.hasOwn(
+    APPROVAL_MODES,
+    application.approvalMode,
+  );
 
   const values = {
     "application-identity": {
@@ -137,21 +223,31 @@ export function computeChecks(
       result: identityComplete
         ? `${application.name} · ${application.repositoryOwner}/${application.repositoryName} · Production`
         : "The application identity is incomplete.",
-      evidence: [applicationEvidence(application, "Application identity and repository selection")],
+      evidence: [
+        applicationEvidence(application, "Saved application and repository"),
+      ],
       canRerun: false,
     },
     "repository-readable": {
-      status: repositoryStatus(repository),
-      result: repository?.summary ?? "The repository has not been checked yet.",
+      status: currentRepository ? repositoryStatus(repository) : "not-yet",
+      result: !githubConnectionId
+        ? "Connect GitHub, then run the repository check."
+        : !currentRepository
+          ? "Run the repository check with your current GitHub connection."
+          : (repository?.summary ?? "The repository has not been checked yet."),
       evidence: repository
-        ? [observationEvidence(repository, "Latest repository access result")]
+        ? [observationEvidence(repository, "Latest repository check")]
         : [],
       canRerun: true,
     },
     "target-environment": {
       status: environmentExplicit ? "passed" : "not-yet",
-      result: environmentExplicit ? "Production" : "Choose a target environment.",
-      evidence: [applicationEvidence(application, "Selected target environment")],
+      result: environmentExplicit
+        ? "Production"
+        : "Choose a target environment.",
+      evidence: [
+        applicationEvidence(application, "Saved deployment environment"),
+      ],
       canRerun: false,
     },
     "approval-authority": {
@@ -159,7 +255,7 @@ export function computeChecks(
       result: approvalExplicit
         ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
         : "Choose how Pi should ask before external changes.",
-      evidence: [applicationEvidence(application, "Selected permission policy")],
+      evidence: [applicationEvidence(application, "Saved approval settings")],
       canRerun: false,
     },
   } satisfies Record<

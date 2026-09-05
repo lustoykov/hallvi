@@ -14,7 +14,8 @@ afterEach(() => {
   globalThis.__serverGuyDb?.$client.close();
   delete globalThis.__serverGuyDb;
   delete process.env.SERVER_GUY_DB_PATH;
-  if (databaseDirectory) rmSync(databaseDirectory, { recursive: true, force: true });
+  if (databaseDirectory)
+    rmSync(databaseDirectory, { recursive: true, force: true });
   databaseDirectory = null;
 });
 
@@ -45,7 +46,9 @@ describe("Phase 1 schema", () => {
     vi.resetModules();
     const database = await import("../../../src/server/db");
 
-    expect(() => database.db()).toThrow("is not initialized. Run npm run db:push");
+    expect(() => database.db()).toThrow(
+      "is not initialized. Run npm run db:push",
+    );
   });
 
   it("refuses to open a record written by an older schema", async () => {
@@ -68,7 +71,9 @@ describe("Phase 1 schema", () => {
     const database = await loadFreshDatabase();
     const client = database.db().$client;
     const tables = client
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      )
       .all()
       .map((row) => (row as { name: string }).name);
     const workspaceColumns = client
@@ -76,7 +81,9 @@ describe("Phase 1 schema", () => {
       .all()
       .map((row) => (row as { name: string }).name);
     const indexes = client
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name",
+      )
       .all()
       .map((row) => (row as { name: string }).name);
 
@@ -89,22 +96,33 @@ describe("Phase 1 schema", () => {
       "observations",
       "phase_workspaces",
     ]);
-    expect(workspaceColumns).toEqual(["id", "application_id", "phase_key", "created_at"]);
+    expect(workspaceColumns).toEqual([
+      "id",
+      "application_id",
+      "phase_key",
+      "created_at",
+    ]);
     expect(indexes).toEqual([
       "idx_activity_workspace",
       "idx_decisions_application",
       "idx_messages_chat",
       "idx_observations_application_kind",
     ]);
-    expect(client.pragma("user_version", { simple: true })).toBe(schemaVersion.version);
+    expect(client.pragma("user_version", { simple: true })).toBe(
+      schemaVersion.version,
+    );
     expect(client.pragma("foreign_keys", { simple: true })).toBe(1);
     expect(client.pragma("journal_mode", { simple: true })).toBe("wal");
   });
 
   it("selects the newest Observation deterministically within one Application", async () => {
     const database = await loadFreshDatabase();
-    const firstApplication = database.insertApplication(applicationInput("first-app"));
-    const secondApplication = database.insertApplication(applicationInput("second-app"));
+    const firstApplication = database.insertApplication(
+      applicationInput("first-app"),
+    );
+    const secondApplication = database.insertApplication(
+      applicationInput("second-app"),
+    );
     const first = database.insertObservation({
       applicationId: firstApplication.id,
       kind: "github-repository-identity",
@@ -134,24 +152,38 @@ describe("Phase 1 schema", () => {
     });
     database
       .db()
-      .$client
-      .prepare("UPDATE observations SET observed_at = ? WHERE id IN (?, ?)")
+      .$client.prepare(
+        "UPDATE observations SET observed_at = ? WHERE id IN (?, ?)",
+      )
       .run("2026-09-03T00:00:00.000Z", first.id, second.id);
 
     expect(
-      database.latestObservation(firstApplication.id, "github-repository-identity")?.id,
+      database.latestObservation(
+        firstApplication.id,
+        "github-repository-identity",
+      )?.id,
     ).toBe(second.id);
     expect(
-      database.latestObservation(firstApplication.id, "github-repository-identity")?.raw,
+      database.latestObservation(
+        firstApplication.id,
+        "github-repository-identity",
+      )?.raw,
     ).toEqual({ attempt: 2, reason: "private" });
   });
 
   it("preserves superseded Decision history until its Application is deleted", async () => {
     const database = await loadFreshDatabase();
-    const application = database.insertApplication(applicationInput("decision-history"));
+    const application = database.insertApplication(
+      applicationInput("decision-history"),
+    );
     const workspace = database.insertWorkspace(application.id);
     const chat = database.insertChat(workspace.id, "Decision history", true);
-    const sourceMessage = database.insertMessage(chat.id, "user", "Reliability comes first.", "user");
+    const sourceMessage = database.insertMessage(
+      chat.id,
+      "user",
+      "Reliability comes first.",
+      "user",
+    );
     const previous = database.insertDecision({
       applicationId: application.id,
       sourceMessageId: sourceMessage.id,
@@ -169,11 +201,19 @@ describe("Phase 1 schema", () => {
     database.supersedeDecision(application.id, previous.id, replacement.id);
 
     expect(() =>
-      database.db().$client.prepare("DELETE FROM decisions WHERE id = ?").run(replacement.id),
+      database
+        .db()
+        .$client.prepare("DELETE FROM decisions WHERE id = ?")
+        .run(replacement.id),
     ).toThrow("FOREIGN KEY constraint failed");
     expect(database.listActiveDecisions(application.id)).toEqual([replacement]);
 
-    database.db().$client.prepare("DELETE FROM applications WHERE id = ?").run(application.id);
-    expect(database.db().$client.prepare("SELECT id FROM decisions").all()).toEqual([]);
+    database
+      .db()
+      .$client.prepare("DELETE FROM applications WHERE id = ?")
+      .run(application.id);
+    expect(
+      database.db().$client.prepare("SELECT id FROM decisions").all(),
+    ).toEqual([]);
   });
 });
