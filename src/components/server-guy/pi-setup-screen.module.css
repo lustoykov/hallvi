@@ -38,6 +38,12 @@
 .savedLogin { display: flex; align-items: center; gap: 12px; }
 .savedLogin > svg { width: 24px; color: #0c7248; flex-shrink: 0; }
 .hint { color: #536078; font-size: 13px; line-height: 1.6; margin: 0; }
+.repositoryChecks { margin-top: 18px; }
+.repositoryChecks > p { display: flex; align-items: center; gap: 8px; }
+.repositoryChecks svg { width: 18px; height: 18px; flex-shrink: 0; }
+.repositoryChecks ul { list-style: none; padding: 0; margin: 16px 0 0; }
+.repositoryChecks li + li { margin-top: 16px; }
+.repositoryChecks li p { display: block; margin: 4px 0 0; }
 .error { color: #9c312a; font-size: 14px; line-height: 1.6; margin: 14px 0 0; overflow-wrap: anywhere; }
 .fields { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
 .fields label { display: grid; gap: 8px; font-size: 13px; font-weight: 600; min-width: 0; }

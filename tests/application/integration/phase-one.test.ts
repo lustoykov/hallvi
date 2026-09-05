@@ -19,7 +19,7 @@ vi.mock("../../../src/server/github", async () => {
   return { ...actual, inspectGithubRepository: mocks.inspectGithubRepository };
 });
 
-vi.mock("../../../src/server/pi", () => ({ askPi: mocks.askPi }));
+vi.mock("../../../src/server/pi", () => ({ askPi: mocks.askPi, PiUnavailableError: class extends Error {} }));
 
 let databaseDirectory: string;
 let databasePath: string;
@@ -54,6 +54,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  saveGithubConnection({ id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "fixture" }, connectedAt: new Date().toISOString() });
   database.db().$client.exec("DELETE FROM applications");
   mocks.askPi.mockReset();
   mocks.inspectGithubRepository.mockReset();
@@ -75,6 +76,91 @@ async function createApplication(approvalMode: "pi-decides" | "always-ask" = "pi
     approvalMode,
   });
 }
+
+describe("repository verification after reconnecting", () => {
+  const connectionId = "00000000-0000-4000-8000-000000000002";
+  function reconnect() {
+    saveGithubConnection({ id: connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 2, login: "new-login" }, connectedAt: new Date().toISOString() });
+    mocks.inspectGithubRepository.mockResolvedValue({ ...passingInspection, raw: { ...passingInspection.raw, connectionId } });
+    mocks.inspectGithubRepository.mockClear();
+  }
+
+  it("checks each existing application with the new connection, preserving chats and avoiding model calls", async () => {
+    const first = await createApplication();
+    await phaseOne.createPhaseOneApplication({ repositoryUrl: "https://github.com/example/second", environment: "production", approvalMode: "always-ask" });
+    reconnect();
+    const results = await phaseOne.recheckGithubRepositories(connectionId);
+    expect(results).toHaveLength(2);
+    expect(results.every((result) => result.status === "passed")).toBe(true);
+    expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(2);
+    expect(mocks.askPi).not.toHaveBeenCalled();
+    expect(phaseOne.getPhaseOneOperatorView(first.view.application!.id).messages).toEqual(first.view.messages);
+    await phaseOne.recheckGithubRepositories(connectionId);
+    expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing without existing applications", async () => {
+    reconnect();
+    expect(await phaseOne.recheckGithubRepositories(connectionId)).toEqual([]);
+    expect(mocks.inspectGithubRepository).not.toHaveBeenCalled();
+  });
+
+  it("records denial without automatic retry loops, and keeps manual retry available", async () => {
+    const { view } = await createApplication();
+    reconnect();
+    mocks.inspectGithubRepository.mockResolvedValueOnce({ status: "failed", summary: "Grant repository access, then retry.", sourceUrl: null, raw: { connectionId } });
+    expect(await phaseOne.recheckGithubRepositories(connectionId)).toMatchObject([{ status: "blocked", result: "Grant repository access, then retry." }]);
+    await phaseOne.recheckGithubRepositories(connectionId);
+    expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(1);
+    await phaseOne.observeRepository(view.application!.id);
+    expect(phaseOne.getPhaseOneOperatorView(view.application!.id).checks[1].status).toBe("passed");
+  });
+
+  it("shares simultaneous reconnect checks instead of writing duplicate observations", async () => {
+    const { view } = await createApplication();
+    reconnect();
+    const results = await Promise.all([phaseOne.recheckGithubRepositories(connectionId), phaseOne.recheckGithubRepositories(connectionId)]);
+    expect(results[0]).toEqual(results[1]);
+    expect(mocks.inspectGithubRepository).toHaveBeenCalledTimes(1);
+    expect(database.listObservations(view.application!.id)).toHaveLength(2);
+  });
+
+  it("rejects a stale connection before sending any provider request", async () => {
+    await createApplication();
+    mocks.inspectGithubRepository.mockClear();
+    await expect(phaseOne.recheckGithubRepositories(connectionId)).rejects.toThrow("connection changed");
+    expect(mocks.inspectGithubRepository).not.toHaveBeenCalled();
+  });
+
+  it.each(["disconnect", "replace"])("discards a late observation after %s", async (operation) => {
+    const { view } = await createApplication();
+    reconnect();
+    let finish!: (value: typeof passingInspection) => void;
+    mocks.inspectGithubRepository.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = phaseOne.recheckGithubRepositories(connectionId);
+    const rejected = expect(pending).rejects.toThrow("connection changed");
+    saveGithubConnection(operation === "disconnect" ? null : { id: passingInspection.raw.connectionId, mode: "cli", source: "gh", fingerprint: "0".repeat(64), account: { id: 1, login: "replacement" }, connectedAt: new Date().toISOString() });
+    const observations = database.listObservations(view.application!.id);
+    finish({ ...passingInspection, raw: { ...passingInspection.raw, connectionId } });
+    await rejected;
+    expect(database.listObservations(view.application!.id)).toEqual(observations);
+  });
+
+  it("validates same-origin requests and the exact saved connection before running checks", async () => {
+    const { POST } = await import("../../../src/app/api/github/setup/repositories/route");
+    await createApplication();
+    reconnect();
+    const request = (body: object, origin = "http://localhost:3000") => new Request("http://localhost:3000/api/github/setup/repositories", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify(body) });
+    expect((await POST(request({ connectionId }, "https://attacker.example"))).status).toBe(400);
+    expect((await POST(request({ connectionId: "invalid" }))).status).toBe(400);
+    expect((await POST(request({ connectionId, extra: true }))).status).toBe(400);
+    expect((await POST(request({ connectionId: passingInspection.raw.connectionId }))).status).toBe(400);
+    expect(mocks.inspectGithubRepository).not.toHaveBeenCalled();
+    const response = await POST(request({ connectionId }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject([{ status: "passed" }]);
+  });
+});
 
 describe("Phase 1 application workspace", () => {
   it("requires the exact repository before removing anything", async () => {

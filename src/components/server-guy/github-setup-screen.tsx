@@ -3,8 +3,9 @@
 import { ArrowLeft, ArrowRight, ArrowSquareOut, Check, Copy, SpinnerGap, X } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GithubLoginAttempt, GithubSetupStatus } from "@/server/github-setup";
+import type { GithubRepositoryCheckResult } from "@/server/phase-one";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
@@ -29,11 +30,35 @@ export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { init
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState<number | null>(null);
+  const [repositoryCheck, setRepositoryCheck] = useState<{
+    connectionId: string; checking: boolean; results: GithubRepositoryCheckResult[]; error: string | null;
+  } | null>(null);
   const generation = useRef(0);
   const inFlight = useRef(false);
   const working = waiting(attempt);
   const connected = Boolean(status.connection && !status.issue);
   const candidate = status.detected.candidate;
+  const visibleCheck = repositoryCheck?.connectionId === status.connection?.id ? repositoryCheck : null;
+
+  useEffect(() => () => { generation.current++; }, []);
+
+  const checkRepositories = useCallback(async (connectionId: string, expected: number) => {
+    setRepositoryCheck({ connectionId, checking: true, results: [], error: null });
+    try {
+      // Keep this server request running if the user navigates back to their application.
+      const results = await request<GithubRepositoryCheckResult[]>("/api/github/setup/repositories", "POST", { connectionId });
+      if (generation.current !== expected) return;
+      setRepositoryCheck({ connectionId, checking: false, results, error: null });
+      // A check can discover a revoked login. Refresh that status without hiding its results.
+      const fresh = await request<GithubSetupStatus>("/api/github/setup").catch(() => null);
+      if (generation.current !== expected) return;
+      if (fresh) setStatus(fresh);
+      router.refresh();
+    } catch {
+      if (generation.current !== expected) return;
+      setRepositoryCheck({ connectionId, checking: false, results: [], error: "Could not finish checking repositories. Open your application and retry Check 2." });
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!working) return;
@@ -51,7 +76,10 @@ export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { init
         const next = await request<GithubLoginAttempt>(`/api/github/setup/login/${current.id}`, "POST", {}, controller.signal);
         const saved = next.status === "connected" ? await request<GithubSetupStatus>("/api/github/setup", "GET", undefined, controller.signal) : null;
         if (controller.signal.aborted || generation.current !== expected) return;
-        if (saved) { setStatus(saved); setChoosing(false); router.refresh(); }
+        if (saved) {
+          setStatus(saved); setChoosing(false); router.refresh();
+          if (saved.connection && !saved.issue) void checkRepositories(saved.connection.id, expected);
+        }
         setAttempt(next); setError(null);
       } catch (caught) {
         if (controller.signal.aborted || generation.current !== expected) return;
@@ -60,7 +88,7 @@ export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { init
       }
     }, current.intervalSeconds * 1000);
     return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [attempt, router]);
+  }, [attempt, router, checkRepositories]);
 
   async function act(work: () => Promise<void>) {
     if (inFlight.current) return;
@@ -79,6 +107,7 @@ export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { init
     generation.current++;
     const fresh = await request<GithubSetupStatus>("/api/github/setup", "POST", { candidateId: candidate?.id });
     setStatus(fresh); setAttempt(null); setChoosing(false); router.refresh();
+    if (fresh.connection && !fresh.issue) await checkRepositories(fresh.connection.id, generation.current);
   }
   async function disconnect() {
     generation.current++;
@@ -125,10 +154,20 @@ export function GithubSetupScreen({ initialStatus, returnToAdd = false }: { init
         </section>
         <section className={s.section}>
           <h2>Repository access</h2>
-          <p className={s.hint}>{status.connection?.mode === "app" ? "Install Server Guy on GitHub for the repositories you want it to read. Adding an application checks its access and exact commit." : connected ? "Adding an application checks repository access using your existing login and records the exact commit." : "Connect an account first. When you add an application, Server Guy checks its repository access and exact commit."}</p>
+          <p className={s.hint}>{status.connection?.mode === "app" ? "Choose which repositories Server Guy can read on GitHub. Existing applications are checked automatically after reconnecting." : connected ? "Existing applications are checked automatically after reconnecting. New applications are checked when you add them." : "Connect an account to check repository access for your applications."}</p>
+          {visibleCheck && <div className={s.repositoryChecks} aria-live="polite" aria-busy={visibleCheck.checking}>
+            {visibleCheck.checking ? <p role="status"><SpinnerGap className="spin" />Checking repository…</p> : visibleCheck.error ? <p role="alert" className={s.error}>{visibleCheck.error}</p> : visibleCheck.results.length === 0 ? <p className={s.hint}>No applications to check yet. Add an application to verify its repository.</p> : <>
+              <p role="status">{visibleCheck.results.every((check) => check.status === "passed") ? "Repository checks passed." : "Repository checks finished. Some need attention."}</p>
+              <ul>{visibleCheck.results.map((check) => <li key={check.applicationId}>
+                <Link className={s.textButton} href={`/applications/${check.applicationId}`}>{check.repository}<ArrowRight /></Link>
+                <p className={check.status === "passed" ? s.success : s.error}>{check.status === "passed" ? "Check 2 passed." : check.result}</p>
+                {check.status !== "passed" && <p className={s.hint}>After fixing access, open this application and retry Check 2.</p>}
+              </li>)}</ul>
+            </>}
+          </div>}
           {status.connection?.mode === "app" && <p><a className={s.textButton} href={status.connection.accessUrl} target="_blank" rel="noreferrer">Choose repositories on GitHub <ArrowSquareOut /></a></p>}
         </section>
-        <footer className={s.footer}><Link className={s.primary} href={returnToAdd ? "/applications/new" : "/applications"}>{returnToAdd ? "Back to add application" : "View applications"}<ArrowRight /></Link></footer>
+        <footer className={s.footer}>{visibleCheck?.checking ? <button className={s.primary} disabled>{returnToAdd ? "Back to add application" : "View applications"}<ArrowRight /></button> : <Link className={s.primary} href={returnToAdd ? "/applications/new" : "/applications"}>{returnToAdd ? "Back to add application" : "View applications"}<ArrowRight /></Link>}</footer>
       </section>
     </div>
     <aside popover="auto" id="github-storage" className={s.help} aria-labelledby="github-storage-title">
