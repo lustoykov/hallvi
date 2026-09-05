@@ -4,7 +4,6 @@ import {
   getApplication,
   getApplicationByRepository,
   getChat,
-  getDecision,
   getWorkspace,
   insertActivity,
   insertApplication,
@@ -18,6 +17,7 @@ import {
   listActivity,
   listApplications,
   listChats,
+  listChatSummaries,
   listMessages,
   listObservations,
   supersedeDecision,
@@ -34,6 +34,7 @@ import {
   deriveUpcomingRequirements,
 } from "./phase-one-spec";
 import { APPROVAL_MODES, isApprovalMode } from "./types";
+import { removeNativeApplicationSessions } from "./pi-sessions";
 import type {
   ApplicationRecord,
   CreateApplicationInput,
@@ -304,7 +305,9 @@ export function removeApplication(applicationId: string, repository: string) {
   }
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
-  deleteApplication(application.id);
+  removeNativeApplicationSessions(application.id, () => {
+    deleteApplication(application.id);
+  });
   return { removedApplicationId: application.id };
 }
 
@@ -315,7 +318,7 @@ export function getPhaseOneOperatorView(
   const { application, workspace } = loadWorkspace(applicationId);
 
   const checks = currentChecks(application);
-  const chats = listChats(workspace.id);
+  const chats = listChatSummaries(workspace.id);
   const selected =
     (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
     chats.find((chat) => !chat.archivedAt && chat.isPrimary) ??
@@ -364,7 +367,7 @@ export function archiveChat(applicationId: string, chatId: string) {
 }
 
 function decisionLabel(decision: PiDecision) {
-  return { "launch-priority": "Additional launch priority" }[decision.kind];
+  return { "launch-priority": "Saved requirement" }[decision.kind];
 }
 
 export function buildViewSummary(application: ApplicationRecord) {
@@ -396,18 +399,6 @@ export function savePiDecisions(
   proposals: PiDecision[],
 ) {
   for (const proposed of proposals) {
-    const previous = proposed.replaces ? getDecision(proposed.replaces) : null;
-    if (
-      proposed.replaces &&
-      (!previous ||
-        previous.applicationId !== applicationId ||
-        previous.supersededById !== null)
-    ) {
-      throw new Error(
-        "Pi referenced a Decision that is missing, already replaced, or belongs to another application.",
-      );
-    }
-
     const decision = insertDecision({
       applicationId,
       sourceMessageId,
@@ -415,9 +406,12 @@ export function savePiDecisions(
       label: decisionLabel(proposed),
       value: proposed.value,
     });
+    const previous =
+      proposed.replaces === undefined
+        ? null
+        : supersedeDecision(applicationId, proposed.replaces, decision.id);
 
     if (previous) {
-      supersedeDecision(applicationId, previous.id, decision.id);
       insertActivity(
         workspaceId,
         "decision-revised",

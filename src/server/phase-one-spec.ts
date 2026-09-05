@@ -97,27 +97,9 @@ export const PHASE_ONE_CHECKS = [
   },
   {
     key: "approval-authority",
-    label: "When Pi asks for approval",
+    label: "When Server Guy asks for approval",
     definition:
-      "Your choice of when Pi should ask you before changing code or infrastructure is saved. Phase 1 makes no external changes.",
-  },
-] as const;
-
-export const PRODUCTION_BASELINE = [
-  {
-    key: "protect-database",
-    label: "Protect database data",
-    rule: "Required for every production launch",
-  },
-  {
-    key: "minimize-downtime",
-    label: "Minimize downtime",
-    rule: "Prefer changes that preserve availability",
-  },
-  {
-    key: "keep-cost-low",
-    label: "Keep infrastructure cost low",
-    rule: "Use the smallest credible infrastructure",
+      "Your choice of when Server Guy should ask you before changing code or infrastructure is saved. Phase 1 makes no external changes.",
   },
 ] as const;
 
@@ -141,7 +123,7 @@ export const UPCOMING_REQUIREMENTS = [
     label: "Domain starting state",
     owner: "engineer" as const,
     resolutionPath:
-      "Tell Pi whether the domain is already owned before Connect domain.",
+      "Tell Server Guy whether the domain is already owned before Connect domain.",
     requiredBeforePhase: 6,
   },
 ] as const;
@@ -254,7 +236,7 @@ export function computeChecks(
       status: approvalExplicit ? "passed" : "not-yet",
       result: approvalExplicit
         ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
-        : "Choose how Pi should ask before external changes.",
+        : "Choose how Server Guy should ask before external changes.",
       evidence: [applicationEvidence(application, "Saved approval settings")],
       canRerun: false,
     },

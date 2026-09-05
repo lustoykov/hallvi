@@ -479,7 +479,7 @@ export function OperatorShell({
             title={
               initialPiSetup.ready
                 ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                : "Connect ChatGPT to chat with Pi"
+                : "Connect ChatGPT to chat with Server Guy"
             }
           >
             <span
@@ -515,6 +515,7 @@ export function OperatorShell({
           runs={runs.filter((run) => run.chatId === activeChat?.id)}
           reconnecting={reconnecting}
           onRunAction={runAction}
+          onNewChat={createChat}
           view={view}
         />
         <Inspector

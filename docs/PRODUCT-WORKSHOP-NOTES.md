@@ -2,11 +2,11 @@
 
 Status: living planning notes, not a finished specification and not evidence of implementation.
 
-Last updated: 2026-09-04
+Last updated: 2026-09-05
 
 These notes preserve decisions, hypotheses, and unresolved questions from the product workshop. They should later be distilled into a tight product specification. Unresolved choices must not be presented as settled in that specification.
 
-**Current terminology note:** the 2026-09-03 Phase 1 simplification renamed the durable conversation to **Chat** and removed Operator Session, Operator Record, and Session Event as domain entities. Server Guy persists explicit application records and Activity Events, then generates the Operator View, Gate Checks, workspace status, and Blockers. Older reviewer-input sections below retain their original terminology as historical context; they are not the current data model.
+**Current terminology note:** the 2026-09-03 Phase 1 simplification renamed the durable conversation to **Chat** and removed Operator Session, Operator Record, and Session Event as domain entities. Server Guy persists explicit application records and Activity Events, then generates the Operator View, Gate Checks, workspace status, and Blockers. The 2026-08-30 reviewer input that used the older terminology is archived under [docs/archive/](archive/2026-08-30-workshop-review-input.md); it is not the current data model. [CONTEXT.md](../CONTEXT.md) owns canonical terms.
 
 ## Product thesis
 
@@ -409,93 +409,24 @@ This favors one narrow, complete deployment-to-recovery lifecycle over many part
 10. Where are logs, traces, metrics, and backups stored, and what are the retention/privacy defaults?
 11. What installation and onboarding flow makes the open-source product genuinely easy for the initial user?
 
-## Independent review input
+## Review input (archived)
 
-Fable reviewed these notes read-only on 2026-08-30 through the dedicated `codex-collab-server-guy-review` session. This subsection records reviewer input, not settled product decisions.
+Fable reviewed these notes read-only three times on 2026-08-30: an independent review, a model-native review and a use-case review. The full reviewer input and Codex synthesis are preserved with their original terminology in [docs/archive/2026-08-30-workshop-review-input.md](archive/2026-08-30-workshop-review-input.md). What carried into the notes above:
 
-Verdict: proceed to specification after defining the authorization boundary precisely and resolving V1's autonomy posture.
+- Invocation-level authorization was judged too restrictive. The small set of Approval Modes replaced it, and Approval Records stay audit evidence rather than permission context fed back to Pi.
+- Pi controls the adaptive operational loop rather than proposing inside a fixed pipeline; Inspect -> Resolve profile -> Plan -> Policy -> Approval -> Execute -> Verify -> Evidence is descriptive vocabulary.
+- Shipping a routine Release became its own journey, Deployment is distinct from an Out-of-band Change, the initial alerting journey covers detectable unavailability only, and every MCP read path redacts.
+- The sentinel boundary, the 03:00-to-08:00 scenario, remains unresolved question 1 above.
 
-Material points to carry into the workshop:
+## Working terms not in CONTEXT.md
 
-- **Policy inputs must be bounded.** A policy gate should evaluate capability, bound parameters and scope, environment, approval state, and deterministic preconditions computed from Observations. A Finding or Diagnosis should inform planning and the user but should not itself grant authority.
-- **Approval needs an explicit unit.** The reviewer recommends authorization bound to concrete capability invocations with parameters, checked again at execution. A revised adaptive plan must not inherit authority for newly added operations merely because an earlier plan was approved.
-- **External agent requests are not approvals.** An MCP client may request deployment or verification, but Codex or Claude tool approval must not substitute for approval inside Server Guy.
-- **Privilege isolation must be an environment property.** The Operational Reasoner should have evidence adapters rather than unrestricted shell/filesystem access. A Repository Executor may have a sandboxed shell but must not have infrastructure credentials or a network path to privileged provider operations.
-- **Recovery needs an asymmetry rule.** Mandatory checks must be necessary. Pi may veto, question, or escalate a recovery result, but it must not declare recovery over a failing mandatory check.
-- **V1 should visibly prove governance.** The V1 record should include at least one meaningful gate outcome: either a pre-declared operation runs without a per-action prompt, or policy blocks/downgrades a Pi proposal, with both proposal and result preserved as evidence.
-- **V1 capability and V1 proof may differ.** The specification must say whether MCP and the Remediation PR path are required parts of the demonstrated V1 loop or merely available capabilities.
-
-The review's most important product-owner question is whether Server Guy V1 performs any consequential operation while the engineer is absent. This choice affects topology, approval semantics, the always-on component, Pi authentication, and how clearly V1 differs from a general coding agent plus scripts.
-
-Workshop response: invocation-level authorization is considered too restrictive and has not been adopted. The current alternative is a small set of Approval Modes. In Pi Decides mode, Pi itself determines when to ask; Server Guy does not maintain a growing policy inferred from previous approvals.
-
-## Model-native review input
-
-Fable performed a second read-only review on 2026-08-30 after the Approval Mode correction. This subsection is reviewer input plus Codex synthesis, not a settled replacement architecture.
-
-Reviewer verdict: the authority model is now genuinely model-native, but the surrounding architecture still uses workflow-native shapes that subordinate Pi.
-
-Material corrections proposed by the reviewer:
-
-- **The Pi session is the loop.** Server Guy should host and resume a durable Operator Session rather than orchestrate Pi through a fixed Inspect -> Plan -> Execute pipeline. The current pipeline may remain useful as descriptive timeline vocabulary.
-- **Pi is the author of record.** Pi should write Findings, Diagnoses, Plans, and Assessments directly as versioned, disputable conclusions citing Observations. Proposal semantics remain useful for approval requests and External Agent Clients, not for every Pi action.
-- **Broad tools are scoped by environment and credential custody.** Pi should have a real application-host shell for novel operations. Provider credentials should remain outside that shell and be available through provider tools. Approval Modes govern tool classes without parsing or predefining every command parameter.
-- **Operational knowledge starts seeded and becomes model-grown.** Server Guy supplies application contracts and initial provider/stack skills, then preserves Pi-authored runbook notes, learned application quirks, topology, and explicit user intent.
-- **Durable user intent matters in addition to Approval Mode.** A short user-authored prose brief can tell Pi what the user values without compiling that intent into rules or learning permission from old approvals.
-
-The reviewer identifies the minimum non-model substrate as Approval Mode enforcement, credential custody, environment scoping, a durable resumable Operator Session, authoritative Release and Incident Case state, provenance-preserving Observations, independent sentinel checks, seed knowledge, model-grown memory, the operator UI, and authenticated MCP transport.
-
-The proposed V1 proof is a failure that no predefined capability anticipates: Pi resumes with application history, diagnoses a full disk through a real shell, composes a repair, decides whether to ask from the selected mode and explicit user intent, verifies recovery using independent sentinel evidence, records the incident, updates application memory, and prepares a durable remediation change.
-
-Codex synthesis:
-
-- The central correction is valid: Pi should be the operational control loop, not merely a proposer inside Server Guy's loop.
-- The typed pipeline, Temporal role, proposal language, and deterministic acceptance of a Diagnosis must be reconsidered against this principle.
-- The user's previous "plan before action" decision should not be silently discarded. A model-written visible plan may still precede action without becoming a fixed workflow gate; its exact role remains an owner choice.
-- Approval Records should remain audit evidence and should not be fed back to Pi by default as permission context. Explicit current user intent is a cleaner context channel.
-- Credential isolation and independent observations preserve a minimum reliable floor without forcing Pi into predetermined operations.
-
-## Use-case review input
-
-Fable performed a third read-only review on 2026-08-30 against the first concrete use-case draft. This subsection records the material review and resulting corrections, not answers to the remaining owner choices.
-
-Reviewer verdict: the requested journeys are sufficient to drive the specification after adding one routine journey and clarifying the always-on boundary.
-
-Material corrections incorporated into the draft:
-
-- Added shipping a new Release of an already-live application as a distinct use case. First Application Launch, routine Release deployment, and incident remediation are not the same journey.
-- Distinguished Deployment from an Out-of-band Change so direct host repairs remain visible as drift until reconciled with a Release.
-- Narrowed the initial alerting journey to detectable application unavailability based on the external Application Contract. Broader degradation depends on unresolved telemetry.
-- Added missing engineer/Pi handoffs for Application Contract provenance, guided DNS work, PR merge, deployment, and verification.
-- Distinguished the Operational Control Plane from the Operator UI.
-- Required redaction on every MCP read path, not only preassembled Evidence Bundles.
-
-The unresolved material issue is the sentinel boundary. Alerting with the laptop closed could be implemented as a prober that persists a detection event and sends a notification, as a small remote control-plane component that also creates Incident Cases, or as infrastructure capable of resuming Pi and acting. The 03:00-to-08:00 scenario is now the next product-owner question.
-
-## Canonical working terms
+[CONTEXT.md](../CONTEXT.md) is the canonical product language; where these notes and CONTEXT.md differ, CONTEXT.md wins. The terms below are workshop-only working terms that CONTEXT.md does not define yet.
 
 - **Agent Runtime**: Pi's model, session, tool-loop, and agent execution environment.
 - **Model Backend**: the model/provider accessed through Pi.
 - **Operational Knowledge**: Server Guy's profiles, contracts, runbooks, policies, and verification knowledge.
-- **Operational Control Plane**: authoritative operational state and execution coordination wherever its components run; it is not the Operator UI.
-- **External Agent Client**: Codex, Claude, or another agent using Server Guy through MCP.
 - **Operational Plan**: Pi-authored proposed approach, expected effects, checks, and escalation conditions; its implementation details may change as evidence appears.
-- **Approval Mode**: the explicit user-selected rule governing whether Pi must request approval before state-changing operations: Full Autonomy, Pi Decides, or Always Ask.
-- **Approval Record**: historical evidence of the Approval Mode and any explicit approval applicable when an operation occurred; it does not grant authority to future operations.
-- **Observation**: a captured operational fact.
 - **Evidence Selection**: observations selected as support for a claim.
-- **Finding**: an agent interpretation of evidence.
-- **Diagnosis**: Pi's current model-authored explanation of an Incident Case, kept distinct from the Observations it cites.
-- **Evidence Bundle**: bounded, structured, redacted, source-attributed material for review or handoff.
-- **Candidate Fix**: an untrusted proposed repository change.
-- **Remediation PR**: the reviewable GitHub artifact for application-code remediation.
-- **Release**: the versioned unit intended to run in an environment, identified by an application revision and deployment configuration identity.
-- **Deployment**: a transition that moves a specific Release into an environment.
-- **Out-of-band Change**: a recorded live-environment mutation not represented by the current Release and therefore visible as drift until reconciled.
-- **Alert**: a notification sent to the engineer about a meaningful detection or Incident Case transition; it is not an operational state.
-- **Incident Case**: the durable record of a suspected or confirmed service degradation and its investigation, actions, and outcome.
-- **Remediation**: a durable operational or repository change intended to correct an incident's cause or prevent recurrence.
-- **Recovery**: a recorded outcome supported by evidence that the application has returned to its contract-defined healthy condition.
 
 ## Deferred or explicitly non-primary work
 

@@ -102,6 +102,9 @@ describe("account-first setup and progressive disclosure", () => {
     });
     expect(defaultView).toContain("Existing ChatGPT login found");
     expect(defaultView).toContain("Use existing login");
+    expect(defaultView).toContain(
+      "Share Pi’s login file and copy its model settings.",
+    );
     expect(defaultView).toContain("Connect another account");
     expect(defaultView).not.toContain("Check for a saved login");
     expect(defaultView).toContain("GPT-5.6 Sol / High");
@@ -125,6 +128,7 @@ describe("account-first setup and progressive disclosure", () => {
       },
     });
     expect(defaultView).toContain("Login saved");
+    expect(defaultView).toContain("Sharing the existing Pi login file");
     expect(defaultView).toContain("Disconnect</button>");
     expect(defaultView).toContain("Access is checked when you send a message.");
     expect(html).toContain("/approved/pi/auth.json");

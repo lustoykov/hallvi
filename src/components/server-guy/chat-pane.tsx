@@ -55,6 +55,7 @@ export function ChatPane({
   runs,
   reconnecting,
   onRunAction,
+  onNewChat,
 }: {
   view: PhaseOneOperatorView;
   activeChat: Chat | null;
@@ -69,6 +70,7 @@ export function ChatPane({
   runs: PiRun[];
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
+  onNewChat: () => void;
 }) {
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
@@ -131,6 +133,9 @@ export function ChatPane({
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
+            const historyUnavailable =
+              run?.status === "failed" &&
+              run.error?.startsWith("Conversation history unavailable.");
             return (
               <Message
                 className={
@@ -148,9 +153,11 @@ export function ChatPane({
                     className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
                     aria-hidden="true"
                   >
-                    {message.role === "user" ? "You" : "Pi"}
+                    {message.role === "user" ? "You" : "SG"}
                   </span>
-                  <strong>{message.role === "user" ? "You" : "Pi"}</strong>
+                  <strong>
+                    {message.role === "user" ? "You" : "Server Guy"}
+                  </strong>
                   {message.source === "server-guy" && (
                     <span className="sg-source-tag">Recorded event</span>
                   )}
@@ -176,11 +183,16 @@ export function ChatPane({
                           <SpinnerGap className="spin" aria-hidden="true" />
                         )}
                         {message.status === "queued"
-                          ? "Message saved. Waiting for the worker…"
+                          ? "Waiting to reply…"
                           : message.status === "running"
-                            ? "Pi is replying… Decisions are saved only when it finishes."
-                            : (run?.error ??
-                              "This attempt did not finish. No Decisions were saved.")}
+                            ? "Replying…"
+                            : run?.error?.startsWith(
+                                  "Conversation history unavailable.",
+                                )
+                              ? run.error
+                              : message.status === "cancelled"
+                                ? "Reply cancelled."
+                                : "Something went wrong. Please retry."}
                       </p>
                       {message.body && !inProgress && (
                         <details className="sg-run-draft">
@@ -194,9 +206,14 @@ export function ChatPane({
                         <button
                           className={`sg-run-action ${inProgress ? "sg-secondary-button" : "sg-primary-button"}`}
                           disabled={busy !== null}
-                          onClick={() =>
-                            onRunAction(run.id, inProgress ? "cancel" : "retry")
-                          }
+                          onClick={() => {
+                            if (historyUnavailable) onNewChat();
+                            else
+                              onRunAction(
+                                run.id,
+                                inProgress ? "cancel" : "retry",
+                              );
+                          }}
                           type="button"
                         >
                           {inProgress ? (
@@ -204,7 +221,11 @@ export function ChatPane({
                           ) : (
                             <ArrowClockwise aria-hidden="true" weight="bold" />
                           )}
-                          {inProgress ? "Cancel request" : "Retry reply"}
+                          {inProgress
+                            ? "Cancel request"
+                            : historyUnavailable
+                              ? "Start a new chat"
+                              : "Retry reply"}
                         </button>
                       )}
                     </div>
@@ -279,7 +300,7 @@ export function ChatPane({
           <textarea
             disabled={composerDisabled}
             id="pi-composer"
-            aria-label="Message Pi"
+            aria-label="Message Server Guy"
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {
               if (
@@ -297,7 +318,7 @@ export function ChatPane({
                 : !piReady
                   ? "Connect ChatGPT in Settings to chat"
                   : application
-                    ? "Ask Pi, correct a decision, or add context…"
+                    ? "Ask Server Guy, correct a decision, or add context…"
                     : "Create the application workspace to start chatting"
             }
             rows={2}

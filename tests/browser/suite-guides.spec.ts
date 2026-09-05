@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
+import { phaseOneCases } from "../evals/phase-one-cases";
 import { createDashboard } from "../dashboard/server";
 import { journey } from "./journeys";
 
@@ -61,7 +62,7 @@ test(
         "database connections close and these temporary folders are deleted",
         "Only the two journeys tagged @smoke run.",
         "dashboard journey starts its own temporary testing dashboard",
-        "model replies are not mocked",
+        "model replies and compaction summaries are not mocked",
         "the greeting case cannot inherit messages or Decisions from revise-existing",
         "the /tmp/server-guy-pi-eval-* directory is deleted",
         "failed code checks stay failed",
@@ -89,6 +90,7 @@ test(
         "Run",
         "Run",
         "Choose journeys…",
+        `Run new evals only (${phaseOneCases.length})…`,
         "Choose cases…",
       ]);
       await expect(

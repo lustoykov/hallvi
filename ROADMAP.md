@@ -15,7 +15,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
-| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Implemented on `codex/durable-pi-requests`, pending PR review. Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
+| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
 | 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
@@ -27,6 +27,8 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 15 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
 
 Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
+
+Implemented follow-up on this branch, awaiting PR review: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Native per-Chat history replaces custom replay/compaction, saved Decisions are retrieved through a scoped read-only tool, and invalid proposals return in-loop feedback. External authority and atomic Decision commits are unchanged; independently committed tools remain deferred. Next is action history and tracing, not a new launch phase.
 
 ## Phase 1 implementation backlog
 
@@ -40,7 +42,7 @@ Finish the required [Phase 1 acceptance gates](docs/testing/phase-one-acceptance
 - [x] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
 - [x] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
 
-Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or intentionally nuking the local database.
+Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or explicitly resetting a disposable local database. Version mismatches stop setup rather than migrate data. Before the first release with user-data retention promises, implement and test schema migrations and backup/restore; until then, development chats are disposable.
 
 ### Configure Pi explicitly
 
@@ -67,7 +69,7 @@ Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle sche
 - [x] Add eight opt-in real-Pi eval cases with repeatable inputs, exact proposal/state checks, isolated SQLite state, model/source metadata and a human review sheet; reuse Vitest, not a new eval service.
 - [x] Extend the casebook with three GitHub evidence cases (eleven total), using synthetic connection/repository records with real Pi answers. Accept equivalent meaning without requiring unrelated disclaimers; keep false claims and unauthorized Decisions as failures.
 - [x] Group the live-eval picker by searchable categories and default to cases without a saved attempt, including archived history. Keep saved answers and earlier judgments intact when rubrics change.
-- [ ] Finish dashboard automatic-judge recovery: judge saved answers after a failed eval runner when auto-judging was explicitly selected, without auto-retrying generation or resuming cancelled runs. Make unjudged, judging and judged-but-failed states clear. The successful-run handoff works; this is developer-tool follow-up, not a GitHub-connection or Phase 2 gate.
+- [x] Finish dashboard automatic-judge recovery: judge saved answers after a failed eval runner when auto-judging was explicitly selected, without auto-retrying generation or resuming cancelled runs. Make unjudged, judging and judged-but-failed states clear. Done 2026-09-05: failed and timed-out runners hand saved answers to the judge, stopped runs do not, the run log says what was saved and why the runner failed, and Eval runs shows judge progress and a source-change notice.
 - [ ] Review the live Pi baseline's meaning against its case rubrics and record human verdicts. Keep automated checks and semantic acceptance distinct; rerun relevant cases as each phase changes.
 - [x] Clarify the unresolved-conflict eval. Decided 2026-09-04: Pi may suggest a way to resolve the conflict as long as nothing is recorded and it does not claim the engineer chose; the rubric now says so. Earlier judgments used the stricter wording and stay as saved.
 - [ ] Retain a repeatable real-route production smoke check that login POST and attempt GET share the coordinator in one process. A fresh September 4 production start/poll/cancel probe passed; the old Fable singleton concern was not reproduced. Do not add cross-process machinery without a demonstrated need.
@@ -93,8 +95,8 @@ Decision: offer explicit reuse of a detected GitHub CLI/environment credential o
 
 The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
 
-- [x] Replace the unbounded transcript replay with a bounded recent-message window plus a durable summary.
-- [x] Always send every active Decision because it is the application's compact, authoritative state. Never truncate active Decisions by recency; scope or summarize them by phase only when the product requires it.
+- [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; this branch replaces that path with native Pi history/compaction. Prototype chats are disposable; no legacy import.
+- [x] Make all active Decisions available regardless of age. This branch replaces the repeated injected list with scoped, paginated `search_decisions`; current checks and previous attempt outcomes remain separate Run context.
 - [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
 - [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
 - [x] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
@@ -104,7 +106,7 @@ The [implementation contract](docs/specs/durable-pi-requests.md) defines the fir
 - [x] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
 - [x] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
 
-Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered this worker and bounded-context implementation. The database is authoritative: the durable summary, messages, Decisions, and Pi Run live there. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered the worker and bounded-context implementation. SQLite remains authoritative for saved effects, messages and Runs; native JSONL owns attempted model/tool history and compaction. Old summary rows are unused; no import or reconstruction runs. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
 
 The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
 

@@ -1,44 +1,30 @@
-// Explicit additive v4 -> v5 upgrade. Drizzle's SQLite table rebuild can fire
-// ON DELETE cascades from messages into Decisions. Add these two columns in
-// place first; Drizzle still owns the schema and creates the new tables.
+// Prototype databases are disposable. Do not attempt an in-place upgrade.
 import Database from "better-sqlite3";
-import { randomUUID } from "node:crypto";
-import { chmodSync, mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const path =
   process.env.SERVER_GUY_DB_PATH ??
   join(process.cwd(), ".server-guy", "server-guy.db");
+const { version } = JSON.parse(
+  readFileSync(
+    new URL("../src/server/schema-version.json", import.meta.url),
+    "utf8",
+  ),
+);
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {
-  const version = database.pragma("user_version", { simple: true });
-  if (version === 4) {
-    const backup = `${path}.pre-v5-${randomUUID()}.backup`;
-    await database.backup(backup);
-    chmodSync(backup, 0o600);
-    console.log(`Preserved pre-upgrade database: ${backup}`);
-    database
-      .transaction(() => {
-        const columns = database
-          .prepare("PRAGMA table_info(messages)")
-          .all()
-          .map((column) => column.name);
-        if (!columns.includes("status"))
-          database.exec(
-            "ALTER TABLE messages ADD COLUMN status text NOT NULL DEFAULT 'completed'",
-          );
-        if (!columns.includes("revision"))
-          database.exec(
-            "ALTER TABLE messages ADD COLUMN revision integer NOT NULL DEFAULT 0",
-          );
-      })
-      .immediate();
-    if (database.pragma("foreign_key_check").length)
-      throw new Error(
-        "Database has invalid references. Stop and inspect the backup before continuing.",
-      );
-  }
+  const current = database.pragma("user_version", { simple: true });
+  const populated = database
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1",
+    )
+    .get();
+  if (populated && current !== version)
+    throw new Error(
+      `Prototype schema ${current} is incompatible with ${version}. Stop the app and worker, move aside the disposable database and its -wal/-shm files, then run npm run db:push. Keep credentials and tests/results. No migration was attempted.`,
+    );
 } finally {
   database.close();
 }

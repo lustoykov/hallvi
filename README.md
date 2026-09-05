@@ -31,7 +31,7 @@ Next.js
 Local Node worker
 ├── Same SQLite database: queued Pi Runs, messages and Decisions
 ├── Pi SDK adapter
-└── Bounded Chat context and durable summaries
+└── One native Pi JSONL session per Chat, with Pi-owned compaction
 ```
 
 There is no separate API service, distributed queue or workflow engine. The first real intake repository is `lustoykov/todo-fastapi`.
@@ -52,7 +52,11 @@ Open <http://127.0.0.1:3000>.
 
 In a second terminal, run `npm run worker`. Keep both processes running from this checkout with the same database/configuration. The worker reads `.env` and `.env.local`; `SERVER_GUY_DB_PATH` selects the database for both. A second worker for the same database is rejected.
 
-Sending returns immediately after the message is saved. You can leave the page and return to its saved progress. Cancellation and Retry are beside the attempt. An interrupted/failed attempt saves no Decisions; Retry uses the original user message. Without a worker, requests stay visibly queued. Stop the app and worker before applying schema changes. A v4 → v5 upgrade automatically keeps a `.db.pre-v5-*.backup` beside the database and adds message columns without rebuilding it; do not delete this backup until you have verified your records.
+Sending returns immediately after the message is saved. You can leave the page and return to its saved progress. Cancellation and Retry are beside the attempt. An interrupted/failed attempt saves no Decisions; Retry uses the original user message. Without a worker, requests stay visibly queued. Stop the app and worker before applying schema changes. Prototype data is disposable: no in-place schema upgrades or old-chat imports are supported. If the schema version differs, stop the app and worker, move aside the database and its `-wal`/`-shm` files, then run `npm run db:push` for a fresh database. Keep credential/configuration files and `tests/results/`. Missing native history offers **Start a new chat**, not reconstruction.
+
+Each Chat continues its private native Pi session across requests and worker restarts. Server Guy sends stable instructions, a small current-state note and the new user message; the model looks up current Decisions through a scoped read-only tool. Proposals remain pending until the final SQLite transaction. No filesystem, shell or external mutation tools are granted. See the [native session contract](docs/specs/native-pi-and-permissions.md).
+
+Native histories live beside the configured database at `pi-sessions/<application-id>/<chat-id>.jsonl`. Back up **both SQLite and pi-sessions** with the web app and worker stopped; restoring only SQLite can leave a missing-history error. Compaction reduces model context, not disk history. A damaged/missing established history offers **Rebuild conversation from saved chat**: it preserves existing files and saved records, imports bounded saved text, and does not retry automatically. Cancel an active reply and wait for it to stop before removing its application; removal deletes that application's records and native files, not credentials or other applications.
 
 Open **Settings → ChatGPT & model** to configure Pi, and **Settings → GitHub** before adding a repository. A detected login is never silently adopted. For a separate GitHub login, follow the [GitHub App registration guide](docs/integrations/github.md); only a public client ID and App slug go in local configuration, never an App private key or client secret.
 

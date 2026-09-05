@@ -13,6 +13,10 @@ let judgePreferences = null;
 let selectorsReady = false;
 let evalCatalogSignature = "";
 let evalSelectionEdited = false;
+let autoAll = false; // Landed on a run with nothing needing attention.
+// The page can outrun the server process behind it; this is the state shape
+// the page needs.
+const REQUIRED_API = 6;
 let busy = false;
 const notes = new Map();
 const openReasoning = new Set();
@@ -66,6 +70,58 @@ function suiteName(id) {
     (id === "judge" ? "LLM judgments" : id)
   );
 }
+function newEvalIds() {
+  return state.evalCases
+    .filter((item) => item.hasRun === false)
+    .map((item) => item.id);
+}
+const LAST_LABELS = {
+  failures: "Failed",
+  "needs-review": "Needs review",
+  "needs-judge": "Not judged",
+  reviewed: "Human pass",
+  cleared: "LLM-cleared",
+};
+const shortDate = (iso) =>
+  new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+// What happened the last time this case ran, so choosing what to rerun needs
+// no memory.
+function lastAttemptLabel(item) {
+  if (item.last)
+    return `${LAST_LABELS[item.last.status] ?? "Run before"} · ${shortDate(item.last.startedAt)}${item.last.rubricChanged ? " · rubric changed" : ""}`;
+  return item.hasRun === false
+    ? "Not run"
+    : item.hasRun
+      ? "Run before"
+      : "History unavailable";
+}
+const failedLastTime = (item) => item?.last?.status === "failures";
+const rubricChanged = (item) => Boolean(item?.last?.rubricChanged);
+// One control on both pages: the primary button while unattempted cases exist,
+// otherwise a quiet status line. A button that can never be clicked reads as
+// broken.
+function configureNewEvalsButton(button, status) {
+  const count = newEvalIds().length;
+  const ready = (state.apiVersion ?? 0) >= REQUIRED_API;
+  button.hidden = !ready || !count;
+  button.textContent = `Run new evals only (${count})…`;
+  button.disabled = Boolean(state.active);
+  button.title =
+    "New means no saved attempt on this machine, including archived runs. Existing cases are never included.";
+  status.hidden = !button.hidden;
+  status.textContent = ready
+    ? `All ${plural(state.evalCases.length, "case")} have a saved answer`
+    : "Restart the dashboard to see which evals are new";
+}
+function runNewEvals() {
+  const cases = newEvalIds();
+  if (!cases.length || state.active || (state.apiVersion ?? 0) < REQUIRED_API)
+    return;
+  requestRun({ suite: "live", cases, repeats: 1 });
+}
 const statusLabel = (status) =>
   status === "timed-out"
     ? "Timed out"
@@ -111,8 +167,11 @@ function scopeOf(run) {
   }
   const keys = command.match(/PI_JUDGE_CASES='(\[[^']*\])'/)?.[1];
   if (keys) {
+    const judged = state.reports.find(
+      (r) => r.run === command.match(/PI_JUDGE_RUN='?([\w.-]+)/)?.[1],
+    );
     try {
-      return plural(JSON.parse(keys).length, "saved answer");
+      return `${plural(JSON.parse(keys).length, "saved answer")}${judged ? ` from the run of ${formatDate(judged.startedAt)}` : ""}`;
     } catch {
       return "";
     }
@@ -147,6 +206,31 @@ function shownResults(saved) {
   return orderedResults(saved).filter((c) =>
     matchesFilter(saved, c, answerFilter),
   );
+}
+// The active judge run for a saved run, with the answer keys it is grading;
+// null when nothing is judging that run right now.
+function judgingNow(saved) {
+  const command = state.active?.command ?? "";
+  if (state.active?.suite !== "judge") return null;
+  if (command.match(/PI_JUDGE_RUN='?([\w.-]+)/)?.[1] !== saved.run) return null;
+  try {
+    return new Set(
+      JSON.parse(command.match(/PI_JUDGE_CASES='(\[[^']*\])'/)?.[1] ?? "[]"),
+    );
+  } catch {
+    return new Set();
+  }
+}
+function triageCounts(saved) {
+  const counts = {
+    failures: 0,
+    "needs-review": 0,
+    "needs-judge": 0,
+    cleared: 0,
+    reviewed: 0,
+  };
+  for (const c of saved.results) counts[triageFor(saved, c).status]++;
+  return counts;
 }
 function pendingCount(saved) {
   return saved.results.filter((c) =>
@@ -242,7 +326,7 @@ async function refresh() {
     if (signature === stateSignature) return;
     stateSignature = signature;
     state = nextState;
-    $("stale").hidden = (state.apiVersion ?? 0) >= 5; // The page can outrun the server process behind it.
+    $("stale").hidden = (state.apiVersion ?? 0) >= REQUIRED_API; // The page can outrun the server process behind it.
     $("active").hidden = !state.active;
     tick();
     $("suites").replaceChildren(
@@ -297,12 +381,22 @@ async function refresh() {
           else requestRun({ suite: suite.id });
         });
         action.append(button);
+        if (suite.id === "live") {
+          const actions = element("div", "", "eval-suite-actions");
+          const newButton = element("button", "", "primary");
+          const status = element("small", "", "muted");
+          configureNewEvalsButton(newButton, status);
+          newButton.addEventListener("click", runNewEvals);
+          actions.append(newButton, button, status);
+          action.replaceChildren(actions);
+        }
         row.append(action);
         return row;
       }),
     );
     renderAbout();
     initializeSelectors();
+    configureNewEvalsButton($("run-new-evals"), $("new-evals-status"));
     updateSelections();
     renderHistory();
     const pending = state.reports
@@ -382,11 +476,20 @@ function renderAbout() {
 // Recent runs: one row each; the selected run's output expands inline right
 // under it.
 const logPanel = $("log-panel");
+const HISTORY_ROWS = 8;
+let historyExpanded = false;
 function renderHistory() {
   $("empty-runs").hidden = state.history.length > 0;
   const focusedRun = document.activeElement?.dataset.logRun;
+  // Every judge pass adds a row, so the list folds to the latest few; an open
+  // log stays visible.
+  if (state.history.findIndex((r) => r.id === selectedLog) >= HISTORY_ROWS)
+    historyExpanded = true;
+  const shown = historyExpanded
+    ? state.history
+    : state.history.slice(0, HISTORY_ROWS);
   $("history").replaceChildren(
-    ...state.history.map((run) => {
+    ...shown.map((run) => {
       const row = element("div", "", "history-row");
       row.setAttribute("aria-current", String(run.id === selectedLog));
       const open = element("button", suiteName(run.suite), "history-open");
@@ -415,6 +518,19 @@ function renderHistory() {
       return row;
     }),
   );
+  if (state.history.length > shown.length) {
+    const more = element(
+      "button",
+      `Show all ${plural(state.history.length, "run")}`,
+      "text-button history-more",
+    );
+    more.type = "button";
+    more.addEventListener("click", () => {
+      historyExpanded = true;
+      renderHistory();
+    });
+    $("history").append(more);
+  }
   const run = state.history.find((r) => r.id === selectedLog);
   // Re-attach before touching its children: replaceChildren above detaches it.
   logPanel.hidden = !run;
@@ -437,9 +553,11 @@ $("log-close").addEventListener("click", (event) => {
 });
 logPanel.addEventListener("click", (event) => event.stopPropagation());
 function tick() {
-  if (state?.active)
+  if (state?.active) {
+    const scope = scopeOf(state.active);
     $("active-text").textContent =
-      `Running ${suiteName(state.active.suite)} · ${elapsed(state.active)}`;
+      `Running ${suiteName(state.active.suite)}${scope ? ` · ${scope}` : ""} · ${elapsed(state.active)}`;
+  }
   for (const node of document.querySelectorAll("[data-started]"))
     node.textContent = elapsed({ startedAt: node.dataset.started });
 }
@@ -460,6 +578,14 @@ function renderReview() {
   if (openRun !== saved.run) {
     openRun = saved.run;
     $("bulk-result").textContent = "";
+    // Land on something useful: when nothing needs attention, show every
+    // answer instead of an empty queue. Filter clicks after that are the
+    // user's own.
+    autoAll =
+      answerFilter === "attention" &&
+      saved.results.some((c) => c.reply) &&
+      !pendingCount(saved);
+    if (autoAll) answerFilter = "all";
   }
   const ordered = orderedResults(saved);
   const shown = shownResults(saved);
@@ -468,7 +594,20 @@ function renderReview() {
   renderAnswerList(saved, ordered, shown);
   renderRunHeader(saved, shown);
   renderAnswer(saved, ordered, shown);
+  fitSidebar();
 }
+// The sticky sidebar may only use the viewport space below its natural top,
+// so the runs and answer queue scroll in place at scroll position zero. When
+// the page scrolls for a long answer, the sidebar sticks 16px from the top.
+function fitSidebar() {
+  const layout = $("review-content");
+  if (layout.hidden) return;
+  const offset = Math.round(
+    layout.getBoundingClientRect().top + window.scrollY,
+  );
+  document.documentElement.style.setProperty("--sidebar-offset", `${offset}px`);
+}
+window.addEventListener("resize", fitSidebar);
 
 function runCard(r) {
   const li = document.createElement("li");
@@ -483,17 +622,32 @@ function runCard(r) {
     element("strong", formatDate(r.startedAt)),
     element("small", `${r.model} · ${r.effort} · ${plural(answers, "answer")}`),
   );
-  button.append(
+  // The triage numbers make runs comparable at a glance; the same phrase on
+  // every card carries no information.
+  const counts = triageCounts(r);
+  const human = r.results.filter(
+    (c) => c.reply && reviewFor(r, "human", keyOf(c)),
+  ).length;
+  const judging = judgingNow(r);
+  const summary = element("small");
+  summary.append(
     element(
-      "small",
-      pending
-        ? `${pending} need attention`
-        : answers
-          ? "Nothing needs attention"
-          : "No saved answers",
-      pending ? "todo" : answers ? "done" : "",
+      "span",
+      judging
+        ? "Judging now"
+        : pending
+          ? `${pending} need attention`
+          : answers
+            ? "Nothing needs attention"
+            : "No saved answers",
+      judging ? "judging" : pending ? "todo" : answers ? "done" : "",
     ),
   );
+  if (answers)
+    summary.append(
+      ` · ${counts.cleared} LLM-cleared · ${human} human-reviewed`,
+    );
+  button.append(summary);
   button.addEventListener("click", () => {
     if (selectedRun !== r.run) {
       selectedRun = r.run;
@@ -505,12 +659,36 @@ function runCard(r) {
   li.append(button);
   return li;
 }
+// A live run in progress sits at the top of the list. Its answers and
+// judgments are saved when the runner finishes, so only scope and time are
+// known until then.
+function runningCard() {
+  const li = document.createElement("li");
+  const card = element("div", "", "run-card running");
+  card.setAttribute("role", "status");
+  const duration = element("small", elapsed(state.active));
+  duration.dataset.started = state.active.startedAt;
+  card.append(
+    element("strong", "Running now"),
+    element(
+      "small",
+      `${scopeOf(state.active) || "Live agent evals"} · answers are saved when the run finishes`,
+    ),
+    duration,
+  );
+  li.append(card);
+  return li;
+}
 function renderRuns() {
   const active = state.reports.filter((r) => !r.archived);
   const archived = state.reports.filter((r) => r.archived);
   const focused = document.activeElement?.dataset.run;
-  $("run-list").replaceChildren(...active.map(runCard));
-  $("no-active-runs").hidden = active.length > 0;
+  const live = state.active?.suite === "live";
+  $("run-list").replaceChildren(
+    ...(live ? [runningCard()] : []),
+    ...active.map(runCard),
+  );
+  $("no-active-runs").hidden = live || active.length > 0;
   $("archived-runs").hidden = !archived.length;
   $("archived-count").textContent = `(${archived.length})`;
   $("archived-list").replaceChildren(...archived.map(runCard));
@@ -552,6 +730,10 @@ function renderAnswerList(saved, ordered, shown) {
     : answerFilter === "attention"
       ? "Nothing needs attention. Open Cleared to spot-check the judge, or All to browse."
       : "No answers match this filter.";
+  $("filter-note").hidden = !autoAll;
+  $("filter-note").textContent = autoAll
+    ? "Nothing needs attention, so all answers are shown."
+    : "";
   if (focusedCase)
     document
       .querySelector(`.answer-open[data-case-key="${CSS.escape(focusedCase)}"]`)
@@ -632,14 +814,7 @@ function renderRunHeader(saved, shown) {
   $("archive-error").hidden = !saved.archiveError;
   // One bar for the whole run: what still needs attention, what the judge
   // cleared, what you graded.
-  const counts = {
-    failures: 0,
-    "needs-review": 0,
-    "needs-judge": 0,
-    cleared: 0,
-    reviewed: 0,
-  };
-  for (const c of saved.results) counts[triageFor(saved, c).status]++;
+  const counts = triageCounts(saved);
   const segments = {
     failures: "failures",
     review: "needs-review",
@@ -656,9 +831,16 @@ function renderRunHeader(saved, shown) {
   const humanReviewed = saved.results.filter(
     (c) => c.reply && reviewFor(saved, "human", keyOf(c)),
   ).length;
+  const judging = judgingNow(saved);
   const parts = [
     attention ? `${attention} need attention` : "Nothing needs attention",
   ];
+  if (judging) {
+    const done = [...judging].filter(
+      (key) => saved.triage[key] && saved.triage[key].status !== "needs-judge",
+    ).length;
+    parts.unshift(`Judging now · ${done} of ${judging.size} judged`);
+  }
   if (counts.cleared) parts.push(`${counts.cleared} LLM-cleared`);
   parts.push(`${humanReviewed} of ${answers} human-reviewed`);
   const compared = saved.results
@@ -672,6 +854,13 @@ function renderRunHeader(saved, shown) {
     ? parts.join(" · ")
     : "No answers to review";
   $("progress-bar").setAttribute("aria-label", $("progress-text").textContent);
+  // The runner's exit status lives under Run checks; the one failure that says
+  // nothing about the answers is worth repeating here.
+  $("run-notice").hidden = saved.sourcesUnchanged !== false;
+  $("run-notice").textContent =
+    saved.sourcesUnchanged === false
+      ? "Source files changed while this run was in progress, so the runner reported a failure. The answers were saved and are reviewable; treat the run as a mixed-code baseline."
+      : "";
 }
 
 function renderAnswer(saved, ordered, shown) {
@@ -685,18 +874,21 @@ function renderAnswer(saved, ordered, shown) {
   $("triage-chip").className = `chip ${triageKinds[triage.status]}`;
   const agrees = agreement(saved, current);
   const llmVerdict = reviewFor(saved, "llm", key)?.verdict;
+  const judging = judgingNow(saved);
   $("triage-reason").textContent =
     triage.status === "cleared"
       ? "Current judge policy and recorded code checks passed. Not human-approved."
-      : triage.status === "needs-judge" || triage.label === "Failed checks"
-        ? triage.reason
-        : agrees === true
-          ? "The judge agrees with your verdict."
-          : agrees === false
-            ? `The judge said ${VERDICTS[llmVerdict][0].toLowerCase()}; your verdict wins.`
-            : triage.status === "reviewed"
-              ? "Not judged by the LLM under the current policy."
-              : "See the judgment and verdict below for the supporting evidence.";
+      : triage.status === "needs-judge" && judging?.has(key)
+        ? "The judge is working through this run now; this answer is still in its queue."
+        : triage.status === "needs-judge" || triage.label === "Failed checks"
+          ? triage.reason
+          : agrees === true
+            ? "The judge agrees with your verdict."
+            : agrees === false
+              ? `The judge said ${VERDICTS[llmVerdict][0].toLowerCase()}; your verdict wins.`
+              : triage.status === "reviewed"
+                ? "Not judged by the LLM under the current policy."
+                : "See the judgment and verdict below for the supporting evidence.";
   const index = shown.findIndex((c) => keyOf(c) === key);
   $("answer-position").textContent =
     index >= 0 ? `${index + 1} of ${shown.length}` : "";
@@ -774,7 +966,11 @@ function renderAnswer(saved, ordered, shown) {
     ...checks.map(([name, ok]) => element("li", name, ok ? "" : "failed")),
   );
   $("state").textContent = JSON.stringify(
-    { before: current.before, after: current.after },
+    {
+      before: current.before,
+      after: current.after,
+      nativeEvidence: current.nativeEvidence,
+    },
     null,
     2,
   );
@@ -946,8 +1142,14 @@ document.addEventListener("keydown", (event) => {
 for (const button of document.querySelectorAll(".filters button"))
   button.addEventListener("click", () => {
     answerFilter = button.dataset.filter;
+    autoAll = false;
     renderReview();
   });
+$("show-all").addEventListener("click", () => {
+  answerFilter = "all";
+  autoAll = false;
+  renderReview();
+});
 
 async function start(input) {
   try {
@@ -1093,6 +1295,7 @@ document.addEventListener("click", (event) => {
 });
 window.addEventListener("popstate", renderPage);
 $("empty-choose").addEventListener("click", () => $("eval-picker").showModal());
+$("run-new-evals").addEventListener("click", runNewEvals);
 $("rerun-case").addEventListener("click", () =>
   requestRun({ suite: "live", cases: [record().caseId], repeats: 1 }),
 );
@@ -1187,7 +1390,7 @@ function initializeEvalSelector() {
     const open = new Map(
       Array.from($("eval-options").children).map((group) => [
         group.dataset.category,
-        group.open,
+        group.querySelector("details").open,
       ]),
     );
     evalCatalogSignature = signature;
@@ -1199,31 +1402,30 @@ function initializeEvalSelector() {
         const items = state.evalCases.filter(
           (item) => (item.category || "Other") === category,
         );
-        const group = element("details", "", "eval-category");
+        const group = element("div", "", "eval-category");
         group.dataset.category = category;
-        group.open =
+        // The checkbox sits beside the disclosure, outside the <details>, so a
+        // collapsed group is picked in one click without toggling it open.
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "category-check";
+        check.setAttribute("aria-label", `Select all cases in ${category}`);
+        check.addEventListener("change", () => {
+          for (const input of visibleCaseInputs(group))
+            input.checked = check.checked;
+          evalSelectionEdited = true;
+          updateSelections();
+        });
+        const panel = element("details", "", "category-details");
+        panel.open =
           open.get(category) ?? items.some((item) => item.hasRun === false);
         const summary = element("summary");
         summary.append(
           element("strong", category),
           element("span", "", "category-count"),
         );
-        const select = element(
-          "button",
-          "Select category",
-          "text-button category-select",
-        );
-        select.type = "button";
-        select.addEventListener("click", () => {
-          const inputs = Array.from(
-            group.querySelectorAll('input[type="checkbox"]'),
-          );
-          const checked = !inputs.every((input) => input.checked);
-          for (const input of inputs) input.checked = checked;
-          evalSelectionEdited = true;
-          updateSelections();
-        });
-        group.append(summary, select);
+        panel.append(summary);
+        group.append(check, panel);
         for (const item of items) {
           const row = element("div", "", "selection-option eval-option");
           row.dataset.caseId = item.id;
@@ -1250,7 +1452,7 @@ function initializeEvalSelector() {
             element("p", item.message, "case-input"),
           );
           row.append(label, details);
-          group.append(row);
+          panel.append(row);
         }
         return group;
       }),
@@ -1258,7 +1460,7 @@ function initializeEvalSelector() {
   }
   const inputs = new Map(
     Array.from(
-      $("eval-options").querySelectorAll('input[type="checkbox"]'),
+      $("eval-options").querySelectorAll('.eval-option input[type="checkbox"]'),
     ).map((input) => [input.value, input]),
   );
   for (const item of state.evalCases) {
@@ -1266,20 +1468,16 @@ function initializeEvalSelector() {
     if (!input) continue;
     if (!evalSelectionEdited) input.checked = item.hasRun === false;
     const badge = input.closest(".eval-option").querySelector(".case-history");
-    badge.textContent =
-      item.hasRun === false
-        ? "Not run"
-        : item.hasRun
-          ? "Run before"
-          : "History unavailable";
+    badge.textContent = lastAttemptLabel(item);
+    badge.classList.toggle("failed", failedLastTime(item));
   }
   const unrun = state.evalCases.filter((item) => item.hasRun === false).length;
   $("eval-history").textContent =
-    (state.apiVersion ?? 0) < 5
+    (state.apiVersion ?? 0) < REQUIRED_API
       ? "Restart the dashboard to load saved run history."
       : unrun
         ? `${plural(unrun, "case")} not run yet. Only unrun cases are selected by default.`
-        : "All cases have been run. Select a category or individual cases to run again.";
+        : "All cases have been run. Pick a category, the cases that failed last time, or individual cases to run again.";
   filterEvalCases();
 }
 function filterEvalCases() {
@@ -1297,14 +1495,33 @@ function filterEvalCases() {
       if (!row.hidden) visible++;
     }
     group.hidden = !visible;
-    if (query && visible) group.open = true;
+    if (query && visible) group.querySelector("details").open = true;
     matches += visible;
   }
   $("eval-no-matches").hidden = matches > 0;
+  updateCategoryChecks();
+}
+function visibleCaseInputs(group) {
+  return Array.from(
+    group.querySelectorAll('.eval-option:not([hidden]) input[type="checkbox"]'),
+  );
+}
+// The category checkbox and count describe the rows currently shown, so a
+// search narrows what one click selects.
+function updateCategoryChecks() {
+  for (const group of $("eval-options").children) {
+    const inputs = visibleCaseInputs(group);
+    const selected = inputs.filter((input) => input.checked).length;
+    group.querySelector(".category-count").textContent =
+      `${selected} / ${inputs.length} selected`;
+    const check = group.querySelector(".category-check");
+    check.checked = inputs.length > 0 && selected === inputs.length;
+    check.indeterminate = selected > 0 && selected < inputs.length;
+  }
 }
 function selectedOptions(prefix) {
   return Array.from(
-    $(`${prefix}-options`).querySelectorAll("input:checked"),
+    $(`${prefix}-options`).querySelectorAll(".selection-option input:checked"),
   ).map((input) => input.value);
 }
 function updateSelections() {
@@ -1317,25 +1534,44 @@ function updateSelections() {
     `${plural(cases, "case")} × ${plural(repeats, "repetition")} = ${plural(cases * repeats, "planned answer")}`;
   $("run-journeys").disabled = Boolean(state.active) || !journeys;
   $("run-evals").disabled = Boolean(state.active) || !cases;
-  const unavailable = (state.apiVersion ?? 0) < 5;
+  const unavailable = (state.apiVersion ?? 0) < REQUIRED_API;
   if (unavailable) $("run-evals").disabled = true;
-  for (const group of $("eval-options").children) {
-    const inputs = Array.from(group.querySelectorAll('input[type="checkbox"]'));
-    const selected = inputs.filter((input) => input.checked).length;
-    group.querySelector(".category-count").textContent =
-      `${selected} / ${inputs.length} selected`;
-    const button = group.querySelector(".category-select");
-    const action = selected === inputs.length ? "Clear" : "Select";
-    button.textContent = `${action} category (${inputs.length})`;
-    button.setAttribute("aria-label", `${action} ${group.dataset.category}`);
-  }
+  updateCategoryChecks();
   for (const picker of ["journey-picker", "eval-picker"])
     for (const control of $(picker).querySelectorAll(
-      "input,select,.selection-actions button,.category-select",
+      "input,select,.selection-actions button",
     ))
       control.disabled =
         Boolean(state.active) || (picker === "eval-picker" && unavailable);
+  const failed = state.evalCases.filter(failedLastTime).length;
+  const changed = state.evalCases.filter(rubricChanged).length;
+  $("evals-failed").textContent = `Select failed last time (${failed})`;
+  if (!failed) $("evals-failed").disabled = true;
+  $("evals-changed").textContent = `Select rubric changed (${changed})`;
+  if (!changed) $("evals-changed").disabled = true;
 }
+// History-based presets beside "Select unrun": what failed last time, and
+// what has a changed rubric since it last ran.
+function selectCasesWhere(predicate) {
+  evalSelectionEdited = true;
+  for (const input of $("eval-options").querySelectorAll(
+    '.eval-option input[type="checkbox"]',
+  ))
+    input.checked = predicate(
+      state.evalCases.find((item) => item.id === input.value),
+    );
+  for (const group of $("eval-options").children)
+    group.querySelector("details").open = Boolean(
+      group.querySelector(".eval-option input:checked"),
+    );
+  updateSelections();
+}
+$("evals-failed").addEventListener("click", () =>
+  selectCasesWhere(failedLastTime),
+);
+$("evals-changed").addEventListener("click", () =>
+  selectCasesWhere(rubricChanged),
+);
 for (const [prefix, buttons] of [
   ["journey", "journeys"],
   ["eval", "evals"],
@@ -1352,7 +1588,9 @@ $("evals-unrun").addEventListener("click", () => {
   evalSelectionEdited = false;
   initializeEvalSelector();
   for (const group of $("eval-options").children)
-    group.open = Boolean(group.querySelector("input:checked"));
+    group.querySelector("details").open = Boolean(
+      group.querySelector(".eval-option input:checked"),
+    );
   updateSelections();
 });
 $("eval-search").addEventListener("input", filterEvalCases);

@@ -104,15 +104,17 @@ describe("GitHub eval scenarios use real local state with no GitHub or model cal
         scenario.message,
       );
       const input = mocks.askPi.mock.calls[0][0];
-      expect(input.viewSummary).toContain(JSON.stringify(check.result));
-      expect(input.viewSummary).toContain(`${check.label}=${check.status}`);
-      expect(input.viewSummary).not.toContain("ghu_");
-      expect(input.viewSummary).not.toContain("previous-eval-user");
+      const summary = JSON.parse(input.runContext).currentApplication;
+      expect(summary).toContain(JSON.stringify(check.result));
+      expect(summary).toContain(`${check.label}=${check.status}`);
+      expect(summary).not.toContain("ghu_");
+      expect(summary).not.toContain("previous-eval-user");
       if (scenario.githubState === "reconnected") {
-        expect(input.messages.at(-1)?.body).toContain(
+        expect(before.messages.at(-1)?.body).toContain(
           "All four Launch Brief checks passed",
         );
-        expect(input.viewSummary).not.toContain("readable at main");
+        expect(input).not.toHaveProperty("messages");
+        expect(summary).not.toContain("readable at main");
       }
       expect(
         Object.values(

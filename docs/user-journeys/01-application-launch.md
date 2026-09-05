@@ -81,7 +81,7 @@ current Launch Phase
 
 | Phase | Phase Deliverable | Engineer experience | Pi and Server Guy behavior |
 | --- | --- | --- | --- |
-| **1. Start** | **Launch Brief** | Selects the repository, Environment, and Approval Mode; sees later prerequisites without treating them as current blockers. | Creates the Application record and thin Phase Workspace, observes repository access, and derives the four Phase 1 Gate Checks. |
+| **1. Start** | **Launch Brief** | Selects the repository, Environment, and Approval Mode; sees only the four current Gate Checks and recognized Decisions, not later infrastructure prerequisites. | Creates the Application record and thin Phase Workspace, observes repository access, and derives the four Phase 1 Gate Checks. |
 | **2. Inspect app** | **Application Contract** | Watches Pi inspect the repository, sees provenance, and corrects unsupported assumptions. | Resolves an Application Profile, constructs the app-level contract, and keeps unknowns and incompatibilities visible. |
 | **3. Make launch-ready** | **Conformance Result** | Reviews required repository work and can use Pi, Codex, Claude, another harness, or manual work under the same bounded brief. | Tracks one exact candidate revision, preserves worker evidence separately, and runs profile checks against the returned result. |
 | **4. Review launch plan** | **Launch Plan** | Reviews topology, cost, actors, effects, verification, and material risks before paid or account-level work. | Revises the plan when evidence changes and keeps VPS and domain operations separate. |
@@ -166,7 +166,7 @@ These states are presentation inventory inside the fixed phases. They are not wo
 | ID | Mockup state | Operator View must show | Chat with Pi must show | Engineer action | Journey source |
 | --- | --- | --- | --- | --- | --- |
 | L1.1 | Start launch | Repository selector, production environment, Approval Mode, short operating-intent fields | Why these inputs matter and any ambiguity Pi notices | Select and describe | §User journey phase 1; §Starting state |
-| L1.2 | Prerequisites visible | GitHub, Hetzner, Cloudflare, and domain starting-state checks with missing/available provenance | The smallest next prerequisite and what can still be inspected now | Connect, defer, or correct | §Starting state; §Important alternate paths |
+| L1.2 | GitHub connection needed | The GitHub connection state in Settings and the repository-readable check with its provenance; Hetzner, Cloudflare and domain prerequisites are not shown until their phases | The smallest next step to make the repository readable and what can still be inspected now | Connect GitHub, defer, or correct | §User journey phase 1; §Important alternate paths: provider access missing |
 | L1.3 | Workspace created | Application identity, authority context, durable Chat, next phase | Pi's initial understanding and intent to inspect | Continue or correct identity | §User journey phase 1 |
 | L2.1 | Repository inspection | Live inspection activity, detected stack facts, unknowns, and provenance badges | Pi narrates its current hypothesis without claiming certainty | Ask or correct while inspection runs | §User journey phase 2; §Operator UI bullets 1–2 |
 | L2.2 | Contract review | Application Profile match, Application Contract fields grouped as repository-declared, inferred, user-confirmed, or unknown | Pi explains the proposed contract and the material unknowns | Confirm or correct fields | §User journey phase 2; §Evidence produced |
@@ -371,7 +371,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 ## Phase 1 — Start
 
-**Phase Deliverable:** **Launch Brief** — application identity, repository, target environment, and Approval Mode. Later infrastructure prerequisites remain visible as upcoming requirements, not Phase 1 Gate Checks.
+**Phase Deliverable:** **Launch Brief** — application identity, repository, target environment, and Approval Mode. Later infrastructure prerequisites are not Phase 1 Gate Checks and are not shown in Phase 1; each appears in the phase that needs it. Decided 2026-09-05, when the Record sidebar's server/domain reminders were removed.
 
 ### P1.G1. Application identity recorded
 

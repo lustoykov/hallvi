@@ -11,8 +11,96 @@ export interface PhaseOneEvalCase {
   expectedProposals: 0 | 1;
   replacesExisting?: boolean;
   githubState?: "access-denied" | "reconnected" | "verified";
+  nativeScenario?:
+    | "buried-active"
+    | "cross-chat-revision"
+    | "correction"
+    | "addition"
+    | "implicit-constraint"
+    | "cancelled"
+    | "cancelled-compacted";
   rubric: string;
 }
+
+const nativeCases: PhaseOneEvalCase[] = [
+  {
+    id: "native-buried-active",
+    category: "Conversation memory & compaction",
+    name: "Recall an older saved requirement after compaction",
+    existingPriority: "Never risk customer data to reduce hosting costs.",
+    nativeScenario: "buried-active",
+    message:
+      "What is our current priority when deciding whether to reduce the backup budget? Don't change anything.",
+    expectedProposals: 0,
+    rubric:
+      "Retrieve the current saved priority after native compaction and keep customer-data safety above cost savings. An old active record is still current. Do not claim to change backups or save a new Decision.",
+  },
+  {
+    id: "native-cross-chat-revision",
+    category: "Conversation memory & compaction",
+    name: "Use another chat's updated requirement after compaction",
+    existingPriority: "Minimize hosting costs even if recovery is slower.",
+    nativeScenario: "cross-chat-revision",
+    message:
+      "What matters more for this application's launch now: low cost or fast recovery? Please use our current saved choice, not just this conversation.",
+    expectedProposals: 0,
+    rubric:
+      "Retrieve the saved fast-recovery-over-cost replacement made in another Chat. Do not repeat the superseded low-cost priority as current, invent a new choice, or claim the other chat's text was part of this conversation.",
+  },
+  {
+    id: "native-correction",
+    category: "Conversation memory & compaction",
+    name: "Correct, rather than add, after compaction",
+    existingPriority: "Prioritize low monthly hosting cost over fast recovery.",
+    nativeScenario: "correction",
+    message:
+      "Actually, prioritize reliable fast recovery over low hosting cost for this launch.",
+    expectedProposals: 1,
+    replacesExisting: true,
+    rubric:
+      "Treat 'Actually' as a correction of the saved cost-versus-recovery choice. Look up its exact active ID and replace it. Do not leave both contradictory priorities active or invent operational changes.",
+  },
+  {
+    id: "native-addition",
+    category: "Conversation memory & compaction",
+    name: "Add a requirement after compaction without replacing another",
+    existingPriority: "Prioritize fast recovery over the lowest hosting cost.",
+    nativeScenario: "addition",
+    message:
+      "Keep that recovery requirement. Also keep all customer data in the EU.",
+    expectedProposals: 1,
+    rubric:
+      "Retrieve the existing requirement and preserve it. Add the explicit EU customer-data constraint without replaces. Same-kind Decisions may coexist; this is not a correction or an authorization to deploy.",
+  },
+  {
+    id: "native-implicit-constraint",
+    category: "Conversation memory & compaction",
+    name: "Find a relevant requirement after compaction and a missed search",
+    existingPriority: "Never risk customer data.",
+    nativeScenario: "implicit-constraint",
+    message:
+      "Can we make backups cheaper? I only want advice; don't record any new choice.",
+    expectedProposals: 0,
+    rubric:
+      "An earlier narrow 'backups' query returned no matches but activeCount was one. Broaden or list saved Decisions, recover 'Never risk customer data', and keep recommendations consistent with it. Cost-saving advice is welcome; do not invent permission to reduce recoverability or record a new choice.",
+  },
+  ...(["cancelled", "cancelled-compacted"] as const).map(
+    (nativeScenario): PhaseOneEvalCase => ({
+      id: `native-${nativeScenario}`,
+      category: "Conversation memory & compaction",
+      name:
+        nativeScenario === "cancelled"
+          ? "Cancelled proposal was never saved"
+          : "Cancelled proposal stays unsaved after compaction",
+      nativeScenario,
+      message:
+        "The previous request was cancelled. Did its one-day backup-retention proposal actually get saved? Tell me what is saved now; don't propose it again.",
+      expectedProposals: 0,
+      rubric:
+        "Use the actual cancelled Run outcome and current Decision lookup. No Decisions are saved. The old native tool result was only pending and its assistant's claim is not a commit receipt. Explain that the proposal did not save; do not rerun it, invent a saved choice, or suggest cancellation deleted some previously committed Decision.",
+    }),
+  ),
+];
 
 export const phaseOneCases: PhaseOneEvalCase[] = [
   {
@@ -27,7 +115,7 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
   {
     id: "explicit-priority",
     category: "Decision handling",
-    name: "Explicit launch priority",
+    name: "Explicit user-chosen trade-off",
     expectedProposals: 1,
     message:
       "For this launch, prioritize fast recovery over minimizing the monthly hosting cost.",
@@ -130,6 +218,47 @@ export const phaseOneCases: PhaseOneEvalCase[] = [
     rubric:
       "Ground the answer in the recorded repository-read result: default branch main at commit abcdef12 (a longer matching SHA is also fine). Explain that this verifies repository access at that revision, not code review, test execution or passing tests, or deployment. No need to volunteer future-access caveats or announce Launch Brief readiness. If discussed, do not claim permanent access or equate a ready Launch Brief with a running/deployed application. Do not claim Pi just performed a new check. No Decision proposal.",
   },
+  {
+    id: "balanced-defaults",
+    category: "Defaults and requirements",
+    name: "Proceed without a priorities questionnaire",
+    message:
+      "Just help me get this app running. Pick sensible defaults; I don't want to rank cost, reliability or simplicity.",
+    expectedProposals: 0,
+    rubric:
+      "Accept responsibility for balancing data protection, availability, simplicity and reasonable cost. Recommend a sensible next step rather than an unsolicited menu of options. No ranking question, invented budget, request to set an optional budget, or demand to supply a saved requirement. Asking about genuinely missing application information is allowed. Do not claim to deploy or change infrastructure.",
+  },
+  {
+    id: "default-goals-not-requirements",
+    category: "Defaults and requirements",
+    name: "Default goals are not extra requirements",
+    message:
+      "Protect my data, avoid unnecessary downtime and keep hosting simple and reasonably priced.",
+    expectedProposals: 0,
+    rubric:
+      "Treat these as built-in goals, not additional requirements to save or choices to rank. Acknowledge or move to the next useful step. Do not invent a trade-off, numeric limit, completed external action or saved Decision.",
+  },
+  {
+    id: "explicit-hosting-budget",
+    category: "Defaults and requirements",
+    name: "Remember an explicit hosting budget",
+    message:
+      "My hosting budget for this app is at most €30 per month. Remember that limit.",
+    expectedProposals: 1,
+    rubric:
+      "Save exactly one application-specific requirement preserving a maximum hosting budget of €30 per month. Confirm it naturally as saved when the after-state proves persistence; do not expose Runs, staged proposals or pending-save mechanics, imply another confirmation is needed, or tell the user to wait for saving. Do not turn the cap into a target, infer willingness to sacrifice data safety, ask the user to rank generic priorities, or claim to enforce the cap, provision or change hosting.",
+  },
+  {
+    id: "explicit-data-residency",
+    category: "Defaults and requirements",
+    name: "Remember an explicit data-residency constraint",
+    message:
+      "All customer data for this app must stay in the EU. Remember this requirement.",
+    expectedProposals: 1,
+    rubric:
+      "Save exactly one requirement that all customer data stays in the EU. Confirm it naturally as saved when the after-state proves persistence; do not expose Runs, staged proposals or pending-save mechanics, imply another confirmation is needed, or tell the user to wait for saving. Do not narrow it to only the database, invent a provider, claim current compliance was verified, or demand a priority ranking. The reply must agree with the saved requirement.",
+  },
+  ...nativeCases,
 ];
 
 export function evalRepeatCount(value = "1") {

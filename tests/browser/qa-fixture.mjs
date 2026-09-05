@@ -2,7 +2,13 @@
 // adapters.
 // Never copies .server-guy, .env files, or credentials from the source
 // checkout.
-import { cpSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  writeFileSync,
+  symlinkSync,
+  renameSync,
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
@@ -62,9 +68,13 @@ for (const name of [
   cpSync(join(source, name), join(app, name), { recursive: true });
 }
 symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
+renameSync(
+  join(app, "src/server/pi-configuration.ts"),
+  join(app, "src/server/pi-configuration-real.ts"),
+);
 cpSync(
-  join(source, "tests/browser-fixtures/pi.ts.txt"),
-  join(app, "src/server/pi.ts"),
+  join(source, "tests/browser-fixtures/pi-configuration.ts.txt"),
+  join(app, "src/server/pi-configuration.ts"),
 );
 cpSync(
   join(source, "tests/browser-fixtures/github-api.ts.txt"),
@@ -168,7 +178,7 @@ const manifest = {
   initialSetup,
   database: env.SERVER_GUY_DB_PATH,
   externalAdapters:
-    "Pi turn and GitHub API/credentials are synthetic; ChatGPT OAuth " +
+    "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials are synthetic. ChatGPT OAuth " +
     loginMode +
     " and GitHub device flow are simulated without provider calls",
 };

@@ -62,6 +62,7 @@ export const chats = sqliteTable("chats", {
     .default(false),
   createdAt: text("created_at").notNull(),
   archivedAt: text("archived_at"),
+  nativeSessionId: text("native_session_id"),
 });
 
 export const messages = sqliteTable(

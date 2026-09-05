@@ -16,7 +16,7 @@ test(
       timeout: 30_000,
     });
     const composer = page.getByRole("textbox", {
-      name: "Message Pi",
+      name: "Message Server Guy",
       exact: true,
     });
     await composer.fill("Main chat draft");
@@ -33,11 +33,11 @@ test(
       /^[\da-f-]{36}$/,
     );
     await page
-      .getByRole("button", { name: /Pi Launch Brief Main phase chat/ })
+      .getByRole("button", { name: /SG Launch Brief Main phase chat/ })
       .click();
     await expect(composer).toHaveValue("Main chat draft");
     await page
-      .getByRole("button", { name: /Pi Launch question 2 Separate transcript/ })
+      .getByRole("button", { name: /SG Launch question 2 Separate transcript/ })
       .click();
     await expect(composer).toHaveValue("Separate chat draft");
     await composer.press("Enter");
@@ -72,7 +72,7 @@ test(
       .getByRole("button", { name: "Archive chat", exact: true })
       .click();
     const archivedChat = page.getByRole("button", {
-      name: /Pi Launch question 2 Separate transcript Archived/,
+      name: /SG Launch question 2 Separate transcript Archived/,
     });
     await archivedChat.click();
     await expect(composer).toBeDisabled();
@@ -95,7 +95,7 @@ test(
       .getByRole("button", { name: /Check 1 Application details/ })
       .click();
     await page
-      .getByRole("button", { name: "Ask Pi about this check", exact: true })
+      .getByRole("button", { name: "Ask about this check", exact: true })
       .click();
     await expect(composer).toBeEnabled();
     await expect(composer).toBeFocused();
@@ -150,23 +150,26 @@ test(
     ).toHaveCount(0);
     const message = `priority: ${"reliability-".repeat(24)}`;
     await page
-      .getByRole("textbox", { name: "Message Pi", exact: true })
+      .getByRole("textbox", { name: "Message Server Guy", exact: true })
       .fill(message);
     await page
-      .getByRole("textbox", { name: "Message Pi", exact: true })
+      .getByRole("textbox", { name: "Message Server Guy", exact: true })
       .dispatchEvent("keydown", {
         key: "Enter",
         code: "Enter",
         isComposing: true,
       });
     await expect(
-      page.getByRole("textbox", { name: "Message Pi", exact: true }),
+      page.getByRole("textbox", { name: "Message Server Guy", exact: true }),
     ).toHaveValue(message);
     await expect(page.getByText("Pending", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
       page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
     ).toBeVisible();
+    // Saved requirements sit behind a closed disclosure; open it once, then
+    // check the long value fits at both desktop widths.
+    await page.getByText(/^Saved requirements \(1\)$/).click();
     for (const width of [1440, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(page.locator(".sg-decision-list strong")).toBeVisible();

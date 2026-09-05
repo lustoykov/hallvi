@@ -22,7 +22,24 @@ async function view(page: Page) {
 }
 async function send(page: Page, message: string) {
   await page.getByRole("textbox").fill(message);
-  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const applicationUrl = new URL(page.url());
+  // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
+  const [accepted] = await Promise.all([
+    page.waitForResponse(
+      (response) => {
+        const url = new URL(response.url());
+        return (
+          response.request().method() === "POST" &&
+          url.origin === applicationUrl.origin &&
+          url.pathname.startsWith(`/api${applicationUrl.pathname}/chats/`) &&
+          /\/chats\/[\da-f-]{36}\/messages$/.test(url.pathname)
+        );
+      },
+      { timeout: 30_000 },
+    ),
+    page.getByRole("button", { name: "Send", exact: true }).click(),
+  ]);
+  expect(accepted.status()).toBe(202);
   await expect(
     page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
   ).toBeVisible();
@@ -70,8 +87,8 @@ test(
     await expect(
       page.getByRole("button", { name: "Cancel request" }),
     ).toBeVisible();
-    await expect(page.locator(".sg-run-progress strong")).toHaveText(
-      "Reply in progress…",
+    await expect(page.locator(".sg-run-progress")).toContainText(
+      "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(page.getByRole("textbox")).toBeEnabled();
@@ -93,8 +110,8 @@ test(
     ).toBeVisible();
     await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
-    await expect(page.locator(".sg-run-progress details strong")).toHaveText(
-      "Reply in progress…",
+    await expect(page.locator(".sg-run-progress details")).toContainText(
+      "[QA fixture reply]",
     );
     await page.getByText("Show unfinished draft", { exact: true }).click();
     await page.screenshot({
@@ -128,6 +145,7 @@ test(
       path: testInfo.outputPath("durable-retried-reply.png"),
       fullPage: true,
     });
+    await send(page, "Continue after cancellation");
   },
 );
 
@@ -135,9 +153,9 @@ test(
   "P1-04/06 add an application, record a priority, reload",
   journey("add-application"),
   async ({ page }) => {
-    // This first journey compiles the dev routes; CI spent ~60s before its
-    // final state check.
-    test.setTimeout(90_000);
+    // Cold CI navigation took ~60s; leave room for 30s HTTP acceptance and the
+    // unchanged 10s reply assertion, plus the final reload and state check.
+    test.setTimeout(120_000);
     await page.goto("/");
     await expect(page).toHaveURL(/\/applications$/);
     await addApplication(page, "smoke-app");
@@ -189,8 +207,10 @@ test(
     const before = await view(page);
     await page.getByRole("textbox").fill("Hello [fail-once]");
     await page.getByRole("button", { name: "Send", exact: true }).click();
+    // The pane shows one user-safe line for any failed attempt; the worker's
+    // exact error stays in the run record.
     await expect(
-      page.getByText(/Pi could not finish this attempt/),
+      page.getByText("Something went wrong. Please retry.", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("textbox")).toHaveValue("");
     await expect(
@@ -233,7 +253,7 @@ test(
 );
 
 test(
-  "P1-06/07 revision replaces exactly; fabricated replacement rolls back",
+  "P1-06/07 revision uses lookup; fabricated replacement returns a recoverable tool error",
   journey("revision"),
   async ({ page }) => {
     await addApplication(page, "revision-app");
@@ -247,7 +267,10 @@ test(
     await page.getByRole("textbox").fill("invalid-replacement: reject this");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
-      page.getByText(/Pi could not finish this attempt/),
+      page.getByText(
+        "[QA fixture reply] Replacement rejected; no Decision was staged.",
+        { exact: true },
+      ),
     ).toBeVisible();
     expect((await view(page)).messages).toHaveLength(
       revised.messages.length + 2,

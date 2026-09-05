@@ -16,10 +16,13 @@ python3 -m http.server 8765
 
 Then open `http://127.0.0.1:8765/docs/architecture/` and select the PR artifact.
 
-Current explanations:
+Each explanation is a snapshot of the architecture when its PR merged, not a living diagram; later PRs changed what earlier diagrams show (for example, PR #13 added the local Pi worker). The [README architecture section](../../README.md#architecture) describes the current shape.
 
-- [Journey 1 Phase 1 — current simplified architecture](pr-001-journey-1-phase-1.html)
+Explanations by PR, oldest first:
+
+- [Journey 1 Phase 1 — initial simplified architecture, before the local worker](pr-001-journey-1-phase-1.html)
 - [PR 7 — Pi contract evolution and Phase 1 boundary hardening](pr-007-phase-1-boundary-hardening.html)
 - [PR 8 — Drizzle over the existing SQLite persistence layer](pr-008-drizzle-sqlite.html)
 - [PR 9 — explicit Pi setup and fixed Phase 1 runtime](pr-009-explicit-pi-setup.html)
 - [PR 10 — real Pi evals, exact state checks and human meaning review](pr-010-phase-one-evals.html)
+- [PR 15 — native Pi conversation history versus saved Decisions](pr-015-native-pi-sessions.html)

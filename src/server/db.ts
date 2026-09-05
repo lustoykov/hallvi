@@ -63,6 +63,10 @@ function createDatabase(): ServerGuyDatabase {
     client.pragma("journal_mode = WAL");
     client.pragma("foreign_keys = ON");
     client.pragma("busy_timeout = 5000");
+    // SQLite's built-in lower() folds ASCII only. Decision text can be Unicode.
+    client.function("unicode_lower", { deterministic: true }, (value) =>
+      typeof value === "string" ? value.toLowerCase() : null,
+    );
     assertCurrentSchema(client, path);
     return drizzle({ client, schema });
   } catch (error) {
@@ -206,6 +210,20 @@ export function listChats(workspaceId: string) {
     .all();
 }
 
+// The chat list shows when each chat was last active: its newest message, or
+// its creation when nothing has been sent yet.
+export function listChatSummaries(workspaceId: string) {
+  return listChats(workspaceId).map((chat) => ({
+    ...chat,
+    lastActivityAt:
+      db()
+        .select({ at: sql<string | null>`max(${messages.createdAt})` })
+        .from(messages)
+        .where(eq(messages.chatId, chat.id))
+        .get()?.at ?? chat.createdAt,
+  }));
+}
+
 export function archiveChat(id: string) {
   db()
     .update(chats)
@@ -269,6 +287,22 @@ export function getDecision(id: string) {
   );
 }
 
+export function getActiveDecision(applicationId: string, id: string) {
+  return (
+    db()
+      .select()
+      .from(decisions)
+      .where(
+        and(
+          eq(decisions.id, id),
+          eq(decisions.applicationId, applicationId),
+          isNull(decisions.supersededById),
+        ),
+      )
+      .get() ?? null
+  );
+}
+
 export function listActiveDecisions(applicationId: string) {
   return db()
     .select()
@@ -296,14 +330,18 @@ export function supersedeDecision(
         eq(decisions.id, previousId),
         eq(decisions.applicationId, applicationId),
         isNull(decisions.supersededById),
+        sql`${decisions.id} <> ${replacementId}`,
+        sql`exists (select 1 from decisions as replacement where replacement.id = ${replacementId} and replacement.application_id = ${applicationId} and replacement.superseded_by_id is null)`,
       ),
     )
-    .run();
-  if (result.changes !== 1) {
+    .returning()
+    .get();
+  if (!result) {
     throw new Error(
       "The Decision being corrected is missing, already replaced, or belongs to another application.",
     );
   }
+  return result;
 }
 
 // Observations

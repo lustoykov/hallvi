@@ -1,7 +1,7 @@
 export const APPROVAL_MODES = {
   "pi-decides": {
-    label: "Pi decides",
-    hint: "Pi asks when the consequence warrants it.",
+    label: "Let Server Guy decide",
+    hint: "Server Guy asks when the consequence warrants it.",
   },
   "always-ask": {
     label: "Always ask",
@@ -55,6 +55,11 @@ export interface Chat {
   isPrimary: boolean;
   createdAt: string;
   archivedAt: string | null;
+}
+
+/** A chat as the list shows it: with the time of its newest message. */
+export interface ChatSummary extends Chat {
+  lastActivityAt: string;
 }
 
 export interface ChatMessage {
@@ -165,7 +170,7 @@ export interface UpcomingRequirement {
 export interface PhaseOneOperatorView {
   application: ApplicationRecord | null;
   workspace: PhaseWorkspaceView | null;
-  chats: Chat[];
+  chats: ChatSummary[];
   selectedChatId: string | null;
   messages: ChatMessage[];
   checks: GateCheck[];

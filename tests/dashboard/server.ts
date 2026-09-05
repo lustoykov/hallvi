@@ -26,7 +26,7 @@ import { guidePage, renderMarkdown } from "./markdown.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
-export const API_VERSION = 5;
+export const API_VERSION = 6;
 const currentRubrics = Object.fromEntries(
   phaseOneCases.map((item) => [item.id, item.rubric]),
 );
@@ -53,7 +53,7 @@ export const suites = [
     id: "e2e",
     name: "Browser journeys",
     command: "npm run test:e2e",
-    scope: `${browserJourneys.length} selectable journeys · simulated Pi, GitHub and login`,
+    scope: `${browserJourneys.length} selectable journeys · native Pi SDK, synthetic model and services`,
     cost: "No AI calls",
     ci: `${browserJourneys.filter((journey) => journey.smoke).length} of ${browserJourneys.length} per PR`,
     ciDetail: `All ${browserJourneys.length} on demand`,
@@ -226,10 +226,6 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     if (active)
       throw new Error("A check is already running. Wait for it to finish.");
     const command = commandFor(input);
-    const previousReports =
-      input.suite === "live"
-        ? new Set(listReports(root).map((report) => report.run))
-        : null;
     if (input.suite === "judge")
       for (const key of input.keys ?? [input.key!])
         findCase(root, input.run!, input.hash!, key);
@@ -333,24 +329,56 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       run.exitCode = code;
       run.finishedAt = new Date().toISOString();
       if (paid) {
-        const noReport =
-          previousReports &&
-          !listReports(root).some((report) => !previousReports.has(report.run));
+        // Same match as the judge handoff: the report this run wrote starts
+        // after the dashboard run did.
+        const saved = listReports(root).find(
+          (report) => report.startedAt >= run.startedAt,
+        );
         run.log =
           code === 0
             ? "Run completed. Open Eval runs to inspect answers and judgments. Runner completion is not semantic acceptance.\n"
-            : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${noReport ? "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made." : "Earlier saved answers and verdicts remain; remaining items may not have run."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
+            : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${saved ? failureSummary(saved) : "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
       }
       writeJson(path, run);
       active = null;
       child = null;
       cancelActive = null;
-      if (input.suite === "live" && input.judgeAfter && code === 0)
+      // Saved answers are judged even when the runner exited non-zero: a
+      // failed check or a source change mid-run is not a reason to leave the
+      // answers unjudged. A stopped run is the user's call and stays as is.
+      if (
+        input.suite === "live" &&
+        input.judgeAfter &&
+        run.status !== "cancelled"
+      )
         judgeAfterRun(run, path, input);
     };
     child.on("error", () => finish(null));
     child.on("close", finish);
     return run;
+  }
+  // What a non-zero exit meant for the answers: the runner's own output is
+  // hidden, so say what was saved, what failed its checks, and whether the
+  // sources changed under it.
+  function failureSummary(report: ReturnType<typeof listReports>[number]) {
+    const planned = report.plannedCases ?? report.results.length;
+    const answered = report.results.filter((record) => record.reply).length;
+    const failed = report.results.filter(
+      (record) =>
+        record.outcome === "checks-failed" || record.outcome === "run-error",
+    ).length;
+    const parts = [
+      `${answered} of ${planned} planned answers were saved`,
+      failed
+        ? `${failed} failed their checks or errored`
+        : answered
+          ? "all of them passed their checks"
+          : "",
+      report.sourcesUnchanged === false
+        ? "source files changed while it ran, so the runner refused to call it a clean baseline"
+        : "",
+    ].filter(Boolean);
+    return `${parts.join("; ")}. The saved answers are reviewable under Eval runs.`;
   }
   // The one confirmation for a live run also covers judging its answers with
   // the same model once they are saved.
@@ -479,6 +507,33 @@ export function createDashboard(root: string, launch: Launch = spawn) {
               .map((record) => record.caseId),
           ),
         );
+        // The newest attempt of each case, summarised for the picker: its
+        // triage status, when it ran, and whether the rubric wording has
+        // changed since. Reports are newest first.
+        const lastAttempt = (item: (typeof phaseOneCases)[number]) => {
+          for (const report of reports) {
+            const records = report.results.filter(
+              (record) =>
+                record.caseId === item.id && record.outcome !== "not-run",
+            );
+            if (!records.length) continue;
+            const statuses = records.map(
+              (record) => report.triage[caseKey(record)].status,
+            );
+            return {
+              run: report.run,
+              startedAt: report.startedAt,
+              status:
+                ["failures", "needs-review", "needs-judge", "reviewed"].find(
+                  (status) => statuses.includes(status),
+                ) ?? "cleared",
+              rubricChanged: records.some(
+                (record) => record.rubric !== item.rubric,
+              ),
+            };
+          }
+          return null;
+        };
         json({
           apiVersion: API_VERSION,
           suites: suites.map((suite) => ({
@@ -489,6 +544,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
           evalCases: phaseOneCases.map((item) => ({
             ...item,
             hasRun: attempted.has(item.id),
+            last: lastAttempt(item),
           })),
           active,
           history: history(),

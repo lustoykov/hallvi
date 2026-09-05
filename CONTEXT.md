@@ -4,12 +4,16 @@ Canonical product language for Server Guy's deployment and operations domain.
 
 ## Language
 
+**Server Guy**:
+The deployment and operations product, presented to the engineer as one assistant. Its conversational replies and recorded operational facts remain distinguishable.
+_Avoid_: Pi as a second user-facing assistant, separate product and runtime personas
+
 **Model-Native Operation**:
 An operating model in which Pi handles interpretation, ambiguity, diagnosis, and plan revision while Server Guy supplies durable context, tools, observations, resumability, approval behavior, and inspectable execution. A model-native product may still use deterministic procedures wherever the next valid operation follows from explicit desired state and fresh observations.
 _Avoid_: AI-assisted workflow, model-powered pipeline
 
 **Chat**:
-A durable conversation between the engineer and Pi inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
+A durable conversation between the engineer and Server Guy inside one Phase Workspace. A phase may contain many Chats with separate transcripts and shared operational state.
 _Avoid_: Operator Session, workflow run, pipeline execution
 
 **Pi Run**:
@@ -45,8 +49,20 @@ One observable condition inside an Exit Gate whose current result is recomputed 
 _Avoid_: Decision, manual checkbox, confidence judgment, internal reference as the name
 
 **Decision**:
-A durable, revisable choice or constraint recognized from a Chat and stored with its originating message and affected application. A replacement supersedes the prior Decision without erasing its history.
-_Avoid_: Chat message, Gate Check, application configuration, product rule, permanent preference
+An application-specific requirement or choice explicitly stated by the engineer, saved with its originating message and affected application. These requirements are optional; a replacement supersedes the prior Decision without erasing its history.
+_Avoid_: Required onboarding choice, launch priority, default operating goal, Chat message, Gate Check, application configuration, product rule, permanent preference
+
+**Operating Defaults**:
+Server Guy's built-in responsibility to balance data protection, availability, simplicity and reasonable cost without asking the engineer to rank them. An unresolved concrete trade-off may require a question; the defaults themselves do not need to be supplied or saved as Decisions.
+_Avoid_: User-selected priorities, additional requirements, permission to make external changes
+
+**Active Decision**:
+A saved Decision that has not been superseded. Its age does not determine whether it is current.
+_Avoid_: Recently created Decision, pending proposal
+
+**Decision Proposal**:
+A model-suggested new or replacement choice awaiting acceptance as a Decision. It does not establish that a Decision has been recorded.
+_Avoid_: Saved Decision, committed change
 
 **Control Point**:
 A user-facing path from a Decision, Gate Check, Operational Claim, or operational fact to its meaning, provenance, affected source, takeover actions, and re-verification. It keeps model-authored explanation, the governing rule, and supporting evidence distinguishable.
@@ -185,19 +201,19 @@ Codex, Claude, or another independent agent that uses Server Guy through MCP whi
 _Avoid_: Embedded runtime, Pi worker
 
 **Approval Mode**:
-The explicit user-selected rule governing whether Pi must request approval before state-changing operations.
+The explicit user-selected rule governing whether Pi must request approval before external changes within the resources and actions the engineer has granted. It does not itself expand that scope; recording Chat messages, Observations and explicit Decisions is internal bookkeeping.
 _Avoid_: Permission template, Operational Mandate
 
 **Full Autonomy**:
-An Approval Mode in which Pi may perform state-changing operations without required user approval.
+An Approval Mode in which Pi may perform external changes within the granted scope and explicit user limits without required per-action approval.
 _Avoid_: Bypass permissions
 
 **Pi Decides**:
-An Approval Mode in which Pi decides whether a state-changing operation warrants user approval.
+An Approval Mode in which Pi decides whether an external change within the granted scope warrants user approval.
 _Avoid_: Auto-approve, ask when risky
 
 **Always Ask**:
-An Approval Mode in which user approval is required before every state-changing operation; read-only observation remains automatic.
+An Approval Mode in which user approval is required before every external change within the granted scope; read-only observation remains automatic.
 _Avoid_: Restricted mode
 
 **Approval Record**:

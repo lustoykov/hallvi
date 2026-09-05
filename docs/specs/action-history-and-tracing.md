@@ -1,5 +1,7 @@
 # Action history and tracing
 
+Status: proposed design, not implemented. Planned as development milestone 7, after durable Pi requests; the [native Pi sessions proposal](native-pi-and-permissions.md) is the suggested step before it.
+
 Users should be able to inspect what Server Guy attempted, what each step returned, and what actually changed. Start with one chat execution and extend the same view as external Operations arrive. Delivery order and implementation status belong to the [roadmap](../../ROADMAP.md#action-history-and-tracing).
 
 ## First slice

@@ -1,6 +1,6 @@
 # Durable Pi requests
 
-Status: implemented on `codex/durable-pi-requests`, pending PR review. This is development milestone 6, still within Launch Phase 1. [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status.
+Status: implemented; merged as [PR #13](https://github.com/lustoykov/server-guy/pull/13) on 2026-09-05. This document is the current contract for accepted requests: durable acceptance, cancellation, retry, saved message revisions and atomic Decision commits. This branch replaces the original bounded replay with the [native Pi session contract](native-pi-and-permissions.md), while preserving those durable request guarantees. [ROADMAP.md](../../ROADMAP.md#make-pi-requests-durable) owns build order and completion status.
 
 ## Outcome
 
@@ -15,7 +15,7 @@ Browser POST
 
 One local worker
   → claim queued run
-  → load current Decisions/checks and bounded Chat context
+  → reopen Chat's native history; append current checks and actual prior outcome
   → Pi execution → batched assistant-message revisions in SQLite
   → validate → commit final answer + Decisions + successful run together
 
@@ -30,7 +30,7 @@ Browser reload / reconnect
 - The client supplies an idempotency key. Repeating the same accepted submission returns its original IDs; reusing its key with different input is rejected. Validate application/Chat ownership and writability before acceptance.
 - Persist the user message, assistant placeholder and queued run atomically. The placeholder is visibly pending, not a completed Pi answer. Preserve the existing message `body` field unless a concrete implementation need justifies a rename; add status and monotonically increasing revision.
 - Run one separately started local Node worker, initially with global concurrency one. This also satisfies at most one active run per Phase Workspace. Reject accidental second-worker startup; do not introduce leases, Redis, a workflow engine or independent queue consumers.
-- Multiple Chats may enqueue work. Preserve accepted order within a Phase Workspace, and load shared Decisions when execution starts so later runs see prior committed results. Show queue state rather than pretending queued work is already generating.
+- Multiple Chats may enqueue work. Preserve accepted order within a Phase Workspace; shared Decisions are read from current SQLite state when the model calls `search_decisions`. Show queue state rather than pretending queued work is already generating.
 - Use Pi directly. Persist accumulated user-facing text in batches, not one message or Activity Event per token. Do not expose private model reasoning. Provisional text cannot claim authoritative saved Decisions.
 - Validate Decision proposals against current application state immediately before committing. Save the final assistant answer, accepted Decisions, their Activity Events and successful run status in one transaction. Late callbacks cannot complete a terminal run or restore a removed application.
 
@@ -48,7 +48,7 @@ Browser reload / reconnect
 
 An explicit retry creates a new linked Pi Run and assistant attempt for the original accepted user message. It must not duplicate that user message or erase the failed attempt. Prevent duplicate retries and preserve Phase Workspace serialization. Cancellation races are resolved by the persisted terminal transition: a cancellation after successful commit cannot undo it.
 
-This changes the old “failed turn leaves no messages” expectation: **accepted intent survives failure, while failed attempts never become completed answers or committed Decisions**. Update domain tests, browser journeys and eval snapshots to express that distinction. Incomplete or failed assistant attempts are not ordinary transcript context for the next generation.
+This changes the old “failed turn leaves no messages” expectation: **accepted intent survives failure, while failed attempts never become completed answers or committed Decisions**. Native attempted history is retained, including a fully generated but uncommitted answer. Every subsequent Run carries the previous attempt's actual saved outcome; native conversation text is not evidence of a database commit.
 
 ## Reconnectable delivery
 
@@ -58,15 +58,15 @@ Deliver only persisted revisions. A reconnect starts with the latest snapshot an
 
 ## Bounded context
 
-Use a bounded recent-message window plus a durable, per-Chat summary of the older completed transcript. Record the covered message boundary so summarization cannot omit a gap or count the same range twice. Keep the complete transcript for inspection; context compaction is not deletion.
+Pi owns native history and compaction. Existing Chats import a clearly labeled bounded legacy summary/text note once; subsequent Runs append native messages instead of replaying SQLite text. The previous custom summary rows are preserved but no longer updated.
 
-The summary is model-authored context, never new authorization or a replacement for evidence. Always supply every active application Decision and freshly derived checks separately. Never silently drop Decisions to meet a limit. Establish explicit context/summary budgets and visible failure behavior when they cannot be met; a failed summary update must not advance its coverage marker or fall back to unlimited replay. Extra model calls for summarization must be accounted for in live-eval usage.
+Instructions stay stable. A bounded Run-context message supplies freshly derived checks, Approval Mode and actual prior outcome without embedding Decisions. `search_decisions` reads active saved records with pagination when needed, while `propose_decision` stages changes for the final guarded transaction. Compaction summaries are model-authored context, never authorization or proof of a saved effect. Cancellation aborts both compaction and generation and retains the writer lock until settlement; a non-draining worker exits rather than allowing overlapping writers. Native logs and SQLite both belong in backups.
 
 ## Implementation and verification order
 
 1. **Durable acceptance and completion:** schema/types, idempotent enqueue, one worker, atomic terminal commit. Prove the HTTP response returns before the synthetic Pi turn completes and database records survive process boundaries.
 2. **Failure recovery and delivery:** cancellation, timeout, interruption, linked retry, snapshots, SSE and the desktop pending/queue/reconnect experience. Prove worker crashes and browser disconnects with real local processes and synthetic Pi.
-3. **Bounded context:** summary coverage and recent-message selection, every active Decision retained, isolation between Chats, and summary failure cases. Update the live eval harness to exercise the durable execution path without making a browser mandatory.
+3. **Native context:** session identity/import/recovery, compaction, scoped Decision retrieval, isolation between Chats, and cancellation settlement. Live evals exercise the same durable path and review model behavior after compaction without requiring a browser.
 
 Use disposable databases and synthetic Pi for deterministic and desktop tests. Cover duplicate submission, multiple Chats in one workspace, independent applications, stale completions, removal during execution, cancellation/completion races, timeout, worker restart and reconnect after the final commit. Preserve old accepted data when applying the new schema; never reset the user's live database as a test setup step.
 

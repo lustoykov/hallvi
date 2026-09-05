@@ -75,6 +75,7 @@ describe("application navigation", () => {
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Add application/);
     expect(html).not.toContain("todo-fastapi");
     expect(html).toContain("Always ask");
+    expect(html).toContain("Let Server Guy decide");
     expect(html).toContain("Full autonomy");
     expect(html).toContain('href="/applications"');
   });

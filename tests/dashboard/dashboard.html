@@ -37,24 +37,27 @@
       <section class="about-block" aria-labelledby="usage-title"><h2 id="usage-title">AI usage &amp; automatic runs</h2>
         <p><strong>Automatic checks</strong> run on every PR and push to main. The browser smoke journeys are the automatic subset of the full browser suite.</p>
         <p><strong>On demand</strong> means you start the tests yourself, here or in GitHub Actions. The tests still run automatically after you start them. Live evals and LLM judgments are local-only; this dashboard confirms before using your ChatGPT subscription, and one confirmation covers a run and judging its answers.</p>
-        <p>Browser tests use simulated Pi, GitHub and login responses, with no AI calls. GitHub-hosted runs still consume Actions minutes.</p>
+        <p>Browser tests run the native Pi SDK with synthetic model, GitHub and login responses. No AI calls; GitHub-hosted runs still consume Actions minutes.</p>
       </section>
       <section class="about-block" aria-labelledby="files-title"><h2 id="files-title">Where everything lives</h2><dl><dt>Application tests</dt><dd><code>tests/application/unit/</code> and <code>tests/application/integration/</code></dd><dt>Browser smoke &amp; journeys</dt><dd><code>tests/browser/</code> · smoke selects <code>@smoke</code> tags · synthetic adapters in <code>tests/browser-fixtures/</code></dd><dt>Real agent evals and judge</dt><dd><code>tests/evals/</code></dd><dt>Saved runs, answers and reviews</dt><dd><code>tests/results/</code> · private, gitignored</dd><dt>Written acceptance contract</dt><dd><code>docs/testing/phase-one-acceptance.md</code></dd></dl><p>For interactive runner UIs: <code>npm run test:ui</code> or <code>npm run test:e2e:ui</code>. To open a browser trace/report: <code>npx playwright show-report tests/results/browser-report</code>.</p></section>
     </section>
 
     <section id="reviews-panel" aria-labelledby="reviews-title" hidden>
-      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval runs</h1><p>Saved Server Guy answers from live agent evals, not browser test results. New runs are judged by a model as they finish; you look at what still needs attention.</p></div></div>
+      <div class="page-heading"><div><h1 id="reviews-title" tabindex="-1">Eval runs</h1><p>Saved Server Guy answers, not browser test results. Runs started here are judged automatically. For command-line runs, use the judge button below or review the answers yourself.</p></div><div class="new-evals"><button id="run-new-evals" class="primary" type="button" hidden>Run new evals only…</button><p id="new-evals-status" class="muted">Checking for new evals…</p></div></div>
       <p id="bulk-result" class="notice" role="status"></p>
       <div id="empty-reviews" class="empty" hidden><p>No saved live eval answers yet.</p><p class="footnote">Run Live agent evals to create the first run; its answers are judged automatically when it finishes.</p><button id="empty-choose" class="secondary" type="button">Choose cases to run…</button></div>
       <div id="review-content" class="review-layout" hidden>
         <aside class="review-sidebar" aria-label="Runs and answers">
           <h2 class="side-heading">Runs</h2>
-          <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
-          <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
-          <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          <div class="runs-scroll">
+            <ul id="run-list" class="run-list" aria-label="Active eval runs"></ul>
+            <p id="no-active-runs" class="side-empty" hidden>No active runs. Archived runs stay readable below.</p>
+            <details id="archived-runs" class="archived-runs" hidden><summary>Archived runs <span id="archived-count"></span></summary><ul id="archived-list" class="run-list" aria-label="Archived eval runs"></ul></details>
+          </div>
           <div id="answers-block" class="answers-block">
             <div class="answers-heading"><h2>Answers</h2><span id="answers-total"></span></div>
             <div class="filters" role="group" aria-label="Filter answers"><button type="button" data-filter="attention" aria-pressed="true">Attention <span></span></button><button type="button" data-filter="failures" aria-pressed="false">Failed <span></span></button><button type="button" data-filter="cleared" aria-pressed="false">Cleared <span></span></button><button type="button" data-filter="reviewed" aria-pressed="false">Reviewed <span></span></button><button type="button" data-filter="all" aria-pressed="false">All <span></span></button></div>
+            <p id="filter-note" class="side-empty" hidden></p>
             <ul id="answer-list" class="answer-list" aria-label="Answers in selected run"></ul>
             <p id="no-answers" class="side-empty" hidden></p>
             <details class="side-help"><summary>How triage works</summary><p><strong>Attention</strong> holds answers that are not judged under the current judge policy, judged as uncertain, or failed (code checks, the judge, or you). <strong>Cleared</strong> answers passed the current judge policy and their recorded code checks; they are not human-approved. <strong>Reviewed</strong> answers carry your verdict, which never overrides failed code checks.</p><p>Open Cleared now and then to spot-check the judge: it can be confidently wrong, and your verdict always wins.</p></details>
@@ -65,9 +68,10 @@
           <header id="run-header" class="run-header">
             <div class="run-title-row"><div><h2 id="run-title"></h2><p id="run-meta"></p><p id="run-repeats" class="footnote" hidden></p></div><div class="run-actions"><span id="run-archived" class="chip" hidden>Archived</span><button id="judge-run" class="primary" type="button">Judge…</button><button id="archive-run" class="secondary" type="button">Archive run</button></div></div>
             <p id="archive-error" class="error" role="alert" hidden>Run metadata could not be read. The run stays visible; archiving is disabled until the file is repaired.</p>
+            <p id="run-notice" class="notice" hidden></p>
             <div class="progress"><div id="progress-bar" class="progress-bar" role="img"><span class="seg failures"></span><span class="seg review"></span><span class="seg judge"></span><span class="seg cleared"></span><span class="seg reviewed"></span></div><p id="progress-text"></p></div>
           </header>
-          <p id="empty-answers" class="empty" hidden>No answers match this filter. Nothing here needs you right now; open All to browse.</p>
+          <p id="empty-answers" class="empty" hidden>No answers match this filter. <button id="show-all" class="text-button" type="button">Show all answers</button></p>
           <section id="answer-detail" class="answer-card" aria-labelledby="case-title">
             <header class="answer-header">
               <div><h3 id="case-title"></h3><p id="case-sub"><span id="case-meta"></span><button id="rerun-case" class="text-button" type="button">Run case again…</button><span id="rerun-unavailable" class="footnote" hidden>No longer in the casebook, so it cannot be rerun</span></p></div>
@@ -115,7 +119,7 @@
     <header class="dialog-heading"><h2 id="eval-summary">Choose live eval cases</h2><button class="text-button" data-close="eval-picker" aria-label="Close eval selection">Close</button></header>
     <p id="eval-history" class="muted">Cases you have not run are selected by default.</p>
     <label class="field eval-search">Search cases<input id="eval-search" type="search" placeholder="Name, category or expected behavior" autocomplete="off"></label>
-    <div class="selection-actions"><button id="evals-unrun" class="text-button">Select unrun</button><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <div class="selection-actions"><button id="evals-unrun" class="text-button">Select unrun</button><button id="evals-failed" class="text-button">Select failed last time</button><button id="evals-changed" class="text-button">Select rubric changed</button><button id="evals-all" class="text-button">Select all cases</button><button id="evals-clear" class="text-button">Clear cases</button><label class="repeat-control">Repetitions per case<select id="eval-repeats"><option value="1" selected>1 (default)</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
     <div class="picker-body"><fieldset><legend class="visually-hidden">Live eval cases</legend><div id="eval-options" class="selection-list"></div></fieldset><p id="eval-no-matches" class="muted" hidden>No matching cases. Try another search.</p></div>
     <footer class="picker-footer"><span id="eval-count" role="status"></span><button id="run-evals" class="primary">Review and run live evals…</button></footer>
   </dialog>

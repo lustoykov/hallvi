@@ -391,7 +391,7 @@ export function PiSetupScreen({
                     </strong>
                     <p>
                       {status.mode === "shared"
-                        ? "Using the saved Pi login"
+                        ? "Sharing the existing Pi login file"
                         : "Separate login for Server Guy"}
                     </p>
                   </div>
@@ -423,7 +423,7 @@ export function PiSetupScreen({
                         </div>
                       </div>
                       <p className={s.hint}>
-                        Reuse its login file and model settings.
+                        Share Pi’s login file and copy its model settings.
                       </p>
                       <button
                         className={s.primary}

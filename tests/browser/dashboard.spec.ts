@@ -213,7 +213,7 @@ test(
             return { left, width, height };
           }),
         );
-      expect(actionBounds).toHaveLength(4);
+      expect(actionBounds).toHaveLength(5);
       for (const dimension of ["left", "width", "height"] as const) {
         expect(
           Math.max(...actionBounds.map((box) => box[dimension])) -
@@ -675,7 +675,13 @@ test(
         page.locator("#run-list").locator(runCard(run)),
       ).toBeVisible();
       await expect(page.locator("#archived-runs")).toBeHidden();
-      await expect(page.locator("#empty-answers")).toBeVisible();
+      // Landing on a run with nothing needing attention shows every answer
+      // instead of an empty queue.
+      await expect(page.locator("#filter-note")).toHaveText(
+        "Nothing needs attention, so all answers are shown.",
+      );
+      await expect(page.locator("#answer-detail")).toBeVisible();
+      await expect(filterCount("all")).toHaveText("4");
       expect(launches).toBe(0);
       expect(loadReport(root, run).hash).toBe(hash);
       const savedReviews = listReports(root)[0].reviews;
@@ -751,8 +757,8 @@ test(
       expect(listReports(root).find((r) => r.run === run)?.archived).toBe(
         false,
       );
-      // A full 16-answer run expands in normal page flow, without a nested
-      // sidebar scroller.
+      // A full 16-answer run scrolls inside the sticky sidebar, so the open
+      // answer stays in view while the queue is browsed.
       const fullRun = "sixteen-answer-run";
       const caseIds = Array.from(
         { length: 8 },
@@ -783,27 +789,24 @@ test(
         "8 cases × 2 repetitions = 16 planned · 16 answers saved",
       );
       await expect(page.locator("#answer-list .answer-open")).toHaveCount(16);
+      await expect(page.locator(".review-sidebar")).toHaveCSS(
+        "position",
+        "sticky",
+      );
       for (const container of [
         page.locator("#answer-list"),
-        page.locator(".review-sidebar"),
-      ]) {
-        await expect(container).toHaveCSS("max-height", "none");
-        await expect(container).toHaveCSS("overflow-y", "visible");
-        expect(
-          await container.evaluate(
-            (element) => element.scrollHeight <= element.clientHeight + 1,
-          ),
-        ).toBe(true);
-      }
+        page.locator(".runs-scroll"),
+      ])
+        await expect(container).toHaveCSS("overflow-y", "auto");
       const lastAnswer = answer("layout-case-8:2");
       await lastAnswer.scrollIntoViewIfNeeded();
       await expect(lastAnswer).toBeInViewport();
-      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
       expect(
         await page
-          .locator(".review-sidebar")
+          .locator("#answer-list")
           .evaluate((element) => element.scrollTop),
-      ).toBe(0);
+      ).toBeGreaterThan(0);
+      await expect(page.locator("#case-title")).toBeInViewport();
       await lastAnswer.click();
       await page.screenshot({
         path: testInfo.outputPath("dashboard-sixteen-answers.png"),

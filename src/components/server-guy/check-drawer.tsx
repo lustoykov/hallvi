@@ -40,7 +40,7 @@ export function CheckDrawer({
     dialog?.showModal();
     return () => {
       dialog?.close();
-      // Restore before the next frame, so an explicit Ask Pi action can then
+      // Restore before the next frame, so an explicit Ask action can then
       // move focus to the composer without this cleanup stealing it back.
       if (opener?.isConnected) opener.focus();
     };
@@ -137,7 +137,7 @@ export function CheckDrawer({
             onClick={() => onAsk(check)}
             type="button"
           >
-            <ChatCircleDots /> Ask Pi about this check
+            <ChatCircleDots /> Ask about this check
           </button>
           {check.canRerun && (
             <button

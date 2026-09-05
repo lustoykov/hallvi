@@ -544,14 +544,16 @@ a.sg-chip:hover {
   min-width: 0;
 }
 .sg-session small,
-.sg-session em {
+.sg-session em,
+.sg-session time {
   color: var(--muted);
   font-size: 11px;
   font-style: normal;
   white-space: nowrap;
 }
 /* Separator dot drawn, not typed, so it stays out of the accessible name. */
-.sg-session em::before {
+.sg-session em::before,
+.sg-session time::before {
   content: "";
   display: inline-block;
   width: 3px;
@@ -560,6 +562,9 @@ a.sg-chip:hover {
   border-radius: 50%;
   background: currentColor;
   vertical-align: middle;
+}
+.sg-session time {
+  margin-left: auto;
 }
 .sg-icon-button {
   width: 28px;
@@ -1290,6 +1295,18 @@ a.sg-chip:hover {
   overflow: hidden;
   background: #fff;
 }
+.sg-saved-requirements {
+  margin-top: 20px;
+}
+.sg-saved-requirements > summary {
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sg-saved-requirements > summary:hover {
+  color: var(--ink);
+}
 .sg-decision-list a {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 14px;
@@ -1307,10 +1324,6 @@ a.sg-chip:hover {
 .sg-decision-list a:last-child {
   border-bottom: 0;
 }
-.sg-decision-list span {
-  color: var(--muted);
-  font-size: 11px;
-}
 .sg-decision-list strong {
   grid-column: 1;
   font-size: 13px;
@@ -1320,7 +1333,7 @@ a.sg-chip:hover {
 }
 .sg-decision-list svg {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   width: 13px;
   color: var(--muted);
 }
