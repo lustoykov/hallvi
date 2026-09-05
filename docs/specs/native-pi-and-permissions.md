@@ -109,13 +109,24 @@ The `AgentSession` object can be short-lived. Reopening the same native session 
 
 Use `systemPromptOverride` for stable behavior instructions, including when to consult saved records and how to distinguish evidence from conversation. Do not put per-Run timestamps, changing Decisions or the preceding Run's status into this prefix. Preserve native history and append new context through Pi's public native message APIs; no context extension is required for this slice.
 
-Add one read-only `search_decisions` tool bound to the current application by the worker, not by a model-supplied application ID. It queries SQLite when called. An optional text query narrows current Decisions; omitting it lists current Decisions in bounded pages, and history/provenance is available explicitly. Start with ordinary scoped database queries, not embeddings, a vector store or a separate retrieval service.
+Add one read-only `search_decisions` tool bound to the current application by the worker, not by a model-supplied application ID. Start with ordinary scoped database queries, not embeddings, a vector store or a separate retrieval service. The first interface is deliberately small:
+
+| Part | Contract |
+| --- | --- |
+| Inputs | Optional `query` and non-negative integer `offset` (default `0`); fixed server-controlled page size. Omit the query to list active Decisions. A query performs case-insensitive substring matching over label and value. |
+| Ordering | Creation time, then SQLite rowid, matching the existing active-Decision listing. `nextOffset` continues the same query, or is `null` when no matching records remain. |
+| Result | `records`, `nextOffset`, `activeCount` (all active Decisions in this application, before filtering), and `pendingCount` (this Run's staged proposals, not saved records). |
+| Each record | Exact ID, kind, label, value, creation time and source message ID; at most one level of replacement lineage, the previous Decision's ID and value. Scope lineage/source references to the same application too. |
+
+All listed records are active saved Decisions; historical content appears only in explicitly labeled replacement lineage. Defer a general history-browsing mode. Each call reads current SQLite state, not a frozen multi-call snapshot; final writes still guard against state changes. A cap without continuation is insufficient because it makes later records unreachable.
 
 **Current means active, not recently created.** A months-old constraint that has not been superseded remains eligible. Do not use a recent-message window or creation-time cutoff as a substitute for active state. A query with no matches does not prove the application has no Decisions; Pi can broaden it or list current records. A failed lookup is a tool error, not an empty successful result. Mark bounded/truncated results and provide a way to continue rather than silently omitting records.
 
-Return exact record IDs, labels/values, active or superseded status, and bounded source/replacement references in model-visible tool content. Keep this Run's pending proposals clearly separate from saved results. `propose_decision` still stages a proposal and returns its content with a pending/not-yet-saved status; it does not commit early. Pi already sees a proposal it just made, and can read back the actual saved result when needed on a later Run.
+Return these records and bounded source/replacement references in model-visible tool content. Keep this Run's pending proposals clearly separate from saved results. `propose_decision` still stages a proposal and returns its content with an explicit **"pending, not saved"** status; it does not commit early. Pi already sees a proposal it just made, and can read back the actual saved result when needed on a later Run.
 
-Stable instructions should direct Pi to consult the tool when answering what was agreed, explaining a choice, or finding a current replacement target. Let it choose the relevant query and next step; do not mechanically call it on every greeting or pretend a remembered/summarized Decision is guaranteed current. The final guarded writes still check current database state, even after a successful lookup.
+Stable instructions should direct Pi to consult the tool when answering what was agreed, explaining a choice, or finding a current replacement target. Also consult it before adding or revising a priority when existing choices matter, and before recommending a change that could affect a saved constraint—even if the engineer does not mention Decisions. For example, **"Can we make backups cheaper?"** may depend on **"Never risk customer data."** A narrow query may miss that wording; broaden the query or list active records when needed. Let Pi choose the relevant query and next step; do not mechanically call it on every greeting or pretend a remembered/summarized Decision is guaranteed current.
+
+Replace the existing `CURRENT DECISIONS` ID-copying instructions in both the system prompt and proposal-tool guidelines with instructions to obtain exact active IDs from lookup results. Multiple priorities of the same kind can legitimately coexist; same-kind presence is not itself a conflict. Do not add a semantic conflict classifier or a new pre-staging approval protocol. Feedback after accepting a proposal cannot retract it. Start with lookup guidance and the correction-versus-addition eval below; retain the proposal-time replacement checks specified above and the final guarded writes.
 
 The disclaimer belongs in those stable instructions, not above a frozen Decision list in the system prompt: **“Decisions mentioned in conversation or earlier tool results may be outdated. When an answer depends on current saved choices, use the Decision lookup tool.”** Old Decision content remains in native conversation/tool history; new choices enter through `propose_decision` as pending proposals and become searchable saved Decisions only after a successful final commit.
 
@@ -134,9 +145,9 @@ This design does not automatically inject all Decisions, a per-message Decision 
 
 The worker still prepares and validates the application's scope, current Approval Mode/checks and relevant prior-attempt outcome before starting the model. These are operational context, not a list of Decisions. Append a bounded, clearly labeled native custom message near the new engineer message, using `sendCustomMessage` without triggering a turn. It can carry the Run correlation marker as well; do not add an extra event store. The engineer's message remains a normal user message.
 
-For example, after cancellation: `Previous attempt: cancelled. Its staged Decisions were not committed.` This prevents an uncommitted answer in native history from being presented as a saved effect without repeatedly listing every Decision. Prepare this context before model execution; if mandatory state cannot be read, fail before the request. User-authored values and legacy summaries remain data, not new instructions or authority. Final effect boundaries always use current server-side state.
+For example, after cancellation: `Previous attempt: cancelled. Its proposals were pending, not saved; none were committed.` This gives Pi the actual outcome without repeatedly listing every Decision; it does not guarantee the model or a later summary will preserve that distinction. Prepare this context before model execution; if mandatory state cannot be read, fail before the request. User-authored values and legacy summaries remain data, not new instructions or authority. Final effect boundaries always use current server-side state.
 
-Native custom messages/tool results become part of saved history and may later be compacted. They are not permanently current or exempt from summarization. Bound their size, label when they were observed, retain native overflow recovery, and retrieve records again when current evidence is needed. Compaction does not delete authoritative Decisions from SQLite.
+Native custom messages/tool results become part of saved history and may later be compacted. They are not permanently current or exempt from summarization. Bound their size, label when they were observed, retain native overflow recovery, and retrieve records again when current evidence is needed. Pi can check for compaction inside `session.prompt` after an idle custom message was appended. Cover that near-limit ordering and later summarization with a focused regression and behavior eval, not a new compaction subsystem. Compaction does not delete authoritative Decisions from SQLite.
 
 ### Cache reuse and attention must be measured
 
@@ -144,7 +155,7 @@ Changing early prompt content can prevent reuse of the later cached prefix; rese
 
 On-demand retrieval reduces mandatory Decision context but can require another model/tool round trip. It can also fail because Pi never searches or chooses a poor query. Neither persistence, a retrieval tool nor prompt placement guarantees attention. Measure reported cached/input tokens and latency where available; the subscription-backed provider's credit effects remain unmeasured. Do not claim exact token budgets from character counts or guaranteed savings.
 
-Make the user's “lost in the middle” concern an explicit eval: bury the original Decision in long history, compact it, then ask something whose correct answer depends on that still-active Decision. Verify the model actually retrieves and follows the evidence. Include an old active constraint, a superseded choice, and a Decision changed in another Chat. A synthetic tool/persistence test proves plumbing, not retrieval judgment. If the model misses important records, revise tool guidance or retrieval behavior based on those failures; do not silently restore full per-message injection against the user's chosen design.
+Make the user's “lost in the middle” concern an explicit acceptance gate using the behavior evals below. A synthetic tool/persistence test proves plumbing, not retrieval judgment. If the model misses important records, revise tool guidance or retrieval behavior based on those failures; do not silently restore full per-message injection against the user's chosen design.
 
 ### Storage and initialization
 
@@ -191,7 +202,7 @@ Required tests for slice 1:
 - Continue the same Chat across Runs and worker restarts; keep two Chats' histories isolated while sharing current application Decisions.
 - Reopen a compacted native session without a custom summary call; a Decision lookup returns current records and Run context exposes updated checks even after compaction.
 - Prove no full Decision list is automatically injected into ordinary prompts; unchanged instructions stay stable and new context/results append without rewriting history.
-- Verify application-scoped search/list/history behavior, old active records, superseded records, provenance, bounded pagination, lookup failure and the distinction between saved records and pending proposals.
+- Verify application-scoped search/list behavior, old active records, labeled replacement lineage/source references, deterministic pagination through every matching record, no-match counts, lookup failure and the distinction between saved records and pending proposals. General history browsing remains deferred.
 - Fail before making a model request if mandatory Run context cannot be prepared; verify context and tool-result values remain data rather than tool authority.
 - Cancel during generation, a tool call and compaction; prove no overlapping session writer or late successful commit.
 - Crash after proposal collection, after native final output and after SQLite success; prove truthful outcomes and no blind replay.
@@ -199,6 +210,15 @@ Required tests for slice 1:
 - Detect missing/mismatched established files; cover initial-file and association interruption, partial trailing writes and explicit legacy import.
 - Verify a recoverable tool error returns to Pi; separately verify final domain rejection still rolls back the entire first-slice transaction.
 - Retain desktop send/reload/cancel/retry journeys; live model checks remain separate, opt-in evals for continuity, recovery, truthful saved-state claims and Decision retrieval/use in long or compacted conversations.
+
+Before merging the native-session migration, run and review this small live behavior set as well as the deterministic tests. These are local opt-in runs, not model calls on every CI push. Code checks verify stored state and tool arguments; review also checks the answer's meaning and whether retrieval supplied the relevant evidence.
+
+| Eval | Setup and expected behavior |
+| --- | --- |
+| Buried or changed Decision | Bury a Decision early in long history, compact, then ask a question that depends on it. Cover an old still-active constraint, a superseded choice, and a replacement made in another Chat. Pi retrieves and follows the current record, not stale history. |
+| Correction versus addition | Start with a saved cost priority. "Actually, prioritize reliability over cost" must retrieve and replace the intended Decision by exact ID, without leaving an unintended extra proposal. A separate additive request must preserve the existing priority; do not treat every same-kind choice as a replacement. |
+| Implicit constraint | Save "Never risk customer data," then ask "Can we make backups cheaper?" without mentioning Decisions. Pi retrieves the constraint and keeps its recommendation consistent with it. Include a narrow-query miss that must be broadened or followed by listing; an empty search is not proof that no constraint exists. |
+| Unsaved proposal after compaction | Stage a proposal, cancel before the final transaction, and append the actual failure outcome. Ask what is saved before and after compaction, including compaction triggered at the next prompt near the context limit. The proposal remains absent from SQLite and is not described as saved. Pair this with a deterministic test of the custom-message/compaction ordering. |
 
 ## Installed-source reference map
 
@@ -215,9 +235,16 @@ Verified against `@earendil-works/pi-coding-agent` 0.84.4, not an assumed future
 
 ## Fable review
 
-Reviewed with Fable in two CLI rounds on September 5, 2026, against repository code and installed SDK sources. Fable made no repository changes. Session: `1828e643-c348-4360-880e-5b8f89e23e97` (resume with `claude --resume 1828e643-c348-4360-880e-5b8f89e23e97`).
+Reviewed with Fable in four CLI rounds on September 5, 2026: two initial architecture rounds against repository code/installed SDK sources, then two rounds on the revised retrieval design at commit `eda7b66`. Fable made no repository changes during these review rounds; these refinements record the resulting agreement, not runtime verification. Session: `1828e643-c348-4360-880e-5b8f89e23e97` (resume with `claude --resume 1828e643-c348-4360-880e-5b8f89e23e97`).
 
-**Historical review boundary:** the two Fable rounds preceded the user's cache and on-demand-retrieval corrections. Fable has not reviewed this revised context/retrieval design. The old agreement to put a changing snapshot in the system prompt is superseded, not current guidance.
+**Current verdict: proceed with narrow refinements, not a redesign.** The first two rounds preceded the user's cache and on-demand-retrieval corrections; the old agreement to put a changing snapshot in the system prompt is superseded. The follow-up review supports stable instructions and scoped lookup while accepting that the model may fail to retrieve needed records.
+
+The follow-up refinements are included above:
+
+- Broaden lookup guidance to cover implicit constraints and correction versus addition; obtain replacement IDs from tool results, not the removed prompt list.
+- Keep a small paginated active-Decision interface with bounded source/one-level lineage. Defer general history browsing, but do not strand records behind a fixed cap.
+- Add correction/addition, implicit-constraint and near-limit failure/compaction evals to the existing long-context retrieval gate. Explicit pending/not-saved wording helps, but is not proof that a model summary preserves the truth.
+- **Rejected after discussion:** automatically treating same-kind Decisions as conflicts or returning a warning only after staging a proposal. Fable withdrew that recommendation; no extra conflict classifier or staging protocol is added. The already-agreed settlement fix and retrieval acceptance gate remain required, not newly discovered blockers.
 
 The earlier exchange changed the proposal:
 
