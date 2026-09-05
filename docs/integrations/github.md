@@ -28,9 +28,17 @@ This is deployment configuration, not something each person must do on every log
 
 6. Restart Server Guy after editing environment configuration. Open Settings → GitHub, start sign-in, and enter the displayed code at GitHub. The page polls at GitHub's requested interval and slows down if told to.
 7. Use **Choose repositories on GitHub** to install the App for **only selected repositories**. Sign-in identifies the user; installation grants repository access. Both are needed. Either may be completed first.
-8. Add an application, or open its repository check and choose **Re-run repository check**.
+8. Add an application to check its repository. Reconnecting from Settings automatically checks existing applications. If you grant repository permissions after that check, open the application's Check 2 and choose **Re-run repository check**.
 
 The device flow exchanges the public client ID and device code for a user access token; no App secret is required. Keep private keys/client secrets out of the distributed app, git and browser. A real installation and device sign-in were verified without generating either. GitHub's own [user access-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) describes the supported flow and expiration.
+
+## Automatic checks after reconnecting
+
+After either login path succeeds in Settings, the page shows **Checking repository…** and sends a same-origin POST with the newly saved connection ID. Server Guy checks each existing application's repository and shows the individual results with links back to the applications. This uses the GitHub adapter directly, not Pi or another model call.
+
+The check runs once for the new connection; it does not repeat on every page load. Already-recorded attempts for that connection, including permission failures, are not automatically retried. **Re-run repository check** remains available after fixing access. Concurrent automatic requests share one in-process batch. A changed/disconnected login stops the batch, and late results cannot overwrite evidence for a replacement login. Application history is preserved.
+
+This is a bounded request, not a durable background job: a server crash can interrupt it. If the browser cannot retrieve the result, it points to the application's manual retry. Changing installation permissions directly on GitHub does not trigger a webhook or a new check by itself.
 
 ## Exactly what a passing check proves
 

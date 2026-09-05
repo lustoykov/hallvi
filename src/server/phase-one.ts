@@ -24,7 +24,7 @@ import {
   withTransaction,
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
-import { currentGithubConnectionId } from "./github-connection";
+import { currentGithubConnectionId, readGithubConnection } from "./github-connection";
 import {
   PHASE_ONE,
   computeChecks,
@@ -133,7 +133,10 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   return { view: getPhaseOneOperatorView(application.id), created: true };
 }
 
-export async function observeRepository(applicationId: string) {
+export async function observeRepository(applicationId: string, expectedConnectionId?: string) {
+  if (expectedConnectionId && currentGithubConnectionId() !== expectedConnectionId) {
+    throw new Error("The GitHub connection changed. Check repositories with the current login.");
+  }
   const { application, workspace } = loadWorkspace(applicationId);
   const recorded = listObservations(application.id).find((observation) => observation.kind === REPOSITORY_OBSERVATION && observation.status === "passed" && observation.raw && typeof observation.raw === "object" && "repositoryId" in observation.raw);
   const expectedId = recorded?.raw && typeof recorded.raw === "object" && "repositoryId" in recorded.raw && typeof recorded.raw.repositoryId === "number" ? recorded.raw.repositoryId : undefined;
@@ -142,6 +145,11 @@ export async function observeRepository(applicationId: string) {
     name: application.repositoryName,
     canonicalUrl: application.repositoryUrl,
   }, expectedId);
+
+  // A slow check from a previous login must not overwrite the new login's evidence.
+  if (expectedConnectionId && readGithubConnection()?.id !== expectedConnectionId) {
+    throw new Error("The GitHub connection changed. Check repositories with the current login.");
+  }
 
   const observation = insertObservation({
     applicationId: application.id,
@@ -159,6 +167,44 @@ export async function observeRepository(applicationId: string) {
     observation.summary,
   );
   return observation;
+}
+
+export interface GithubRepositoryCheckResult {
+  applicationId: string;
+  repository: string;
+  status: GateCheck["status"];
+  result: string;
+}
+
+const reconnectChecks = new Map<string, Promise<GithubRepositoryCheckResult[]>>();
+
+/** One bounded verification of existing applications after explicit connection consent. */
+export async function recheckGithubRepositories(connectionId: string) {
+  if (currentGithubConnectionId() !== connectionId) {
+    throw new Error("The GitHub connection changed. Check repositories with the current login.");
+  }
+  const pending = reconnectChecks.get(connectionId);
+  if (pending) return pending;
+  const work = (async () => {
+    const results: GithubRepositoryCheckResult[] = [];
+    for (const application of listApplications()) {
+      if (readGithubConnection()?.id !== connectionId) {
+        throw new Error("The GitHub connection changed. Check repositories with the current login.");
+      }
+      const previous = latestObservation(application.id, REPOSITORY_OBSERVATION);
+      const checkedConnection = previous?.raw && typeof previous.raw === "object" && "connectionId" in previous.raw ? previous.raw.connectionId : null;
+      // A failed check is still a completed attempt. Only explicit Retry runs it again.
+      if (currentGithubConnectionId() === connectionId && checkedConnection !== connectionId) {
+        await observeRepository(application.id, connectionId);
+      }
+      const check = currentChecks(application).find((item) => item.key === "repository-readable")!;
+      results.push({ applicationId: application.id, repository: `${application.repositoryOwner}/${application.repositoryName}`, status: check.status, result: check.result });
+    }
+    return results;
+  })();
+  reconnectChecks.set(connectionId, work);
+  try { return await work; }
+  finally { reconnectChecks.delete(connectionId); }
 }
 
 export function listApplicationSummaries() {
