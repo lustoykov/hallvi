@@ -1,6 +1,6 @@
 # Action history and tracing
 
-Status: proposed design, not implemented. Planned as development milestone 7, after durable Pi requests; the [native Pi sessions proposal](native-pi-and-permissions.md) is the suggested step before it.
+Status: implemented in the Activity/tracing slice, after durable requests and native Pi sessions. This document describes the current boundary; later Operations remain future scope.
 
 Users should be able to inspect what Server Guy attempted, what each step returned, and what actually changed. Start with one chat execution and extend the same view as external Operations arrive. Delivery order and implementation status belong to the [roadmap](../../ROADMAP.md#action-history-and-tracing).
 
@@ -8,21 +8,22 @@ Users should be able to inspect what Server Guy attempted, what each step return
 
 Reuse the planned durable Pi Run, Activity Events, and existing Inspector. Trace the path from accepting a chat request through Pi execution, domain validation, database commit, and rebuilding the Operator View. Pi remains the direct runtime.
 
-At the September 4, 2026 baseline, the [Pi adapter](../../src/server/pi.ts) uses an in-memory session and collects text deltas; the [Activity view](../../src/components/server-guy/inspector.tsx) displays saved summaries. The installed SDK also exposes model-message, tool execution, and retry lifecycle events. Instrument these plus Server Guy's own code; Pi events alone cannot prove a domain change was committed.
+The [Pi adapter](../../src/server/pi.ts) reopens each Chat's native JSONL history. Its SDK emits response, tool, compaction and retry lifecycle events. The worker records these alongside its own context and save boundaries. SDK response timings are not individual HTTP request timings; preparation and first-byte delays can lie outside response events. Pi events alone cannot prove a domain change was committed.
 
-For “Prioritize low operating cost,” the expanded history should explain:
+For “My hosting budget is at most €30/month,” the expanded history explains:
 
 ```text
 Chat execution
 ├─ Request accepted → queued → worker started
-├─ Load current application, Decisions, and bounded conversation
+├─ Load current app context
+├─ Prepare native conversation and configured model
 ├─ Pi execution
-│  ├─ Model call → requests propose_decision
+│  ├─ Model response → looks up saved requirements and requests propose_decision
 │  ├─ propose_decision → proposal collected
-│  └─ Model call → final response
+│  └─ Model response → final answer
 ├─ Server Guy validates the proposed Decision
 ├─ Database commit → messages, Decision, and Activity Event saved
-└─ Operator View refreshed → link to the saved Decision
+└─ Live Activity snapshot → link to the saved requirement
 ```
 
 The existing [domain path](../../src/server/phase-one.ts) can reject a proposal after the Pi tool succeeds, for example when a replacement Decision is already superseded. Show both outcomes: proposal collected; change rejected; no Decision saved.
@@ -60,7 +61,28 @@ Save successful domain changes and their Activity Events atomically. If that tra
 
 Telemetry export is asynchronous and optional. An unavailable exporter must not fail or repeat an otherwise completed action, erase local history, or block the Inspector. Sampling and retention may reduce diagnostic detail; durable product history must not depend on them. Do not make a Langfuse account, a collector service, or a new dashboard a prerequisite for local use.
 
-Apply payload selection and redaction before local diagnostic storage or export. Exclude credentials, OAuth codes, authorization headers, and unnecessary private content; limit payload size and disclose truncation. Scope history and evidence reads to the relevant application and viewer. Keep Langfuse credentials server-side and never create public trace links automatically.
+Apply payload selection before local diagnostic storage or export. Exclude credentials, OAuth codes, authorization headers, prompts, answers, tool arguments/results and raw errors entirely. Existing user-facing records and native histories are unchanged by this telemetry policy. Scope history reads through the existing application/Chat checks. This remains a local single-user prototype, not a new multi-tenant authorization layer. Keep Langfuse credentials server-side and never create public trace links automatically.
+
+## Configuration and data boundaries
+
+```dotenv
+SERVER_GUY_TRACING=1
+LANGFUSE_PUBLIC_KEY=your-project-public-key
+LANGFUSE_SECRET_KEY=your-project-secret-key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_PROJECT_ID=your-project-id
+```
+
+Keep these in `.env.local`, never Git. Use your project's region or self-hosted HTTPS base URL. Restart the worker after changing configuration. Set `SERVER_GUY_TRACING=0` to stop future exports; this does not delete existing Cloud traces or local history. The project ID enables authenticated deep links; it is not an access credential.
+
+- `run-history.ts` stores one `chat-execution` Activity row per Run, using that Run's ID. Its existing `detail` column holds a bounded structured payload, so this slice needs no schema change or data migration. Run status/timestamps are joined from `pi_runs`, not copied into a second state machine.
+- At most 128 steps are retained per reply. Further steps are counted as omitted. Each step has a fixed label, timing, outcome and an allowlisted set of numeric usage fields/model identifiers. No token-level activity rows or unbounded error blobs.
+- Requirement links and the completed save step are written in the same transaction as the reply. Failure/rejection history is saved separately after rollback. Cancellation/restart closes unfinished steps as incomplete, never successful. Crashes can lose diagnostic spans without changing these durable facts.
+- The OTel provider is private to the worker, with explicit parent contexts and no global HTTP/SDK auto-instrumentation. Only the `server-guy` scope is exported. Local history, spans and the completion log share Run/trace/span IDs. The worker batches export and flushes on graceful shutdown; the live-eval runner also flushes before cleanup.
+- Langfuse may display API-list-price estimates automatically. They are **not ChatGPT subscription charges**. Missing token usage stays absent, not zero. Payload omission is deliberate even if Langfuse suggests adding input/output.
+- Live evals require their existing separate opt-in. Browser fixtures force tracing off and strip inherited telemetry variables; ordinary deterministic tests never need Cloud or provider credentials.
+
+The product does not claim that opening the browser caused an exported span or that a trace was delivered merely because a link exists. Export is best-effort. The Activity tab reconstructs current history through the same saved-state stream used by chat and preserves the selected tab during updates.
 
 ## Acceptance scenarios
 

@@ -136,6 +136,27 @@ export interface ActivityEvent {
   summary: string;
   detail: string;
   createdAt: string;
+  execution?: ExecutionHistory;
+  run?: PiRun | null;
+}
+
+export interface ExecutionStep {
+  id: string;
+  label: string;
+  startedAt: string;
+  finishedAt?: string;
+  outcome: "running" | "completed" | "failed" | "incomplete";
+  metadata: Record<string, string | number>;
+  spanId?: string;
+}
+
+export interface ExecutionHistory {
+  steps: ExecutionStep[];
+  omitted: number;
+  traceId?: string;
+  traceUrl?: string;
+  exportEnabled?: boolean;
+  decisionIds?: string[];
 }
 
 export interface EvidenceReference {

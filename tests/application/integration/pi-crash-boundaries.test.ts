@@ -279,7 +279,13 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
       expect(database.listActiveDecisions(applicationId)).toEqual(
         decisionsBefore,
       );
-      expect(database.listActivity(workspaceId)).toEqual(activityBefore);
+      expect(
+        database.listActivity(workspaceId).filter((event) => !event.execution),
+      ).toEqual(activityBefore.filter((event) => !event.execution));
+      expect(
+        database.listActivity(workspaceId).find((event) => event.execution)?.run
+          ?.status,
+      ).toBe(success ? "succeeded" : "interrupted");
       expect(nativeText()).toBe(before);
       const next = runs.sendChatMessage(
         applicationId,

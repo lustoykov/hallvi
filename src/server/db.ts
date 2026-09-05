@@ -25,6 +25,7 @@ import type {
   Decision,
   Observation,
   PhaseWorkspaceRecord,
+  ExecutionHistory,
 } from "./types";
 
 const schema = {
@@ -412,11 +413,21 @@ export function insertActivity(
 
 export function listActivity(workspaceId: string) {
   return db()
-    .select()
+    .select({ event: activityEvents, run: piRuns })
     .from(activityEvents)
+    .leftJoin(piRuns, eq(activityEvents.id, piRuns.id))
     .where(eq(activityEvents.workspaceId, workspaceId))
-    .orderBy(desc(activityEvents.createdAt), desc(rowId))
-    .all();
+    .orderBy(desc(activityEvents.createdAt), desc(sql`${activityEvents}.rowid`))
+    .all()
+    .map(({ event, run }): ActivityEvent => {
+      if (event.kind !== "chat-execution") return event;
+      return {
+        ...event,
+        detail: "",
+        execution: JSON.parse(event.detail) as ExecutionHistory,
+        run,
+      };
+    });
 }
 
 export function withTransaction<T>(work: () => T): T {

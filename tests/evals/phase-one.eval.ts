@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { shutdownTracing } from "../../src/server/tracing";
 
 import * as database from "../../src/server/db";
 import * as github from "../../src/server/github";
@@ -272,7 +273,8 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
   }
 }
 
-afterAll(() => {
+afterAll(async () => {
+  await shutdownTracing();
   // The scratch database is released even when setup failed before a run
   // directory existed.
   if (!runDirectory) {

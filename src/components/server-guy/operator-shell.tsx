@@ -118,6 +118,7 @@ export function OperatorShell({
       const snapshot = JSON.parse(event.data) as {
         messages: ChatMessage[];
         runs: PiRun[];
+        activity: PhaseOneOperatorView["activity"];
       };
       setRuns(snapshot.runs);
       setView((current) =>
@@ -125,12 +126,16 @@ export function OperatorShell({
           ? {
               ...current,
               messages: mergeMessages(current.messages, snapshot.messages),
+              activity: snapshot.activity ?? current.activity,
             }
           : current,
       );
       const pending = readSubmission(selectedChatId);
       if (pending) {
         if (snapshot.runs.some((run) => run.requestKey === pending.key)) {
+          // SSE can confirm acceptance before the POST response arrives.
+          // Retire the optimistic copy as soon as durable intent is visible.
+          setPendingMessage(null);
           sessionStorage.removeItem(`pi-submission:${selectedChatId}`);
           setDrafts((current) =>
             current[selectedChatId] === pending.message
@@ -302,6 +307,7 @@ export function OperatorShell({
         );
         await api.sendMessage(application.id, activeChat.id, message, key);
         accepted = true;
+        setPendingMessage(null);
         sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
         return api.view(application.id, activeChat.id);
       },

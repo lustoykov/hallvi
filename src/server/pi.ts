@@ -10,6 +10,7 @@ import {
 } from "./pi-decisions";
 import { openNativeChatSession } from "./pi-sessions";
 import type { PiDecision, PiRun, PiTurnResult } from "./types";
+import type { ActivitySignal } from "./run-history";
 
 export class PiUnavailableError extends Error {}
 
@@ -70,6 +71,7 @@ export interface PiExecutionOptions {
   signal?: AbortSignal;
   onText?: (text: string) => void;
   onModelCall?: () => void;
+  onActivity?: (event: ActivitySignal) => void;
 }
 
 export async function askPi(
@@ -77,6 +79,7 @@ export async function askPi(
   options: PiExecutionOptions = {},
 ): Promise<PiTurnResult> {
   options.signal?.throwIfAborted();
+  options.onActivity?.({ type: "start", key: "session", kind: "session" });
   const sdk = await import("@earendil-works/pi-coding-agent");
   const {
     createAgentSession,
@@ -187,11 +190,57 @@ export async function askPi(
       resourceLoader: loader,
       sessionManager: native.sessionManager,
     }));
+    options.onActivity?.({ type: "end", key: "session" });
     let response = "";
     // Native overflow recovery can remove the current failed assistant from
     // session.messages. Only this Run's completion events establish its result.
     let outcome = { text: "", error: true };
+    let generation = 0;
+    let compaction = 0;
+    let retry = 0;
+    let toolSequence = 0;
+    const toolKeys = new Map<string, string>();
     unsubscribe = session.subscribe((event) => {
+      if (event.type === "tool_execution_start") {
+        const key = `tool:${++toolSequence}`;
+        toolKeys.set(event.toolCallId, key);
+        options.onActivity?.({
+          type: "start",
+          key,
+          kind:
+            event.toolName === "search_decisions" ||
+            event.toolName === "propose_decision"
+              ? event.toolName
+              : "tool",
+        });
+      }
+      if (event.type === "tool_execution_end") {
+        const key = toolKeys.get(event.toolCallId);
+        if (key)
+          options.onActivity?.({ type: "end", key, failed: event.isError });
+        toolKeys.delete(event.toolCallId);
+      }
+      if (event.type === "compaction_start")
+        options.onActivity?.({
+          type: "start",
+          key: `compaction:${++compaction}`,
+          kind: "compaction",
+        });
+      if (event.type === "compaction_end")
+        options.onActivity?.({
+          type: "end",
+          key: `compaction:${compaction}`,
+          failed: event.aborted || !!event.errorMessage,
+        });
+      if (event.type === "auto_retry_start") {
+        const key = `retry:${++retry}`;
+        options.onActivity?.({ type: "start", key, kind: "retry" });
+        options.onActivity?.({
+          type: "end",
+          key,
+          metadata: { attempt: event.attempt },
+        });
+      }
       if (event.type === "turn_start" || event.type === "compaction_start") {
         options.onModelCall?.();
         // compaction_start precedes creation of the SDK's abort controller.
@@ -206,9 +255,29 @@ export async function askPi(
         event.message.role === "assistant"
       ) {
         response = "";
+        options.onActivity?.({
+          type: "start",
+          key: `model:${++generation}`,
+          kind: "model",
+        });
         outcome = { text: "", error: true };
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
+        options.onActivity?.({
+          type: "end",
+          key: `model:${generation}`,
+          failed:
+            event.message.stopReason === "error" ||
+            event.message.stopReason === "aborted",
+          metadata: {
+            model: event.message.model,
+            provider: event.message.provider,
+            inputTokens: event.message.usage?.input,
+            outputTokens: event.message.usage?.output,
+            cacheReadTokens: event.message.usage?.cacheRead,
+            cacheWriteTokens: event.message.usage?.cacheWrite,
+          },
+        });
         outcome = {
           text: event.message.content
             .filter((part) => part.type === "text")

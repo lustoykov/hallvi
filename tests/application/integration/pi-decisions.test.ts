@@ -422,7 +422,10 @@ describe("Decision proposals and the final commit", () => {
       { value: "Keep operations simple", sourceMessageId: run.userMessageId },
     ]);
     expect(
-      store.listActivity(current.workspace.id).map((event) => event.kind),
+      store
+        .listActivity(current.workspace.id)
+        .filter((event) => event.kind !== "chat-execution")
+        .map((event) => event.kind),
     ).toEqual(["decision-recorded", "decision-revised"]);
   });
 

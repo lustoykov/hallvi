@@ -13,6 +13,7 @@ import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
 
 import { statusLabel } from "./format";
 import { LocalTime } from "./local-time";
+import { ExecutionActivity } from "./execution-activity";
 
 type InspectorTab = "record" | "activity" | "changes" | "receipts";
 const tabs = ["record", "activity", "changes", "receipts"] as const;
@@ -158,18 +159,21 @@ export function Inspector({
 
         {activeTab === "activity" && (
           <section className="sg-inspector-section">
-            <span className="sg-eyebrow">What happened</span>
             {view.activity.length ? (
-              view.activity.map((event) => (
-                <article className="sg-event" key={event.id}>
-                  <span className="sg-event-dot" />
-                  <div>
-                    <strong>{event.summary}</strong>
-                    <p>{event.detail}</p>
-                    <LocalTime value={event.createdAt} />
-                  </div>
-                </article>
-              ))
+              view.activity.map((event) =>
+                event.execution ? (
+                  <ExecutionActivity event={event} key={event.id} />
+                ) : (
+                  <article className="sg-event" key={event.id}>
+                    <span className="sg-event-dot" />
+                    <div>
+                      <strong>{event.summary}</strong>
+                      <p>{event.detail}</p>
+                      <LocalTime value={event.createdAt} />
+                    </div>
+                  </article>
+                ),
+              )
             ) : (
               <p>Activity will appear after the workspace is created.</p>
             )}

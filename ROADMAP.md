@@ -16,7 +16,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
 | 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
-| 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
+| 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Implemented in the Activity/tracing slice; verified with deterministic, desktop and one real-model trace. Extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
 | 10 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
@@ -114,11 +114,11 @@ The first design deliberately has one worker process and no leases. A Chat ID id
 
 Give users an expandable history of what Server Guy attempted, accepted, and actually changed, with technical evidence when they want to inspect a step. The [action history and tracing spec](docs/specs/action-history-and-tracing.md) owns the behavior and boundaries; build order and completion stay here. The first slice follows durable Pi requests and does not add a new Phase 1 acceptance gate.
 
-- [ ] Reuse Pi Run identity and durable Activity Events to correlate one chat execution across the worker, Pi, domain validation, database commit, and refreshed Operator View.
-- [ ] Instrument Pi model/tool lifecycle and Server Guy's own boundaries with OpenTelemetry; export to Langfuse and attach the same run/trace references to structured logs.
-- [ ] Preserve meaningful start, result, retry, cancellation, timeout, interruption, and rejection facts. Record a Decision as saved only after commit; retain failure history when domain writes roll back.
-- [ ] Expand the existing Activity view into ordered steps with timing, outcomes, and record/evidence links; keep redacted technical payloads in Evidence and offer an authorized Langfuse trace link when configured.
-- [ ] Verify success, domain rejection after tool success, timeout/cancellation, restart/reconnect, unavailable telemetry, and payload redaction against the spec's acceptance scenarios.
+- [x] Reuse Pi Run identity and durable Activity Events to correlate one chat execution across the worker, Pi, domain validation, database commit, and refreshed Operator View.
+- [x] Instrument Pi model/tool lifecycle and Server Guy's own boundaries with OpenTelemetry; export to Langfuse and attach the same run/trace references to structured logs.
+- [x] Preserve meaningful start, result, retry, cancellation, timeout, interruption, and rejection facts. Record a Decision as saved only after commit; retain failure history when domain writes roll back.
+- [x] Expand the existing Activity view into ordered steps with timing, outcomes, and record/evidence links; keep selected metadata in collapsed Technical details and offer an authenticated Langfuse trace link when configured.
+- [x] Verify success, domain rejection after tool success, timeout/cancellation, restart/reconnect, unavailable telemetry, and payload redaction against the spec's acceptance scenarios.
 - [ ] Extend the same correlation through policy, approvals, provider calls, receipts, and verification as those Operations are implemented; add Sentry for application errors before external-user releases.
 
 ## Revisit Workflow DevKit only at its trigger

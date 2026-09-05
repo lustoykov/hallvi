@@ -2,6 +2,13 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "activity-history",
+    name: "Inspect reply history and recover from interruptions",
+    description:
+      "Watch execution steps, reload, inspect saved requirements, cancel and retry without claiming incomplete work succeeded.",
+    smoke: false,
+  },
+  {
     id: "add-application",
     name: "Add application and save a priority",
     description:

@@ -154,10 +154,11 @@ const env = {
   SERVER_GUY_GITHUB_CLIENT_ID: "Iv1.qa",
   SERVER_GUY_GITHUB_APP_SLUG: "qa-server-guy",
   NEXT_TELEMETRY_DISABLED: "1",
+  SERVER_GUY_TRACING: "0",
 };
 for (const key of Object.keys(env)) {
   if (
-    /(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|GITHUB_TOKEN|GH_TOKEN|OPENAI_API_KEY)$/.test(
+    /(?:LANGFUSE|OTEL)|(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|GITHUB_TOKEN|GH_TOKEN|OPENAI_API_KEY)$/.test(
       key,
     )
   )

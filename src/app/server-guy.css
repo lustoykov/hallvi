@@ -1864,3 +1864,99 @@ a.sg-chip:hover {
     animation: none;
   }
 }
+.sg-execution {
+  border-bottom: 1px solid var(--line);
+  padding-block: 16px;
+  font-size: 13px;
+}
+.sg-execution > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.sg-execution-caret {
+  flex: 0 0 12px;
+}
+.sg-execution[open] > summary > .sg-execution-caret {
+  transform: rotate(90deg);
+}
+.sg-execution > summary > span:first-of-type {
+  display: grid;
+  gap: 4px;
+}
+.sg-execution time,
+.sg-execution-state,
+.sg-execution-timing,
+.sg-execution-steps small {
+  color: var(--ink-2);
+}
+.sg-execution-state {
+  margin-left: auto;
+  text-align: right;
+  font-size: 12px;
+}
+.sg-execution-body {
+  padding-top: 12px;
+}
+.sg-execution-body p {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.sg-execution-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.sg-execution-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 10px;
+}
+.sg-execution-steps li > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+.sg-execution-steps li > span:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sg-execution-steps strong {
+  font-weight: 500;
+}
+.sg-execution-warning {
+  color: var(--amber-text);
+}
+.sg-execution-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.sg-execution a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sg-execution-diagnostics {
+  margin-top: 16px;
+}
+.sg-execution-diagnostics > summary {
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.sg-execution-diagnostics dl {
+  margin: 8px 0 16px;
+  overflow-wrap: anywhere;
+}
+.sg-execution-diagnostics dt {
+  color: var(--ink-2);
+}
+.sg-execution-diagnostics dd {
+  margin: 0 0 6px;
+}
+.sg-execution summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}

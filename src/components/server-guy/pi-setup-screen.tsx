@@ -700,6 +700,11 @@ export function PiSetupScreen({
         </p>
         <h3>What leaves this machine?</h3>
         <p>
+          If optional Langfuse tracing is enabled by the operator, reply IDs,
+          step timings, outcomes, model names and token counts are exported.
+          Traces omit prompts, replies, tool arguments and credentials.
+        </p>
+        <p>
           Sign-in goes to OpenAI. Chat messages and relevant context go to its
           model. Your subscription limits apply; there’s no automatic switch to
           API billing.

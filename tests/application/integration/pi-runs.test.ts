@@ -150,7 +150,14 @@ describe("durable Pi acceptance and outcomes", () => {
     await executePiRun(claimed());
     expect(runs.getPiRun(accepted.run.id)?.status).toBe("failed");
     expect(store.listActiveDecisions(applicationId)).toEqual([]);
-    expect(store.listActivity(before.workspace!.id)).toEqual(before.activity);
+    const history = store.listActivity(before.workspace!.id);
+    expect(history.filter((event) => !event.execution)).toEqual(
+      before.activity,
+    );
+    expect(
+      history.find((event) => event.execution)?.execution?.steps.at(-1)
+        ?.outcome,
+    ).toBe("failed");
     expect(store.listMessages(chatId).at(-1)).toMatchObject({
       body: "",
       status: "failed",

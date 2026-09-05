@@ -1,7 +1,8 @@
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { databasePath, listMessages } from "./db";
+import { databasePath, listMessages, withTransaction } from "./db";
+import { beginRunTrace } from "./tracing";
 import { buildPiRunContext, PiRunContextError } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
 import { buildViewSummary, loadChat } from "./phase-one";
@@ -49,6 +50,7 @@ export async function executePiRun(
   } = {},
 ) {
   const controller = new AbortController();
+  const execution = beginRunTrace(run);
   const stop = () => {
     finishPiRun(
       run.id,
@@ -81,6 +83,7 @@ export async function executePiRun(
   try {
     const work = async () => {
       controller.signal.throwIfAborted();
+      execution.signal({ type: "start", key: "context", kind: "context" });
       const { application, chat } = loadChat(run.applicationId, run.chatId);
       if (chat.archivedAt) throw new Error("This Chat is archived.");
       const runContext = buildPiRunContext(run, buildViewSummary(application));
@@ -88,10 +91,12 @@ export async function executePiRun(
         (message) => message.id === run.userMessageId,
       );
       if (!user) throw new Error("The accepted user message is missing.");
+      execution.signal({ type: "end", key: "context" });
       const reply = await askPi(
         { run, userMessage: user.body, runContext },
         {
           signal: controller.signal,
+          onActivity: execution.signal,
           onModelCall() {
             if (getPiRun(run.id)?.status === "running") recordPiCall(run.id);
             else controller.abort();
@@ -102,10 +107,24 @@ export async function executePiRun(
         },
       );
       controller.signal.throwIfAborted();
-      completePiRun(run.id, {
-        ...reply,
-        message: normalizePiAssistantMessage(reply.message),
-      });
+      execution.signal({ type: "start", key: "save", kind: "save" });
+      try {
+        withTransaction(() => {
+          const saved = completePiRun(run.id, {
+            ...reply,
+            message: normalizePiAssistantMessage(reply.message),
+          });
+          if (saved)
+            execution.signal({
+              type: "end",
+              key: "save",
+              metadata: { requirements: reply.decisionProposals.length },
+            });
+        });
+      } catch (error) {
+        execution.signal({ type: "end", key: "save", failed: true });
+        throw error;
+      }
     };
     await Promise.race([
       work(),
@@ -141,6 +160,7 @@ export async function executePiRun(
         : "Server Guy could not finish this attempt. Check Settings or retry. Your message is saved; no Decisions were saved from this attempt.",
     );
   } finally {
+    execution.finish(getPiRun(run.id)?.status ?? "interrupted");
     clearInterval(poll);
     clearTimeout(timeout);
     clearTimeout(drainTimer);

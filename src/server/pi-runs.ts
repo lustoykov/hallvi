@@ -1,7 +1,18 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, insertMessage, listMessages, withTransaction } from "./db";
-import { messages, piRuns } from "./db-schema";
+import {
+  db,
+  insertMessage,
+  listMessages,
+  listActivity,
+  withTransaction,
+} from "./db";
+import {
+  createRunHistory,
+  closeRunHistory,
+  updateRunHistory,
+} from "./run-history";
+import { messages, piRuns, decisions } from "./db-schema";
 import {
   loadChat,
   NotFoundError,
@@ -17,8 +28,9 @@ export function getPiRun(id: string) {
 }
 
 export function chatRunSnapshot(applicationId: string, chatId: string) {
-  loadChat(applicationId, chatId);
+  const { workspace } = loadChat(applicationId, chatId);
   return withTransaction(() => ({
+    activity: listActivity(workspace.id),
     messages: listMessages(chatId),
     runs: db()
       .select()
@@ -100,7 +112,7 @@ function insertRun(
   retryOfId: string | null,
 ) {
   const assistant = insertMessage(chatId, "assistant", "", "pi", "queued");
-  return db()
+  const run = db()
     .insert(piRuns)
     .values({
       id: randomUUID(),
@@ -116,6 +128,8 @@ function insertRun(
     })
     .returning()
     .get();
+  createRunHistory(run);
+  return run;
 }
 
 export function retryPiRun(applicationId: string, chatId: string, id: string) {
@@ -240,6 +254,7 @@ export function finishPiRun(
       .set({ status, revision: sql`${messages.revision} + 1` })
       .where(eq(messages.id, run.assistantMessageId))
       .run();
+    closeRunHistory(id);
     return true;
   });
 }
@@ -257,6 +272,14 @@ export function completePiRun(id: string, reply: PiTurnResult) {
       run.userMessageId,
       reply.decisionProposals,
     );
+    updateRunHistory(id, (history) => {
+      history.decisionIds = db()
+        .select({ id: decisions.id })
+        .from(decisions)
+        .where(eq(decisions.sourceMessageId, run.userMessageId))
+        .all()
+        .map((d) => d.id);
+    });
     db()
       .update(messages)
       .set({

@@ -1,0 +1,246 @@
+import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import * as store from "../../../src/server/db";
+import * as runs from "../../../src/server/pi-runs";
+import { executePiRun } from "../../../src/server/pi-worker";
+import {
+  diagnosticMetadata,
+  MAX_EXECUTION_STEPS,
+  startHistoryStep,
+} from "../../../src/server/run-history";
+import {
+  beginRunTrace,
+  langfuseTraceUrl,
+  shutdownTracing,
+} from "../../../src/server/tracing";
+import { pushTestDatabase } from "../../test-database";
+
+const mocks = vi.hoisted(() => ({
+  ask: vi.fn(),
+  spans: [] as unknown[],
+  unavailable: false,
+}));
+vi.mock("../../../src/server/pi", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi")>()),
+  askPi: mocks.ask,
+}));
+vi.mock("@langfuse/otel", async () => {
+  const { SimpleSpanProcessor } = await import("@opentelemetry/sdk-trace-base");
+  return {
+    LangfuseSpanProcessor: class extends SimpleSpanProcessor {
+      constructor() {
+        super({
+          export(spans, callback) {
+            mocks.spans.push(...spans);
+            callback({ code: mocks.unavailable ? 1 : 0 });
+          },
+          shutdown: async () => {},
+        });
+      }
+    },
+  };
+});
+let root: string, app: string, chat: string, workspace: string;
+beforeAll(() => {
+  root = mkdtempSync(join(tmpdir(), "server-guy-history-"));
+  vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "test.db"));
+  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+});
+beforeEach(async () => {
+  await shutdownTracing();
+  vi.stubEnv("SERVER_GUY_TRACING", "0");
+  store.db().$client.exec("DELETE FROM applications");
+  app = store.insertApplication({
+    name: "audit",
+    repositoryUrl: "https://github.com/qa/audit",
+    repositoryOwner: "qa",
+    repositoryName: "audit",
+    environment: "production",
+    approvalMode: "pi-decides",
+    approvalScope: "test",
+  }).id;
+  workspace = store.insertWorkspace(app).id;
+  chat = store.insertChat(workspace, "Main", true).id;
+  mocks.spans.length = 0;
+  mocks.unavailable = false;
+  mocks.ask.mockReset().mockImplementation(async (_input, options) => {
+    options.onActivity({ type: "start", key: "model:1", kind: "model" });
+    options.onActivity({
+      type: "end",
+      key: "model:1",
+      metadata: {
+        model: "fixture",
+        inputTokens: 12,
+        outputTokens: 4,
+        password: "secret-canary",
+        output: "secret-canary",
+      },
+    });
+    options.onActivity({
+      type: "start",
+      key: "tool:1",
+      kind: "propose_decision",
+    });
+    options.onActivity({ type: "end", key: "tool:1" });
+    return {
+      message: "Saved: secret-canary",
+      decisionProposals: [
+        { kind: "launch-priority", value: "Keep data in the EU" },
+      ],
+    };
+  });
+});
+afterAll(async () => {
+  await shutdownTracing();
+  globalThis.__serverGuyDb?.$client.close();
+  delete globalThis.__serverGuyDb;
+  vi.unstubAllEnvs();
+  rmSync(root, { recursive: true, force: true });
+});
+function queued() {
+  return runs.sendChatMessage(app, chat, "secret-canary", randomUUID()).run;
+}
+function history() {
+  return store.listActivity(workspace).find((event) => event.execution)!;
+}
+
+it("persists ordered steps and committed requirement links, deduplicates submissions and reconstructs after reopening SQLite", async () => {
+  const run = queued();
+  expect(
+    runs.sendChatMessage(app, chat, "secret-canary", run.requestKey).run.id,
+  ).toBe(run.id);
+  expect(history().run?.status).toBe("queued");
+  await executePiRun(runs.claimNextPiRun()!);
+  expect(history().run?.status).toBe("succeeded");
+  expect(history().execution?.steps.map((s) => s.id)).toEqual([
+    "context",
+    "model:1",
+    "tool:1",
+    "save",
+  ]);
+  expect(
+    history().execution?.steps.every((s) => s.outcome === "completed"),
+  ).toBe(true);
+  expect(history().execution?.decisionIds).toEqual(
+    store.listActiveDecisions(app).map((d) => d.id),
+  );
+  expect(JSON.stringify(history())).not.toContain("secret-canary");
+  const before = history();
+  store.db().$client.close();
+  delete globalThis.__serverGuyDb;
+  expect(history()).toEqual(before);
+  expect(runs.chatRunSnapshot(app, chat).activity).toContainEqual(before);
+  const other = store.insertApplication({
+    name: "other",
+    repositoryUrl: "https://github.com/qa/other",
+    repositoryOwner: "qa",
+    repositoryName: "other",
+    environment: "production",
+    approvalMode: "pi-decides",
+    approvalScope: "test",
+  });
+  expect(() => runs.chatRunSnapshot(other.id, chat)).toThrow();
+});
+
+it("keeps completed tool evidence when final validation rejects all writes", async () => {
+  mocks.ask.mockImplementation(async (_input, options) => {
+    options.onActivity({
+      type: "start",
+      key: "tool:1",
+      kind: "propose_decision",
+    });
+    options.onActivity({ type: "end", key: "tool:1" });
+    return {
+      message: "Saved",
+      decisionProposals: [
+        { kind: "launch-priority", value: "Budget", replaces: randomUUID() },
+      ],
+    };
+  });
+  queued();
+  await executePiRun(runs.claimNextPiRun()!);
+  expect(history().run?.status).toBe("failed");
+  expect(
+    history().execution?.steps.find((s) => s.id === "tool:1")?.outcome,
+  ).toBe("completed");
+  expect(history().execution?.steps.at(-1)?.outcome).toBe("failed");
+  expect(history().execution?.decisionIds).toBeUndefined();
+  expect(store.listActiveDecisions(app)).toEqual([]);
+});
+
+it.each(["cancelled", "timed-out", "interrupted"] as const)(
+  "marks unfinished steps incomplete on %s and preserves retry lineage",
+  (status) => {
+    const run = queued();
+    runs.claimNextPiRun();
+    startHistoryStep(run.id, "model:1", "model");
+    if (status === "interrupted") runs.interruptRunningPiRuns();
+    else runs.finishPiRun(run.id, status, "Stopped");
+    expect(history().execution?.steps[0].outcome).toBe("incomplete");
+    expect(startHistoryStep(run.id, "late", "model")).toBe(false);
+    const retry = runs.retryPiRun(app, chat, run.id);
+    expect(retry.run.retryOfId).toBe(run.id);
+    expect(
+      store.listActivity(workspace).filter((e) => e.execution),
+    ).toHaveLength(2);
+  },
+);
+
+it("bounds diagnostic growth and only retains selected numeric/model metadata", () => {
+  const run = queued();
+  runs.claimNextPiRun();
+  for (let i = 0; i < MAX_EXECUTION_STEPS + 5; i++)
+    startHistoryStep(run.id, `tool:${i}`, "tool");
+  expect(history().execution?.steps).toHaveLength(MAX_EXECUTION_STEPS);
+  expect(history().execution?.omitted).toBe(5);
+  expect(
+    diagnosticMetadata({
+      inputTokens: -1,
+      outputTokens: Infinity,
+      model: "sk-secret",
+      provider: "authorization bearer secret",
+      error: "secret",
+      arguments: "secret",
+    }),
+  ).toEqual({});
+});
+
+it.each([false, true])(
+  "exports correlated metadata without content and survives exporter failure=%s",
+  async (unavailable) => {
+    vi.stubEnv("SERVER_GUY_TRACING", "1");
+    vi.stubEnv("LANGFUSE_PUBLIC_KEY", "synthetic");
+    vi.stubEnv("LANGFUSE_SECRET_KEY", "synthetic");
+    vi.stubEnv("LANGFUSE_PROJECT_ID", "test-project");
+    vi.stubEnv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com");
+    mocks.unavailable = unavailable;
+    queued();
+    await executePiRun(runs.claimNextPiRun()!);
+    await shutdownTracing();
+    expect(history().run?.status).toBe("succeeded");
+    const spans =
+      mocks.spans as import("@opentelemetry/sdk-trace-base").ReadableSpan[];
+    expect(spans.length).toBeGreaterThan(3);
+    expect(new Set(spans.map((s) => s.spanContext().traceId)).size).toBe(1);
+    expect(JSON.stringify(spans.map((s) => s.attributes))).not.toContain(
+      "secret-canary",
+    );
+    expect(history().execution?.traceUrl).toMatch(
+      /^https:\/\/cloud.langfuse.com\/project\/test-project\/traces\/[a-f0-9]{32}$/,
+    );
+  },
+);
+
+it("does not present unsafe trace URLs", () => {
+  vi.stubEnv("SERVER_GUY_TRACING", "1");
+  vi.stubEnv("LANGFUSE_PROJECT_ID", "test");
+  vi.stubEnv("LANGFUSE_BASE_URL", "javascript:alert(1)");
+  expect(langfuseTraceUrl("a".repeat(32))).toBeUndefined();
+  const run = queued();
+  runs.claimNextPiRun();
+  const trace = beginRunTrace(run);
+  trace.finish("interrupted");
+});
