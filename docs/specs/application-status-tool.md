@@ -1,6 +1,6 @@
 # Application status lookup for Pi
 
-Status: agreed September 6, 2026 and implemented on this branch, stacked on [PR #16](https://github.com/lustoykov/server-guy/pull/16) (Activity/tracing), awaiting PR review. Build order and the implementation checklist stay in [ROADMAP.md](../../ROADMAP.md#application-status-lookup), after Activity/tracing and before Phase 2.
+Status: agreed and merged September 6, 2026 in [PR #17](https://github.com/lustoykov/server-guy/pull/17), after [PR #16](https://github.com/lustoykov/server-guy/pull/16) (Activity/tracing). Build order and the implementation checklist stay in [ROADMAP.md](../../ROADMAP.md#application-status-lookup), after Activity/tracing and before Phase 2.
 
 ## Purpose
 

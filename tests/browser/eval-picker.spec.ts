@@ -54,7 +54,9 @@ test(
       );
     save(
       "original",
-      phaseOneCases.filter((item) => !item.githubState).map((item) => item.id),
+      phaseOneCases
+        .filter((item) => item.category !== "GitHub access")
+        .map((item) => item.id),
     );
     archiveRun(root, "original", loadReport(root, "original").hash, true);
     dashboard.server.listen(0, "127.0.0.1");
@@ -75,7 +77,7 @@ test(
           inputs.map((input) => (input as HTMLInputElement).value),
         );
     const githubIds = phaseOneCases
-      .filter((item) => item.githubState)
+      .filter((item) => item.category === "GitHub access")
       .map((item) => item.id);
     const category = (name: string) =>
       page.locator(`.eval-category[data-category="${name}"] > details`);

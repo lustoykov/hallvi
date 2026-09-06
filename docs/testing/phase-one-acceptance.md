@@ -1,6 +1,6 @@
 # Phase 1 acceptance: repeatable desktop journeys
 
-Status: maintained acceptance contract and test plan, 2026-09-05. This is the single testing guide for Phase 1. Vitest, checked-in desktop Playwright journeys, an opt-in real-Pi casebook and a local testing dashboard run today. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance. All executable testing code, runner configurations and generated reports live under [tests/](../../tests/README.md).
+Status: maintained acceptance contract and test plan, updated 2026-09-06. This is the single testing guide for Phase 1. Vitest, checked-in desktop Playwright journeys, an opt-in real-Pi casebook and a local testing dashboard run today. Automated eval checks do not imply human-reviewed model quality or complete Phase 1 acceptance. All executable testing code, runner configurations and generated reports live under [tests/](../../tests/README.md).
 
 This guide owns acceptance cases, test/eval procedures, and dated verification evidence. The [journey](../user-journeys/01-application-launch.md) owns expected product behavior; the [roadmap](../../ROADMAP.md) owns development order and implementation status. Failures found here become linked roadmap work, not a competing build plan.
 
@@ -146,7 +146,7 @@ This workflow authorizes audit/test work, not unrelated product fixes or new dep
 
 ## Desktop automation and CI policy
 
-The [shared catalog](../../tests/browser/journeys.ts) contains thirteen selectable groups, including [GitHub connection](../../tests/browser/github.spec.ts), durable requests, [native history/recovery](../../tests/browser/native-sessions.spec.ts) and dashboard testing. One group can contain several tests; see the dated verification below for the tested case count. These cover selected contract branches, not every branch of the acceptance cases. Further fresh Pi setup/device-code variants, evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
+The [shared catalog](../../tests/browser/journeys.ts) contains fourteen selectable groups, including [GitHub connection](../../tests/browser/github.spec.ts), durable requests, [native history/recovery](../../tests/browser/native-sessions.spec.ts) and dashboard testing. One group can contain several tests; see the dated verification below for the tested case count. These cover selected contract branches, not every branch of the acceptance cases. Further fresh Pi setup/device-code variants, evidence/chat-lifecycle paths and the complete keyboard audit remain broader acceptance work.
 
 The dashboard's **Choose journeys** dialog describes each scenario and runs only the selected stable tags from [the shared catalog](../../tests/browser/journeys.ts), without scrolling away from the suite table. Empty, duplicate and unknown selections are rejected. Browser smoke remains the two tagged smoke journeys; selecting a local subset does not change CI.
 
@@ -238,6 +238,24 @@ Before declaring the complete Phase 1 follow-up sequence done, also prove:
 Deployment, infrastructure provisioning, monitoring automations, and Phase 2 work remain outside this Phase 1 acceptance contract. Workflow DevKit is still a later complexity-triggered choice, not a test runner.
 
 ## Latest verification
+
+### September 6 acceptance pass after PRs #15–17 merged
+
+Base: `9e757934574183237f369811f81431d046331e8b` (`main` after PR #17), isolated checkout `codex/phase-one-acceptance`. The application code stayed frozen throughout the full live baseline. This pass adds one approval-explanation instruction, repairs one browser test fixture, and corrects stale status documentation.
+
+- **Live baseline: 29/29 automated cases passed**, `gpt-5.6-sol` / `high`, one repetition, 321.93 seconds. Actual native Pi, scoped tools, compaction and durable SQLite completion ran against disposable records; no GitHub calls. All required/forbidden status-lookup assertions passed. Saved cases cover requirements, stale checks, deployment claims, current Decisions after compaction and cancelled proposals.
+- **Assistant semantic review:** all 29 answers, accepted proposals and available tool assertions were reviewed against the saved rubrics. Twenty-eight met the rubric; one needed more precise wording: the changed Approval Mode answer said approval before “any change” instead of “every external change.” The stable instruction now states the external-change boundary and that an explicitly requested local requirement needs no second confirmation.
+- **Targeted live follow-up: 6/6 automated and assistant-reviewed passes**, two repetitions each of `status-approval-mode-changed`, `explicit-hosting-budget` and `explicit-data-residency`, 72.67 seconds. Both mode answers now state the correct boundary; all four requirement answers save naturally without another approval or a claim to enforce infrastructure changes. Fingerprints stayed frozen during each run. The full 29-case baseline was not rerun after this narrowly scoped instruction change.
+- **Full desktop suite: 26/26 passed** (2.8 minutes). The initial run had 25 passes and one stale eval-picker test: filtering by `githubState` selected seven cases after status scenarios began using GitHub fixtures, while the test expected the three-case GitHub category. Selecting the actual `GitHub access` category repaired the test; the focused rerun and then the full suite passed. The dashboard behavior did not change.
+- **Deterministic tests: 560/560 passed in 48 files** after the instruction correction; TypeScript, ESLint/Prettier and the production build also passed. Browser provider responses are synthetic; the live eval responses above are real. No user applications, transcripts, saved reviews or GitHub credentials were changed. Existing Pi OAuth credentials supplied the authorized live runs; normal SDK refresh may update that credential file.
+
+Local evidence (git-ignored):
+
+- `tests/results/evals/2026-09-06T12-56-10.868Z-kJ5jaX/`: original immutable `results.json`, `review.md`, and a separate `assistant-review.md` with a source hash and per-case reasoning.
+- `tests/results/evals/2026-09-06T13-02-18.599Z-WjuXdz/`: targeted follow-up with the same evidence files.
+- `tests/results/acceptance-2026-09-06/initial-browser-artifacts/`: retained failure screenshot/trace from the first full desktop run. Final passing screenshots/report are under `tests/results/browser-artifacts/` and `tests/results/browser-report/`.
+
+**Remaining acceptance evidence:** this is a completed technical pass, not a claim that every branch of P1-01–20 or human acceptance is complete. The assistant reviews do not populate human verdicts or impersonate the separate dashboard judge. Human meaning sign-off is still pending. Fresh/replacement Pi OAuth transport variants, the complete keyboard-only/focus audit, and a retained production-build login start/poll/cancel smoke probe remain open coverage work. Synthetic coordinator/error tests and prior live happy-path evidence do not replace those missing end-to-end receipts. No new infrastructure is required to close them; optional unused-field cleanup and future Operation tracing remain separate backlog items.
 
 **Local rollout for [PR #15](https://github.com/lustoykov/server-guy/pull/15):** stopped the original web, worker and idle testing dashboard with zero queued/running Runs. Made a private SQLite backup (including WAL state), then ran the explicit v5 → v6 upgrade. Every old column/row in all nine tables matched the backup; `quick_check` returned `ok`, with no foreign-key violations. Restarted the app at port 3000, worker and dashboard at 4317. Browser inspection confirmed the existing Chat and 23 messages remained, updated assistant labels rendered, and the new live eval report was discoverable. No test message was added to the real Chat, and no credential or review reset was performed.
 

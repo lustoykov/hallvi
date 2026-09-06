@@ -1,6 +1,6 @@
 # Native Pi sessions and permission boundaries
 
-Status: slice 1 implemented on this branch, awaiting PR review. This is the current native-session contract; external mutation/approval enforcement remains a later slice. Baseline: [PR #13](https://github.com/lustoykov/server-guy/pull/13), merged September 5, 2026. Build order belongs in [ROADMAP.md](../../ROADMAP.md).
+Status: slice 1 merged in [PR #15](https://github.com/lustoykov/server-guy/pull/15). This is the current native-session contract; external mutation/approval enforcement remains a later slice. Baseline: [PR #13](https://github.com/lustoykov/server-guy/pull/13), merged September 5, 2026. Build order belongs in [ROADMAP.md](../../ROADMAP.md).
 
 ## Recommendation
 
