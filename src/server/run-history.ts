@@ -1,13 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, withTransaction } from "./db";
-import { activityEvents, piRuns } from "./db-schema";
+import { replyExecutionHistory, piRuns } from "./db-schema";
 import type { ExecutionHistory, ExecutionStep, PiRun } from "./types";
 
 // Reply execution history answers "how did Server Guy produce this answer?".
-// It is stored as one bounded row per reply (not per token) beside the
-// application's Activity Events, but it is never an Activity Event: the feed
-// excludes it and the Chat shows it with its reply. The Run remains the
-// authority for status.
+// Its dedicated table holds one bounded row per Run, separate from application
+// Activity Events. The Chat shows it with its reply; the Run owns lifecycle.
 export const MAX_EXECUTION_STEPS = 128;
 export const stepLabels = {
   context: "Load current app context",
@@ -66,29 +64,20 @@ export function listExecutionHistories(
   if (!runIds.length) return {};
   return Object.fromEntries(
     db()
-      .select({ id: activityEvents.id, detail: activityEvents.detail })
-      .from(activityEvents)
-      .where(
-        and(
-          inArray(activityEvents.id, runIds),
-          eq(activityEvents.kind, "chat-execution"),
-        ),
-      )
+      .select()
+      .from(replyExecutionHistory)
+      .where(inArray(replyExecutionHistory.runId, runIds))
       .all()
-      .map((row) => [row.id, JSON.parse(row.detail) as ExecutionHistory]),
+      .map((row) => [row.runId, JSON.parse(row.detail) as ExecutionHistory]),
   );
 }
 
 export function createRunHistory(run: PiRun) {
   db()
-    .insert(activityEvents)
+    .insert(replyExecutionHistory)
     .values({
-      id: run.id,
-      workspaceId: run.workspaceId,
-      kind: "chat-execution",
-      summary: "Assistant reply",
+      runId: run.id,
       detail: JSON.stringify({ steps: [], omitted: 0 }),
-      createdAt: run.createdAt,
     })
     .run();
 }
@@ -98,18 +87,18 @@ export function updateRunHistory(
   update: (history: ExecutionHistory) => void,
 ) {
   return withTransaction(() => {
-    const event = db()
+    const row = db()
       .select()
-      .from(activityEvents)
-      .where(eq(activityEvents.id, id))
+      .from(replyExecutionHistory)
+      .where(eq(replyExecutionHistory.runId, id))
       .get();
-    if (!event || event.kind !== "chat-execution") return;
-    const history = JSON.parse(event.detail) as ExecutionHistory;
+    if (!row) return;
+    const history = JSON.parse(row.detail) as ExecutionHistory;
     update(history);
     db()
-      .update(activityEvents)
+      .update(replyExecutionHistory)
       .set({ detail: JSON.stringify(history) })
-      .where(eq(activityEvents.id, id))
+      .where(eq(replyExecutionHistory.runId, id))
       .run();
   });
 }

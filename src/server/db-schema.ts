@@ -134,6 +134,15 @@ export const chatSummaries = sqliteTable("chat_summaries", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// Bounded reply diagnostics; pi_runs owns lifecycle and timestamps.
+export const replyExecutionHistory = sqliteTable("reply_execution_history", {
+  runId: text("run_id")
+    .primaryKey()
+    .notNull()
+    .references(() => piRuns.id, { onDelete: "cascade" }),
+  detail: text("detail").notNull(),
+});
+
 export const decisions = sqliteTable(
   "decisions",
   {

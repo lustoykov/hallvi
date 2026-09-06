@@ -238,7 +238,6 @@ describe("application creation, checks and chat administration", () => {
       "repository-observed",
       "chat-created",
       "chat-archived",
-      "chat-execution",
     ]);
     expect(
       runs

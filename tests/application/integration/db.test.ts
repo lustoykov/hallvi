@@ -97,6 +97,7 @@ describe("Phase 1 schema", () => {
       "observations",
       "phase_workspaces",
       "pi_runs",
+      "reply_execution_history",
     ]);
     expect(workspaceColumns).toEqual([
       "id",

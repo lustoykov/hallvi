@@ -226,6 +226,45 @@ it.each(["cancelled", "timed-out", "interrupted"] as const)(
   },
 );
 
+it("rolls back saved Decision links with a failed final commit, then retains failure diagnostics", async () => {
+  const run = queued();
+  store.db().$client.exec(`
+    CREATE TRIGGER reject_final_run BEFORE UPDATE ON pi_runs
+    WHEN NEW.status = 'succeeded'
+    BEGIN SELECT RAISE(ABORT, 'synthetic final commit failure'); END;
+  `);
+  try {
+    await executePiRun(runs.claimNextPiRun()!);
+    expect(status(run.id)).toBe("failed");
+    expect(execution(run.id).decisionIds).toBeUndefined();
+    expect(
+      execution(run.id).steps.find((step) => step.id === "tool:1")?.outcome,
+    ).toBe("completed");
+    expect(execution(run.id).steps.at(-1)?.outcome).toBe("failed");
+    expect(store.listActiveDecisions(app)).toEqual([]);
+    expect(store.listActivity(workspace)).toEqual([]);
+    expect(store.listMessages(chat).at(-1)?.status).toBe("failed");
+    expect(
+      store
+        .db()
+        .$client.prepare(
+          "SELECT count(*) AS count FROM reply_execution_history WHERE run_id = ?",
+        )
+        .get(run.id),
+    ).toEqual({ count: 1 });
+    expect(
+      store
+        .db()
+        .$client.prepare(
+          "SELECT count(*) AS count FROM activity_events WHERE kind = 'chat-execution'",
+        )
+        .get(),
+    ).toEqual({ count: 0 });
+  } finally {
+    store.db().$client.exec("DROP TRIGGER reject_final_run");
+  }
+});
+
 it("bounds diagnostic growth and only retains selected numeric/model metadata", () => {
   const run = queued();
   runs.claimNextPiRun();

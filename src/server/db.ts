@@ -15,6 +15,7 @@ import {
   phaseWorkspaces,
   piRuns,
   chatSummaries,
+  replyExecutionHistory,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type {
@@ -37,6 +38,7 @@ const schema = {
   phaseWorkspaces,
   piRuns,
   chatSummaries,
+  replyExecutionHistory,
 };
 type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -92,7 +94,7 @@ function assertCurrentSchema(
   }
   if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Run npm run db:push, or delete the disposable database and push a fresh one.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Only the version 6 to 7 upgrade is supported; other prototype versions require an explicit fresh database.`,
     );
   }
 }

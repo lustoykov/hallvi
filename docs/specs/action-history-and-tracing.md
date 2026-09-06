@@ -2,7 +2,7 @@
 
 Status: implemented in [PR #16](https://github.com/lustoykov/server-guy/pull/16). Its first slice added reply execution history and optional tracing; its 2026-09-06 follow-up applied the Application Activity correction below: reply details moved beside each Chat reply, the feed was restricted to application events, and repository-verification invalidation is recorded. Later Operations remain future scope; remaining work belongs in the [roadmap](../../ROADMAP.md#action-history-and-tracing).
 
-Application Activity answers **what happened to this application?** Reply execution details answer **how did Server Guy produce this answer?** Keep both inspectable in their appropriate surfaces. Sharing diagnostic signals or storage does not make every execution step an Activity Event.
+Application Activity answers **what happened to this application?** Reply execution details answer **how did Server Guy produce this answer?** Keep both inspectable in their appropriate surfaces. Sharing diagnostic signals does not make every execution step an Activity Event.
 
 ## Application Activity inclusion rules
 
@@ -128,7 +128,11 @@ Apply payload selection before local diagnostic storage or export. Exclude crede
 
 ## Configuration and data boundaries
 
-Storage and presentation are deliberately separate. Each reply's execution history is stored as one `chat-execution` row in the Activity table, keyed by its Run ID, but that row is read only through `run-history.ts`, delivered with the Chat's Runs, and never returned by the application feed; no migration was needed for the correction. Verification invalidation is recorded by `withGithubConnectionTransition` around the GitHub setup operations (reuse, device sign-in, disconnect): it compares the saved connection ID before and after the operation and, for each application whose latest repository check passed under the previous ID, records one event whose ID is derived from that Observation, so retried or concurrent requests, reads and refreshes cannot add a second item. Token renewal keeps the ID and records nothing.
+Reply execution history has separate storage: `reply_execution_history` holds one bounded JSON `detail` payload per `run_id`, with a foreign key to `pi_runs` and deletion cascading from the Run. `run-history.ts` reads it into the existing Chat snapshot. Application domain events remain in `activity_events`. Verification invalidation is recorded by `withGithubConnectionTransition` around the GitHub setup operations (reuse, device sign-in, disconnect): it compares the saved connection ID before and after the operation and, for each application whose latest repository check passed under the previous ID, records one event whose ID is derived from that Observation, so retried or concurrent requests, reads and refreshes cannot add a second item. Token renewal keeps the ID and records nothing.
+
+The existing `npm run db:push` command supports one explicit in-place upgrade, prototype schema **6 → 7**. Stop the app and worker first. `prepare-db.mjs` accepts version 6, Drizzle adds the dedicated table, then `stamp-db.mjs` copies every legacy `chat-execution` payload byte-for-byte, deletes only those source rows, and stamps version 7 in one transaction. Reopening and repeating the command are safe. Copy conflicts, missing parent Runs or delete failures roll back the data move and version stamp; the new empty table may remain from Drizzle, but source diagnostics remain available for repair and retry. Other old prototype versions are still rejected. No migration runs implicitly on application or worker startup.
+
+Legacy `chat-created` and `chat-archived` rows remain stored and excluded from the application feed. Migration does not change pending Runs: the existing worker startup policy marks running attempts interrupted and closes their saved unfinished steps; queued attempts remain queued. Missing diagnostics are never reconstructed from messages or fabricated.
 
 ```dotenv
 SERVER_GUY_TRACING=1
@@ -140,7 +144,7 @@ LANGFUSE_PROJECT_ID=your-project-id
 
 Keep these in `.env.local`, never Git. Use your project's region or self-hosted HTTPS base URL. Restart the worker after changing configuration. Set `SERVER_GUY_TRACING=0` to stop future exports; this does not delete existing Cloud traces or local history. The project ID enables authenticated deep links; it is not an access credential.
 
-- `run-history.ts` stores one `chat-execution` Activity row per Run, using that Run's ID. Its existing `detail` column holds a bounded structured payload, so this slice needs no schema change or data migration. Run status/timestamps are joined from `pi_runs`, not copied into a second state machine.
+- `pi_runs` remains authoritative for reply status, lifecycle timestamps and retry lineage. The dedicated history table stores only the existing diagnostic payload, including step timings, omitted-step count, saved Decision links and optional trace references. Historical Runs with no execution history remain without it; the Chat shows the existing unavailable-details fallback.
 - At most 128 steps are retained per reply. Further steps are counted as omitted. Each step has a fixed label, timing, outcome and an allowlisted set of numeric usage fields/model identifiers. No token-level activity rows or unbounded error blobs.
 - Requirement links and the completed save step are written in the same transaction as the reply. Failure/rejection history is saved separately after rollback. Cancellation/restart closes unfinished steps as incomplete, never successful. Crashes can lose diagnostic spans without changing these durable facts.
 - The OTel provider is private to the worker, with explicit parent contexts and no global HTTP/SDK auto-instrumentation. Only the `server-guy` scope is exported. Local history, spans and the completion log share Run/trace/span IDs. The worker batches export and flushes on graceful shutdown; the live-eval runner also flushes before cleanup.
