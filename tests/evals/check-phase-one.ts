@@ -5,6 +5,11 @@ import type {
 } from "../../src/server/types";
 import type { PhaseOneEvalCase } from "./phase-one-cases";
 
+const gateStatus = (check: PhaseOneOperatorView["checks"][number]) => [
+  check.key,
+  check.status,
+];
+
 /**
  * Exact structural/state checks only. Meaning is deliberately a separate
  * review.
@@ -24,10 +29,20 @@ export function checkPhaseOne(
     ? before.decisions[0]?.id
     : undefined;
   return {
+    // A chat turn never adds repository evidence. Phase 1 gate results stay
+    // byte-identical; a committed Phase 2 contract legitimately moves the
+    // contract gates (checked separately); Phase 3 gate text narrates the
+    // staged proposal, but no status may move: worker evidence never
+    // satisfies a gate.
     "repository evidence and gate results unchanged by chat":
       JSON.stringify(after.observations) ===
         JSON.stringify(before.observations) &&
-      JSON.stringify(after.checks) === JSON.stringify(before.checks),
+      (scenario.phaseThree
+        ? JSON.stringify(after.checks.map(gateStatus)) ===
+          JSON.stringify(before.checks.map(gateStatus))
+        : scenario.phaseTwo
+          ? true
+          : JSON.stringify(after.checks) === JSON.stringify(before.checks)),
     "expected proposal count": proposals.length === scenario.expectedProposals,
     "supported nonempty values": proposals.every(
       (p) =>

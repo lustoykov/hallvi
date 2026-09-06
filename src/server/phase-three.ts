@@ -701,20 +701,69 @@ export async function commandForRun(
  * staged acceptance checks are saved with the answer, guarded against a
  * contract that changed underneath them. Approval follows the Approval Mode.
  */
+/**
+ * The contract a staged proposal is saved against: normally the one it was
+ * staged under. When the same reply revised the contract, that revision was
+ * committed a moment earlier in this transaction, so the proposal keeps its
+ * meaning if the revision stays at the same commit and every field it maps
+ * is still a required change; it then binds to the revision. Otherwise the
+ * attempt fails and nothing from it is saved, the revision included.
+ */
+function contractBinding(
+  run: PiRun,
+  reply: PiTurnResult,
+  contract: ApplicationContractRecord,
+) {
+  const revisedHere =
+    Boolean(reply.contractProposal) &&
+    contract.sourceMessageId === run.userMessageId;
+  const required = new Set(
+    contractGapReport(contract.body).conformance.map((item) => item.field),
+  );
+  return (
+    proposal: {
+      contractId: string;
+      contractVersion: number;
+      mapping?: Array<{ field: string }>;
+    },
+    what: string,
+  ) => {
+    if (
+      proposal.contractId === contract.id &&
+      proposal.contractVersion === contract.version
+    )
+      return { id: contract.id, version: contract.version };
+    if (!revisedHere)
+      throw new StaleConformanceProposalError(
+        `The Application Contract changed while ${what} was being proposed (v${proposal.contractVersion} → v${contract.version}); nothing from this attempt was saved. Ask again to propose it against the current contract.`,
+      );
+    const dropped = (proposal.mapping ?? [])
+      .map((entry) => entry.field)
+      .filter((field) => !required.has(field));
+    if (
+      getContract(proposal.contractId)?.commitSha !== contract.commitSha ||
+      dropped.length
+    )
+      throw new StaleConformanceProposalError(
+        `This reply revised the Application Contract (v${proposal.contractVersion} → v${contract.version})${
+          dropped.length
+            ? ` so that ${dropped.join(", ")} ${dropped.length === 1 ? "is" : "are"} no longer a required change`
+            : " at a different commit"
+        }; neither the revision nor ${what} was saved. Ask again, revising the contract first.`,
+      );
+    return { id: contract.id, version: contract.version };
+  };
+}
+
 export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
   if (!reply.sourceProposal && !reply.acceptanceProposal) return;
   const { application, workspace, contract, blocked } = runScope(run);
   if (workspace.completedAt) throw new Error("Make launch-ready is complete.");
   if (blocked) throw new Error(blocked);
+  const bind = contractBinding(run, reply, contract);
   if (reply.sourceProposal) {
     const proposal = reply.sourceProposal;
-    if (
-      proposal.contractId !== contract.id ||
-      proposal.contractVersion !== contract.version
-    )
-      throw new StaleConformanceProposalError(
-        `The Application Contract changed while this change was being proposed (v${proposal.contractVersion} → v${contract.version}); the change was not saved. Ask again to propose it against the current contract.`,
-      );
+    const bound = bind(proposal, "this change");
     if (proposal.filesDigest !== overlayDigest(proposal.changes))
       throw new Error("The staged change does not match its digest.");
     const previous = activeConformanceProposal(workspace.id);
@@ -728,8 +777,8 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
       origin: "server-guy",
       status: automatic ? "approved" : "proposed",
       baseSha: proposal.baseSha,
-      contractId: proposal.contractId,
-      contractVersion: proposal.contractVersion,
+      contractId: bound.id,
+      contractVersion: bound.version,
       summary: proposal.summary,
       changes: proposal.changes,
       filesDigest: proposal.filesDigest,
@@ -744,7 +793,7 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
             approvedAt: new Date().toISOString(),
             filesDigest: proposal.filesDigest,
             baseSha: proposal.baseSha,
-            contractVersion: proposal.contractVersion,
+            contractVersion: bound.version,
           }
         : null,
       publication: null,
@@ -776,13 +825,7 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
   }
   if (reply.acceptanceProposal) {
     const proposal = reply.acceptanceProposal;
-    if (
-      proposal.contractId !== contract.id ||
-      proposal.contractVersion !== contract.version
-    )
-      throw new StaleConformanceProposalError(
-        `The Application Contract changed while the acceptance checks were being proposed (v${proposal.contractVersion} → v${contract.version}); they were not saved.`,
-      );
+    const bound = bind(proposal, "the acceptance checks");
     const accepted = acceptedAcceptanceChecks(application.id);
     const weakens = weakensAcceptedChecks(proposal.steps, accepted);
     const automatic = application.approvalMode === "full-autonomy" && !weakens;
@@ -797,8 +840,8 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
       steps: proposal.steps,
       evidence: proposal.evidence,
       digest: proposal.digest,
-      contractId: proposal.contractId,
-      contractVersion: proposal.contractVersion,
+      contractId: bound.id,
+      contractVersion: bound.version,
       sourceMessageId: run.userMessageId,
       piRunId: run.id,
       acceptedAt: automatic ? new Date().toISOString() : null,

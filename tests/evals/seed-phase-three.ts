@@ -1,11 +1,15 @@
+import { vi } from "vitest";
+
 import { CONFORMANCE_DEFINITION } from "../../src/server/conformance-definition";
 import * as database from "../../src/server/db";
+import * as executionTree from "../../src/server/execution-tree";
 import { getOperatorView } from "../../src/server/operator-view";
 import { setConformanceExecutor } from "../../src/server/phase-three";
 import { PHASE_THREE } from "../../src/server/phase-three-spec";
 import type { InspectAppEvidence } from "../../src/server/types";
 import { primaryChatTitle } from "../../src/server/workspaces";
 import { FakeExecutor, missingEnvironment } from "../fixtures/fake-executor";
+import { repositoryFixtures } from "../fixtures/repositories";
 import type { PhaseOneEvalCase } from "./phase-one-cases";
 import { seedPhaseTwoEvalCase } from "./seed-phase-two";
 
@@ -13,7 +17,8 @@ import { seedPhaseTwoEvalCase } from "./seed-phase-two";
  * Seeds an application already in Make launch-ready: the Phase 2 seed with a
  * committed contract, the completed Inspect app workspace with its retained
  * evidence, and the Phase 3 workspace and chat. The runner is the fake
- * executor, whose outcomes follow the staged tree; GitHub stays blocked.
+ * executor, whose outcomes follow the staged tree over the fixture tree
+ * served in-process; GitHub stays blocked, archive download included.
  */
 export function seedPhaseThreeEvalCase(
   scenario: PhaseOneEvalCase,
@@ -24,6 +29,14 @@ export function seedPhaseThreeEvalCase(
   if (phaseThree.executionEnvironment === "missing")
     executor.status = missingEnvironment();
   setConformanceExecutor(executor);
+  const baseTree = repositoryFixtures[phaseThree.repository].map((file) => ({
+    path: file.path,
+    content: Buffer.from(file.content, "utf8"),
+    mode: 0o644,
+  }));
+  vi.spyOn(executionTree, "fetchBaseTree").mockImplementation(
+    async () => baseTree,
+  );
   const phaseTwo = seedPhaseTwoEvalCase(
     {
       ...scenario,

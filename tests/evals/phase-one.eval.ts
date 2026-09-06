@@ -170,7 +170,7 @@ beforeAll(() => {
     database: join(state, "eval.db"),
     databaseRetained: false,
     coverage:
-      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Application Contract cases seed a Phase 2 workspace with a synthetic inspection and saved file reads of a fixture repository, so read_repository_file is served from records and the GitHub API is blocked. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Application status cases seed real records and, for stale-history cases, an outdated synthetic get_application_status exchange; the live lookup reads local records only and is recorded as native tool evidence. This is not a production context-window benchmark.",
+      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Application Contract cases seed a Phase 2 workspace with a synthetic inspection and saved file reads of a fixture repository, so read_repository_file is served from records and the GitHub API is blocked. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Application status cases seed real records and, for stale-history cases, an outdated synthetic get_application_status exchange; the live lookup reads local records only and is recorded as native tool evidence. Conformance Result cases run the fake runner over the fixture tree served in-process, with the archive download blocked like the API. This is not a production context-window benchmark.",
   };
   vi.stubEnv("SERVER_GUY_DB_PATH", join(state, "eval.db"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(state, "config"));
@@ -186,6 +186,13 @@ beforeAll(() => {
   // Phase 2 reads are served from seeded Observations; an unseeded path is a
   // failed read, never a network request with the fixture token.
   vi.spyOn(githubApi, "githubJson").mockImplementation(async () => {
+    throw new githubApi.GithubAccessError(
+      "GitHub access is outside this eval's scope.",
+    );
+  });
+  // The archive download behind a preview's base tree is blocked the same
+  // way; Conformance Result cases serve that tree from the fixture.
+  vi.spyOn(githubApi, "githubArchive").mockImplementation(async () => {
     throw new githubApi.GithubAccessError(
       "GitHub access is outside this eval's scope.",
     );

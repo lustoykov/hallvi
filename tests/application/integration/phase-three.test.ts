@@ -347,6 +347,15 @@ async function runtime(sdk: typeof import("@earendil-works/pi-coding-agent")) {
             const commandResult = results.find(
               (r) => r.name === "run_repository_command",
             );
+            const revising =
+              conformanceMode === "revise" ||
+              conformanceMode === "revise-resolved";
+            const revisionResult = results.find(
+              (r) => r.name === "propose_application_contract",
+            );
+            const currentResult = results.find(
+              (r) => r.name === "get_application_contract" && !r.isError,
+            );
             if (!briefResult) call("get_conformance_brief", {});
             else if (!inspectionResult) call("get_repository_inspection", {});
             else {
@@ -355,10 +364,50 @@ async function runtime(sdk: typeof import("@earendil-works/pi-coding-agent")) {
                 tree: { entries: string[] };
               };
               const paths = treePaths(inspection as never);
-              const next = CONFORMANCE_READ_ORDER.filter((p) =>
-                paths.includes(p),
-              ).find((p) => !reads.some((read) => read.path === p));
+              const next = (
+                revising
+                  ? [...CONTRACT_READ_ORDER, ...CONFORMANCE_READ_ORDER]
+                  : CONFORMANCE_READ_ORDER
+              )
+                .filter((p) => paths.includes(p))
+                .find((p) => !reads.some((read) => read.path === p));
               if (next) call("read_repository_file", { path: next });
+              else if (revising && !revisionResult) {
+                // The same reply corrects one contract field ("revise <key>
+                // <value>") before staging the change. A corrected field
+                // carries no conformance item, so correcting health.path
+                // ("revise-resolved") drops the required change the change
+                // maps.
+                if (!currentResult) call("get_application_contract", {});
+                else {
+                  const current = (
+                    JSON.parse(currentResult.body) as {
+                      current: { id: string } | null;
+                    }
+                  ).current!;
+                  const [, , key, ...rest] = user.split(/\s+/);
+                  const value = rest.join(" ");
+                  const revision = buildContractProposal(
+                    JSON.parse(inspectionResult.body) as Parameters<
+                      typeof buildContractProposal
+                    >[0],
+                    reads,
+                    {
+                      revises: current.id,
+                      corrections: [
+                        {
+                          key,
+                          value,
+                          messageId: runContext?.userMessageId ?? "missing",
+                          quote: value,
+                        },
+                      ],
+                    },
+                  );
+                  call("propose_application_contract", revision);
+                }
+              } else if (revisionResult?.isError)
+                answer({ rejected: revisionResult.body });
               else if (conformanceMode === "command" && !commandResult)
                 call("run_repository_command", {
                   command: user.split(/\s+/).slice(2),
@@ -1288,6 +1337,69 @@ describe("external returns, the no-change path and contract revisions", () => {
     expect(stale.contractVersion).toBe(1);
     expect(() => approveProposal(app.id, stale.id)).toThrow(/now v3/);
   }, 90_000);
+
+  it("a reply that revises the contract and stages a change in one turn saves both, the change bound to the revision", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    const turn = await serverGuyTurn(
+      app.id,
+      app.chatId,
+      "conformance: revise migrations.tool alembic",
+    );
+    expect(turn.error).toBeNull();
+    expect(turn.status).toBe("succeeded");
+    expect(store.currentContract(app.id)?.version).toBe(2);
+    const view = conformance(app.id);
+    expect(view.proposal).toMatchObject({
+      status: "proposed",
+      contractVersion: 2,
+    });
+    expect(view.proposedAcceptance).toMatchObject({ contractVersion: 2 });
+    expect(() => approveProposal(app.id, view.proposal!.id)).not.toThrow();
+  }, 60_000);
+
+  it("a candidate verified after a Phase 3 revision satisfies the conformance check against the revision, not the retained contract", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    expect(
+      (
+        await serverGuyTurn(
+          app.id,
+          app.chatId,
+          "conformance: revise migrations.tool alembic",
+        )
+      ).status,
+    ).toBe("succeeded");
+    const view = conformance(app.id);
+    acceptAcceptanceChecks(app.id, view.proposedAcceptance!.id);
+    approveProposal(app.id, view.proposal!.id);
+    github(app.name).permissions = { pull: true, push: true, admin: false };
+    await grantPublication(app.id);
+    const published = await publishProposal(app.id, view.proposal!.id);
+    github(app.name).merge(published.publication!.pullRequestNumber, "squash");
+    await refreshCandidate(app.id);
+    expect((await verifyCandidate(app.id)).status).toBe("passed");
+    expect(checks(app.id)).toEqual({
+      "candidate-identified": "passed",
+      "changes-resolved": "passed",
+      "conformance-passed": "passed",
+    });
+    expect(results(app.id)["conformance-passed"]).toContain("check set v1");
+  }, 60_000);
+
+  it("a same-turn revision that drops a mapped required change saves nothing, the revision included", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    const turn = await serverGuyTurn(
+      app.id,
+      app.chatId,
+      "conformance: revise-resolved health.path /health",
+    );
+    expect(turn.status).toBe("failed");
+    expect(turn.error).toMatch(
+      /revised the Application Contract \(v1 → v2\) so that health\.path is no longer a required change; neither the revision nor this change was saved/,
+    );
+    expect(store.currentContract(app.id)?.version).toBe(1);
+    expect(conformance(app.id).proposal).toBeNull();
+    expect(conformance(app.id).proposedAcceptance).toBeNull();
+  }, 60_000);
 
   it("cancels a queued candidate run, marks a running one interrupted on restart, and removal cascades", async () => {
     const app = await inPhaseThree("fastapi-app");

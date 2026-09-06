@@ -14,7 +14,9 @@ export default defineConfig({
     include: ["tests/evals/phase-one.eval.ts"],
     fileParallelism: false,
     maxWorkers: 1,
-    testTimeout: 60_000,
+    // One Phase 1 turn fits in a minute; a Make launch-ready turn reads,
+    // stages, previews and answers, and does not.
+    testTimeout: 600_000,
     hookTimeout: 30_000,
   },
 });

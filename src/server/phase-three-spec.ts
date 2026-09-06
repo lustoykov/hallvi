@@ -298,7 +298,8 @@ export function computePhaseThreeChecks(view: ConformanceView): GateCheck[] {
                   evidence: runEvidence(view),
                   rerun: null,
                 }
-              : run.contractId !== retained.contractId ||
+              : run.contractId !==
+                    (view.brief?.contract.id ?? retained.contractId) ||
                   run.contractVersion !==
                     (view.brief?.contract.version ??
                       retained.contractVersion) ||
