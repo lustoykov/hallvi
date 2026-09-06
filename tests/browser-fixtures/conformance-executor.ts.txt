@@ -1,0 +1,110 @@
+// Copied only into disposable QA apps in place of the Docker executor. The
+// engine status and every outcome follow the scenario file, so the desktop
+// journeys can exercise the prerequisite, recovery, preview, failure and
+// candidate flows without containers. The real executor stays intact as
+// conformance-executor-real.ts; only the runner is synthetic.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  FakeExecutor,
+  missingEnvironment,
+  readyEnvironment,
+} from "./qa-fixtures/fake-executor";
+import type { ExecutionEnvironmentStatus } from "./types";
+import type { ConformanceExecutor } from "./conformance-executor-real";
+
+export * from "./conformance-executor-real";
+
+function scenario(): { docker?: string; runDelayMs?: number } {
+  if (!process.env.SERVER_GUY_QA_ROOT)
+    throw new Error("Synthetic executor requires an isolated QA root.");
+  try {
+    return JSON.parse(
+      readFileSync(
+        join(process.env.SERVER_GUY_CONFIG_DIR!, "conformance-scenario.json"),
+        "utf8",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function environmentFor(state: string | undefined): ExecutionEnvironmentStatus {
+  const ready = readyEnvironment();
+  const host = { hostname: "qa-controller", platform: "darwin", arch: "arm64" };
+  switch (state) {
+    case "missing":
+      return { ...missingEnvironment(), host, checkedAt: new Date().toISOString() };
+    case "stopped":
+      return {
+        ...missingEnvironment(),
+        host,
+        checkedAt: new Date().toISOString(),
+        state: "unreachable",
+        endpoint: "unix:///Users/qa/.docker/run/docker.sock",
+        endpointSource: "docker-context",
+        summary:
+          "Docker is installed on qa-controller (darwin/arm64), the machine running Server Guy but its engine is not answering on /Users/qa/.docker/run/docker.sock; it is probably stopped.",
+        recovery: {
+          label: "Start the Docker engine",
+          href: "https://docs.docker.com/get-started/get-docker/",
+          steps: [
+            "Open Docker Desktop, OrbStack or Colima on this Mac and wait until it reports the engine as running.",
+            "Then choose Check again.",
+          ],
+        },
+        detail: "ECONNREFUSED connecting to /Users/qa/.docker/run/docker.sock",
+      };
+    case "denied":
+      return {
+        ...missingEnvironment(),
+        host,
+        checkedAt: new Date().toISOString(),
+        state: "permission-denied",
+        endpoint: "unix:///var/run/docker.sock",
+        endpointSource: "known-socket",
+        summary:
+          "The Docker Engine socket on qa-controller (darwin/arm64), the machine running Server Guy refused this user account.",
+        recovery: {
+          label: "Fix socket permissions",
+          href: "https://docs.docker.com/engine/install/",
+          steps: ["Check the socket's ownership and permissions.", "Then choose Check again."],
+        },
+        detail: "EACCES connecting to /var/run/docker.sock",
+      };
+    case "unverified":
+      return { ...ready, host, checkedAt: new Date().toISOString(), verified: null };
+    default:
+      return { ...ready, host, checkedAt: new Date().toISOString() };
+  }
+}
+
+/** The scripted runner: scenario-driven status, tree-driven outcomes. */
+export function dockerConformanceExecutor(): ConformanceExecutor {
+  const fake = new FakeExecutor();
+  return {
+    async environment() {
+      fake.status = environmentFor(scenario().docker);
+      return fake.status;
+    },
+    async prepare(options) {
+      fake.status = environmentFor(scenario().docker);
+      if (!fake.status.ready) return fake.status;
+      options?.onProgress?.({ step: "images", message: "Pulling synthetic/runner (scripted)" });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      fake.status = { ...fake.status, verified: readyEnvironment().verified };
+      return fake.status;
+    },
+    async execute(plan, options) {
+      fake.status = environmentFor(scenario().docker);
+      options?.onProgress?.({ step: "materialize", message: "Copying the exact tree (scripted)" });
+      await new Promise((resolve) => setTimeout(resolve, scenario().runDelayMs ?? 1_500));
+      return fake.execute(plan, options);
+    },
+    async cleanupLeftovers() {
+      return 0;
+    },
+  };
+}

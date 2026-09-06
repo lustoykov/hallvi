@@ -212,7 +212,7 @@ describe("Application Contract validation", () => {
     });
     expect(health.conformance?.citation).toMatchObject({
       path: "app/main.py",
-      line: 5,
+      line: 6,
     });
   });
 

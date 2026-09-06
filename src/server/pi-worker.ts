@@ -17,6 +17,17 @@ import {
   recordPiCall,
 } from "./pi-runs";
 import { StaleContractProposalError } from "./phase-two";
+import {
+  conformanceExecutor,
+  executeClaimedConformanceRun,
+  publishIfAutomatic,
+  StaleConformanceProposalError,
+} from "./phase-three";
+import {
+  claimNextConformanceRun,
+  interruptConformanceRuns,
+} from "./conformance-runs";
+import { getWorkspaceById } from "./db";
 import type { PiRun } from "./types";
 import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 
@@ -41,6 +52,16 @@ export function acquireWorkerLock() {
   return () => {
     lock.close();
   };
+}
+
+/**
+ * Make launch-ready Runs execute isolated previews that take minutes; the
+ * earlier phases answer from local records and GitHub reads within seconds.
+ */
+export function defaultRunTimeoutMs(run: PiRun) {
+  return getWorkspaceById(run.workspaceId)?.phaseKey === "make-launch-ready"
+    ? 30 * 60_000
+    : 120_000;
 }
 
 export async function executePiRun(
@@ -72,14 +93,17 @@ export async function executePiRun(
       savedDraft = draft;
     }
   }, 250);
-  const timeout = setTimeout(() => {
-    finishPiRun(
-      run.id,
-      "timed-out",
-      "The reply exceeded the execution time limit. Retry when ready; no Decisions were saved.",
-    );
-    controller.abort();
-  }, options.timeoutMs ?? 120_000);
+  const timeout = setTimeout(
+    () => {
+      finishPiRun(
+        run.id,
+        "timed-out",
+        "The reply exceeded the execution time limit. Retry when ready; no Decisions were saved.",
+      );
+      controller.abort();
+    },
+    options.timeoutMs ?? defaultRunTimeoutMs(run),
+  );
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
   const stage: { value: "context" | "model" | "save" } = { value: "context" };
@@ -127,15 +151,21 @@ export async function executePiRun(
         });
         // completePiRun has committed before either the log or span can claim
         // success. A cancelled/stale result leaves this step incomplete.
-        if (saved)
+        if (saved) {
           diagnostics.signal({
             type: "end",
             key: "save",
             metadata: {
               requirements: reply.decisionProposals.length,
               contract: reply.contractProposal ? 1 : 0,
+              sourceChange: reply.sourceProposal ? 1 : 0,
             },
           });
+          // Publication under an automatic policy is an external effect after
+          // the commit; its own receipt or failure lands on the proposal.
+          if (reply.sourceProposal)
+            await publishIfAutomatic(run.applicationId, run.workspaceId);
+        }
       } catch (error) {
         diagnostics.signal({ type: "end", key: "save", failed: true });
         throw error;
@@ -190,7 +220,8 @@ export async function executePiRun(
       run.id,
       "failed",
       error instanceof NativeSessionError ||
-        error instanceof StaleContractProposalError
+        error instanceof StaleContractProposalError ||
+        error instanceof StaleConformanceProposalError
         ? error.message
         : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
       failure,
@@ -212,11 +243,28 @@ export async function runPiWorker(signal: AbortSignal) {
   let unsettled = false;
   try {
     interruptRunningPiRuns();
+    const interrupted = interruptConformanceRuns();
+    // Containers of interrupted attempts are removed by label; a failure here
+    // only leaves leftovers for the next start, never a false outcome.
+    void conformanceExecutor()
+      .cleanupLeftovers()
+      .then((removed) => {
+        if (removed || interrupted.length)
+          console.info(
+            `Removed ${removed} leftover runner resource${removed === 1 ? "" : "s"}; ${interrupted.length} interrupted conformance run${interrupted.length === 1 ? "" : "s"} recorded.`,
+          );
+      })
+      .catch(() => undefined);
     console.info("Pi worker ready. Watching saved requests, one at a time.");
     while (!signal.aborted) {
       const run = claimNextPiRun();
       if (run) await executePiRun(run, { signal });
-      else await delay(250, undefined, { signal }).catch(() => undefined);
+      else {
+        const conformance = claimNextConformanceRun();
+        if (conformance)
+          await executeClaimedConformanceRun(conformance, signal);
+        else await delay(250, undefined, { signal }).catch(() => undefined);
+      }
     }
   } catch (error) {
     unsettled = error instanceof PiWorkerDrainError;

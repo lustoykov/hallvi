@@ -62,7 +62,55 @@ it("upgrades a populated v6 database in place, keeping its rows and a backup", (
       upgraded.close();
     }
     expect(
-      readdirSync(root).some((name) => /\.pre-v8-.*\.backup$/.test(name)),
+      readdirSync(root).some((name) => /\.pre-v9-.*\.backup$/.test(name)),
+    ).toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 30_000);
+
+it("upgrades a populated v8 database in place by adding the Phase 3 tables", () => {
+  const root = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+  const path = join(root, "v8.db");
+  try {
+    pushTestDatabase(path);
+    const current = new Database(path);
+    current.exec(
+      `INSERT INTO applications (id, name, repository_url, repository_owner, repository_name, environment, approval_mode, approval_scope, created_at, updated_at) VALUES ('app', 'app', 'https://github.com/qa/app', 'qa', 'app', 'production', 'pi-decides', 'scope', '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z');
+       DROP TABLE conformance_proposals;
+       DROP TABLE conformance_runs;
+       DROP TABLE acceptance_checks;
+       DROP TABLE publication_grants;
+       PRAGMA user_version = 8;`,
+    );
+    current.close();
+    pushTestDatabase(path);
+    const upgraded = new Database(path, { readonly: true });
+    try {
+      expect(upgraded.pragma("user_version", { simple: true })).toBe(
+        schemaVersion.version,
+      );
+      expect(upgraded.prepare("SELECT id FROM applications").all()).toEqual([
+        { id: "app" },
+      ]);
+      expect(
+        upgraded
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('conformance_proposals', 'conformance_runs', 'acceptance_checks', 'publication_grants') ORDER BY name",
+          )
+          .all(),
+      ).toEqual([
+        { name: "acceptance_checks" },
+        { name: "conformance_proposals" },
+        { name: "conformance_runs" },
+        { name: "publication_grants" },
+      ]);
+      expect(upgraded.pragma("foreign_key_check")).toEqual([]);
+    } finally {
+      upgraded.close();
+    }
+    expect(
+      readdirSync(root).some((name) => /\.pre-v9-.*\.backup$/.test(name)),
     ).toBe(true);
   } finally {
     rmSync(root, { recursive: true, force: true });

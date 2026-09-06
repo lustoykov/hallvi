@@ -262,7 +262,12 @@ test(
       record.locator('[data-field="health.path"] .sg-provenance.conformance'),
     ).toBeVisible();
     await expect(record.getByText("Ready for review")).toBeVisible();
-    await expect(record.getByText("not available in this build")).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Continue to Make launch-ready",
+        exact: true,
+      }),
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("phase-two-06-conformance-work.png"),
       fullPage: true,

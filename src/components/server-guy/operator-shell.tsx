@@ -34,6 +34,7 @@ import { ChatList } from "./chat-list";
 import { ChatPane } from "./chat-pane";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import type { ConformanceAction } from "./conformance-record";
 import { Inspector } from "./inspector";
 import { PhaseRail } from "./phase-rail";
 
@@ -274,9 +275,57 @@ export function OperatorShell({
     void run("chat", () => api.viewPhase(application.id, phaseKey));
   }
 
-  function continueToInspectApp() {
+  // The explicit Continue from a ready deliverable into the next phase.
+  function continueToNextPhase() {
     if (!application) return;
-    void run("continue", () => api.continueToInspectApp(application.id));
+    const phase = view.workspace?.phaseKey;
+    void run("continue", () =>
+      phase === "inspect-app"
+        ? api.continueToMakeLaunchReady(application.id)
+        : api.continueToInspectApp(application.id),
+    );
+  }
+
+  // Phase 3 actions: every one asks the server for the whole view again. A
+  // returned view for the phase's primary chat replaces the current selection
+  // only when the current chat belongs to that phase.
+  function conformanceAction(action: ConformanceAction) {
+    if (!application) return;
+    const conformance = api.conformance(application.id);
+    const work = () => {
+      switch (action.type) {
+        case "continue":
+          return conformance.continueWithServerGuy();
+        case "return":
+          return conformance.returnChange(action.reference);
+        case "select-current":
+          return conformance.selectCurrentRevision();
+        case "refresh":
+          return conformance.refresh();
+        case "verify":
+          return conformance.verify();
+        case "approve":
+          return conformance.approve(action.proposalId);
+        case "publish":
+          return conformance.publish(action.proposalId);
+        case "withdraw":
+          return conformance.withdraw(action.proposalId);
+        case "accept-checks":
+          return conformance.acceptChecks(action.acceptanceId);
+        case "cancel-run":
+          return conformance.cancelRun(action.runId);
+        case "grant":
+          return conformance.grant();
+        case "revoke":
+          return conformance.revoke();
+      }
+    };
+    void run(action.type, async () => {
+      const next = await work();
+      return activeChat && next.selectedChatId !== activeChat.id
+        ? api.view(application.id, activeChat.id)
+        : next;
+    });
   }
 
   function createChat() {
@@ -359,13 +408,36 @@ export function OperatorShell({
       setSelectedCheckKey(
         key === "repository-readable"
           ? "repository-readable"
-          : "profile-resolved",
+          : key === "repository-inspection"
+            ? "profile-resolved"
+            : key === "conformance-refresh"
+              ? "candidate-identified"
+              : "conformance-passed",
       );
       return activeChat && next.selectedChatId !== activeChat.id
         ? api.view(application.id, activeChat.id)
         : next;
     });
   }
+
+  // A conformance run progresses in the worker; while one is queued or
+  // running, the view is refreshed so its progress and outcome appear.
+  const runInProgress = Boolean(
+    view.conformance?.runs.some(
+      (item) => item.status === "queued" || item.status === "running",
+    ),
+  );
+  useEffect(() => {
+    if (!runInProgress || !applicationId || !selectedChatId) return;
+    const timer = window.setInterval(() => {
+      void api
+        .view(applicationId, selectedChatId)
+        .then((next) => applyView(next))
+        .catch(() => undefined);
+    }, 3_000);
+    return () => window.clearInterval(timer);
+    // applyView is stable enough for a poll; the interval is short-lived.
+  }, [runInProgress, applicationId, selectedChatId]);
 
   async function askAboutCheck(check: GateCheck) {
     const question = `Explain “${check.label}”, its current result, and what I can verify myself.`;
@@ -564,7 +636,8 @@ export function OperatorShell({
         <Inspector
           busy={busy}
           checks={checks}
-          onContinue={continueToInspectApp}
+          onConformance={conformanceAction}
+          onContinue={continueToNextPhase}
           onSelectCheck={setSelectedCheckKey}
           view={view}
         />

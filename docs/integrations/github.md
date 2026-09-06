@@ -1,6 +1,6 @@
 # GitHub connection
 
-Server Guy reads repositories through an explicitly chosen, installation-wide connection. Application records and repository-check evidence remain application-scoped. This milestone is read-only: no pushes, pull requests, workflow changes, or deployment writes.
+Server Guy reads repositories through an explicitly chosen, installation-wide connection. Application records and repository-check evidence remain application-scoped. Phases 1 and 2 are read-only. Phase 3 can publish a reviewable branch and pull request, but only after an explicit per-application [publishing grant](#publishing-in-phase-3) that Server Guy verifies against the connection; it never merges, changes workflows, or deploys.
 
 ## Two login paths
 
@@ -65,6 +65,17 @@ The gate requires a passing Observation from the **currently selected connection
 - Logins saved before automatic renewal was implemented need one new sign-in: their refresh token was not retained and cannot be recovered from the access token. They continue working until their existing access token expires. Reused CLI/environment credentials remain read-only and are not refreshed by Server Guy.
 - Cancelled, denied, expired and interrupted device attempts have visible retry paths. Replacing a connection activates only after success; late completion cannot undo cancellation/disconnect/reuse. Attempts live in one Node process; a restart requires starting sign-in again.
 - App permissions and the user's permissions intersect. Missing installation, missing Contents permission, an unselected/inaccessible private repository, or organization restrictions cannot become a passing check.
+
+## Publishing in Phase 3
+
+Make launch-ready publishes Server Guy's staged change as one commit on the contract's base, one branch named `server-guy/conformance-<proposal>` and one pull request against the default branch, through the Git Data API. That needs write access the read-only connection does not have, and it is granted per application, never inferred from a token:
+
+| Connection | Minimum verified before the grant is recorded | Where to change it |
+| --- | --- | --- |
+| Existing CLI/environment login | The login can push to the repository (`permissions.push`). | The account's repository role on GitHub. |
+| GitHub App | The installation grants **Contents: Read and write** and **Pull requests: Read and write** for the repository (Metadata read stays mandatory). | Edit the App's repository permissions in its registration, then re-approve the installation at [installed GitHub Apps](https://github.com/settings/installations); a registration made for Phases 1 and 2 has Contents read only. |
+
+**Allow publishing** in the Conformance Result performs that verification and records the grant with the connection id and what GitHub reported; replacing or disconnecting the connection ends it, and **Stop allowing** revokes it. Before every publication Server Guy rechecks the proposal, its approval digest, the contract version and the grant. Retries reconcile against GitHub first: a branch whose commit carries the proposal trailer, or an existing pull request for it, is adopted; a branch of the same name made by someone else is refused. Merging is always yours on GitHub; Server Guy only observes the default branch afterwards. This slice was verified against a synthetic GitHub; the App's actual write permission model remains a separately authorized check, recorded in the [roadmap](../../ROADMAP.md#phase-3-conformance-result).
 
 ## Verification
 

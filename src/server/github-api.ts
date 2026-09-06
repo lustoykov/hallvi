@@ -19,16 +19,30 @@ export class GithubAccessError extends Error {
 export async function githubJson(
   path: string,
   token: string,
-  options: { signal?: AbortSignal } = {},
+  options: {
+    signal?: AbortSignal;
+    /** A write: POST/PATCH with a JSON body. Reads never send one. */
+    method?: "POST" | "PATCH";
+    body?: unknown;
+    /** Return `data: null` for 404 instead of an access error. */
+    allowNotFound?: boolean;
+  } = {},
 ): Promise<{ data: unknown; scopes: string[] }> {
   const timeout = AbortSignal.timeout(20_000);
   try {
     const response = await fetch(`https://api.github.com${path}`, {
+      method: options.method ?? "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
+        ...(options.body !== undefined
+          ? { "Content-Type": "application/json" }
+          : {}),
       },
+      ...(options.body !== undefined
+        ? { body: JSON.stringify(options.body) }
+        : {}),
       // A read inside a Pi Run stops with the Run; every read stops at 20s.
       signal: options.signal
         ? AbortSignal.any([timeout, options.signal])
@@ -36,6 +50,8 @@ export async function githubJson(
       cache: "no-store",
       redirect: "error",
     });
+    if (response.status === 404 && options.allowNotFound)
+      return { data: null, scopes: [] };
     if (response.status === 401)
       throw new GithubAccessError(
         "GitHub no longer accepts this login. Reconnect in Settings → GitHub.",
@@ -59,10 +75,15 @@ export async function githubJson(
         "The repository is missing or this login cannot access it. Check its URL and repository access on GitHub.",
         "access",
       );
+    if (response.status === 422)
+      throw new GithubAccessError(
+        "GitHub rejected the request as invalid for this repository's current state.",
+        "access",
+      );
     if (!response.ok)
       throw new GithubAccessError("GitHub is unavailable. Try again later.");
     return {
-      data: await response.json(),
+      data: response.status === 204 ? null : await response.json(),
       scopes: (response.headers.get("x-oauth-scopes") ?? "")
         .split(",")
         .map((scope) => scope.trim())
@@ -74,6 +95,72 @@ export async function githubJson(
     if (options.signal?.aborted) throw options.signal.reason;
     throw new GithubAccessError(
       "Could not reach GitHub or read its response. Try again.",
+    );
+  }
+}
+
+/**
+ * Downloads the repository archive at one exact commit. GitHub answers with a
+ * redirect to a signed codeload URL; the bearer header is not forwarded
+ * across that origin. The gzip body is bounded before it is decompressed.
+ */
+export async function githubArchive(
+  fullName: string,
+  sha: string,
+  token: string,
+  options: { signal?: AbortSignal; maxBytes: number },
+): Promise<Buffer> {
+  const timeout = AbortSignal.timeout(120_000);
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${fullName}/tarball/${sha}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        signal: options.signal
+          ? AbortSignal.any([timeout, options.signal])
+          : timeout,
+        cache: "no-store",
+        redirect: "follow",
+      },
+    );
+    if (response.status === 401)
+      throw new GithubAccessError(
+        "GitHub no longer accepts this login. Reconnect in Settings → GitHub.",
+        "auth",
+      );
+    if (response.status === 403 || response.status === 404)
+      throw new GithubAccessError(
+        "The repository archive could not be read with this login. Check repository access on GitHub.",
+        "access",
+      );
+    if (!response.ok || !response.body)
+      throw new GithubAccessError("GitHub is unavailable. Try again later.");
+    const chunks: Buffer[] = [];
+    let received = 0;
+    const reader = response.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > options.maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new GithubAccessError(
+          `The repository archive is larger than the supported ${options.maxBytes} bytes.`,
+          "access",
+        );
+      }
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks);
+  } catch (error) {
+    if (error instanceof GithubAccessError) throw error;
+    if (options.signal?.aborted) throw options.signal.reason;
+    throw new GithubAccessError(
+      "Could not download the repository archive from GitHub. Try again.",
     );
   }
 }

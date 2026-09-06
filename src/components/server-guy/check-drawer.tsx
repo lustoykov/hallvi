@@ -93,6 +93,14 @@ export function CheckDrawer({
                     <GithubLogo weight="fill" /> Open GitHub settings
                   </Link>
                 )}
+                {check.key === "conformance-passed" && (
+                  <Link
+                    className="sg-secondary-button sg-drawer-settings"
+                    href="/setup/execution"
+                  >
+                    Open Execution settings
+                  </Link>
+                )}
               </div>
             </div>
           </section>

@@ -16,6 +16,7 @@ const empty: PhaseOneOperatorView = {
   workspaces: [],
   inspection: null,
   contract: null,
+  conformance: null,
   selectedChatId: null,
   chats: [],
   messages: [],
@@ -33,6 +34,7 @@ function render(view = empty) {
       view={view}
       checks={view.checks}
       onContinue={() => {}}
+      onConformance={() => {}}
       onSelectCheck={() => {}}
     />,
   );

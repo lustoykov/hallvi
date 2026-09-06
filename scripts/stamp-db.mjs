@@ -8,9 +8,9 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
-// A fresh push starts at 0; prepare-db.mjs has already upgraded a v6 file in
-// place. Any other version is refused before data could be misread.
-const STAMPABLE_VERSIONS = [0, 6, version];
+// A fresh push starts at 0; prepare-db.mjs has already upgraded a v6 or v8
+// file in place. Any other version is refused before data could be misread.
+const STAMPABLE_VERSIONS = [0, 6, 8, version];
 const databasePath =
   process.env.SERVER_GUY_DB_PATH ??
   join(process.cwd(), ".server-guy", "server-guy.db");

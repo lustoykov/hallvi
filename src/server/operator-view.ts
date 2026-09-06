@@ -23,12 +23,16 @@ import {
   repositoryEvidence,
   type RepositoryEvidence,
 } from "./phase-two";
-import { computePhaseTwoChecks } from "./phase-two-spec";
+import { computePhaseTwoChecks, PHASE_TWO_CHECKS } from "./phase-two-spec";
+import { conformanceView } from "./phase-three";
+import { computePhaseThreeChecks } from "./phase-three-spec";
 import type {
   ApplicationContractView,
   ApplicationRecord,
   ApplicationStatus,
+  ConformanceView,
   GateCheck,
+  InspectAppEvidence,
   LaunchBriefEvidence,
   OperatorView,
   PhaseKey,
@@ -49,9 +53,12 @@ import {
  * sources appear in the current phase's checks instead.
  */
 function retainedChecks(workspace: PhaseWorkspaceRecord): GateCheck[] {
-  const evidence =
-    workspace.deliverableEvidence as Partial<LaunchBriefEvidence> | null;
-  const definitions = PHASE_ONE_CHECKS as readonly {
+  const evidence = workspace.deliverableEvidence as Partial<
+    LaunchBriefEvidence | InspectAppEvidence
+  > | null;
+  const definitions = (
+    workspace.phaseKey === "inspect-app" ? PHASE_TWO_CHECKS : PHASE_ONE_CHECKS
+  ) as readonly {
     key: string;
     label: string;
     definition: string;
@@ -69,25 +76,41 @@ export interface PhaseEvaluation {
   checks: GateCheck[];
   evidence: RepositoryEvidence | null;
   contract: ApplicationContractView | null;
+  conformance: ConformanceView | null;
 }
 
-/** The viewed workspace's checks and, for Inspect app, its evidence. */
+/** The viewed workspace's checks and, for the later phases, its evidence. */
 export function evaluatePhase(
   application: ApplicationRecord,
   workspace: PhaseWorkspaceRecord,
+  workspaces: PhaseWorkspaceRecord[] = listWorkspaces(application.id),
 ): PhaseEvaluation {
   if (workspace.completedAt)
     return {
       checks: retainedChecks(workspace),
       evidence: null,
-      contract: null,
+      contract:
+        workspace.phaseKey === "inspect-app"
+          ? contractView(application.id)
+          : null,
+      conformance: null,
     };
   if (workspace.phaseKey === "start")
     return {
       checks: currentPhaseOneChecks(application),
       evidence: null,
       contract: null,
+      conformance: null,
     };
+  if (workspace.phaseKey === "make-launch-ready") {
+    const conformance = conformanceView(application, workspaces, workspace);
+    return {
+      checks: computePhaseThreeChecks(conformance),
+      evidence: null,
+      contract: contractView(application.id),
+      conformance,
+    };
+  }
   const evidence = repositoryEvidence(application.id);
   const contract = contractView(application.id);
   return {
@@ -100,6 +123,7 @@ export function evaluatePhase(
     }),
     evidence,
     contract,
+    conformance: null,
   };
 }
 
@@ -134,7 +158,7 @@ function workspaceViews(
       workspace,
       workspace.id === evaluated.workspace.id
         ? evaluated.checks
-        : evaluatePhase(application, workspace).checks,
+        : evaluatePhase(application, workspace, workspaces).checks,
       workspace.id === current.id,
     ),
   );
@@ -167,7 +191,7 @@ export function getOperatorView(
     chats.find((chat) => !chat.archivedAt) ??
     chats[0] ??
     null;
-  const evaluation = evaluatePhase(application, workspace);
+  const evaluation = evaluatePhase(application, workspace, workspaces);
   const views = workspaceViews(application, workspaces, current, {
     workspace,
     checks: evaluation.checks,
@@ -188,6 +212,7 @@ export function getOperatorView(
       ? inspectionSummary(evaluation.evidence)
       : null,
     contract: evaluation.contract,
+    conformance: evaluation.conformance,
   };
 }
 
@@ -198,7 +223,7 @@ export function listApplicationSummaries() {
   return listApplications().map((application) => {
     const workspaces = listWorkspaces(application.id);
     const current = workspaces.at(-1)!;
-    const { checks } = evaluatePhase(application, current);
+    const { checks } = evaluatePhase(application, current, workspaces);
     return {
       application,
       workspace: workspaceView(current, checks, true),
@@ -223,8 +248,11 @@ export function getApplicationStatus(
   applicationId: string,
   chatId: string,
 ): ApplicationStatus {
-  const { application, workspace, current } = loadChat(applicationId, chatId);
-  const evaluation = evaluatePhase(application, workspace);
+  const { application, workspace, workspaces, current } = loadChat(
+    applicationId,
+    chatId,
+  );
+  const evaluation = evaluatePhase(application, workspace, workspaces);
   const view = workspaceView(workspace, evaluation.checks, current);
   const inspectionCurrent = evaluation.evidence?.current ?? false;
   const status: ApplicationStatus = {
@@ -312,6 +340,62 @@ export function getApplicationStatus(
         createdAt: contract.createdAt,
       };
     } else status.contract = null;
+  }
+  if (workspace.phaseKey === "make-launch-ready" && evaluation.conformance) {
+    const view = evaluation.conformance;
+    const failed = (
+      run: { results: Array<{ outcome: string; key: string }> } | null,
+    ) =>
+      run
+        ? run.results
+            .filter((item) => item.outcome === "failed")
+            .map((item) => item.key)
+        : [];
+    status.conformance = {
+      baseSha: view.brief?.baseSha ?? null,
+      requiredChanges: view.brief?.requiredChanges.length ?? 0,
+      proposal: view.proposal
+        ? {
+            id: view.proposal.id,
+            origin: view.proposal.origin,
+            status: view.proposal.status,
+            files: view.proposal.changes.length,
+            pullRequestUrl:
+              view.proposal.publication?.pullRequestUrl ??
+              view.proposal.external?.pullRequestUrl ??
+              null,
+            candidateSha: view.proposal.candidate?.sha ?? null,
+          }
+        : null,
+      acceptance: view.acceptance
+        ? {
+            version: view.acceptance.version,
+            status: view.acceptance.status,
+            steps: view.acceptance.steps.length,
+          }
+        : view.proposedAcceptance
+          ? {
+              version: view.proposedAcceptance.version,
+              status: view.proposedAcceptance.status,
+              steps: view.proposedAcceptance.steps.length,
+            }
+          : null,
+      latestPreview: view.latestPreview
+        ? {
+            status: view.latestPreview.status,
+            treeDigest: view.latestPreview.source.treeDigest,
+            failed: failed(view.latestPreview),
+          }
+        : null,
+      latestCandidateRun: view.latestCandidateRun
+        ? {
+            status: view.latestCandidateRun.status,
+            commitSha: view.latestCandidateRun.source.commitSha,
+            failed: failed(view.latestCandidateRun),
+          }
+        : null,
+      executionEnvironment: view.environment?.state ?? "unchecked",
+    };
   }
   return status;
 }

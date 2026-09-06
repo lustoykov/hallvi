@@ -11,6 +11,7 @@ import { logDiagnostic, type DiagnosticFailure } from "./diagnostics";
 import { messages, piRuns } from "./db-schema";
 import { savePiDecisions } from "./phase-one";
 import { commitContractProposal } from "./phase-two";
+import { commitConformanceProposals } from "./phase-three";
 import { sendChatMessageRequestSchema } from "./schemas";
 import {
   assertChatWritable,
@@ -360,6 +361,7 @@ export function completePiRun(id: string, reply: PiTurnResult) {
       );
       if (reply.contractProposal)
         commitContractProposal(run, reply.contractProposal);
+      commitConformanceProposals(run, reply);
       db()
         .update(messages)
         .set({
@@ -392,6 +394,8 @@ export function completePiRun(id: string, reply: PiTurnResult) {
           metadata: {
             requirements: reply.decisionProposals.length,
             contract: reply.contractProposal ? 1 : 0,
+            sourceChange: reply.sourceProposal ? 1 : 0,
+            acceptanceChecks: reply.acceptanceProposal ? 1 : 0,
           },
         });
     },

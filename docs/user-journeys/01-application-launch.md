@@ -116,7 +116,7 @@ When Application Launch requires source-controlled work, the UI presents **Conti
 
 Every option receives the same bounded brief: repository and starting revision, required outcome, relevant evidence, Application Contract requirements, acceptance checks, and explicit operational boundaries. A local coding harness starts inside the managed application repository; local Journey 1 does not require MCP.
 
-The selected environment returns its change and evidence without becoming authoritative. Server Guy preserves that evidence, may run its own Application Contract checks, and continues to the normal reviewable branch or pull-request state. Worker evidence and Server Guy evidence remain distinct.
+The selected environment returns its change and evidence without becoming authoritative. Server Guy preserves that evidence, may run its own Application Contract checks, and continues to the normal reviewable branch or pull-request state. Worker evidence and Server Guy evidence remain distinct. Decided 2026-09-06: Continue with Server Guy stages file changes through scoped tools over a tree the controller owns and verifies them in disposable containers; a container is never the source of truth for edits, and the exported brief works without the engine while completing conformance still needs the runner.
 
 ## Stable UI contract
 
@@ -444,11 +444,14 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 **Phase Deliverable:** **Conformance Result** — one exact eligible repository revision and evidence that all required profile checks pass for it.
 
+**Decided 2026-09-06:** Phase 3 executes repository code only inside disposable containers on the machine running Server Guy's controller, so built-in verification requires a reachable Docker Engine there (any engine with the standard local socket; Docker Desktop is not required). The controller, the verification runner and the eventual Deployment Host are different roles; Phase 3 never assumes the production host exists, and Phases 1 and 2 never need the engine. Static checks and previews inform the work; only Server Guy's own run over the exact merged candidate satisfies the gate, and a health decorator in source is not evidence that the application starts or answers. Server Guy publishes a reviewable branch and pull request under the Approval Mode after an explicit publishing grant; the engineer merges on GitHub in every mode; the candidate is the default-branch head Server Guy observes after the merge, whatever the merge method. The required check set is more than the health path: locked installation, enforced configuration, a disposable PostgreSQL with migrations, startup, a probe from outside the process, an accepted application-behavior definition proposed from cited routes, and the repository's tests. Missing, unrun or unsupported required checks never pass. The implementation is specified in the [Phase 3 spec](../specs/phase-three-conformance.md).
+
 ### P3.G1. Exact candidate revision is identified
 
 - **Satisfied when:** One immutable repository commit is recorded as the conformance candidate. If a pull request was needed, this is the merged target revision rather than only an unmerged head.
 - **Evidence:** Git commit identity, branch/ref Observation, and merge receipt when applicable.
 - **Human observability:** Open the exact GitHub commit; open the originating pull request and merge event.
+- **Decided 2026-09-06:** the candidate is the default-branch head Server Guy observes after the merge (the merge commit for merge and squash, the rebased head for rebase), never the pull-request head; an already-conforming repository selects the contract commit explicitly and still needs current conformance evidence.
 - **Invalidated by:** Candidate selection or target branch head changing.
 
 ### P3.G2. Required source-controlled changes are resolved
@@ -456,6 +459,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Satisfied when:** Every conformance item recorded on the Application Contract, plus any blocker the engineer resolved with a required change, is resolved in the exact candidate revision, no required change remains only local or unmerged, and any returned coding-agent change stays within its bounded brief.
 - **Evidence:** Gap-to-diff mapping, pull-request status, changed-file list, independent scope check, and merge result. A timeout, abandoned handoff, or scope violation keeps the check Unsatisfied.
 - **Human observability:** Open the pull request, complete diff, changed files, review discussion, and coding-agent evidence separately from Server Guy's checks.
+- **Decided 2026-09-06:** the hard scope rules are deterministic (no workflow, hook, environment, key or credential paths; only the reviewed files for Server Guy's own change); Pi's mapping explanation is interpretation; an external return is fetched and checked independently, and a withdrawal is explicit. Unexpected or out-of-scope changes block until a reviewed replacement; they are never silently accepted.
 - **Specification dependency:** **G-HANDOFF-TIMEOUT** still requires a defined abandoned/timeout terminal. This draft does not invent one.
 - **Invalidated by:** Candidate revision, required-gap set, PR status, or returned diff changing.
 
@@ -464,6 +468,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Satisfied when:** Every required conformance check defined by the selected Application Profile passes against the exact candidate revision, and the result is current for that revision.
 - **Evidence:** Profile-check run identity, per-check output, logs, timestamps, and candidate SHA.
 - **Human observability:** Open the GitHub check run or Server Guy check artifact; inspect raw output for every check; open the exact source lines involved.
+- **Decided 2026-09-06:** the checker, the probe and the receipt belong to Server Guy's runner, outside the editable proposal; previews over a working tree or a pull-request head and Pi-requested commands are worker evidence that never satisfies this check; every result is bound to the candidate, the contract version, the profile and check-set versions, the accepted behavior-check version and the runner image.
 - **Invalidated by:** Candidate revision, profile version, check definition, or relevant configuration changing.
 
 ## Phase 4 — Review launch plan

@@ -100,6 +100,13 @@ export const browserJourneys = [
     smoke: false,
   },
   {
+    id: "phase-three-conformance",
+    name: "Make the repository launch-ready and verify the exact candidate",
+    description:
+      "Continue from a ready contract, let Server Guy stage and preview a change, approve and publish it, merge on GitHub, verify the merged candidate in the runner, and recover from a missing engine.",
+    smoke: false,
+  },
+  {
     id: "dashboard",
     name: "Testing dashboard and saved reviews",
     description:

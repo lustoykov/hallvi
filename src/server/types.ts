@@ -36,7 +36,7 @@ export interface ApplicationRecord {
 }
 
 /** The launch phases with a durable workspace in this build. */
-export type PhaseKey = "start" | "inspect-app";
+export type PhaseKey = "start" | "inspect-app" | "make-launch-ready";
 
 export interface PhaseWorkspaceRecord {
   id: string;
@@ -66,6 +66,25 @@ export interface LaunchBriefEvidence {
   approvalMode: ApprovalMode;
   approvalScope: string;
   decisionIds: string[];
+}
+
+/**
+ * The Application Contract as it was when Inspect app completed: the check
+ * results and the contract identity Phase 3 works from. Retained history, not
+ * a live re-evaluation; a later revision appears in the current phase.
+ */
+export interface InspectAppEvidence {
+  completedAt: string;
+  checks: Array<
+    Pick<GateCheck, "key" | "label" | "status" | "result" | "evidence">
+  >;
+  contractId: string;
+  contractVersion: number;
+  profileId: string;
+  profileVersion: number;
+  commitSha: string;
+  inspectionObservationId: string;
+  connectionId: string | null;
 }
 
 export interface PhaseWorkspaceView extends PhaseWorkspaceRecord {
@@ -189,7 +208,13 @@ export interface ChatRunSnapshot {
 }
 
 export interface EvidenceReference {
-  recordType: "application" | "decision" | "observation" | "contract";
+  recordType:
+    | "application"
+    | "decision"
+    | "observation"
+    | "contract"
+    | "conformance-proposal"
+    | "conformance-run";
   recordId: string;
   role: string;
   label: string;
@@ -206,7 +231,11 @@ export interface GateCheck {
   evidence: EvidenceReference[];
   /** The explicit re-verification this check offers, if any. */
   rerun: {
-    key: "repository-readable" | "repository-inspection";
+    key:
+      | "repository-readable"
+      | "repository-inspection"
+      | "conformance-refresh"
+      | "conformance-verify";
     label: string;
   } | null;
 }
@@ -386,6 +415,369 @@ export interface ApplicationContractView extends ApplicationContractRecord {
   provenanceIssues: Array<{ field: string; reason: string }>;
 }
 
+// Make launch-ready (Phase 3)
+
+export type ExecutionEnvironmentState =
+  "ready" | "not-found" | "unreachable" | "permission-denied" | "unsupported";
+
+/**
+ * Whether the machine running Server Guy's controller can execute repository
+ * code in disposable containers. Discovered by connecting to the configured
+ * Docker Engine, never by finding a `docker` executable; the states say what
+ * the evidence supports and nothing more.
+ */
+export interface ExecutionEnvironmentStatus {
+  state: ExecutionEnvironmentState;
+  ready: boolean;
+  checkedAt: string;
+  /** The machine that was checked: the controller host, not the browser. */
+  host: { hostname: string; platform: string; arch: string };
+  endpoint: string | null;
+  endpointSource: "DOCKER_HOST" | "docker-context" | "known-socket" | null;
+  engine: {
+    version: string;
+    apiVersion: string;
+    platform: string;
+    os: string;
+    arch: string;
+  } | null;
+  summary: string;
+  recovery: { label: string; href: string | null; steps: string[] };
+  detail: string | null;
+  /** The runner images were pulled and a trivial container ran. */
+  verified: {
+    at: string;
+    runnerImage: string;
+    runnerImageDigest: string;
+    databaseImage: string;
+    databaseImageDigest: string;
+  } | null;
+}
+
+export type ConformanceCheckKey =
+  | "install"
+  | "configuration"
+  | "database"
+  | "migrations"
+  | "startup"
+  | "health"
+  | "behavior"
+  | "tests"
+  /** A Pi-requested exploratory command; never part of the gate. */
+  | "command";
+
+export type ConformanceCheckOutcome =
+  "passed" | "failed" | "not-run" | "not-applicable";
+
+export interface ConformanceStepResult {
+  name: string;
+  request: string;
+  status: number | null;
+  passed: boolean;
+  detail: string;
+}
+
+export interface ConformanceCheckResult {
+  key: ConformanceCheckKey;
+  label: string;
+  outcome: ConformanceCheckOutcome;
+  summary: string;
+  /** Bounded, credential-redacted process or probe output. */
+  output: string | null;
+  outputTruncated: boolean;
+  exitCode: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** For not-applicable: the record that proves the responsibility is
+   * absent. */
+  evidence?: string;
+  /** For the behavior check: one entry per accepted step. */
+  steps?: ConformanceStepResult[];
+}
+
+export type ConformanceRunKind = "preview" | "candidate" | "command";
+export type ConformanceRunStatus =
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "cancelled"
+  | "timed-out"
+  | "interrupted"
+  | "unavailable";
+
+/** What one execution ran: the exact tree and the configuration it used. */
+export interface ConformanceRunSource {
+  commitSha: string;
+  /** Present for a preview over staged changes; null for an exact commit. */
+  overlayDigest: string | null;
+  treeDigest: string;
+  fileCount: number;
+}
+
+export interface ConformanceRunConfiguration {
+  startCommand: string[];
+  startCommandSource: "dockerfile" | "contract";
+  port: number;
+  healthPath: string;
+  /** Variable names and their synthetic values; never production values. */
+  environment: Record<string, string>;
+  database: "postgresql" | "none";
+  migrationTool: string | null;
+  /** For a command run: the command Pi requested. */
+  command?: string[];
+}
+
+/**
+ * One execution attempt over an exact source tree. Preview and command runs
+ * are worker evidence; only a candidate run over an exact commit with current
+ * bindings can satisfy P3.G3. Rows are appended, never rewritten.
+ */
+export interface ConformanceRunRecord {
+  id: string;
+  applicationId: string;
+  workspaceId: string;
+  kind: ConformanceRunKind;
+  status: ConformanceRunStatus;
+  source: ConformanceRunSource;
+  proposalId: string | null;
+  contractId: string;
+  contractVersion: number;
+  profileId: string;
+  profileVersion: number;
+  definitionVersion: number;
+  acceptanceChecksId: string | null;
+  acceptanceChecksVersion: number | null;
+  imageDigest: string | null;
+  configuration: ConformanceRunConfiguration | null;
+  results: ConformanceCheckResult[];
+  summary: string;
+  error: string | null;
+  piRunId: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export type ConformanceProposalOrigin = "server-guy" | "external" | "no-change";
+export type ConformanceProposalStatus =
+  "proposed" | "approved" | "published" | "withdrawn" | "superseded";
+
+export interface ProposedFileChange {
+  path: string;
+  /** Null deletes the file. */
+  content: string | null;
+  /** The saved read of the file at the base commit, when it existed. */
+  baseObservationId: string | null;
+}
+
+export interface ConformanceMappingEntry {
+  field: string;
+  paths: string[];
+  explanation: string;
+}
+
+export interface ProposalApproval {
+  mode: ApprovalMode;
+  by: "engineer" | "approval-mode";
+  approvedAt: string;
+  filesDigest: string;
+  baseSha: string;
+  contractVersion: number;
+}
+
+export type PullRequestState = "open" | "closed" | "merged";
+
+export interface ProposalPublication {
+  branch: string;
+  commitSha: string;
+  pullRequestNumber: number;
+  pullRequestUrl: string;
+  publishedAt: string;
+  connectionId: string;
+  /** Set when a prior attempt found the branch or pull request already
+   * there. */
+  adopted: boolean;
+  /** As last observed on GitHub. */
+  state?: PullRequestState;
+  observedAt?: string;
+}
+
+export interface ExternalReturn {
+  reference: string;
+  branch: string | null;
+  headSha: string;
+  pullRequestNumber: number | null;
+  pullRequestUrl: string | null;
+  returnedAt: string;
+  state?: PullRequestState;
+  observedAt?: string;
+}
+
+export interface CandidateResolution {
+  sha: string;
+  defaultBranch: string;
+  resolvedAt: string;
+  source: "contract-commit" | "merged-pull-request" | "external";
+  merge: {
+    pullRequestNumber: number;
+    mergedAt: string | null;
+    mergeCommitSha: string | null;
+    method: "merge" | "squash" | "rebase" | "unknown";
+  } | null;
+}
+
+/** Deterministic checks of the candidate against the proposal and scope. */
+export interface CandidateVerification {
+  candidateSha: string;
+  verifiedAt: string;
+  changesComplete: boolean;
+  differences: string[];
+  scope: { ok: boolean; violations: string[]; changedFiles: string[] };
+}
+
+export interface ConformanceProposalRecord {
+  id: string;
+  applicationId: string;
+  workspaceId: string;
+  origin: ConformanceProposalOrigin;
+  status: ConformanceProposalStatus;
+  baseSha: string;
+  contractId: string;
+  contractVersion: number;
+  summary: string;
+  changes: ProposedFileChange[];
+  filesDigest: string;
+  mapping: ConformanceMappingEntry[];
+  requestApproval: boolean;
+  sourceMessageId: string | null;
+  piRunId: string | null;
+  approval: ProposalApproval | null;
+  publication: ProposalPublication | null;
+  publicationError: string | null;
+  external: ExternalReturn | null;
+  candidate: CandidateResolution | null;
+  verification: CandidateVerification | null;
+  supersededById: string | null;
+  createdAt: string;
+}
+
+export interface AcceptanceStep {
+  name: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  body?: string;
+  expectStatus: number;
+  expectBodyIncludes?: string[];
+}
+
+/**
+ * The application-specific behavior the candidate must show, proposed from
+ * cited repository evidence and versioned; an accepted definition is executed
+ * beside the fixed profile checks and cannot be weakened unilaterally.
+ */
+export interface AcceptanceChecksRecord {
+  id: string;
+  applicationId: string;
+  workspaceId: string;
+  version: number;
+  status: "proposed" | "accepted" | "superseded";
+  rationale: string;
+  steps: AcceptanceStep[];
+  evidence: RepositoryCitation[];
+  digest: string;
+  contractId: string;
+  contractVersion: number;
+  sourceMessageId: string | null;
+  piRunId: string | null;
+  acceptedAt: string | null;
+  acceptedBy: "engineer" | "approval-mode" | null;
+  supersededById: string | null;
+  createdAt: string;
+}
+
+/**
+ * The engineer's explicit, verified grant to publish branches and pull
+ * requests to this application's repository with one GitHub connection.
+ * A broadly scoped token is not a grant; a replaced connection ends it.
+ */
+export interface PublicationGrantRecord {
+  id: string;
+  applicationId: string;
+  connectionId: string;
+  mechanism: "cli" | "app";
+  verifiedPermissions: Record<string, unknown>;
+  grantedAt: string;
+  revokedAt: string | null;
+}
+
+export interface ConformanceCheckDefinition {
+  key: ConformanceCheckKey;
+  label: string;
+  proves: string;
+  limits: string;
+  required: boolean;
+}
+
+/** The bounded brief every working environment receives. */
+export interface ConformanceBrief {
+  repository: {
+    url: string;
+    owner: string;
+    name: string;
+    defaultBranch: string | null;
+  };
+  baseSha: string;
+  contract: {
+    id: string;
+    version: number;
+    profileId: string;
+    profileVersion: number;
+    profileLabel: string;
+  };
+  requiredChanges: Array<{
+    field: string;
+    label: string;
+    required: string;
+    observed: string;
+    change: string;
+  }>;
+  blockers: Array<{ field: string; label: string; reason: string }>;
+  scope: {
+    allowed: string;
+    forbidden: string[];
+    sensitive: string[];
+  };
+  acceptance: {
+    definitionVersion: number;
+    checks: ConformanceCheckDefinition[];
+    applicationBehavior: AcceptanceChecksRecord | null;
+    configuration: Pick<
+      ConformanceRunConfiguration,
+      "port" | "healthPath" | "environment" | "database" | "migrationTool"
+    >;
+  };
+  exclusions: string[];
+  exportText: string;
+}
+
+/** The Phase 3 projection the Operator View and the status tool share. */
+export interface ConformanceView {
+  retained: InspectAppEvidence | null;
+  brief: ConformanceBrief | null;
+  proposal: ConformanceProposalRecord | null;
+  proposals: ConformanceProposalRecord[];
+  acceptance: AcceptanceChecksRecord | null;
+  proposedAcceptance: AcceptanceChecksRecord | null;
+  runs: ConformanceRunRecord[];
+  latestPreview: ConformanceRunRecord | null;
+  latestCandidateRun: ConformanceRunRecord | null;
+  environment: ExecutionEnvironmentStatus | null;
+  grant: PublicationGrantRecord | null;
+  /** Non-null when a Phase 3 contract revision reintroduced blockers. */
+  contractBlocked: string | null;
+}
+
 export interface OperatorView {
   application: ApplicationRecord | null;
   /** The viewed workspace: the selected chat's phase. */
@@ -402,6 +794,8 @@ export interface OperatorView {
   activity: ActivityEvent[];
   inspection: RepositoryInspectionSummary | null;
   contract: ApplicationContractView | null;
+  /** Phase 3 only. */
+  conformance: ConformanceView | null;
 }
 
 /** Retained name from the Phase 1 build; the view is now phase-aware. */
@@ -419,10 +813,35 @@ export interface PiDecision {
   replaces?: string;
 }
 
+/** A staged source change, validated but not saved until the final
+ * transaction. */
+export interface SourceChangeProposal {
+  baseSha: string;
+  contractId: string;
+  contractVersion: number;
+  summary: string;
+  changes: ProposedFileChange[];
+  filesDigest: string;
+  mapping: ConformanceMappingEntry[];
+  requestApproval: boolean;
+}
+
+/** A staged acceptance-check definition, saved with the final answer. */
+export interface AcceptanceChecksProposal {
+  rationale: string;
+  steps: AcceptanceStep[];
+  evidence: RepositoryCitation[];
+  digest: string;
+  contractId: string;
+  contractVersion: number;
+}
+
 export interface PiTurnResult {
   message: string;
   decisionProposals: PiDecision[];
   contractProposal?: ApplicationContractProposal | null;
+  sourceProposal?: SourceChangeProposal | null;
+  acceptanceProposal?: AcceptanceChecksProposal | null;
 }
 
 /**
@@ -488,5 +907,30 @@ export interface ApplicationStatus {
     conformanceItems: number;
     policyItems: number;
     createdAt: string;
+  } | null;
+  /** Phase 3 only: the current conformance state, bounded. */
+  conformance?: {
+    baseSha: string | null;
+    requiredChanges: number;
+    proposal: {
+      id: string;
+      origin: ConformanceProposalOrigin;
+      status: ConformanceProposalStatus;
+      files: number;
+      pullRequestUrl: string | null;
+      candidateSha: string | null;
+    } | null;
+    acceptance: { version: number; status: string; steps: number } | null;
+    latestPreview: {
+      status: ConformanceRunStatus;
+      treeDigest: string;
+      failed: string[];
+    } | null;
+    latestCandidateRun: {
+      status: ConformanceRunStatus;
+      commitSha: string;
+      failed: string[];
+    } | null;
+    executionEnvironment: ExecutionEnvironmentState | "unchecked";
   } | null;
 }

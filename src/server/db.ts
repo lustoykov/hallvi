@@ -15,29 +15,37 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
+  acceptanceChecks,
   activityEvents,
   applicationContracts,
   applications,
   chats,
+  conformanceProposals,
+  conformanceRuns,
   decisions,
   messages,
   observations,
   phaseWorkspaces,
   piRuns,
+  publicationGrants,
   chatSummaries,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type {
+  AcceptanceChecksRecord,
   ActivityEvent,
   ApplicationContractBody,
   ApplicationContractRecord,
   ApplicationRecord,
   Chat,
   ChatMessage,
+  ConformanceProposalRecord,
+  ConformanceRunRecord,
   Decision,
   Observation,
   PhaseKey,
   PhaseWorkspaceRecord,
+  PublicationGrantRecord,
 } from "./types";
 
 const schema = {
@@ -621,6 +629,313 @@ export function supersedeContract(
     );
   }
   return result;
+}
+
+// Conformance proposals (Phase 3)
+
+export function insertConformanceProposal(
+  input: Omit<ConformanceProposalRecord, "id" | "createdAt">,
+) {
+  const proposal: ConformanceProposalRecord = {
+    ...input,
+    id: randomUUID(),
+    createdAt: now(),
+  };
+  db().insert(conformanceProposals).values(proposal).run();
+  return proposal;
+}
+
+export function getConformanceProposal(id: string) {
+  return (
+    db()
+      .select()
+      .from(conformanceProposals)
+      .where(eq(conformanceProposals.id, id))
+      .get() ?? null
+  );
+}
+
+/** The workspace's active proposal: neither superseded nor withdrawn. */
+export function activeConformanceProposal(workspaceId: string) {
+  return (
+    db()
+      .select()
+      .from(conformanceProposals)
+      .where(
+        and(
+          eq(conformanceProposals.workspaceId, workspaceId),
+          isNull(conformanceProposals.supersededById),
+          notInArray(conformanceProposals.status, ["withdrawn", "superseded"]),
+        ),
+      )
+      .orderBy(desc(conformanceProposals.createdAt), desc(rowId))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+export function listConformanceProposals(applicationId: string) {
+  return db()
+    .select()
+    .from(conformanceProposals)
+    .where(eq(conformanceProposals.applicationId, applicationId))
+    .orderBy(asc(conformanceProposals.createdAt), asc(rowId))
+    .all();
+}
+
+/**
+ * Guarded update of one proposal: the row must still be in one of the
+ * expected states, so a lost receipt or a concurrent action cannot overwrite
+ * a later outcome. Returns the updated row or null when the guard failed.
+ */
+export function updateConformanceProposal(
+  id: string,
+  expectedStatuses: ConformanceProposalRecord["status"][],
+  patch: Partial<
+    Pick<
+      ConformanceProposalRecord,
+      | "status"
+      | "approval"
+      | "publication"
+      | "publicationError"
+      | "external"
+      | "candidate"
+      | "verification"
+      | "supersededById"
+    >
+  >,
+) {
+  return (
+    db()
+      .update(conformanceProposals)
+      .set(patch)
+      .where(
+        and(
+          eq(conformanceProposals.id, id),
+          inArray(conformanceProposals.status, expectedStatuses),
+        ),
+      )
+      .returning()
+      .get() ?? null
+  );
+}
+
+// Conformance runs (Phase 3)
+
+export function insertConformanceRun(
+  input: Omit<ConformanceRunRecord, "id" | "createdAt">,
+) {
+  const run: ConformanceRunRecord = {
+    ...input,
+    id: randomUUID(),
+    createdAt: now(),
+  };
+  db().insert(conformanceRuns).values(run).run();
+  return run;
+}
+
+export function getConformanceRun(id: string) {
+  return (
+    db()
+      .select()
+      .from(conformanceRuns)
+      .where(eq(conformanceRuns.id, id))
+      .get() ?? null
+  );
+}
+
+export function listConformanceRuns(applicationId: string) {
+  return db()
+    .select()
+    .from(conformanceRuns)
+    .where(eq(conformanceRuns.applicationId, applicationId))
+    .orderBy(desc(conformanceRuns.createdAt), desc(rowId))
+    .all();
+}
+
+export function listPendingConformanceRuns() {
+  return db()
+    .select()
+    .from(conformanceRuns)
+    .where(inArray(conformanceRuns.status, ["queued", "running"]))
+    .orderBy(asc(conformanceRuns.createdAt), asc(rowId))
+    .all();
+}
+
+/** Guarded status change; returns null when the run left the expected
+ * states. */
+export function updateConformanceRun(
+  id: string,
+  expectedStatuses: ConformanceRunRecord["status"][],
+  patch: Partial<
+    Pick<
+      ConformanceRunRecord,
+      | "status"
+      | "results"
+      | "summary"
+      | "error"
+      | "imageDigest"
+      | "configuration"
+      | "startedAt"
+      | "finishedAt"
+      | "source"
+    >
+  >,
+) {
+  return (
+    db()
+      .update(conformanceRuns)
+      .set(patch)
+      .where(
+        and(
+          eq(conformanceRuns.id, id),
+          inArray(conformanceRuns.status, expectedStatuses),
+        ),
+      )
+      .returning()
+      .get() ?? null
+  );
+}
+
+// Acceptance checks (Phase 3)
+
+export function insertAcceptanceChecks(
+  input: Omit<AcceptanceChecksRecord, "id" | "createdAt">,
+) {
+  const record: AcceptanceChecksRecord = {
+    ...input,
+    id: randomUUID(),
+    createdAt: now(),
+  };
+  db().insert(acceptanceChecks).values(record).run();
+  return record;
+}
+
+export function getAcceptanceChecks(id: string) {
+  return (
+    db()
+      .select()
+      .from(acceptanceChecks)
+      .where(eq(acceptanceChecks.id, id))
+      .get() ?? null
+  );
+}
+
+export function listAcceptanceChecks(applicationId: string) {
+  return db()
+    .select()
+    .from(acceptanceChecks)
+    .where(eq(acceptanceChecks.applicationId, applicationId))
+    .orderBy(asc(acceptanceChecks.version))
+    .all();
+}
+
+/** The accepted definition the runner executes, if any. */
+export function acceptedAcceptanceChecks(applicationId: string) {
+  return (
+    db()
+      .select()
+      .from(acceptanceChecks)
+      .where(
+        and(
+          eq(acceptanceChecks.applicationId, applicationId),
+          eq(acceptanceChecks.status, "accepted"),
+          isNull(acceptanceChecks.supersededById),
+        ),
+      )
+      .orderBy(desc(acceptanceChecks.version))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+/** The newest proposed definition awaiting acceptance, if any. */
+export function proposedAcceptanceChecks(applicationId: string) {
+  return (
+    db()
+      .select()
+      .from(acceptanceChecks)
+      .where(
+        and(
+          eq(acceptanceChecks.applicationId, applicationId),
+          eq(acceptanceChecks.status, "proposed"),
+          isNull(acceptanceChecks.supersededById),
+        ),
+      )
+      .orderBy(desc(acceptanceChecks.version))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+export function updateAcceptanceChecks(
+  id: string,
+  expectedStatuses: AcceptanceChecksRecord["status"][],
+  patch: Partial<
+    Pick<
+      AcceptanceChecksRecord,
+      "status" | "acceptedAt" | "acceptedBy" | "supersededById"
+    >
+  >,
+) {
+  return (
+    db()
+      .update(acceptanceChecks)
+      .set(patch)
+      .where(
+        and(
+          eq(acceptanceChecks.id, id),
+          inArray(acceptanceChecks.status, expectedStatuses),
+        ),
+      )
+      .returning()
+      .get() ?? null
+  );
+}
+
+// Publication grants (Phase 3)
+
+export function insertPublicationGrant(
+  input: Omit<PublicationGrantRecord, "id" | "grantedAt" | "revokedAt">,
+) {
+  const grant: PublicationGrantRecord = {
+    ...input,
+    id: randomUUID(),
+    grantedAt: now(),
+    revokedAt: null,
+  };
+  db().insert(publicationGrants).values(grant).run();
+  return grant;
+}
+
+export function activePublicationGrant(applicationId: string) {
+  return (
+    db()
+      .select()
+      .from(publicationGrants)
+      .where(
+        and(
+          eq(publicationGrants.applicationId, applicationId),
+          isNull(publicationGrants.revokedAt),
+        ),
+      )
+      .orderBy(desc(publicationGrants.grantedAt), desc(rowId))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+export function revokePublicationGrants(applicationId: string) {
+  return db()
+    .update(publicationGrants)
+    .set({ revokedAt: now() })
+    .where(
+      and(
+        eq(publicationGrants.applicationId, applicationId),
+        isNull(publicationGrants.revokedAt),
+      ),
+    )
+    .run().changes;
 }
 
 // Activity

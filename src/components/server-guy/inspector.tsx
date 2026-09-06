@@ -14,10 +14,15 @@ import { useId, useState } from "react";
 import type {
   ActivityEvent,
   GateCheck,
+  InspectAppEvidence,
   LaunchBriefEvidence,
   OperatorView,
 } from "@/server/types";
 
+import {
+  ConformanceRecord,
+  type ConformanceAction,
+} from "./conformance-record";
 import { ContractRecord } from "./contract-record";
 import { statusLabel } from "./format";
 import { LocalTime } from "./local-time";
@@ -32,14 +37,23 @@ function eventTone(kind: string) {
     kind === "repository-observed" ||
     kind === "repository-inspected" ||
     kind === "phase-completed" ||
-    kind === "contract-established"
+    kind === "contract-established" ||
+    kind === "change-published" ||
+    kind === "candidate-recorded" ||
+    kind === "conformance-passed" ||
+    kind === "acceptance-accepted" ||
+    kind === "publication-granted"
   )
     return "passed";
   if (
     kind === "repository-unavailable" ||
     kind === "repository-inspection-failed" ||
     kind === "repository-verification-invalidated" ||
-    kind === "repository-inspection-invalidated"
+    kind === "repository-inspection-invalidated" ||
+    kind === "conformance-failed" ||
+    kind === "conformance-incomplete" ||
+    kind === "change-publication-failed" ||
+    kind === "change-withdrawn"
   )
     return "attention";
   return "";
@@ -56,7 +70,8 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     <section className="sg-inspector-section">
       <p className="sg-inspector-hint">
         What happened to this application: saved requirements, repository checks
-        and inspections, phase transitions, contracts and connection changes.
+        and inspections, phase transitions, contracts, proposed and published
+        changes, candidates, conformance runs and connection changes.
       </p>
       {events.length ? (
         events.map((event) => (
@@ -91,13 +106,15 @@ export function Inspector({
   busy,
   onSelectCheck,
   onContinue,
+  onConformance,
 }: {
   view: OperatorView;
   checks: GateCheck[];
   busy: string | null;
   onSelectCheck: (key: string) => void;
-  /** The explicit transition from a ready Launch Brief into Inspect app. */
+  /** The explicit transition into the next phase from a ready deliverable. */
   onContinue: () => void;
+  onConformance: (action: ConformanceAction) => void;
 }) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("record");
   const tabId = useId();
@@ -106,11 +123,16 @@ export function Inspector({
   const completed = workspace?.status === "completed";
   const ready = workspace?.status === "ready";
   const canContinue = Boolean(
-    workspace?.current && ready && workspace.phaseKey === "start",
+    workspace?.current &&
+    ready &&
+    (workspace.phaseKey === "start" || workspace.phaseKey === "inspect-app"),
   );
   const evidence = completed
-    ? (workspace?.deliverableEvidence as Partial<LaunchBriefEvidence> | null)
+    ? (workspace?.deliverableEvidence as Partial<
+        LaunchBriefEvidence | InspectAppEvidence
+      > | null)
     : null;
+  const proposal = view.conformance?.proposal ?? null;
 
   return (
     <aside className="sg-inspector">
@@ -199,9 +221,9 @@ export function Inspector({
             {canContinue && (
               <div className="sg-phase-continue">
                 <p>
-                  All four checks pass. Continue to Phase 2, where Server Guy
-                  inspects the repository and proposes the Application Contract.
-                  Phase 1 chats become read-only.
+                  {workspace?.phaseKey === "start"
+                    ? "All four checks pass. Continue to Phase 2, where Server Guy inspects the repository and proposes the Application Contract. Phase 1 chats become read-only."
+                    : "All four checks pass. Continue to Phase 3, where the contract's required changes are made, published for your review and verified in an isolated runner. Phase 2 chats become read-only."}
                 </p>
                 <button
                   className="sg-primary-button"
@@ -214,17 +236,18 @@ export function Inspector({
                   ) : (
                     <ArrowRight aria-hidden="true" weight="bold" />
                   )}
-                  Continue to Inspect app
+                  {workspace?.phaseKey === "start"
+                    ? "Continue to Inspect app"
+                    : "Continue to Make launch-ready"}
                 </button>
               </div>
             )}
             {workspace?.current &&
               ready &&
-              workspace.phaseKey === "inspect-app" && (
+              workspace.phaseKey === "make-launch-ready" && (
                 <p className="sg-record-notice" role="note">
-                  The Application Contract checks pass. Phase 3, Make
-                  launch-ready, is not available in this build; its conformance
-                  work is recorded below.
+                  The Conformance Result checks pass for the exact candidate.
+                  Phase 4, Review launch plan, is not available in this build.
                 </p>
               )}
             <div className="sg-check-list">
@@ -255,6 +278,18 @@ export function Inspector({
                 inspection={view.inspection}
               />
             )}
+            {workspace?.phaseKey === "make-launch-ready" &&
+              view.application &&
+              view.conformance && (
+                <ConformanceRecord
+                  application={view.application}
+                  approvalMode={view.application.approvalMode}
+                  busy={busy}
+                  conformance={view.conformance}
+                  onAction={onConformance}
+                  readOnly={completed}
+                />
+              )}
             {view.decisions.length > 0 && (
               <details className="sg-saved-requirements">
                 <summary>Saved requirements ({view.decisions.length})</summary>
@@ -279,19 +314,81 @@ export function Inspector({
 
         {activeTab === "activity" && <ActivityFeed events={view.activity} />}
 
-        {activeTab === "changes" && (
-          <section className="sg-empty-state">
-            <div className="sg-empty-icon">
-              <GithubLogo />
-            </div>
-            <strong>No external changes yet</strong>
-            <p>
-              Server Guy has only read the repository and written to its own
-              local record. Code and infrastructure remain untouched;
-              conformance work is recorded for Phase 3.
-            </p>
-          </section>
-        )}
+        {activeTab === "changes" &&
+          (proposal ? (
+            <section className="sg-inspector-section">
+              <span className="sg-eyebrow">Repository changes</span>
+              <article className="sg-receipt">
+                <div>
+                  <GithubLogo weight="fill" />
+                  <span>
+                    <strong>
+                      {proposal.origin === "external"
+                        ? "Returned change"
+                        : proposal.origin === "no-change"
+                          ? "No change required"
+                          : "Server Guy's proposed change"}
+                    </strong>
+                    <small>
+                      <LocalTime value={proposal.createdAt} />
+                    </small>
+                  </span>
+                  <em className={proposal.candidate ? "passed" : "unavailable"}>
+                    {proposal.candidate ? "merged" : proposal.status}
+                  </em>
+                </div>
+                <p>{proposal.summary}</p>
+                <ul className="sg-changed-files">
+                  {proposal.changes.map((change) => (
+                    <li key={change.path}>
+                      <code>{change.path}</code>
+                      {change.content === null && <small>deleted</small>}
+                    </li>
+                  ))}
+                </ul>
+                <div className="sg-receipt-actions">
+                  <a
+                    href={`/api/conformance/proposals/${proposal.id}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Complete diff <ArrowSquareOut aria-hidden="true" />
+                  </a>
+                  {(proposal.publication?.pullRequestUrl ??
+                    proposal.external?.pullRequestUrl) && (
+                    <a
+                      href={
+                        proposal.publication?.pullRequestUrl ??
+                        proposal.external?.pullRequestUrl ??
+                        ""
+                      }
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Pull request <ArrowSquareOut aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
+              </article>
+              <p className="sg-inspector-hint">
+                Server Guy publishes a branch and pull request; it never merges.
+                The candidate is the exact revision observed on the default
+                branch after your merge.
+              </p>
+            </section>
+          ) : (
+            <section className="sg-empty-state">
+              <div className="sg-empty-icon">
+                <GithubLogo />
+              </div>
+              <strong>No external changes yet</strong>
+              <p>
+                Server Guy has only read the repository and written to its own
+                local record. A proposed change appears here before it is
+                published as a branch and pull request for your review.
+              </p>
+            </section>
+          ))}
 
         {activeTab === "receipts" && (
           <section className="sg-inspector-section">

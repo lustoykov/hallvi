@@ -1,7 +1,11 @@
 import Link from "next/link";
 import s from "./pi-setup-screen.module.css";
 
-export function SettingsNav({ current }: { current: "pi" | "github" }) {
+export function SettingsNav({
+  current,
+}: {
+  current: "pi" | "github" | "execution";
+}) {
   return (
     <nav className={s.settingsNav} aria-label="Settings">
       <Link
@@ -15,6 +19,12 @@ export function SettingsNav({ current }: { current: "pi" | "github" }) {
         aria-current={current === "github" ? "page" : undefined}
       >
         GitHub
+      </Link>
+      <Link
+        href="/setup/execution"
+        aria-current={current === "execution" ? "page" : undefined}
+      >
+        Execution
       </Link>
       {process.env.NODE_ENV === "development" && (
         <a

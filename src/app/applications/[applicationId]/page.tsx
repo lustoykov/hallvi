@@ -26,7 +26,11 @@ export default async function ApplicationPage({
     view = getOperatorView(
       applicationId,
       typeof chat === "string" ? chat : undefined,
-      phase === "start" || phase === "inspect-app" ? phase : undefined,
+      phase === "start" ||
+        phase === "inspect-app" ||
+        phase === "make-launch-ready"
+        ? phase
+        : undefined,
     );
   } catch (error) {
     if (error instanceof NotFoundError) notFound();

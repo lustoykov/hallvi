@@ -21,7 +21,11 @@ import type {
   PiTurnResult,
 } from "../../src/server/types";
 import { pushTestDatabase } from "../test-database";
-import { checkPhaseOne, checkPhaseTwo } from "./check-phase-one";
+import {
+  checkPhaseOne,
+  checkPhaseThree,
+  checkPhaseTwo,
+} from "./check-phase-one";
 import { evalRepeatCount, selectPhaseOneCases } from "./phase-one-cases";
 import { createEvalScratch, releaseEvalScratch } from "./scratch";
 import { seedPhaseOneEvalCase } from "./seed-phase-one";
@@ -55,6 +59,13 @@ const sourceFiles = [
   "src/server/phase-one-spec.ts",
   "src/server/phase-two.ts",
   "src/server/phase-two-spec.ts",
+  "src/server/phase-three.ts",
+  "src/server/phase-three-spec.ts",
+  "src/server/pi-conformance.ts",
+  "src/server/conformance-brief.ts",
+  "src/server/conformance-definition.ts",
+  "src/server/source-proposal.ts",
+  "src/server/acceptance-checks.ts",
   "src/server/application-profile.ts",
   "src/server/application-contract.ts",
   "src/server/operator-view.ts",
@@ -67,6 +78,9 @@ const sourceFiles = [
   "tests/evals/phase-one-cases.ts",
   "tests/evals/seed-phase-one.ts",
   "tests/evals/seed-phase-two.ts",
+  "tests/evals/seed-phase-three.ts",
+  "tests/fixtures/fake-executor.ts",
+  "tests/fixtures/conformance-builder.ts",
   "tests/fixtures/repositories.ts",
   "tests/fixtures/contract-builder.ts",
   "tests/evals/native-scenarios.ts",
@@ -255,6 +269,11 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
           Object.assign(
             record.checks,
             checkPhaseTwo(scenario, before, record.after),
+          );
+        if (scenario.phaseThree)
+          Object.assign(
+            record.checks,
+            checkPhaseThree(scenario, before, record.after),
           );
         if (scenario.nativeScenario || scenario.statusLookup) {
           record.nativeEvidence = nativeEvalEvidence(

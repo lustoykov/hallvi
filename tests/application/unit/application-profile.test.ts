@@ -42,7 +42,7 @@ describe("FastAPI + uv profile resolution", () => {
       ["requires-python", true],
     ]);
     expect(resolution.criteria[1].evidence).toContain(
-      'declares "fastapi[standard]>=0.115"',
+      'declares "fastapi>=0.115"',
     );
     expect(resolution.criteria[3].evidence).toBe('requires-python = ">=3.12"');
   });

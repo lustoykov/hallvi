@@ -79,6 +79,7 @@ function render({
     workspaces: [],
     inspection: null,
     contract: null,
+    conformance: null,
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
     messages: [

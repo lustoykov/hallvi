@@ -180,6 +180,7 @@ function view(overrides: Partial<OperatorView>): OperatorView {
     activity: [],
     inspection: null,
     contract: null,
+    conformance: null,
     ...overrides,
   };
 }
@@ -212,6 +213,7 @@ describe("inspector record", () => {
         busy={null}
         checks={v.checks}
         onContinue={() => {}}
+        onConformance={() => {}}
         onSelectCheck={() => {}}
         view={v}
       />,
@@ -246,7 +248,7 @@ describe("inspector record", () => {
     expect(html).toContain("Launch Brief");
     expect(html).toContain("Completed");
   });
-  it("shows the contract record for Inspect app and Phase 3 as unavailable when ready", () => {
+  it("shows the contract record for Inspect app and offers Continue to Phase 3 when ready", () => {
     const html = render(
       view({
         workspace: { ...inspect, status: "ready" },
@@ -255,7 +257,7 @@ describe("inspector record", () => {
       }),
     );
     expect(html).toContain("Application Contract v2");
-    expect(html).toContain("not available in this build");
+    expect(html).toContain("Continue to Make launch-ready");
     expect(
       render(
         view({ workspace: inspect, workspaces: [completedStart, inspect] }),

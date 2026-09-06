@@ -660,10 +660,15 @@ export function collectContractProposal(
   input: unknown,
 ) {
   const { application, workspace } = loadChat(run.applicationId, run.chatId);
-  if (workspace.phaseKey !== "inspect-app")
+  if (
+    workspace.phaseKey !== "inspect-app" &&
+    workspace.phaseKey !== "make-launch-ready"
+  )
     throw new Error("Application Contracts belong to Inspect app.");
   const evidence = requireCurrentInspection(application.id);
   const context = validationContext(application.id, evidence);
+  if (workspace.phaseKey === "make-launch-ready" && !context.currentContract)
+    throw new Error("There is no Application Contract to revise.");
   const proposal = validateContractProposal(input, context);
   const replaced = staged.proposal !== null;
   staged.proposal = proposal;
@@ -759,9 +764,13 @@ export function commitContractProposal(
   proposal: ApplicationContractProposal,
 ) {
   const { application, workspace } = loadChat(run.applicationId, run.chatId);
-  if (workspace.phaseKey !== "inspect-app" || workspace.completedAt)
+  if (
+    (workspace.phaseKey !== "inspect-app" &&
+      workspace.phaseKey !== "make-launch-ready") ||
+    workspace.completedAt
+  )
     throw new Error(
-      "The Application Contract can only be saved in the current Inspect app phase.",
+      "The Application Contract can only be saved in the current phase.",
     );
   const evidence = requireCurrentInspection(application.id);
   assertProposalIdentityCurrent(proposal, evidence);
@@ -784,7 +793,11 @@ export function commitContractProposal(
       workspace.id,
       "contract-revised",
       "Application Contract revised",
-      `v${previous.version} → v${record.version} at ${shortSha(record.commitSha)} · ${changes.count} field${changes.count === 1 ? "" : "s"} changed: ${changes.detail || "provenance only"} · ${counts}`,
+      `v${previous.version} → v${record.version} at ${shortSha(record.commitSha)} · ${changes.count} field${changes.count === 1 ? "" : "s"} changed: ${changes.detail || "provenance only"} · ${counts}${
+        workspace.phaseKey === "make-launch-ready"
+          ? " · revised during Make launch-ready: plans, approvals and runs bound to the previous version are stale"
+          : ""
+      }`,
     );
   } else
     insertActivity(

@@ -22,7 +22,11 @@ export async function GET(
     return getOperatorView(
       applicationId,
       chatId,
-      phase === "start" || phase === "inspect-app" ? phase : undefined,
+      phase === "start" ||
+        phase === "inspect-app" ||
+        phase === "make-launch-ready"
+        ? phase
+        : undefined,
     );
   });
 }

@@ -128,3 +128,56 @@ export function checkPhaseTwo(
       }),
   };
 }
+
+/** Exact structural checks for Phase 3 cases; meaning is reviewed
+ * separately. */
+export function checkPhaseThree(
+  scenario: PhaseOneEvalCase,
+  before: PhaseOneOperatorView,
+  after: PhaseOneOperatorView,
+) {
+  const expected = scenario.phaseThree!;
+  const proposal = after.conformance?.proposal ?? null;
+  const saved =
+    proposal !== null && proposal.id !== before.conformance?.proposal?.id;
+  const acceptance =
+    after.conformance?.proposedAcceptance ??
+    after.conformance?.acceptance ??
+    null;
+  const previews = (after.conformance?.runs ?? []).filter(
+    (run) => run.kind === "preview",
+  ).length;
+  return {
+    "source change saved as expected":
+      expected.expectedSourceChange === "any"
+        ? true
+        : expected.expectedSourceChange === 1
+          ? saved
+          : !saved,
+    "every expected field mapped": (expected.mappedFields ?? []).every(
+      (field) =>
+        !saved || proposal.mapping.some((entry) => entry.field === field),
+    ),
+    "no forbidden path changed": (expected.forbiddenPaths ?? []).every(
+      (path) =>
+        !proposal || !proposal.changes.some((change) => change.path === path),
+    ),
+    "behavior checks saved as expected":
+      expected.expectedAcceptance === undefined ||
+      expected.expectedAcceptance === "any"
+        ? true
+        : expected.expectedAcceptance === 1
+          ? acceptance !== null
+          : acceptance === null,
+    "preview runs as expected":
+      expected.expectedPreview === undefined ||
+      expected.expectedPreview === "any"
+        ? true
+        : expected.expectedPreview === 1
+          ? previews > 0
+          : previews === 0,
+    "nothing published or merged by the turn":
+      !proposal ||
+      (proposal.publication === null && proposal.candidate === null),
+  };
+}

@@ -685,6 +685,8 @@ describe("native Pi adapter", () => {
         { kind: "launch-priority", value: "Recover quickly" },
       ],
       contractProposal: null,
+      sourceProposal: null,
+      acceptanceProposal: null,
     });
     expect(
       (mocks.create.mock.calls[0][0] as Options).customTools[0]

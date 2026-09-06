@@ -27,3 +27,4 @@ Explanations by PR, oldest first:
 - [PR 10 — real Pi evals, exact state checks and human meaning review](pr-010-phase-one-evals.html)
 - [PR 15 — native Pi conversation history versus saved Decisions](pr-015-native-pi-sessions.html)
 - [PR 19 — Phase 2: explicit transition, pinned inspection, scoped reads and the validated Application Contract](pr-019-phase-two-application-contract.html)
+- [PR 20 — Phase 3: the conformance brief, staged changes with isolated previews, reconciled publication, the exact merged candidate and the disposable runner](pr-020-phase-three-conformance.html)

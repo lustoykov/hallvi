@@ -1,7 +1,8 @@
 // Development databases must match the current prototype schema. The only
-// supported in-place change is the additive v6 → v8 upgrade below; every other
-// prototype version, including the abandoned v7 history-table branch, needs an
-// explicit fresh database.
+// supported in-place changes are the additive upgrades below (v6 → v8 columns
+// and tables, v8 → v9 new Phase 3 tables); every other prototype version,
+// including the abandoned v7 history-table branch, needs an explicit fresh
+// database.
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync } from "node:fs";
@@ -16,7 +17,7 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
-const UPGRADABLE_VERSIONS = [6];
+const UPGRADABLE_VERSIONS = [6, 8];
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {
@@ -31,9 +32,11 @@ try {
       throw new Error(
         `Prototype schema ${current} is incompatible with ${version}. Stop the app and worker, move aside the disposable database and its -wal/-shm files, then run npm run db:push. Keep credentials and tests/results. No migration was attempted.`,
       );
-    // Additive v6 → v8 upgrade: back up first, add the workspace completion
-    // columns in place, and let Drizzle create the new contracts table. A
-    // Drizzle table rebuild could fire ON DELETE cascades into domain records.
+    // Additive upgrades: back up first, add the v8 workspace completion
+    // columns in place when coming from v6, and let Drizzle create every
+    // missing table (contracts at v8; proposals, runs, acceptance checks and
+    // grants at v9). A Drizzle table rebuild could fire ON DELETE cascades
+    // into domain records, so nothing existing is rebuilt.
     const backup = `${path}.pre-v${version}-${randomUUID()}.backup`;
     await database.backup(backup);
     chmodSync(backup, 0o600);
