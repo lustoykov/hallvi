@@ -19,7 +19,9 @@ export class GithubAccessError extends Error {
 export async function githubJson(
   path: string,
   token: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<{ data: unknown; scopes: string[] }> {
+  const timeout = AbortSignal.timeout(20_000);
   try {
     const response = await fetch(`https://api.github.com${path}`, {
       headers: {
@@ -27,7 +29,10 @@ export async function githubJson(
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },
-      signal: AbortSignal.timeout(20_000),
+      // A read inside a Pi Run stops with the Run; every read stops at 20s.
+      signal: options.signal
+        ? AbortSignal.any([timeout, options.signal])
+        : timeout,
       cache: "no-store",
       redirect: "error",
     });
@@ -65,6 +70,8 @@ export async function githubJson(
     };
   } catch (error) {
     if (error instanceof GithubAccessError) throw error;
+    // Cancellation is the caller's decision, not a provider failure.
+    if (options.signal?.aborted) throw options.signal.reason;
     throw new GithubAccessError(
       "Could not reach GitHub or read its response. Try again.",
     );

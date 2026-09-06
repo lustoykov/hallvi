@@ -2,7 +2,8 @@ import type {
   AcceptedPiRun,
   ApprovalMode,
   ChatRunSnapshot,
-  PhaseOneOperatorView,
+  OperatorView,
+  PhaseKey,
 } from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -30,7 +31,7 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function post(url: string, body: unknown) {
-  return jsonRequest<PhaseOneOperatorView>(url, {
+  return jsonRequest<OperatorView>(url, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -62,8 +63,14 @@ export const api = {
     return post("/api/applications", input);
   },
   view(applicationId: string, chatId: string) {
-    return jsonRequest<PhaseOneOperatorView>(
+    return jsonRequest<OperatorView>(
       `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}`,
+    );
+  },
+  /** A phase's primary chat: how the phase strip switches the viewed phase. */
+  viewPhase(applicationId: string, phaseKey: PhaseKey) {
+    return jsonRequest<OperatorView>(
+      `/api/applications/${applicationId}?phase=${encodeURIComponent(phaseKey)}`,
     );
   },
   createChat(applicationId: string) {
@@ -100,10 +107,14 @@ export const api = {
       { method: "POST" },
     );
   },
-  rerunRepositoryCheck(applicationId: string) {
-    return post(
-      `/api/applications/${applicationId}/checks/repository-readable/rerun`,
-      {},
-    );
+  rerunCheck(
+    applicationId: string,
+    check: "repository-readable" | "repository-inspection",
+  ) {
+    return post(`/api/applications/${applicationId}/checks/${check}/rerun`, {});
+  },
+  /** The explicit Continue from a ready Launch Brief into Inspect app. */
+  continueToInspectApp(applicationId: string) {
+    return post(`/api/applications/${applicationId}/phases/inspect-app`, {});
   },
 };

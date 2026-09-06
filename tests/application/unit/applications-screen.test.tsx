@@ -12,6 +12,20 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+const workspace = {
+  id: "workspace-one",
+  applicationId: "app-one",
+  phaseKey: "start" as const,
+  createdAt: "2026-09-04T00:00:00Z",
+  completedAt: null,
+  deliverableEvidence: null,
+  phaseNumber: 1,
+  name: "Start",
+  deliverable: "Launch Brief",
+  status: "ready" as const,
+  current: true,
+};
+
 const application: ApplicationRecord = {
   id: "app-one",
   name: "todo",
@@ -46,12 +60,18 @@ describe("application navigation", () => {
       <ApplicationsScreen
         piReady
         applications={[
-          { application, passedChecks: 4, totalChecks: 4 },
+          { application, workspace, passedChecks: 4, totalChecks: 4 },
           {
             application: {
               ...application,
               id: "app-two",
               repositoryOwner: "two",
+            },
+            workspace: {
+              ...workspace,
+              id: "workspace-two",
+              applicationId: "app-two",
+              status: "in-progress",
             },
             passedChecks: 2,
             totalChecks: 4,

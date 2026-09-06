@@ -127,10 +127,12 @@ describe("durable Pi acceptance and outcomes", () => {
       userMessage: "What priority?",
     });
     expect(Object.keys(secondInput).sort()).toEqual([
+      "phaseKey",
       "run",
       "runContext",
       "userMessage",
     ]);
+    expect(secondInput.phaseKey).toBe("start");
     expect(JSON.parse(secondInput.runContext)).toMatchObject({
       chatId: second,
       applicationId,
@@ -303,6 +305,7 @@ describe("minimal native Run context", () => {
         "createdAt",
         "previousAttempt",
         "runId",
+        "userMessageId",
       ]);
       expect(context).not.toHaveProperty("currentApplication");
       expect(context).not.toHaveProperty("decisions");

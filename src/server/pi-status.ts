@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 
-import { getApplicationStatus } from "./phase-one";
+import { getApplicationStatus } from "./operator-view";
 import type { ApplicationStatus } from "./types";
 
 // Empty input: the worker supplies the application and Chat from the accepted

@@ -28,7 +28,7 @@ export function CheckDrawer({
   busy: boolean;
   onClose: () => void;
   onAsk: (check: GateCheck) => void;
-  onRerun: () => void;
+  onRerun: (key: NonNullable<GateCheck["rerun"]>["key"]) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
@@ -139,15 +139,15 @@ export function CheckDrawer({
           >
             <ChatCircleDots /> Ask about this check
           </button>
-          {check.canRerun && (
+          {check.rerun && (
             <button
               className="sg-primary-button"
               disabled={busy}
-              onClick={onRerun}
+              onClick={() => onRerun(check.rerun!.key)}
               type="button"
             >
               {busy ? <SpinnerGap className="spin" /> : <ArrowClockwise />}
-              Re-run repository check
+              {check.rerun.label}
             </button>
           )}
         </footer>

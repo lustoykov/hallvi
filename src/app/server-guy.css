@@ -1882,3 +1882,290 @@ a.sg-chip:hover {
   background: var(--amber);
   box-shadow: 0 0 0 3px var(--amber-soft);
 }
+
+/* ---------- Phase 2: phase navigation, transition and the contract ---------- */
+
+.sg-phase-label {
+  margin-left: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 10%);
+  color: #cad3e3;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sg-phase-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.sg-phase-button:disabled {
+  cursor: default;
+}
+.sg-phase:has(.sg-phase-button):hover {
+  background: #f1f4f9;
+}
+.sg-phase.active:has(.sg-phase-button):hover {
+  background: var(--blue-soft);
+}
+.sg-phase.completed .sg-phase-number {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.sg-phase.completed .sg-phase-number svg {
+  width: 11px;
+}
+.sg-phase.completed .sg-phase-name {
+  color: var(--ink-2);
+}
+.sg-phase.viewed {
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+}
+.sg-phase.viewed:not(.active) {
+  background: #fff;
+  color: var(--ink);
+}
+.sg-phase.completed .sg-phase-meta {
+  border-left-color: rgb(20 148 95 / 25%);
+}
+.sg-record-notice {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-phase-continue {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #bfd0f5;
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+}
+.sg-phase-continue p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-phase-continue .sg-primary-button {
+  justify-self: start;
+}
+.sg-message-request {
+  opacity: 0.92;
+}
+.sg-contract {
+  gap: 12px;
+}
+.sg-contract-inspection {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-contract-inspection svg {
+  flex: none;
+  width: 16px;
+  margin-top: 1px;
+  color: var(--muted);
+}
+.sg-contract-inspection a,
+.sg-contract-heading a,
+.sg-contract-note a {
+  color: var(--blue-text);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.sg-contract-inspection a:hover,
+.sg-contract-heading a:hover,
+.sg-contract-note a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sg-contract-note svg,
+.sg-contract-heading svg {
+  width: 11px;
+}
+.sg-contract-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #c9d3e2;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-contract-heading {
+  display: grid;
+  gap: 2px;
+}
+.sg-contract-heading strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sg-contract-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sg-contract-summary {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-contract-gaps {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-contract-gaps.blocked {
+  border-color: #ecc9a3;
+  background: var(--amber-soft);
+}
+.sg-contract-gaps.conformance {
+  border-color: #bfd0f5;
+  background: var(--blue-soft);
+}
+.sg-contract-gaps strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sg-contract-gaps ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.sg-contract-gaps li {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.sg-contract-gaps b {
+  font-weight: 600;
+}
+.sg-contract-group {
+  display: grid;
+  gap: 6px;
+}
+.sg-contract-group dl {
+  margin: 0;
+  display: grid;
+  border: 1px solid #d6dee9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+}
+.sg-contract-field {
+  display: grid;
+  gap: 3px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+.sg-contract-field:last-child {
+  border-bottom: 0;
+}
+.sg-contract-field dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.sg-contract-field dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.sg-contract-value {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sg-contract-value em {
+  color: var(--muted);
+  font-weight: 500;
+  font-style: normal;
+}
+.sg-provenance {
+  padding: 2px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.sg-provenance.repository-declared {
+  border-color: #b9e2cc;
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+.sg-provenance.profile-rule {
+  border-color: #bfd0f5;
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.sg-provenance.user-confirmed {
+  border-color: #cfc2ef;
+  background: #f3eefc;
+  color: #5b3fa6;
+}
+.sg-provenance.inferred {
+  border-color: #ecc9a3;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.sg-provenance.unresolved {
+  border-style: dashed;
+}
+.sg-provenance.conformance {
+  border-color: #bfd0f5;
+  color: var(--blue-text);
+}
+.sg-contract-note {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sg-contract-snippet {
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f1f4f9;
+  font: 11px var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sg-contract-source {
+  white-space: nowrap;
+}

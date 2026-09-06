@@ -1,5 +1,14 @@
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -7,6 +16,7 @@ import { dirname, join } from "node:path";
 
 import {
   activityEvents,
+  applicationContracts,
   applications,
   chats,
   decisions,
@@ -19,16 +29,20 @@ import {
 import schemaVersion from "./schema-version.json";
 import type {
   ActivityEvent,
+  ApplicationContractBody,
+  ApplicationContractRecord,
   ApplicationRecord,
   Chat,
   ChatMessage,
   Decision,
   Observation,
+  PhaseKey,
   PhaseWorkspaceRecord,
 } from "./types";
 
 const schema = {
   activityEvents,
+  applicationContracts,
   applications,
   chats,
   decisions,
@@ -152,18 +166,26 @@ export function insertApplication(
 
 // Phase workspaces
 
-export function insertWorkspace(applicationId: string) {
+export function insertWorkspace(
+  applicationId: string,
+  phaseKey: PhaseKey = "start",
+) {
   const workspace: PhaseWorkspaceRecord = {
     id: randomUUID(),
     applicationId,
-    phaseKey: "start",
+    phaseKey,
     createdAt: now(),
+    completedAt: null,
+    deliverableEvidence: null,
   };
   db().insert(phaseWorkspaces).values(workspace).run();
   return workspace;
 }
 
-export function getWorkspace(applicationId: string) {
+export function getWorkspace(
+  applicationId: string,
+  phaseKey: PhaseKey = "start",
+) {
   return (
     db()
       .select()
@@ -171,10 +193,45 @@ export function getWorkspace(applicationId: string) {
       .where(
         and(
           eq(phaseWorkspaces.applicationId, applicationId),
-          eq(phaseWorkspaces.phaseKey, "start"),
+          eq(phaseWorkspaces.phaseKey, phaseKey),
         ),
       )
       .get() ?? null
+  );
+}
+
+export function getWorkspaceById(id: string) {
+  return (
+    db()
+      .select()
+      .from(phaseWorkspaces)
+      .where(eq(phaseWorkspaces.id, id))
+      .get() ?? null
+  );
+}
+
+// Workspaces are created in phase order, so creation order is phase order.
+export function listWorkspaces(applicationId: string) {
+  return db()
+    .select()
+    .from(phaseWorkspaces)
+    .where(eq(phaseWorkspaces.applicationId, applicationId))
+    .orderBy(asc(phaseWorkspaces.createdAt), asc(rowId))
+    .all();
+}
+
+/** Marks a workspace complete exactly once, retaining its deliverable
+ * evidence. Returns false when it was already completed. */
+export function completeWorkspace(id: string, evidence: unknown) {
+  const completedAt = now();
+  return (
+    db()
+      .update(phaseWorkspaces)
+      .set({ completedAt, deliverableEvidence: evidence })
+      .where(
+        and(eq(phaseWorkspaces.id, id), isNull(phaseWorkspaces.completedAt)),
+      )
+      .run().changes > 0
   );
 }
 
@@ -251,6 +308,44 @@ export function insertMessage(
   };
   db().insert(messages).values(message).run();
   return message;
+}
+
+export function getMessage(id: string) {
+  return db().select().from(messages).where(eq(messages.id, id)).get() ?? null;
+}
+
+/** A message only when it belongs to one of this application's Chats. */
+export function getApplicationMessage(applicationId: string, id: string) {
+  return (
+    db()
+      .select({ message: messages })
+      .from(messages)
+      .innerJoin(chats, eq(chats.id, messages.chatId))
+      .innerJoin(phaseWorkspaces, eq(phaseWorkspaces.id, chats.workspaceId))
+      .where(
+        and(
+          eq(messages.id, id),
+          eq(phaseWorkspaces.applicationId, applicationId),
+        ),
+      )
+      .get()?.message ?? null
+  );
+}
+
+/** Whether any Pi Run for this application is queued or running. */
+export function hasPendingRuns(applicationId: string) {
+  return Boolean(
+    db()
+      .select({ id: piRuns.id })
+      .from(piRuns)
+      .where(
+        and(
+          eq(piRuns.applicationId, applicationId),
+          inArray(piRuns.status, ["queued", "running"]),
+        ),
+      )
+      .get(),
+  );
 }
 
 export function listMessages(chatId: string) {
@@ -389,6 +484,143 @@ export function listObservations(applicationId: string) {
     .where(eq(observations.applicationId, applicationId))
     .orderBy(desc(observations.observedAt), desc(rowId))
     .all();
+}
+
+/** The saved read of one repository path at one commit, if any. Reads are
+ * pinned to a commit, so a later connection cannot change their content. */
+export function findRepositoryFileObservation(
+  applicationId: string,
+  commitSha: string,
+  path: string,
+) {
+  return (
+    db()
+      .select()
+      .from(observations)
+      .where(
+        and(
+          eq(observations.applicationId, applicationId),
+          eq(observations.kind, "github-repository-file"),
+          eq(observations.status, "passed"),
+          sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
+          sql`json_extract(${observations.raw}, '$.path') = ${path}`,
+        ),
+      )
+      .orderBy(desc(observations.observedAt), desc(rowId))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+export function listRepositoryFileObservations(
+  applicationId: string,
+  commitSha: string,
+) {
+  return db()
+    .select()
+    .from(observations)
+    .where(
+      and(
+        eq(observations.applicationId, applicationId),
+        eq(observations.kind, "github-repository-file"),
+        eq(observations.status, "passed"),
+        sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
+      ),
+    )
+    .orderBy(asc(observations.observedAt), asc(rowId))
+    .all();
+}
+
+// Application Contracts
+
+export function insertContract(input: {
+  applicationId: string;
+  workspaceId: string;
+  version: number;
+  sourceMessageId: string;
+  body: ApplicationContractBody;
+}) {
+  const contract: ApplicationContractRecord = {
+    id: randomUUID(),
+    applicationId: input.applicationId,
+    workspaceId: input.workspaceId,
+    version: input.version,
+    profileId: input.body.profileId,
+    profileVersion: input.body.profileVersion,
+    commitSha: input.body.commitSha,
+    sourceMessageId: input.sourceMessageId,
+    body: input.body,
+    supersededById: null,
+    createdAt: now(),
+  };
+  db().insert(applicationContracts).values(contract).run();
+  return contract;
+}
+
+export function getContract(id: string) {
+  return (
+    db()
+      .select()
+      .from(applicationContracts)
+      .where(eq(applicationContracts.id, id))
+      .get() ?? null
+  );
+}
+
+/** The application's active contract: the one no revision has superseded. */
+export function currentContract(applicationId: string) {
+  return (
+    db()
+      .select()
+      .from(applicationContracts)
+      .where(
+        and(
+          eq(applicationContracts.applicationId, applicationId),
+          isNull(applicationContracts.supersededById),
+        ),
+      )
+      .orderBy(desc(applicationContracts.version))
+      .limit(1)
+      .get() ?? null
+  );
+}
+
+export function listContracts(applicationId: string) {
+  return db()
+    .select()
+    .from(applicationContracts)
+    .where(eq(applicationContracts.applicationId, applicationId))
+    .orderBy(asc(applicationContracts.version))
+    .all();
+}
+
+/** Guarded like supersedeDecision: the previous contract must still be the
+ * active one of this application. */
+export function supersedeContract(
+  applicationId: string,
+  previousId: string,
+  replacementId: string,
+) {
+  const result = db()
+    .update(applicationContracts)
+    .set({ supersededById: replacementId })
+    .where(
+      and(
+        eq(applicationContracts.id, previousId),
+        eq(applicationContracts.applicationId, applicationId),
+        isNull(applicationContracts.supersededById),
+        sql`${applicationContracts.id} <> ${replacementId}`,
+        sql`exists (select 1 from application_contracts as replacement where replacement.id = ${replacementId} and replacement.application_id = ${applicationId} and replacement.superseded_by_id is null)`,
+      ),
+    )
+    .returning()
+    .get();
+  if (!result) {
+    throw new Error(
+      "The Application Contract being revised is missing, already revised, or belongs to another application.",
+    );
+  }
+  return result;
 }
 
 // Activity

@@ -2,13 +2,13 @@
 
 import { Plus } from "@phosphor-icons/react";
 
-import { PHASE_ONE } from "@/server/phase-one-spec";
-import type { ChatSummary } from "@/server/types";
+import type { ChatSummary, PhaseWorkspaceView } from "@/server/types";
 
 import { LocalTime } from "./local-time";
 
 export function ChatList({
   chats,
+  workspace,
   selectedChatId,
   hasApplication,
   busy,
@@ -16,31 +16,39 @@ export function ChatList({
   onCreate,
 }: {
   chats: ChatSummary[];
+  /** The viewed phase; its chats are listed. */
+  workspace: PhaseWorkspaceView | null;
   selectedChatId: string | null;
   hasApplication: boolean;
   busy: boolean;
   onSelect: (chatId: string) => void;
   onCreate: () => void;
 }) {
+  const completed = workspace?.status === "completed";
+  const canCreate = Boolean(workspace?.current) && !completed;
   return (
     <aside className="sg-chat-list" aria-label="Phase chats">
       <div className="sg-pane-title">
         <div>
           <strong>Chats</strong>
           <span>
-            Phase {PHASE_ONE.number} · {PHASE_ONE.name}
+            {workspace
+              ? `Phase ${workspace.phaseNumber} · ${workspace.name}${completed ? " · completed" : ""}`
+              : "Phase 1 · Start"}
           </span>
         </div>
-        <button
-          aria-label="Start a new phase chat"
-          className="sg-icon-button"
-          disabled={!hasApplication || busy}
-          onClick={onCreate}
-          title="New chat in this phase"
-          type="button"
-        >
-          <Plus weight="bold" />
-        </button>
+        {canCreate && (
+          <button
+            aria-label="Start a new phase chat"
+            className="sg-icon-button"
+            disabled={!hasApplication || busy}
+            onClick={onCreate}
+            title="New chat in this phase"
+            type="button"
+          >
+            <Plus weight="bold" />
+          </button>
+        )}
       </div>
       <div className="sg-session-list">
         {chats.length ? (
@@ -59,7 +67,11 @@ export function ChatList({
                   <small>
                     {chat.isPrimary ? "Main phase chat" : "Separate transcript"}
                   </small>
-                  {chat.archivedAt && <em>Archived</em>}
+                  {chat.archivedAt ? (
+                    <em>Archived</em>
+                  ) : completed ? (
+                    <em>Read-only</em>
+                  ) : null}
                   <LocalTime value={chat.lastActivityAt} variant="compact" />
                 </span>
               </span>

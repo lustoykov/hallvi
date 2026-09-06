@@ -40,6 +40,9 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
   const before: PhaseOneOperatorView = {
     application,
     workspace: null,
+    workspaces: [],
+    inspection: null,
+    contract: null,
     chats: [],
     selectedChatId: "chat",
     messages: [],

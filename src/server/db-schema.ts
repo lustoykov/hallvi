@@ -10,6 +10,8 @@ import {
 
 import type {
   ActivityEvent,
+  ApplicationContractBody,
+  ApplicationContractRecord,
   ApplicationRecord,
   Chat,
   ChatMessage,
@@ -47,6 +49,8 @@ export const phaseWorkspaces = sqliteTable(
       .$type<PhaseWorkspaceRecord["phaseKey"]>()
       .notNull(),
     createdAt: text("created_at").notNull(),
+    completedAt: text("completed_at"),
+    deliverableEvidence: text("deliverable_evidence", { mode: "json" }),
   },
   (table) => [unique().on(table.applicationId, table.phaseKey)],
 );
@@ -181,6 +185,39 @@ export const observations = sqliteTable(
   ],
 );
 
+/**
+ * Versioned Application Contracts. A revision is a new full row that
+ * supersedes the previous one, like a replaced Decision; nothing is edited in
+ * place. Rows are written only inside the worker's final Run transaction.
+ */
+export const applicationContracts = sqliteTable(
+  "application_contracts",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    profileId: text("profile_id").notNull(),
+    profileVersion: integer("profile_version").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    sourceMessageId: text("source_message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    body: text("body_json", { mode: "json" })
+      .$type<ApplicationContractBody>()
+      .notNull(),
+    supersededById: text("superseded_by_id").references(
+      (): AnySQLiteColumn => applicationContracts.id,
+    ),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.applicationId, table.version)],
+);
+
 export const activityEvents = sqliteTable(
   "activity_events",
   {
@@ -219,5 +256,9 @@ export type DatabaseRowTypes = {
   run: AssertExtends<PiRun, typeof piRuns.$inferSelect>;
   decision: AssertExtends<Decision, typeof decisions.$inferSelect>;
   observation: AssertExtends<Observation, typeof observations.$inferSelect>;
+  contract: AssertExtends<
+    ApplicationContractRecord,
+    typeof applicationContracts.$inferSelect
+  >;
   activity: AssertExtends<ActivityEvent, typeof activityEvents.$inferSelect>;
 };

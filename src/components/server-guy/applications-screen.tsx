@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import type { listApplicationSummaries } from "@/server/phase-one";
-import { PHASE_ONE } from "@/server/phase-one-spec";
 
 import s from "./applications.module.css";
 
@@ -48,41 +47,44 @@ export function ApplicationsScreen({
           </div>
         ) : (
           <ul className={s.list} aria-label="Applications">
-            {applications.map(({ application, passedChecks, totalChecks }) => (
-              <li key={application.id}>
-                <Link
-                  className={s.application}
-                  href={`/applications/${application.id}`}
-                >
-                  <div className={s.repository}>
-                    <h2>{application.name}</h2>
-                    <span>
-                      {application.repositoryOwner}/{application.repositoryName}
-                    </span>
-                  </div>
-                  <div className={s.phase}>
-                    <strong>
-                      Phase {PHASE_ONE.number} · {PHASE_ONE.deliverable}
-                    </strong>
-                    <span>Production</span>
-                  </div>
-                  <div className={s.checks}>
-                    <strong
-                      className={
-                        passedChecks === totalChecks ? s.ready : s.attention
-                      }
-                    >
-                      {passedChecks === totalChecks
-                        ? "Launch Brief ready"
-                        : "Needs attention"}
-                    </strong>
-                    <span>
-                      {passedChecks} of {totalChecks} checks pass
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {applications.map(
+              ({ application, workspace, passedChecks, totalChecks }) => (
+                <li key={application.id}>
+                  <Link
+                    className={s.application}
+                    href={`/applications/${application.id}`}
+                  >
+                    <div className={s.repository}>
+                      <h2>{application.name}</h2>
+                      <span>
+                        {application.repositoryOwner}/
+                        {application.repositoryName}
+                      </span>
+                    </div>
+                    <div className={s.phase}>
+                      <strong>
+                        Phase {workspace.phaseNumber} · {workspace.deliverable}
+                      </strong>
+                      <span>Production</span>
+                    </div>
+                    <div className={s.checks}>
+                      <strong
+                        className={
+                          passedChecks === totalChecks ? s.ready : s.attention
+                        }
+                      >
+                        {passedChecks === totalChecks
+                          ? `${workspace.deliverable} ready`
+                          : "Needs attention"}
+                      </strong>
+                      <span>
+                        {passedChecks} of {totalChecks} checks pass
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ),
+            )}
           </ul>
         )}
       </section>

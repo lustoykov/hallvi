@@ -89,6 +89,7 @@ describe("Phase 1 schema", () => {
 
     expect(tables).toEqual([
       "activity_events",
+      "application_contracts",
       "applications",
       "chat_summaries",
       "chats",
@@ -103,6 +104,8 @@ describe("Phase 1 schema", () => {
       "application_id",
       "phase_key",
       "created_at",
+      "completed_at",
+      "deliverable_evidence",
     ]);
     expect(indexes).toEqual([
       "idx_activity_workspace",

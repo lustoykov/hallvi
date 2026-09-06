@@ -20,12 +20,7 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
-import type {
-  Chat,
-  ChatMessage,
-  PhaseOneOperatorView,
-  PiRun,
-} from "@/server/types";
+import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
@@ -57,7 +52,7 @@ export function ChatPane({
   onRunAction,
   onNewChat,
 }: {
-  view: PhaseOneOperatorView;
+  view: OperatorView;
   activeChat: Chat | null;
   busy: string | null;
   error: string | null;
@@ -73,15 +68,19 @@ export function ChatPane({
   onNewChat: () => void;
 }) {
   const application = view.application;
+  const workspace = view.workspace;
   const archived = Boolean(activeChat?.archivedAt);
+  const completed = workspace?.status === "completed";
+  const readOnly = archived || completed;
+  const deliverable = workspace?.deliverable ?? "Launch Brief";
   // The gate's state lives in the pane header (and the top bar), not as a
   // standing message in the transcript.
-  const ready = Boolean(application) && view.workspace?.status === "ready";
+  const ready = Boolean(application) && workspace?.status === "ready";
   const passed = view.checks.filter(
     (check) => check.status === "passed",
   ).length;
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
-  const composerDisabled = !canWrite || archived;
+  const composerDisabled = !canWrite || readOnly;
   const requestPending = view.messages.some(
     (message) => message.status === "queued" || message.status === "running",
   );
@@ -90,16 +89,20 @@ export function ChatPane({
     <section className="sg-chat-pane">
       <header className="sg-pane-title sg-chat-title">
         <div>
-          <strong>{activeChat?.title ?? "Launch Brief"}</strong>
+          <strong>{activeChat?.title ?? deliverable}</strong>
           <span className={ready ? "ready" : undefined}>
             {archived
               ? "Archived · read-only"
-              : ready
-                ? "Ready for review"
-                : `Working toward the Launch Brief · ${passed} of ${view.checks.length} checks`}
+              : completed
+                ? `Phase ${workspace?.phaseNumber} is complete · read-only`
+                : ready
+                  ? workspace?.phaseKey === "start"
+                    ? "Launch Brief ready"
+                    : "Ready for review"
+                  : `Working toward the ${deliverable} · ${passed} of ${view.checks.length} checks`}
           </span>
         </div>
-        {activeChat && !activeChat.isPrimary && !archived && (
+        {activeChat && !activeChat.isPrimary && !readOnly && (
           <button
             className="sg-text-button"
             disabled={busy !== null}
@@ -136,6 +139,10 @@ export function ChatPane({
             const historyUnavailable =
               run?.status === "failed" &&
               run.error?.startsWith("Conversation history unavailable.");
+            // A request Server Guy started itself is never shown as the
+            // engineer's words.
+            const engineer =
+              message.role === "user" && message.source === "user";
             return (
               <Message
                 className={
@@ -143,23 +150,27 @@ export function ChatPane({
                     ? inProgress
                       ? "sg-message-live"
                       : "sg-message-failed"
-                    : ""
+                    : message.role === "user" && !engineer
+                      ? "sg-message-request"
+                      : ""
                 }
-                from={message.role}
+                from={engineer ? "user" : "assistant"}
                 key={message.id}
               >
                 <div className="sg-message-heading">
                   <span
-                    className={`sg-avatar ${message.role === "user" ? "user" : ""}`}
+                    className={`sg-avatar ${engineer ? "user" : ""}`}
                     aria-hidden="true"
                   >
-                    {message.role === "user" ? "You" : "SG"}
+                    {engineer ? "You" : "SG"}
                   </span>
-                  <strong>
-                    {message.role === "user" ? "You" : "Server Guy"}
-                  </strong>
+                  <strong>{engineer ? "You" : "Server Guy"}</strong>
                   {message.source === "server-guy" && (
-                    <span className="sg-source-tag">Recorded event</span>
+                    <span className="sg-source-tag">
+                      {message.role === "user"
+                        ? "Started automatically"
+                        : "Recorded event"}
+                    </span>
                   )}
                   {provisional && (
                     <span
@@ -202,7 +213,7 @@ export function ChatPane({
                           </MessageResponse>
                         </details>
                       )}
-                      {run && !archived && !retried && (
+                      {run && !readOnly && !retried && (
                         <button
                           className={`sg-run-action ${inProgress ? "sg-secondary-button" : "sg-primary-button"}`}
                           disabled={busy !== null}
@@ -284,6 +295,12 @@ export function ChatPane({
             a new one.
           </p>
         )}
+        {!archived && completed && (
+          <p className="sg-archived-notice">
+            Phase {workspace?.phaseNumber} is complete and its chats are
+            read-only. Continue in the current phase.
+          </p>
+        )}
         {application && !piReady && (
           <div className="sg-pi-required">
             <WarningCircle weight="bold" />
@@ -315,11 +332,13 @@ export function ChatPane({
             placeholder={
               archived
                 ? "This chat is archived"
-                : !piReady
-                  ? "Connect ChatGPT in Settings to chat"
-                  : application
-                    ? "Ask Server Guy, correct a decision, or add context…"
-                    : "Create the application workspace to start chatting"
+                : completed
+                  ? `Phase ${workspace?.phaseNumber} is complete · read-only`
+                  : !piReady
+                    ? "Connect ChatGPT in Settings to chat"
+                    : application
+                      ? "Ask Server Guy, correct a decision, or add context…"
+                      : "Create the application workspace to start chatting"
             }
             rows={2}
             value={composer}

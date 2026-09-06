@@ -12,6 +12,10 @@ export const stepLabels = {
   search_decisions: "Look up saved requirements",
   propose_decision: "Prepare requirement",
   get_application_status: "Look up application status",
+  get_repository_inspection: "Look up repository inspection",
+  read_repository_file: "Read repository file",
+  get_application_contract: "Look up Application Contract",
+  propose_application_contract: "Prepare Application Contract",
   tool: "Execute tool",
   compaction: "Summarize earlier conversation",
   retry: "Model retry scheduled",
@@ -25,6 +29,10 @@ const TOOL_STEP_KINDS: readonly StepKind[] = [
   "search_decisions",
   "propose_decision",
   "get_application_status",
+  "get_repository_inspection",
+  "read_repository_file",
+  "get_application_contract",
+  "propose_application_contract",
 ];
 export function isToolStep(kind: StepKind) {
   return TOOL_STEP_KINDS.includes(kind);
@@ -52,6 +60,7 @@ export function diagnosticMetadata(input: Record<string, unknown> = {}) {
     "cacheWriteTokens",
     "attempt",
     "requirements",
+    "contract",
   ])
     if (
       typeof input[key] === "number" &&

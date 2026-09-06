@@ -9,13 +9,15 @@ import {
 } from "./db";
 import { logDiagnostic, type DiagnosticFailure } from "./diagnostics";
 import { messages, piRuns } from "./db-schema";
+import { savePiDecisions } from "./phase-one";
+import { commitContractProposal } from "./phase-two";
+import { sendChatMessageRequestSchema } from "./schemas";
 import {
+  assertChatWritable,
+  ExistingApplicationConflictError,
   loadChat,
   NotFoundError,
-  ExistingApplicationConflictError,
-  savePiDecisions,
-} from "./phase-one";
-import { sendChatMessageRequestSchema } from "./schemas";
+} from "./workspaces";
 import type {
   AcceptedPiRun,
   ChatRunSnapshot,
@@ -79,7 +81,7 @@ export function sendChatMessage(
   return withTransaction(
     () => {
       const { workspace, chat } = loadChat(applicationId, chatId);
-      if (chat.archivedAt) throw new Error("This Chat is archived.");
+      assertChatWritable(chat, workspace);
       const existing = db()
         .select()
         .from(piRuns)
@@ -122,6 +124,40 @@ export function sendChatMessage(
   );
 }
 
+/**
+ * A request Server Guy starts itself, such as the first inspection after the
+ * phase transition. The accepted message is recorded with source
+ * `server-guy`, never as the engineer's words. Without a worker it stays
+ * visibly queued like any other request.
+ */
+export function enqueueServerGuyRequest(
+  applicationId: string,
+  chatId: string,
+  body: string,
+) {
+  let created: AcceptedPiRun | undefined;
+  return withTransaction(
+    () => {
+      const { workspace, chat } = loadChat(applicationId, chatId);
+      assertChatWritable(chat, workspace);
+      const user = insertMessage(chatId, "user", body, "server-guy");
+      created = accepted(
+        insertRun(
+          applicationId,
+          workspace.id,
+          chatId,
+          user.id,
+          randomUUID(),
+          null,
+        ),
+      );
+      return created;
+    },
+    (result) =>
+      logDiagnostic("reply.accepted", result.run, { outcome: "queued" }),
+  );
+}
+
 function insertRun(
   applicationId: string,
   workspaceId: string,
@@ -155,8 +191,8 @@ export function retryPiRun(applicationId: string, chatId: string, id: string) {
   return withTransaction(
     () => {
       const run = scopedRun(applicationId, chatId, id);
-      if (loadChat(applicationId, chatId).chat.archivedAt)
-        throw new Error("This Chat is archived.");
+      const scope = loadChat(applicationId, chatId);
+      assertChatWritable(scope.chat, scope.workspace);
       const existing = db()
         .select()
         .from(piRuns)
@@ -311,15 +347,19 @@ export function completePiRun(id: string, reply: PiTurnResult) {
     () => {
       const run = getPiRun(id);
       if (run?.status !== "running") return false;
-      const { chat } = loadChat(run.applicationId, run.chatId);
-      if (chat.archivedAt)
-        throw new Error("This Chat was archived before the answer finished.");
+      const { chat, workspace } = loadChat(run.applicationId, run.chatId);
+      // A phase completed or a Chat archived while the answer was being
+      // produced cannot receive it; the attempt fails instead of crossing
+      // the boundary.
+      assertChatWritable(chat, workspace);
       savePiDecisions(
         run.applicationId,
         run.workspaceId,
         run.userMessageId,
         reply.decisionProposals,
       );
+      if (reply.contractProposal)
+        commitContractProposal(run, reply.contractProposal);
       db()
         .update(messages)
         .set({
@@ -349,7 +389,10 @@ export function completePiRun(id: string, reply: PiTurnResult) {
           durationMs:
             Date.parse(run.finishedAt!) -
             Date.parse(run.startedAt ?? run.createdAt),
-          metadata: { requirements: reply.decisionProposals.length },
+          metadata: {
+            requirements: reply.decisionProposals.length,
+            contract: reply.contractProposal ? 1 : 0,
+          },
         });
     },
   );

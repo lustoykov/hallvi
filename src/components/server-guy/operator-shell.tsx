@@ -23,7 +23,8 @@ import type {
   ApplicationRecord,
   ChatRunSnapshot,
   GateCheck,
-  PhaseOneOperatorView,
+  OperatorView,
+  PhaseKey,
   PiRun,
   ChatMessage,
 } from "@/server/types";
@@ -70,7 +71,7 @@ export function OperatorShell({
   initialPiSetup,
   applications,
 }: {
-  initialView: PhaseOneOperatorView;
+  initialView: OperatorView;
   initialPiSetup: PiSetupStatus;
   applications: Pick<
     ApplicationRecord,
@@ -199,7 +200,7 @@ export function OperatorShell({
     menu.style.minWidth = `${anchor.width}px`;
   }
 
-  function applyView(next: PhaseOneOperatorView) {
+  function applyView(next: OperatorView) {
     setView((current) =>
       current.selectedChatId === next.selectedChatId
         ? { ...next, messages: mergeMessages(current.messages, next.messages) }
@@ -237,7 +238,7 @@ export function OperatorShell({
   // current one.
   async function run(
     label: string,
-    work: () => Promise<PhaseOneOperatorView>,
+    work: () => Promise<OperatorView>,
     recover?: () => Promise<void>,
   ) {
     if (busy) return;
@@ -264,6 +265,18 @@ export function OperatorShell({
   function selectChat(chatId: string) {
     if (!application || chatId === view.selectedChatId) return;
     void run("chat", () => api.view(application.id, chatId));
+  }
+
+  // The phase strip switches the viewed phase; a completed phase opens its
+  // read-only chats and retained evidence, never a re-evaluation.
+  function selectPhase(phaseKey: PhaseKey) {
+    if (!application || view.workspace?.phaseKey === phaseKey) return;
+    void run("chat", () => api.viewPhase(application.id, phaseKey));
+  }
+
+  function continueToInspectApp() {
+    if (!application) return;
+    void run("continue", () => api.continueToInspectApp(application.id));
   }
 
   function createChat() {
@@ -339,11 +352,15 @@ export function OperatorShell({
     });
   }
 
-  function rerunRepositoryCheck() {
+  function rerunCheck(key: NonNullable<GateCheck["rerun"]>["key"]) {
     if (!application) return;
     void run("rerun", async () => {
-      const next = await api.rerunRepositoryCheck(application.id);
-      setSelectedCheckKey("repository-readable");
+      const next = await api.rerunCheck(application.id, key);
+      setSelectedCheckKey(
+        key === "repository-readable"
+          ? "repository-readable"
+          : "profile-resolved",
+      );
       return activeChat && next.selectedChatId !== activeChat.id
         ? api.view(application.id, activeChat.id)
         : next;
@@ -352,14 +369,22 @@ export function OperatorShell({
 
   async function askAboutCheck(check: GateCheck) {
     const question = `Explain “${check.label}”, its current result, and what I can verify myself.`;
-    if (application && activeChat?.archivedAt) {
-      const primary = view.chats.find(
-        (chat) => chat.isPrimary && !chat.archivedAt,
-      );
-      if (!primary) return;
+    const readOnly =
+      activeChat?.archivedAt || view.workspace?.status === "completed";
+    if (application && readOnly) {
+      // From read-only history, ask in the current phase's main chat.
+      const current = view.workspaces.find((item) => item.current);
+      const primary =
+        current && current.id === view.workspace?.id
+          ? view.chats.find((chat) => chat.isPrimary && !chat.archivedAt)
+          : null;
       await run("chat", async () => {
-        const next = await api.view(application.id, primary.id);
-        setDrafts((current) => ({ ...current, [primary.id]: question }));
+        const next = primary
+          ? await api.view(application.id, primary.id)
+          : await api.viewPhase(application.id, current?.phaseKey ?? "start");
+        const target = primary?.id ?? next.selectedChatId;
+        if (target)
+          setDrafts((current) => ({ ...current, [target]: question }));
         return next;
       });
     } else {
@@ -401,6 +426,14 @@ export function OperatorShell({
               <CaretDown aria-hidden="true" weight="bold" />
             </button>
             <span className="sg-environment-label">Production</span>
+            {view.workspace && (
+              <span
+                className="sg-phase-label"
+                title={`Viewing phase ${view.workspace.phaseNumber}${view.workspace.current ? " (current)" : " (completed)"}`}
+              >
+                Phase {view.workspace.phaseNumber} · {view.workspace.name}
+              </span>
+            )}
             <nav
               id="application-picker"
               popover="auto"
@@ -494,7 +527,13 @@ export function OperatorShell({
         </div>
       </header>
 
-      <PhaseRail checks={checks} />
+      <PhaseRail
+        busy={busy !== null}
+        checks={checks}
+        onSelectPhase={selectPhase}
+        viewedPhaseKey={view.workspace?.phaseKey ?? null}
+        workspaces={view.workspaces}
+      />
 
       <section className="sg-workspace">
         <ChatList
@@ -504,6 +543,7 @@ export function OperatorShell({
           onCreate={createChat}
           onSelect={selectChat}
           selectedChatId={view.selectedChatId}
+          workspace={view.workspace}
         />
         <ChatPane
           activeChat={activeChat}
@@ -522,7 +562,9 @@ export function OperatorShell({
           view={view}
         />
         <Inspector
+          busy={busy}
           checks={checks}
+          onContinue={continueToInspectApp}
           onSelectCheck={setSelectedCheckKey}
           view={view}
         />
@@ -534,7 +576,7 @@ export function OperatorShell({
           check={selectedCheck}
           onAsk={askAboutCheck}
           onClose={closeCheck}
-          onRerun={rerunRepositoryCheck}
+          onRerun={rerunCheck}
         />
       )}
       {confirmRemove && application && (

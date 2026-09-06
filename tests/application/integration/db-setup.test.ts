@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
@@ -26,7 +26,50 @@ it("initializes a fresh prototype database and can push its current schema again
   }
 }, 20_000);
 
-it.each([0, 4, 5])(
+it("upgrades a populated v6 database in place, keeping its rows and a backup", () => {
+  const root = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+  const path = join(root, "v6.db");
+  try {
+    pushTestDatabase(path);
+    const current = new Database(path);
+    current.exec(
+      `INSERT INTO applications (id, name, repository_url, repository_owner, repository_name, environment, approval_mode, approval_scope, created_at, updated_at) VALUES ('app', 'app', 'https://github.com/qa/app', 'qa', 'app', 'production', 'pi-decides', 'scope', '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z');
+       INSERT INTO phase_workspaces (id, application_id, phase_key, created_at) VALUES ('ws', 'app', 'start', '2026-09-01T00:00:00Z');
+       DROP TABLE application_contracts;
+       ALTER TABLE phase_workspaces DROP COLUMN completed_at;
+       ALTER TABLE phase_workspaces DROP COLUMN deliverable_evidence;
+       PRAGMA user_version = 6;`,
+    );
+    current.close();
+    pushTestDatabase(path);
+    const upgraded = new Database(path, { readonly: true });
+    try {
+      expect(upgraded.pragma("user_version", { simple: true })).toBe(
+        schemaVersion.version,
+      );
+      expect(
+        upgraded.prepare("SELECT id, completed_at FROM phase_workspaces").all(),
+      ).toEqual([{ id: "ws", completed_at: null }]);
+      expect(
+        upgraded
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'application_contracts'",
+          )
+          .get(),
+      ).toEqual({ name: "application_contracts" });
+      expect(upgraded.pragma("foreign_key_check")).toEqual([]);
+    } finally {
+      upgraded.close();
+    }
+    expect(
+      readdirSync(root).some((name) => /\.pre-v8-.*\.backup$/.test(name)),
+    ).toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 30_000);
+
+it.each([0, 4, 5, 7])(
   "rejects an existing v%s database without migrating or deleting its data",
   (version) => {
     const root = mkdtempSync(join(tmpdir(), "server-guy-schema-"));

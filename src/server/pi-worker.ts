@@ -5,8 +5,8 @@ import { databasePath, listMessages } from "./db";
 import { beginRunDiagnostics } from "./tracing";
 import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
-import { loadChat } from "./phase-one";
 import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
+import { assertChatWritable, loadChat } from "./workspaces";
 import {
   claimNextPiRun,
   completePiRun,
@@ -86,8 +86,8 @@ export async function executePiRun(
     const work = async () => {
       controller.signal.throwIfAborted();
       diagnostics.signal({ type: "start", key: "context", kind: "context" });
-      const { chat } = loadChat(run.applicationId, run.chatId);
-      if (chat.archivedAt) throw new Error("This Chat is archived.");
+      const { chat, workspace } = loadChat(run.applicationId, run.chatId);
+      assertChatWritable(chat, workspace);
       // No application summary is injected: Pi reads current state through
       // get_application_status when an answer depends on it.
       const runContext = buildPiRunContext(run);
@@ -98,7 +98,12 @@ export async function executePiRun(
       diagnostics.signal({ type: "end", key: "context" });
       stage.value = "model";
       const reply = await askPi(
-        { run, userMessage: user.body, runContext },
+        {
+          run,
+          userMessage: user.body,
+          runContext,
+          phaseKey: workspace.phaseKey,
+        },
         {
           signal: controller.signal,
           onActivity: diagnostics.signal,
@@ -125,7 +130,10 @@ export async function executePiRun(
           diagnostics.signal({
             type: "end",
             key: "save",
-            metadata: { requirements: reply.decisionProposals.length },
+            metadata: {
+              requirements: reply.decisionProposals.length,
+              contract: reply.contractProposal ? 1 : 0,
+            },
           });
       } catch (error) {
         diagnostics.signal({ type: "end", key: "save", failed: true });

@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  ArrowRight,
   ArrowSquareOut,
   CaretRight,
   Check,
   GithubLogo,
+  SpinnerGap,
   Warning,
 } from "@phosphor-icons/react";
 import { useId, useState } from "react";
@@ -12,9 +14,11 @@ import { useId, useState } from "react";
 import type {
   ActivityEvent,
   GateCheck,
-  PhaseOneOperatorView,
+  LaunchBriefEvidence,
+  OperatorView,
 } from "@/server/types";
 
+import { ContractRecord } from "./contract-record";
 import { statusLabel } from "./format";
 import { LocalTime } from "./local-time";
 
@@ -24,10 +28,18 @@ const tabs = ["record", "activity", "changes", "receipts"] as const;
 // A verification result colors its marker; requirement and workspace events
 // keep the neutral one.
 function eventTone(kind: string) {
-  if (kind === "repository-observed") return "passed";
+  if (
+    kind === "repository-observed" ||
+    kind === "repository-inspected" ||
+    kind === "phase-completed" ||
+    kind === "contract-established"
+  )
+    return "passed";
   if (
     kind === "repository-unavailable" ||
-    kind === "repository-verification-invalidated"
+    kind === "repository-inspection-failed" ||
+    kind === "repository-verification-invalidated" ||
+    kind === "repository-inspection-invalidated"
   )
     return "attention";
   return "";
@@ -35,15 +47,16 @@ function eventTone(kind: string) {
 
 /**
  * What happened to this application: saved or changed requirements,
- * repository checks and connection consequences. How a reply was produced is
- * not an event here; local logs and traces hold its diagnostics.
+ * repository checks and inspections, phase transitions, contracts and
+ * connection consequences. How a reply was produced is not an event here;
+ * local logs and traces hold its diagnostics.
  */
 export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   return (
     <section className="sg-inspector-section">
       <p className="sg-inspector-hint">
         What happened to this application: saved requirements, repository checks
-        and connection changes.
+        and inspections, phase transitions, contracts and connection changes.
       </p>
       {events.length ? (
         events.map((event) => (
@@ -75,16 +88,29 @@ export function CheckIcon({ status }: { status: GateCheck["status"] }) {
 export function Inspector({
   view,
   checks,
+  busy,
   onSelectCheck,
+  onContinue,
 }: {
-  view: PhaseOneOperatorView;
+  view: OperatorView;
   checks: GateCheck[];
+  busy: string | null;
   onSelectCheck: (key: string) => void;
+  /** The explicit transition from a ready Launch Brief into Inspect app. */
+  onContinue: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("record");
   const tabId = useId();
   const passed = checks.filter((check) => check.status === "passed").length;
-  const ready = view.workspace?.status === "ready";
+  const workspace = view.workspace;
+  const completed = workspace?.status === "completed";
+  const ready = workspace?.status === "ready";
+  const canContinue = Boolean(
+    workspace?.current && ready && workspace.phaseKey === "start",
+  );
+  const evidence = completed
+    ? (workspace?.deliverableEvidence as Partial<LaunchBriefEvidence> | null)
+    : null;
 
   return (
     <aside className="sg-inspector">
@@ -137,11 +163,15 @@ export function Inspector({
           <>
             <div className="sg-record-heading">
               <div>
-                <strong>Launch Brief</strong>
-                <span className={ready ? "ready" : undefined}>
-                  {ready
-                    ? "Ready for review"
-                    : `${passed} of ${checks.length} checks complete`}
+                <strong>{workspace?.deliverable ?? "Launch Brief"}</strong>
+                <span className={ready || completed ? "ready" : undefined}>
+                  {completed
+                    ? "Completed"
+                    : ready
+                      ? workspace?.phaseKey === "start"
+                        ? "Launch Brief ready"
+                        : "Ready for review"
+                      : `${passed} of ${checks.length} checks complete`}
                 </span>
               </div>
               <div
@@ -159,6 +189,44 @@ export function Inspector({
                 />
               </div>
             </div>
+            {completed && evidence?.completedAt && (
+              <p className="sg-record-notice" role="note">
+                Completed <LocalTime value={evidence.completedAt} />. These
+                checks are retained as recorded then; they are not re-evaluated.
+                Later changes appear in the current phase.
+              </p>
+            )}
+            {canContinue && (
+              <div className="sg-phase-continue">
+                <p>
+                  All four checks pass. Continue to Phase 2, where Server Guy
+                  inspects the repository and proposes the Application Contract.
+                  Phase 1 chats become read-only.
+                </p>
+                <button
+                  className="sg-primary-button"
+                  disabled={busy !== null}
+                  onClick={onContinue}
+                  type="button"
+                >
+                  {busy === "continue" ? (
+                    <SpinnerGap className="spin" aria-hidden="true" />
+                  ) : (
+                    <ArrowRight aria-hidden="true" weight="bold" />
+                  )}
+                  Continue to Inspect app
+                </button>
+              </div>
+            )}
+            {workspace?.current &&
+              ready &&
+              workspace.phaseKey === "inspect-app" && (
+                <p className="sg-record-notice" role="note">
+                  The Application Contract checks pass. Phase 3, Make
+                  launch-ready, is not available in this build; its conformance
+                  work is recorded below.
+                </p>
+              )}
             <div className="sg-check-list">
               {checks.map((check, index) => (
                 <button
@@ -180,6 +248,13 @@ export function Inspector({
                 </button>
               ))}
             </div>
+            {workspace?.phaseKey === "inspect-app" && view.application && (
+              <ContractRecord
+                application={view.application}
+                contract={view.contract}
+                inspection={view.inspection}
+              />
+            )}
             {view.decisions.length > 0 && (
               <details className="sg-saved-requirements">
                 <summary>Saved requirements ({view.decisions.length})</summary>
@@ -209,10 +284,11 @@ export function Inspector({
             <div className="sg-empty-icon">
               <GithubLogo />
             </div>
-            <strong>No external changes in Phase 1</strong>
+            <strong>No external changes yet</strong>
             <p>
-              Start reads GitHub and writes only to Server Guy’s local record.
-              Code and infrastructure remain untouched.
+              Server Guy has only read the repository and written to its own
+              local record. Code and infrastructure remain untouched;
+              conformance work is recorded for Phase 3.
             </p>
           </section>
         )}

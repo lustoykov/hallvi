@@ -223,7 +223,7 @@ export function computeChecks(
       evidence: [
         applicationEvidence(application, "Saved application and repository"),
       ],
-      canRerun: false,
+      rerun: null,
     },
     "repository-readable": {
       status: currentRepository ? repositoryStatus(repository) : "not-yet",
@@ -235,7 +235,7 @@ export function computeChecks(
       evidence: repository
         ? [observationEvidence(repository, "Latest repository check")]
         : [],
-      canRerun: true,
+      rerun: { key: "repository-readable", label: "Re-run repository check" },
     },
     "target-environment": {
       status: environmentExplicit ? "passed" : "not-yet",
@@ -245,7 +245,7 @@ export function computeChecks(
       evidence: [
         applicationEvidence(application, "Saved deployment environment"),
       ],
-      canRerun: false,
+      rerun: null,
     },
     "approval-authority": {
       status: approvalExplicit ? "passed" : "not-yet",
@@ -253,7 +253,7 @@ export function computeChecks(
         ? `${APPROVAL_MODES[application.approvalMode].label} · ${application.approvalScope}`
         : "Choose how Server Guy should ask before external changes.",
       evidence: [applicationEvidence(application, "Saved approval settings")],
-      canRerun: false,
+      rerun: null,
     },
   } satisfies Record<
     (typeof PHASE_ONE_CHECKS)[number]["key"],
