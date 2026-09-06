@@ -11,6 +11,7 @@ import { executePiRun } from "../../../src/server/pi-worker";
 import {
   diagnosticLogPath,
   MAX_DIAGNOSTIC_STEPS,
+  LOG_MAX_BYTES,
 } from "../../../src/server/diagnostics";
 import {
   beginRunDiagnostics,
@@ -63,6 +64,7 @@ beforeEach(async () => {
   vi.stubEnv("SERVER_GUY_TRACING", "0");
   store.db().$client.exec("DELETE FROM applications");
   rmSync(diagnosticLogPath(), { force: true });
+  rmSync(diagnosticLogPath("spans.ndjson"), { force: true });
   app = store.insertApplication({
     name: "audit",
     repositoryUrl: "https://github.com/qa/audit",
@@ -162,7 +164,7 @@ it("logs bounded correlated steps with export disabled and preserves only author
     ),
   ).toBe(true);
   expect(JSON.stringify(output)).not.toContain("secret-canary");
-  expect(output.some((row) => row.traceId)).toBe(false);
+  expect(output.some((row) => row.traceId)).toBe(true);
   expect(store.listActivity(workspace).map((event) => event.kind)).toEqual([
     "decision-recorded",
   ]);
@@ -393,6 +395,11 @@ it.each([false, true])(
     const spans =
       mocks.spans as import("@opentelemetry/sdk-trace-base").ReadableSpan[];
     expect(spans.length).toBeGreaterThan(3);
+    expect(
+      localSpans()
+        .map((span) => span.spanId)
+        .sort(),
+    ).toEqual(spans.map((span) => span.spanContext().spanId).sort());
     expect(new Set(spans.map((span) => span.spanContext().traceId)).size).toBe(
       1,
     );
@@ -509,7 +516,68 @@ it("continues local diagnostics and succeeds if telemetry initialization throws"
   const run = queued();
   await executePiRun(runs.claimNextPiRun()!);
   expect(status(run.id)).toBe("succeeded");
+  expect(localSpans().some((span) => span.name === "Assistant reply")).toBe(
+    true,
+  );
   expect(
     logs(run.id).filter((row) => row.event === "step.finished"),
   ).toHaveLength(4);
+});
+
+interface StoredSpan {
+  traceId: string;
+  spanId: string;
+  parentSpanId?: string;
+  name: string;
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
+  status: { code: number };
+  attributes: { key: string; value: unknown }[];
+}
+function localSpans(): StoredSpan[] {
+  return readFileSync(diagnosticLogPath("spans.ndjson"), "utf8")
+    .trim()
+    .split("\n")
+    .flatMap((line) => {
+      const record = JSON.parse(line) as {
+        resourceSpans: { scopeSpans: { spans: StoredSpan[] }[] }[];
+      };
+      return record.resourceSpans.flatMap((resource) =>
+        resource.scopeSpans.flatMap((scope) => scope.spans),
+      );
+    });
+}
+
+it("saves complete correlated OTLP spans locally without a remote exporter and rotates the file", async () => {
+  writeFileSync(diagnosticLogPath("spans.ndjson"), " ".repeat(LOG_MAX_BYTES));
+  const run = queued();
+  await executePiRun(runs.claimNextPiRun()!);
+  const spans = localSpans();
+  const rootSpan = spans.find((span) => span.name === "Assistant reply")!;
+  expect(spans).toHaveLength(6);
+  expect(rootSpan.status.code).toBe(1);
+  expect(BigInt(rootSpan.endTimeUnixNano)).toBeGreaterThan(
+    BigInt(rootSpan.startTimeUnixNano),
+  );
+  expect(rootSpan.attributes).toContainEqual({
+    key: "server_guy.run.id",
+    value: { stringValue: run.id },
+  });
+  expect(
+    spans
+      .filter((span) => span !== rootSpan)
+      .every(
+        (span) =>
+          span.parentSpanId === rootSpan.spanId &&
+          span.traceId === rootSpan.traceId,
+      ),
+  ).toBe(true);
+  expect(
+    logs(run.id).find((row) => row.event === "execution.started")?.traceId,
+  ).toBe(rootSpan.traceId);
+  expect(JSON.stringify(spans)).not.toContain("secret-canary");
+  expect(mocks.langfuseCreated).toBe(0);
+  expect(readFileSync(diagnosticLogPath("spans.ndjson") + ".1")).toHaveLength(
+    LOG_MAX_BYTES,
+  );
 });

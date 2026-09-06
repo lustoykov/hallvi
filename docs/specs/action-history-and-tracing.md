@@ -74,14 +74,15 @@ flowchart LR
     O --> A[SQLite: application Activity]
     A --> U[Inspector: Activity]
     E --> G[Bounded local NDJSON logs]
-    E --> T[Optional OpenTelemetry spans]
-    T --> L[Langfuse or another OTLP trace backend]
+    E --> T[OpenTelemetry spans]
+    T --> F[Bounded local OTLP JSON span files]
+    T --> L[Optional: Langfuse or another OTLP trace backend]
 ```
 
 - **SQLite owns product state.** `pi_runs` retains accepted requests, lifecycle status/timestamps, retry lineage and safe user-facing failures. Messages, Decisions and meaningful Activity remain durable. The UI reconstructs these after refresh or reconnect. There is no detailed execution-history table in the current schema and no second coordinator or diagnostic Run status.
 - **Pi's native history supports conversation continuity.** The existing per-Chat JSONL history is separate from diagnostic logs. It contains conversation/tool content and follows its existing privacy and lifecycle rules. Do not treat it as metadata-only telemetry or reconstruct it from diagnostic logs.
 - **Local logs support debugging.** Fixed lifecycle and step events carry Run, Chat and application IDs, timings, outcomes, allowlisted model/usage metadata and safe failure categories. They work with tracing disabled and can be read with a text editor, `jq`, or an agent. They are bounded operational records, not a complete searchable product timeline.
-- **Optional traces connect timed steps.** The worker exports OpenTelemetry spans directly to Langfuse or a configured OTLP/HTTP trace endpoint. Trace/span IDs correlate with local logs when available. No account, Collector, or separate service is needed for ordinary self-hosted use.
+- **Local traces connect timed steps.** Completed OpenTelemetry spans are appended to `spans.ndjson`, one standard OTLP JSON envelope per line, including IDs, parent relationships, timestamps, status and selected attributes. This works with remote export off. Optional export sends the same spans directly to Langfuse or a configured OTLP/HTTP trace endpoint. Trace/span IDs correlate with local logs. No account, Collector, or separate service is needed for ordinary self-hosted use.
 
 For “My hosting budget is at most €30/month,” Pi may propose a Decision before Server Guy validates it. The proposal step succeeding does not establish that the requirement was saved. Only the database transaction can commit the reply, Decision and requirement-saved Activity together. The successful save diagnostic is emitted **after the outer transaction commits**. If validation or commit fails, the product records the failed attempt separately and no requirement-saved event remains.
 
@@ -144,9 +145,9 @@ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://your-backend.example/v1/traces
 OTEL_EXPORTER_OTLP_TRACES_HEADERS=authorization=your-encoded-value
 ```
 
-An explicit trace endpoint takes precedence over Langfuse settings. Keep keys server-side and restart the worker after changes. `SERVER_GUY_TRACING=0` stops future exports without deleting local logs or already-exported traces. The OTel provider is private to the worker; it uses explicit parent contexts and no global HTTP/SDK auto-instrumentation. The worker batches export and flushes on graceful shutdown. A trace ID does not prove delivery.
+An explicit trace endpoint takes precedence over Langfuse settings. Keep keys server-side and restart both the server and worker with the same environment after changes. Settings reports this server’s configuration, not a delivery check. Destination display omits URL credentials, paths and query strings. `SERVER_GUY_TRACING=0` stops future remote exports; local logs and completed spans continue to be saved. The OTel provider is private to the worker; it uses explicit parent contexts and no global HTTP/SDK auto-instrumentation. The worker batches export and flushes on graceful shutdown. A trace ID does not prove delivery.
 
-OpenTelemetry logs and traces are different signals. These local files are ordinary structured NDJSON, **not an OTLP trace archive**; Langfuse does not automatically import them as historical traces. Send spans through the optional exporter for trace inspection. Langfuse may display API-price estimates, which are not ChatGPT subscription charges. Payload omission is deliberate even if a backend suggests adding input/output.
+OpenTelemetry logs and traces are different signals. `replies.ndjson` is an ordinary event log, not an OpenTelemetry logs export. `spans.ndjson` contains completed spans serialized by the official OTLP JSON serializer. Each file rotates separately at 1 MiB with three archives. Local writes happen when a span ends, independently of remote export, and can fail without failing a reply. A crash can lose unfinished spans; rotation can remove part of a trace. These files are a local diagnostic archive, not a durable sending queue: no replay, delivery tracking or automatic import into Langfuse. Langfuse may display API-price estimates, which are not ChatGPT subscription charges. Payload omission applies to both local and remote outputs.
 
 Browser fixtures disable export and isolate diagnostic files alongside disposable databases. Live model evals retain their separate explicit opt-in.
 
@@ -154,7 +155,7 @@ Browser fixtures disable export and isolate diagnostic files alongside disposabl
 
 The current schema remains prototype version **6**. Existing v6 databases need no diagnostic migration. Historical `chat-execution`, `chat-created` and `chat-archived` rows in `activity_events` remain stored but are excluded from the feed.
 
-An earlier unmerged revision of PR #16 introduced version 7 and `reply_execution_history`. This implementation can open those databases for authoritative product records while leaving their old diagnostic table untouched and unused. `npm run db:push` refuses version 7 to prevent Drizzle dropping that historical data. Do not reset a database merely for this change. No startup migration, data copying or reconstruction runs. Older prototype versions still require the existing explicit setup procedure.
+Development databases use the current schema only. Recreate disposable databases from incompatible prototype versions, including the abandoned version-7 history-table branch. There is no special version-7 runtime compatibility, migration, copying or reconstruction.
 
 Verification invalidation remains in `withGithubConnectionTransition`: changing or disconnecting a saved connection records one event per prior successful repository Observation. Token renewal keeps the connection ID and emits nothing; refresh cannot duplicate the event. Pending Runs retain their existing recovery policy: queued work stays queued and a restarted worker marks in-flight attempts interrupted.
 
@@ -171,10 +172,10 @@ Use disposable deterministic fixtures for the following boundaries. Current run 
 | Browser reconnect/retry | No duplicate user message or Activity; retry retains its original Run lineage. |
 | GitHub connection transition | Invalidation once per prior Observation, no unobserved access-loss claim. |
 | Chat creation/archive | No Activity event; archived transcript remains readable and read-only. |
-| Tracing disabled | Local diagnostic events still exist; ordinary product behavior works. |
+| Remote export disabled | Local event logs and complete ended spans still exist; ordinary product behavior works. |
 | Unwritable logs, failed rotation or failed exporter | Product outcomes are unchanged and no automatic retry is introduced. |
 | Retention and privacy | File/step bounds hold; synthetic private content never enters logs or spans. |
-| Schema compatibility | v6 is unchanged; old v7 product records remain usable and diagnostic rows preserved. |
+| Prototype schema | v6 remains current; incompatible disposable development databases are recreated. |
 
 ## Later scope and references
 

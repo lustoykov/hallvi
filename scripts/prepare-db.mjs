@@ -1,4 +1,4 @@
-// Prototype schema v6 remains current; never drop v7 branch diagnostics.
+// Development databases must match the current prototype schema.
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -21,10 +21,6 @@ try {
       "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1",
     )
     .get();
-  if (current === 7)
-    throw new Error(
-      "Schema 7 is runtime-compatible with this version. Its legacy reply_execution_history table is preserved. db:push is refused because Drizzle would drop that historical data. No schema or data was changed.",
-    );
   if (populated && current !== version)
     throw new Error(
       `Prototype schema ${current} is incompatible with ${version}. Stop the app and worker, move aside the disposable database and its -wal/-shm files, then run npm run db:push. Keep credentials and tests/results. No migration was attempted.`,

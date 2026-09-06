@@ -36,7 +36,7 @@ function eventTone(kind: string) {
 /**
  * What happened to this application: saved or changed requirements,
  * repository checks and connection consequences. How a reply was produced is
- * not an event here; each Chat reply carries its own details.
+ * not an event here; local logs and traces hold its diagnostics.
  */
 export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   return (

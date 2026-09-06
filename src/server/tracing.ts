@@ -5,11 +5,17 @@ import {
   type Span,
 } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
+import {
+  BatchSpanProcessor,
+  type SpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import {
+  appendDiagnosticLine,
+  diagnosticLogPath,
   diagnosticMetadata,
   logDiagnostic,
   MAX_DIAGNOSTIC_STEPS,
@@ -17,46 +23,58 @@ import {
   type ExecutionSignal,
   type StepKind,
 } from "./diagnostics";
+import { traceExportConfiguration } from "./tracing-config";
 import type { PiRun } from "./types";
 
 let provider: NodeTracerProvider | undefined;
 
 function tracer() {
   if (!provider) {
-    const endpoint =
-      process.env.SERVER_GUY_TRACING === "1"
-        ? process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-        : undefined;
-    const enabled =
-      process.env.SERVER_GUY_TRACING === "1" &&
-      process.env.LANGFUSE_PUBLIC_KEY &&
-      process.env.LANGFUSE_SECRET_KEY;
+    const configuration = traceExportConfiguration();
+    const local: SpanProcessor = {
+      onStart() {},
+      onEnd(span) {
+        optionalTelemetry(() => {
+          const bytes = JsonTraceSerializer.serializeRequest([span]);
+          if (bytes)
+            appendDiagnosticLine(
+              diagnosticLogPath("spans.ndjson"),
+              Buffer.from(bytes).toString("utf8") + "\n",
+            );
+        });
+      },
+      forceFlush: async () => {},
+      shutdown: async () => {},
+    };
+    // A broken optional exporter must not prevent local span recording.
+    const remote = optionalTelemetry(() =>
+      configuration.mode === "otlp"
+        ? new BatchSpanProcessor(
+            new OTLPTraceExporter({
+              url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+              timeoutMillis: 3000,
+            }),
+            {
+              maxQueueSize: 512,
+              maxExportBatchSize: 128,
+              scheduledDelayMillis: 2000,
+              exportTimeoutMillis: 3000,
+            },
+          )
+        : configuration.mode === "langfuse"
+          ? new LangfuseSpanProcessor({
+              exportMode: "batched",
+              timeout: 3,
+              flushInterval: 2,
+              mediaUploadEnabled: false,
+              shouldExportSpan: ({ otelSpan }) =>
+                otelSpan.instrumentationScope.name === "server-guy",
+            })
+          : undefined,
+    );
     provider = new NodeTracerProvider({
       resource: resourceFromAttributes({ "service.name": "server-guy" }),
-      spanProcessors: endpoint
-        ? [
-            new BatchSpanProcessor(
-              new OTLPTraceExporter({ url: endpoint, timeoutMillis: 3000 }),
-              {
-                maxQueueSize: 512,
-                maxExportBatchSize: 128,
-                scheduledDelayMillis: 2000,
-                exportTimeoutMillis: 3000,
-              },
-            ),
-          ]
-        : enabled
-          ? [
-              new LangfuseSpanProcessor({
-                exportMode: "batched",
-                timeout: 3,
-                flushInterval: 2,
-                mediaUploadEnabled: false,
-                shouldExportSpan: ({ otelSpan }) =>
-                  otelSpan.instrumentationScope.name === "server-guy",
-              }),
-            ]
-          : [],
+      spanProcessors: remote ? [local, remote] : [local],
     });
   }
   // Explicit parent contexts: no global provider, auto-instrumentation, or
@@ -74,25 +92,23 @@ function optionalTelemetry<T>(work: () => T): T | undefined {
 
 export function beginRunDiagnostics(run: PiRun) {
   const root = optionalTelemetry(() =>
-    process.env.SERVER_GUY_TRACING === "1"
-      ? tracer().startSpan(
-          "Assistant reply",
-          {
-            startTime: new Date(run.createdAt),
-            attributes: {
-              "server_guy.run.id": run.id,
-              "server_guy.application.id": run.applicationId,
-              "langfuse.session.id": run.chatId,
-              "server_guy.retry_of": run.retryOfId ?? "",
-              "langfuse.trace.name": "Server Guy reply",
-              "server_guy.payload_policy": "Content omitted; metadata only",
-              "server_guy.cost_basis":
-                "API price estimates are not subscription charges",
-            },
-          },
-          ROOT_CONTEXT,
-        )
-      : undefined,
+    tracer().startSpan(
+      "Assistant reply",
+      {
+        startTime: new Date(run.createdAt),
+        attributes: {
+          "server_guy.run.id": run.id,
+          "server_guy.application.id": run.applicationId,
+          "langfuse.session.id": run.chatId,
+          "server_guy.retry_of": run.retryOfId ?? "",
+          "langfuse.trace.name": "Server Guy reply",
+          "server_guy.payload_policy": "Content omitted; metadata only",
+          "server_guy.cost_basis":
+            "API price estimates are not subscription charges",
+        },
+      },
+      ROOT_CONTEXT,
+    ),
   );
   const traceId = optionalTelemetry(() => root?.spanContext().traceId);
   const parent =

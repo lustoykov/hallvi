@@ -90,9 +90,7 @@ function assertCurrentSchema(
   if (!initialized) {
     throw new Error(`${databasePath} is not initialized. Run npm run db:push.`);
   }
-  // v7 was the short-lived history-table branch; core records are identical.
-  // Keep its table/version intact; db:push refuses destructive drift.
-  if (version !== schemaVersion.version && version !== 7) {
+  if (version !== schemaVersion.version) {
     throw new Error(
       `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Other prototype versions require an explicit fresh database.`,
     );

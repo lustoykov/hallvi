@@ -190,10 +190,24 @@ test(
     await page
       .context()
       .grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.getByRole("button", { name: "Copy path", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("Log path copied.");
+    await page
+      .getByRole("button", { name: "Copy log path", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toHaveText("Path copied.");
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
       setupStatus.diagnosticLogPath,
+    );
+    await expect(
+      page.getByText(setupStatus.localTracePath, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Off. Traces stay local.", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Copy trace path", exact: true })
+      .click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      setupStatus.localTracePath,
     );
     await page.keyboard.press("Escape");
     const disconnect = page.getByRole("button", {

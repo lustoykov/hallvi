@@ -142,14 +142,18 @@ export function diagnosticFailure(error: unknown): DiagnosticFailure {
   return { category: "unknown" };
 }
 
-export function diagnosticLogPath() {
+export function diagnosticLogPath(
+  filename: "replies.ndjson" | "spans.ndjson" = "replies.ndjson",
+) {
   const dbPath =
     process.env.SERVER_GUY_DB_PATH ??
     join(process.cwd(), ".server-guy", "server-guy.db");
+  // Runtime output files must not be included in the application build.
   return join(
+    /* turbopackIgnore: true */
     (process.env.SERVER_GUY_LOG_DIR?.trim() || undefined) ??
       join(dirname(dbPath), "diagnostics"),
-    "replies.ndjson",
+    filename,
   );
 }
 
@@ -225,7 +229,16 @@ export function logDiagnostic(
     }
     const line = JSON.stringify(record) + "\n";
     if (Buffer.byteLength(line) > 4096) return;
-    const path = diagnosticLogPath();
+    appendDiagnosticLine(diagnosticLogPath(), line);
+  } catch {
+    /* Diagnostic failure cannot affect a reply. */
+  }
+}
+
+// Shared bounded file output for event logs and completed OTLP spans.
+export function appendDiagnosticLine(path: string, line: string) {
+  try {
+    if (Buffer.byteLength(line) > LOG_MAX_BYTES) return;
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     let size = 0;
     try {
