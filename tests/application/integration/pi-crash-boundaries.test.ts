@@ -279,7 +279,11 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
       expect(database.listActiveDecisions(applicationId)).toEqual(
         decisionsBefore,
       );
+      // Startup preserves domain Activity and saved native conversation.
       expect(database.listActivity(workspaceId)).toEqual(activityBefore);
+      expect(runs.chatRunSnapshot(applicationId, chatId)).not.toHaveProperty(
+        "executions",
+      );
       expect(nativeText()).toBe(before);
       const next = runs.sendChatMessage(
         applicationId,

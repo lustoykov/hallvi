@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -92,7 +92,7 @@ function assertCurrentSchema(
   }
   if (version !== schemaVersion.version) {
     throw new Error(
-      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Run npm run db:push, or delete the disposable database and push a fresh one.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Other prototype versions require an explicit fresh database.`,
     );
   }
 }
@@ -410,15 +410,80 @@ export function insertActivity(
   db().insert(activityEvents).values(activity).run();
 }
 
-export function listActivity(workspaceId: string) {
+/**
+ * Records one event per deterministic ID. Retried or concurrent requests for
+ * the same transition therefore cannot add a second feed item. Returns whether
+ * this call recorded it.
+ */
+export function recordActivityOnce(
+  id: string,
+  workspaceId: string,
+  kind: string,
+  summary: string,
+  detail: string,
+) {
+  const activity: ActivityEvent = {
+    id,
+    workspaceId,
+    kind,
+    summary,
+    detail,
+    createdAt: now(),
+  };
+  return (
+    db().insert(activityEvents).values(activity).onConflictDoNothing().run()
+      .changes > 0
+  );
+}
+
+// Legacy reply/Chat administration rows remain stored, but are not domain
+// Activity. New rich diagnostics go only to local logs and optional traces.
+const EXCLUDED_ACTIVITY_KINDS = [
+  "chat-execution",
+  "chat-created",
+  "chat-archived",
+];
+
+export function listActivity(workspaceId: string): ActivityEvent[] {
   return db()
     .select()
     .from(activityEvents)
-    .where(eq(activityEvents.workspaceId, workspaceId))
+    .where(
+      and(
+        eq(activityEvents.workspaceId, workspaceId),
+        notInArray(activityEvents.kind, EXCLUDED_ACTIVITY_KINDS),
+      ),
+    )
     .orderBy(desc(activityEvents.createdAt), desc(rowId))
     .all();
 }
 
-export function withTransaction<T>(work: () => T): T {
-  return db().transaction(() => work(), { behavior: "immediate" });
+let committedCallbacks: (() => void)[] | undefined;
+
+// Diagnostic callbacks wait for the outermost commit. Nested rollback discards
+// only its callbacks; a later outer rollback discards all queued claims.
+export function withTransaction<T>(
+  work: () => T,
+  onCommit?: (value: T) => void,
+): T {
+  const parent = committedCallbacks;
+  const callbacks: (() => void)[] = [];
+  committedCallbacks = callbacks;
+  try {
+    const result = db().transaction(() => work(), { behavior: "immediate" });
+    committedCallbacks = parent;
+    if (onCommit) callbacks.push(() => onCommit(result));
+    if (parent) parent.push(...callbacks);
+    else
+      for (const callback of callbacks) {
+        try {
+          callback();
+        } catch {
+          /* Diagnostics never alter committed state. */
+        }
+      }
+    return result;
+  } finally {
+    committedCallbacks = parent;
+  }
 }

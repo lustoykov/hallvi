@@ -734,7 +734,7 @@ The default sidebar for the current phase contains only:
 
 One level deeper:
 
-- **Activity** shows what happened across the Phase Workspace, including the originating chat for Pi's visible intent, tool calls, observations, waits, approvals, and outcomes;
+- **Activity** shows meaningful application changes, verification milestones, and consequential operational attempts across the Phase Workspace, with source Chat/evidence links where relevant. It follows the [Activity inclusion rules](../specs/action-history-and-tracing.md#application-activity-inclusion-rules); ordinary replies and internal execution steps belong with their Chat, not in this feed;
 - **Changes** shows proposed and actual external/repository changes, including rejected effects and Out-of-band Changes;
 - **Evidence** shows the source-attributed proof behind claims and Gate Checks, with raw results and observability targets.
 

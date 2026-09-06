@@ -12,5 +12,13 @@ const databasePath =
   process.env.SERVER_GUY_DB_PATH ??
   join(process.cwd(), ".server-guy", "server-guy.db");
 const database = new Database(databasePath);
-database.pragma(`user_version = ${version}`);
-database.close();
+try {
+  const current = database.pragma("user_version", { simple: true });
+  if (current !== 0 && current !== version)
+    throw new Error(
+      `Refusing to stamp schema ${current} as ${version}. Existing data is unchanged.`,
+    );
+  database.pragma(`user_version = ${version}`);
+} finally {
+  database.close();
+}

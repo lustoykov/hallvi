@@ -2,6 +2,13 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "activity-history",
+    name: "Inspect application Activity and reply recovery",
+    description:
+      "Keep Activity to saved requirements and repository checks, preserve normal Chat, reload, cancel, retry, and record a GitHub disconnect once.",
+    smoke: false,
+  },
+  {
     id: "add-application",
     name: "Add application and save a priority",
     description:

@@ -1,4 +1,4 @@
-// Prototype databases are disposable. Do not attempt an in-place upgrade.
+// Development databases must match the current prototype schema.
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

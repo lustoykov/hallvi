@@ -21,6 +21,7 @@ import type { PiSetupStatus } from "@/server/pi-setup";
 import { APPROVAL_MODES } from "@/server/types";
 import type {
   ApplicationRecord,
+  ChatRunSnapshot,
   GateCheck,
   PhaseOneOperatorView,
   PiRun,
@@ -115,22 +116,23 @@ export function OperatorShell({
     stream.onerror = () => setReconnecting(true);
     stream.onmessage = (event) => {
       if (!active) return;
-      const snapshot = JSON.parse(event.data) as {
-        messages: ChatMessage[];
-        runs: PiRun[];
-      };
+      const snapshot = JSON.parse(event.data) as ChatRunSnapshot;
       setRuns(snapshot.runs);
       setView((current) =>
         current.selectedChatId === selectedChatId
           ? {
               ...current,
               messages: mergeMessages(current.messages, snapshot.messages),
+              activity: snapshot.activity ?? current.activity,
             }
           : current,
       );
       const pending = readSubmission(selectedChatId);
       if (pending) {
         if (snapshot.runs.some((run) => run.requestKey === pending.key)) {
+          // SSE can confirm acceptance before the POST response arrives.
+          // Retire the optimistic copy as soon as durable intent is visible.
+          setPendingMessage(null);
           sessionStorage.removeItem(`pi-submission:${selectedChatId}`);
           setDrafts((current) =>
             current[selectedChatId] === pending.message
@@ -302,6 +304,7 @@ export function OperatorShell({
         );
         await api.sendMessage(application.id, activeChat.id, message, key);
         accepted = true;
+        setPendingMessage(null);
         sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
         return api.view(application.id, activeChat.id);
       },

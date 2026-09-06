@@ -1,9 +1,8 @@
 import type {
   AcceptedPiRun,
   ApprovalMode,
+  ChatRunSnapshot,
   PhaseOneOperatorView,
-  PiRun,
-  ChatMessage,
 } from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -43,7 +42,7 @@ function post(url: string, body: unknown) {
  */
 export const api = {
   runSnapshot(applicationId: string, chatId: string) {
-    return jsonRequest<{ runs: PiRun[]; messages: ChatMessage[] }>(
+    return jsonRequest<ChatRunSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
     );
   },

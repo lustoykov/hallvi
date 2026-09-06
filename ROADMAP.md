@@ -16,7 +16,7 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
 | 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
-| 7 | Make one chat execution inspectable through durable Activity Events, structured logs, OpenTelemetry, and Langfuse. | Planned; follows durable Pi requests, then extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
+| 7 | Keep application Activity meaningful, with bounded local diagnostic logs and optional OpenTelemetry export. | Implemented in [PR #16](https://github.com/lustoykov/server-guy/pull/16), including the September 6 correction that removes Reply details and detailed SQLite diagnostics. Extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
 | 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
 | 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
 | 10 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
@@ -98,7 +98,7 @@ The [implementation contract](docs/specs/durable-pi-requests.md) defines the fir
 - [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; this branch replaces that path with native Pi history/compaction. Prototype chats are disposable; no legacy import.
 - [x] Make all active Decisions available regardless of age. This branch replaces the repeated injected list with scoped, paginated `search_decisions`; current checks and previous attempt outcomes remain separate Run context.
 - [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
-- [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Reserve Activity Events for meaningful lifecycle, tool, approval, retry, and failure facts.
+- [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Keep durable reply status and retry lineage in Runs, and diagnostic step metadata in local logs; the application feed follows the [Activity inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules).
 - [x] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
 - [x] Validate the multiple-Chat experience with worker concurrency set to one, visible queue state, and cancellation. Add a small bounded concurrency pool inside the same process only if real waiting makes the interface materially unpleasant.
 - [x] Return a run ID immediately, load the authoritative message snapshot after reload, and continue updates through a reconnectable SSE endpoint. SSE frames are delivery notifications, not the system of record.
@@ -112,13 +112,18 @@ The first design deliberately has one worker process and no leases. A Chat ID id
 
 ## Action history and tracing
 
-Give users an expandable history of what Server Guy attempted, accepted, and actually changed, with technical evidence when they want to inspect a step. The [action history and tracing spec](docs/specs/action-history-and-tracing.md) owns the behavior and boundaries; build order and completion stay here. The first slice follows durable Pi requests and does not add a new Phase 1 acceptance gate.
+Give users application history for meaningful domain events and ordinary Chat with safe recovery. Operators debug using bounded local logs and optional trace export. The [action history and tracing spec](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules) owns inclusion rules and the flow inventory; build order and completion stay here. This adds no Phase 1 acceptance gate.
 
-- [ ] Reuse Pi Run identity and durable Activity Events to correlate one chat execution across the worker, Pi, domain validation, database commit, and refreshed Operator View.
-- [ ] Instrument Pi model/tool lifecycle and Server Guy's own boundaries with OpenTelemetry; export to Langfuse and attach the same run/trace references to structured logs.
-- [ ] Preserve meaningful start, result, retry, cancellation, timeout, interruption, and rejection facts. Record a Decision as saved only after commit; retain failure history when domain writes roll back.
-- [ ] Expand the existing Activity view into ordered steps with timing, outcomes, and record/evidence links; keep redacted technical payloads in Evidence and offer an authorized Langfuse trace link when configured.
-- [ ] Verify success, domain rejection after tool success, timeout/cancellation, restart/reconnect, unavailable telemetry, and payload redaction against the spec's acceptance scenarios.
+- [x] Retain authoritative Pi Runs, messages, Decisions and application Activity in SQLite; reuse Run IDs for diagnostics and retry lineage.
+- [x] Remove the ordinary Chat Reply details panel and detailed SQLite execution-history writes. Keep queued/working, failure, cancellation, unfinished drafts and retry states.
+- [x] Record bounded, metadata-only local diagnostic logs with rotation, safe failures and Run correlation, independently of tracing. Emit successful save diagnostics after outer commit; log/export failures cannot change product outcomes.
+- [x] Export optional OpenTelemetry spans to Langfuse or an explicit OTLP/HTTP trace backend without a required Collector or service.
+- [x] Keep Activity to meaningful application outcomes: creation, repository checks, one requirement-saved event per committed Decision and one old → new event per replacement. Replies, lookups and Chat administration add no events.
+- [x] Record repository-verification invalidation once per invalidated Observation on connection change/disconnect, without claiming access loss or repeating events on refresh or token renewal.
+- [x] Keep schema version 6; preserve historical diagnostic rows and compatibility with earlier unmerged version 7 databases without dropping their old table or migrating real data.
+
+Earlier PR revisions placed every reply in Activity, then moved details into Chat and a separate table. The final September 6 decision supersedes those implementations: no rich diagnostic database or in-app viewer is required for the current product.
+
 - [ ] Extend the same correlation through policy, approvals, provider calls, receipts, and verification as those Operations are implemented; add Sentry for application errors before external-user releases.
 
 ## Revisit Workflow DevKit only at its trigger

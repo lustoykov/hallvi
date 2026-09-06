@@ -1,6 +1,13 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { db, insertMessage, listMessages, withTransaction } from "./db";
+import {
+  db,
+  insertMessage,
+  listMessages,
+  listActivity,
+  withTransaction,
+} from "./db";
+import { logDiagnostic, type DiagnosticFailure } from "./diagnostics";
 import { messages, piRuns } from "./db-schema";
 import {
   loadChat,
@@ -9,24 +16,37 @@ import {
   savePiDecisions,
 } from "./phase-one";
 import { sendChatMessageRequestSchema } from "./schemas";
-import type { AcceptedPiRun, PiRun, PiRunStatus, PiTurnResult } from "./types";
+import type {
+  AcceptedPiRun,
+  ChatRunSnapshot,
+  PiRun,
+  PiRunStatus,
+  PiTurnResult,
+} from "./types";
 
 const pending = ["queued", "running"] as const;
 export function getPiRun(id: string) {
   return db().select().from(piRuns).where(eq(piRuns.id, id)).get() ?? null;
 }
 
-export function chatRunSnapshot(applicationId: string, chatId: string) {
-  loadChat(applicationId, chatId);
-  return withTransaction(() => ({
-    messages: listMessages(chatId),
-    runs: db()
+export function chatRunSnapshot(
+  applicationId: string,
+  chatId: string,
+): ChatRunSnapshot {
+  const { workspace } = loadChat(applicationId, chatId);
+  return withTransaction(() => {
+    const runs = db()
       .select()
       .from(piRuns)
       .where(eq(piRuns.chatId, chatId))
       .orderBy(asc(sql`rowid`))
-      .all(),
-  }));
+      .all();
+    return {
+      messages: listMessages(chatId),
+      runs,
+      activity: listActivity(workspace.id),
+    };
+  });
 }
 
 function scopedRun(applicationId: string, chatId: string, id: string) {
@@ -55,40 +75,51 @@ export function sendChatMessage(
     message: body,
     requestKey,
   });
-  return withTransaction(() => {
-    const { workspace, chat } = loadChat(applicationId, chatId);
-    if (chat.archivedAt) throw new Error("This Chat is archived.");
-    const existing = db()
-      .select()
-      .from(piRuns)
-      .where(
-        and(eq(piRuns.chatId, chatId), eq(piRuns.requestKey, input.requestKey)),
-      )
-      .get();
-    if (existing) {
-      const user = db()
+  let created = false;
+  return withTransaction(
+    () => {
+      const { workspace, chat } = loadChat(applicationId, chatId);
+      if (chat.archivedAt) throw new Error("This Chat is archived.");
+      const existing = db()
         .select()
-        .from(messages)
-        .where(eq(messages.id, existing.userMessageId))
+        .from(piRuns)
+        .where(
+          and(
+            eq(piRuns.chatId, chatId),
+            eq(piRuns.requestKey, input.requestKey),
+          ),
+        )
         .get();
-      if (existing.retryOfId || user?.body !== input.message)
-        throw new ExistingApplicationConflictError(
-          "This request key was already used for a different message.",
-        );
-      return accepted(existing);
-    }
-    const user = insertMessage(chatId, "user", input.message, "user");
-    return accepted(
-      insertRun(
-        applicationId,
-        workspace.id,
-        chatId,
-        user.id,
-        input.requestKey,
-        null,
-      ),
-    );
-  });
+      if (existing) {
+        const user = db()
+          .select()
+          .from(messages)
+          .where(eq(messages.id, existing.userMessageId))
+          .get();
+        if (existing.retryOfId || user?.body !== input.message)
+          throw new ExistingApplicationConflictError(
+            "This request key was already used for a different message.",
+          );
+        return accepted(existing);
+      }
+      created = true;
+      const user = insertMessage(chatId, "user", input.message, "user");
+      return accepted(
+        insertRun(
+          applicationId,
+          workspace.id,
+          chatId,
+          user.id,
+          input.requestKey,
+          null,
+        ),
+      );
+    },
+    (result) => {
+      if (created)
+        logDiagnostic("reply.accepted", result.run, { outcome: "queued" });
+    },
+  );
 }
 
 function insertRun(
@@ -100,7 +131,7 @@ function insertRun(
   retryOfId: string | null,
 ) {
   const assistant = insertMessage(chatId, "assistant", "", "pi", "queued");
-  return db()
+  const run = db()
     .insert(piRuns)
     .values({
       id: randomUUID(),
@@ -116,37 +147,46 @@ function insertRun(
     })
     .returning()
     .get();
+  return run;
 }
 
 export function retryPiRun(applicationId: string, chatId: string, id: string) {
-  return withTransaction(() => {
-    const run = scopedRun(applicationId, chatId, id);
-    if (loadChat(applicationId, chatId).chat.archivedAt)
-      throw new Error("This Chat is archived.");
-    const existing = db()
-      .select()
-      .from(piRuns)
-      .where(eq(piRuns.retryOfId, id))
-      .get();
-    if (existing) return accepted(existing);
-    if (
-      run.status === "succeeded" ||
-      pending.includes(run.status as (typeof pending)[number])
-    )
-      throw new ExistingApplicationConflictError(
-        "Only an unsuccessful, finished attempt can be retried.",
+  let created = false;
+  return withTransaction(
+    () => {
+      const run = scopedRun(applicationId, chatId, id);
+      if (loadChat(applicationId, chatId).chat.archivedAt)
+        throw new Error("This Chat is archived.");
+      const existing = db()
+        .select()
+        .from(piRuns)
+        .where(eq(piRuns.retryOfId, id))
+        .get();
+      if (existing) return accepted(existing);
+      if (
+        run.status === "succeeded" ||
+        pending.includes(run.status as (typeof pending)[number])
+      )
+        throw new ExistingApplicationConflictError(
+          "Only an unsuccessful, finished attempt can be retried.",
+        );
+      created = true;
+      return accepted(
+        insertRun(
+          applicationId,
+          run.workspaceId,
+          chatId,
+          run.userMessageId,
+          randomUUID(),
+          id,
+        ),
       );
-    return accepted(
-      insertRun(
-        applicationId,
-        run.workspaceId,
-        chatId,
-        run.userMessageId,
-        randomUUID(),
-        id,
-      ),
-    );
-  });
+    },
+    (result) => {
+      if (created)
+        logDiagnostic("reply.retry", result.run, { outcome: "queued" });
+    },
+  );
 }
 
 export function cancelPiRun(applicationId: string, chatId: string, id: string) {
@@ -165,39 +205,44 @@ export function cancelPiRun(applicationId: string, chatId: string, id: string) {
 // There is one OS-locked worker. An immediate SQLite transaction also prevents
 // overlapping claims by code callers and serializes completion against cancel.
 export function claimNextPiRun() {
-  return withTransaction(() => {
-    if (
-      db()
-        .select({ id: piRuns.id })
+  return withTransaction(
+    () => {
+      if (
+        db()
+          .select({ id: piRuns.id })
+          .from(piRuns)
+          .where(eq(piRuns.status, "running"))
+          .get()
+      )
+        return null;
+      const next = db()
+        .select()
         .from(piRuns)
-        .where(eq(piRuns.status, "running"))
-        .get()
-    )
-      return null;
-    const next = db()
-      .select()
-      .from(piRuns)
-      .where(eq(piRuns.status, "queued"))
-      .orderBy(asc(sql`rowid`))
-      .limit(1)
-      .get();
-    if (!next) return null;
-    db()
-      .update(piRuns)
-      .set({
-        status: "running",
-        startedAt: new Date().toISOString(),
-        revision: sql`${piRuns.revision} + 1`,
-      })
-      .where(eq(piRuns.id, next.id))
-      .run();
-    db()
-      .update(messages)
-      .set({ status: "running", revision: sql`${messages.revision} + 1` })
-      .where(eq(messages.id, next.assistantMessageId))
-      .run();
-    return getPiRun(next.id)!;
-  });
+        .where(eq(piRuns.status, "queued"))
+        .orderBy(asc(sql`rowid`))
+        .limit(1)
+        .get();
+      if (!next) return null;
+      db()
+        .update(piRuns)
+        .set({
+          status: "running",
+          startedAt: new Date().toISOString(),
+          revision: sql`${piRuns.revision} + 1`,
+        })
+        .where(eq(piRuns.id, next.id))
+        .run();
+      db()
+        .update(messages)
+        .set({ status: "running", revision: sql`${messages.revision} + 1` })
+        .where(eq(messages.id, next.assistantMessageId))
+        .run();
+      return getPiRun(next.id)!;
+    },
+    (run) => {
+      if (run) logDiagnostic("reply.claimed", run, { outcome: "running" });
+    },
+  );
 }
 
 export function persistPiDraft(id: string, body: string) {
@@ -220,63 +265,94 @@ export function finishPiRun(
   id: string,
   status: Exclude<PiRunStatus, "queued" | "running" | "succeeded">,
   error: string,
+  failure?: DiagnosticFailure,
 ) {
-  return withTransaction(() => {
-    const run = getPiRun(id);
-    if (!run || !pending.includes(run.status as (typeof pending)[number]))
-      return false;
-    db()
-      .update(piRuns)
-      .set({
-        status,
-        error,
-        finishedAt: new Date().toISOString(),
-        revision: sql`${piRuns.revision} + 1`,
-      })
-      .where(eq(piRuns.id, id))
-      .run();
-    db()
-      .update(messages)
-      .set({ status, revision: sql`${messages.revision} + 1` })
-      .where(eq(messages.id, run.assistantMessageId))
-      .run();
-    return true;
-  });
+  return withTransaction(
+    () => {
+      const run = getPiRun(id);
+      if (!run || !pending.includes(run.status as (typeof pending)[number]))
+        return false;
+      db()
+        .update(piRuns)
+        .set({
+          status,
+          error,
+          finishedAt: new Date().toISOString(),
+          revision: sql`${piRuns.revision} + 1`,
+        })
+        .where(eq(piRuns.id, id))
+        .run();
+      db()
+        .update(messages)
+        .set({ status, revision: sql`${messages.revision} + 1` })
+        .where(eq(messages.id, run.assistantMessageId))
+        .run();
+      return true;
+    },
+    (changed) => {
+      if (!changed) return;
+      const run = getPiRun(id);
+      if (run)
+        logDiagnostic(`reply.${status}`, run, {
+          outcome: status,
+          durationMs:
+            Date.parse(run.finishedAt!) -
+            Date.parse(run.startedAt ?? run.createdAt),
+          failure: failure ?? {
+            category: status === "failed" ? "unknown" : status,
+          },
+        });
+    },
+  );
 }
 
 export function completePiRun(id: string, reply: PiTurnResult) {
-  return withTransaction(() => {
-    const run = getPiRun(id);
-    if (run?.status !== "running") return false;
-    const { chat } = loadChat(run.applicationId, run.chatId);
-    if (chat.archivedAt)
-      throw new Error("This Chat was archived before the answer finished.");
-    savePiDecisions(
-      run.applicationId,
-      run.workspaceId,
-      run.userMessageId,
-      reply.decisionProposals,
-    );
-    db()
-      .update(messages)
-      .set({
-        body: reply.message,
-        status: "completed",
-        revision: sql`${messages.revision} + 1`,
-      })
-      .where(eq(messages.id, run.assistantMessageId))
-      .run();
-    db()
-      .update(piRuns)
-      .set({
-        status: "succeeded",
-        finishedAt: new Date().toISOString(),
-        revision: sql`${piRuns.revision} + 1`,
-      })
-      .where(eq(piRuns.id, id))
-      .run();
-    return true;
-  });
+  return withTransaction(
+    () => {
+      const run = getPiRun(id);
+      if (run?.status !== "running") return false;
+      const { chat } = loadChat(run.applicationId, run.chatId);
+      if (chat.archivedAt)
+        throw new Error("This Chat was archived before the answer finished.");
+      savePiDecisions(
+        run.applicationId,
+        run.workspaceId,
+        run.userMessageId,
+        reply.decisionProposals,
+      );
+      db()
+        .update(messages)
+        .set({
+          body: reply.message,
+          status: "completed",
+          revision: sql`${messages.revision} + 1`,
+        })
+        .where(eq(messages.id, run.assistantMessageId))
+        .run();
+      db()
+        .update(piRuns)
+        .set({
+          status: "succeeded",
+          finishedAt: new Date().toISOString(),
+          revision: sql`${piRuns.revision} + 1`,
+        })
+        .where(eq(piRuns.id, id))
+        .run();
+      return true;
+    },
+    (saved) => {
+      if (!saved) return;
+      const run = getPiRun(id);
+      if (run)
+        logDiagnostic("reply.succeeded", run, {
+          outcome: "succeeded",
+          durationMs:
+            Date.parse(run.finishedAt!) -
+            Date.parse(run.startedAt ?? run.createdAt),
+          metadata: { requirements: reply.decisionProposals.length },
+        });
+    },
+  );
 }
 
 export function interruptRunningPiRuns() {

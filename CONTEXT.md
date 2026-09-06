@@ -73,8 +73,8 @@ The engineer or an External Agent Client inspecting and changing the underlying 
 _Avoid_: Manual pass, bypass, leaving Server Guy
 
 **Activity Event**:
-A durable historical item such as a Chat creation, tool call, command result, Decision change, Observation, approval, or recovery assessment.
-_Avoid_: Chain of thought, raw agent trace
+A durable record of a meaningful change, verification milestone, or consequential operational attempt affecting an Application. A newly saved or replaced Decision produces an Activity Event; ordinary conversation and internal execution steps do not.
+_Avoid_: Chat message, tool invocation, model response, execution trace, every Observation
 
 **Operator View**:
 The generated application view combining the selected Chat, current Decisions, Observations, Gate Checks, upcoming requirements, and activity. It is rebuilt from durable records rather than stored as one polymorphic record.

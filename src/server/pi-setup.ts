@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { mkdirSync, rmSync } from "node:fs";
 
 import {
@@ -19,6 +19,8 @@ import type {
   PiSelection,
 } from "./pi-configuration";
 import { PI_PROVIDER_ID } from "./pi-settings";
+import { traceExportConfiguration } from "./tracing-config";
+import { diagnosticLogPath } from "./diagnostics";
 import {
   piModelOptions,
   validatePiSelection,
@@ -42,6 +44,9 @@ export interface PiSetupStatus {
   hasSavedConfiguration: boolean;
   models: PiModelOption[];
   separateAuthPath: string;
+  diagnosticLogPath: string;
+  localTracePath: string;
+  traceExport: ReturnType<typeof traceExportConfiguration>;
   runtime: {
     label: string;
     detail: string;
@@ -68,6 +73,9 @@ function baseStatus(): PiSetupStatus {
     hasSavedConfiguration: false,
     models: [],
     separateAuthPath: join(piConfigDir(), "pi-auth.json"),
+    diagnosticLogPath: resolve(diagnosticLogPath()),
+    localTracePath: resolve(diagnosticLogPath("spans.ndjson")),
+    traceExport: traceExportConfiguration(),
     runtime: {
       label: "Bundled Pi SDK",
       detail: "No separate Pi or Codex CLI installation is required.",

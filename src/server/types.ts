@@ -129,6 +129,11 @@ export interface Observation {
   observedAt: string;
 }
 
+/**
+ * One meaningful application event: a saved or changed requirement, workspace
+ * creation, a repository check result, or an invalidated verification. Reply
+ * execution is not an Activity Event; it travels with its Chat reply.
+ */
 export interface ActivityEvent {
   id: string;
   workspaceId: string;
@@ -136,6 +141,16 @@ export interface ActivityEvent {
   summary: string;
   detail: string;
   createdAt: string;
+}
+
+/**
+ * The authoritative Chat state delivered over SSE and on demand: messages,
+ * their Pi Runs and the application's Activity.
+ */
+export interface ChatRunSnapshot {
+  messages: ChatMessage[];
+  runs: PiRun[];
+  activity: ActivityEvent[];
 }
 
 export interface EvidenceReference {

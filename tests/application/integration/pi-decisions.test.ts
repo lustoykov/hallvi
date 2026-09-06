@@ -421,9 +421,20 @@ describe("Decision proposals and the final commit", () => {
       { value: "Reliability first", sourceMessageId: run.userMessageId },
       { value: "Keep operations simple", sourceMessageId: run.userMessageId },
     ]);
+    // One feed item per committed change; the replacement shows old → new and
+    // the reply itself adds nothing.
     expect(
-      store.listActivity(current.workspace.id).map((event) => event.kind),
-    ).toEqual(["decision-recorded", "decision-revised"]);
+      store
+        .listActivity(current.workspace.id)
+        .map((event) => [event.kind, event.summary, event.detail]),
+    ).toEqual([
+      ["decision-recorded", "Requirement saved", "Keep operations simple"],
+      [
+        "decision-revised",
+        "Requirement changed",
+        "Cost first → Reliability first",
+      ],
+    ]);
   });
 
   it("guards replacement ownership as well as the old Decision's active application scope", () => {
