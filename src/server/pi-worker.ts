@@ -1,12 +1,12 @@
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { databasePath, listMessages, withTransaction } from "./db";
+import { databasePath, listMessages } from "./db";
 import { beginRunTrace } from "./tracing";
 import { buildPiRunContext, PiRunContextError } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
 import { buildViewSummary, loadChat } from "./phase-one";
-import { askPi, normalizePiAssistantMessage } from "./pi";
+import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
 import {
   claimNextPiRun,
   completePiRun,
@@ -17,6 +17,7 @@ import {
   recordPiCall,
 } from "./pi-runs";
 import type { PiRun } from "./types";
+import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 
 // The process must exit instead of releasing its writer locks while SDK work
 // may still be alive. This is deliberately not an ordinary failed Run.
@@ -80,6 +81,7 @@ export async function executePiRun(
   }, options.timeoutMs ?? 120_000);
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
+  const stage: { value: "context" | "model" | "save" } = { value: "context" };
   try {
     const work = async () => {
       controller.signal.throwIfAborted();
@@ -92,6 +94,7 @@ export async function executePiRun(
       );
       if (!user) throw new Error("The accepted user message is missing.");
       execution.signal({ type: "end", key: "context" });
+      stage.value = "model";
       const reply = await askPi(
         { run, userMessage: user.body, runContext },
         {
@@ -107,20 +110,21 @@ export async function executePiRun(
         },
       );
       controller.signal.throwIfAborted();
+      stage.value = "save";
       execution.signal({ type: "start", key: "save", kind: "save" });
       try {
-        withTransaction(() => {
-          const saved = completePiRun(run.id, {
-            ...reply,
-            message: normalizePiAssistantMessage(reply.message),
-          });
-          if (saved)
-            execution.signal({
-              type: "end",
-              key: "save",
-              metadata: { requirements: reply.decisionProposals.length },
-            });
+        const saved = completePiRun(run.id, {
+          ...reply,
+          message: normalizePiAssistantMessage(reply.message),
         });
+        // completePiRun has committed before either the log or span can claim
+        // success. A cancelled/stale result leaves this step incomplete.
+        if (saved)
+          execution.signal({
+            type: "end",
+            key: "save",
+            metadata: { requirements: reply.decisionProposals.length },
+          });
       } catch (error) {
         execution.signal({ type: "end", key: "save", failed: true });
         throw error;
@@ -150,14 +154,35 @@ export async function executePiRun(
     ]);
   } catch (error) {
     if (error instanceof PiWorkerDrainError) throw error;
-    // Provider errors may contain payloads or credentials. Persist only a safe
-    // recovery instruction; precise transient failures stay out of public APIs.
+    let failure: DiagnosticFailure =
+      error instanceof PiUnavailableError
+        ? (error.diagnostic ?? diagnosticFailure(error))
+        : diagnosticFailure(error);
+    if (error instanceof PiRunContextError) failure = { category: "context" };
+    else if (error instanceof NativeSessionError)
+      failure = {
+        category: error.code === "busy" ? "busy" : "history-unavailable",
+      };
+    else if (failure.category === "unknown" && stage.value === "save")
+      failure = { category: "validation" };
+    const advice =
+      failure.category === "authentication"
+        ? "The model connection was rejected. Open Settings and reconnect."
+        : failure.category === "rate-limit"
+          ? "The model reports a usage or rate limit. Check the account allowance, then retry."
+          : failure.category === "network" ||
+              failure.category === "provider-unavailable"
+            ? "The model service could not be reached. Check your connection and retry."
+            : failure.category === "storage"
+              ? "The reply could not be saved. Check local storage, then retry."
+              : "Server Guy could not finish this attempt. Check Settings or retry.";
     finishPiRun(
       run.id,
       "failed",
       error instanceof PiRunContextError || error instanceof NativeSessionError
         ? error.message
-        : "Server Guy could not finish this attempt. Check Settings or retry. Your message is saved; no Decisions were saved from this attempt.",
+        : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
+      failure,
     );
   } finally {
     execution.finish(getPiRun(run.id)?.status ?? "interrupted");

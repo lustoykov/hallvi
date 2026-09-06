@@ -83,9 +83,6 @@ export function OperatorShell({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
-  const [executions, setExecutions] = useState<ChatRunSnapshot["executions"]>(
-    {},
-  );
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +118,6 @@ export function OperatorShell({
       if (!active) return;
       const snapshot = JSON.parse(event.data) as ChatRunSnapshot;
       setRuns(snapshot.runs);
-      setExecutions(snapshot.executions ?? {});
       setView((current) =>
         current.selectedChatId === selectedChatId
           ? {
@@ -520,7 +516,6 @@ export function OperatorShell({
           onComposerChange={setComposer}
           onSend={sendMessage}
           runs={runs.filter((run) => run.chatId === activeChat?.id)}
-          executions={executions}
           reconnecting={reconnecting}
           onRunAction={runAction}
           onNewChat={createChat}

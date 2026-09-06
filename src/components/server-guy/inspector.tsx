@@ -43,8 +43,7 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
     <section className="sg-inspector-section">
       <p className="sg-inspector-hint">
         What happened to this application: saved requirements, repository checks
-        and connection changes. For how a reply was produced, open its details
-        in Chat.
+        and connection changes.
       </p>
       {events.length ? (
         events.map((event) => (

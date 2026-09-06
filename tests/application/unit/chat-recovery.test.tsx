@@ -105,7 +105,6 @@ function render({
       onSend={vi.fn()}
       onArchive={vi.fn()}
       runs={[{ ...run, error, status }]}
-      executions={{}}
       reconnecting={false}
       onRunAction={vi.fn()}
       onNewChat={vi.fn()}

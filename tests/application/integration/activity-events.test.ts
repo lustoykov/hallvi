@@ -1,7 +1,7 @@
 // Application Activity inclusion rules: which outcomes become feed items, that
 // each committed change produces exactly one, that rollbacks leave no success
 // claim, and that a GitHub disconnect/replacement records its application
-// consequence once. Reply execution stays with the Chat's Runs.
+// consequence once. Reply diagnostics do not become application Activity.
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -165,9 +165,6 @@ async function reply(
   await worker.executePiRun(runs.claimNextPiRun()!);
   return {
     run: runs.getPiRun(accepted.run.id)!,
-    execution: runs.chatRunSnapshot(app.id, app.chatId).executions[
-      accepted.run.id
-    ],
   };
 }
 
@@ -222,7 +219,7 @@ describe("application creation, checks and chat administration", () => {
       "Chat archived",
       "x",
     );
-    const { run } = await reply(app, "Hello");
+    await reply(app, "Hello");
     expect(feed(app).map(([kind]) => kind)).toEqual([
       "repository-observed",
       "workspace-created",
@@ -239,16 +236,14 @@ describe("application creation, checks and chat administration", () => {
       "chat-created",
       "chat-archived",
     ]);
-    expect(
-      runs
-        .chatRunSnapshot(app.id, app.chatId)
-        .executions[run.id].steps.map((step) => step.id),
-    ).toEqual(["context", "save"]);
+    expect(runs.chatRunSnapshot(app.id, app.chatId)).not.toHaveProperty(
+      "executions",
+    );
   });
 });
 
 describe("decisions", () => {
-  it("adds no event for an ordinary answer or a lookup, while their execution stays with the reply", async () => {
+  it("adds no application event for an ordinary answer or a lookup", async () => {
     const app = await application();
     const before = feed(app);
     const lookup = await reply(app, "No saved requirements yet.", [], (o) => {
@@ -256,12 +251,6 @@ describe("decisions", () => {
       o.onActivity({ type: "end", key: "tool:1" });
     });
     expect(lookup.run.status).toBe("succeeded");
-    expect(lookup.execution.steps.map((step) => step.id)).toEqual([
-      "context",
-      "tool:1",
-      "save",
-    ]);
-    expect(lookup.execution.decisionIds).toEqual([]);
     expect(feed(app)).toEqual(before);
   });
 
@@ -277,7 +266,6 @@ describe("decisions", () => {
       ...before,
     ]);
     const previous = store.listActiveDecisions(app.id)[0];
-    expect(saved.execution.decisionIds).toEqual([previous.id]);
     const changed = await reply(app, "Updated.", [
       {
         kind: "launch-priority",
@@ -303,7 +291,7 @@ describe("decisions", () => {
     expect(store.getDecision(previous.id)?.supersededById).not.toBeNull();
   });
 
-  it("rolls back a rejected save without a success event; the failed attempt stays inspectable with its reply", async () => {
+  it("rolls back a rejected save without a success event; the failed attempt remains recorded", async () => {
     const app = await application();
     const before = feed(app);
     const rejected = await reply(
@@ -325,14 +313,6 @@ describe("decisions", () => {
     expect(rejected.run.status).toBe("failed");
     expect(store.listActiveDecisions(app.id)).toEqual([]);
     expect(feed(app)).toEqual(before);
-    expect(
-      rejected.execution.steps.find((step) => step.id === "tool:1")?.outcome,
-    ).toBe("completed");
-    expect(rejected.execution.steps.at(-1)).toMatchObject({
-      id: "save",
-      outcome: "failed",
-    });
-    expect(rejected.execution.decisionIds).toBeUndefined();
   });
 
   it("adds no event for a cancelled attempt", async () => {
@@ -347,9 +327,6 @@ describe("decisions", () => {
     runs.cancelPiRun(app.id, app.chatId, accepted.run.id);
     expect(runs.getPiRun(accepted.run.id)?.status).toBe("cancelled");
     expect(feed(app)).toEqual(before);
-    expect(
-      runs.chatRunSnapshot(app.id, app.chatId).executions[accepted.run.id],
-    ).toEqual({ steps: [], omitted: 0 });
   });
 });
 

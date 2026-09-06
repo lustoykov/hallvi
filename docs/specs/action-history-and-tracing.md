@@ -1,8 +1,8 @@
 # Action history and tracing
 
-Status: implemented in [PR #16](https://github.com/lustoykov/server-guy/pull/16). Its first slice added reply execution history and optional tracing; its 2026-09-06 follow-up applied the Application Activity correction below: reply details moved beside each Chat reply, the feed was restricted to application events, and repository-verification invalidation is recorded. Later Operations remain future scope; remaining work belongs in the [roadmap](../../ROADMAP.md#action-history-and-tracing).
+Status: implemented in [PR #16](https://github.com/lustoykov/server-guy/pull/16). The final 2026-09-06 correction keeps meaningful application Activity, ordinary Chat with recovery states, bounded local diagnostic logs, and optional trace export. It removes the earlier Reply details panel and detailed execution-history database writes. Later Operations remain future scope; remaining work belongs in the [roadmap](../../ROADMAP.md#action-history-and-tracing).
 
-Application Activity answers **what happened to this application?** Reply execution details answer **how did Server Guy produce this answer?** Keep both inspectable in their appropriate surfaces. Sharing diagnostic signals does not make every execution step an Activity Event.
+Application Activity answers **what happened to this application?** Diagnostic logs and traces help operators investigate **how Server Guy handled a request**. SQLite stores the product's authoritative state. Diagnostics support investigation and can be incomplete; they do not establish product outcomes.
 
 ## Application Activity inclusion rules
 
@@ -27,9 +27,9 @@ The review question is: **would this help someone understand how the application
 
 Choose the event's product meaning when implementing a flow. The code responsible for that flow emits it at the relevant outcome boundary; Pi may initiate the flow, but does not classify its own prose or call a generic activity-logging tool to establish what happened.
 
-For a local domain change, commit the change and its success event together. A rollback must not leave a success event. External effects require their own recorded outcomes and verification; a local transaction or a successful tool return cannot prove that a deployment or recovery succeeded. Failed consequential operations may deserve Activity even without a successful change. A failed ordinary reply stays with that reply's execution details.
+For a local domain change, commit the change and its success event together. A rollback must not leave a success event. External effects require their own recorded outcomes and verification; a local transaction or a successful tool return cannot prove that a deployment or recovery succeeded. Failed consequential operations may deserve Activity even without a successful change. A failed ordinary reply stays in Chat as a failed attempt, with diagnostic context in local logs.
 
-For each new event, specify the affected application/subject, the exact trigger and outcome, the actor/source where known, and the supporting record or evidence. The same domain change should produce the same event whether initiated through chat, a form, or a future external agent. Do not duplicate an outcome merely because several layers observe it. Group meaningful lifecycle events under their operation; retain low-level steps as supporting execution details.
+For each new event, specify the affected application/subject, the exact trigger and outcome, the actor/source where known, and the supporting record or evidence. The same domain change should produce the same event whether initiated through chat, a form, or a future external agent. Do not duplicate an outcome merely because several layers observe it. Group meaningful lifecycle events under their operation; retain low-level steps in diagnostic logs and optional traces.
 
 ### Flow inventory
 
@@ -57,125 +57,129 @@ This is an inclusion guide, not a new implementation backlog. Add events as thei
 
 ### Exclusions and scope
 
-- Greetings, ordinary answers, streamed text, model generations, tool invocations, compaction, model retries, and reply failures/cancellations belong with the Chat's execution details and optional traces.
+- Greetings, ordinary answers, streamed text, model generations, tool invocations, compaction, model retries, and reply failures/cancellations are not application Activity. Chat retains answers and reply states; local logs and optional traces retain selected diagnostic metadata.
 - Chat creation/archive belongs with Chat history, not application Activity. Rows recorded for these before the correction stay stored but are excluded from the feed.
 - Read-only lookups and unchanged background observations do not produce individual feed items. An explicit verification milestone may qualify even though it changes no external resource.
 - Installation-wide ChatGPT/model settings, GitHub account setup, tracing configuration, and routine credential refresh are not copied into every application's feed. Record an application-specific consequence, such as verification invalidation, when it occurs.
 - Removing an application is meaningful, but today's prototype removes its workspace/history. A surviving deletion record would need an installation-level history; do not add that facility solely for this correction.
 - Validation errors before an operation is accepted stay with the form/chat. Record a consequential accepted operation's failure at its own boundary, with an honest outcome and evidence.
 
-## Reply execution and tracing
+## Product records and diagnostics
 
-Keep the existing Pi Run identity and inspectable local execution history. Trace the path from accepting a chat request through Pi execution, domain validation, database commit, and rebuilding the Operator View. Pi remains the direct runtime. Local diagnostic storage is not the inclusion rule for the application feed.
-
-The [Pi adapter](../../src/server/pi.ts) reopens each Chat's native JSONL history. Its SDK emits response, tool, compaction and retry lifecycle events. The worker records these alongside its own context and save boundaries. SDK response timings are not individual HTTP request timings; preparation and first-byte delays can lie outside response events. Pi events alone cannot prove a domain change was committed.
-
-For “My hosting budget is at most €30/month,” the reply's expanded execution details explain:
-
-```text
-Chat execution
-├─ Request accepted → queued → worker started
-├─ Load current app context
-├─ Prepare native conversation and configured model
-├─ Pi execution
-│  ├─ Model response → looks up saved requirements and requests propose_decision
-│  ├─ propose_decision → proposal collected
-│  └─ Model response → final answer
-├─ Server Guy validates the proposed Decision
-├─ Database commit → messages, Decision, and Activity Event saved
-└─ Application Activity → requirement-saved event, if committed
+```mermaid
+flowchart LR
+    E[Pi and Server Guy execution] --> D[SQLite: Runs and messages]
+    D --> C[Chat: answer and recovery state]
+    E --> O[Committed Decisions and meaningful outcomes]
+    O --> A[SQLite: application Activity]
+    A --> U[Inspector: Activity]
+    E --> G[Bounded local NDJSON logs]
+    E --> T[Optional OpenTelemetry spans]
+    T --> L[Langfuse or another OTLP trace backend]
 ```
 
-The existing [domain path](../../src/server/phase-one.ts) can reject a proposal after the Pi tool succeeds, for example when a replacement Decision is already superseded. Reply execution details show both outcomes: proposal collected; change rejected; no Decision saved. This does not create a requirement-saved Activity event.
+- **SQLite owns product state.** `pi_runs` retains accepted requests, lifecycle status/timestamps, retry lineage and safe user-facing failures. Messages, Decisions and meaningful Activity remain durable. The UI reconstructs these after refresh or reconnect. There is no detailed execution-history table in the current schema and no second coordinator or diagnostic Run status.
+- **Pi's native history supports conversation continuity.** The existing per-Chat JSONL history is separate from diagnostic logs. It contains conversation/tool content and follows its existing privacy and lifecycle rules. Do not treat it as metadata-only telemetry or reconstruct it from diagnostic logs.
+- **Local logs support debugging.** Fixed lifecycle and step events carry Run, Chat and application IDs, timings, outcomes, allowlisted model/usage metadata and safe failure categories. They work with tracing disabled and can be read with a text editor, `jq`, or an agent. They are bounded operational records, not a complete searchable product timeline.
+- **Optional traces connect timed steps.** The worker exports OpenTelemetry spans directly to Langfuse or a configured OTLP/HTTP trace endpoint. Trace/span IDs correlate with local logs when available. No account, Collector, or separate service is needed for ordinary self-hosted use.
+
+For “My hosting budget is at most €30/month,” Pi may propose a Decision before Server Guy validates it. The proposal step succeeding does not establish that the requirement was saved. Only the database transaction can commit the reply, Decision and requirement-saved Activity together. The successful save diagnostic is emitted **after the outer transaction commits**. If validation or commit fails, the product records the failed attempt separately and no requirement-saved event remains.
+
+The [Pi adapter](../../src/server/pi.ts) emits response, tool, compaction and retry signals. The worker adds context and save boundaries. SDK response timings are not individual HTTP request timings; preparation and first-byte delays can lie outside response events. This instrumentation exposes selected execution evidence, not private model reasoning.
 
 ## User experience
 
 | Surface | What the user sees |
 | --- | --- |
-| Application Activity | Qualifying domain events with subject, timestamp, outcome, and supporting record/evidence links. Meaningful operation lifecycle events stay grouped. |
-| Chat reply details | A collapsed **Reply details** row under each Server Guy reply, summarizing the outcome, work time and step count; expanded, it shows queue versus work time, ordered steps with outcomes, retry lineage, links to requirements saved by that reply, and nested **Technical details**. An unsuccessful attempt states that nothing was saved and that any draft above it is unfinished text. |
-| Evidence and optional Langfuse | Source-attributed operational evidence and selected diagnostic metadata. Reply telemetry omits prompts, answers, raw tool payloads, and errors. Offer **Open in Langfuse** only when configured; access still requires project authorization. |
+| Chat | Answers, queued/working state, failed/cancelled/interrupted attempts, unfinished drafts and retry where allowed. No Reply details panel or new diagnostics viewer. Archived Chats remain readable and read-only. |
+| Application Activity | Meaningful domain outcomes with subject, timestamp and supporting evidence. An ordinary answer, lookup, cancellation or retry adds no event. |
+| Record and Evidence | Current saved requirements and source-attributed verification evidence. Users can understand application outcomes without Langfuse. |
+| Local diagnostic files | Operator/developer investigation using correlated, bounded metadata. Reading files does not require a service. |
+| Optional trace backend | Deeper model/tool timing and usage inspection for developers/operators. Export settings and credentials stay server-side. |
 
-Keep technical output collapsed by default and preserve the user's selected Inspector tab. Follow the existing [technical detail renderers](../user-journeys/01-application-launch.md#technical-detail-renderers). Activity supplies meaningful historical facts; Evidence supplies technical depth. Model-authored explanations remain distinguishable from recorded outcomes. This view exposes execution evidence, not private model reasoning.
-
-While a reply is running, show its last recorded step and state with that reply. After reload or reconnect, reconstruct local history from SQLite. A retry must remain distinguishable and linked to the preceding attempt. Missing or truncated telemetry is labeled as such; it must not turn an unknown outcome into success or add an unrelated application Activity item.
-
-## Records and telemetry
-
-```mermaid
-flowchart LR
-    E[Pi and Server Guy execution] --> D[SQLite: Pi Runs and reply execution history]
-    D --> C[Chat: reply execution details]
-    E --> O[Domain outcome and evidence]
-    O --> A[Qualifying Activity Event]
-    A --> U[Inspector: application Activity]
-    E --> T[OpenTelemetry spans]
-    T --> L[Langfuse trace explorer]
-    E --> G[Structured logs with run and trace IDs]
-    C -. Authorized trace link .-> L
-```
-
-- **SQLite owns durable local records.** Keep application Activity Events distinct in meaning and presentation from reply execution diagnostics. Reuse Pi Run identity for diagnostic correlation; do not introduce another execution coordinator or a second Run status. Keep accumulated message revisions; do not persist one Activity Event per token.
-- **OpenTelemetry connects timed steps.** Carry application, Chat, and Pi Run IDs through worker execution, model/tool steps, validation, and commit. Correlate spans and logs with trace/span IDs. A trace ID is diagnostic identity, not a replacement for the durable run or Operation ID.
-- **Langfuse provides deeper inspection.** Export nested model/tool spans and explicitly instrument domain steps. Capture provider/model and reported usage; label calculated cost as an estimate, not a ChatGPT subscription charge. Missing usage or cost stays unavailable rather than zero.
-- **Sentry covers application errors at external release.** Correlate errors with the same run context when available. It is not required for this first local slice.
-
-Save successful domain changes and their Activity Events atomically. If that transaction rolls back, persist the run failure/rejection separately so the failed attempt remains inspectable. On worker restart, use the durable-run interruption policy; do not infer completion from an unfinished span or repeat a possible effect to fill a trace gap.
-
-Telemetry export is asynchronous and optional. An unavailable exporter must not fail or repeat an otherwise completed action, erase local history, or block local inspection. Sampling and retention may reduce diagnostic detail; durable product history must not depend on them. Do not make a Langfuse account, a collector service, or a new dashboard a prerequisite for local use.
-
-Apply payload selection before local diagnostic storage or export. Exclude credentials, OAuth codes, authorization headers, prompts, answers, tool arguments/results and raw errors entirely. Existing user-facing records and native histories are unchanged by this telemetry policy. Scope history reads through the existing application/Chat checks. This remains a local single-user prototype, not a new multi-tenant authorization layer. Keep Langfuse credentials server-side and never create public trace links automatically.
+Preserve the selected Inspector tab during updates. Model-authored explanations remain distinguishable from recorded outcomes. Keep cancellation and retry attached to the attempt; do not replay possible external effects merely to complete a trace.
 
 ## Configuration and data boundaries
 
-Reply execution history has separate storage: `reply_execution_history` holds one bounded JSON `detail` payload per `run_id`, with a foreign key to `pi_runs` and deletion cascading from the Run. `run-history.ts` reads it into the existing Chat snapshot. Application domain events remain in `activity_events`. Verification invalidation is recorded by `withGithubConnectionTransition` around the GitHub setup operations (reuse, device sign-in, disconnect): it compares the saved connection ID before and after the operation and, for each application whose latest repository check passed under the previous ID, records one event whose ID is derived from that Observation, so retried or concurrent requests, reads and refreshes cannot add a second item. Token renewal keeps the ID and records nothing.
+### Local logs
 
-The existing `npm run db:push` command supports one explicit in-place upgrade, prototype schema **6 → 7**. Stop the app and worker first. `prepare-db.mjs` accepts version 6, Drizzle adds the dedicated table, then `stamp-db.mjs` copies every legacy `chat-execution` payload byte-for-byte, deletes only those source rows, and stamps version 7 in one transaction. Reopening and repeating the command are safe. Copy conflicts, missing parent Runs or delete failures roll back the data move and version stamp; the new empty table may remain from Drizzle, but source diagnostics remain available for repair and retry. Other old prototype versions are still rejected. No migration runs implicitly on application or worker startup.
+Logs are enabled independently of tracing. By default they live beside the configured database in `diagnostics/replies.ndjson`: for the default database, `.server-guy/diagnostics/replies.ndjson`. Set `SERVER_GUY_LOG_DIR` to use another directory. Each file rotates at 1 MiB and retains three archives (`replies.ndjson.1` through `.3`), approximately 4 MiB total. Keep the directory private and writable by the Server Guy process. Restart the app and worker after changing environment settings.
 
-Legacy `chat-created` and `chat-archived` rows remain stored and excluded from the application feed. Migration does not change pending Runs: the existing worker startup policy marks running attempts interrupted and closes their saved unfinished steps; queued attempts remain queued. Missing diagnostics are never reconstructed from messages or fabricated.
+```dotenv
+# Optional: otherwise use diagnostics/ beside SERVER_GUY_DB_PATH.
+SERVER_GUY_LOG_DIR=/path/to/private/server-guy-logs
+# Independent of local logging; disabled by default.
+SERVER_GUY_TRACING=0
+```
+
+Search by the durable Run ID, for example:
+
+```sh
+jq 'select(.runId == "your-run-id")' .server-guy/diagnostics/replies.ndjson*
+```
+
+Rotation and crashes can remove events or leave a start with no end. A missing end means diagnostics are incomplete, not that the operation failed or had no effects. Consult authoritative Runs, messages, Decisions and Activity before retrying consequential work. Deleting an application does not erase its entries from shared rotated diagnostic files; retention removes those naturally. Native content-bearing conversation history remains separate.
+
+At most 128 steps per Run are recorded; further steps are counted as omitted. No per-token events or unbounded error blobs. Selection happens before writing or export: omit prompts, answers, tool arguments/results, credentials, OAuth codes, authorization headers, private reasoning and unrestricted error text. Safe failures expose bounded categories and numeric HTTP status codes where available, not arbitrary provider payloads. Errors without recognized structured status or codes remain `unknown`. Missing usage remains absent rather than zero.
+
+Local write, rotation and export failures are best effort and cannot fail a reply, roll back a committed Decision, add Activity or trigger a retry. Logs may be unavailable when the configured directory cannot be written. The logger and exporter are not durability guarantees; product state does not depend on them.
+
+### Optional export
+
+For Langfuse, use ignored `.env.local` settings:
 
 ```dotenv
 SERVER_GUY_TRACING=1
 LANGFUSE_PUBLIC_KEY=your-project-public-key
 LANGFUSE_SECRET_KEY=your-project-secret-key
 LANGFUSE_BASE_URL=https://cloud.langfuse.com
-LANGFUSE_PROJECT_ID=your-project-id
 ```
 
-Keep these in `.env.local`, never Git. Use your project's region or self-hosted HTTPS base URL. Restart the worker after changing configuration. Set `SERVER_GUY_TRACING=0` to stop future exports; this does not delete existing Cloud traces or local history. The project ID enables authenticated deep links; it is not an access credential.
+Use your project's region or self-hosted HTTPS base URL. Alternatively, configure a full OTLP/HTTP trace endpoint:
 
-- `pi_runs` remains authoritative for reply status, lifecycle timestamps and retry lineage. The dedicated history table stores only the existing diagnostic payload, including step timings, omitted-step count, saved Decision links and optional trace references. Historical Runs with no execution history remain without it; the Chat shows the existing unavailable-details fallback.
-- At most 128 steps are retained per reply. Further steps are counted as omitted. Each step has a fixed label, timing, outcome and an allowlisted set of numeric usage fields/model identifiers. No token-level activity rows or unbounded error blobs.
-- Requirement links and the completed save step are written in the same transaction as the reply. Failure/rejection history is saved separately after rollback. Cancellation/restart closes unfinished steps as incomplete, never successful. Crashes can lose diagnostic spans without changing these durable facts.
-- The OTel provider is private to the worker, with explicit parent contexts and no global HTTP/SDK auto-instrumentation. Only the `server-guy` scope is exported. Local history, spans and the completion log share Run/trace/span IDs. The worker batches export and flushes on graceful shutdown; the live-eval runner also flushes before cleanup.
-- Langfuse may display API-list-price estimates automatically. They are **not ChatGPT subscription charges**. Missing token usage stays absent, not zero. Payload omission is deliberate even if Langfuse suggests adding input/output.
-- Live evals require their existing separate opt-in. Browser fixtures force tracing off and strip inherited telemetry variables; ordinary deterministic tests never need Cloud or provider credentials.
+```dotenv
+SERVER_GUY_TRACING=1
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://your-backend.example/v1/traces
+# Optional, standard OTLP headers; never commit actual credentials.
+OTEL_EXPORTER_OTLP_TRACES_HEADERS=authorization=your-encoded-value
+```
 
-The product does not claim that opening the browser caused an exported span or that a trace was delivered merely because a link exists. Export is best-effort; a trace ID is shown only when export is enabled. Reply details reach the Chat through the same saved-state stream as messages and Runs (one snapshot with messages, Runs, execution histories and application Activity), so they survive refresh and reconnects, and the Inspector preserves the selected tab during updates.
+An explicit trace endpoint takes precedence over Langfuse settings. Keep keys server-side and restart the worker after changes. `SERVER_GUY_TRACING=0` stops future exports without deleting local logs or already-exported traces. The OTel provider is private to the worker; it uses explicit parent contexts and no global HTTP/SDK auto-instrumentation. The worker batches export and flushes on graceful shutdown. A trace ID does not prove delivery.
+
+OpenTelemetry logs and traces are different signals. These local files are ordinary structured NDJSON, **not an OTLP trace archive**; Langfuse does not automatically import them as historical traces. Send spans through the optional exporter for trace inspection. Langfuse may display API-price estimates, which are not ChatGPT subscription charges. Payload omission is deliberate even if a backend suggests adding input/output.
+
+Browser fixtures disable export and isolate diagnostic files alongside disposable databases. Live model evals retain their separate explicit opt-in.
+
+### Database compatibility
+
+The current schema remains prototype version **6**. Existing v6 databases need no diagnostic migration. Historical `chat-execution`, `chat-created` and `chat-archived` rows in `activity_events` remain stored but are excluded from the feed.
+
+An earlier unmerged revision of PR #16 introduced version 7 and `reply_execution_history`. This implementation can open those databases for authoritative product records while leaving their old diagnostic table untouched and unused. `npm run db:push` refuses version 7 to prevent Drizzle dropping that historical data. Do not reset a database merely for this change. No startup migration, data copying or reconstruction runs. Older prototype versions still require the existing explicit setup procedure.
+
+Verification invalidation remains in `withGithubConnectionTransition`: changing or disconnecting a saved connection records one event per prior successful repository Observation. Token renewal keeps the connection ID and emits nothing; refresh cannot duplicate the event. Pending Runs retain their existing recovery policy: queued work stays queued and a restarted worker marks in-flight attempts interrupted.
 
 ## Acceptance scenarios
 
-Verified on 2026-09-06 with deterministic domain tests (`tests/application/integration/activity-events.test.ts`, `run-history.test.ts`, `pi-decisions.test.ts`, `pi-crash-boundaries.test.ts`), component tests for the reply details and the feed, and the `activity-history` desktop journey. The earlier per-reply Activity tests were replaced, not kept as evidence.
+Use disposable deterministic fixtures for the following boundaries. Current run results belong in the [acceptance guide](../testing/phase-one-acceptance.md#latest-verification).
 
 | Scenario | Required evidence |
 | --- | --- |
-| Ordinary reply or requirement lookup | Reply execution remains inspectable in Chat; no application Activity item is added. |
-| Successful Decision | One saved/changed event per committed Decision change; a replacement has one old-to-new event, with no extra per-reply item. Refresh preserves history. |
-| Tool succeeds, domain rejects | Chat execution shows completed proposal and rejected save; no saved-Decision Activity claim or partial domain write. |
-| Reply timeout, cancellation, or worker crash | Terminal/interrupted state survives reload with that reply; incomplete spans do not appear completed or create application Activity. |
-| Browser disconnect and reply retry | Reconnection reconstructs history without duplicate rows; retry history remains attributable to its Chat attempt. |
-| Application creation and repository verification | Existing meaningful events remain; explicit rechecks preserve their result and evidence. |
-| GitHub connection changes or disconnects | Affected prior verification is recorded as invalidated once; no unsupported access-loss claim. Re-rendering does not duplicate the event. |
-| Chat creation/archive | Chat administration remains visible in its own context and adds no application Activity item. |
-| Export disabled or unavailable | Local execution and inspection still work; absent diagnostic detail is explicit. |
-| Sensitive payload | Synthetic secrets never appear in stored diagnostic payloads, exported spans/logs, or the Inspector. |
-
-Verify the history with deterministic Pi/domain fixtures, then use one explicitly enabled real-Pi run to confirm actual model/tool spans reach the configured Langfuse project. A working exporter alone is not acceptance of the user-facing history.
+| Ordinary answer or lookup | Chat shows the answer without Reply details; no application Activity item. |
+| Saved/replaced Decision | One event per committed change; replacement records old → new once; reload preserves it. |
+| Tool succeeds, domain rejects or commit rolls back | No partial domain write, saved Activity claim or successful-save diagnostic. Failed attempt remains in product state. |
+| Cancel, timeout or restart | Durable terminal/interrupted state and safe recovery; unfinished diagnostics do not claim success. |
+| Browser reconnect/retry | No duplicate user message or Activity; retry retains its original Run lineage. |
+| GitHub connection transition | Invalidation once per prior Observation, no unobserved access-loss claim. |
+| Chat creation/archive | No Activity event; archived transcript remains readable and read-only. |
+| Tracing disabled | Local diagnostic events still exist; ordinary product behavior works. |
+| Unwritable logs, failed rotation or failed exporter | Product outcomes are unchanged and no automatic retry is introduced. |
+| Retention and privacy | File/step bounds hold; synthetic private content never enters logs or spans. |
+| Schema compatibility | v6 is unchanged; old v7 product records remain usable and diagnostic rows preserved. |
 
 ## Later scope and references
 
-As Operations are implemented, extend tracing through policy, approval, provider request, receipt, and independent verification. Success still comes from durable records and fresh evidence. Managed-application infrastructure logs, general analytics dashboards, and on-demand dashboard generation are outside this first slice.
+Extend correlation through policy, approval, provider requests, receipts and independent verification as those Operations are implemented. Do not add a local diagnostics viewer, analytics database, Collector or monitoring service without a concrete product requirement. Managed-application infrastructure logs are outside this first slice. Sentry remains a later external-release concern.
 
 - [Domain vocabulary](../../CONTEXT.md) and [observability learning target](../learning/stack-with-server-guy.md#observability-learning-target).
-- [OpenTelemetry traces](https://opentelemetry.io/docs/concepts/signals/traces/).
-- [Langfuse instrumentation](https://langfuse.com/docs/observability/sdk/instrumentation) and [usage/cost tracking](https://langfuse.com/docs/observability/features/token-and-cost-tracking).
+- [OpenTelemetry signals](https://opentelemetry.io/docs/concepts/signals/).
+- [Langfuse OpenTelemetry integration](https://langfuse.com/integrations/native/opentelemetry).

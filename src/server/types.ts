@@ -143,33 +143,13 @@ export interface ActivityEvent {
   createdAt: string;
 }
 
-export interface ExecutionStep {
-  id: string;
-  label: string;
-  startedAt: string;
-  finishedAt?: string;
-  outcome: "running" | "completed" | "failed" | "incomplete";
-  metadata: Record<string, string | number>;
-  spanId?: string;
-}
-
-export interface ExecutionHistory {
-  steps: ExecutionStep[];
-  omitted: number;
-  traceId?: string;
-  traceUrl?: string;
-  exportEnabled?: boolean;
-  decisionIds?: string[];
-}
-
 /**
  * The authoritative Chat state delivered over SSE and on demand: messages,
- * their Pi Runs, each Run's execution history, and the application's Activity.
+ * their Pi Runs and the application's Activity.
  */
 export interface ChatRunSnapshot {
   messages: ChatMessage[];
   runs: PiRun[];
-  executions: Record<string, ExecutionHistory>;
   activity: ActivityEvent[];
 }
 

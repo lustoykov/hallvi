@@ -279,16 +279,11 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
       expect(database.listActiveDecisions(applicationId)).toEqual(
         decisionsBefore,
       );
-      // A restart never adds or removes application events; the attempt's
-      // execution history closes without any step left "running".
+      // Startup preserves domain Activity and saved native conversation.
       expect(database.listActivity(workspaceId)).toEqual(activityBefore);
-      expect(
-        runs
-          .chatRunSnapshot(applicationId, chatId)
-          .executions[accepted.run.id].steps.some(
-            (step) => step.outcome === "running",
-          ),
-      ).toBe(false);
+      expect(runs.chatRunSnapshot(applicationId, chatId)).not.toHaveProperty(
+        "executions",
+      );
       expect(nativeText()).toBe(before);
       const next = runs.sendChatMessage(
         applicationId,

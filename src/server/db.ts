@@ -15,7 +15,6 @@ import {
   phaseWorkspaces,
   piRuns,
   chatSummaries,
-  replyExecutionHistory,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type {
@@ -38,7 +37,6 @@ const schema = {
   phaseWorkspaces,
   piRuns,
   chatSummaries,
-  replyExecutionHistory,
 };
 type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -92,9 +90,11 @@ function assertCurrentSchema(
   if (!initialized) {
     throw new Error(`${databasePath} is not initialized. Run npm run db:push.`);
   }
-  if (version !== schemaVersion.version) {
+  // v7 was the short-lived history-table branch; core records are identical.
+  // Keep its table/version intact; db:push refuses destructive drift.
+  if (version !== schemaVersion.version && version !== 7) {
     throw new Error(
-      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Only the version 6 to 7 upgrade is supported; other prototype versions require an explicit fresh database.`,
+      `${databasePath} has prototype schema version ${version}; expected ${schemaVersion.version}. Stop the app and worker, then run npm run db:push. Other prototype versions require an explicit fresh database.`,
     );
   }
 }
@@ -438,10 +438,8 @@ export function recordActivityOnce(
   );
 }
 
-// The table also stores each reply's execution history (read through
-// run-history.ts and shown with its Chat reply) and older Chat creation/archive
-// rows. Neither is an application event, so the feed excludes them without
-// deleting anything.
+// Legacy reply/Chat administration rows remain stored, but are not domain
+// Activity. New rich diagnostics go only to local logs and optional traces.
 const EXCLUDED_ACTIVITY_KINDS = [
   "chat-execution",
   "chat-created",
@@ -462,6 +460,32 @@ export function listActivity(workspaceId: string): ActivityEvent[] {
     .all();
 }
 
-export function withTransaction<T>(work: () => T): T {
-  return db().transaction(() => work(), { behavior: "immediate" });
+let committedCallbacks: (() => void)[] | undefined;
+
+// Diagnostic callbacks wait for the outermost commit. Nested rollback discards
+// only its callbacks; a later outer rollback discards all queued claims.
+export function withTransaction<T>(
+  work: () => T,
+  onCommit?: (value: T) => void,
+): T {
+  const parent = committedCallbacks;
+  const callbacks: (() => void)[] = [];
+  committedCallbacks = callbacks;
+  try {
+    const result = db().transaction(() => work(), { behavior: "immediate" });
+    committedCallbacks = parent;
+    if (onCommit) callbacks.push(() => onCommit(result));
+    if (parent) parent.push(...callbacks);
+    else
+      for (const callback of callbacks) {
+        try {
+          callback();
+        } catch {
+          /* Diagnostics never alter committed state. */
+        }
+      }
+    return result;
+  } finally {
+    committedCallbacks = parent;
+  }
 }

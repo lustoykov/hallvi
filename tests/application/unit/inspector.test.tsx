@@ -104,7 +104,8 @@ describe("application Activity", () => {
     expect(html).toContain('class="sg-event-dot attention"');
     expect(html).toContain('class="sg-event-dot passed"');
     expect(html).toContain('class="sg-event-dot "');
-    expect(html).toContain("open its details in Chat");
+    expect(html).toContain("What happened to this application");
+    expect(html).not.toContain("open its details in Chat");
     expect(html).not.toContain("Reply details");
     expect(html).not.toContain("Technical details");
     expect(html).not.toContain("Assistant reply");

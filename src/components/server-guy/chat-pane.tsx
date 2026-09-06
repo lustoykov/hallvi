@@ -23,14 +23,12 @@ import {
 import type {
   Chat,
   ChatMessage,
-  ExecutionHistory,
   PhaseOneOperatorView,
   PiRun,
 } from "@/server/types";
 
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
-import { ReplyExecution } from "./reply-execution";
 
 const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   completed: "Saved",
@@ -55,7 +53,6 @@ export function ChatPane({
   onSend,
   onArchive,
   runs,
-  executions,
   reconnecting,
   onRunAction,
   onNewChat,
@@ -71,7 +68,6 @@ export function ChatPane({
   onSend: () => void;
   onArchive: () => void;
   runs: PiRun[];
-  executions: Record<string, ExecutionHistory>;
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
   onNewChat: () => void;
@@ -239,12 +235,6 @@ export function ChatPane({
                     </MessageResponse>
                   )}
                 </MessageContent>
-                {/* How this reply was produced stays with the reply, collapsed;
-                    the application's Activity feed records only domain
-                    outcomes. */}
-                {run && (
-                  <ReplyExecution execution={executions[run.id]} run={run} />
-                )}
               </Message>
             );
           })}

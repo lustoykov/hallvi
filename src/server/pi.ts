@@ -10,9 +10,20 @@ import {
 } from "./pi-decisions";
 import { openNativeChatSession } from "./pi-sessions";
 import type { PiDecision, PiRun, PiTurnResult } from "./types";
-import type { ActivitySignal } from "./run-history";
+import {
+  diagnosticFailure,
+  type DiagnosticFailure,
+  type ExecutionSignal,
+} from "./diagnostics";
 
-export class PiUnavailableError extends Error {}
+export class PiUnavailableError extends Error {
+  constructor(
+    message: string,
+    public readonly diagnostic: DiagnosticFailure = { category: "unknown" },
+  ) {
+    super(message);
+  }
+}
 
 // Stable across Runs: changing facts belong in native messages or tool results,
 // never in a rewritten instruction prefix.
@@ -71,7 +82,7 @@ export interface PiExecutionOptions {
   signal?: AbortSignal;
   onText?: (text: string) => void;
   onModelCall?: () => void;
-  onActivity?: (event: ActivitySignal) => void;
+  onActivity?: (event: ExecutionSignal) => void;
 }
 
 export async function askPi(
@@ -319,7 +330,10 @@ export async function askPi(
     };
   } catch (error) {
     if (options.signal?.aborted) throw error;
-    throw new PiUnavailableError(describePiFailure(error));
+    throw new PiUnavailableError(
+      describePiFailure(error),
+      diagnosticFailure(error),
+    );
   } finally {
     if (options.signal?.aborted) abort();
     // Never release the native-file lock on a timer. The worker terminates if

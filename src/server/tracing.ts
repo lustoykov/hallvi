@@ -4,68 +4,59 @@ import {
   trace,
   type Span,
 } from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import {
   diagnosticMetadata,
-  endHistoryStep,
-  startHistoryStep,
+  logDiagnostic,
+  MAX_DIAGNOSTIC_STEPS,
   stepLabels,
-  updateRunHistory,
-  type ActivitySignal,
-} from "./run-history";
+  type ExecutionSignal,
+  type StepKind,
+} from "./diagnostics";
 import type { PiRun } from "./types";
 
 let provider: NodeTracerProvider | undefined;
 
-export function langfuseTraceUrl(traceId: string) {
-  if (process.env.SERVER_GUY_TRACING !== "1") return undefined;
-  const project = process.env.LANGFUSE_PROJECT_ID;
-  if (
-    !project ||
-    !/^[a-zA-Z0-9_-]+$/.test(project) ||
-    !/^[a-f0-9]{32}$/.test(traceId)
-  )
-    return undefined;
-  try {
-    const base = new URL(
-      process.env.LANGFUSE_BASE_URL ?? "https://cloud.langfuse.com",
-    );
-    if (
-      base.protocol !== "https:" ||
-      base.username ||
-      base.password ||
-      base.search ||
-      base.hash
-    )
-      return undefined;
-    return `${base.origin}/project/${project}/traces/${traceId}`;
-  } catch {
-    return undefined;
-  }
-}
-
 function tracer() {
   if (!provider) {
+    const endpoint =
+      process.env.SERVER_GUY_TRACING === "1"
+        ? process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+        : undefined;
     const enabled =
       process.env.SERVER_GUY_TRACING === "1" &&
       process.env.LANGFUSE_PUBLIC_KEY &&
       process.env.LANGFUSE_SECRET_KEY;
     provider = new NodeTracerProvider({
       resource: resourceFromAttributes({ "service.name": "server-guy" }),
-      spanProcessors: enabled
+      spanProcessors: endpoint
         ? [
-            new LangfuseSpanProcessor({
-              exportMode: "batched",
-              timeout: 3,
-              flushInterval: 2,
-              mediaUploadEnabled: false,
-              shouldExportSpan: ({ otelSpan }) =>
-                otelSpan.instrumentationScope.name === "server-guy",
-            }),
+            new BatchSpanProcessor(
+              new OTLPTraceExporter({ url: endpoint, timeoutMillis: 3000 }),
+              {
+                maxQueueSize: 512,
+                maxExportBatchSize: 128,
+                scheduledDelayMillis: 2000,
+                exportTimeoutMillis: 3000,
+              },
+            ),
           ]
-        : [],
+        : enabled
+          ? [
+              new LangfuseSpanProcessor({
+                exportMode: "batched",
+                timeout: 3,
+                flushInterval: 2,
+                mediaUploadEnabled: false,
+                shouldExportSpan: ({ otelSpan }) =>
+                  otelSpan.instrumentationScope.name === "server-guy",
+              }),
+            ]
+          : [],
     });
   }
   // Explicit parent contexts: no global provider, auto-instrumentation, or
@@ -83,132 +74,159 @@ function optionalTelemetry<T>(work: () => T): T | undefined {
 
 export function beginRunTrace(run: PiRun) {
   const root = optionalTelemetry(() =>
-    tracer().startSpan(
-      "Assistant reply",
-      {
-        startTime: new Date(run.createdAt),
-        attributes: {
-          "server_guy.run.id": run.id,
-          "server_guy.application.id": run.applicationId,
-          "langfuse.session.id": run.chatId,
-          "server_guy.retry_of": run.retryOfId ?? "",
-          "langfuse.trace.name": "Server Guy reply",
-          "server_guy.payload_policy": "Content omitted; metadata only",
-          "server_guy.cost_basis":
-            "Langfuse API price estimates are not ChatGPT subscription charges",
-        },
-      },
-      ROOT_CONTEXT,
-    ),
-  );
-  const traceId = root?.spanContext().traceId;
-  const parent = root ? trace.setSpan(ROOT_CONTEXT, root) : ROOT_CONTEXT;
-  if (traceId)
-    updateRunHistory(run.id, (history) => {
-      history.traceId = traceId;
-      history.exportEnabled =
-        process.env.SERVER_GUY_TRACING === "1" &&
-        !!process.env.LANGFUSE_PUBLIC_KEY &&
-        !!process.env.LANGFUSE_SECRET_KEY;
-      history.traceUrl = history.exportEnabled
-        ? langfuseTraceUrl(traceId)
-        : undefined;
-    });
-  optionalTelemetry(() => {
-    const queue = tracer().startSpan(
-      "Wait for worker",
-      { startTime: new Date(run.createdAt) },
-      parent,
-    );
-    queue.end(new Date(run.startedAt ?? run.createdAt));
-  });
-  const active = new Map<string, Span>();
-  return {
-    signal(event: ActivitySignal) {
-      if (event.type === "start") {
-        if (active.has(event.key)) return;
-        // Bound local storage and exported spans together.
-        if (!startHistoryStep(run.id, event.key, event.kind)) return;
-        const span = optionalTelemetry(() =>
-          tracer().startSpan(
-            stepLabels[event.kind],
-            {
-              attributes: {
-                "langfuse.observation.type":
-                  event.kind === "model"
-                    ? "generation"
-                    : event.kind === "search_decisions" ||
-                        event.kind === "propose_decision"
-                      ? "tool"
-                      : "span",
-              },
+    process.env.SERVER_GUY_TRACING === "1"
+      ? tracer().startSpan(
+          "Assistant reply",
+          {
+            startTime: new Date(run.createdAt),
+            attributes: {
+              "server_guy.run.id": run.id,
+              "server_guy.application.id": run.applicationId,
+              "langfuse.session.id": run.chatId,
+              "server_guy.retry_of": run.retryOfId ?? "",
+              "langfuse.trace.name": "Server Guy reply",
+              "server_guy.payload_policy": "Content omitted; metadata only",
+              "server_guy.cost_basis":
+                "API price estimates are not subscription charges",
             },
-            parent,
-          ),
-        );
-        if (span) {
-          active.set(event.key, span);
-          updateRunHistory(run.id, (history) => {
-            const step = history.steps.find((s) => s.id === event.key);
-            if (step) step.spanId = span.spanContext().spanId;
+          },
+          ROOT_CONTEXT,
+        )
+      : undefined,
+  );
+  const traceId = optionalTelemetry(() => root?.spanContext().traceId);
+  const parent =
+    optionalTelemetry(() =>
+      root ? trace.setSpan(ROOT_CONTEXT, root) : ROOT_CONTEXT,
+    ) ?? ROOT_CONTEXT;
+  logDiagnostic("execution.started", run, {
+    traceId,
+    spanId: optionalTelemetry(() => root?.spanContext().spanId),
+    durationMs:
+      Date.parse(run.startedAt ?? run.createdAt) - Date.parse(run.createdAt),
+  });
+  if (root)
+    optionalTelemetry(() => {
+      const queue = tracer().startSpan(
+        "Wait for worker",
+        { startTime: new Date(run.createdAt) },
+        parent,
+      );
+      queue.end(new Date(run.startedAt ?? run.createdAt));
+    });
+  const active = new Map<
+    string,
+    { span?: Span; kind: StepKind; started: number }
+  >();
+  const seen = new Set<string>();
+  let omitted = 0;
+  let finished = false;
+  const closeStep = (
+    key: string,
+    outcome: "completed" | "failed" | "incomplete",
+    input?: Record<string, unknown>,
+  ) => {
+    const step = active.get(key);
+    if (!step) return;
+    active.delete(key);
+    const metadata = diagnosticMetadata(input);
+    logDiagnostic("step.finished", run, {
+      step: step.kind,
+      stepId: key,
+      outcome,
+      durationMs: Date.now() - step.started,
+      traceId,
+      spanId: optionalTelemetry(() => step.span?.spanContext().spanId),
+      metadata,
+    });
+    optionalTelemetry(() => {
+      const span = step.span;
+      if (!span) return;
+      const attrs: Record<string, string | number | boolean> = {
+        "server_guy.outcome": outcome,
+      };
+      if (outcome === "incomplete") attrs["server_guy.incomplete"] = true;
+      for (const [key, value] of Object.entries(metadata))
+        attrs[`server_guy.${key}`] = value;
+      if (metadata.model) attrs["gen_ai.request.model"] = metadata.model;
+      if (metadata.provider) attrs["gen_ai.provider.name"] = metadata.provider;
+      if (typeof metadata.inputTokens === "number")
+        attrs["gen_ai.usage.input_tokens"] = metadata.inputTokens;
+      if (typeof metadata.outputTokens === "number")
+        attrs["gen_ai.usage.output_tokens"] = metadata.outputTokens;
+      span.setAttributes(attrs);
+      span.setStatus({
+        code:
+          outcome === "completed" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
+      });
+      span.end();
+    });
+  };
+  return {
+    signal(event: ExecutionSignal) {
+      optionalTelemetry(() => {
+        if (finished) return;
+        if (event.type === "start") {
+          if (seen.has(event.key)) return;
+          if (seen.size >= MAX_DIAGNOSTIC_STEPS) {
+            omitted++;
+            return;
+          }
+          seen.add(event.key);
+          const span = root
+            ? optionalTelemetry(() =>
+                tracer().startSpan(
+                  stepLabels[event.kind],
+                  {
+                    attributes: {
+                      "langfuse.observation.type":
+                        event.kind === "model"
+                          ? "generation"
+                          : event.kind === "search_decisions" ||
+                              event.kind === "propose_decision"
+                            ? "tool"
+                            : "span",
+                    },
+                  },
+                  parent,
+                ),
+              )
+            : undefined;
+          active.set(event.key, {
+            span,
+            kind: event.kind,
+            started: Date.now(),
           });
-        }
-      } else {
-        const metadata = diagnosticMetadata(event.metadata);
-        endHistoryStep(
-          run.id,
-          event.key,
-          event.failed ? "failed" : "completed",
-          metadata,
-        );
-        optionalTelemetry(() => {
-          const span = active.get(event.key);
-          if (!span) return;
-          const attrs: Record<string, string | number> = {};
-          for (const [key, value] of Object.entries(metadata))
-            attrs[`server_guy.${key}`] = value;
-          if (metadata.model) attrs["gen_ai.request.model"] = metadata.model;
-          if (metadata.provider)
-            attrs["gen_ai.provider.name"] = metadata.provider;
-          if (typeof metadata.inputTokens === "number")
-            attrs["gen_ai.usage.input_tokens"] = metadata.inputTokens;
-          if (typeof metadata.outputTokens === "number")
-            attrs["gen_ai.usage.output_tokens"] = metadata.outputTokens;
-          span.setAttributes(attrs);
-          span.setStatus({
-            code: event.failed ? SpanStatusCode.ERROR : SpanStatusCode.OK,
+          logDiagnostic("step.started", run, {
+            step: event.kind,
+            stepId: event.key,
+            traceId,
+            spanId: optionalTelemetry(() => span?.spanContext().spanId),
           });
-          span.end();
-        });
-        active.delete(event.key);
-      }
+        } else
+          closeStep(
+            event.key,
+            event.failed ? "failed" : "completed",
+            event.metadata,
+          );
+      });
     },
     finish(status: PiRun["status"]) {
+      if (finished) return;
+      finished = true;
+      for (const key of active.keys())
+        optionalTelemetry(() => closeStep(key, "incomplete"));
+      active.clear();
+      seen.clear();
+      if (omitted)
+        logDiagnostic("execution.omitted", run, { omitted, traceId });
       optionalTelemetry(() => {
-        for (const span of active.values()) {
-          span.setAttribute("server_guy.incomplete", true);
-          span.setStatus({ code: SpanStatusCode.ERROR });
-          span.end();
-        }
-        active.clear();
         root?.setAttribute("server_guy.outcome", status);
         root?.setStatus({
           code:
             status === "succeeded" ? SpanStatusCode.OK : SpanStatusCode.ERROR,
         });
         root?.end();
-        if (process.env.SERVER_GUY_TRACING === "1")
-          console.info(
-            JSON.stringify({
-              event: "reply.finished",
-              runId: run.id,
-              applicationId: run.applicationId,
-              chatId: run.chatId,
-              traceId,
-              spanId: root?.spanContext().spanId,
-              status,
-            }),
-          );
       });
     },
   };
