@@ -169,10 +169,23 @@ describe("reply details", () => {
     expect(html).not.toContain("not configured");
   });
 
-  it("renders before its execution history arrives", () => {
+  it("does not infer saved requirements or tracing configuration from missing history", () => {
+    // Older successful Runs may have saved Decisions without execution
+    // history. Missing diagnostics cannot establish a zero requirement count.
     const html = render({}, null);
     expect(html).toContain("Completed in 4.0s");
-    expect(html).toContain("No execution steps were recorded.");
-    expect(html).toContain("no requirements saved");
+    expect(html).toContain("Reply saved");
+    expect(html).toContain("Execution details unavailable for this reply.");
+    expect(html).toContain("Tracing details unavailable for this reply.");
+    expect(html).not.toContain("no requirements saved");
+    expect(html).not.toContain("No execution steps were recorded.");
+    expect(html).not.toContain("Langfuse export is not configured");
+    expect(html).not.toContain("Local history is complete");
+  });
+
+  it("reports zero saved requirements when execution history is available", () => {
+    const html = render({}, { ...completed, decisionIds: [] });
+    expect(html).toContain("Reply saved · no requirements saved");
+    expect(html).not.toContain("Execution details unavailable");
   });
 });

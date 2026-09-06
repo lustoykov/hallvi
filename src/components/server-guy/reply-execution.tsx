@@ -93,10 +93,9 @@ export function ReplyExecution({
         <p className="sg-execution-timing">{timing}</p>
         {succeeded && (
           <p className="sg-execution-result">
-            Reply saved ·{" "}
-            {savedCount
-              ? `${plural(savedCount, "requirement")} saved`
-              : "no requirements saved"}
+            Reply saved
+            {execution &&
+              ` · ${savedCount ? `${plural(savedCount, "requirement")} saved` : "no requirements saved"}`}
           </p>
         )}
         {unsuccessful && (
@@ -121,9 +120,11 @@ export function ReplyExecution({
           </ol>
         ) : (
           <p>
-            {run.status === "queued"
-              ? "Steps appear when the reply starts."
-              : "No execution steps were recorded."}
+            {!execution
+              ? "Execution details unavailable for this reply."
+              : run.status === "queued"
+                ? "Steps appear when the reply starts."
+                : "No execution steps were recorded."}
           </p>
         )}
         {execution && execution.omitted > 0 && (
@@ -187,9 +188,11 @@ export function ReplyExecution({
             </p>
           ) : (
             <p>
-              {execution?.exportEnabled
-                ? "Langfuse export is enabled. Set LANGFUSE_PROJECT_ID to enable trace links."
-                : "Langfuse export is not configured for this reply. Local history is complete without it."}
+              {!execution
+                ? "Tracing details unavailable for this reply."
+                : execution.exportEnabled
+                  ? "Langfuse export is enabled. Set LANGFUSE_PROJECT_ID to enable trace links."
+                  : "Langfuse export is not configured for this reply. Local history is complete without it."}
             </p>
           )}
         </details>
