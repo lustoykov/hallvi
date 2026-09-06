@@ -72,7 +72,7 @@ function optionalTelemetry<T>(work: () => T): T | undefined {
   }
 }
 
-export function beginRunTrace(run: PiRun) {
+export function beginRunDiagnostics(run: PiRun) {
   const root = optionalTelemetry(() =>
     process.env.SERVER_GUY_TRACING === "1"
       ? tracer().startSpan(

@@ -12,7 +12,10 @@ import {
   diagnosticLogPath,
   MAX_DIAGNOSTIC_STEPS,
 } from "../../../src/server/diagnostics";
-import { beginRunTrace, shutdownTracing } from "../../../src/server/tracing";
+import {
+  beginRunDiagnostics,
+  shutdownTracing,
+} from "../../../src/server/tracing";
 import { pushTestDatabase } from "../../test-database";
 
 const mocks = vi.hoisted(() => ({
@@ -296,13 +299,13 @@ it.each(["cancelled", "timed-out", "interrupted"] as const)(
   (status) => {
     const run = queued();
     const claimed = runs.claimNextPiRun()!;
-    const execution = beginRunTrace(claimed);
-    execution.signal({ type: "start", key: "model:1", kind: "model" });
+    const diagnostics = beginRunDiagnostics(claimed);
+    diagnostics.signal({ type: "start", key: "model:1", kind: "model" });
     if (status === "interrupted") runs.interruptRunningPiRuns();
     else runs.finishPiRun(run.id, status, "Stopped");
-    execution.finish(status);
-    execution.signal({ type: "start", key: "tool:99", kind: "tool" });
-    execution.finish(status);
+    diagnostics.finish(status);
+    diagnostics.signal({ type: "start", key: "tool:99", kind: "tool" });
+    diagnostics.finish(status);
     expect(
       logs(run.id).filter((row) => row.event === "step.finished"),
     ).toHaveLength(1);
@@ -323,13 +326,13 @@ it.each(["cancelled", "timed-out", "interrupted"] as const)(
 
 it("bounds total spans/steps, deduplicates callbacks and cleans up even without export", () => {
   const run = queued();
-  const execution = beginRunTrace(runs.claimNextPiRun()!);
+  const diagnostics = beginRunDiagnostics(runs.claimNextPiRun()!);
   for (let i = 0; i < MAX_DIAGNOSTIC_STEPS + 5; i++) {
-    execution.signal({ type: "start", key: `tool:${i}`, kind: "tool" });
-    execution.signal({ type: "end", key: `tool:${i}` });
+    diagnostics.signal({ type: "start", key: `tool:${i}`, kind: "tool" });
+    diagnostics.signal({ type: "end", key: `tool:${i}` });
   }
-  execution.signal({ type: "start", key: "tool:0", kind: "tool" });
-  execution.finish("succeeded");
+  diagnostics.signal({ type: "start", key: "tool:0", kind: "tool" });
+  diagnostics.finish("succeeded");
   expect(
     logs(run.id).filter((row) => row.event === "step.started"),
   ).toHaveLength(MAX_DIAGNOSTIC_STEPS);
