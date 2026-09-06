@@ -60,6 +60,9 @@ export function PiSetupScreen({
   const [pollError, setPollError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [logPathCopy, setLogPathCopy] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const [modelId, setModelId] = useState(initialStatus.selection.modelId);
@@ -618,6 +621,38 @@ export function PiSetupScreen({
             <X />
           </button>
         </header>
+        <h3>Diagnostic logs</h3>
+        <p>
+          Stored on the machine running Server Guy. Works without Langfuse.
+          Prompts, answers and tool payloads are omitted.
+        </p>
+        <code>{status.diagnosticLogPath}</code>
+        <button
+          className={s.textButton}
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(status.diagnosticLogPath);
+              setLogPathCopy("copied");
+            } catch {
+              setLogPathCopy("failed");
+            }
+          }}
+        >
+          {logPathCopy === "copied" ? <Check /> : <Copy />}
+          {logPathCopy === "copied" ? "Copied" : "Copy path"}
+        </button>
+        <p role="status" hidden={logPathCopy === "idle"}>
+          {logPathCopy === "failed"
+            ? "Could not copy. Select the path and copy it manually."
+            : logPathCopy === "copied"
+              ? "Log path copied."
+              : null}
+        </p>
+        <p>
+          Rotates at 1 MiB and keeps three archives. The oldest logs are
+          replaced as new events arrive.
+        </p>
         <h3>How your login is protected</h3>
         <p>
           Pi saves OAuth tokens, not your password, in a local file. New files

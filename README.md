@@ -65,7 +65,7 @@ Two surfaces answer two questions. **Activity** in an application's Inspector an
 
 Chat keeps answers, working/failed/cancelled states, unfinished drafts and retry. It has no Reply details panel. Product outcomes remain understandable through Chat, Record and Activity without a tracing service.
 
-Metadata-only diagnostic logs work by default, independently of export, at `.server-guy/diagnostics/replies.ndjson` (or `diagnostics/` beside a custom database). Files rotate at 1 MiB with three archives. `SERVER_GUY_LOG_DIR` overrides the directory. Read them locally by Run ID using a text editor, `jq`, or an agent; missing diagnostic events never establish a product outcome.
+Metadata-only diagnostic logs work by default, independently of export, at `.server-guy/diagnostics/replies.ndjson` (or `diagnostics/` beside a custom database). Files rotate at 1 MiB with three archives. `SERVER_GUY_LOG_DIR` overrides the directory. **Settings → ChatGPT & model → Storage & privacy → Diagnostic logs** shows the resolved path on the server and lets you copy it. Read them locally by Run ID using a text editor, `jq`, or an agent; missing diagnostic events never establish a product outcome.
 
 Optional OpenTelemetry trace export supports Langfuse or another OTLP/HTTP trace backend. Set `SERVER_GUY_TRACING=1` and either Langfuse project keys or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` in ignored `.env.local`, then restart the worker. See [configuration and data boundaries](docs/specs/action-history-and-tracing.md#configuration-and-data-boundaries). Local logs are not automatically importable Langfuse traces. No Collector or account is needed for local use, and diagnostic failures cannot change reply or Activity outcomes.
 

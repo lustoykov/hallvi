@@ -6,7 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -94,6 +94,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("explicit Pi adoption", () => {
+  it("reports the resolved diagnostic path without creating a log file", async () => {
+    vi.stubEnv("SERVER_GUY_DB_PATH", join(directory, "state", "app.db"));
+    vi.stubEnv("SERVER_GUY_LOG_DIR", "");
+    const expected = join(directory, "state", "diagnostics", "replies.ndjson");
+    expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
+      expected,
+    );
+    expect(existsSync(expected)).toBe(false);
+    vi.stubEnv("SERVER_GUY_LOG_DIR", "custom/logs");
+    expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
+      resolve("custom/logs/replies.ndjson"),
+    );
+    vi.stubEnv("SERVER_GUY_LOG_DIR", join(directory, "custom logs"));
+    expect((await getPiSetupStatus(sdkLoader)).diagnosticLogPath).toBe(
+      join(directory, "custom logs", "replies.ndjson"),
+    );
+  });
   it.each(["shared", "separate"] as const)(
     "disconnects %s setup without deleting credentials or automatically reusing them",
     async (mode) => {

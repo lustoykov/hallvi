@@ -30,6 +30,7 @@ const initialStatus: PiSetupStatus = {
     },
   ],
   separateAuthPath: "/server-guy/pi-auth.json",
+  diagnosticLogPath: "/custom/logs/replies.ndjson",
   runtime: {
     label: "Bundled Pi SDK",
     detail: "No separate installation required.",
@@ -66,6 +67,11 @@ describe("account-first setup and progressive disclosure", () => {
     expect(defaultView).not.toContain(initialStatus.separateAuthPath);
     expect(defaultView).not.toContain("Bundled Pi SDK");
     expect(html).toContain("Storage &amp; privacy");
+    expect(html).toContain("Diagnostic logs");
+    expect(html).toContain(initialStatus.diagnosticLogPath);
+    expect(defaultView).not.toContain(initialStatus.diagnosticLogPath);
+    expect(html).toContain("Copy path");
+    expect(html).toContain("Works without Langfuse");
     expect(html).toContain("tokens are not encrypted");
     expect(html).toContain(
       "Other software running as that same user can read them",
