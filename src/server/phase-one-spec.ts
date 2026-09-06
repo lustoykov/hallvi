@@ -168,6 +168,25 @@ function repositoryStatus(repository: Observation | null): GateStatus {
 }
 
 /**
+ * A repository Observation supports the current check only when it was made
+ * with the current GitHub connection. The gate evaluation and the status
+ * projection share this one predicate; neither keeps a second evaluator.
+ */
+export function observationMatchesConnection(
+  observation: Observation | null,
+  githubConnectionId: string | null,
+) {
+  const raw = observation?.raw;
+  return Boolean(
+    githubConnectionId &&
+    raw &&
+    typeof raw === "object" &&
+    "connectionId" in raw &&
+    raw.connectionId === githubConnectionId,
+  );
+}
+
+/**
  * Evaluates the Phase 1 Exit Gate from current records. Gate results are
  * projections:
  * they are never stored and they never fall back to an older passing
@@ -178,13 +197,9 @@ export function computeChecks(
   repository: Observation | null,
   githubConnectionId: string | null,
 ): GateCheck[] {
-  const raw = repository?.raw;
-  const currentRepository = Boolean(
-    githubConnectionId &&
-    raw &&
-    typeof raw === "object" &&
-    "connectionId" in raw &&
-    raw.connectionId === githubConnectionId,
+  const currentRepository = observationMatchesConnection(
+    repository,
+    githubConnectionId,
   );
   const identityComplete = Boolean(
     application.id &&

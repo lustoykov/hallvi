@@ -13,6 +13,7 @@ import {
 import * as database from "../../../src/server/db";
 import { currentGithubConnectionId } from "../../../src/server/github-connection";
 import * as api from "../../../src/server/github-api";
+import { getApplicationStatus } from "../../../src/server/phase-one";
 import { executePiTurn } from "../../execute-pi-turn";
 import { checkPhaseOne } from "../../evals/check-phase-one";
 import { phaseOneCases } from "../../evals/phase-one-cases";
@@ -76,7 +77,11 @@ describe("GitHub eval scenarios use real local state with no GitHub or model cal
       expect(before.workspace?.status).toBe(
         scenario.githubState === "verified" ? "ready" : "in-progress",
       );
-      expect(before.observations).toHaveLength(1);
+      // A stale-history status case also seeds an older passing check; the
+      // newest record comes first.
+      expect(before.observations).toHaveLength(
+        scenario.staleHistory === "checks-passed" ? 2 : 1,
+      );
       if (scenario.githubState === "access-denied") {
         expect(before.observations[0].status).toBe("failed");
         expect(check.result).toContain("Allow this exact repository");
@@ -104,17 +109,42 @@ describe("GitHub eval scenarios use real local state with no GitHub or model cal
         scenario.message,
       );
       const input = mocks.askPi.mock.calls[0][0];
-      const summary = JSON.parse(input.runContext).currentApplication;
-      expect(summary).toContain(JSON.stringify(check.result));
-      expect(summary).toContain(`${check.label}=${check.status}`);
-      expect(summary).not.toContain("ghu_");
-      expect(summary).not.toContain("previous-eval-user");
+      // No application summary travels with the request. The recorded check
+      // reaches Pi only when it calls the scoped status tool.
+      expect(JSON.parse(input.runContext)).not.toHaveProperty(
+        "currentApplication",
+      );
+      expect(input.runContext).not.toContain(check.label);
+      const status = getApplicationStatus(
+        before.application!.id,
+        before.selectedChatId!,
+      );
+      const repository = status.checks.find(
+        (item) => item.key === "repository-readable",
+      )!;
+      expect(repository).toMatchObject({
+        status: check.status,
+        result: check.result,
+      });
+      const text = JSON.stringify(status);
+      expect(text).not.toContain("ghu_");
+      expect(text).not.toContain("previous-eval-user");
       if (scenario.githubState === "reconnected") {
         expect(before.messages.at(-1)?.body).toContain(
           "All four Launch Brief checks passed",
         );
         expect(input).not.toHaveProperty("messages");
-        expect(summary).not.toContain("readable at main");
+        expect(text).not.toContain("readable at main");
+        // The invalidated Observation is not offered as current evidence.
+        expect(repository.evidence).toEqual([]);
+      } else {
+        expect(repository.evidence).toEqual([
+          expect.objectContaining({
+            recordType: "observation",
+            recordId: before.observations[0].id,
+            observedAt: before.observations[0].observedAt,
+          }),
+        ]);
       }
       expect(
         Object.values(

@@ -249,6 +249,13 @@ describe("decisions", () => {
     const lookup = await reply(app, "No saved requirements yet.", [], (o) => {
       o.onActivity({ type: "start", key: "tool:1", kind: "search_decisions" });
       o.onActivity({ type: "end", key: "tool:1" });
+      // A status read changes nothing either; it stays with the reply.
+      o.onActivity({
+        type: "start",
+        key: "tool:2",
+        kind: "get_application_status",
+      });
+      o.onActivity({ type: "end", key: "tool:2" });
     });
     expect(lookup.run.status).toBe("succeeded");
     expect(feed(app)).toEqual(before);

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   collect: vi.fn(),
   search: vi.fn(),
+  status: vi.fn(),
 }));
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: mocks.create,
@@ -42,6 +43,10 @@ vi.mock("../../../src/server/pi-decisions", async (original) => ({
   collectPiDecisionProposal: mocks.collect,
   searchPiDecisions: mocks.search,
 }));
+vi.mock("../../../src/server/pi-status", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi-status")>()),
+  readPiApplicationStatus: mocks.status,
+}));
 
 import {
   askPi,
@@ -53,6 +58,7 @@ import {
   proposeDecisionParameters,
   searchDecisionParameters,
 } from "../../../src/server/pi-decisions";
+import { applicationStatusParameters } from "../../../src/server/pi-status";
 
 const model = {
   provider: "openai-codex",
@@ -79,7 +85,7 @@ const run: PiRun = {
 const input = {
   run,
   userMessage: "Hello",
-  runContext: '{"currentApplication":"Example"}',
+  runContext: '{"runId":"run-a","previousAttempt":null}',
 };
 function deferred<T = void>() {
   let resolve!: (value: T) => void;
@@ -176,6 +182,14 @@ beforeEach(() => {
     activeCount: 0,
     pendingCount: proposals.length,
   }));
+  mocks.status.mockImplementation((applicationId: string, chatId: string) => {
+    const status = {
+      retrievedAt: "2026-09-06T12:00:00.000Z",
+      application: { id: applicationId },
+      chatId,
+    };
+    return { status, text: JSON.stringify(status) };
+  });
 });
 
 describe("assistant output and errors", () => {
@@ -209,6 +223,38 @@ describe("assistant output and errors", () => {
     );
     expect(SYSTEM_PROMPT).toContain(
       "Never claim a failed or cancelled request saved a requirement",
+    );
+  });
+
+  it("reads current application state through the scoped tool instead of an injected summary", () => {
+    expect(SYSTEM_PROMPT).toContain("it carries no application state");
+    expect(SYSTEM_PROMPT).toContain(
+      "call get_application_status in the current request",
+    );
+    expect(SYSTEM_PROMPT).toContain("historical and may be outdated");
+    expect(SYSTEM_PROMPT).toContain("need no status lookup");
+    expect(SYSTEM_PROMPT).toContain("some questions need both");
+    expect(SYSTEM_PROMPT).toContain(
+      "say that current status could not be retrieved",
+    );
+    expect(SYSTEM_PROMPT).not.toContain("supplies current application checks");
+  });
+
+  it("separates reading records from observing GitHub and readiness from deployment", () => {
+    expect(SYSTEM_PROMPT).toContain("reads local records at retrievedAt");
+    expect(SYSTEM_PROMPT).toContain("observed at its own observedAt");
+    expect(SYSTEM_PROMPT).toContain(
+      "Reading does not recheck GitHub, renew evidence or verify anything",
+    );
+    expect(SYSTEM_PROMPT).toContain("Re-run repository check");
+    expect(SYSTEM_PROMPT).toContain(
+      "not code review, passing tests, deployability or continuing access",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "say deployment has not been verified here",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "product rules for later phases, not observations",
     );
   });
 
@@ -480,6 +526,18 @@ describe("scoped Decision tool shapes", () => {
       Value.Check(searchDecisionParameters, { applicationId: "other" }),
     ).toBe(false);
   });
+  it("accepts only an empty status lookup: no application choice, filters or refresh", () => {
+    expect(Value.Check(applicationStatusParameters, {})).toBe(true);
+    for (const attempt of [
+      { applicationId: "other" },
+      { chatId: "other" },
+      { refresh: true },
+      { query: "repository" },
+      null,
+      "{}",
+    ])
+      expect(Value.Check(applicationStatusParameters, attempt)).toBe(false);
+  });
   it.each([
     { kind: "paid-action-approved", value: "yes" },
     { kind: "approval-mode", value: "full-autonomy" },
@@ -510,15 +568,18 @@ describe("native Pi adapter", () => {
     const options = mocks.create.mock.calls[0][0] as Options;
     expect(options).toMatchObject({
       noTools: "all",
-      tools: ["propose_decision", "search_decisions"],
+      tools: ["propose_decision", "search_decisions", "get_application_status"],
       sessionManager: handles[0].sessionManager,
       settingsManager: { isolated: true },
     });
     expect(options.customTools.map((tool) => tool.name)).toEqual([
       "propose_decision",
       "search_decisions",
+      "get_application_status",
     ]);
     expect(mocks.search).not.toHaveBeenCalled();
+    // Nothing is read on the model's behalf before it asks.
+    expect(mocks.status).not.toHaveBeenCalled();
     expect(session.sendCustomMessage).toHaveBeenCalledWith(
       {
         customType: "server-guy-run",
@@ -629,6 +690,53 @@ describe("native Pi adapter", () => {
         .constrainedSampling,
     ).toEqual({ type: "json_schema", strict: "require" });
   });
+  it("reads status only for the Run's application and Chat and returns the projection as tool content", async () => {
+    let result: unknown;
+    session.prompt.mockImplementation(async () => {
+      const tool = (mocks.create.mock.calls[0][0] as Options).customTools[2];
+      expect(tool).toMatchObject({
+        name: "get_application_status",
+        label: "Look up application status",
+      });
+      result = await tool.execute("status", {});
+      session.finish();
+    });
+    await askPi(input);
+    expect(mocks.status).toHaveBeenCalledExactlyOnceWith(
+      run.applicationId,
+      run.chatId,
+    );
+    expect(result).toEqual({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            retrievedAt: "2026-09-06T12:00:00.000Z",
+            application: { id: run.applicationId },
+            chatId: run.chatId,
+          }),
+        },
+      ],
+      details: {
+        retrievedAt: "2026-09-06T12:00:00.000Z",
+        application: { id: run.applicationId },
+        chatId: run.chatId,
+      },
+    });
+  });
+  it("returns a failed status lookup to the tool loop as an error, never as an empty result", async () => {
+    mocks.status.mockImplementationOnce(() => {
+      throw new Error("Status storage unavailable");
+    });
+    session.prompt.mockImplementation(async () => {
+      const tool = (mocks.create.mock.calls[0][0] as Options).customTools[2];
+      await expect(tool.execute("status", {})).rejects.toThrow(
+        "Status storage unavailable",
+      );
+      session.finish();
+    });
+    await expect(askPi(input)).resolves.toMatchObject({ message: "Done." });
+  });
   it("returns proposal-time failures to the SDK tool loop so a corrected call can continue", async () => {
     mocks.collect.mockImplementationOnce(() => {
       throw new Error("Replacement is no longer active");
@@ -730,11 +838,16 @@ describe("native Pi adapter", () => {
       expect(session.abortCompaction).toHaveBeenCalled();
       expect(session.abort).toHaveBeenCalledOnce();
       if (phase === "tool") {
-        const tool = (mocks.create.mock.calls[0][0] as Options).customTools[0];
+        const tools = (mocks.create.mock.calls[0][0] as Options).customTools;
         await expect(
-          tool.execute("late", { kind: "launch-priority", value: "Too late" }),
+          tools[0].execute("late", {
+            kind: "launch-priority",
+            value: "Too late",
+          }),
         ).rejects.toThrow();
         expect(mocks.collect).not.toHaveBeenCalled();
+        await expect(tools[2].execute("late-status", {})).rejects.toThrow();
+        expect(mocks.status).not.toHaveBeenCalled();
       }
       expect(handles[0].release).not.toHaveBeenCalled();
       prompt.resolve();

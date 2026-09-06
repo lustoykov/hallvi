@@ -104,13 +104,13 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
 }
 
 describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
-  it("has twenty-two uniquely named cases with explicit semantic rubrics", () => {
-    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(22);
+  it("has twenty-nine uniquely named cases with explicit semantic rubrics", () => {
+    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(29);
     expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
   });
 
   it("selects a case subset without silently expanding invalid selections", () => {
-    expect(selectPhaseOneCases().length).toBe(22);
+    expect(selectPhaseOneCases().length).toBe(29);
     expect(
       selectPhaseOneCases("greeting,hypothetical").map((c) => c.id),
     ).toEqual(["greeting", "hypothetical"]);

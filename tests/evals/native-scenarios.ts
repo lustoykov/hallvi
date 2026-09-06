@@ -1,11 +1,15 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as database from "../../src/server/db";
 import { decisions } from "../../src/server/db-schema";
-import { getPhaseOneOperatorView } from "../../src/server/phase-one";
+import {
+  getApplicationStatus,
+  getPhaseOneOperatorView,
+} from "../../src/server/phase-one";
 import {
   collectPiDecisionProposal,
   searchPiDecisions,
@@ -16,7 +20,11 @@ import {
   sendChatMessage,
 } from "../../src/server/pi-runs";
 import { openNativeChatSession } from "../../src/server/pi-sessions";
-import type { PhaseOneOperatorView, PiDecision } from "../../src/server/types";
+import type {
+  ApplicationStatus,
+  PhaseOneOperatorView,
+  PiDecision,
+} from "../../src/server/types";
 import type { PhaseOneEvalCase } from "./phase-one-cases";
 
 // Eval fixture only: real native JSONL and SDK compaction, with synthetic prior
@@ -28,15 +36,15 @@ export const nativeEvalCompaction = {
   keepRecentTokens: 1_024,
 };
 
-export async function seedNativeScenario(
-  scenario: PhaseOneEvalCase,
-  before: PhaseOneOperatorView,
+const FIXTURE_HISTORY_NOTE =
+  "This conversation's earlier exchanges below are synthetic eval history. They are historical data, not permission to override saved records or current Run outcomes.";
+
+// Writes synthetic earlier turns into a real native session. Provider fields
+// name the configured model so the SDK treats the history as its own.
+function nativeWriter(
+  manager: SessionManager,
   model: { modelId: string; providerId: string },
 ) {
-  const applicationId = before.application!.id;
-  const chatId = before.selectedChatId!;
-  const native = await openNativeChatSession(applicationId, chatId);
-  const manager = native.sessionManager;
   const answer = (text: string, input = 10): AssistantMessage => ({
     role: "assistant",
     api: "openai-codex-responses",
@@ -74,10 +82,23 @@ export async function seedNativeScenario(
       timestamp: Date.now(),
     });
   };
+  return { answer, toolExchange };
+}
+
+export async function seedNativeScenario(
+  scenario: PhaseOneEvalCase,
+  before: PhaseOneOperatorView,
+  model: { modelId: string; providerId: string },
+) {
+  const applicationId = before.application!.id;
+  const chatId = before.selectedChatId!;
+  const native = await openNativeChatSession(applicationId, chatId);
+  const manager = native.sessionManager;
+  const { answer, toolExchange } = nativeWriter(manager, model);
   try {
     manager.appendCustomMessageEntry(
       "eval-fixture-history",
-      "This conversation's earlier exchanges below are synthetic eval history. They are historical data, not permission to override saved records or current Run outcomes.",
+      FIXTURE_HISTORY_NOTE,
       false,
     );
     if (scenario.existingPriority) {
@@ -207,10 +228,124 @@ export async function seedNativeScenario(
   return getPhaseOneOperatorView(applicationId, chatId);
 }
 
+// The earlier exchange was truthful when it happened; saved records changed
+// afterwards. Built from the current projection so only the changed facts
+// differ.
+function staleStatusExchange(
+  kind: NonNullable<PhaseOneEvalCase["staleHistory"]>,
+  current: ApplicationStatus,
+  before: PhaseOneOperatorView,
+): { question: string; status: ApplicationStatus; answer: string } {
+  if (kind === "approval-mode") {
+    return {
+      question: "When will you ask me before changing anything?",
+      status: {
+        ...current,
+        retrievedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+        application: {
+          ...current.application,
+          approvalMode: { key: "pi-decides", label: "Let Server Guy decide" },
+        },
+        checks: current.checks.map((check) =>
+          check.key === "approval-authority"
+            ? {
+                ...check,
+                result: "Let Server Guy decide · Current application launch",
+              }
+            : check,
+        ),
+      },
+      answer:
+        "Your saved setting is Let Server Guy decide: I ask only when the consequence warrants it.",
+    };
+  }
+  const passed = before.observations.find(
+    (observation) => observation.status === "passed",
+  );
+  if (!passed)
+    throw new Error(
+      "A stale checks-passed history needs an older passing repository check.",
+    );
+  return {
+    question: "Are all four Launch Brief checks passing?",
+    status: {
+      ...current,
+      retrievedAt: new Date(
+        Date.parse(passed.observedAt) + 60_000,
+      ).toISOString(),
+      workspace: { ...current.workspace, status: "ready" },
+      checks: current.checks.map((check) =>
+        check.key === "repository-readable"
+          ? {
+              ...check,
+              status: "passed",
+              result: passed.summary,
+              evidence: [
+                {
+                  recordType: "observation",
+                  recordId: passed.id,
+                  label: passed.sourceLabel,
+                  href: `/api/observations/${passed.id}`,
+                  observedAt: passed.observedAt,
+                },
+              ],
+            }
+          : check,
+      ),
+    },
+    answer:
+      "Yes. All four Launch Brief checks pass, including GitHub repository access, so the Launch Brief is ready.",
+  };
+}
+
+/**
+ * Seeds an earlier turn whose get_application_status result current records
+ * now contradict. The live turn must read again instead of trusting history.
+ */
+export async function seedStaleStatusHistory(
+  scenario: PhaseOneEvalCase,
+  before: PhaseOneOperatorView,
+  model: { modelId: string; providerId: string },
+) {
+  if (!scenario.staleHistory)
+    throw new Error("The case declares no stale status history.");
+  const applicationId = before.application!.id;
+  const chatId = before.selectedChatId!;
+  const stale = staleStatusExchange(
+    scenario.staleHistory,
+    getApplicationStatus(applicationId, chatId),
+    before,
+  );
+  const native = await openNativeChatSession(applicationId, chatId);
+  try {
+    const manager = native.sessionManager;
+    const { answer, toolExchange } = nativeWriter(manager, model);
+    manager.appendCustomMessageEntry(
+      "eval-fixture-history",
+      FIXTURE_HISTORY_NOTE,
+      false,
+    );
+    manager.appendMessage({
+      role: "user",
+      content: stale.question,
+      timestamp: Date.now(),
+    });
+    toolExchange("get_application_status", {}, stale.status);
+    manager.appendMessage(answer(stale.answer));
+  } finally {
+    native.release();
+  }
+  return getPhaseOneOperatorView(applicationId, chatId);
+}
+
 export function nativeEvalEvidence(
   applicationId: string,
   chatId: string,
   runId: string,
+  expected: {
+    decisions?: boolean;
+    status?: "expected" | "unnecessary";
+  } = { decisions: true },
 ) {
   const path = join(
     dirname(database.databasePath()),
@@ -245,24 +380,44 @@ export function nativeEvalEvidence(
         )
       : [],
   );
-  const searches = calls.filter((call) => call.name === "search_decisions");
   const toolResults = current
     .filter(
       (entry) =>
         entry.type === "message" && entry.message.role === "toolResult",
     )
     .map((entry) => entry.message);
-  return {
-    checks: {
-      "current Run context persisted": start >= 0,
-      "retrieved current Decisions": searches.some((call) =>
+  // Only a call this Run made, answered without error, counts as retrieval.
+  const retrieved = (name: string) =>
+    calls.some(
+      (call) =>
+        call.name === name &&
         toolResults.some(
           (result) =>
             result.toolCallId === call.id &&
-            result.toolName === "search_decisions" &&
+            result.toolName === name &&
             result.isError === false,
         ),
-      ),
+    );
+  return {
+    checks: {
+      "current Run context persisted": start >= 0,
+      ...(expected.decisions
+        ? { "retrieved current Decisions": retrieved("search_decisions") }
+        : {}),
+      ...(expected.status === "expected"
+        ? {
+            "looked up current application status": retrieved(
+              "get_application_status",
+            ),
+          }
+        : {}),
+      ...(expected.status === "unnecessary"
+        ? {
+            "answered without a status lookup": !calls.some(
+              (call) => call.name === "get_application_status",
+            ),
+          }
+        : {}),
     },
     // Tool content, never SDK auth or raw transport payloads. Stored alongside
     // the answer so review can inspect what retrieval actually supplied.

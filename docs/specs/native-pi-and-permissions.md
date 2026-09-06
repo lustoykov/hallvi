@@ -75,7 +75,7 @@ Three questions must remain separate:
 
 None of these modes grants access to another application, expands credentials, removes a user's explicit limit, or lets Pi change its own mode. Recording messages, Observations and an explicitly stated Decision is internal bookkeeping, not a separate external-change approval.
 
-Today these modes are recorded preferences. Phase 1 exposes only `search_decisions` and `propose_decision`; it has no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
+Today these modes are recorded preferences. Phase 1 exposes only `search_decisions`, `propose_decision` and the read-only `get_application_status` ([spec](application-status-tool.md)); it has no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
 
 ### Enforce the scope at the operation
 
@@ -121,7 +121,7 @@ The `AgentSession` object can be short-lived. Reopening the same native session 
 
 1. Claim the Run with the existing single worker.
 2. Open the Chat's own native session and restore its messages and compaction state.
-3. Prepare current application scope/checks and the actual prior attempt outcome as bounded native context, without a Decision dump. Make scoped Decision lookup available to the model.
+3. Prepare the Run's identity and the actual prior attempt outcome as bounded native context, without a Decision dump or an application summary. Make the scoped Decision lookup and the scoped application status lookup available to the model.
 4. Call `session.prompt` with only the new engineer message, not a rebuilt transcript.
 5. Let Pi perform its model/tool loop and native compaction; stream progress through the existing message snapshots/SSE.
 6. Keep the existing final SQLite transaction for answer, staged Decisions, Activity and Run success.
@@ -167,11 +167,11 @@ This design does not automatically inject all Decisions, a per-message Decision 
 
 ### Minimal Run context and failure truth
 
-The worker still prepares and validates the application's scope, current Approval Mode/checks and relevant prior-attempt outcome before starting the model. These are operational context, not a list of Decisions. Append a bounded, clearly labeled native custom message near the new engineer message, using `sendCustomMessage` without triggering a turn. It can carry the Run correlation marker as well; do not add an extra event store. The engineer's message remains a normal user message.
+The worker still validates the application/Chat scope and prepares the relevant prior-attempt outcome before starting the model. Since the [application status lookup](application-status-tool.md) shipped, the Run context no longer carries current checks or the Approval Mode: it holds only `createdAt`, Run/application/Chat identity and `previousAttempt`. Current application state is read on demand through `get_application_status`, bound to the accepted Run the same way `search_decisions` is. Append the bounded, clearly labeled native custom message near the new engineer message, using `sendCustomMessage` without triggering a turn. It carries the Run correlation marker; do not add an extra event store. The engineer's message remains a normal user message.
 
 For example, after cancellation: `Previous attempt: cancelled. Its proposals were pending, not saved; none were committed.` This gives Pi the actual outcome without repeatedly listing every Decision; it does not guarantee the model or a later summary will preserve that distinction. Prepare this context before model execution; if mandatory state cannot be read, fail before the request. User-authored values and legacy summaries remain data, not new instructions or authority. Final effect boundaries always use current server-side state.
 
-Native custom messages/tool results become part of saved history and may later be compacted. They are not permanently current or exempt from summarization. Bound their size, label when they were observed, retain native overflow recovery, and retrieve records again when current evidence is needed. Pi can check for compaction inside `session.prompt` after an idle custom message was appended. Cover that near-limit ordering and later summarization with a focused regression and behavior eval, not a new compaction subsystem. Compaction does not delete authoritative Decisions from SQLite.
+Native custom messages/tool results become part of saved history and may later be compacted. They are not permanently current or exempt from summarization. Bound their size, label when they were prepared or retrieved, retain native overflow recovery, and retrieve records again when current evidence is needed. Older Run contexts written before this change still contain a `currentApplication` summary; the stable instructions treat every earlier context message and tool result as historical, and old native history is not rewritten. Pi can check for compaction inside `session.prompt` after an idle custom message was appended. Cover that near-limit ordering and later summarization with a focused regression and behavior eval, not a new compaction subsystem. Compaction does not delete authoritative Decisions from SQLite.
 
 ### Cache reuse and attention must be measured
 
@@ -228,7 +228,7 @@ The active custom summarization/replay path is removed. Old persisted summary ro
 Required tests for slice 1:
 
 - Continue the same Chat across Runs and worker restarts; keep two Chats' histories isolated while sharing current application Decisions.
-- Reopen a compacted native session without a custom summary call; a Decision lookup returns current records and Run context exposes updated checks even after compaction.
+- Reopen a compacted native session without a custom summary call; a Decision lookup returns current records and a status lookup returns updated checks even after compaction.
 - Prove no full Decision list is automatically injected into ordinary prompts; unchanged instructions stay stable and new context/results append without rewriting history.
 - Verify application-scoped search/list behavior, old active records, labeled replacement lineage/source references, deterministic pagination through every matching record, no-match counts, lookup failure and the distinction between saved records and pending proposals. General history browsing remains deferred.
 - Fail before making a model request if mandatory Run context cannot be prepared; verify context and tool-result values remain data rather than tool authority.
@@ -252,7 +252,7 @@ Before merging the native-session migration, run and review this small live beha
 
 Verified against `@earendil-works/pi-coding-agent` 0.84.4, not an assumed future SDK:
 
-- Application adapter: [`src/server/pi.ts`](../../src/server/pi.ts); native storage/recovery: [`pi-sessions.ts`](../../src/server/pi-sessions.ts); minimal Run context: [`pi-run-context.ts`](../../src/server/pi-run-context.ts); scoped tools: [`pi-decisions.ts`](../../src/server/pi-decisions.ts). The old `pi-context.ts` replay policy is removed (retained in Git history).
+- Application adapter: [`src/server/pi.ts`](../../src/server/pi.ts); native storage/recovery: [`pi-sessions.ts`](../../src/server/pi-sessions.ts); minimal Run context: [`pi-run-context.ts`](../../src/server/pi-run-context.ts); scoped tools: [`pi-decisions.ts`](../../src/server/pi-decisions.ts) and [`pi-status.ts`](../../src/server/pi-status.ts). The old `pi-context.ts` replay policy and the per-Run `buildViewSummary` are removed (retained in Git history).
 - Run completion/cancellation: [`src/server/pi-runs.ts`](../../src/server/pi-runs.ts); single-worker lifecycle: [`src/server/pi-worker.ts`](../../src/server/pi-worker.ts).
 - SDK `dist/core/sdk.js`: restores `sessionManager.buildSessionContext()` and exposes `transformContext` through the extension runner.
 - SDK `dist/core/resource-loader.d.ts`: supports the existing `systemPromptOverride` path for stable instructions. Inline extensions and their `context` hook were considered but are not needed for the next PR.

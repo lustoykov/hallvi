@@ -33,11 +33,13 @@ import {
   PHASE_ONE,
   computeChecks,
   deriveUpcomingRequirements,
+  observationMatchesConnection,
 } from "./phase-one-spec";
 import { APPROVAL_MODES, isApprovalMode } from "./types";
 import { removeNativeApplicationSessions } from "./pi-sessions";
 import type {
   ApplicationRecord,
+  ApplicationStatus,
   CreateApplicationInput,
   GateCheck,
   PhaseOneOperatorView,
@@ -68,12 +70,18 @@ export function loadChat(applicationId: string, chatId: string) {
   return { application, workspace, chat };
 }
 
+// The latest repository Observation and the login it must match. Every gate
+// evaluation reads both from current records; nothing caches a result.
+function currentRepositoryEvidence(application: ApplicationRecord) {
+  return {
+    repository: latestObservation(application.id, REPOSITORY_OBSERVATION),
+    connectionId: currentGithubConnectionId(),
+  };
+}
+
 function currentChecks(application: ApplicationRecord) {
-  return computeChecks(
-    application,
-    latestObservation(application.id, REPOSITORY_OBSERVATION),
-    currentGithubConnectionId(),
-  );
+  const { repository, connectionId } = currentRepositoryEvidence(application);
+  return computeChecks(application, repository, connectionId);
 }
 
 function workspaceView(
@@ -446,24 +454,75 @@ function decisionLabel(decision: PiDecision) {
   return { "launch-priority": "Saved requirement" }[decision.kind];
 }
 
-export function buildViewSummary(application: ApplicationRecord) {
-  const checks = currentChecks(application);
-  const upcoming = deriveUpcomingRequirements();
-  return [
-    `Application: ${application.name}`,
-    `Repository: ${application.repositoryUrl}`,
-    "Environment: Production",
-    `Permission policy: ${APPROVAL_MODES[application.approvalMode].label}`,
-    // Public current results, not raw provider payloads or credential records.
-    // Old observations must not masquerade as evidence for the current login.
-    `Checks:\n${checks.map((check) => `- ${check.label}=${check.status}; result=${JSON.stringify(check.result)}`).join("\n")}`,
-    `Upcoming requirements: ${upcoming
-      .map(
-        (requirement) =>
-          `${requirement.label} before Phase ${requirement.requiredBeforePhase}`,
-      )
-      .join("; ")}`,
-  ].join("\n");
+/**
+ * The read-only projection behind Pi's `get_application_status`. The worker
+ * binds the application and Chat from the accepted Run, and the Chat must
+ * still belong to that application. It reads the same current records and
+ * gate evaluation as the Operator View, so an older passing Observation never
+ * stands in for the latest failed or invalidated result, and it returns only
+ * public check text and the evidence that supports each current check: no
+ * credentials, raw provider payloads, transcripts, Activity or Decisions.
+ * Reading is not rechecking; `retrievedAt` is when these records were read.
+ */
+export function getApplicationStatus(
+  applicationId: string,
+  chatId: string,
+): ApplicationStatus {
+  const { application, workspace } = loadChat(applicationId, chatId);
+  const { repository, connectionId } = currentRepositoryEvidence(application);
+  const checks = computeChecks(application, repository, connectionId);
+  const repositoryCurrent = observationMatchesConnection(
+    repository,
+    connectionId,
+  );
+  const { phaseKey, phaseNumber, deliverable, status } = workspaceView(
+    workspace,
+    checks,
+  );
+  return {
+    retrievedAt: new Date().toISOString(),
+    application: {
+      id: application.id,
+      name: application.name,
+      repositoryUrl: application.repositoryUrl,
+      environment: application.environment,
+      approvalMode: {
+        key: application.approvalMode,
+        label: APPROVAL_MODES[application.approvalMode].label,
+      },
+      updatedAt: application.updatedAt,
+    },
+    workspace: { phaseKey, phaseNumber, deliverable, status },
+    checks: checks.map((check) => ({
+      key: check.key,
+      label: check.label,
+      status: check.status,
+      result: check.result,
+      // The Operator View keeps an invalidated repository check inspectable
+      // as history; the model must not receive it as support for current
+      // access.
+      evidence: check.evidence
+        .filter(
+          (evidence) =>
+            evidence.recordType !== "observation" || repositoryCurrent,
+        )
+        .map(({ recordType, recordId, label, href, observedAt }) => ({
+          recordType,
+          recordId,
+          label,
+          href,
+          observedAt,
+        })),
+    })),
+    upcomingRequirements: deriveUpcomingRequirements().map(
+      ({ key, label, requiredBeforePhase, resolutionPath }) => ({
+        key,
+        label,
+        requiredBeforePhase,
+        resolutionPath,
+      }),
+    ),
+  };
 }
 
 // Called only inside the worker's final transaction. Model text is not a

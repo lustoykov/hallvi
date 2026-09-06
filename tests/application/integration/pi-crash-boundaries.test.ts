@@ -88,16 +88,16 @@ import { askPi } from './src/server/pi.ts';
 import { acquireWorkerLock } from './src/server/pi-worker.ts';
 import { claimNextPiRun, completePiRun, recordPiCall } from './src/server/pi-runs.ts';
 import { buildPiRunContext } from './src/server/pi-run-context.ts';
-import { buildViewSummary, loadChat } from './src/server/phase-one.ts';
+import { loadChat } from './src/server/phase-one.ts';
 import { listMessages } from './src/server/db.ts';
 // Keep the acquired handle explicitly reachable throughout every pause.
 globalThis.crashFixtureWorkerRelease = acquireWorkerLock();
 setInterval(() => {}, 1000);
 const run = claimNextPiRun();
 if (!run) throw new Error('Expected queued fixture Run');
-const { application } = loadChat(run.applicationId, run.chatId);
+loadChat(run.applicationId, run.chatId);
 const user = listMessages(run.chatId).find(message => message.id === run.userMessageId);
-const reply = await askPi({run,userMessage:user.body,runContext:buildPiRunContext(run,buildViewSummary(application))},{onModelCall:()=>recordPiCall(run.id)});
+const reply = await askPi({run,userMessage:user.body,runContext:buildPiRunContext(run)},{onModelCall:()=>recordPiCall(run.id)});
 if (process.env.CRASH_FIXTURE_STAGE === 'native-final') {
   process.send?.({type:'native-final'});
   await new Promise(() => {});
