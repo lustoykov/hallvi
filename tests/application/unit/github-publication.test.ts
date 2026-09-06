@@ -187,9 +187,17 @@ describe("publication through the Git Data API", () => {
           },
           scopes: [],
         };
-      if (path === "/user/installations/9")
+      if (path === "/user/installations?per_page=100&page=1")
         return {
-          data: { permissions: { contents: "read", pull_requests: "none" } },
+          data: {
+            installations: [
+              {
+                id: 9,
+                suspended_at: null,
+                permissions: { contents: "read", pull_requests: "none" },
+              },
+            ],
+          },
           scopes: [],
         };
       throw new Error(path);
@@ -220,4 +228,81 @@ describe("publication through the Git Data API", () => {
       (await verifyPublicationPermissions("token", "qa/app", "cli", null)).ok,
     ).toBe(true);
   });
+
+  it("finds the exact App installation on a later page using the user-token endpoint", async () => {
+    const observed = {
+      contents: "write",
+      pull_requests: "write",
+      metadata: "read",
+    };
+    const paths: string[] = [];
+    mocks.githubJson.mockImplementation(async (path: string) => {
+      paths.push(path);
+      if (path === "/repos/qa/app")
+        return { data: { default_branch: "main" }, scopes: [] };
+      if (path === "/user/installations?per_page=100&page=1")
+        return {
+          data: {
+            installations: Array.from({ length: 100 }, (_, id) => ({
+              id: id + 100,
+              suspended_at: null,
+              permissions: observed,
+            })),
+          },
+          scopes: [],
+        };
+      if (path === "/user/installations?per_page=100&page=2")
+        return {
+          data: {
+            installations: [
+              { id: 9, suspended_at: null, permissions: observed },
+            ],
+          },
+          scopes: [],
+        };
+      throw new Error(`Unsupported GitHub endpoint: ${path}`);
+    });
+    expect(
+      await verifyPublicationPermissions("token", "qa/app", "app", 9),
+    ).toEqual({
+      ok: true,
+      reason: null,
+      observed: { installationId: 9, permissions: observed },
+    });
+    expect(paths).toEqual([
+      "/repos/qa/app",
+      "/user/installations?per_page=100&page=1",
+      "/user/installations?per_page=100&page=2",
+    ]);
+  });
+
+  it.each([false, true])(
+    "refuses an unavailable or suspended installation (suspended: %s)",
+    async (suspended) => {
+      mocks.githubJson.mockImplementation(async (path: string) => {
+        if (path === "/repos/qa/app")
+          return { data: { default_branch: "main" }, scopes: [] };
+        if (path === "/user/installations?per_page=100&page=1")
+          return {
+            data: {
+              installations: [
+                {
+                  id: suspended ? 9 : 10,
+                  suspended_at: suspended ? "2026-09-06T00:00:00Z" : null,
+                  permissions: { contents: "write", pull_requests: "write" },
+                },
+              ],
+            },
+            scopes: [],
+          };
+        throw new Error(`Unsupported GitHub endpoint: ${path}`);
+      });
+      expect(
+        await verifyPublicationPermissions("token", "qa/app", "app", 9),
+      ).toMatchObject({
+        ok: false,
+        reason: expect.stringContaining("unavailable or suspended"),
+      });
+    },
+  );
 });

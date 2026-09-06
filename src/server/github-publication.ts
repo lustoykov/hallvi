@@ -446,15 +446,36 @@ export async function verifyPublicationPermissions(
         reason: "No App installation is recorded for this repository.",
         observed: {},
       };
-    const installation = z
-      .object({ permissions: z.record(z.string(), z.string()) })
-      .parse(
-        (
-          await githubJson(`/user/installations/${installationId}`, token, {
-            signal,
-          })
-        ).data,
-      );
+    const installationSchema = z.object({
+      id: z.number().int(),
+      permissions: z.record(z.string(), z.string()),
+      suspended_at: z.string().nullable(),
+    });
+    let installation: z.infer<typeof installationSchema> | undefined;
+    // Device login yields an App user token. GitHub exposes installation
+    // permissions on this list, not GET /user/installations/{id}.
+    for (let page = 1; page <= 20; page++) {
+      const { installations } = z
+        .object({ installations: z.array(installationSchema) })
+        .parse(
+          (
+            await githubJson(
+              `/user/installations?per_page=100&page=${page}`,
+              token,
+              { signal },
+            )
+          ).data,
+        );
+      installation = installations.find((item) => item.id === installationId);
+      if (installation || installations.length < 100) break;
+    }
+    if (!installation || installation.suspended_at)
+      return {
+        ok: false,
+        reason:
+          "The recorded GitHub App installation is unavailable or suspended. Check its installation and repository access on GitHub.",
+        observed: { installationId },
+      };
     const contents = installation.permissions.contents;
     const pulls = installation.permissions.pull_requests;
     const ok = contents === "write" && pulls === "write";

@@ -76,7 +76,7 @@ export async function githubJson(path: string, _token: string, options: { method
   if (path === "/user") data = { id: 42, login: "qa-fixture-user" };
   else if (path.startsWith("/user/installations?")) data = { installations: [{ id: 7, app_slug: "qa-server-guy", account: { id: 1, login: "qa" }, permissions: { contents: current.repository === "missing-scope" ? "none" : "read", metadata: "read" }, repository_selection: "selected", suspended_at: null }] };
   else if (path.startsWith("/user/installations/7/repositories")) data = { repositories: current.repository === "denied" ? [] : [{ id: 99 }] };
-  else if (path.startsWith("/user/installations/")) data = { id: 7, permissions: { contents: "write", pull_requests: "write", metadata: "read" } };
+  else if (path.startsWith("/user/installations/")) throw new Error(`Unsupported GitHub installation endpoint: ${path}`);
   else {
     const [, , owner, name, action] = path.split("/");
     if (!owner || !name) throw new Error("Unknown fixture endpoint");
