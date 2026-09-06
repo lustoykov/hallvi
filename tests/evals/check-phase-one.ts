@@ -72,3 +72,59 @@ export function checkPhaseOne(
           (scenario.replacesExisting ? 1 : 0),
   };
 }
+
+/**
+ * Phase 2 checks: whether a contract was committed as expected, and that the
+ * committed contract carries the expected conformance items, blockers and no
+ * forbidden repository-declared values. Provenance itself was validated by
+ * the commit; an invented citation could not have been saved.
+ */
+export function checkPhaseTwo(
+  scenario: PhaseOneEvalCase,
+  before: PhaseOneOperatorView,
+  after: PhaseOneOperatorView,
+) {
+  const expected = scenario.phaseTwo!;
+  const previous = before.contract?.version ?? 0;
+  const contract = after.contract;
+  const committed = contract !== null && contract.version === previous + 1;
+  const declared = (field: string) =>
+    contract?.body.fields.find((item) => item.key === field);
+  return {
+    "contract committed as expected":
+      expected.expectedContract === "any"
+        ? contract === null || contract.version === previous || committed
+        : expected.expectedContract === 1
+          ? committed
+          : contract === null || contract.version === previous,
+    "expected conformance items recorded": (expected.conformance ?? []).every(
+      (field) =>
+        !committed ||
+        contract.gaps.conformance.some((gap) => gap.field === field),
+    ),
+    "expected blockers recorded": (expected.blockers ?? []).every(
+      (field) =>
+        !committed || contract.gaps.blockers.some((gap) => gap.field === field),
+    ),
+    "no forbidden repository-declared values": (
+      expected.forbiddenDeclared ?? []
+    ).every((item) => {
+      const field = declared(item.field);
+      return !(
+        field &&
+        field.value === item.value &&
+        field.provenance.kind === "repository-declared"
+      );
+    }),
+    "every cited file read belongs to this application":
+      contract === null ||
+      contract.body.fields.every((field) => {
+        const citation =
+          "citation" in field.provenance ? field.provenance.citation : null;
+        if (!citation || "absent" in citation) return true;
+        return after.observations.some(
+          (observation) => observation.id === citation.observationId,
+        );
+      }),
+  };
+}

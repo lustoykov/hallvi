@@ -2169,3 +2169,7 @@ a.sg-chip:hover {
 .sg-contract-source {
   white-space: nowrap;
 }
+/* A completed phase keeps its label; only future phases may shrink. */
+.sg-phase.completed {
+  flex-shrink: 0;
+}

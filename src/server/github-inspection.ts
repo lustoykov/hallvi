@@ -33,7 +33,9 @@ export function normalizeRepositoryPath(input: string) {
     path.length > INSPECTION_LIMITS.pathCharacters ||
     path.includes("\\") ||
     path.includes("\0") ||
-    path.split("/").some((segment) => segment === "" || segment === "..")
+    path
+      .split("/")
+      .some((segment) => segment === "" || segment === "." || segment === "..")
   )
     throw new RepositoryPathError(
       "Give a repository-relative path such as app/main.py, without .. segments.",

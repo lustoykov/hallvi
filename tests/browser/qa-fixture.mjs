@@ -80,6 +80,11 @@ cpSync(
   join(source, "tests/browser-fixtures/github-api.ts.txt"),
   join(app, "src/server/github-api.ts"),
 );
+// Synthetic repositories, GitHub tree/contents responses and the scripted
+// contract builder, shared with the deterministic tests and eval seeds.
+cpSync(join(source, "tests/fixtures"), join(app, "src/server/qa-fixtures"), {
+  recursive: true,
+});
 cpSync(
   join(source, "tests/browser-fixtures/login-fixture.ts.txt"),
   join(app, "src/server/qa-login-fixture.ts"),
@@ -180,7 +185,7 @@ const manifest = {
   initialSetup,
   database: env.SERVER_GUY_DB_PATH,
   externalAdapters:
-    "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials are synthetic. ChatGPT OAuth " +
+    "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials are synthetic (fixture repository trees and contents at a synthetic commit). ChatGPT OAuth " +
     loginMode +
     " and GitHub device flow are simulated without provider calls",
 };

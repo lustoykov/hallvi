@@ -89,7 +89,7 @@ export function evaluatePhase(
       contract: null,
     };
   const evidence = repositoryEvidence(application.id);
-  const contract = contractView(application.id, evidence);
+  const contract = contractView(application.id);
   return {
     checks: computePhaseTwoChecks({
       inspection: evidence.inspection,

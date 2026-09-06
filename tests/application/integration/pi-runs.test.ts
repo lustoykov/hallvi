@@ -514,6 +514,11 @@ function createWorkerFixture(name: string) {
     "tests/browser-fixtures/pi-configuration.ts.txt",
     join(copy, "src/server/pi-configuration.ts"),
   );
+  // The synthetic provider's scripted Phase 2 flow imports the shared fixture
+  // modules, copied the way the disposable browser app copies them.
+  cpSync("tests/fixtures", join(copy, "src/server/qa-fixtures"), {
+    recursive: true,
+  });
   const authPath = join(root, "synthetic-auth.json");
   writeFileSync(
     authPath,

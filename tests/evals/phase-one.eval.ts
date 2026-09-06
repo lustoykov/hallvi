@@ -7,6 +7,7 @@ import { shutdownTracing } from "../../src/server/tracing";
 
 import * as database from "../../src/server/db";
 import * as github from "../../src/server/github";
+import * as githubApi from "../../src/server/github-api";
 import { getPhaseOneOperatorView } from "../../src/server/phase-one";
 import * as pi from "../../src/server/pi";
 import { executePiTurn } from "../execute-pi-turn";
@@ -20,7 +21,7 @@ import type {
   PiTurnResult,
 } from "../../src/server/types";
 import { pushTestDatabase } from "../test-database";
-import { checkPhaseOne } from "./check-phase-one";
+import { checkPhaseOne, checkPhaseTwo } from "./check-phase-one";
 import { evalRepeatCount, selectPhaseOneCases } from "./phase-one-cases";
 import { createEvalScratch, releaseEvalScratch } from "./scratch";
 import { seedPhaseOneEvalCase } from "./seed-phase-one";
@@ -47,9 +48,17 @@ const sourceFiles = [
   "src/server/pi-decisions.ts",
   "src/server/pi-status.ts",
   "src/server/pi-worker.ts",
+  "src/server/pi-repository.ts",
+  "src/server/pi-contract.ts",
   "tests/execute-pi-turn.ts",
   "src/server/phase-one.ts",
   "src/server/phase-one-spec.ts",
+  "src/server/phase-two.ts",
+  "src/server/phase-two-spec.ts",
+  "src/server/application-profile.ts",
+  "src/server/application-contract.ts",
+  "src/server/operator-view.ts",
+  "src/server/workspaces.ts",
   "src/server/pi-configuration.ts",
   "src/server/db.ts",
   "src/server/db-schema.ts",
@@ -57,6 +66,9 @@ const sourceFiles = [
   "src/server/github-api.ts",
   "tests/evals/phase-one-cases.ts",
   "tests/evals/seed-phase-one.ts",
+  "tests/evals/seed-phase-two.ts",
+  "tests/fixtures/repositories.ts",
+  "tests/fixtures/contract-builder.ts",
   "tests/evals/native-scenarios.ts",
   "tests/evals/check-phase-one.ts",
   "tests/evals/phase-one.eval.ts",
@@ -144,7 +156,7 @@ beforeAll(() => {
     database: join(state, "eval.db"),
     databaseRetained: false,
     coverage:
-      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Application status cases seed real records and, for stale-history cases, an outdated synthetic get_application_status exchange; the live lookup reads local records only and is recorded as native tool evidence. This is not a production context-window benchmark.",
+      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Application Contract cases seed a Phase 2 workspace with a synthetic inspection and saved file reads of a fixture repository, so read_repository_file is served from records and the GitHub API is blocked. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Application status cases seed real records and, for stale-history cases, an outdated synthetic get_application_status exchange; the live lookup reads local records only and is recorded as native tool evidence. This is not a production context-window benchmark.",
   };
   vi.stubEnv("SERVER_GUY_DB_PATH", join(state, "eval.db"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(state, "config"));
@@ -156,6 +168,13 @@ beforeAll(() => {
   pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
   vi.spyOn(github, "inspectGithubRepository").mockImplementation(() => {
     throw new Error("GitHub access is outside this eval's scope.");
+  });
+  // Phase 2 reads are served from seeded Observations; an unseeded path is a
+  // failed read, never a network request with the fixture token.
+  vi.spyOn(githubApi, "githubJson").mockImplementation(async () => {
+    throw new githubApi.GithubAccessError(
+      "GitHub access is outside this eval's scope.",
+    );
   });
   console.log(
     `Live Pi eval: ${selectedCases.length * repeats} sequential turns, ${chosen.modelId}/${chosen.reasoningEffort}. Results: ${runDirectory}`,
@@ -232,6 +251,11 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
           record.reply!,
           before.decisions.map((decision) => database.getDecision(decision.id)),
         );
+        if (scenario.phaseTwo)
+          Object.assign(
+            record.checks,
+            checkPhaseTwo(scenario, before, record.after),
+          );
         if (scenario.nativeScenario || scenario.statusLookup) {
           record.nativeEvidence = nativeEvalEvidence(
             before.application!.id,

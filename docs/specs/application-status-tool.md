@@ -10,6 +10,10 @@ Before this change, the worker called `buildViewSummary` before each reply and a
 
 For example, “Thanks” needs no lookup. “Can you still read my repository?” requires one. The answer should describe the latest recorded repository check and its observation time, not imply the lookup contacted GitHub again.
 
+## Phase awareness
+
+Since Phase 2, the projection follows the Chat's phase: `workspace` and `checks` come from the workspace the Chat belongs to (the retained Launch Brief evidence for a completed Phase 1 chat; the Phase 2 checks for an Inspect app chat), and Phase 2 adds a bounded `inspection` summary (Observation ID, status, commit, whether it was made with the current connection, profile resolution status) and a `contract` summary (ID, version, commit, profile, field count, blockers, conformance items, open policies) within the same 12,000-character bound. The full contract and evidence come from `get_application_contract` and `get_repository_inspection`, specified in the [Application Contract spec](application-contract.md). Everything below is unchanged.
+
 ## Tool contract
 
 | Part | Contract |

@@ -75,7 +75,7 @@ Three questions must remain separate:
 
 None of these modes grants access to another application, expands credentials, removes a user's explicit limit, or lets Pi change its own mode. Recording messages, Observations and an explicitly stated Decision is internal bookkeeping, not a separate external-change approval.
 
-Today these modes are recorded preferences. Phase 1 exposes only `search_decisions`, `propose_decision` and the read-only `get_application_status` ([spec](application-status-tool.md)); it has no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
+Today these modes are recorded preferences. Phase 1 exposes only `search_decisions`, `propose_decision` and the read-only `get_application_status` ([spec](application-status-tool.md)); Phase 2 Runs add the read-only `get_repository_inspection`, `read_repository_file`, `get_application_contract` and the staging `propose_application_contract` ([spec](application-contract.md)), all bound to the Run's application and pinned commit. There is still no deployment, shell or repository-write tool. Do not present a future approval gate as already implemented. See [current tool configuration](../../src/server/pi.ts) and [mode descriptions](../../src/server/types.ts).
 
 ### Enforce the scope at the operation
 
@@ -129,7 +129,7 @@ The `AgentSession` object can be short-lived. Reopening the same native session 
 
 ### Stable instructions, on-demand Decisions
 
-Use `systemPromptOverride` for stable behavior instructions, including when to consult saved records and how to distinguish evidence from conversation. Do not put per-Run timestamps, changing Decisions or the preceding Run's status into this prefix. Preserve native history and append new context through Pi's public native message APIs; no context extension is required for this slice.
+Use `systemPromptOverride` for stable behavior instructions, including when to consult saved records and how to distinguish evidence from conversation. Do not put per-Run timestamps, changing Decisions or the preceding Run's status into this prefix. The prefix is selected per phase from the Run's workspace: a Chat never changes phase, so its instructions never change either. Preserve native history and append new context through Pi's public native message APIs; no context extension is required for this slice.
 
 Add one read-only `search_decisions` tool bound to the current application by the worker, not by a model-supplied application ID. Start with ordinary scoped database queries, not embeddings, a vector store or a separate retrieval service. The first interface is deliberately small:
 

@@ -70,7 +70,7 @@ export const suiteGuides = {
       "Vitest enqueues a saved message, claims its Pi Run, and executes the same worker code in Node.js. No Next.js server, HTTP request or browser is involved.",
     real: "Pi, the configured model, tool proposals, domain validation and the SQLite transaction. Uses your configured ChatGPT subscription.",
     mocked:
-      "Application data and existing Decisions are seeded examples. Conversation memory & compaction cases also seed earlier history and usage, with a smaller retained-history setting to trigger real compaction affordably. GitHub inspection is blocked; model replies and compaction summaries are not mocked.",
+      "Application data and existing Decisions are seeded examples. Conversation memory & compaction cases also seed earlier history and usage, with a smaller retained-history setting to trigger real compaction affordably. Application Contract cases seed a Phase 2 workspace with a synthetic inspection and saved reads of a fixture repository. GitHub is blocked; model replies, tool choices and compaction summaries are not mocked.",
     isolation:
       "Each live eval run creates one temporary eval database under /tmp/server-guy-pi-eval-*. All selected cases share that file, but every case and repetition gets a new application and chat. Example: the greeting case cannot inherit messages or Decisions from revise-existing. After the reports are written, the database connection closes and the /tmp/server-guy-pi-eval-* directory is deleted; what remains for review is under tests/results/. The answer report is saved separately under tests/results/evals/. Your normal application database is never opened; configured Pi credentials are real and may be refreshed.",
     checks:

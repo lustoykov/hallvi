@@ -1,6 +1,7 @@
 // Synthetic provider boundary, copied into disposable apps only. No fetch, no real credentials.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { contentsResponse, fixtureCommitSha, treeResponse } from "./qa-fixtures/github-responses";
 
 export class GithubAccessError extends Error {
   constructor(message: string, public readonly kind: "auth" | "access" | "unavailable" = "unavailable") { super(message); }
@@ -41,7 +42,22 @@ export async function githubJson(path: string) {
     if (name.includes("missing")) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
     if (name.includes("offline")) throw new GithubAccessError("Could not reach GitHub.");
     if (name.includes("slow-create") && !action) await new Promise((resolve) => setTimeout(resolve, 3000));
-    data = action === "commits" ? { sha: "1234567890abcdef1234567890abcdef12345678" } : { id: 99, full_name: `${owner}/${name}`, visibility: "private", default_branch: "main", permissions: { pull: true, push: false, admin: false } };
+    const fullName = `${owner}/${name}`;
+    // Phase 2 reads are pinned to one synthetic commit per repository name and
+    // scenario revision; `revision: "2"` in the scenario simulates a new push.
+    const revision = typeof current.revision === "string" ? current.revision : "1";
+    if (action === "git") {
+      if (current.inspection === "offline") throw new GithubAccessError("Could not reach GitHub.");
+      const sha = path.split("/")[6]?.split("?")[0] ?? "";
+      data = treeResponse(fullName, sha);
+    } else if (action === "contents") {
+      if (current.inspection === "offline") throw new GithubAccessError("Could not reach GitHub.");
+      const [encoded, query = ""] = path.slice(path.indexOf("/contents/") + "/contents/".length).split("?");
+      const body = contentsResponse(fullName, decodeURIComponent(encoded), new URLSearchParams(query).get("ref") ?? "");
+      if (!body) throw new GithubAccessError("The repository is missing or this login cannot access it.", "access");
+      data = body;
+    } else if (action === "commits") data = { sha: fixtureCommitSha(fullName, revision) };
+    else data = { id: 99, full_name: fullName, visibility: "private", default_branch: "main", permissions: { pull: true, push: false, admin: false } };
   }
   return { data, scopes: ["repo"] };
 }

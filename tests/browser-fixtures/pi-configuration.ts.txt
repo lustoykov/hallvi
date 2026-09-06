@@ -18,8 +18,123 @@ import {
   readPiCredential,
   type PiSdk,
 } from "./pi-configuration-real";
+import {
+  buildContractProposal,
+  CONTRACT_READ_ORDER,
+  treePaths,
+  type SeenRead,
+} from "./qa-fixtures/contract-builder";
 
 export * from "./pi-configuration-real";
+
+const INSPECTION_REQUEST =
+  "Inspect the repository and propose the Application Contract.";
+
+/**
+ * The scripted Phase 2 flow: read the saved inspection, read the fixture
+ * files that matter, propose a contract built from exactly those reads, then
+ * answer. "contract: correct <value>" revises health.path from the engineer's
+ * message; "contract: invented" cites a read that never happened.
+ */
+function contractStep(
+  user: string,
+  context: Context,
+  userIndex: number,
+): { tool?: ToolCall; answer?: string } {
+  const mode =
+    user === INSPECTION_REQUEST
+      ? "propose"
+      : user.slice("contract:".length).trim();
+  const results = context.messages
+    .slice(userIndex + 1)
+    .filter((entry) => entry.role === "toolResult")
+    .map((entry) => ({
+      name: entry.toolName,
+      isError: entry.isError,
+      body: textOf(entry),
+    }));
+  const runContext = context.messages
+    .slice(0, userIndex + 1)
+    .filter((entry) => entry.role === "user" && textOf(entry).startsWith("{"))
+    .map((entry) => JSON.parse(textOf(entry)) as { userMessageId?: string })
+    .at(-1);
+  const call = (name: string, args: Record<string, unknown>): ToolCall => ({
+    type: "toolCall",
+    id: randomUUID(),
+    name,
+    arguments: args,
+  });
+  const inspectionResult = results.find(
+    (result) => result.name === "get_repository_inspection" && !result.isError,
+  );
+  const proposalResult = results.find(
+    (result) => result.name === "propose_application_contract",
+  );
+  const currentResult = results.find(
+    (result) => result.name === "get_application_contract" && !result.isError,
+  );
+  if (!inspectionResult) return { tool: call("get_repository_inspection", {}) };
+  if (proposalResult) {
+    if (proposalResult.isError)
+      return {
+        answer: `[QA contract] Proposal rejected; nothing was saved. ${proposalResult.body.split("\n")[1] ?? ""}`,
+      };
+    const proposal = JSON.parse(proposalResult.body) as {
+      version: number;
+      fields: number;
+      blockers: string[];
+      conformanceItems: string[];
+    };
+    return {
+      answer: `[QA contract] Proposed Application Contract v${proposal.version} with ${proposal.fields} fields, ${proposal.blockers.length} blocker(s) and ${proposal.conformanceItems.length} conformance item(s).`,
+    };
+  }
+  const inspection = JSON.parse(inspectionResult.body) as {
+    inspection: { observationId: string; commitSha: string } | null;
+    tree: { entries: string[] };
+  };
+  if (!inspection.inspection)
+    return {
+      answer:
+        "[QA contract] The repository has not been inspected in this phase.",
+    };
+  const paths = treePaths(inspection);
+  const reads: SeenRead[] = results
+    .filter((result) => result.name === "read_repository_file" && !result.isError)
+    .map((result) => JSON.parse(result.body) as SeenRead);
+  const next = CONTRACT_READ_ORDER.filter((path) => paths.includes(path)).find(
+    (path) => !reads.some((read) => read.path === path),
+  );
+  if (next) return { tool: call("read_repository_file", { path: next }) };
+  if (mode.startsWith("correct") && !currentResult)
+    return { tool: call("get_application_contract", {}) };
+  const current = currentResult
+    ? (JSON.parse(currentResult.body) as { current: { id: string } | null })
+        .current
+    : null;
+  const value = mode.split(" ").at(-1)!;
+  return {
+    tool: call(
+      "propose_application_contract",
+      buildContractProposal(inspection, reads, {
+        ...(current ? { revises: current.id } : {}),
+        ...(mode.startsWith("correct") && current
+          ? {
+              corrections: [
+                {
+                  key: "health.path",
+                  value,
+                  messageId: runContext?.userMessageId ?? "missing",
+                  quote: value,
+                },
+              ],
+            }
+          : {}),
+        invented: mode === "invented",
+      }),
+    ),
+  };
+}
 
 function textOf(message: Context["messages"][number]) {
   return typeof message.content === "string"
@@ -97,7 +212,14 @@ function streamSynthetic(
       const lastSearch = searchResults.at(-1);
       let tool: ToolCall | undefined;
       let answer = `[QA fixture reply] ${userMessage}`;
-      if (lastResult?.isError) {
+      if (
+        userMessage === INSPECTION_REQUEST ||
+        userMessage.startsWith("contract:")
+      ) {
+        const step = contractStep(userMessage, context, userIndex);
+        tool = step.tool;
+        if (step.answer) answer = step.answer;
+      } else if (lastResult?.isError) {
         answer =
           "[QA fixture reply] Replacement rejected; no Decision was staged.";
       } else if (

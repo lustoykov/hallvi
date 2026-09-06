@@ -171,7 +171,6 @@ function lookups(applicationId: string): ContractValidationContext["lookups"] {
 
 export function contractView(
   applicationId: string,
-  evidence: RepositoryEvidence,
 ): ApplicationContractView | null {
   const record = currentContract(applicationId);
   if (!record) return null;

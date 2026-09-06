@@ -4,7 +4,7 @@ Status: canonical workshop draft. This document is the single product and UI spe
 
 [Open the Journey 1 diagrams](./diagrams/01-application-launch.html)
 
-[Run the implemented Journey 1 Phase 1 UI](../../README.md)
+[Run the implemented Journey 1 Phase 1–2 UI](../../README.md)
 
 ## Purpose
 
@@ -169,7 +169,7 @@ These states are presentation inventory inside the fixed phases. They are not wo
 | L1.2 | GitHub connection needed | The GitHub connection state in Settings and the repository-readable check with its provenance; Hetzner, Cloudflare and domain prerequisites are not shown until their phases | The smallest next step to make the repository readable and what can still be inspected now | Connect GitHub, defer, or correct | §User journey phase 1; §Important alternate paths: provider access missing |
 | L1.3 | Workspace created | Application identity, authority context, durable Chat, next phase | Pi's initial understanding and intent to inspect | Continue or correct identity | §User journey phase 1 |
 | L2.1 | Repository inspection | Live inspection activity, detected stack facts, unknowns, and provenance badges | Pi narrates its current hypothesis without claiming certainty | Ask or correct while inspection runs | §User journey phase 2; §Operator UI bullets 1–2 |
-| L2.2 | Contract review | Application Profile match, Application Contract fields grouped as repository-declared, inferred, user-confirmed, or unknown | Pi explains the proposed contract and the material unknowns | Confirm or correct fields | §User journey phase 2; §Evidence produced |
+| L2.2 | Contract review | Application Profile match, Application Contract fields grouped as repository-declared, profile-derived, inferred, user-confirmed, or unresolved, with conformance work for Phase 3 and open policies shown separately | Pi explains the proposed contract, the material unknowns and any decision the engineer must make | Confirm or correct fields | §User journey phase 2; §Evidence produced |
 | L2.3 | Profile gap or unsupported repository | Bounded conformance gaps or an explicit unmatched-contract result; no deploy action | Why the repository is outside the supported contract and what would make it eligible | Choose conformance or stop | §Important alternate paths: unsupported repository |
 | L3.1 | Conformance plan | Required health, configuration, logging, and deployment-file changes, separated into source-controlled and operational work | Pi explains why each gap blocks a supported launch | Open the repository-work chooser | §User journey phase 3 |
 | L3.W1 | Choose repository working environment | The bounded repository brief and four paths: Server Guy, Codex, another coding harness, or manual work; Server Guy is the capable recommended default | Pi explains that every path receives the same objective, evidence, acceptance checks, and operational boundaries | Choose where the repository work happens | §Repository working environment |
@@ -407,6 +407,8 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 **Phase Deliverable:** **Application Contract** — the app-level agreement describing build, runtime, health, persistence, configuration, observability, and verification requirements with provenance and explicit gaps.
 
+**Decided 2026-09-06:** Phase 2 establishes what the application requires; Phase 3 makes and verifies the changes. A requirement the repository does not yet meet but whose change is known is recorded on the contract as conformance work for Phase 3. An unknown, contradictory or unsupported required value still blocks Phase 2. Open product policies are represented on the contract, stay visibly unresolved, and must be resolved before the later gate that needs them; they are never defaulted or silently waived. The read-only implementation of this phase is specified in the [Application Contract spec](../specs/application-contract.md).
+
 ### P2.G1. Application Profile resolution is conclusive and supported
 
 - **Satisfied when:** The repository resolves to one supported Application Profile with an explicit profile identity and version. Unsupported or ambiguous resolution remains Unsatisfied with a Blocker; recording the mismatch alone does not make the launch eligible to advance.
@@ -420,20 +422,20 @@ An observability target is a runtime link, not documentation prose. Product docu
 - **Satisfied when:** Every material field required by the selected Application Profile exists in the Application Contract, including an explicit unknown or gap rather than silent omission.
 - **Evidence:** Versioned Application Contract artifact plus schema-validation result against the selected profile.
 - **Human observability:** Open the Application Contract grouped by build, runtime, health/readiness, persistence, migrations, configuration/secrets, logs/telemetry, backup, and verification; open the governing profile field definition.
-- **Open dependency:** **U16** affects the required migration-compatibility and rollback fields. Until U16 is resolved, those fields must remain visibly unresolved rather than defaulted.
+- **Open dependency:** **U16** affects the required migration-compatibility and rollback fields. Until U16 is resolved, those fields must remain visibly unresolved rather than defaulted. The same holds for the backup and telemetry fields that **U1** decides and the mandatory verification set that **U15** decides: represented in the contract, visibly unresolved, and required at the later gate that needs them (P7.G3, P7.G4, P4.G4, P8.G2), not here.
 - **Invalidated by:** Contract schema, profile version, or material repository facts changing.
 
 ### P2.G3. Every material field carries provenance
 
-- **Satisfied when:** Each material Application Contract value is labeled as repository-declared, profile-derived, user-confirmed, provider-observed, or unresolved, and links to the source that produced it.
+- **Satisfied when:** Each material Application Contract value is labeled as repository-declared, profile-derived, user-confirmed, inferred, provider-observed, or unresolved, and links to the source that produced it. Inferred marks Server Guy's interpretation of cited evidence; it is never presented as a repository declaration, and a value that merely matches a quoted line is not thereby declared.
 - **Evidence:** Contract provenance map and Evidence References for inferred or observed values; Decisions for user-confirmed values.
 - **Human observability:** Open any contract field to its repository line, profile rule, raw Observation, or originating chat decision.
 - **Invalidated by:** Any source value, source identity, or field origin changing.
 
 ### P2.G4. No required contract gap remains unresolved
 
-- **Satisfied when:** Every required field has a valid value and every incompatibility is resolved. Unknown, unsupported, or contradictory required fields produce explicit Conformance Blockers and keep this check Unsatisfied.
-- **Evidence:** Contract validation report and bounded gap list, each tied to the affected field and source evidence.
+- **Satisfied when:** Every required field has a valid value or is a recorded conformance item, and every incompatibility is resolved. **Decided 2026-09-06:** a required value the repository does not yet meet but whose change is known (a missing `/health` route, a localhost-only bind) is recorded as a conformance item for Phase 3 and does not keep this check Unsatisfied. Unknown, unsupported, or contradictory required values (a SQLite declaration where the profile targets PostgreSQL) produce explicit Conformance Blockers and keep this check Unsatisfied until the engineer decides or the evidence changes. Open product policies (U1, U15, U16, F-8) are unresolved fields that do not block this check and must be resolved before the later gate that needs them.
+- **Evidence:** Contract validation report and bounded gap list (blockers, conformance items, open policies), each tied to the affected field and source evidence.
 - **Human observability:** Open the gap report; open the affected contract field and repository source; ask Pi to explain or propose conformance work.
 - **Open dependency:** **U3** determines whether explicit engineer confirmation of the initial Application Contract is additionally required before paid work. This check does not treat silence as confirmation or choose mode-specific confirmation behavior.
 - **Invalidated by:** Application Contract, profile, repository revision, or a gap-resolution source changing.
@@ -451,7 +453,7 @@ An observability target is a runtime link, not documentation prose. Product docu
 
 ### P3.G2. Required source-controlled changes are resolved
 
-- **Satisfied when:** Every required conformance gap is resolved in the exact candidate revision, no required change remains only local or unmerged, and any returned coding-agent change stays within its bounded brief.
+- **Satisfied when:** Every conformance item recorded on the Application Contract, plus any blocker the engineer resolved with a required change, is resolved in the exact candidate revision, no required change remains only local or unmerged, and any returned coding-agent change stays within its bounded brief.
 - **Evidence:** Gap-to-diff mapping, pull-request status, changed-file list, independent scope check, and merge result. A timeout, abandoned handoff, or scope violation keeps the check Unsatisfied.
 - **Human observability:** Open the pull request, complete diff, changed files, review discussion, and coding-agent evidence separately from Server Guy's checks.
 - **Specification dependency:** **G-HANDOFF-TIMEOUT** still requires a defined abandoned/timeout terminal. This draft does not invent one.
@@ -708,15 +710,15 @@ All chats in the phase can read the shared Phase Workspace and contribute recogn
 
 Chat is where the engineer and Pi collaborate toward the current Gate Checks; no chat is the durable source of truth for phase progress. Other application conversations remain outside Journey 1.
 
-When every Gate Check in the current Exit Gate becomes Satisfied, Server Guy performs one visible phase transition:
+When every Gate Check in the current Exit Gate is Satisfied, the engineer's explicit **Continue** starts one visible phase transition (decided 2026-09-06: gate results are projections that can regress, for example after a GitHub disconnect, so nothing advances automatically):
 
-1. finalize the Phase Deliverable and its version/identity;
-2. evaluate the Gate Checks from current records and retain the Evidence References used by the completed deliverable;
+1. re-evaluate the Gate Checks from current records, refuse if any is Unsatisfied or a request is still in flight, and retain the Evidence References used by the completed deliverable;
+2. finalize the Phase Deliverable and its version/identity;
 3. persist recognized Decisions, current facts, Operations, and unresolved product dependencies; derive Blockers from those sources;
 4. mark every Chat in the completed Phase Workspace read-only without deleting its conversation or Activity Events;
 5. open the next Phase Workspace with its main Chat;
 6. seed Pi from the Operator View, not from completed chat transcripts;
-7. let Pi's first message name the new Phase Deliverable, summarize inherited facts/decisions, and identify the first unsatisfied Gate Checks.
+7. let the first message of the new phase name its Phase Deliverable and checks; when Server Guy starts the phase's first request itself, that request is recorded and shown as Server Guy's, never as the engineer's words.
 
 Completed chats remain available for provenance. Their transcripts are not injected wholesale into the next phase. Phase 9 ends by making the Handoff Phase Workspace read-only and entering the normal application workspace rather than creating a tenth Launch Phase.
 

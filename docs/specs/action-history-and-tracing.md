@@ -41,7 +41,7 @@ This is an inclusion guide, not a new implementation backlog. Add events as thei
 | Decisions | Requirement saved or replaced | Emit only for committed records, not staged proposals or lookups. |
 | Repository verification | Repository identity/access verified; explicit recheck completed; check failed; access restored when supported by evidence | Include checked identity/revision and time. A failed check does not always establish lost access. |
 | Verification invalidation | Prior repository verification invalidated by a connection change or disconnect | Record the transition once; stale verification does not prove access was lost. A view refresh is not another transition. |
-| Application Contract and readiness | Contract established/materially revised; candidate submitted for verification; conformance passed or failed | Later flow. Internal reads, model drafts, and intermediate coding steps stay in execution detail. |
+| Application Contract and readiness | Contract established/materially revised (implemented: `contract-established`, `contract-revised` with old → new for up to five fields); repository inspected or inspection failed (`repository-inspected`, `repository-inspection-failed`); inspection invalidated by a connection change (`repository-inspection-invalidated`, once per inspection); candidate submitted for verification; conformance passed or failed | Internal reads, model drafts, and intermediate coding steps stay in execution detail: a `read_repository_file` step is a diagnostic step, never Activity. Conformance execution remains a later flow. |
 | Launch Plan | Reviewable plan established or materially revised | Later flow. Describe meaningful changes to topology, cost, or intended effects, not every model revision. |
 | Application authority and approvals | Authority changed; concrete operation awaiting approval; approval granted, rejected, or invalidated | Later flow. Distinguish an approval from execution or success. |
 | Deployment Host | Host provisioned/adopted; readiness verified; setup failed | Later flow. Distinguish resource creation from readiness. |
@@ -52,7 +52,7 @@ This is an inclusion guide, not a new implementation backlog. Add events as thei
 | Health, incidents, and alerts | Material health transition; Incident Case opened; recovery attempted/verified; incident resolved | Later flow. Attach alert delivery/failure to the incident; unchanged background probes remain Observations. |
 | Drift | Out-of-band Change recorded/detected; drift accepted or reconciled | Later flow. Link the affected resource and supporting evidence. |
 | Remediation and handoff | Bounded repair handed off; Candidate Fix returned; accepted/rejected after verification | Later flow. External-agent integration remains deferred; worker completion does not prove recovery. |
-| Launch progress | Phase completed/reopened; Application Launch completed and handed over | Later flow. Do not emit on every Gate Check recomputation. |
+| Launch progress | Phase completed/reopened; Application Launch completed and handed over | Implemented for the Phase 1 → Phase 2 transition: `phase-completed` in the completed workspace and `phase-started` in the new one, once per explicit Continue. Reopening remains a later flow. Do not emit on every Gate Check recomputation. |
 | Cost monitoring | Configured threshold crossed or material discrepancy detected | Later flow. Ordinary price lookups and saving a budget sentence do not establish threshold enforcement. |
 
 ### Exclusions and scope
@@ -153,7 +153,7 @@ Browser fixtures disable export and isolate diagnostic files alongside disposabl
 
 ### Database compatibility
 
-The current schema remains prototype version **6**. Existing v6 databases need no diagnostic migration. Historical `chat-execution`, `chat-created` and `chat-archived` rows in `activity_events` remain stored but are excluded from the feed.
+The current schema is prototype version **8** (Phase 2 added completed workspaces and `application_contracts`; version 7 was an abandoned branch and is refused). A version-6 database is upgraded in place by `db:push` after a backup copy is written; no diagnostic migration is involved. Historical `chat-execution`, `chat-created` and `chat-archived` rows in `activity_events` remain stored but are excluded from the feed.
 
 Development databases use the current schema only. Recreate disposable databases from incompatible prototype versions, including the abandoned version-7 history-table branch. There is no special version-7 runtime compatibility, migration, copying or reconstruction.
 
