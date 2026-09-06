@@ -17,6 +17,7 @@ import {
   appendDiagnosticLine,
   diagnosticLogPath,
   diagnosticMetadata,
+  isToolStep,
   logDiagnostic,
   MAX_DIAGNOSTIC_STEPS,
   stepLabels,
@@ -198,8 +199,7 @@ export function beginRunDiagnostics(run: PiRun) {
                       "langfuse.observation.type":
                         event.kind === "model"
                           ? "generation"
-                          : event.kind === "search_decisions" ||
-                              event.kind === "propose_decision"
+                          : isToolStep(event.kind)
                             ? "tool"
                             : "span",
                     },

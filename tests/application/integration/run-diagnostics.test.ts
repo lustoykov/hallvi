@@ -191,6 +191,38 @@ it("logs bounded correlated steps with export disabled and preserves only author
   expect(runs.chatRunSnapshot(app, chat)).toEqual(snapshot);
 });
 
+it("records a status lookup as a diagnostic step, never as application Activity", async () => {
+  mocks.ask.mockImplementation(async (_input, options) => {
+    options.onActivity({
+      type: "start",
+      key: "tool:1",
+      kind: "get_application_status",
+    });
+    options.onActivity({ type: "end", key: "tool:1" });
+    options.onActivity({
+      type: "start",
+      key: "tool:2",
+      kind: "get_application_status",
+    });
+    options.onActivity({ type: "end", key: "tool:2", failed: true });
+    return { message: "Phase 1 is not ready yet.", decisionProposals: [] };
+  });
+  const run = queued();
+  await executePiRun(runs.claimNextPiRun()!);
+  expect(status(run.id)).toBe("succeeded");
+  expect(
+    logs(run.id)
+      .filter((row) => row.event === "step.finished")
+      .map((row) => [row.stepId, row.step, row.outcome]),
+  ).toEqual([
+    ["context", "context", "completed"],
+    ["tool:1", "get_application_status", "completed"],
+    ["tool:2", "get_application_status", "failed"],
+    ["save", "save", "completed"],
+  ]);
+  expect(store.listActivity(workspace)).toEqual([]);
+});
+
 it("keeps tool completion diagnostic while a rejected save leaves no successful outcome or Decision", async () => {
   mocks.ask.mockImplementation(async (_input, options) => {
     options.onActivity({

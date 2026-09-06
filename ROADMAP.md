@@ -17,18 +17,19 @@ The sequence below carries the agreed order formerly kept in the learning guide,
 | 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
 | 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
 | 7 | Keep application Activity meaningful, with bounded local diagnostic logs and optional OpenTelemetry export. | Implemented in [PR #16](https://github.com/lustoykov/server-guy/pull/16), including the September 6 correction that removes Reply details and detailed SQLite diagnostics. Extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
-| 8 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
-| 9 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
-| 10 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
-| 11 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
-| 12 | Revisit Workflow DevKit only when its durability trigger is present. | Conditional: [trigger](#revisit-workflow-devkit-only-at-its-trigger); not a prerequisite for the next milestone. |
-| 13 | Break, recover, roll back, and externally re-verify a deployed application. | Planned. |
-| 14 | Add the EC2 Host Adapter, reusing the proven Linux-host lifecycle and Host Record. | Planned: [AWS direction](#aws-integration-direction). |
-| 15 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
+| 8 | Let Pi retrieve application status and recorded evidence through a scoped read-only tool instead of injecting the full summary before every reply. | Implemented on this branch, stacked on PR #16 and awaiting PR review. [Spec](docs/specs/application-status-tool.md), [checklist](#application-status-lookup). |
+| 9 | Implement the Phase 2 Application Contract as a read-only vertical slice. | Planned; after required Phase 1 acceptance. [Product contract](docs/user-journeys/01-application-launch.md#nine-phase-journey), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
+| 10 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned. |
+| 11 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
+| 12 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
+| 13 | Revisit Workflow DevKit only when its durability trigger is present. | Conditional: [trigger](#revisit-workflow-devkit-only-at-its-trigger); not a prerequisite for the next milestone. |
+| 14 | Break, recover, roll back, and externally re-verify a deployed application. | Planned. |
+| 15 | Add the EC2 Host Adapter, reusing the proven Linux-host lifecycle and Host Record. | Planned: [AWS direction](#aws-integration-direction). |
+| 16 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
 
 Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
 
-Implemented follow-up on this branch, awaiting PR review: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md). Native per-Chat history replaces custom replay/compaction, saved Decisions are retrieved through a scoped read-only tool, and invalid proposals return in-loop feedback. External authority and atomic Decision commits are unchanged; independently committed tools remain deferred. Next is action history and tracing, not a new launch phase.
+Implemented follow-ups awaiting PR review: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md) (native per-Chat history replaces custom replay/compaction, saved Decisions are retrieved through a scoped read-only tool, and invalid proposals return in-loop feedback), action history and tracing, and the [application status lookup](#application-status-lookup) that replaces the per-reply application summary. External authority and atomic Decision commits are unchanged; independently committed tools remain deferred. Next is Phase 2, not a new prompt-injection mechanism.
 
 ## Phase 1 implementation backlog
 
@@ -125,6 +126,18 @@ Give users application history for meaningful domain events and ordinary Chat wi
 Earlier PR revisions placed every reply in Activity, then moved details into Chat and a separate table. The final September 6 decision supersedes those implementations: no rich diagnostic database or in-app viewer is required for the current product.
 
 - [ ] Extend the same correlation through policy, approvals, provider calls, receipts, and verification as those Operations are implemented; add Sentry for application errors before external-user releases.
+
+## Application status lookup
+
+After Activity/tracing and before Phase 2: replace the repeated per-reply application summary with `get_application_status`, a read-only tool bound to the current application. The [tool spec](docs/specs/application-status-tool.md) owns its behavior, evidence boundaries, and acceptance scenarios. Implemented on this branch (stacked on [PR #16](https://github.com/lustoykov/server-guy/pull/16)); the live-eval cases are added but only run on explicit opt-in.
+
+- [x] Add the empty-input, application-scoped tool using the same current check evaluation as the Operator View; return saved configuration, workspace status, public check results, applicable evidence references/timestamps, and catalog requirements. Extra input fields, a mismatched or deleted scope, and a failed storage read are tool errors; missing repository evidence is a successful `not-yet` result.
+- [x] Remove automatic `currentApplication` summary injection; retain the small execution envelope (`createdAt`, Run/application/Chat identity) and previous-attempt outcome needed to distinguish committed effects from failed proposals.
+- [x] Update Pi instructions to look up current state when needed, distinguish retrieval time from observation time, and avoid inferring deployment status from Phase 1 readiness. Keep saved requirements in `search_decisions`.
+- [x] Keep status reads out of application Activity; record them only as metadata-only `get_application_status` diagnostic steps in local logs and optional spans (PR #16's final revision removed the Reply details panel), without adding provider calls or broader database access.
+- [x] Verify scope, stale/invalidated evidence, lookup failures, no domain effects, and removal of repeated summaries with deterministic tests, including the actual SDK tool loop with a synthetic provider.
+- [x] Extend the synthetic real-Pi casebook with seven `Application status` cases (acknowledgement and conceptual questions without a lookup; blockers, recorded access versus a live recheck, stale checks-passed history, a changed Approval Mode, and readiness versus deployment) and status-lookup expectations on the greeting and GitHub cases; run and review them on explicit opt-in, as recorded in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
+- [x] Update native-session documentation to reflect the tool and the reduced Run context.
 
 ## Revisit Workflow DevKit only at its trigger
 

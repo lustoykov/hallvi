@@ -6,17 +6,32 @@ export const MAX_DIAGNOSTIC_STEPS = 128;
 export const LOG_MAX_BYTES = 1024 * 1024;
 export const LOG_ARCHIVES = 3;
 export const stepLabels = {
-  context: "Load current app context",
+  context: "Load request context",
   session: "Prepare conversation",
   model: "Generate response",
   search_decisions: "Look up saved requirements",
   propose_decision: "Prepare requirement",
+  get_application_status: "Look up application status",
   tool: "Execute tool",
   compaction: "Summarize earlier conversation",
   retry: "Model retry scheduled",
   save: "Validate and save reply and requirements",
 } as const;
 export type StepKind = keyof typeof stepLabels;
+// The scoped tools Pi may call. A status read is diagnostic detail like a
+// requirement lookup: it changes nothing, so it is never an Activity Event.
+// Any other tool name is recorded generically.
+const TOOL_STEP_KINDS: readonly StepKind[] = [
+  "search_decisions",
+  "propose_decision",
+  "get_application_status",
+];
+export function isToolStep(kind: StepKind) {
+  return TOOL_STEP_KINDS.includes(kind);
+}
+export function toolStepKind(toolName: string): StepKind {
+  return TOOL_STEP_KINDS.find((kind) => kind === toolName) ?? "tool";
+}
 export type ExecutionSignal =
   | { type: "start"; key: string; kind: StepKind }
   | {

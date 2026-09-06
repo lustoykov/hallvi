@@ -211,3 +211,44 @@ export interface PiTurnResult {
   message: string;
   decisionProposals: PiDecision[];
 }
+
+/**
+ * What `get_application_status` returns to Pi: saved configuration, the
+ * current check evaluation, the evidence that supports each current check and
+ * the catalog of upcoming product requirements. `retrievedAt` is when these
+ * local records were read; an evidence entry's `observedAt` is when that
+ * record was saved or its check was performed, which may be much older.
+ * Reading never rechecks GitHub, renews evidence or verifies a deployment.
+ */
+export interface ApplicationStatus {
+  retrievedAt: string;
+  application: {
+    id: string;
+    name: string;
+    repositoryUrl: string;
+    environment: ApplicationRecord["environment"];
+    approvalMode: { key: ApprovalMode; label: string };
+    updatedAt: string;
+  };
+  workspace: Pick<
+    PhaseWorkspaceView,
+    "phaseKey" | "phaseNumber" | "deliverable" | "status"
+  >;
+  checks: Array<
+    Pick<GateCheck, "key" | "label" | "status" | "result"> & {
+      evidence: Array<
+        Pick<
+          EvidenceReference,
+          "recordType" | "recordId" | "label" | "href" | "observedAt"
+        >
+      >;
+    }
+  >;
+  // Product rules for later phases, not observations of provider access.
+  upcomingRequirements: Array<
+    Pick<
+      UpcomingRequirement,
+      "key" | "label" | "requiredBeforePhase" | "resolutionPath"
+    >
+  >;
+}

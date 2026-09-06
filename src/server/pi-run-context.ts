@@ -3,13 +3,15 @@ import { db } from "./db";
 import { piRuns } from "./db-schema";
 import type { PiRun } from "./types";
 
-export class PiRunContextError extends Error {}
-
-export function buildPiRunContext(run: PiRun, viewSummary: string) {
-  if (!viewSummary.trim() || viewSummary.length > 12_000)
-    throw new PiRunContextError(
-      "Current application checks could not fit in the Run context. No model request was started.",
-    );
+/**
+ * The bounded execution envelope appended before each new engineer message:
+ * Run/application/Chat identity, when it was prepared, and the previous
+ * attempt's actual outcome, so a failed or cancelled proposal is never
+ * mistaken for a committed Decision. It carries no application state. Current
+ * checks, Approval Mode and evidence come from `get_application_status` when
+ * an answer depends on them; saved requirements from `search_decisions`.
+ */
+export function buildPiRunContext(run: PiRun) {
   const previous = db()
     .select()
     .from(piRuns)
@@ -23,11 +25,10 @@ export function buildPiRunContext(run: PiRun, viewSummary: string) {
     .orderBy(desc(sql`rowid`))
     .get();
   return JSON.stringify({
-    observedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     runId: run.id,
     applicationId: run.applicationId,
     chatId: run.chatId,
-    currentApplication: viewSummary,
     previousAttempt: previous
       ? {
           runId: previous.id,

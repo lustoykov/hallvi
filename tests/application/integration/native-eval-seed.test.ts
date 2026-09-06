@@ -342,13 +342,13 @@ describe("the seven native eval scenarios use real local data and explicitly syn
         ),
       ).toBe(false);
       const next = acceptedRun(after, "What is saved now?");
-      expect(
-        JSON.parse(buildPiRunContext(next, "Current checks")).previousAttempt,
-      ).toMatchObject({
-        runId: previous.id,
-        status: "cancelled",
-        savedOutcome: expect.stringContaining("none were committed"),
-      });
+      expect(JSON.parse(buildPiRunContext(next)).previousAttempt).toMatchObject(
+        {
+          runId: previous.id,
+          status: "cancelled",
+          savedOutcome: expect.stringContaining("none were committed"),
+        },
+      );
     },
   );
 });

@@ -59,7 +59,7 @@ This is an inclusion guide, not a new implementation backlog. Add events as thei
 
 - Greetings, ordinary answers, streamed text, model generations, tool invocations, compaction, model retries, and reply failures/cancellations are not application Activity. Chat retains answers and reply states; local logs and optional traces retain selected diagnostic metadata.
 - Chat creation/archive belongs with Chat history, not application Activity. Rows recorded for these before the correction stay stored but are excluded from the feed.
-- Read-only lookups and unchanged background observations do not produce individual feed items. An explicit verification milestone may qualify even though it changes no external resource.
+- Read-only lookups and unchanged background observations do not produce individual feed items. Pi's `get_application_status` read ([spec](application-status-tool.md)) is a `get_application_status` step in local logs and optional spans, nowhere in the feed. An explicit verification milestone may qualify even though it changes no external resource.
 - Installation-wide ChatGPT/model settings, GitHub account setup, tracing configuration, and routine credential refresh are not copied into every application's feed. Record an application-specific consequence, such as verification invalidation, when it occurs.
 - Removing an application is meaningful, but today's prototype removes its workspace/history. A surviving deletion record would need an installation-level history; do not add that facility solely for this correction.
 - Validation errors before an operation is accepted stay with the form/chat. Record a consequential accepted operation's failure at its own boundary, with an honest outcome and evidence.

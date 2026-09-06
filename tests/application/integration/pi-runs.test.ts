@@ -30,6 +30,7 @@ import {
 } from "../../../src/server/pi-worker";
 import { buildPiRunContext } from "../../../src/server/pi-run-context";
 import { openNativeChatSession } from "../../../src/server/pi-sessions";
+import { readPiApplicationStatus } from "../../../src/server/pi-status";
 import {
   createChat,
   getPhaseOneOperatorView,
@@ -136,6 +137,13 @@ describe("durable Pi acceptance and outcomes", () => {
       previousAttempt: null,
     });
     expect(secondInput.runContext).not.toContain("Recover quickly");
+    // No automatic application summary: check labels, results and the
+    // Approval Mode reach Pi only through the scoped status tool.
+    expect(JSON.parse(secondInput.runContext)).not.toHaveProperty(
+      "currentApplication",
+    );
+    expect(secondInput.runContext).not.toContain("GitHub repository access");
+    expect(secondInput.runContext).not.toContain("Let Server Guy decide");
   });
   it("rolls back all Decisions and final text if a later proposal is invalid", async () => {
     const before = getPhaseOneOperatorView(applicationId);
@@ -287,7 +295,16 @@ describe("minimal native Run context", () => {
       expect(context.previousAttempt.savedOutcome).toContain(
         "pending, not saved; none were committed",
       );
-      expect(context.currentApplication).toContain("Checks:");
+      // The envelope carries identity and outcome only; current checks and
+      // Approval Mode are read on demand through get_application_status.
+      expect(Object.keys(context).sort()).toEqual([
+        "applicationId",
+        "chatId",
+        "createdAt",
+        "previousAttempt",
+        "runId",
+      ]);
+      expect(context).not.toHaveProperty("currentApplication");
       expect(context).not.toHaveProperty("decisions");
     },
   );
@@ -296,7 +313,7 @@ describe("minimal native Run context", () => {
     await executePiRun(claimed());
     enqueue("Next");
     const next = claimed();
-    const context = JSON.parse(buildPiRunContext(next, "Current checks"));
+    const context = JSON.parse(buildPiRunContext(next));
     expect(context.previousAttempt).toMatchObject({
       runId: previous.run.id,
       status: "succeeded",
@@ -305,9 +322,7 @@ describe("minimal native Run context", () => {
     runs.finishPiRun(next.id, "cancelled", "Stop test");
     const other = createChat(applicationId, "Other").selectedChatId!;
     enqueue("Fresh Chat", other);
-    expect(
-      JSON.parse(buildPiRunContext(claimed(), "Other checks")).previousAttempt,
-    ).toBeNull();
+    expect(JSON.parse(buildPiRunContext(claimed())).previousAttempt).toBeNull();
   });
   it("does not inject large Decision collections, legacy summaries or completed transcripts", async () => {
     const source = store.insertMessage(
@@ -340,18 +355,31 @@ describe("minimal native Run context", () => {
       store.db().$client.prepare("SELECT body FROM chat_summaries").get(),
     ).toEqual({ body: "Old model-authored summary" });
   });
-  it("fails before model execution when mandatory current context cannot fit", async () => {
+  it("no longer sizes application state before a reply; an oversized status is the lookup's own tool error", async () => {
     store
       .db()
       .$client.prepare("UPDATE applications SET name = ? WHERE id = ?")
       .run("x".repeat(12_001), applicationId);
     const accepted = enqueue();
     await executePiRun(claimed());
+    expect(mocks.ask).toHaveBeenCalledOnce();
+    expect(mocks.ask.mock.calls[0][0].runContext).not.toContain("xxxx");
+    expect(runs.getPiRun(accepted.run.id)).toMatchObject({
+      status: "succeeded",
+    });
+    expect(() => readPiApplicationStatus(applicationId, chatId)).toThrow(
+      "larger than the supported tool result",
+    );
+  });
+  it("fails before model execution when the Chat can no longer be loaded", async () => {
+    const accepted = enqueue();
+    const run = claimed();
+    store.archiveChat(chatId);
+    await executePiRun(run);
     expect(mocks.ask).not.toHaveBeenCalled();
     expect(runs.getPiRun(accepted.run.id)).toMatchObject({
       status: "failed",
       piCalls: 0,
-      error: expect.stringContaining("No model request was started"),
     });
   });
   it("counts tool-loop and compaction model calls from adapter events", async () => {

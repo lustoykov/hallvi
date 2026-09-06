@@ -29,6 +29,7 @@ import {
   nativeEvalCompaction,
   nativeEvalEvidence,
   seedNativeScenario,
+  seedStaleStatusHistory,
 } from "./native-scenarios";
 
 // This file is deliberately .eval.ts, excluded by Vitest's normal test
@@ -44,6 +45,7 @@ const sourceFiles = [
   "src/server/pi-run-context.ts",
   "src/server/pi-sessions.ts",
   "src/server/pi-decisions.ts",
+  "src/server/pi-status.ts",
   "src/server/pi-worker.ts",
   "tests/execute-pi-turn.ts",
   "src/server/phase-one.ts",
@@ -142,7 +144,7 @@ beforeAll(() => {
     database: join(state, "eval.db"),
     databaseRetained: false,
     coverage:
-      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Native tool evidence is retained; this is not a production context-window benchmark.",
+      "Real Pi adapter, native session/tool loop and SQLite transaction; synthetic application/context; no GitHub calls. Native scenarios seed synthetic previous exchanges/usage and lower keepRecentTokens to exercise real auto-compaction with a small fixture. Application status cases seed real records and, for stale-history cases, an outdated synthetic get_application_status exchange; the live lookup reads local records only and is recorded as native tool evidence. This is not a production context-window benchmark.",
   };
   vi.stubEnv("SERVER_GUY_DB_PATH", join(state, "eval.db"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(state, "config"));
@@ -203,6 +205,15 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
           );
         restoreSettings = () => settingsSpy.mockRestore();
       }
+      if (scenario.staleHistory) {
+        before = await seedStaleStatusHistory(
+          scenario,
+          before,
+          readPiConfiguration()!,
+        );
+        record.before = before;
+        record.after = before;
+      }
       // Pass-through spy: the actual adapter executes. No fake model response.
       const turn = vi.spyOn(pi, "askPi");
       const start = performance.now();
@@ -221,14 +232,21 @@ for (let repetition = 1; repetition <= repeats; repetition++) {
           record.reply!,
           before.decisions.map((decision) => database.getDecision(decision.id)),
         );
-        if (scenario.nativeScenario) {
+        if (scenario.nativeScenario || scenario.statusLookup) {
           record.nativeEvidence = nativeEvalEvidence(
             before.application!.id,
             before.selectedChatId!,
             record.input!.run.id,
+            {
+              decisions: Boolean(scenario.nativeScenario),
+              status: scenario.statusLookup,
+            },
           );
           Object.assign(record.checks, record.nativeEvidence.checks);
-          if (scenario.nativeScenario !== "cancelled") {
+          if (
+            scenario.nativeScenario &&
+            scenario.nativeScenario !== "cancelled"
+          ) {
             record.checks[
               "native compaction ran after fresh context was appended"
             ] = record.nativeEvidence.compactions.length > 0;

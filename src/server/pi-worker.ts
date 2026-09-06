@@ -3,9 +3,9 @@ import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { databasePath, listMessages } from "./db";
 import { beginRunDiagnostics } from "./tracing";
-import { buildPiRunContext, PiRunContextError } from "./pi-run-context";
+import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
-import { buildViewSummary, loadChat } from "./phase-one";
+import { loadChat } from "./phase-one";
 import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
 import {
   claimNextPiRun,
@@ -86,9 +86,11 @@ export async function executePiRun(
     const work = async () => {
       controller.signal.throwIfAborted();
       diagnostics.signal({ type: "start", key: "context", kind: "context" });
-      const { application, chat } = loadChat(run.applicationId, run.chatId);
+      const { chat } = loadChat(run.applicationId, run.chatId);
       if (chat.archivedAt) throw new Error("This Chat is archived.");
-      const runContext = buildPiRunContext(run, buildViewSummary(application));
+      // No application summary is injected: Pi reads current state through
+      // get_application_status when an answer depends on it.
+      const runContext = buildPiRunContext(run);
       const user = listMessages(run.chatId).find(
         (message) => message.id === run.userMessageId,
       );
@@ -158,8 +160,7 @@ export async function executePiRun(
       error instanceof PiUnavailableError
         ? (error.diagnostic ?? diagnosticFailure(error))
         : diagnosticFailure(error);
-    if (error instanceof PiRunContextError) failure = { category: "context" };
-    else if (error instanceof NativeSessionError)
+    if (error instanceof NativeSessionError)
       failure = {
         category: error.code === "busy" ? "busy" : "history-unavailable",
       };
@@ -179,7 +180,7 @@ export async function executePiRun(
     finishPiRun(
       run.id,
       "failed",
-      error instanceof PiRunContextError || error instanceof NativeSessionError
+      error instanceof NativeSessionError
         ? error.message
         : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
       failure,
