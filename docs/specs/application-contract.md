@@ -103,7 +103,7 @@ Material fields (19), grouped for the Record:
 
 Stored as `application_contracts` rows: application, workspace, `version`, profile identity and version, `commit_sha`, the source message, the JSON body and `superseded_by_id`. A revision is a new full row that supersedes the previous one with the same guarded update the Decision replacement uses; nothing is edited in place and prior versions remain readable at `/api/contracts/{id}`. Rows are written only inside the worker's final Run transaction, together with the answer, Decisions and Activity.
 
-Body: `{ profileId, profileVersion, commitSha, summary, fields[] }` where each field is `{ key, value | null, provenance, conformance? }`. Profile identity and commit are bound by the server from the current inspection; the model cannot choose a commit.
+Body: `{ profileId, profileVersion, commitSha, summary, fields[] }` where each field is `{ key, value | null, provenance, conformance? }`. Profile identity and commit are bound by the server from the current inspection; the model cannot choose a commit. The schema is TypeBox, shared between the tool parameters and the stored body, because the Pi SDK validates tool arguments with TypeBox; a second Zod copy of the same shape would only drift. The learning guide's Zod exercise is satisfied by this one typed schema plus the deterministic checks below.
 
 ### Provenance kinds are not interchangeable
 

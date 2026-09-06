@@ -92,7 +92,7 @@ Use the Phase 2 read-only Application Contract slice for the exercises below. It
 
 ### Build
 
-- Define a Zod schema for build, runtime, port, health, persistence, migrations, configuration, telemetry, and verification requirements.
+- Define a typed, versioned schema for build, runtime, port, health, persistence, migrations, configuration, telemetry, and verification requirements (the implementation uses one TypeBox schema shared with the Pi tool boundary; see the [Application Contract spec](../specs/application-contract.md)).
 - Collect repository facts deterministically with source identity and timestamps.
 - Let Pi interpret ambiguity and propose contract fields.
 - Accept model output only when deterministic validation and evidence support it.
