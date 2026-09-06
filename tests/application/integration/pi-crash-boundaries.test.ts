@@ -279,13 +279,16 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
       expect(database.listActiveDecisions(applicationId)).toEqual(
         decisionsBefore,
       );
+      // A restart never adds or removes application events; the attempt's
+      // execution history closes without any step left "running".
+      expect(database.listActivity(workspaceId)).toEqual(activityBefore);
       expect(
-        database.listActivity(workspaceId).filter((event) => !event.execution),
-      ).toEqual(activityBefore.filter((event) => !event.execution));
-      expect(
-        database.listActivity(workspaceId).find((event) => event.execution)?.run
-          ?.status,
-      ).toBe(success ? "succeeded" : "interrupted");
+        runs
+          .chatRunSnapshot(applicationId, chatId)
+          .executions[accepted.run.id].steps.some(
+            (step) => step.outcome === "running",
+          ),
+      ).toBe(false);
       expect(nativeText()).toBe(before);
       const next = runs.sendChatMessage(
         applicationId,

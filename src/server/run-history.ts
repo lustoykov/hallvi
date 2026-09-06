@@ -1,10 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, withTransaction } from "./db";
 import { activityEvents, piRuns } from "./db-schema";
 import type { ExecutionHistory, ExecutionStep, PiRun } from "./types";
 
-// One Activity row per reply, not per token. The Run remains the authority for
-// status; this bounded payload records meaningful execution steps only.
+// Reply execution history answers "how did Server Guy produce this answer?".
+// It is stored as one bounded row per reply (not per token) beside the
+// application's Activity Events, but it is never an Activity Event: the feed
+// excludes it and the Chat shows it with its reply. The Run remains the
+// authority for status.
 export const MAX_EXECUTION_STEPS = 128;
 export const stepLabels = {
   context: "Load current app context",
@@ -54,6 +57,26 @@ export function diagnosticMetadata(input: Record<string, unknown> = {}) {
     )
       safe[key] = input[key];
   return safe;
+}
+
+/** Execution histories keyed by Run ID, for the Runs of one Chat. */
+export function listExecutionHistories(
+  runIds: string[],
+): Record<string, ExecutionHistory> {
+  if (!runIds.length) return {};
+  return Object.fromEntries(
+    db()
+      .select({ id: activityEvents.id, detail: activityEvents.detail })
+      .from(activityEvents)
+      .where(
+        and(
+          inArray(activityEvents.id, runIds),
+          eq(activityEvents.kind, "chat-execution"),
+        ),
+      )
+      .all()
+      .map((row) => [row.id, JSON.parse(row.detail) as ExecutionHistory]),
+  );
 }
 
 export function createRunHistory(run: PiRun) {

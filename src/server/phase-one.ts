@@ -20,6 +20,7 @@ import {
   listChatSummaries,
   listMessages,
   listObservations,
+  recordActivityOnce,
   supersedeDecision,
   withTransaction,
 } from "./db";
@@ -282,6 +283,81 @@ export async function recheckGithubRepositories(connectionId: string) {
   }
 }
 
+function observationConnectionId(observation: { raw: unknown }) {
+  return observation.raw &&
+    typeof observation.raw === "object" &&
+    "connectionId" in observation.raw &&
+    typeof observation.raw.connectionId === "string"
+    ? observation.raw.connectionId
+    : null;
+}
+
+/**
+ * Disconnecting or replacing the GitHub login is installation-wide; its
+ * application consequence is that a passing repository check made with the
+ * previous login no longer counts as current. That does not show access was
+ * lost. The event ID is derived from the invalidated Observation, so a retried
+ * or concurrent request, a later read, or a view refresh cannot add a second
+ * item; a fresh check under the current login records its own outcome.
+ */
+function invalidateRepositoryVerifications(
+  previousConnectionId: string,
+  next: "disconnected" | "replaced",
+) {
+  withTransaction(() => {
+    for (const application of listApplications()) {
+      const latest = latestObservation(application.id, REPOSITORY_OBSERVATION);
+      if (
+        latest?.status !== "passed" ||
+        observationConnectionId(latest) !== previousConnectionId
+      )
+        continue;
+      const workspace = getWorkspace(application.id);
+      if (!workspace) continue;
+      recordActivityOnce(
+        `verification-invalidated:${latest.id}`,
+        workspace.id,
+        "repository-verification-invalidated",
+        "Repository verification invalidated",
+        `${
+          next === "disconnected"
+            ? "GitHub was disconnected"
+            : "The GitHub connection was replaced"
+        } after this repository was verified with the previous login, so that check no longer counts as current. This does not show that access was lost. Check the repository again with the current connection to verify access. Earlier result: ${latest.summary}`,
+      );
+    }
+  });
+}
+
+function savedGithubConnectionId() {
+  try {
+    return readGithubConnection()?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Runs one GitHub setup operation and records the application consequence of
+ * an actual connection transition: the saved connection ID after the operation
+ * differs from the one before. Token renewal keeps the ID and records nothing.
+ */
+export async function withGithubConnectionTransition<T>(
+  operation: () => Promise<T> | T,
+): Promise<T> {
+  const before = savedGithubConnectionId();
+  try {
+    return await operation();
+  } finally {
+    const after = savedGithubConnectionId();
+    if (before && before !== after)
+      invalidateRepositoryVerifications(
+        before,
+        after ? "replaced" : "disconnected",
+      );
+  }
+}
+
 export function listApplicationSummaries() {
   return listApplications().map((application) => {
     const checks = currentChecks(application);
@@ -353,16 +429,16 @@ export function createChat(applicationId: string, title?: string) {
     "This is a separate Chat for the same Launch Brief. I can see the shared Operator View and checks, but this transcript starts fresh.",
     "server-guy",
   );
-  insertActivity(workspace.id, "chat-created", "Chat created", chat.title);
+  // Chat administration is visible in the chat list; it is not an application
+  // event.
   return getPhaseOneOperatorView(application.id, chat.id);
 }
 
 export function archiveChat(applicationId: string, chatId: string) {
-  const { application, workspace, chat } = loadChat(applicationId, chatId);
+  const { application, chat } = loadChat(applicationId, chatId);
   if (chat.isPrimary)
     throw new Error("The main Launch Brief Chat stays with Phase 1.");
   archiveChatRecord(chat.id);
-  insertActivity(workspace.id, "chat-archived", "Chat archived", chat.title);
   return getPhaseOneOperatorView(application.id);
 }
 
@@ -392,6 +468,8 @@ export function buildViewSummary(application: ApplicationRecord) {
 
 // Called only inside the worker's final transaction. Model text is not a
 // Decision: every proposal must still match the current durable domain state.
+// Each committed Decision produces exactly one Activity Event in that same
+// transaction, so a rollback leaves neither the record nor a success claim.
 export function savePiDecisions(
   applicationId: string,
   workspaceId: string,
@@ -415,15 +493,15 @@ export function savePiDecisions(
       insertActivity(
         workspaceId,
         "decision-revised",
-        "Decision revised from Chat",
+        "Requirement changed",
         `${previous.value} → ${decision.value}`,
       );
     } else {
       insertActivity(
         workspaceId,
         "decision-recorded",
-        "Decision recorded from Chat",
-        `${decision.label}: ${decision.value}`,
+        "Requirement saved",
+        decision.value,
       );
     }
   }

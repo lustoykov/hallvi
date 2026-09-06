@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -25,7 +25,6 @@ import type {
   Decision,
   Observation,
   PhaseWorkspaceRecord,
-  ExecutionHistory,
 } from "./types";
 
 const schema = {
@@ -411,23 +410,54 @@ export function insertActivity(
   db().insert(activityEvents).values(activity).run();
 }
 
-export function listActivity(workspaceId: string) {
+/**
+ * Records one event per deterministic ID. Retried or concurrent requests for
+ * the same transition therefore cannot add a second feed item. Returns whether
+ * this call recorded it.
+ */
+export function recordActivityOnce(
+  id: string,
+  workspaceId: string,
+  kind: string,
+  summary: string,
+  detail: string,
+) {
+  const activity: ActivityEvent = {
+    id,
+    workspaceId,
+    kind,
+    summary,
+    detail,
+    createdAt: now(),
+  };
+  return (
+    db().insert(activityEvents).values(activity).onConflictDoNothing().run()
+      .changes > 0
+  );
+}
+
+// The table also stores each reply's execution history (read through
+// run-history.ts and shown with its Chat reply) and older Chat creation/archive
+// rows. Neither is an application event, so the feed excludes them without
+// deleting anything.
+const EXCLUDED_ACTIVITY_KINDS = [
+  "chat-execution",
+  "chat-created",
+  "chat-archived",
+];
+
+export function listActivity(workspaceId: string): ActivityEvent[] {
   return db()
-    .select({ event: activityEvents, run: piRuns })
+    .select()
     .from(activityEvents)
-    .leftJoin(piRuns, eq(activityEvents.id, piRuns.id))
-    .where(eq(activityEvents.workspaceId, workspaceId))
-    .orderBy(desc(activityEvents.createdAt), desc(sql`${activityEvents}.rowid`))
-    .all()
-    .map(({ event, run }): ActivityEvent => {
-      if (event.kind !== "chat-execution") return event;
-      return {
-        ...event,
-        detail: "",
-        execution: JSON.parse(event.detail) as ExecutionHistory,
-        run,
-      };
-    });
+    .where(
+      and(
+        eq(activityEvents.workspaceId, workspaceId),
+        notInArray(activityEvents.kind, EXCLUDED_ACTIVITY_KINDS),
+      ),
+    )
+    .orderBy(desc(activityEvents.createdAt), desc(rowId))
+    .all();
 }
 
 export function withTransaction<T>(work: () => T): T {

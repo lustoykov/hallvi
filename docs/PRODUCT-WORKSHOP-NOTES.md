@@ -2,7 +2,7 @@
 
 Status: living planning notes, not a finished specification and not evidence of implementation.
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 These notes preserve decisions, hypotheses, and unresolved questions from the product workshop. They should later be distilled into a tight product specification. Unresolved choices must not be presented as settled in that specification.
 
@@ -125,7 +125,7 @@ Settled direction:
 
 > Chat is the durable conversation surface. Pi controls the adaptive operational loop while Server Guy owns durable application state, evidence, effects, and generated views.
 
-Inspect, Resolve profile, Plan, Policy, Approval, Execute, Verify, and Evidence may remain useful classifications for Activity Events and UI presentation. They are not a required sequence imposed on Pi. Pi may inspect, act, gather more evidence, revise its explanation, ask the user, or enter a bounded Guided Operation as the situation requires.
+Inspect, Resolve profile, Plan, Policy, Approval, Execute, Verify, and Evidence may remain useful descriptions of execution and UI presentation. They are not a required sequence imposed on Pi or an instruction to create an Activity Event for each step. Application Activity follows the [inclusion rules](specs/action-history-and-tracing.md#application-activity-inclusion-rules) agreed on September 6; Pi may inspect, act, gather evidence, revise its explanation, ask the user, or enter a bounded Guided Operation as the situation requires.
 
 Server Guy records Pi's visible intent, tool calls, commands, results, conclusions, approvals, and verification evidence. It does not expose or require private model reasoning.
 
@@ -149,7 +149,7 @@ The Operator View should include:
 - applications and current status;
 - per-application conversation with Server Guy;
 - Pi's current objective and visible intent;
-- live activity showing tools, commands, results, and status;
+- live reply execution details showing tools, commands, results, and status beside the relevant Chat reply; application Activity remains meaningful domain history;
 - proposed plans and approval requests;
 - deployment and incident timelines;
 - evidence and explanations;

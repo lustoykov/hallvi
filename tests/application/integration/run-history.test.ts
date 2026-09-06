@@ -103,8 +103,12 @@ afterAll(async () => {
 function queued() {
   return runs.sendChatMessage(app, chat, "secret-canary", randomUUID()).run;
 }
-function history() {
-  return store.listActivity(workspace).find((event) => event.execution)!;
+// Execution history travels with the Chat's Runs, never through the feed.
+function execution(id: string) {
+  return runs.chatRunSnapshot(app, chat).executions[id];
+}
+function status(id: string) {
+  return runs.getPiRun(id)?.status;
 }
 
 it("persists ordered steps and committed requirement links, deduplicates submissions and reconstructs after reopening SQLite", async () => {
@@ -112,27 +116,36 @@ it("persists ordered steps and committed requirement links, deduplicates submiss
   expect(
     runs.sendChatMessage(app, chat, "secret-canary", run.requestKey).run.id,
   ).toBe(run.id);
-  expect(history().run?.status).toBe("queued");
+  expect(status(run.id)).toBe("queued");
+  expect(execution(run.id)).toEqual({ steps: [], omitted: 0 });
   await executePiRun(runs.claimNextPiRun()!);
-  expect(history().run?.status).toBe("succeeded");
-  expect(history().execution?.steps.map((s) => s.id)).toEqual([
+  expect(status(run.id)).toBe("succeeded");
+  expect(execution(run.id).steps.map((s) => s.id)).toEqual([
     "context",
     "model:1",
     "tool:1",
     "save",
   ]);
-  expect(
-    history().execution?.steps.every((s) => s.outcome === "completed"),
-  ).toBe(true);
-  expect(history().execution?.decisionIds).toEqual(
+  expect(execution(run.id).steps.every((s) => s.outcome === "completed")).toBe(
+    true,
+  );
+  expect(execution(run.id).decisionIds).toEqual(
     store.listActiveDecisions(app).map((d) => d.id),
   );
-  expect(JSON.stringify(history())).not.toContain("secret-canary");
-  const before = history();
+  expect(JSON.stringify(execution(run.id))).not.toContain("secret-canary");
+  // The application feed records the committed requirement once; the reply
+  // itself is not an application event.
+  expect(
+    store
+      .listActivity(workspace)
+      .map((event) => [event.kind, event.summary, event.detail]),
+  ).toEqual([
+    ["decision-recorded", "Requirement saved", "Keep data in the EU"],
+  ]);
+  const before = execution(run.id);
   store.db().$client.close();
   delete globalThis.__serverGuyDb;
-  expect(history()).toEqual(before);
-  expect(runs.chatRunSnapshot(app, chat).activity).toContainEqual(before);
+  expect(execution(run.id)).toEqual(before);
   const other = store.insertApplication({
     name: "other",
     repositoryUrl: "https://github.com/qa/other",
@@ -145,7 +158,29 @@ it("persists ordered steps and committed requirement links, deduplicates submiss
   expect(() => runs.chatRunSnapshot(other.id, chat)).toThrow();
 });
 
-it("keeps completed tool evidence when final validation rejects all writes", async () => {
+it("records no application event for an ordinary reply or lookup while keeping its execution inspectable", async () => {
+  mocks.ask.mockImplementation(async (_input, options) => {
+    options.onActivity({
+      type: "start",
+      key: "tool:1",
+      kind: "search_decisions",
+    });
+    options.onActivity({ type: "end", key: "tool:1" });
+    return { message: "No saved requirements yet.", decisionProposals: [] };
+  });
+  const run = queued();
+  await executePiRun(runs.claimNextPiRun()!);
+  expect(status(run.id)).toBe("succeeded");
+  expect(execution(run.id).steps.map((s) => s.id)).toEqual([
+    "context",
+    "tool:1",
+    "save",
+  ]);
+  expect(execution(run.id).decisionIds).toEqual([]);
+  expect(store.listActivity(workspace)).toEqual([]);
+});
+
+it("keeps completed tool evidence when final validation rejects all writes, without a success event", async () => {
   mocks.ask.mockImplementation(async (_input, options) => {
     options.onActivity({
       type: "start",
@@ -160,15 +195,16 @@ it("keeps completed tool evidence when final validation rejects all writes", asy
       ],
     };
   });
-  queued();
+  const run = queued();
   await executePiRun(runs.claimNextPiRun()!);
-  expect(history().run?.status).toBe("failed");
-  expect(
-    history().execution?.steps.find((s) => s.id === "tool:1")?.outcome,
-  ).toBe("completed");
-  expect(history().execution?.steps.at(-1)?.outcome).toBe("failed");
-  expect(history().execution?.decisionIds).toBeUndefined();
+  expect(status(run.id)).toBe("failed");
+  expect(execution(run.id).steps.find((s) => s.id === "tool:1")?.outcome).toBe(
+    "completed",
+  );
+  expect(execution(run.id).steps.at(-1)?.outcome).toBe("failed");
+  expect(execution(run.id).decisionIds).toBeUndefined();
   expect(store.listActiveDecisions(app)).toEqual([]);
+  expect(store.listActivity(workspace)).toEqual([]);
 });
 
 it.each(["cancelled", "timed-out", "interrupted"] as const)(
@@ -179,13 +215,14 @@ it.each(["cancelled", "timed-out", "interrupted"] as const)(
     startHistoryStep(run.id, "model:1", "model");
     if (status === "interrupted") runs.interruptRunningPiRuns();
     else runs.finishPiRun(run.id, status, "Stopped");
-    expect(history().execution?.steps[0].outcome).toBe("incomplete");
+    expect(execution(run.id).steps[0].outcome).toBe("incomplete");
     expect(startHistoryStep(run.id, "late", "model")).toBe(false);
     const retry = runs.retryPiRun(app, chat, run.id);
     expect(retry.run.retryOfId).toBe(run.id);
     expect(
-      store.listActivity(workspace).filter((e) => e.execution),
-    ).toHaveLength(2);
+      Object.keys(runs.chatRunSnapshot(app, chat).executions).sort(),
+    ).toEqual([run.id, retry.run.id].sort());
+    expect(store.listActivity(workspace)).toEqual([]);
   },
 );
 
@@ -194,8 +231,8 @@ it("bounds diagnostic growth and only retains selected numeric/model metadata", 
   runs.claimNextPiRun();
   for (let i = 0; i < MAX_EXECUTION_STEPS + 5; i++)
     startHistoryStep(run.id, `tool:${i}`, "tool");
-  expect(history().execution?.steps).toHaveLength(MAX_EXECUTION_STEPS);
-  expect(history().execution?.omitted).toBe(5);
+  expect(execution(run.id).steps).toHaveLength(MAX_EXECUTION_STEPS);
+  expect(execution(run.id).omitted).toBe(5);
   expect(
     diagnosticMetadata({
       inputTokens: -1,
@@ -217,10 +254,10 @@ it.each([false, true])(
     vi.stubEnv("LANGFUSE_PROJECT_ID", "test-project");
     vi.stubEnv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com");
     mocks.unavailable = unavailable;
-    queued();
+    const run = queued();
     await executePiRun(runs.claimNextPiRun()!);
     await shutdownTracing();
-    expect(history().run?.status).toBe("succeeded");
+    expect(status(run.id)).toBe("succeeded");
     const spans =
       mocks.spans as import("@opentelemetry/sdk-trace-base").ReadableSpan[];
     expect(spans.length).toBeGreaterThan(3);
@@ -228,9 +265,13 @@ it.each([false, true])(
     expect(JSON.stringify(spans.map((s) => s.attributes))).not.toContain(
       "secret-canary",
     );
-    expect(history().execution?.traceUrl).toMatch(
+    expect(execution(run.id).traceUrl).toMatch(
       /^https:\/\/cloud.langfuse.com\/project\/test-project\/traces\/[a-f0-9]{32}$/,
     );
+    // Export state never changes the product outcome or the feed.
+    expect(store.listActivity(workspace).map((event) => event.kind)).toEqual([
+      "decision-recorded",
+    ]);
   },
 );
 

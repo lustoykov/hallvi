@@ -10,6 +10,7 @@ import {
 import {
   createRunHistory,
   closeRunHistory,
+  listExecutionHistories,
   updateRunHistory,
 } from "./run-history";
 import { messages, piRuns, decisions } from "./db-schema";
@@ -20,25 +21,38 @@ import {
   savePiDecisions,
 } from "./phase-one";
 import { sendChatMessageRequestSchema } from "./schemas";
-import type { AcceptedPiRun, PiRun, PiRunStatus, PiTurnResult } from "./types";
+import type {
+  AcceptedPiRun,
+  ChatRunSnapshot,
+  PiRun,
+  PiRunStatus,
+  PiTurnResult,
+} from "./types";
 
 const pending = ["queued", "running"] as const;
 export function getPiRun(id: string) {
   return db().select().from(piRuns).where(eq(piRuns.id, id)).get() ?? null;
 }
 
-export function chatRunSnapshot(applicationId: string, chatId: string) {
+export function chatRunSnapshot(
+  applicationId: string,
+  chatId: string,
+): ChatRunSnapshot {
   const { workspace } = loadChat(applicationId, chatId);
-  return withTransaction(() => ({
-    activity: listActivity(workspace.id),
-    messages: listMessages(chatId),
-    runs: db()
+  return withTransaction(() => {
+    const runs = db()
       .select()
       .from(piRuns)
       .where(eq(piRuns.chatId, chatId))
       .orderBy(asc(sql`rowid`))
-      .all(),
-  }));
+      .all();
+    return {
+      messages: listMessages(chatId),
+      runs,
+      executions: listExecutionHistories(runs.map((run) => run.id)),
+      activity: listActivity(workspace.id),
+    };
+  });
 }
 
 function scopedRun(applicationId: string, chatId: string, id: string) {

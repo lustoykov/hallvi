@@ -1,4 +1,5 @@
 import { handle } from "@/server/http";
+import { withGithubConnectionTransition } from "@/server/phase-one";
 import { assertSameOrigin, parseJsonRequest } from "@/server/schemas";
 import {
   adoptGithubCliLogin,
@@ -20,14 +21,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return handle(async () => {
     const body = await parseJsonRequest(request, useGithubCliSchema);
-    await adoptGithubCliLogin(body.candidateId);
+    await withGithubConnectionTransition(() =>
+      adoptGithubCliLogin(body.candidateId),
+    );
     return getGithubSetupStatus();
   });
 }
 export async function DELETE(request: Request) {
   return handle(async () => {
     await parseJsonRequest(request, disconnectGithubSchema);
-    disconnectGithub();
+    await withGithubConnectionTransition(() => disconnectGithub());
     return getGithubSetupStatus();
   });
 }

@@ -1,5 +1,7 @@
 # Activity and Phase 1 audit — 2026-09-05
 
+Historical note: this audit covered the first slice, which placed every reply in **Activity**. The 2026-09-06 correction moved reply details under each Chat reply and restricted Activity to application events; see the [spec](../docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules) and the [acceptance guide](../docs/testing/phase-one-acceptance.md#latest-verification) for current evidence. Screenshot paths below refer to the earlier layout.
+
 Scope: the complete implemented Phase 1 desktop experience, not only Activity. No mobile QA. Work took place in an isolated worktree; destructive tests used disposable applications/configuration. The user's saved applications and credentials were not cleared or disconnected.
 
 ## Evidence and results

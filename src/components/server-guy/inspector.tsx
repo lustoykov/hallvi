@@ -9,14 +9,60 @@ import {
 } from "@phosphor-icons/react";
 import { useId, useState } from "react";
 
-import type { GateCheck, PhaseOneOperatorView } from "@/server/types";
+import type {
+  ActivityEvent,
+  GateCheck,
+  PhaseOneOperatorView,
+} from "@/server/types";
 
 import { statusLabel } from "./format";
 import { LocalTime } from "./local-time";
-import { ExecutionActivity } from "./execution-activity";
 
 type InspectorTab = "record" | "activity" | "changes" | "receipts";
 const tabs = ["record", "activity", "changes", "receipts"] as const;
+
+// A verification result colors its marker; requirement and workspace events
+// keep the neutral one.
+function eventTone(kind: string) {
+  if (kind === "repository-observed") return "passed";
+  if (
+    kind === "repository-unavailable" ||
+    kind === "repository-verification-invalidated"
+  )
+    return "attention";
+  return "";
+}
+
+/**
+ * What happened to this application: saved or changed requirements,
+ * repository checks and connection consequences. How a reply was produced is
+ * not an event here; each Chat reply carries its own details.
+ */
+export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
+  return (
+    <section className="sg-inspector-section">
+      <p className="sg-inspector-hint">
+        What happened to this application: saved requirements, repository checks
+        and connection changes. For how a reply was produced, open its details
+        in Chat.
+      </p>
+      {events.length ? (
+        events.map((event) => (
+          <article className="sg-event" key={event.id}>
+            <span className={`sg-event-dot ${eventTone(event.kind)}`} />
+            <div>
+              <strong>{event.summary}</strong>
+              <p>{event.detail}</p>
+              <LocalTime value={event.createdAt} />
+            </div>
+          </article>
+        ))
+      ) : (
+        <p>No application events yet.</p>
+      )}
+    </section>
+  );
+}
 
 export function CheckIcon({ status }: { status: GateCheck["status"] }) {
   return (
@@ -157,28 +203,7 @@ export function Inspector({
           </>
         )}
 
-        {activeTab === "activity" && (
-          <section className="sg-inspector-section">
-            {view.activity.length ? (
-              view.activity.map((event) =>
-                event.execution ? (
-                  <ExecutionActivity event={event} key={event.id} />
-                ) : (
-                  <article className="sg-event" key={event.id}>
-                    <span className="sg-event-dot" />
-                    <div>
-                      <strong>{event.summary}</strong>
-                      <p>{event.detail}</p>
-                      <LocalTime value={event.createdAt} />
-                    </div>
-                  </article>
-                ),
-              )
-            ) : (
-              <p>Activity will appear after the workspace is created.</p>
-            )}
-          </section>
-        )}
+        {activeTab === "activity" && <ActivityFeed events={view.activity} />}
 
         {activeTab === "changes" && (
           <section className="sg-empty-state">

@@ -1,4 +1,5 @@
 import { handle } from "@/server/http";
+import { withGithubConnectionTransition } from "@/server/phase-one";
 import { parseJsonRequest } from "@/server/schemas";
 import {
   cancelGithubLogin,
@@ -11,7 +12,9 @@ type Context = { params: Promise<{ attemptId: string }> };
 export async function POST(request: Request, context: Context) {
   return handle(async () => {
     await parseJsonRequest(request, emptyGithubRequestSchema);
-    return pollGithubLogin((await context.params).attemptId);
+    const { attemptId } = await context.params;
+    // The poll that completes sign-in replaces the saved connection.
+    return withGithubConnectionTransition(() => pollGithubLogin(attemptId));
   });
 }
 export async function DELETE(request: Request, context: Context) {

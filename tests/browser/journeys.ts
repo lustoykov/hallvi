@@ -3,9 +3,9 @@
 export const browserJourneys = [
   {
     id: "activity-history",
-    name: "Inspect reply history and recover from interruptions",
+    name: "Inspect reply details and application Activity",
     description:
-      "Watch execution steps, reload, inspect saved requirements, cancel and retry without claiming incomplete work succeeded.",
+      "Open each reply's details in Chat, keep Activity to saved requirements and repository checks, reload, cancel, retry, and record a GitHub disconnect once.",
     smoke: false,
   },
   {

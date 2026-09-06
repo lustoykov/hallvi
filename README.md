@@ -10,6 +10,7 @@ The [product direction](docs/PRODUCT-WORKSHOP-NOTES.md#self-hosted-oss-deploymen
 | --- | --- |
 | What do we build next, and what is implemented or still open? | [Development roadmap](ROADMAP.md) — ordered milestones/PRs and the implementation backlog. |
 | What should users experience? | [User journeys](docs/user-journeys/README.md) — product behavior, launch phases, deliverables and exit gates. |
+| What belongs in application Activity? | [Activity inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules) — event criteria, flow inventory, and exclusions. |
 | What engineering capabilities does this teach? | [Learning guide](docs/learning/stack-with-server-guy.md) — stack mapping and exercises, not another build plan. |
 | How do we prove the implemented behavior works? | [Phase 1 testing guide](docs/testing/phase-one-acceptance.md) — acceptance cases, test/eval procedures and verification evidence. |
 | Where are the test runners and saved results? | [Tests index](tests/README.md) — commands, folders and the local dashboard. |
@@ -58,11 +59,13 @@ Each Chat continues its private native Pi session across requests and worker res
 
 Native histories live beside the configured database at `pi-sessions/<application-id>/<chat-id>.jsonl`. Back up **both SQLite and pi-sessions** with the web app and worker stopped; restoring only SQLite can leave a missing-history error. Compaction reduces model context, not disk history. A damaged/missing established history offers **Start a new chat**; existing records remain and no old messages are imported or retried automatically. Cancel an active reply and wait for it to stop before removing its application; removal deletes that application's records and native files, not credentials or other applications.
 
-### Activity and optional tracing
+### Activity and reply details
 
-Open **Activity** in an application's Inspector, then expand a reply to see its recorded steps, outcome, and saved requirement links. History survives refresh and worker restarts. **Technical details** shows selected diagnostic metadata, never private reasoning or conversation content.
+Two surfaces answer two questions. **Activity** in an application's Inspector answers *what happened to this application*: the workspace was created, a repository check passed or failed, a requirement was saved or changed (old → new), or a GitHub disconnect/replacement invalidated an earlier repository verification. Ordinary replies, lookups, failed attempts and chat creation/archive add nothing there, following the [inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules).
 
-For optional Langfuse export, set `SERVER_GUY_TRACING=1`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` in your ignored `.env.local`. Add `LANGFUSE_PROJECT_ID` for private project trace links and restart the worker. See [tracing setup and data boundaries](docs/specs/action-history-and-tracing.md#configuration-and-data-boundaries). No collector or Langfuse account is needed for local Activity. Export failures do not change the outcome of a reply.
+**Reply details** under each Server Guy reply in Chat answer *how this answer was produced*: queue and work time, recorded steps with outcomes, retry lineage, links to requirements saved by that reply, and collapsed **Technical details** with selected diagnostic metadata, never prompts, answers, tool payloads or credentials. A cancelled, failed, timed-out or interrupted attempt says that nothing was saved and that any draft above it is unfinished text. History survives refresh, reconnects and worker restarts, and stays readable in archived chats.
+
+For optional Langfuse export, set `SERVER_GUY_TRACING=1`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` in your ignored `.env.local`. Add `LANGFUSE_PROJECT_ID` for private project trace links and restart the worker. See [tracing setup and data boundaries](docs/specs/action-history-and-tracing.md#configuration-and-data-boundaries). No collector or Langfuse account is needed locally. Export failures do not change the outcome of a reply or its Activity.
 
 Open **Settings → ChatGPT & model** to configure Pi, and **Settings → GitHub** before adding a repository. A detected login is never silently adopted. For a separate GitHub login, follow the [GitHub App registration guide](docs/integrations/github.md); only a public client ID and App slug go in local configuration, never an App private key or client secret.
 

@@ -1864,99 +1864,174 @@ a.sg-chip:hover {
     animation: none;
   }
 }
+/* ---------- Reply details: how one reply was produced ---------- */
+
+/* A quiet disclosure row under each assistant reply. Its expanded body is a
+   small panel, so diagnostics never read as part of the answer. */
 .sg-execution {
-  border-bottom: 1px solid var(--line);
-  padding-block: 16px;
-  font-size: 13px;
+  max-width: 100%;
+  font-size: 12px;
+  color: var(--ink-2);
 }
 .sg-execution > summary {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: -4px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 6px;
+  color: var(--muted);
   cursor: pointer;
   list-style: none;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+.sg-execution > summary::-webkit-details-marker {
+  display: none;
+}
+.sg-execution > summary:hover {
+  color: var(--ink);
+  background: #f3f5f9;
+}
+.sg-execution > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 .sg-execution-caret {
-  flex: 0 0 12px;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  transition: transform var(--fast) var(--ease);
 }
-.sg-execution[open] > summary > .sg-execution-caret {
+.sg-execution[open] > summary .sg-execution-caret {
   transform: rotate(90deg);
 }
-.sg-execution > summary > span:first-of-type {
-  display: grid;
-  gap: 4px;
-}
-.sg-execution time,
-.sg-execution-state,
-.sg-execution-timing,
-.sg-execution-steps small {
-  color: var(--ink-2);
-}
 .sg-execution-state {
-  margin-left: auto;
-  text-align: right;
-  font-size: 12px;
-}
-.sg-execution-body {
-  padding-top: 12px;
-}
-.sg-execution-body p {
-  margin: 0 0 12px;
-  line-height: 1.5;
-}
-.sg-execution-steps {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-}
-.sg-execution-steps li {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 10px;
-}
-.sg-execution-steps li > span:first-child {
-  display: grid;
-  gap: 4px;
-}
-.sg-execution-steps li > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.sg-execution-steps strong {
+.sg-execution-state::before {
+  content: "·";
+  margin-right: 6px;
+}
+.sg-execution-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  background: var(--panel);
+  line-height: 1.5;
+}
+.sg-execution-body p {
+  margin: 0;
+}
+.sg-execution-body a {
+  color: var(--blue-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sg-execution-result {
+  color: var(--ink);
   font-weight: 500;
 }
 .sg-execution-warning {
   color: var(--amber-text);
 }
+.sg-execution-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line-2);
+}
+.sg-execution-steps li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.sg-execution-steps li > span:first-child {
+  color: var(--ink);
+}
+.sg-execution-steps small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sg-execution-steps li.failed small,
+.sg-execution-steps li.incomplete small {
+  color: var(--amber-text);
+}
+.sg-execution-steps li.running small {
+  color: var(--blue-text);
+}
+.sg-execution-steps li > span:last-child {
+  min-width: 3.5em;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .sg-execution-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.sg-execution a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.sg-execution-diagnostics {
-  margin-top: 16px;
+  gap: 4px 14px;
 }
 .sg-execution-diagnostics > summary {
+  width: fit-content;
+  color: var(--muted);
   cursor: pointer;
-  margin-bottom: 12px;
+}
+.sg-execution-diagnostics > summary:hover {
+  color: var(--ink);
+}
+.sg-execution-diagnostics > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.sg-execution-diagnostics[open] > summary {
+  margin-bottom: 8px;
 }
 .sg-execution-diagnostics dl {
-  margin: 8px 0 16px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 8px 0;
   overflow-wrap: anywhere;
 }
+.sg-execution-diagnostics dl > div {
+  display: contents;
+}
 .sg-execution-diagnostics dt {
-  color: var(--ink-2);
+  color: var(--muted);
 }
 .sg-execution-diagnostics dd {
-  margin: 0 0 6px;
+  margin: 0;
+  font: 11px/1.5 var(--mono);
 }
-.sg-execution summary:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 4px;
+
+/* ---------- Application Activity: what happened to this application ---- */
+
+.sg-inspector-hint {
+  margin: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-2);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-event-dot.passed {
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.sg-event-dot.attention {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-soft);
 }
