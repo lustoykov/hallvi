@@ -16,6 +16,7 @@ import {
   persistPiDraft,
   recordPiCall,
 } from "./pi-runs";
+import { StaleContractProposalError } from "./phase-two";
 import type { PiRun } from "./types";
 import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 
@@ -188,7 +189,8 @@ export async function executePiRun(
     finishPiRun(
       run.id,
       "failed",
-      error instanceof NativeSessionError
+      error instanceof NativeSessionError ||
+        error instanceof StaleContractProposalError
         ? error.message
         : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
       failure,

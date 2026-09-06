@@ -352,6 +352,68 @@ describe("Application Contract validation", () => {
     );
   });
 
+  it("binds a profile rule to the one field it governs, at proposal and in review", () => {
+    const s = scenario("fastapi-conforming");
+    // The database rule's exact value cited for the health endpoint: the
+    // value matches the rule, the field does not.
+    const wrongField = buildContractProposal(s.seen, s.reads);
+    const health = wrongField.fields.find((f) => f.key === "health.path")!;
+    health.value = "PostgreSQL";
+    health.provenance = { kind: "profile-rule", ruleId: "database" };
+    delete health.conformance;
+    rejects(
+      () => validateContractProposal(wrongField, s.context),
+      "health.path: rule database governs persistence.database, not health.path",
+    );
+    for (const [ruleId, rule] of Object.entries(APPLICATION_PROFILE.rules))
+      expect(
+        APPLICATION_PROFILE.fields.some((field) => field.key === rule.field),
+        `${ruleId} names a material field`,
+      ).toBe(true);
+    // A stored contract that slipped through an older validator is reported
+    // by the review, so P2.G3 blocks instead of trusting it.
+    const accepted = validateContractProposal(
+      buildContractProposal(s.seen, s.reads),
+      s.context,
+    );
+    const record: ApplicationContractRecord = {
+      id: "c-rule",
+      applicationId: APP,
+      workspaceId: "ws",
+      version: 1,
+      profileId: accepted.body.profileId,
+      profileVersion: accepted.body.profileVersion,
+      commitSha: COMMIT,
+      sourceMessageId: "m0",
+      body: {
+        ...accepted.body,
+        fields: accepted.body.fields.map((field) =>
+          field.key === "health.path"
+            ? {
+                key: field.key,
+                value: "PostgreSQL",
+                provenance: { kind: "profile-rule", ruleId: "database" },
+              }
+            : field,
+        ),
+      },
+      supersededById: null,
+      createdAt: "2026-09-06T10:00:00.000Z",
+    };
+    expect(
+      reviewContractProvenance(record, {
+        applicationId: APP,
+        commitSha: COMMIT,
+        lookups: s.context.lookups,
+      }),
+    ).toEqual([
+      {
+        field: "health.path",
+        reason: "rule database governs persistence.database, not this field",
+      },
+    ]);
+  });
+
   it("accepts the engineer's own quoted words or an active Decision, and nothing else", () => {
     const s = scenario("fastapi-conforming");
     s.messages.set("m1", {
@@ -526,16 +588,73 @@ describe("Application Contract validation", () => {
     );
   });
 
-  it("rejects credential-shaped text anywhere in the contract", () => {
+  it("rejects credential-shaped text anywhere in the proposal without echoing it", () => {
     const s = scenario("fastapi-conforming");
+    const token = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab";
+    const rejectsSafely = (input: unknown, path: string) => {
+      let error: unknown;
+      try {
+        validateContractProposal(input, s.context);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(ContractValidationError);
+      const message = (error as Error).message;
+      expect(message).toContain(
+        `${path}: credential-shaped text is never recorded in a contract`,
+      );
+      expect(message).not.toContain(token);
+      expect(message).not.toContain("ghp_");
+    };
     const leaked = buildContractProposal(s.seen, s.reads);
-    leaked.fields.find(
+    const secrets = leaked.fields.findIndex(
       (f) => f.key === "configuration.secretVariables",
-    )!.value = "SECRET_KEY=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab";
-    rejects(
-      () => validateContractProposal(leaked, s.context),
-      "credential-shaped text is never recorded",
     );
+    leaked.fields[secrets].value = `SECRET_KEY=${token}`;
+    rejectsSafely(leaked, `/fields/${secrets}/value`);
+    // The summary, an engineer quote and a citation snippet are strings the
+    // per-field scan never saw. Each is rejected by its JSON path, before any
+    // later reason could repeat the value.
+    const summary = buildContractProposal(s.seen, s.reads);
+    summary.summary = `Synthetic token ${token} in the summary`;
+    rejectsSafely(summary, "/summary");
+    s.messages.set("m-secret", {
+      id: "m-secret",
+      chatId: "chat",
+      role: "user",
+      source: "user",
+      body: `Use ${token} as the key`,
+      createdAt: "2026-09-06T10:00:00.000Z",
+      status: "completed",
+      revision: 0,
+    });
+    const quoted = buildContractProposal(s.seen, s.reads, {
+      corrections: [
+        {
+          key: "configuration.secretVariables",
+          value: "SECRET_KEY",
+          messageId: "m-secret",
+          quote: `Use ${token} as the key`,
+        },
+      ],
+    });
+    rejectsSafely(quoted, `/fields/${secrets}/provenance/source/quote`);
+    const snippet = buildContractProposal(s.seen, s.reads);
+    const python = snippet.fields.findIndex(
+      (f) => f.key === "build.pythonVersion",
+    );
+    (
+      snippet.fields[python].provenance as {
+        citation: { snippet: string };
+      }
+    ).citation.snippet = `requires-python = "${token}"`;
+    rejectsSafely(snippet, `/fields/${python}/provenance/citation/snippet`);
+    // A value that mismatches its rule is still explained, because it is not
+    // credential-shaped; that message is the one the scan protects.
+    const wrongValue = buildContractProposal(s.seen, s.reads);
+    wrongValue.fields.find((f) => f.key === "build.packageManager")!.value =
+      "pip";
+    rejects(() => validateContractProposal(wrongValue, s.context), 'not "pip"');
   });
 
   it("proves absence only from an untruncated inspection at the same commit", () => {

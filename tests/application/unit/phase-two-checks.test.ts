@@ -87,7 +87,7 @@ describe("Phase 2 checks", () => {
   it("asks for GitHub, then an inspection, before anything else", () => {
     const disconnected = computePhaseTwoChecks({
       inspection: null,
-      inspectionCurrent: false,
+      inspectionConnectionCurrent: false,
       githubConnected: false,
       resolution: resolution("not-inspected"),
       contract: null,
@@ -109,7 +109,7 @@ describe("Phase 2 checks", () => {
       results(
         computePhaseTwoChecks({
           inspection: null,
-          inspectionCurrent: false,
+          inspectionConnectionCurrent: false,
           githubConnected: true,
           resolution: resolution("not-inspected"),
           contract: null,
@@ -121,7 +121,7 @@ describe("Phase 2 checks", () => {
   it("does not let an inspection from a previous login support the profile", () => {
     const checks = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: false,
+      inspectionConnectionCurrent: false,
       githubConnected: true,
       resolution: resolution("not-inspected"),
       contract: contract(),
@@ -133,22 +133,56 @@ describe("Phase 2 checks", () => {
     expect(statuses(checks)["contract-complete"]).toBe("not-yet");
   });
 
+  it.each(["failed", "unavailable"] as const)(
+    "asks for a fresh inspection instead of repeating a %s result from a previous login",
+    (status) => {
+      const replaced = computePhaseTwoChecks({
+        inspection: inspection(status),
+        inspectionConnectionCurrent: false,
+        githubConnected: true,
+        resolution: resolution("not-inspected"),
+        contract: null,
+      });
+      expect(statuses(replaced)["profile-resolved"]).toBe("not-yet");
+      expect(results(replaced)["profile-resolved"]).toContain("previous login");
+      expect(replaced[0].rerun?.label).toBe("Re-inspect repository");
+      const disconnected = computePhaseTwoChecks({
+        inspection: inspection(status),
+        inspectionConnectionCurrent: false,
+        githubConnected: false,
+        resolution: resolution("not-inspected"),
+        contract: null,
+      });
+      expect(results(disconnected)["profile-resolved"]).toBe(
+        "Connect GitHub, then re-inspect the repository; the last inspection used a login that is no longer connected.",
+      );
+      expect(disconnected[0].rerun?.label).toBe("Inspect repository");
+    },
+  );
+
   it.each([
     ["failed", "blocked"],
     ["unavailable", "not-yet"],
-  ] as const)("carries a %s inspection as %s", (status, expected) => {
-    const checks = computePhaseTwoChecks({
-      inspection: inspection(status),
-      inspectionCurrent: true,
-      githubConnected: true,
-      resolution: resolution("not-inspected"),
-      contract: null,
-    });
-    expect(statuses(checks)["profile-resolved"]).toBe(expected);
-    expect(results(checks)["profile-resolved"]).toBe(
-      inspection(status).summary,
-    );
-  });
+  ] as const)(
+    "carries a %s inspection under the current login as %s with its own reason",
+    (status, expected) => {
+      const checks = computePhaseTwoChecks({
+        inspection: inspection(status),
+        inspectionConnectionCurrent: true,
+        githubConnected: true,
+        resolution: resolution("not-inspected"),
+        contract: null,
+      });
+      expect(statuses(checks)["profile-resolved"]).toBe(expected);
+      expect(results(checks)["profile-resolved"]).toBe(
+        inspection(status).summary,
+      );
+      expect(results(checks)["profile-resolved"]).not.toContain(
+        "previous login",
+      );
+      expect(checks[0].rerun?.label).toBe("Re-inspect repository");
+    },
+  );
 
   it.each([
     ["unmatched", "FastAPI + uv did not match: no pyproject.toml at the root."],
@@ -159,7 +193,7 @@ describe("Phase 2 checks", () => {
   ] as const)("blocks an %s profile with its reason", (status, reason) => {
     const checks = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution(status, reason),
       contract: null,
@@ -174,7 +208,7 @@ describe("Phase 2 checks", () => {
   it("passes the profile and waits for a contract", () => {
     const checks = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution("matched"),
       contract: null,
@@ -196,7 +230,7 @@ describe("Phase 2 checks", () => {
   it("passes all four for a current, sourced contract without blockers", () => {
     const checks = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution("matched"),
       contract: contract(),
@@ -223,7 +257,7 @@ describe("Phase 2 checks", () => {
   it("blocks a contract built at another commit or profile version, and holds later checks", () => {
     const stale = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution("matched"),
       contract: contract({ commitSha: "d".repeat(40) }),
@@ -239,7 +273,7 @@ describe("Phase 2 checks", () => {
     );
     const olderProfile = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: { ...resolution("matched"), profileVersion: 2 },
       contract: contract(),
@@ -252,7 +286,7 @@ describe("Phase 2 checks", () => {
   it("blocks on stale provenance and on required values that need a decision", () => {
     const provenance = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution("matched"),
       contract: contract({
@@ -280,7 +314,7 @@ describe("Phase 2 checks", () => {
     });
     const gaps = computePhaseTwoChecks({
       inspection: inspection(),
-      inspectionCurrent: true,
+      inspectionConnectionCurrent: true,
       githubConnected: true,
       resolution: resolution("matched"),
       contract: blocked,

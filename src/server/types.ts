@@ -249,7 +249,9 @@ export interface RepositoryInspectionSummary {
   observedAt: string;
   commitSha: string | null;
   defaultBranch: string | null;
-  /** Made with the current GitHub connection, so it can support checks. */
+  /** Made with the current GitHub connection, whatever its outcome. */
+  connectionCurrent: boolean;
+  /** Passed and made with the current connection, so it can support checks. */
   current: boolean;
   entries: number;
   truncated: boolean;
@@ -469,6 +471,9 @@ export interface ApplicationStatus {
     status: ObservationStatus;
     commitSha: string | null;
     observedAt: string;
+    /** Made with the current GitHub connection, whatever its outcome. */
+    connectionCurrent: boolean;
+    /** Passed and made with the current connection. */
     current: boolean;
     profile: Pick<ProfileResolution, "status" | "profileId" | "profileVersion">;
   } | null;

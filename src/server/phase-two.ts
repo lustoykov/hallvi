@@ -91,6 +91,8 @@ export function latestInspection(applicationId: string) {
 export interface RepositoryEvidence {
   inspection: Observation | null;
   connectionId: string | null;
+  /** Made with the current GitHub connection, whatever its outcome. */
+  connectionCurrent: boolean;
   /** Passed, and made with the current GitHub connection. */
   current: boolean;
   commitSha: string | null;
@@ -111,8 +113,11 @@ export function repositoryEvidence(applicationId: string): RepositoryEvidence {
   const connectionId = currentGithubConnectionId();
   const raw = inspectionRaw(inspection);
   const passed = inspection?.status === "passed";
-  const current =
-    passed && observationMatchesConnection(inspection, connectionId);
+  const connectionCurrent = observationMatchesConnection(
+    inspection,
+    connectionId,
+  );
+  const current = passed && connectionCurrent;
   const commitSha = passed ? (raw.commitSha ?? null) : null;
   const entries = passed ? (raw.entries ?? []) : [];
   const files = commitSha
@@ -127,6 +132,7 @@ export function repositoryEvidence(applicationId: string): RepositoryEvidence {
   return {
     inspection,
     connectionId,
+    connectionCurrent,
     current,
     commitSha,
     defaultBranch: passed ? (raw.defaultBranch ?? null) : null,
@@ -153,6 +159,7 @@ export function inspectionSummary(
     observedAt: inspection.observedAt,
     commitSha: evidence.commitSha,
     defaultBranch: evidence.defaultBranch,
+    connectionCurrent: evidence.connectionCurrent,
     current: evidence.current,
     entries: evidence.entries.length,
     truncated: evidence.truncated,
@@ -418,11 +425,15 @@ function requireCurrentInspection(applicationId: string) {
     throw new Error(
       "The repository has not been inspected in this phase. Ask the engineer to use Inspect repository in the check details.",
     );
+  if (!evidence.connectionCurrent)
+    throw new Error(
+      evidence.connectionId
+        ? "The latest inspection used a previous GitHub connection. Ask the engineer to re-inspect the repository with the current connection."
+        : "GitHub is not connected. Ask the engineer to connect GitHub and re-inspect the repository.",
+    );
   if (!evidence.current || !evidence.commitSha)
     throw new Error(
-      evidence.inspection.status === "passed"
-        ? "The latest inspection used a previous GitHub connection. Ask the engineer to re-inspect the repository with the current connection."
-        : `The latest inspection did not pass: ${evidence.inspection.summary} Ask the engineer to re-inspect the repository.`,
+      `The latest inspection did not pass: ${evidence.inspection.summary} Ask the engineer to re-inspect the repository.`,
     );
   return evidence as RepositoryEvidence & { commitSha: string };
 }
@@ -449,6 +460,7 @@ export function repositoryInspectionForRun(
           status: evidence.inspection.status,
           summary: evidence.inspection.summary,
           observedAt: evidence.inspection.observedAt,
+          connectionCurrent: evidence.connectionCurrent,
           current: evidence.current,
           commitSha: evidence.commitSha,
           defaultBranch: evidence.defaultBranch,
@@ -459,6 +471,7 @@ export function repositoryInspectionForRun(
       ...evidence.resolution,
       rules: Object.entries(APPLICATION_PROFILE.rules).map(([id, rule]) => ({
         ruleId: id,
+        field: rule.field,
         value: rule.value,
         label: rule.label,
         definition: rule.definition,
@@ -706,11 +719,40 @@ export function proposalInput(proposal: ApplicationContractProposal) {
   };
 }
 
+export class StaleContractProposalError extends Error {}
+
 /**
- * Called only inside the worker's final transaction. The proposal is validated
- * again against current records, saved as a new version and, for a revision,
- * the previous contract is superseded with a guarded update. One Activity
- * Event per committed contract; a rollback leaves neither.
+ * A staged proposal is bound to the inspection commit and profile version it
+ * was validated against. Re-binding it to whatever is current at commit would
+ * save a contract at a commit the model never saw, so a changed commit or
+ * profile fails the attempt instead; the engineer's message is answered by a
+ * retry against the new evidence.
+ */
+export function assertProposalIdentityCurrent(
+  proposal: ApplicationContractProposal,
+  evidence: RepositoryEvidence & { commitSha: string },
+) {
+  const { body } = proposal;
+  if (body.commitSha !== evidence.commitSha)
+    throw new StaleContractProposalError(
+      `The repository was re-inspected while this contract was being proposed (${shortSha(body.commitSha)} → ${shortSha(evidence.commitSha)}); the proposal was not saved. Ask again to propose it from the current inspection.`,
+    );
+  const { resolution } = evidence;
+  if (
+    body.profileId !== resolution.profileId ||
+    body.profileVersion !== resolution.profileVersion
+  )
+    throw new StaleContractProposalError(
+      `The application profile changed while this contract was being proposed (${body.profileId} v${body.profileVersion} → ${resolution.profileId} v${resolution.profileVersion}); the proposal was not saved.`,
+    );
+}
+
+/**
+ * Called only inside the worker's final transaction. The staged identity is
+ * compared with current evidence, the proposal is validated again against
+ * current records, saved as a new version and, for a revision, the previous
+ * contract is superseded with a guarded update. One Activity Event per
+ * committed contract; a rollback leaves neither.
  */
 export function commitContractProposal(
   run: PiRun,
@@ -722,6 +764,7 @@ export function commitContractProposal(
       "The Application Contract can only be saved in the current Inspect app phase.",
     );
   const evidence = requireCurrentInspection(application.id);
+  assertProposalIdentityCurrent(proposal, evidence);
   const context = validationContext(application.id, evidence);
   const validated = validateContractProposal(proposalInput(proposal), context);
   const previous = context.currentContract;

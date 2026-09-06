@@ -27,38 +27,46 @@ export const APPLICATION_PROFILE = {
     "pom.xml",
     "composer.json",
   ],
+  /** Each rule governs exactly one material field; a rule cited for any
+   * other field is not provenance, whatever value it carries. */
   rules: {
     "package-manager": {
+      field: "build.packageManager",
       value: "uv",
       label: "Dependencies are installed with uv",
       definition:
         "Dependencies come from pyproject.toml and uv.lock through uv sync; no other installer is used.",
     },
     port: {
+      field: "network.port",
       value: "8000",
       label: "Container port 8000",
       definition:
         "The service listens on port 8000 inside the container unless the repository declares another port.",
     },
     "bind-host": {
+      field: "network.bindHost",
       value: "0.0.0.0",
       label: "Bind all interfaces",
       definition:
         "The server binds 0.0.0.0 inside the container so the host can reach it; a localhost-only bind is unreachable.",
     },
     "health-path": {
+      field: "health.path",
       value: "/health",
       label: "GET /health",
       definition:
         "The service exposes GET /health returning HTTP 200 while it can serve requests. Deployment and monitoring probe it.",
     },
     database: {
+      field: "persistence.database",
       value: "PostgreSQL",
       label: "PostgreSQL database",
       definition:
         "Durable application data lives in PostgreSQL, not in files inside disposable container storage.",
     },
     logging: {
+      field: "observability.logging",
       value: "stdout",
       label: "Logs to stdout",
       definition:

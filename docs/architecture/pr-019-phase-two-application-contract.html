@@ -129,12 +129,12 @@
         <g>
           <rect x="40" y="632" width="1200" height="96" rx="12" fill="#fff" stroke="#cbd5e5" />
           <text class="name" x="60" y="664">Provenance kinds are not interchangeable</text>
-          <text class="small" x="60" y="690">repository-declared: value verbatim in a quoted snippet of a saved read · profile-rule: exactly the versioned rule value · user-confirmed: quote of the engineer's own message or an active Decision</text>
+          <text class="small" x="60" y="690">repository-declared: value verbatim in a quoted snippet of a saved read · profile-rule: exactly the versioned rule value, for the one field the rule governs · user-confirmed: quote of the engineer's own message or an active Decision</text>
           <text class="small" x="60" y="708">inferred: Server Guy's labeled interpretation of cited content · unresolved: unknown / contradiction / unsupported (block) or policy (visible, decided at a later gate)</text>
         </g>
       </svg>
 
-      <p class="note"><strong>Facts survive cancellation; effects do not.</strong> A file read saved during a Run is a receipt of what the repository contained at that commit and stays after cancellation, timeout or failure. The staged contract is an effect that only the final transaction publishes; a stale revision, a changed commit or a rejected field fails the attempt and rolls everything back. Retry reuses the saved reads.</p>
+      <p class="note"><strong>Facts survive cancellation; effects do not.</strong> A file read saved during a Run is a receipt of what the repository contained at that commit and stays after cancellation, timeout or failure. The staged contract is an effect that only the final transaction publishes; it stays bound to the commit and profile it was validated against, and the transaction compares that identity with current evidence before revalidating, so a stale revision, a changed commit or profile, or a rejected field fails the attempt and rolls back the answer, Decisions, version, supersede and Activity together. Every proposal string is checked for credential shapes before any reason could echo one. Retry reuses the saved reads.</p>
 
       <h2>Before → after</h2>
       <table>

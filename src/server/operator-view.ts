@@ -93,7 +93,7 @@ export function evaluatePhase(
   return {
     checks: computePhaseTwoChecks({
       inspection: evidence.inspection,
-      inspectionCurrent: evidence.current,
+      inspectionConnectionCurrent: evidence.connectionCurrent,
       githubConnected: Boolean(evidence.connectionId),
       resolution: evidence.resolution,
       contract,
@@ -287,6 +287,7 @@ export function getApplicationStatus(
           status: evidence.inspection.status,
           commitSha: evidence.commitSha,
           observedAt: evidence.inspection.observedAt,
+          connectionCurrent: evidence.connectionCurrent,
           current: evidence.current,
           profile: {
             status: evidence.resolution.status,

@@ -266,7 +266,15 @@ async function contractRuntime(
               const next = CONTRACT_READ_ORDER.filter((p) =>
                 paths.includes(p),
               ).find((p) => !reads.some((read) => read.path === p));
+              const decisionResult = results.find(
+                (r) => r.name === "propose_decision",
+              );
               if (next) call("read_repository_file", { path: next });
+              else if (mode.startsWith("confirm") && !decisionResult)
+                call("propose_decision", {
+                  kind: "launch-priority",
+                  value: "Health checks must answer within one second.",
+                });
               else if (mode.startsWith("pause")) {
                 await new Promise<void>((resolve, reject) => {
                   pause.release = resolve;
@@ -278,10 +286,38 @@ async function contractRuntime(
                   );
                 });
                 answer({ resumed: true });
-              } else if (mode.startsWith("correct") && !currentResult)
+              } else if (
+                (mode.startsWith("correct") || mode.startsWith("confirm")) &&
+                !currentResult
+              )
                 call("get_application_contract", {});
-              else {
-                const value = mode.split(" ").at(-1)!;
+              else if (mode.startsWith("confirm")) {
+                // Every resolved value becomes the engineer's own choice,
+                // quoted from their message: a legitimate revision that cites
+                // no repository read at all.
+                const current = (
+                  JSON.parse(currentResult!.body) as {
+                    current: { id: string } | null;
+                  }
+                ).current;
+                const proposal = buildContractProposal(inspection, reads, {
+                  ...(current ? { revises: current.id } : {}),
+                });
+                for (const field of proposal.fields)
+                  if (field.value !== null) {
+                    field.provenance = {
+                      kind: "user-confirmed",
+                      source: {
+                        type: "message",
+                        messageId: runContext?.userMessageId ?? "missing",
+                        quote: field.value,
+                      },
+                    };
+                    delete field.conformance;
+                  }
+                call("propose_application_contract", proposal);
+              } else {
+                const value = mode.split(/\s+/).at(-1)!;
                 const current = currentResult
                   ? (
                       JSON.parse(currentResult.body) as {
@@ -313,7 +349,10 @@ async function contractRuntime(
               }
             }
           }
-          if (mode(user) === "correct-hold" && message.stopReason === "stop") {
+          if (
+            ["correct-hold", "confirm-hold"].includes(mode(user)) &&
+            message.stopReason === "stop"
+          ) {
             await new Promise<void>((resolve) => {
               pause.release = resolve;
               pause.reached?.();
@@ -358,7 +397,7 @@ async function contractRuntime(
 }
 function mode(user: string) {
   return user.startsWith("contract:")
-    ? user.slice("contract:".length).trim().split(" ")[0]
+    ? user.slice("contract:".length).trim().split(/\s+/)[0]
     : "";
 }
 
@@ -896,6 +935,76 @@ describe("Pi's adaptive inspection through the real SDK tool loop", () => {
     });
     expect(contractOf(app.id)?.id).toBe(external.id);
     expect(store.listContracts(app.id)).toHaveLength(3);
+  }, 30_000);
+
+  it("fails the attempt and saves nothing when a re-inspection changes the commit under a citation-free revision", async () => {
+    const app = await inspected();
+    expect((await work()).status).toBe("succeeded");
+    const first = contractOf(app.id)!;
+    const firstCommit = fixtureCommitSha("qa/fastapi-app");
+    expect(first.commitSha).toBe(firstCommit);
+    // The engineer restates every resolved value, so the revision can quote
+    // their message for each field and cite no repository read.
+    const values = first.body.fields
+      .map((field) => field.value)
+      .filter((value): value is string => value !== null);
+    runs.sendChatMessage(
+      app.id,
+      app.chatId,
+      `contract: confirm-hold\n${values.join("\n")}`,
+      randomUUID(),
+    );
+    const reached = new Promise<void>((resolve) => {
+      pause.reached = resolve;
+    });
+    const holding = executePiRun(runs.claimNextPiRun()!);
+    await reached;
+    // The proposal is staged at the first commit. A push and a re-inspection
+    // from the check drawer pin a new one before the Run finishes.
+    github.revision = "2";
+    const later = await inspectRepository(app.id);
+    expect(later.status).toBe("passed");
+    const secondCommit = fixtureCommitSha("qa/fastapi-app", "2");
+    expect(repositoryEvidence(app.id).commitSha).toBe(secondCommit);
+    pause.release!();
+    await holding;
+    const run = runs.chatRunSnapshot(app.id, app.chatId).runs.at(-1)!;
+    expect(run.status).toBe("failed");
+    expect(run.error).toContain(
+      `re-inspected while this contract was being proposed (${firstCommit.slice(0, 8)} → ${secondCommit.slice(0, 8)})`,
+    );
+    // The failed placeholder carries no answer; the chat shows the Run's
+    // reason instead, which names both commits.
+    expect(store.listMessages(app.chatId).at(-1)).toMatchObject({
+      status: "failed",
+      body: "",
+    });
+    expect(run.error).toContain("the proposal was not saved");
+    // Atomic: no answer, no Decision, no version, no supersede, no Activity.
+    expect(store.listContracts(app.id)).toHaveLength(1);
+    expect(contractOf(app.id)?.id).toBe(first.id);
+    expect(store.getContract(first.id)?.supersededById).toBeNull();
+    expect(store.listActiveDecisions(app.id)).toEqual([]);
+    expect(feed(app.workspaceId)).not.toContain("contract-revised");
+    expect(feed(app.workspaceId)).not.toContain("decision-recorded");
+    expect(feed(app.workspaceId)[0]).toBe("repository-inspected");
+    expect(checks(app.id)["contract-complete"]).toBe("blocked");
+    // The correction path: a new request proposes from the current commit.
+    runs.sendChatMessage(
+      app.id,
+      app.chatId,
+      "contract: correct /health",
+      randomUUID(),
+    );
+    expect((await work()).status).toBe("succeeded");
+    expect(contractOf(app.id)).toMatchObject({
+      version: 2,
+      commitSha: secondCommit,
+    });
+    expect(store.getContract(first.id)?.supersededById).toBe(
+      contractOf(app.id)!.id,
+    );
+    expect(checks(app.id)["contract-complete"]).toBe("passed");
   }, 30_000);
 });
 

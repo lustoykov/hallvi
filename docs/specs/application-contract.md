@@ -82,7 +82,7 @@ Resolution criteria, each reported as matched or rejected with what was found:
 
 All four must match. A matching repository with a second root-level runtime manifest (`package.json`, `go.mod`, `Cargo.toml`, `Gemfile`, `pom.xml`, `composer.json`) resolves as **ambiguous**: the single-service profile cannot describe the whole repository. The manifest reader is deliberately small: the `[project]` table's `requires-python` and `dependencies`, and the `[tool.uv]` header. Unusual layouts do not match and say so.
 
-Profile rules with stable identities (`fastapi-uv@1/<rule>`): `package-manager` = uv, `port` = 8000, `bind-host` = 0.0.0.0, `health-path` = /health, `database` = PostgreSQL, `logging` = stdout.
+Profile rules with stable identities (`fastapi-uv@1/<rule>`), each governing exactly one material field: `package-manager` = uv (`build.packageManager`), `port` = 8000 (`network.port`), `bind-host` = 0.0.0.0 (`network.bindHost`), `health-path` = /health (`health.path`), `database` = PostgreSQL (`persistence.database`), `logging` = stdout (`observability.logging`).
 
 Material fields (19), grouped for the Record:
 
@@ -110,7 +110,7 @@ Body: `{ profileId, profileVersion, commitSha, summary, fields[] }` where each f
 | Kind | Meaning | Validation at proposal and at commit |
 | --- | --- | --- |
 | `repository-declared` | The value appears verbatim in the repository. | The cited Observation is a passed `github-repository-file` read of this application at the contract's commit, the cited path matches, the quoted snippet occurs verbatim in the saved content, and the value is a verbatim part of the snippet. The source line is computed from the content, never model-supplied. |
-| `profile-rule` | The value is a profile convention. | The rule exists in the current profile version and the value equals the rule's value exactly. A different value is not a profile rule. |
+| `profile-rule` | The value is a profile convention. | The rule exists in the current profile version, governs this exact field, and the value equals the rule's value exactly. A different value is not a profile rule, and a rule cited for another field (`health.path` justified by the `database` rule) is rejected at proposal time and reported by the provenance review of a stored contract. |
 | `user-confirmed` | The engineer chose it. | Either a quote that occurs verbatim in one of the engineer's own messages in this application (`source: user`, never a Server Guy request), or an active saved Decision of this application. |
 | `inferred` | Server Guy's interpretation of cited content. | The citation resolves like a declaration, but the value need not be verbatim. Visibly labeled **Inferred** in the Record. |
 | `unresolved` (`unknown`, `contradiction`, `unsupported`) | No supported value. | Value must be null; a reason is required; an optional citation resolves like a declaration. Blocks P2.G4. |
@@ -120,13 +120,17 @@ Body: `{ profileId, profileVersion, commitSha, summary, fields[] }` where each f
 
 Absence is citable: `{ observationId, absent }` names a passed inspection of this application at the contract commit whose untruncated tree does not contain the path.
 
-Further rules: every material field exactly once; unknown keys rejected; credential-shaped text rejected anywhere; conformance items need a required value plus `observed` and `change`; `revises` must name the current contract when one exists and be absent otherwise. Rejections return numbered reasons to the model as a tool error so it can correct the proposal; a second proposal in the same Run replaces the first. The final transaction validates again against current records; a stale `revises` or a changed commit fails the Run and rolls everything back.
+Further rules: every material field exactly once; unknown keys rejected; conformance items need a required value plus `observed` and `change`; `revises` must name the current contract when one exists and be absent otherwise. Rejections return numbered reasons to the model as a tool error so it can correct the proposal; a second proposal in the same Run replaces the first.
+
+Credential shapes: right after the schema check and before any other validation, every string of the proposal (summary, values, engineer quotes, citation snippets and paths, reasons, observed text) is matched against the same supported credential patterns that redact repository reads. A match rejects the proposal naming only the JSON path of the offending string, so no later reason, Activity or log can echo the value. This bounds the existing guard; pattern matching does not detect every secret, and the deny list and redaction remain the primary protection for repository content.
+
+Staged identity: a proposal is bound to the inspection commit and profile identity it was validated against. The final transaction first compares that bound commit and profile with the current evidence and fails the Run when either changed, naming both commits, then validates again against current records; a stale `revises` fails the same way. Nothing is re-bound to whatever inspection is current at commit time, so a proposal whose fields are all engineer-confirmed, and therefore cites no read that would otherwise catch the change, cannot be saved at a commit the model never saw. The failure rolls back the answer, Decisions, the contract version, the supersede and Activity together; the chat shows the reason, and the engineer asks again to propose from the current inspection.
 
 Derived, never stored: the **gap report** (blockers, conformance items, open policies) and the **provenance review** (fields whose cited read, rule, message or Decision no longer resolves).
 
 ## Phase 2 Gate Checks
 
-Projections computed on every read from the latest inspection, its connection, the profile resolution, the current contract and the provenance review; never stored, never satisfied by history.
+Projections computed on every read from the latest inspection, its connection, the profile resolution, the current contract and the provenance review; never stored, never satisfied by history. The evidence keeps connection identity separate from outcome: an inspection made with a replaced login (or after GitHub was disconnected) asks for a fresh one whatever its result, while a failed or unavailable inspection made with the current login keeps its own reason (access denied blocks; a timeout is not-yet) instead of claiming a previous login was used. The tool path applies the same order.
 
 | Check | Passed when | Otherwise |
 | --- | --- | --- |

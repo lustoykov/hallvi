@@ -276,6 +276,7 @@ describe("contract record", () => {
         observedAt: at,
         commitSha: COMMIT,
         defaultBranch: "main",
+        connectionCurrent: true,
         current: true,
         entries: 12,
         truncated: false,

@@ -85,7 +85,7 @@ export const provenanceSchema = Type.Union([
     {
       additionalProperties: false,
       description:
-        "The value is the profile convention identified by ruleId, exactly as get_repository_inspection lists it.",
+        "The value is the profile convention identified by ruleId, exactly as get_repository_inspection lists it, for the one field that rule governs.",
     },
   ),
   Type.Object(
@@ -366,10 +366,25 @@ function withLine(
     : citation;
 }
 
-function secretIssues(field: string, values: Array<string | undefined>) {
-  return values.some((value) => value && looksLikeSecret(value))
-    ? [`${field}: credential-shaped text is never recorded in a contract`]
-    : [];
+/**
+ * Every string leaf of a proposal (summary, values, quotes, snippets, reasons,
+ * paths, ids) is checked against the supported credential shapes before any
+ * other validation, so no later message can echo a matched value. Reports the
+ * JSON path only. Pattern matching bounds the risk; it does not detect every
+ * secret.
+ */
+export function credentialShapedPaths(value: unknown, path = ""): string[] {
+  if (typeof value === "string")
+    return looksLikeSecret(value) ? [path || "/"] : [];
+  if (Array.isArray(value))
+    return value.flatMap((item, index) =>
+      credentialShapedPaths(item, `${path}/${index}`),
+    );
+  if (value && typeof value === "object")
+    return Object.entries(value).flatMap(([key, item]) =>
+      credentialShapedPaths(item, `${path}/${key}`),
+    );
+  return [];
 }
 
 /**
@@ -386,6 +401,14 @@ export function validateContractProposal(
       [...Value.Errors(contractProposalParameters, input)]
         .slice(0, CONTRACT_LIMITS.reportedIssues)
         .map((error) => `${error.instancePath || "/"}: ${error.message}`),
+    );
+  const credentialShaped = credentialShapedPaths(input);
+  if (credentialShaped.length)
+    throw new ContractValidationError(
+      credentialShaped.map(
+        (path) =>
+          `${path}: credential-shaped text is never recorded in a contract; remove it and describe the setting by name`,
+      ),
     );
   if (context.profile.status !== "matched")
     throw new ContractValidationError([
@@ -410,15 +433,6 @@ export function validateContractProposal(
       issues.push(`${field.key}: value is empty; use null when unresolved`);
       continue;
     }
-    issues.push(
-      ...secretIssues(field.key, [
-        value ?? undefined,
-        field.conformance?.observed,
-        field.conformance?.change,
-        "reason" in field.provenance ? field.provenance.reason : undefined,
-        "observed" in field.provenance ? field.provenance.observed : undefined,
-      ]),
-    );
     const policy = policyOf(definition);
     const provenance = field.provenance;
     let normalized: ContractProvenance = provenance;
@@ -480,6 +494,12 @@ export function validateContractProposal(
         if (!rule) {
           issues.push(
             `${field.key}: ${provenance.ruleId} is not a rule of ${APPLICATION_PROFILE.id}@${APPLICATION_PROFILE.version}`,
+          );
+          continue;
+        }
+        if (rule.field !== field.key) {
+          issues.push(
+            `${field.key}: rule ${provenance.ruleId} governs ${rule.field}, not ${field.key}; cite the rule for this field or another provenance`,
           );
           continue;
         }
@@ -666,6 +686,11 @@ export function reviewContractProvenance(
         issues.push({
           field: field.key,
           reason: `rule ${provenance.ruleId} no longer exists in the current profile`,
+        });
+      else if (rule.field !== field.key)
+        issues.push({
+          field: field.key,
+          reason: `rule ${provenance.ruleId} governs ${rule.field}, not this field`,
         });
       else if (rule.value !== field.value)
         issues.push({

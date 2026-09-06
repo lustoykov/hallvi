@@ -87,8 +87,9 @@ const REINSPECT = {
  */
 export function computePhaseTwoChecks(input: {
   inspection: Observation | null;
-  /** Made with the current GitHub connection. */
-  inspectionCurrent: boolean;
+  /** Made with the current GitHub connection, whatever its outcome. A failed
+   * or unavailable inspection under the current login keeps its own reason. */
+  inspectionConnectionCurrent: boolean;
   githubConnected: boolean;
   resolution: ProfileResolution;
   contract: ApplicationContractView | null;
@@ -114,13 +115,14 @@ export function computePhaseTwoChecks(input: {
         evidence: [],
         rerun: INSPECT,
       }
-    : !input.inspectionCurrent
+    : !input.inspectionConnectionCurrent
       ? {
           status: "not-yet",
-          result:
-            "Re-inspect the repository with your current GitHub connection; the last inspection used a previous login.",
+          result: input.githubConnected
+            ? "Re-inspect the repository with your current GitHub connection; the last inspection used a previous login."
+            : "Connect GitHub, then re-inspect the repository; the last inspection used a login that is no longer connected.",
           evidence: inspectionEvidence,
-          rerun: REINSPECT,
+          rerun: input.githubConnected ? REINSPECT : INSPECT,
         }
       : inspection.status === "failed"
         ? {
