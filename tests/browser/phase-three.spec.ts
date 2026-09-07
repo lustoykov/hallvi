@@ -90,7 +90,13 @@ test(
     // Continue with Server Guy: the request is Server Guy's, the change is
     // staged, previewed in the (scripted) runner and behavior checks proposed.
     await page
-      .getByRole("button", { name: "Continue with Server Guy", exact: true })
+      .getByRole("button", {
+        name: "Work on GitHub with Server Guy",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("button", { name: "Start shared preparation", exact: true })
       .click();
     await expect(
       page.locator(".sg-messages").getByText("Started automatically"),
@@ -101,7 +107,7 @@ test(
       ),
     ).toBeVisible({ timeout: 90_000 });
     await expect(
-      record.locator('[data-proposal-status="proposed"]'),
+      record.locator('[data-proposal-status="published"]'),
     ).toBeVisible();
     await expect(record.locator('[data-preview="passed"]')).toContainText(
       "Preview passed over this exact change",
@@ -123,7 +129,8 @@ test(
       "not-yet",
       "not-yet",
     ]);
-    expect(proposed.conformance.proposal.status).toBe("proposed");
+    expect(proposed.conformance.proposal.status).toBe("published");
+    expect(proposed.preparation.pullRequestUrl).toContain("/pull/1");
     expect(proposed.conformance.latestPreview.status).toBe("passed");
 
     // Accept the behavior checks, approve, allow publishing, publish.
@@ -133,25 +140,8 @@ test(
     await expect(
       record.locator('[data-acceptance-status="accepted"]'),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Approve change", exact: true })
-      .click();
-    await expect(
-      record.getByText("Approved · not published yet"),
-    ).toBeVisible();
-    await expect(
-      page.getByText(/Waiting for you: allow publishing/),
-    ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Allow publishing", exact: true })
-      .click();
+    // The explicit shared-work grant already authorized this checkpoint.
     await expect(record.locator('[data-grant="granted"]')).toBeVisible();
-    await page
-      .getByRole("button", {
-        name: "Publish branch and pull request",
-        exact: true,
-      })
-      .click();
     await expect(
       record.locator('[data-proposal-status="published"]'),
     ).toBeVisible({ timeout: 30_000 });
@@ -169,11 +159,9 @@ test(
     const events = page
       .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
-    await expect(events.nth(0)).toContainText(
-      "Branch and pull request published",
-    );
-    await expect(events.nth(1)).toContainText("Publishing allowed");
-    await expect(events.nth(2)).toContainText("Conformance change approved");
+    await expect(
+      events.filter({ hasText: "checkpoint" }).first(),
+    ).toBeVisible();
 
     // Unmerged: refresh keeps the candidate open; merge on GitHub (squash),
     // refresh records the observed default-branch head.
@@ -231,6 +219,31 @@ test(
     expect(verified.workspace.status).toBe("ready");
     await page.screenshot({
       path: testInfo.outputPath("phase-three-05-verified.png"),
+      fullPage: true,
+    });
+
+    // A synthetic runner deliberately cannot supply a real interactive URL.
+    // The application must show a failed preview and allow recovery.
+    await page
+      .getByRole("button", { name: "Start application preview", exact: true })
+      .click();
+    await expect
+      .poll(async () => (await view(page)).preview?.status, { timeout: 30_000 })
+      .toBe("failed");
+    await expect(
+      page.getByRole("button", {
+        name: "Start a new application preview",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "I tested it — the application works",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("application-preview-failed.png"),
       fullPage: true,
     });
 
@@ -338,7 +351,13 @@ test(
       timeout: 30_000,
     });
     await page
-      .getByRole("button", { name: "Continue with Server Guy", exact: true })
+      .getByRole("button", {
+        name: "Work on GitHub with Server Guy",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("button", { name: "Start shared preparation", exact: true })
       .click();
     await expect(
       page.getByText(
@@ -361,7 +380,7 @@ test(
     });
     // The staged proposal is still there; nothing was launched by the recovery.
     await expect(
-      record.locator('[data-proposal-status="proposed"]'),
+      record.locator('[data-proposal-status="published"]'),
     ).toBeVisible();
     expect((await view(page)).conformance.runs).toEqual([]);
   },

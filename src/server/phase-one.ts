@@ -14,6 +14,7 @@ import {
   listApplications,
   listChats,
   listObservations,
+  listApplicationPreviews,
   recordActivityOnce,
   supersedeDecision,
   withTransaction,
@@ -148,6 +149,14 @@ export async function observeRepository(
     },
     expectedId,
   );
+
+  if (
+    loadApplication(applicationId).application.repositoryUrl !==
+    application.repositoryUrl
+  )
+    throw new Error(
+      "The repository changed during its access check. Check the current repository again.",
+    );
 
   // A slow check from a previous login must not overwrite the new login's
   // evidence.
@@ -355,6 +364,14 @@ export function removeApplication(applicationId: string, repository: string) {
       "Type the exact repository owner/name to remove this application.",
     );
   }
+  if (
+    listApplicationPreviews(application.id).some((item) =>
+      ["ready", "starting"].includes(item.status),
+    )
+  )
+    throw new Error(
+      "Stop the application preview before removing this application.",
+    );
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
   // Contracts, every phase workspace and their native files go with it.

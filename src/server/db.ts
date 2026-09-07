@@ -18,6 +18,8 @@ import {
   acceptanceChecks,
   activityEvents,
   applicationContracts,
+  applicationPreviews,
+  preparationBranches,
   applications,
   chats,
   conformanceProposals,
@@ -37,6 +39,7 @@ import type {
   ApplicationContractBody,
   ApplicationContractRecord,
   ApplicationRecord,
+  ApplicationPreview,
   Chat,
   ChatMessage,
   ConformanceProposalRecord,
@@ -46,6 +49,7 @@ import type {
   PhaseKey,
   PhaseWorkspaceRecord,
   PublicationGrantRecord,
+  PreparationBranch,
 } from "./types";
 
 const schema = {
@@ -534,6 +538,7 @@ export function findRepositoryFileObservation(
         and(
           eq(observations.applicationId, applicationId),
           eq(observations.kind, "github-repository-file"),
+          sql`${observations.sourceUrl} LIKE (SELECT repository_url FROM applications WHERE id = ${applicationId}) || '/blob/%'`,
           eq(observations.status, "passed"),
           sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
           sql`json_extract(${observations.raw}, '$.path') = ${path}`,
@@ -556,12 +561,32 @@ export function listRepositoryFileObservations(
       and(
         eq(observations.applicationId, applicationId),
         eq(observations.kind, "github-repository-file"),
+        sql`${observations.sourceUrl} LIKE (SELECT repository_url FROM applications WHERE id = ${applicationId}) || '/blob/%'`,
         eq(observations.status, "passed"),
         sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
       ),
     )
     .orderBy(asc(observations.observedAt), asc(rowId))
     .all();
+}
+
+export function updateApplicationSetup(
+  applicationId: string,
+  input: Pick<
+    ApplicationRecord,
+    | "name"
+    | "repositoryUrl"
+    | "repositoryOwner"
+    | "repositoryName"
+    | "approvalMode"
+  >,
+) {
+  return db()
+    .update(applications)
+    .set({ ...input, updatedAt: now() })
+    .where(eq(applications.id, applicationId))
+    .returning()
+    .get()!;
 }
 
 // Application Contracts
@@ -1058,4 +1083,42 @@ export function withTransaction<T>(
   } finally {
     committedCallbacks = parent;
   }
+}
+
+export function saveApplicationPreview(record: ApplicationPreview) {
+  db()
+    .insert(applicationPreviews)
+    .values({ id: record.id, applicationId: record.applicationId, record })
+    .onConflictDoUpdate({ target: applicationPreviews.id, set: { record } })
+    .run();
+  return record;
+}
+export function listApplicationPreviews(applicationId?: string) {
+  const query = db().select().from(applicationPreviews);
+  const rows = applicationId
+    ? query.where(eq(applicationPreviews.applicationId, applicationId)).all()
+    : query.all();
+  return rows
+    .map((row) => row.record)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function savePreparationBranch(record: PreparationBranch) {
+  db()
+    .insert(preparationBranches)
+    .values({ id: record.id, applicationId: record.applicationId, record })
+    .onConflictDoUpdate({ target: preparationBranches.id, set: { record } })
+    .run();
+  return record;
+}
+export function latestPreparationBranch(applicationId: string) {
+  return (
+    db()
+      .select()
+      .from(preparationBranches)
+      .where(eq(preparationBranches.applicationId, applicationId))
+      .all()
+      .map((row) => row.record)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
+  );
 }

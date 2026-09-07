@@ -1,3 +1,11 @@
+import {
+  preparationGranted,
+  preparationView,
+  preparationFileObservation,
+  publishPreparationCheckpoint,
+} from "./preparation";
+import { computePhaseThreeChecks } from "./phase-three-spec";
+import { recordPreviewRequest } from "./application-preview";
 import { duringApplicationOperation } from "./application-operations";
 // Phase 3, Make launch-ready: the brief, Pi's staged changes and previews,
 // approval and publication, external returns, the exact candidate and the
@@ -56,6 +64,7 @@ import {
   revokePublicationGrants,
   updateAcceptanceChecks,
   updateConformanceProposal,
+  withTransaction,
   updateConformanceRun,
 } from "./db";
 import {
@@ -331,6 +340,7 @@ export function conformanceBriefForRun(run: PiRun, staged: StagedConformance) {
   const active = activeConformanceProposal(workspace.id);
   const environment = lastKnownEnvironment();
   return {
+    preparation: preparationView(application.id),
     retrievedAt: new Date().toISOString(),
     contractBlocked: blocked,
     brief: { ...brief, exportText: undefined },
@@ -414,13 +424,24 @@ export function collectSourceProposal(
   const { application, contract, blocked } = runScope(run);
   if (blocked) throw new Error(blocked);
   const gaps = contractGapReport(contract.body);
+  const paths = baseTreePaths(application.id, contract.commitSha);
+  for (const observation of listObservations(application.id)) {
+    const raw = observation.raw as { path?: string } | null;
+    if (
+      raw?.path &&
+      preparationFileObservation(run, raw.path)?.id === observation.id
+    )
+      paths.add(raw.path);
+  }
   const proposal = validateSourceProposal(input, {
     contract,
     requiredFields: gaps.conformance.map((item) => item.field),
-    treePaths: baseTreePaths(application.id, contract.commitSha),
+    treePaths: paths,
     baseObservationId: (path) =>
+      preparationFileObservation(run, path)?.id ??
       findRepositoryFileObservation(application.id, contract.commitSha, path)
-        ?.id ?? null,
+        ?.id ??
+      null,
   });
   const replaced = staged.proposal !== null;
   staged.proposal = proposal;
@@ -769,7 +790,9 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
       throw new Error("The staged change does not match its digest.");
     const previous = activeConformanceProposal(workspace.id);
     const mode = application.approvalMode;
+    const sharedPreparation = preparationGranted(application.id);
     const automatic =
+      Boolean(sharedPreparation) ||
       mode === "full-autonomy" ||
       (mode === "pi-decides" && !proposal.requestApproval);
     const record = insertConformanceProposal({
@@ -790,7 +813,7 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
       approval: automatic
         ? {
             mode,
-            by: "approval-mode",
+            by: sharedPreparation ? "engineer" : "approval-mode",
             approvedAt: new Date().toISOString(),
             filesDigest: proposal.filesDigest,
             baseSha: proposal.baseSha,
@@ -818,9 +841,11 @@ export function commitConformanceProposals(run: PiRun, reply: PiTurnResult) {
       "change-proposed",
       "Conformance change proposed",
       `${proposal.changes.length} file${proposal.changes.length === 1 ? "" : "s"} against ${shortSha(proposal.baseSha)} · ${proposal.mapping.map((entry) => entry.field).join(", ")} · ${
-        automatic
-          ? `approved by the ${mode === "full-autonomy" ? "Full autonomy" : "Let Server Guy decide"} policy`
-          : "waiting for your approval"
+        sharedPreparation
+          ? "checkpoint authorized by your shared preparation grant"
+          : automatic
+            ? `approved by the ${mode === "full-autonomy" ? "Full autonomy" : "Let Server Guy decide"} policy`
+            : "waiting for your approval"
       }${previous ? ` · replaces the earlier ${previous.origin === "external" ? "returned change" : "proposal"}` : ""}`,
     );
   }
@@ -974,20 +999,23 @@ async function publishProposalImpl(
   const credential = await connectedGithubCredential();
   const defaultBranch = defaultBranchOf(application.id) ?? "main";
   try {
-    const receipt = await publishToGithub(
-      credential.token,
-      {
-        fullName: fullName(application),
-        defaultBranch,
-        baseSha: proposal.baseSha,
-        proposalId: proposal.id,
-        branch: proposalBranchName(proposal.id),
-        title: `Make launch-ready: ${proposal.mapping.map((entry) => entry.field).join(", ") || "conformance"}`,
-        body: `${proposal.summary}\n\nProposed by Server Guy against Application Contract v${proposal.contractVersion} at ${proposal.baseSha}.\n\nRequired changes resolved:\n${proposal.mapping.map((entry) => `- ${entry.field}: ${entry.explanation}`).join("\n")}\n\nServer Guy verifies the merged revision independently; merging is yours.`,
-        changes: proposal.changes,
-      },
-      signal,
-    );
+    const sharedPreparation = preparationGranted(application.id);
+    const receipt = sharedPreparation
+      ? await publishPreparationCheckpoint(application.id, proposal)
+      : await publishToGithub(
+          credential.token,
+          {
+            fullName: fullName(application),
+            defaultBranch,
+            baseSha: proposal.baseSha,
+            proposalId: proposal.id,
+            branch: proposalBranchName(proposal.id),
+            title: `Make launch-ready: ${proposal.mapping.map((entry) => entry.field).join(", ") || "conformance"}`,
+            body: `${proposal.summary}\n\nProposed by Server Guy against Application Contract v${proposal.contractVersion} at ${proposal.baseSha}.\n\nRequired changes resolved:\n${proposal.mapping.map((entry) => `- ${entry.field}: ${entry.explanation}`).join("\n")}\n\nServer Guy verifies the merged revision independently; merging is yours.`,
+            changes: proposal.changes,
+          },
+          signal,
+        );
     const updated = updateConformanceProposal(proposal.id, ["approved"], {
       status: "published",
       publication: {
@@ -1033,7 +1061,8 @@ export async function publishIfAutomatic(
   if (
     !proposal ||
     proposal.status !== "approved" ||
-    proposal.approval?.by !== "approval-mode"
+    (proposal.approval?.by !== "approval-mode" &&
+      !preparationGranted(applicationId))
   )
     return null;
   if (!activePublicationGrant(applicationId)) {
@@ -1194,7 +1223,7 @@ export async function returnExternalChange(
   signal?: AbortSignal,
 ) {
   return duringApplicationOperation(applicationId, () =>
-    returnExternalChangeImpl(applicationId, reference),
+    returnExternalChangeImpl(applicationId, reference, signal),
   );
 }
 
@@ -1455,7 +1484,7 @@ export async function refreshCandidate(
   signal?: AbortSignal,
 ) {
   return duringApplicationOperation(applicationId, () =>
-    refreshCandidateImpl(applicationId),
+    refreshCandidateImpl(applicationId, signal),
   );
 }
 
@@ -1812,7 +1841,7 @@ export async function grantPublication(
   signal?: AbortSignal,
 ) {
   return duringApplicationOperation(applicationId, () =>
-    grantPublicationImpl(applicationId),
+    grantPublicationImpl(applicationId, signal),
   );
 }
 
@@ -1880,4 +1909,25 @@ export async function prepareExecutionEnvironment(
       onProgress: (event) => onProgress?.(`${event.step}: ${event.message}`),
     }),
   );
+}
+
+export function requestApplicationPreview(applicationId: string) {
+  return withTransaction(() => {
+    const { application, workspace, contract } = requireBrief(applicationId);
+    const { workspaces } = loadApplication(applicationId);
+    const prerequisites = computePhaseThreeChecks(
+      conformanceView(application, workspaces, workspace),
+    ).slice(0, 2);
+    if (prerequisites.some((check) => check.status !== "passed"))
+      throw new Error(
+        "Resolve the candidate and required source changes before opening a preview.",
+      );
+    if (!acceptedAcceptanceChecks(applicationId))
+      throw new Error(
+        "Accept application-behavior checks before starting a preview.",
+      );
+    if (contractGapReport(contract.body).blockers.length)
+      throw new Error("Resolve contract gaps before previewing.");
+    return recordPreviewRequest(requestCandidateVerification(applicationId));
+  });
 }

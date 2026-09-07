@@ -1,3 +1,4 @@
+import type { RevisionImpact } from "@/server/revision-correction";
 import type { ContractHistoryEntry } from "@/server/contract-history";
 import type { ExecutionSetupStatus } from "@/server/execution-setup";
 import type {
@@ -44,6 +45,46 @@ function post(url: string, body: unknown) {
  * identity.
  */
 export const api = {
+  setupImpact(
+    applicationId: string,
+    input: { name: string; repositoryUrl: string; approvalMode: ApprovalMode },
+  ) {
+    return jsonRequest<import("@/server/setup-correction").SetupImpact>(
+      `/api/applications/${applicationId}/setup/impact`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+  applySetup(applicationId: string, impactId: string) {
+    return jsonRequest<{ phaseKey: PhaseKey }>(
+      `/api/applications/${applicationId}/setup/apply`,
+      { method: "POST", body: JSON.stringify({ impactId }) },
+    );
+  },
+  preparation(applicationId: string, action: "start" | "refresh") {
+    return post(`/api/applications/${applicationId}/preparation`, { action });
+  },
+  preview(
+    applicationId: string,
+    action: "start" | "stop" | "confirm",
+    previewId?: string,
+  ) {
+    return post(`/api/applications/${applicationId}/preview`, {
+      action,
+      ...(previewId ? { previewId } : {}),
+    });
+  },
+  revisionImpact(applicationId: string, reference: string) {
+    return jsonRequest<RevisionImpact>(
+      `/api/applications/${applicationId}/revision/impact`,
+      { method: "POST", body: JSON.stringify({ reference }) },
+    );
+  },
+  applyRevision(applicationId: string, impactId: string) {
+    return jsonRequest(`/api/applications/${applicationId}/revision/apply`, {
+      method: "POST",
+      body: JSON.stringify({ impactId }),
+    });
+  },
   runSnapshot(applicationId: string, chatId: string) {
     return jsonRequest<ChatRunSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,

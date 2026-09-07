@@ -32,6 +32,8 @@ import type { ConformanceAction } from "./conformance-record";
 import { describeCurrentStep, type StepAction } from "./current-step";
 import { CurrentStepBar } from "./current-step-bar";
 import { DemoContext } from "./external-link";
+import { SetupDialog } from "./setup-dialog";
+import { RevisionDialog } from "./revision-dialog";
 import { Inspector } from "./inspector";
 import { PhaseRail } from "./phase-rail";
 import { recordReferences, type RecordSection } from "./record-references";
@@ -81,6 +83,9 @@ export function OperatorShell({
   demo?: boolean;
 }) {
   const router = useRouter();
+  const [preparationOpen, setPreparationOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
   const [reveal, setReveal] = useState<{
@@ -114,6 +119,29 @@ export function OperatorShell({
   // The current-step bar, the Record and the reply references all read the
   // same view, so a reload and a reply say the same thing.
   const step = describeCurrentStep(view, { demo });
+  if (
+    view.workspace?.current &&
+    ["inspect-app", "make-launch-ready"].includes(view.workspace.phaseKey)
+  )
+    step.actions.push({
+      key: "change-revision",
+      label: "Change selected revision",
+      explanation: "Review the impact before adopting another commit.",
+      kind: "link",
+    });
+  if (
+    application &&
+    ["start", "inspect-app", "make-launch-ready"].includes(
+      view.workspaces.find((w) => w.current)?.phaseKey ?? "",
+    )
+  )
+    step.actions.push({
+      key: "edit-setup",
+      label: "Edit application setup",
+      explanation:
+        "Review the impact before changing the repository or permission policy.",
+      kind: "link",
+    });
   const references = recordReferences(view);
 
   function revealSection(section: RecordSection) {
@@ -191,6 +219,33 @@ export function OperatorShell({
       stream.close();
     };
   }, [applicationId, selectedChatId]);
+
+  const previewActive =
+    view.preview?.status === "starting" || view.preview?.status === "ready";
+  const conformancePending = view.conformance?.runs.some((item) =>
+    ["queued", "running"].includes(item.status),
+  );
+  useEffect(() => {
+    if (
+      !applicationId ||
+      !selectedChatId ||
+      (!previewActive && !conformancePending)
+    )
+      return;
+    let active = true;
+    const timer = setInterval(() => {
+      void api
+        .view(applicationId, selectedChatId)
+        .then((next) => {
+          if (active) setView(next);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [applicationId, selectedChatId, previewActive, conformancePending]);
 
   useLayoutEffect(() => {
     if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
@@ -351,6 +406,37 @@ export function OperatorShell({
   function stepAction(action: StepAction) {
     const [kind, id = ""] = action.key.split(":");
     switch (kind) {
+      case "preparation-start":
+        return setPreparationOpen(true);
+      case "preparation-refresh":
+        return (
+          applicationId &&
+          void run("preparation-refresh", () =>
+            api.preparation(applicationId, "refresh"),
+          )
+        );
+      case "preview-start":
+        return (
+          applicationId &&
+          void run("preview-start", () => api.preview(applicationId, "start"))
+        );
+      case "preview-stop":
+        return (
+          applicationId &&
+          void run("preview-stop", () => api.preview(applicationId, "stop", id))
+        );
+      case "preview-confirm":
+        return (
+          applicationId &&
+          void run("preview-confirm", () =>
+            api.preview(applicationId, "confirm", id),
+          )
+        );
+      case "edit-setup":
+        setSetupOpen(true);
+        return;
+      case "change-revision":
+        return setRevisionOpen(true);
       case "continue":
         return continueToNextPhase();
       case "rerun":
@@ -659,6 +745,42 @@ export function OperatorShell({
             workspace={view.workspace}
           />
           <div className="sg-chat-column">
+            {preparationOpen && applicationId && (
+              <ConfirmActionDialog
+                title="Work on a shared GitHub branch?"
+                destructive={false}
+                description="Server Guy may create a preparation branch and publish source checkpoints to a draft PR for the current contract. You can follow along and commit there too. You review and merge the PR on GitHub when ready."
+                action="Start shared preparation"
+                busy={busy !== null}
+                error={error}
+                onCancel={() => setPreparationOpen(false)}
+                onConfirm={() =>
+                  void run("preparation-start", async () => {
+                    const next = await api.preparation(applicationId, "start");
+                    setPreparationOpen(false);
+                    return next;
+                  })
+                }
+              />
+            )}
+            {setupOpen && application && (
+              <SetupDialog
+                application={application}
+                onClose={() => setSetupOpen(false)}
+                onApplied={async (phase) =>
+                  applyView(await api.viewPhase(application.id, phase))
+                }
+              />
+            )}
+            {revisionOpen && applicationId && (
+              <RevisionDialog
+                applicationId={applicationId}
+                onClose={() => setRevisionOpen(false)}
+                onApplied={async () =>
+                  applyView(await api.viewPhase(applicationId, "inspect-app"))
+                }
+              />
+            )}
             <CurrentStepBar
               busy={busy}
               demo={demo}

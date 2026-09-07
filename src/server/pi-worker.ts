@@ -1,3 +1,4 @@
+import { sweepApplicationPreviews } from "./application-preview";
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -56,12 +57,13 @@ export function acquireWorkerLock() {
 
 /**
  * Make launch-ready Runs execute isolated previews that take minutes; the
- * earlier phases answer from local records and GitHub reads within seconds.
+ * inspection can include many reads and a substantial contract proposal.
  */
 export function defaultRunTimeoutMs(run: PiRun) {
-  return getWorkspaceById(run.workspaceId)?.phaseKey === "make-launch-ready"
-    ? 30 * 60_000
-    : 120_000;
+  const phase = getWorkspaceById(run.workspaceId)?.phaseKey;
+  if (phase === "make-launch-ready") return 30 * 60_000;
+  if (phase === "inspect-app") return 10 * 60_000;
+  return 120_000;
 }
 
 export async function executePiRun(
@@ -241,12 +243,25 @@ export async function executePiRun(
 export async function runPiWorker(signal: AbortSignal) {
   const release = acquireWorkerLock();
   let unsettled = false;
+  let previewTimer: ReturnType<typeof setInterval> | undefined;
   try {
     interruptRunningPiRuns();
     const interrupted = interruptConformanceRuns();
+    await sweepApplicationPreviews(true).catch(() => undefined);
+    let sweeping = false;
+    previewTimer = setInterval(() => {
+      if (sweeping) return;
+      sweeping = true;
+      void sweepApplicationPreviews()
+        .catch(() => undefined)
+        .finally(() => {
+          sweeping = false;
+        });
+    }, 30_000);
+    previewTimer.unref();
     // Containers of interrupted attempts are removed by label; a failure here
     // only leaves leftovers for the next start, never a false outcome.
-    void conformanceExecutor()
+    await conformanceExecutor()
       .cleanupLeftovers()
       .then((removed) => {
         if (removed || interrupted.length)
@@ -270,6 +285,8 @@ export async function runPiWorker(signal: AbortSignal) {
     unsettled = error instanceof PiWorkerDrainError;
     throw error;
   } finally {
+    if (previewTimer) clearInterval(previewTimer);
+    await sweepApplicationPreviews(true).catch(() => undefined);
     // A poisoned worker keeps the OS lock until process exit, not merely until
     // this function rejects. No next writer may overlap an unresponsive SDK.
     if (unsettled) unsettledWorkerLocks.add(release);

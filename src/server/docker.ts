@@ -410,7 +410,13 @@ export class DockerClient {
     return this.json<{
       Id: string;
       State: { Running: boolean; ExitCode: number; Status: string };
-      NetworkSettings?: { Networks?: Record<string, { IPAddress?: string }> };
+      NetworkSettings?: {
+        Networks?: Record<string, { IPAddress?: string }>;
+        Ports?: Record<
+          string,
+          Array<{ HostIp: string; HostPort: string }> | null
+        >;
+      };
     }>(`/containers/${id}/json`);
   }
 

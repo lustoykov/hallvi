@@ -92,7 +92,7 @@ export interface PhaseWorkspaceView extends PhaseWorkspaceRecord {
   name: string;
   deliverable: string;
   status: "in-progress" | "ready" | "completed";
-  /** Whether this is the application's current phase; later work can be paused. */
+  /** The current phase; later work can be paused after a correction. */
   current: boolean;
 }
 
@@ -794,6 +794,8 @@ export interface ConformanceView {
 }
 
 export interface OperatorView {
+  preparation?: PreparationBranch | null;
+  preview?: ApplicationPreview | null;
   application: ApplicationRecord | null;
   /** The viewed workspace: the selected chat's phase. */
   workspace: PhaseWorkspaceView | null;
@@ -948,4 +950,39 @@ export interface ApplicationStatus {
     } | null;
     executionEnvironment: ExecutionEnvironmentState | "unchecked";
   } | null;
+}
+
+/** A running local application preview, bound to its verified candidate Run. */
+export interface ApplicationPreview {
+  id: string;
+  applicationId: string;
+  runId: string;
+  status: "starting" | "ready" | "failed" | "stopped" | "expired" | "stale";
+  createdAt: string;
+  expiresAt: string;
+  url: string | null;
+  containerId: string | null;
+  imageDigest: string | null;
+  summary: string;
+  confirmedAt: string | null;
+  confirmationCurrent?: boolean;
+}
+
+export interface PreparationBranch {
+  id: string;
+  applicationId: string;
+  contractId: string;
+  connectionId: string;
+  grantId: string;
+  baseSha: string;
+  branch: string;
+  defaultBranch: string;
+  headSha: string;
+  status: "starting" | "working" | "conflict" | "failed" | "stopped";
+  summary: string;
+  createdAt: string;
+  pullRequestUrl: string | null;
+  pullRequestNumber: number | null;
+  lastProposalId: string | null;
+  lastFiles: ProposedFileChange[];
 }

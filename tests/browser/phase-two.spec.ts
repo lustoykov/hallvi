@@ -209,7 +209,9 @@ test(
     await expect(
       page.getByRole("button", { name: "Re-inspect repository", exact: true }),
     ).toBeEnabled();
-    await expect(page.getByRole("dialog")).toContainText("FastAPI + uv v1");
+    await expect(page.getByRole("dialog")).toContainText(
+      "FastAPI + uv selected from repository evidence",
+    );
     await page.keyboard.press("Escape");
     expect(
       (await view(page)).checks.map((c: { status: string }) => c.status),
@@ -221,15 +223,20 @@ test(
       JSON.stringify({ revision: "2" }),
     );
     await page
-      .getByRole("button", { name: /Check 1 Supported application profile/ })
+      .getByRole("button", { name: "Change selected revision", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Re-inspect repository", exact: true })
+      .getByRole("button", { name: "Review impact", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Re-inspect repository", exact: true }),
-    ).toBeEnabled();
-    await page.keyboard.press("Escape");
+      page.getByRole("heading", { name: "What needs doing again" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: "Use this commit and review Phase 2",
+        exact: true,
+      })
+      .click();
     await expect(
       record.getByText(/Check 2.*Application Contract complete/),
     ).toBeVisible();

@@ -62,7 +62,9 @@ it("upgrades a populated v6 database in place, keeping its rows and a backup", (
       upgraded.close();
     }
     expect(
-      readdirSync(root).some((name) => /\.pre-v9-.*\.backup$/.test(name)),
+      readdirSync(root).some((name) =>
+        new RegExp(`\\.pre-v${schemaVersion.version}-.*\\.backup$`).test(name),
+      ),
     ).toBe(true);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -110,7 +112,9 @@ it("upgrades a populated v8 database in place by adding the Phase 3 tables", () 
       upgraded.close();
     }
     expect(
-      readdirSync(root).some((name) => /\.pre-v9-.*\.backup$/.test(name)),
+      readdirSync(root).some((name) =>
+        new RegExp(`\\.pre-v${schemaVersion.version}-.*\\.backup$`).test(name),
+      ),
     ).toBe(true);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -146,3 +150,40 @@ it.each([0, 4, 5, 7])(
   },
   20_000,
 );
+
+it("adds preview and preparation tables to v9 without replacing application records", () => {
+  const root = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
+  const path = join(root, "v9.db");
+  try {
+    pushTestDatabase(path);
+    const previous = new Database(path);
+    previous.exec(
+      `INSERT INTO applications (id, name, repository_url, repository_owner, repository_name, environment, approval_mode, approval_scope, created_at, updated_at) VALUES ('app', 'app', 'https://github.com/qa/app', 'qa', 'app', 'production', 'pi-decides', 'scope', '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z'); DROP TABLE application_operations; DROP TABLE application_previews; DROP TABLE preparation_branches; PRAGMA user_version = 9;`,
+    );
+    previous.close();
+    pushTestDatabase(path);
+    const upgraded = new Database(path, { readonly: true });
+    try {
+      expect(upgraded.prepare("SELECT id FROM applications").all()).toEqual([
+        { id: "app" },
+      ]);
+      expect(
+        upgraded
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('application_previews', 'preparation_branches', 'application_operations')",
+          )
+          .all(),
+      ).toHaveLength(3);
+      expect(upgraded.pragma("foreign_key_check")).toEqual([]);
+    } finally {
+      upgraded.close();
+    }
+    expect(
+      readdirSync(root).some((name) =>
+        name.includes(`.pre-v${schemaVersion.version}-`),
+      ),
+    ).toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 20_000);

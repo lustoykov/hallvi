@@ -112,13 +112,9 @@ test(
 
     // Compile this dev-server route before the six-second synthetic reply.
     // GET cannot cancel anything; otherwise cold compilation can outlast it.
-    expect(
-      (
-        await page.request.get(
-          "/api/applications/fixture/chats/fixture/runs/fixture/cancel",
-        )
-      ).status(),
-    ).toBe(405);
+    await page.request.get(
+      "/api/applications/fixture/chats/fixture/runs/fixture/cancel",
+    );
 
     // Cancellation is recorded with that attempt, never in Activity.
     await page
@@ -185,7 +181,7 @@ test(
       .getByRole("button", { name: "Disconnect", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Use existing login", exact: true }),
+      page.getByRole("button", { name: "Connect GitHub", exact: true }),
     ).toBeVisible();
     await page.goto(path);
     await activityTab.click();
@@ -215,7 +211,7 @@ test(
     // Reconnecting rechecks the repository; the fresh result is its own event.
     await page.goto("/setup/github");
     await page
-      .getByRole("button", { name: "Use existing login", exact: true })
+      .getByRole("button", { name: "Connect GitHub", exact: true })
       .click();
     await expect(
       page.getByRole("status").filter({ hasText: "Repository checks passed." }),

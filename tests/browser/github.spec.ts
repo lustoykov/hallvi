@@ -15,7 +15,7 @@ test(
       .getByRole("button", { name: "Disconnect", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Use existing login", exact: true }),
+      page.getByRole("button", { name: "Connect GitHub", exact: true }),
     ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("github-choose.png"),
@@ -36,14 +36,14 @@ test(
       .getByRole("link", { name: "Connect GitHub", exact: true })
       .click();
     await page
-      .getByRole("button", { name: "Use existing login", exact: true })
+      .getByRole("button", { name: "Connect GitHub", exact: true })
       .click();
     await expect(
       page.getByText("Connected as qa-fixture-user", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Choose repositories on GitHub" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("github-connected.png"),
       fullPage: true,
@@ -66,7 +66,7 @@ test(
     expect(before.observations[0].raw).toMatchObject({
       accountId: 42,
       repositoryId: 99,
-      credentialSource: "gh",
+      credentialSource: "Server Guy GitHub App",
       accountRepositoryPermissions: { pull: true },
       connectionId: expect.any(String),
     });
@@ -87,7 +87,7 @@ test(
       .getByRole("button", { name: "Disconnect", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Use existing login" }),
+      page.getByRole("button", { name: "Connect GitHub" }),
     ).toBeVisible();
     const disconnected = await (await page.request.get(`/api${path}`)).json();
     expect(
@@ -123,7 +123,7 @@ test(
       await heldCheck;
       await route.continue();
     });
-    await page.getByRole("button", { name: "Use existing login" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(page.getByText("Connected as qa-fixture-user")).toBeVisible();
     await expect(
       page.getByRole("status").filter({ hasText: "Checking repository…" }),
@@ -188,7 +188,7 @@ test(
     const before = (await (await page.request.get("/api/github/setup")).json())
       .connection;
     await page.getByRole("button", { name: "Change", exact: true }).click();
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(page.getByText("ABCD-1234", { exact: true })).toBeVisible();
     await expect(
       page.getByText("Using qa-fixture-user until the new sign-in succeeds.", {
@@ -212,7 +212,7 @@ test(
       (await (await page.request.get("/api/github/setup")).json()).connection,
     ).toEqual(before);
     scenario({ login: "denied" });
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page
         .getByRole("alert")
@@ -222,7 +222,7 @@ test(
       (await (await page.request.get("/api/github/setup")).json()).connection,
     ).toEqual(before);
     scenario({ login: "success" });
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByText("Separate login for Server Guy", { exact: true }),
     ).toBeVisible();
@@ -264,7 +264,7 @@ test(
   async ({ page, fixture }) => {
     await page.goto("/setup/github");
     await page.getByRole("button", { name: "Change", exact: true }).click();
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByText("Separate login for Server Guy", { exact: true }),
     ).toBeVisible();
@@ -290,7 +290,7 @@ test(
     expect(failed.observations[0].summary).toContain("read access");
     await page.goto("/setup/github");
     await page.getByRole("button", { name: "Change", exact: true }).click();
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByRole("status").filter({
         hasText: "Repository checks finished. Some need attention.",
@@ -338,7 +338,7 @@ test(
     };
     await page.goto("/setup/github");
     await page.getByRole("button", { name: "Change", exact: true }).click();
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByText("Access renews automatically.", { exact: true }),
     ).toBeVisible();
@@ -403,6 +403,7 @@ test(
       page.getByRole("dialog").locator(".sg-drawer-summary"),
     ).toContainText("Not yet");
     await page
+      .getByRole("dialog")
       .getByRole("link", { name: "Open GitHub settings", exact: true })
       .click();
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
@@ -411,7 +412,7 @@ test(
     await expect(page.getByRole("main").getByRole("alert")).not.toContainText(
       "QA-SECRET",
     );
-    await page.getByRole("button", { name: "Connect another account" }).click();
+    await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
       page.getByText("Access renews automatically.", { exact: true }),
     ).toBeVisible();

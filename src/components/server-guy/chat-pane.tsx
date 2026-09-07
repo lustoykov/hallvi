@@ -78,7 +78,8 @@ export function ChatPane({
   const workspace = view.workspace;
   const archived = Boolean(activeChat?.archivedAt);
   const completed = workspace?.status === "completed";
-  const readOnly = archived || completed;
+  const paused = Boolean(workspace && !workspace.current && !completed);
+  const readOnly = archived || completed || paused;
   const deliverable = workspace?.deliverable ?? "Launch Brief";
   // The phase's state lives in the current-step bar above; this header only
   // names the chat and says when it cannot accept new work.
@@ -310,6 +311,11 @@ export function ChatPane({
           <p className="sg-archived-notice">
             This chat is archived and read-only. Choose an active chat or start
             a new one.
+          </p>
+        )}
+        {paused && (
+          <p role="status">
+            This phase is paused while an earlier phase is reviewed.
           </p>
         )}
         {!archived && completed && (

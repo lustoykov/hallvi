@@ -471,7 +471,7 @@ describe("Phase 3", () => {
     expect(step.waitingOn).toBe("you");
     expect(step.now).toMatch(/^1 required change recorded on the contract/);
     expect(step.actions.map((action) => [action.key, action.kind])).toEqual([
-      ["continue-with-server-guy", "primary"],
+      ["preparation-start", "primary"],
       ["reveal:change", "link"],
     ]);
     expect(step.stages.map((stage) => stage.state)).toEqual([
@@ -657,7 +657,7 @@ describe("Phase 3", () => {
     ]);
   });
 
-  it("has nothing waiting once the gate passed, and says the next phase is unavailable", () => {
+  it("asks the owner to try a preview after automated checks pass", () => {
     const merged = proposal({
       status: "published",
       candidate: {
@@ -685,9 +685,12 @@ describe("Phase 3", () => {
         ],
       ),
     );
-    expect(step.waitingOn).toBe("none");
-    expect(step.now).toMatch(/Phase 4, Review launch plan, is not available/);
-    expect(step.remaining).toBe("Nothing remains in this phase.");
+    expect(step.waitingOn).toBe("you");
+    expect(step.now).toMatch(/Automated checks passed/);
+    expect(step.actions[0].key).toBe("preview-start");
+    expect(step.remaining).toBe(
+      "Try the preview and confirm the application works.",
+    );
     expect(step.stages.every((stage) => stage.state === "done")).toBe(true);
   });
 

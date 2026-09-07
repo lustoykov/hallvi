@@ -1,5 +1,7 @@
 .dialog {
-  width: 540px;
+  width: 620px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   max-width: calc(100vw - 48px);
   margin: auto;
   padding: 30px;
@@ -27,12 +29,14 @@
 .dialog label {
   display: grid;
   gap: 10px;
+  margin-bottom: 16px;
   font-size: 14px;
 }
 .dialog label strong {
   overflow-wrap: anywhere;
 }
-.dialog input {
+.dialog input,
+.dialog select {
   width: 100%;
   border: 1px solid #bdc9dc;
   border-radius: 7px;
@@ -41,6 +45,7 @@
 }
 .dialog footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 26px;
@@ -70,7 +75,24 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-.dialog :is(input, button):focus-visible {
+.dialog :is(input, select, button):focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 3px;
+}
+
+.dialog ul {
+  padding-left: 22px;
+  line-height: 1.5;
+}
+.dialog li + li {
+  margin-top: 8px;
+}
+.dialog code {
+  overflow-wrap: anywhere;
+}
+
+.dialog .primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
 }

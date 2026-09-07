@@ -47,7 +47,7 @@ export async function completeLaunchBrief(applicationId: string) {
     const existing = workspaces.find(
       (workspace) => workspace.phaseKey === PHASE_TWO.key,
     );
-    if (existing)
+    if (existing && current.phaseKey !== PHASE_ONE.key)
       return { application, workspace: existing, created: false as const };
     if (current.phaseKey !== PHASE_ONE.key || current.completedAt)
       throw new Error("The Launch Brief phase is not the current phase.");
@@ -89,12 +89,11 @@ export async function completeLaunchBrief(applicationId: string) {
     };
     if (!completeWorkspace(current.id, evidence))
       throw new Error("The Launch Brief phase was already completed.");
-    const workspace = insertWorkspace(application.id, PHASE_TWO.key);
-    const chat = insertChat(
-      workspace.id,
-      primaryChatTitle(PHASE_TWO.key),
-      true,
-    );
+    const workspace =
+      existing ?? insertWorkspace(application.id, PHASE_TWO.key);
+    const chat =
+      listChats(workspace.id).find((item) => item.isPrimary) ??
+      insertChat(workspace.id, primaryChatTitle(PHASE_TWO.key), true);
     insertMessage(
       chat.id,
       "assistant",

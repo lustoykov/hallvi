@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // Synthetic repository trees for the Phase 2 and Phase 3 tests, the
 // disposable browser fixture and the seeded live-eval cases. Only the sibling
 // lockfile module is imported: qa-fixture.mjs copies this whole folder into the
@@ -468,14 +469,12 @@ export interface FixtureTreeEntry {
   sha: string;
 }
 
-function blobSha(path: string, content: string) {
-  // Deterministic, content-derived and clearly synthetic.
-  let hash = 2166136261;
-  for (const character of `${path}\0${content}`) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0").repeat(5);
+function blobSha(_path: string, content: string) {
+  const bytes = Buffer.from(content, "utf8");
+  return createHash("sha1")
+    .update(`blob ${bytes.length}\0`)
+    .update(bytes)
+    .digest("hex");
 }
 
 /** GitHub-style recursive tree entries, directories included. */

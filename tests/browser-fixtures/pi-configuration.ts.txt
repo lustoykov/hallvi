@@ -204,7 +204,7 @@ function contractStep(
     (path) => !reads.some((read) => read.path === path),
   );
   if (next) return { tool: call("read_repository_file", { path: next }) };
-  if (mode.startsWith("correct") && !currentResult)
+  if (!currentResult)
     return { tool: call("get_application_contract", {}) };
   const current = currentResult
     ? (JSON.parse(currentResult.body) as { current: { id: string } | null })

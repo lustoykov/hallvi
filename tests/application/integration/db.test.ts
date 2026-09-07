@@ -91,6 +91,8 @@ describe("Phase 1 schema", () => {
       "acceptance_checks",
       "activity_events",
       "application_contracts",
+      "application_operations",
+      "application_previews",
       "applications",
       "chat_summaries",
       "chats",
@@ -101,6 +103,7 @@ describe("Phase 1 schema", () => {
       "observations",
       "phase_workspaces",
       "pi_runs",
+      "preparation_branches",
       "publication_grants",
     ]);
     expect(workspaceColumns).toEqual([

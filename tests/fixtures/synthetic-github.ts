@@ -27,6 +27,7 @@ interface Pull {
   number: number;
   branch: string;
   base: string;
+  draft?: boolean;
   state: "open" | "closed";
   merged: boolean;
   mergedAt: string | null;
@@ -116,6 +117,15 @@ export class SyntheticGithub {
     this.revision = "1";
     this.failing = [];
     this.calls = [];
+  }
+
+  /** A collaborator appends to an existing branch, preserving its head. */
+  appendToBranch(branch: string, files: FixtureFile[], message: string) {
+    const parent = this.headOf(branch)!;
+    const sha = hex40(`${parent}:${message}:${JSON.stringify(files)}`);
+    this.commits.set(sha, { sha, message, parents: [parent], files });
+    this.branches.set(branch, sha);
+    return sha;
   }
 
   private baseSha() {
@@ -367,7 +377,8 @@ export class SyntheticGithub {
           size: Buffer.byteLength(file.content),
           name: filePath.split("/").at(-1),
           path: filePath,
-          sha: "blob",
+          sha: fixtureTree([file]).find((entry) => entry.path === file.path)!
+            .sha,
           content: Buffer.from(file.content).toString("base64"),
         },
         scopes: [],
@@ -391,7 +402,7 @@ export class SyntheticGithub {
     if (route.startsWith("/git/commits/")) {
       const sha = route.slice("/git/commits/".length);
       const commit = this.commits.get(sha);
-      if (!commit)
+      if (!commit && !this.filesAt(sha))
         throw new SyntheticGithubError(
           "The repository is missing or this login cannot access it.",
           "access",
@@ -399,12 +410,29 @@ export class SyntheticGithub {
       return {
         data: {
           sha,
-          message: commit.message,
-          parents: commit.parents.map((parent) => ({ sha: parent })),
-          tree: { sha: `tree-${sha.slice(0, 8)}` },
+          message: commit?.message ?? "Fixture commit",
+          parents: (commit?.parents ?? []).map((parent) => ({ sha: parent })),
+          tree: { sha },
         },
         scopes: [],
       };
+    }
+    if (route.startsWith("/git/refs/") && method === "PATCH") {
+      const branch = decodeURIComponent(
+        route.slice("/git/refs/".length),
+      ).replace(/^heads\//, "");
+      const head = this.headOf(branch);
+      const next = String(options.body?.sha);
+      if (
+        options.body?.force !== false ||
+        !this.commits.get(next)?.parents.includes(head ?? "")
+      )
+        throw new SyntheticGithubError(
+          "The remote branch changed; non-fast-forward update refused.",
+          "access",
+        );
+      this.branches.set(branch, next);
+      return { data: { object: { sha: next } }, scopes: [] };
     }
     if (method === "POST") {
       if (!this.permissions.push)
@@ -414,7 +442,10 @@ export class SyntheticGithub {
         );
       const body = options.body ?? {};
       if (route === "/git/blobs") {
-        const sha = hex40(`blob:${String(body.content)}`);
+        const content = Buffer.from(String(body.content), "base64").toString(
+          "utf8",
+        );
+        const sha = fixtureTree([{ path: "file", content }])[0].sha;
         this.blobs.set(
           sha,
           Buffer.from(String(body.content), "base64").toString("utf8"),
@@ -483,6 +514,7 @@ export class SyntheticGithub {
           merged: false,
           mergedAt: null,
           mergeCommitSha: null,
+          draft: body.draft === true,
           title: String(body.title),
           body: String(body.body ?? ""),
         };

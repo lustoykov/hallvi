@@ -135,7 +135,7 @@ export function repositoryEvidence(applicationId: string): RepositoryEvidence {
         resolveCitation(citation, {
           applicationId,
           commitSha: commitSha!,
-          lookups: { observation: getObservation },
+          lookups: lookups(applicationId),
         }).ok,
     ) ?? false;
   return {
@@ -178,7 +178,14 @@ export function inspectionSummary(
 
 function lookups(applicationId: string): ContractValidationContext["lookups"] {
   return {
-    observation: getObservation,
+    observation: (id) => {
+      const observation = getObservation(id);
+      const { application } = loadApplication(applicationId);
+      return observation?.kind.startsWith("github-repository-") &&
+        !observation.sourceUrl?.startsWith(`${application.repositoryUrl}/`)
+        ? null
+        : observation;
+    },
     activeDecision: (id) => getActiveDecision(applicationId, id),
     applicationMessage: (id) => getApplicationMessage(applicationId, id),
   };

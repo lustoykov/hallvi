@@ -100,6 +100,7 @@ describe("bounded tree and file reads", () => {
     expect(tree.entries.find((e) => e.path === "app")).toEqual({
       path: "app",
       type: "tree",
+      sha: expect.any(String),
     });
     expect(tree.entries.find((e) => e.path === "app/main.py")).toMatchObject({
       type: "blob",

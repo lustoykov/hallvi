@@ -1,6 +1,6 @@
 // Development databases must match the current prototype schema. The only
 // supported in-place changes are the additive upgrades below (v6 → v8 columns
-// and tables, v8 → v9 new Phase 3 tables); every other prototype version,
+// and tables, then Phase 3 and preview/preparation tables). Other versions,
 // including the abandoned v7 history-table branch, needs an explicit fresh
 // database.
 import Database from "better-sqlite3";
@@ -17,7 +17,7 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
-const UPGRADABLE_VERSIONS = [6, 8];
+const UPGRADABLE_VERSIONS = [6, 8, 9];
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {

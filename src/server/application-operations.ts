@@ -1,19 +1,46 @@
-// Short provider operations do not have a queued Run row. Keep corrections
-// from changing their base while a publication or GitHub read is in flight.
-const active = new Map<string, number>();
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import { applicationOperations } from "./db-schema";
+
+/** Web handlers and the separate worker share this guard through SQLite. */
 export function hasApplicationOperation(applicationId: string) {
-  return (active.get(applicationId) ?? 0) > 0;
+  const rows = db()
+    .select()
+    .from(applicationOperations)
+    .where(eq(applicationOperations.applicationId, applicationId))
+    .all();
+  let active = false;
+  for (const row of rows) {
+    try {
+      process.kill(row.pid, 0);
+      active = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") active = true;
+      else
+        db()
+          .delete(applicationOperations)
+          .where(eq(applicationOperations.id, row.id))
+          .run();
+    }
+  }
+  return active;
 }
 export async function duringApplicationOperation<T>(
   applicationId: string,
   work: () => Promise<T>,
 ): Promise<T> {
-  active.set(applicationId, (active.get(applicationId) ?? 0) + 1);
+  const id = randomUUID();
+  db()
+    .insert(applicationOperations)
+    .values({ id, applicationId, pid: process.pid })
+    .run();
   try {
     return await work();
   } finally {
-    const remaining = (active.get(applicationId) ?? 1) - 1;
-    if (remaining) active.set(applicationId, remaining);
-    else active.delete(applicationId);
+    db()
+      .delete(applicationOperations)
+      .where(eq(applicationOperations.id, id))
+      .run();
   }
 }

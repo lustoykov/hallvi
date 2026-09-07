@@ -47,9 +47,17 @@ export interface ExecutionPlan {
   acceptance: { steps: AcceptanceStep[]; label: string } | null;
   /** A command run executes only this after installation. */
   command?: string[];
+  /** User-requested interactive preview; never supplied by Pi. */
+  keepPreview?: boolean;
+}
+
+export interface PreviewRuntime {
+  containerId: string;
+  url: string;
 }
 
 export interface ExecutionOutcome {
+  preview?: PreviewRuntime;
   status: "passed" | "failed" | "cancelled" | "timed-out" | "unavailable";
   results: ConformanceCheckResult[];
   imageDigest: string | null;
@@ -158,7 +166,9 @@ class DockerRun {
     this.deadline = Date.now() + limits.attemptSeconds * 1000;
   }
 
+  private previewNetwork: string | null = null;
   private applicationImage: BuiltApplicationImage | null = null;
+  preview: PreviewRuntime | undefined;
 
   get applicationImageId() {
     return this.applicationImage?.imageId ?? null;
@@ -688,9 +698,54 @@ class DockerRun {
     const probe = await this.runProbe(plan, app);
     const state = await this.client.inspectContainer(app).catch(() => null);
     const running = state?.State.Running ?? false;
-    await this.client.stopContainer(app, 5).catch(() => undefined);
+    if (this.plan.keepPreview && running) {
+      const address =
+        state?.NetworkSettings?.Networks?.[this.network]?.IPAddress;
+      if (!address)
+        throw new Error("The preview application has no internal address.");
+      this.previewNetwork = `${this.prefix}-preview`;
+      await this.client.createNetwork(this.previewNetwork, this.labels, false);
+      // Only this trusted fixed-destination TCP relay joins the ingress
+      // network. Repository code stays on the isolated internal network.
+      const relay = await this.client.createContainer(
+        `${this.prefix}-preview`,
+        {
+          Image: CONFORMANCE_DEFINITION.runnerImage,
+          User: "1000:1000",
+          Labels: this.labels,
+          Cmd: ["python3", "-c", PREVIEW_RELAY, address, String(port)],
+          ExposedPorts: { "8080/tcp": {} },
+          HostConfig: this.hostConfig({
+            NetworkMode: this.previewNetwork,
+            Binds: [],
+            Memory: 64 * 1024 * 1024,
+            MemorySwap: 64 * 1024 * 1024,
+            PidsLimit: 64,
+            PortBindings: {
+              "8080/tcp": [{ HostIp: "127.0.0.1", HostPort: "" }],
+            },
+          }),
+        },
+      );
+      this.created.push(relay.Id);
+      await this.client.connectNetwork(this.network, relay.Id);
+      await this.client.startContainer(relay.Id);
+      const relayState = await this.client.inspectContainer(relay.Id);
+      const binding = relayState.NetworkSettings?.Ports?.["8080/tcp"]?.find(
+        (item) => item.HostIp === "127.0.0.1",
+      );
+      if (!binding || !/^\d+$/.test(binding.HostPort))
+        throw new Error("Docker did not provide a local preview port.");
+      this.preview = {
+        containerId: app,
+        url: `http://127.0.0.1:${binding.HostPort}`,
+      };
+    } else {
+      await this.client.stopContainer(app, 5).catch(() => undefined);
+    }
     const appLogs = await this.client.containerLogs(app, limits.outputBytes);
-    await this.client.removeContainer(app).catch(() => undefined);
+    if (!this.preview)
+      await this.client.removeContainer(app).catch(() => undefined);
     const observations = probe.logs.stdout
       .split("\n")
       .filter((line) => line.startsWith("{"))
@@ -939,6 +994,10 @@ class DockerRun {
     for (const id of this.created.reverse())
       await this.client.removeContainer(id).catch(() => undefined);
     await this.client.removeNetwork(this.network).catch(() => undefined);
+    if (this.previewNetwork)
+      await this.client
+        .removeNetwork(this.previewNetwork)
+        .catch(() => undefined);
     await this.client.removeVolume(this.volume).catch(() => undefined);
     if (this.applicationImage)
       await removeBuiltImage(
@@ -1200,7 +1259,6 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
           environment,
         };
       }
-      await executing.tearDown();
       const required = plan.command
         ? results
         : results.filter((item) => checkDefinition(item.key).required);
@@ -1208,7 +1266,11 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
         (item) =>
           item.outcome === "passed" || item.outcome === "not-applicable",
       );
+      const preview =
+        passed && plan.keepPreview ? executing.preview : undefined;
+      if (!preview) await executing.tearDown();
       return {
+        ...(preview ? { preview } : {}),
         status: passed ? "passed" : "failed",
         results,
         imageDigest,
@@ -1251,3 +1313,33 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
     },
   };
 }
+
+// A bounded byte relay supports HTTP and WebSockets without interpreting a
+// user-controlled URL or allowing CONNECT requests to choose a destination.
+const PREVIEW_RELAY = `
+import os, socket, socketserver, select, sys, threading
+host, port = sys.argv[1], int(sys.argv[2])
+slots = threading.BoundedSemaphore(24)
+class Relay(socketserver.BaseRequestHandler):
+    def handle(self):
+        if not slots.acquire(blocking=False): return
+        try:
+            with socket.create_connection((host, port), timeout=10) as upstream:
+                self.request.settimeout(30)
+                upstream.settimeout(30)
+                peers = [self.request, upstream]
+                while True:
+                    ready, _, _ = select.select(peers, [], [], 30)
+                    if not ready: break
+                    for source in ready:
+                        data = source.recv(65536)
+                        if not data: return
+                        (upstream if source is self.request else self.request).sendall(data)
+        except OSError: pass
+        finally: slots.release()
+class Server(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+threading.Timer(3600, lambda: os._exit(0)).start()
+with Server(("0.0.0.0", 8080), Relay) as server: server.serve_forever()
+`;

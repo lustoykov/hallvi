@@ -92,6 +92,24 @@ export function describeCurrentStep(
       waitingOn: "none",
       actions: [],
     };
+  if (!workspace.current && workspace.status !== "completed") {
+    const current = view.workspaces.find((item) => item.current);
+    return {
+      ...base,
+      now: "An earlier phase is being reviewed. Its updated contract must be completed before work continues here.",
+      waitingOn: "you",
+      actions: current
+        ? [
+            {
+              key: `phase:${current.phaseKey}`,
+              label: `Review Phase ${current.phaseNumber}`,
+              explanation: "Return to the current phase.",
+              kind: "link",
+            },
+          ]
+        : [],
+    };
+  }
   if (workspace.status === "completed") {
     const current = view.workspaces.find((item) => item.current);
     return {
@@ -115,7 +133,10 @@ export function describeCurrentStep(
   }
   if (phaseKey === "start") return startStep(view, base);
   if (phaseKey === "inspect-app") return inspectStep(view, base);
-  return launchReadyStep(view, base, options);
+  return withPreparation(
+    withApplicationPreview(launchReadyStep(view, base, options), view),
+    view,
+  );
 }
 
 type Base = Omit<CurrentStep, "now" | "waitingOn" | "actions">;
@@ -675,5 +696,140 @@ function launchReadyStep(
     now: conformanceCheck?.result ?? "Working toward the Conformance Result.",
     waitingOn: "server-guy",
     actions: [],
+  };
+}
+
+function withApplicationPreview(
+  step: CurrentStep,
+  view: OperatorView,
+): CurrentStep {
+  const preview = view.preview;
+  if (!view.workspace?.current) return step;
+  const action = (
+    key: string,
+    label: string,
+    kind: StepAction["kind"],
+  ): StepAction => ({ key, label, kind, explanation: label });
+  if (preview?.status === "starting")
+    return {
+      ...step,
+      now: preview.summary,
+      waitingOn: "server-guy",
+      actions: [
+        action(`preview-stop:${preview.id}`, "Stop preview", "secondary"),
+      ],
+    };
+  if (preview?.status === "ready")
+    return {
+      ...step,
+      now: preview.confirmationCurrent
+        ? "You confirmed this verified application preview. It is ready for launch planning; production is not set up yet."
+        : preview.summary,
+      waitingOn: preview.confirmationCurrent ? "none" : "you",
+      actions: [
+        ...(preview.url
+          ? [
+              {
+                ...action("preview-open", "Open application preview", "link"),
+                href: preview.url,
+              },
+            ]
+          : []),
+        ...(!preview.confirmationCurrent
+          ? [
+              action(
+                `preview-confirm:${preview.id}`,
+                "I tested it — the application works",
+                "primary",
+              ),
+            ]
+          : []),
+        action(`preview-stop:${preview.id}`, "Stop preview", "secondary"),
+      ],
+      remaining: `Uses disposable data. Preview expires ${new Date(preview.expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} on the machine running Server Guy.`,
+    };
+  if (
+    view.checks.length >= 3 &&
+    view.checks.every((check) => check.status === "passed")
+  )
+    return {
+      ...step,
+      now: preview?.confirmationCurrent
+        ? "You confirmed this exact application image. The preview is stopped; its confirmation remains recorded."
+        : preview?.status === "failed"
+          ? `Application preview failed. ${preview.summary}`
+          : preview?.status === "expired"
+            ? "The preview expired. Start a new one before confirming the application."
+            : "Automated checks passed. Open a local preview and try the application before confirming it works.",
+      waitingOn: preview?.confirmationCurrent ? "none" : "you",
+      remaining: preview?.confirmationCurrent
+        ? "Local application confirmed; launch planning comes next."
+        : "Try the preview and confirm the application works.",
+      actions: [
+        action(
+          "preview-start",
+          preview
+            ? "Start a new application preview"
+            : "Start application preview",
+          "primary",
+        ),
+        ...step.actions.map((item) => ({
+          ...item,
+          kind: "secondary" as const,
+        })),
+      ],
+    };
+  return step;
+}
+
+function withPreparation(step: CurrentStep, view: OperatorView): CurrentStep {
+  if (!view.workspace?.current) return step;
+  const preparation = view.preparation;
+  if (!preparation || preparation.status === "stopped") {
+    if (
+      view.conformance?.brief?.requiredChanges.length &&
+      !view.conformance.proposal
+    )
+      return {
+        ...step,
+        actions: step.actions.map((action) =>
+          action.key === "continue-with-server-guy"
+            ? {
+                ...action,
+                key: "preparation-start",
+                label: "Work on GitHub with Server Guy",
+                explanation:
+                  "Authorize a shared branch and draft PR checkpoints for this contract.",
+              }
+            : action,
+        ),
+      };
+    return step;
+  }
+  const actions = [...step.actions];
+  if (!actions.some((action) => action.key === "open-pull-request"))
+    actions.push({
+      key: "preparation-link",
+      label: preparation.pullRequestUrl
+        ? "Open preparation draft PR"
+        : "Open preparation branch",
+      href:
+        preparation.pullRequestUrl ??
+        `${view.application!.repositoryUrl}/tree/${preparation.branch}`,
+      kind: "link",
+      explanation: "You can follow along and commit on this branch.",
+    });
+  actions.push({
+    key: "preparation-refresh",
+    label: "Check shared branch",
+    kind: "link",
+    explanation: "Read its current commit and PR state.",
+  });
+  return {
+    ...step,
+    ...(preparation.status === "conflict"
+      ? { now: preparation.summary, waitingOn: "you" as const }
+      : {}),
+    actions,
   };
 }

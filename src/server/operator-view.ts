@@ -1,3 +1,5 @@
+import { preparationView } from "./preparation";
+import { applicationPreviewView } from "./application-preview";
 import {
   listActiveDecisions,
   listActivity,
@@ -199,6 +201,8 @@ export function getOperatorView(
   });
   return {
     application,
+    preview: applicationPreviewView(application.id),
+    preparation: preparationView(application.id),
     workspace: views.find((item) => item.id === workspace.id) ?? null,
     workspaces: views,
     chats,

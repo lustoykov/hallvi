@@ -100,6 +100,41 @@ describe.skipIf(!optedIn)("the Docker conformance executor", () => {
   });
 
   it(
+    "keeps the verified application reachable on loopback until explicitly stopped",
+    async () => {
+      const runId = "docker-interactive-preview";
+      const result = await executor.execute(
+        plan("fastapi-conforming", runId, { keepPreview: true }),
+      );
+      try {
+        expect(
+          result.status,
+          JSON.stringify({
+            error: result.error,
+            results: result.results.map((r) => [r.key, r.outcome, r.summary]),
+          }),
+        ).toBe("passed");
+        expect(result.preview?.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+        const response = await fetch(`${result.preview!.url}/todos`);
+        expect(response.status).toBe(200);
+        const container = await client.inspectContainer(
+          result.preview!.containerId,
+        );
+        expect(container.State.Running).toBe(true);
+        expect(
+          container.NetworkSettings?.Ports?.["8000/tcp"] ?? null,
+        ).toBeNull();
+      } finally {
+        await executor.cleanupLeftovers([runId]);
+      }
+      await expect(
+        client.inspectContainer(result.preview!.containerId),
+      ).rejects.toThrow();
+    },
+    20 * 60_000,
+  );
+
+  it(
     "passes every check for the conforming fixture with per-check evidence and cleans up",
     async () => {
       const outcome = await executor.execute(

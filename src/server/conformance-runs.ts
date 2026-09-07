@@ -1,3 +1,4 @@
+import { previewForRun, recordPreviewOutcome } from "./application-preview";
 // Durable execution attempts. A conformance run is a row that exists before
 // any container does and outlives every one of them: cancellation, timeout,
 // failure and worker restart leave an inspectable outcome, never a green
@@ -162,15 +163,18 @@ export async function executeConformanceRun(
   }, 500);
   let outcome: ExecutionOutcome;
   try {
-    outcome = await executor.execute(plan, {
-      signal: controller.signal,
-      onProgress: (event) => {
-        options.onProgress?.(`${event.step}: ${event.message}`);
-        updateConformanceRun(run.id, ["running"], {
-          summary: `${event.step}: ${event.message}`.slice(0, 300),
-        });
+    outcome = await executor.execute(
+      { ...plan, keepPreview: previewForRun(run.id)?.status === "starting" },
+      {
+        signal: controller.signal,
+        onProgress: (event) => {
+          options.onProgress?.(`${event.step}: ${event.message}`);
+          updateConformanceRun(run.id, ["running"], {
+            summary: `${event.step}: ${event.message}`.slice(0, 300),
+          });
+        },
       },
-    });
+    );
   } finally {
     clearInterval(poll);
     options.signal?.removeEventListener("abort", stop);
@@ -193,8 +197,11 @@ export async function executeConformanceRun(
         imageDigest: outcome.imageDigest,
         configuration: plan.configuration,
       });
-    return getConformanceRun(run.id)!;
+    const final = getConformanceRun(run.id)!;
+    await recordPreviewOutcome(final, outcome);
+    return final;
   }
+  await recordPreviewOutcome(saved, outcome);
   return saved;
 }
 

@@ -1,3 +1,15 @@
+import * as dockerModule from "../../../src/server/docker";
+import {
+  applicationPreviewView,
+  recordPreviewOutcome,
+  confirmApplicationPreview,
+} from "../../../src/server/application-preview";
+import {
+  startPreparation,
+  publishPreparationCheckpoint,
+  readPreparationFile,
+} from "../../../src/server/preparation";
+import { overlayDigest } from "../../../src/server/execution-tree";
 // Phase 3 end to end over real SQLite, the real worker and the actual SDK
 // tool loop: the explicit transition, the brief, Pi's staged change and
 // preview through a fake executor, approval under each policy, publication
@@ -56,6 +68,7 @@ import {
   publishProposal,
   refreshCandidate,
   requestCandidateVerification,
+  requestApplicationPreview,
   returnExternalChange,
   selectCurrentRevision,
   setConformanceExecutor,
@@ -283,8 +296,7 @@ async function runtime(sdk: typeof import("@earendil-works/pi-coding-agent")) {
                 paths.includes(p),
               ).find((p) => !reads.some((read) => read.path === p));
               if (next) call("read_repository_file", { path: next });
-              else if (contractMode.startsWith("correct") && !currentResult)
-                call("get_application_contract", {});
+              else if (!currentResult) call("get_application_contract", {});
               else {
                 const current = currentResult
                   ? (
@@ -1498,4 +1510,306 @@ describe("external returns, the no-change path and contract revisions", () => {
     expect(store.listAcceptanceChecks(app.id)).toEqual([]);
     expect(store.activePublicationGrant(app.id)).toBeNull();
   }, 60_000);
+});
+
+describe("shared preparation checkpoints", () => {
+  it("opens one draft, preserves collaborator commits, refuses a stale replacement and accepts an explicitly reconciled read", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    await grantPublication(app.id);
+    const preparation = await startPreparation(app.id);
+    const repo = github(app.name);
+    expect(preparation.headSha).toBe(store.currentContract(app.id)!.commitSha);
+    expect(repo.pullsFor()).toHaveLength(0);
+    await serverGuyTurn(app.id, app.chatId, "conformance: propose-only");
+    const first = conformance(app.id).proposal!;
+    expect(first.status, first.publicationError ?? "").toBe("published");
+    expect(repo.pullsFor()).toHaveLength(1);
+    expect(repo.pullsFor()[0].draft).toBe(true);
+    const userHead = repo.appendToBranch(
+      preparation.branch,
+      [
+        ...repo.filesAt(repo.head(preparation.branch)!)!,
+        { path: "USER-NOTES.md", content: "keep my notes" },
+      ],
+      "User adds notes",
+    );
+    const nextChanges = first.changes.map((change) => ({
+      ...change,
+      content: change.content + "\n# next checkpoint\n",
+    }));
+    const next = {
+      ...first,
+      id: randomUUID(),
+      changes: nextChanges,
+      filesDigest: overlayDigest(nextChanges),
+    };
+    const checkpoint = await publishPreparationCheckpoint(app.id, next);
+    expect(checkpoint.commitSha).not.toBe(userHead);
+    expect(
+      repo
+        .filesAt(repo.head(preparation.branch)!)!
+        .find((file) => file.path === "USER-NOTES.md")?.content,
+    ).toBe("keep my notes");
+    expect(repo.pullsFor()).toHaveLength(1);
+    const recovered = await publishPreparationCheckpoint(app.id, next);
+    expect(recovered.commitSha).toBe(checkpoint.commitSha);
+    const path = nextChanges[0].path;
+    const userContent = nextChanges[0].content + "# collaborator edit\n";
+    const conflictHead = repo.appendToBranch(
+      preparation.branch,
+      repo
+        .filesAt(repo.head(preparation.branch)!)!
+        .map((file) =>
+          file.path === path ? { ...file, content: userContent } : file,
+        ),
+      "User changes same file",
+    );
+    const thirdChanges = nextChanges.map((change) => ({
+      ...change,
+      content: change.content + "# other change\n",
+    }));
+    const third = {
+      ...next,
+      id: randomUUID(),
+      changes: thirdChanges,
+      filesDigest: overlayDigest(thirdChanges),
+    };
+    await expect(publishPreparationCheckpoint(app.id, third)).rejects.toThrow(
+      "Conflict in",
+    );
+    expect(repo.head(preparation.branch)).toBe(conflictHead);
+    const read = await readPreparationFile(
+      runs.getPiRun(first.piRunId!)!,
+      path,
+    );
+    expect(read.content).toBe(userContent);
+    const resolvedChanges = thirdChanges.map((change) =>
+      change.path === path
+        ? {
+            ...change,
+            baseObservationId: read.observationId!,
+            content: userContent + "# reconciled change\n",
+          }
+        : change,
+    );
+    await publishPreparationCheckpoint(app.id, {
+      ...third,
+      changes: resolvedChanges,
+      filesDigest: overlayDigest(resolvedChanges),
+    });
+    expect(
+      repo
+        .filesAt(repo.head(preparation.branch)!)!
+        .find((file) => file.path === path)?.content,
+    ).toContain("# collaborator edit");
+  }, 60_000);
+
+  it("does not open a PR if permission is revoked while the checkpoint push completes", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    await serverGuyTurn(app.id, app.chatId, "conformance: propose-only");
+    const proposal = conformance(app.id).proposal!;
+    await grantPublication(app.id);
+    const preparation = await startPreparation(app.id);
+    const repo = github(app.name);
+    const request = repo.request.bind(repo);
+    const intercepted = vi
+      .spyOn(repo, "request")
+      .mockImplementation(async (path, options) => {
+        const result = await request(path, options);
+        if (options?.method === "PATCH" && path.includes("/git/refs/"))
+          store.revokePublicationGrants(app.id);
+        return result;
+      });
+    try {
+      await expect(
+        publishPreparationCheckpoint(app.id, proposal),
+      ).rejects.toThrow("scope changed");
+      expect(repo.head(preparation.branch)).not.toBe(preparation.baseSha);
+      expect(repo.pullsFor()).toHaveLength(0);
+    } finally {
+      intercepted.mockRestore();
+    }
+  }, 60_000);
+
+  it("rejects a raced ref update and retains the collaborator's winning commit", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    await grantPublication(app.id);
+    const preparation = await startPreparation(app.id);
+    await serverGuyTurn(app.id, app.chatId, "conformance: propose-only");
+    const first = conformance(app.id).proposal!;
+    const repo = github(app.name);
+    const changes = first.changes.map((change) => ({
+      ...change,
+      content: change.content + "\n# racing edit\n",
+    }));
+    const request = repo.request.bind(repo);
+    let winner: string | null = null;
+    const intercepted = vi
+      .spyOn(repo, "request")
+      .mockImplementation(async (path, options) => {
+        if (options?.method === "PATCH" && path.includes("/git/refs/")) {
+          winner = repo.appendToBranch(
+            preparation.branch,
+            [
+              ...repo.filesAt(repo.head(preparation.branch)!)!,
+              { path: "race.txt", content: "collaborator" },
+            ],
+            "Raced commit",
+          );
+        }
+        return request(path, options);
+      });
+    try {
+      await expect(
+        publishPreparationCheckpoint(app.id, {
+          ...first,
+          id: randomUUID(),
+          changes,
+          filesDigest: overlayDigest(changes),
+        }),
+      ).rejects.toThrow("non-fast-forward");
+      expect(repo.head(preparation.branch)).toBe(winner);
+    } finally {
+      intercepted.mockRestore();
+    }
+  }, 60_000);
+});
+
+describe("application preview acceptance", () => {
+  it("requires behavior checks, binds confirmation to the exact image and invalidates it when the contract changes", async () => {
+    const app = await inPhaseThree("fastapi-app");
+    selectCurrentRevision(app.id);
+    expect(() => requestApplicationPreview(app.id)).toThrow("behavior");
+    await serverGuyTurn(app.id, app.chatId, "conformance: full");
+    acceptAcceptanceChecks(app.id, conformance(app.id).proposedAcceptance!.id);
+    const preview = requestApplicationPreview(app.id);
+    expect(() => requestApplicationPreview(app.id)).toThrow(/queued|existing/);
+    const claimed = claimNextConformanceRun()!;
+    expect(claimed.id).toBe(preview.runId);
+    const finished = store.updateConformanceRun(claimed.id, ["running"], {
+      status: "passed",
+      imageDigest: "sha256:exact-image",
+    })!;
+    await recordPreviewOutcome(finished, {
+      status: "passed",
+      results: [],
+      imageDigest: "sha256:exact-image",
+      error: null,
+      environment: readyEnvironment(),
+      preview: {
+        containerId: "preview-container",
+        url: "http://127.0.0.1:43210",
+      },
+    });
+    expect(applicationPreviewView(app.id)?.confirmationCurrent).toBe(false);
+    const discover = vi
+      .spyOn(dockerModule, "discoverExecutionEnvironment")
+      .mockResolvedValue(readyEnvironment());
+    const client = vi.spyOn(dockerModule, "dockerClientFor").mockReturnValue({
+      inspectContainer: async () => ({ State: { Running: true } }),
+    } as unknown as dockerModule.DockerClient);
+    try {
+      expect(
+        (await confirmApplicationPreview(app.id, preview.id))
+          ?.confirmationCurrent,
+      ).toBe(true);
+      await confirmApplicationPreview(app.id, preview.id);
+      expect(
+        feed(app.workspaceId).filter(
+          (kind) => kind === "application-preview-confirmed",
+        ),
+      ).toHaveLength(1);
+      store.updateConformanceRun(claimed.id, ["passed"], {
+        imageDigest: "sha256:another-image",
+      });
+      expect(applicationPreviewView(app.id)?.confirmationCurrent).toBe(false);
+      await expect(
+        confirmApplicationPreview(app.id, preview.id),
+      ).rejects.toThrow("matching successful");
+      store.revokePublicationGrants(app.id); // unrelated to preview identity
+      const contract = store.currentContract(app.id)!;
+      const replacement = store.insertContract({
+        ...contract,
+        version: contract.version + 1,
+      });
+      store.supersedeContract(app.id, contract.id, replacement.id);
+      expect(applicationPreviewView(app.id)?.status).toBe("stale");
+      await expect(
+        confirmApplicationPreview(app.id, preview.id),
+      ).rejects.toThrow("current");
+    } finally {
+      discover.mockRestore();
+      client.mockRestore();
+    }
+  }, 60_000);
+});
+
+describe("reviewed setup corrections", () => {
+  it("reopens the original phase for another repository, preserves history and drops publication authority", async () => {
+    const app = await inPhaseThree("fastapi-nohealth");
+    github(app.name).permissions = { pull: true, push: true, admin: false };
+    await grantPublication(app.id);
+    const original = store.currentContract(app.id)!;
+    const originalWorkspaces = store.listWorkspaces(app.id);
+    const { previewSetupCorrection, applySetupCorrection } =
+      await import("../../../src/server/setup-correction");
+    const impact = await previewSetupCorrection(app.id, {
+      name: "Corrected application",
+      repositoryUrl: "https://github.com/qa/fastapi-conforming",
+      approvalMode: "always-ask",
+    });
+    expect(store.getApplication(app.id)!.repositoryName).toBe(
+      "fastapi-nohealth",
+    );
+    expect(impact.repositoryChanged).toBe(true);
+    expect(applySetupCorrection(app.id, { impactId: impact.id }).phaseKey).toBe(
+      "start",
+    );
+    expect(store.activePublicationGrant(app.id)).toBeNull();
+    expect(store.getContract(original.id)).toEqual(original);
+    expect(store.listWorkspaces(app.id).map((w) => w.id)).toEqual(
+      originalWorkspaces.map((w) => w.id),
+    );
+    expect(getOperatorView(app.id).workspace?.phaseKey).toBe("start");
+    expect(() => applySetupCorrection(app.id, { impactId: impact.id })).toThrow(
+      /out of date/,
+    );
+    await completeLaunchBrief(app.id);
+    expect((await work()).status).toBe("succeeded");
+    expect(store.currentContract(app.id)?.id).not.toBe(original.id);
+    expect(completeInspectApp(app.id).workspace?.id).toBe(app.workspaceId);
+  });
+  it("changes a policy without repeating code verification and rejects an impact after intervening edits", async () => {
+    const app = await inPhaseThree("fastapi-conforming");
+    github(app.name).permissions = { pull: true, push: true, admin: false };
+    await grantPublication(app.id);
+    const { previewSetupCorrection, applySetupCorrection } =
+      await import("../../../src/server/setup-correction");
+    const input = {
+      name: "Renamed",
+      repositoryUrl: "https://github.com/qa/fastapi-conforming",
+      approvalMode: "pi-decides",
+    };
+    const impact = await previewSetupCorrection(app.id, input);
+    expect(impact.repositoryChanged).toBe(false);
+    expect(applySetupCorrection(app.id, { impactId: impact.id }).phaseKey).toBe(
+      "make-launch-ready",
+    );
+    expect(store.activePublicationGrant(app.id)).toBeNull();
+    expect(store.getApplication(app.id)?.name).toBe("Renamed");
+    expect(
+      store.listWorkspaces(app.id).filter((w) => w.completedAt),
+    ).toHaveLength(2);
+    const stale = await previewSetupCorrection(app.id, {
+      ...input,
+      name: "Another name",
+    });
+    store.updateApplicationSetup(app.id, {
+      ...store.getApplication(app.id)!,
+      name: "Intervening name",
+    });
+    expect(() => applySetupCorrection(app.id, { impactId: stale.id })).toThrow(
+      /out of date/,
+    );
+  });
 });

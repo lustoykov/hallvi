@@ -15,6 +15,7 @@ import type {
   ApplicationContractBody,
   ApplicationContractRecord,
   ApplicationRecord,
+  ApplicationPreview,
   CandidateResolution,
   CandidateVerification,
   Chat,
@@ -34,6 +35,7 @@ import type {
   ProposalPublication,
   ProposedFileChange,
   PublicationGrantRecord,
+  PreparationBranch,
   RepositoryCitation,
 } from "./types";
 
@@ -467,3 +469,30 @@ export type DatabaseRowTypes = {
   >;
   activity: AssertExtends<ActivityEvent, typeof activityEvents.$inferSelect>;
 };
+
+export const applicationPreviews = sqliteTable("application_previews", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  record: text("record", { mode: "json" })
+    .$type<ApplicationPreview>()
+    .notNull(),
+});
+
+// Provider work spans awaits in both the web process and the worker.
+export const applicationOperations = sqliteTable("application_operations", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  pid: integer("pid").notNull(),
+});
+
+export const preparationBranches = sqliteTable("preparation_branches", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  record: text("record", { mode: "json" }).$type<PreparationBranch>().notNull(),
+});

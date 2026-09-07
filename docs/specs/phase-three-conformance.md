@@ -1,6 +1,6 @@
 # Phase 3: Make launch-ready
 
-Status: implemented on `codex/phase-three-conformance`, stacked on the Phase 2 branch. This document is the implementation contract for Phase 3: the transition, the conformance brief, Pi's staged changes and isolated previews, approval and publication, external returns, the exact candidate, the versioned check set and its runner, the Docker prerequisite, and the boundaries this slice deliberately leaves alone. The [journey](../user-journeys/01-application-launch.md#phase-3--make-launch-ready) owns the product behavior and gate definitions; [ROADMAP.md](../../ROADMAP.md#phase-3-conformance-result) owns build order and status; the [testing guide](../testing/phase-one-acceptance.md#phase-3-acceptance-make-launch-ready) owns acceptance cases and dated evidence.
+Status: consolidated on `codex/phase23-core-followups`, including the Phase 2, Phase 3 and experience follow-ups. This document is the implementation contract for Phase 3: the transition, the conformance brief, Pi's staged changes and isolated previews, approval and publication, external returns, the exact candidate, the versioned check set and its runner, the Docker prerequisite, and the boundaries this slice deliberately leaves alone. The [journey](../user-journeys/01-application-launch.md#phase-3--make-launch-ready) owns the product behavior and gate definitions; [ROADMAP.md](../../ROADMAP.md#phase-3-conformance-result) owns build order and status; the [testing guide](../testing/phase-one-acceptance.md#phase-3-acceptance-make-launch-ready) owns acceptance cases and dated evidence.
 
 ## Outcome and boundary
 
@@ -10,12 +10,12 @@ Phase 3 produces a **Conformance Result**: one exact, eligible repository revisi
 Retained Application Contract (Phase 2)
         ↓ explicit Continue
 Conformance brief: base commit, required changes, scope, acceptance bar
-        ↓ Continue with Server Guy (default)      ↓ export the same brief
+        ↓ Work on GitHub with Server Guy      ↓ export the same brief
 Pi: read → stage change → propose behavior checks → isolated preview → fix
         ↓ final Run transaction                    ↓ external harness / manual work
 Proposal saved (approved per policy) ←──── returned pull request, branch or commit
         ↓ explicit grant + policy
-Server Guy publishes one branch and one pull request (never merges)
+Server Guy appends checkpoints to one shared branch and draft PR (never merges)
         ↓ the engineer merges on GitHub
 Refresh: the exact PR merge result is the candidate; the reviewed
 change is compared with it; scope is checked on the reviewed diff
@@ -23,7 +23,21 @@ change is compared with it; scope is checked on the reviewed diff
 Worker runs the check set over the exact commit in disposable containers
         ↓
 P3.G1 candidate · P3.G2 changes resolved · P3.G3 checks passed
+        ↓ Start application preview
+Retained verified image on loopback → engineer tests and confirms
 ```
+
+## Shared preparation, application preview and corrections
+
+The default editing path asks for an explicit shared-work grant for the current contract and GitHub App connection. A preparation branch starts at the selected commit. The first meaningful source checkpoint opens a draft PR; subsequent checkpoints append to the observed branch head. A checkpoint does not require an extra per-file approval inside that already accepted scope. The separate local-proposal path retains its individual approval operation.
+
+Collaborators may commit to the preparation branch. Unrelated files remain untouched. For an affected file, Server Guy compares the current Git blob with the base it read; a conflict requires `read_preparation_file`, reconciliation and another proposal. A non-fast-forward update is refused. Checkpoint markers recover a publication after a lost receipt without recreating a PR or overwriting later commits. Revoking the publication grant or changing the contract ends the session's authority. Server Guy never merges.
+
+Automated source previews are temporary verification runs. The separately requested **application preview** builds and verifies the eligible candidate and retains the verified application, disposable database and a fixed TCP relay. Only the relay publishes an ephemeral loopback port; repository code retains its isolated network. The preview expires after one hour, or stops on explicit cancellation, stale evidence or worker restart. Startup failure has no open/confirm action. Confirmation requires a current running container and matching successful run, image, candidate, contract, check definition and accepted behavior checks. A later deliberate stop retains historical confirmation for that unchanged identity; a failed or replaced identity cannot inherit it. Later launch planning must require this confirmation, not only the three automated checks.
+
+**Change selected revision** saves a bounded impact read before applying an exact SHA. A branch moving after that read cannot silently change the selection. Stale impacts and in-flight work block application. **Edit application setup** also reviews consequences before mutation: a repository change requires fresh identity and contract evidence, revokes publishing authority and reopens Phase 1; a permission change revokes publishing authority without invalidating unchanged code results; a rename needs no rerun. Historical work remains stored. Paused later phases cannot accept chat mutations, and completion resumes their existing workspaces.
+
+The current execution profile remains Python/uv/FastAPI with PostgreSQL. Check set v2 builds the repository-selected Dockerfile/context/target in rootless BuildKit with restricted downloads. Configuration, migrations, startup, health and behavior use the actual application image. Repository tests use the disposable source runner. These boundaries are independent of Pi's choice of files or build recipe; arbitrary stacks and microservice arrangements are not claimed.
 
 ## Transition and retained evidence
 
@@ -49,10 +63,11 @@ Derived deterministically on every read from the contract in force, never stored
 
 ## Continue with Server Guy: staged changes and isolated previews
 
-Phase 3 Runs keep the Phase 2 tools (the pinned inspection and reads at the base commit, the contract lookup and revision) and add five scoped tools:
+Phase 3 Runs keep the Phase 2 tools (the pinned inspection and reads at the base commit, the contract lookup and revision) and add scoped tools:
 
 | Tool | Effect |
 | --- | --- |
+| `read_preparation_file` | Read a collaborator-visible preparation file at the currently observed branch head, saving the source observation for reconciliation. |
 | `get_conformance_brief` | The brief, the saved proposal, the behavior checks, what this request has staged, and whether the execution environment is available. Local records only. |
 | `propose_source_changes` | Stages the complete change: full contents per file or a deletion, and a mapping from every required change to the paths that resolve it. Validated: safe paths, no denied or sensitive paths, text only, bounded count and size, credential shapes rejected by JSON path before any reason could echo them, existing files must have been read first (so the change is reviewable as a diff), every required change mapped. A second proposal in the same Run replaces the first and makes the preview stale. |
 | `propose_acceptance_checks` | Stages the application-behavior definition: HTTP steps with expected status and body substrings, grounded in cited snippets of saved reads at the base commit; a step whose route no cited snippet declares is rejected, as is a set of unasserted GET requests. |

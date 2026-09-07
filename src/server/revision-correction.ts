@@ -71,7 +71,7 @@ interface SavedImpact {
   connectionId: string;
   defaultBranch: string;
 }
-function state(applicationId: string) {
+export function correctionState(applicationId: string) {
   const loaded = loadApplication(applicationId);
   const inspection = latestInspection(applicationId);
   return {
@@ -95,7 +95,7 @@ function state(applicationId: string) {
       .digest("hex"),
   };
 }
-function idle(applicationId: string) {
+export function assertCorrectionIdle(applicationId: string) {
   if (
     hasPendingRuns(applicationId) ||
     listConformanceRuns(applicationId).some((run) =>
@@ -113,7 +113,7 @@ export async function previewRevisionCorrection(
   input: unknown,
 ): Promise<RevisionImpact> {
   const { reference } = revisionImpactRequest.parse(input);
-  const before = state(applicationId);
+  const before = correctionState(applicationId);
   if (!["inspect-app", "make-launch-ready"].includes(before.current.phaseKey))
     throw new Error(
       "Revision changes are available during Inspect app and Make launch-ready.",
@@ -155,7 +155,7 @@ export async function previewRevisionCorrection(
   if (commit.sha === evidence.commitSha)
     throw new Error("That commit is already selected.");
   const tree = await fetchRepositoryTree(name, commit.sha, credential.token);
-  if (state(applicationId).stamp !== before.stamp)
+  if (correctionState(applicationId).stamp !== before.stamp)
     throw new Error(
       "The application changed while checking impact. Review it again.",
     );
@@ -238,7 +238,7 @@ export function applyRevisionCorrection(applicationId: string, input: unknown) {
   return withTransaction(() => {
     const view = getRevisionImpact(applicationId, impactId);
     const saved = getObservation(impactId)!.raw as SavedImpact;
-    const before = state(applicationId);
+    const before = correctionState(applicationId);
     const applied = latestObservation(applicationId, APPLIED)?.raw as
       { impactId?: string } | undefined;
     if (
@@ -254,7 +254,7 @@ export function applyRevisionCorrection(applicationId: string, input: unknown) {
       throw new Error(
         "This impact is out of date. Review the revision change again before applying it.",
       );
-    idle(applicationId);
+    assertCorrectionIdle(applicationId);
     const inspectionWorkspace = before.workspaces.find(
       (w) => w.phaseKey === "inspect-app",
     )!;
