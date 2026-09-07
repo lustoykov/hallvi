@@ -24,6 +24,7 @@ import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
+import type { RecordReference, RecordSection } from "./record-references";
 
 const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   completed: "Saved",
@@ -51,6 +52,8 @@ export function ChatPane({
   reconnecting,
   onRunAction,
   onNewChat,
+  references,
+  onReveal,
 }: {
   view: OperatorView;
   activeChat: Chat | null;
@@ -66,6 +69,10 @@ export function ChatPane({
   reconnecting: boolean;
   onRunAction: (id: string, action: "cancel" | "retry") => void;
   onNewChat: () => void;
+  /** Records each reply produced, shown as a line under it. */
+  references?: Map<string, RecordReference[]>;
+  /** Opens that record section beside the chat. */
+  onReveal?: (section: RecordSection) => void;
 }) {
   const application = view.application;
   const workspace = view.workspace;
@@ -73,12 +80,8 @@ export function ChatPane({
   const completed = workspace?.status === "completed";
   const readOnly = archived || completed;
   const deliverable = workspace?.deliverable ?? "Launch Brief";
-  // The gate's state lives in the pane header (and the top bar), not as a
-  // standing message in the transcript.
-  const ready = Boolean(application) && workspace?.status === "ready";
-  const passed = view.checks.filter(
-    (check) => check.status === "passed",
-  ).length;
+  // The phase's state lives in the current-step bar above; this header only
+  // names the chat and says when it cannot accept new work.
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
   const requestPending = view.messages.some(
@@ -90,16 +93,14 @@ export function ChatPane({
       <header className="sg-pane-title sg-chat-title">
         <div>
           <strong>{activeChat?.title ?? deliverable}</strong>
-          <span className={ready ? "ready" : undefined}>
+          <span>
             {archived
               ? "Archived · read-only"
               : completed
                 ? `Phase ${workspace?.phaseNumber} is complete · read-only`
-                : ready
-                  ? workspace?.phaseKey === "start"
-                    ? "Launch Brief ready"
-                    : "Ready for review"
-                  : `Working toward the ${deliverable} · ${passed} of ${view.checks.length} checks`}
+                : activeChat?.isPrimary === false
+                  ? "Separate transcript · shares the phase's saved state"
+                  : "Main phase chat"}
           </span>
         </div>
         {activeChat && !activeChat.isPrimary && !readOnly && (
@@ -246,6 +247,22 @@ export function ChatPane({
                     </MessageResponse>
                   )}
                 </MessageContent>
+                {references?.get(message.id)?.length ? (
+                  <div className="sg-message-refs">
+                    <span>Saved from this reply</span>
+                    {references.get(message.id)!.map((reference) => (
+                      <button
+                        className={`sg-message-ref ${reference.tone}`}
+                        key={reference.key}
+                        onClick={() => onReveal?.(reference.section)}
+                        title="Open in the Record"
+                        type="button"
+                      >
+                        {reference.label} <em>{reference.status}</em>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </Message>
             );
           })}

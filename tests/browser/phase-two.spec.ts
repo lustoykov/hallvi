@@ -33,7 +33,10 @@ test(
   async ({ page, fixture }, testInfo) => {
     test.setTimeout(240_000);
     await addApplication(page, "fastapi-app");
-    const record = page.getByRole("tabpanel", { name: "Record", exact: true });
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
+    });
     await expect(record.getByText("Launch Brief ready")).toBeVisible();
     // Phase 3 never appears as an option; Phase 2 is only reachable by
     // Continue, which the ready Launch Brief offers.
@@ -72,6 +75,11 @@ test(
       record.getByText(/^Application Contract v1 · [0-9a-f]{8}$/),
     ).toBeVisible();
     await expect(record.getByText("Ready for review")).toBeVisible();
+    await record.locator(".sg-contract-group").evaluateAll((groups) =>
+      groups.forEach((group) => {
+        (group as HTMLDetailsElement).open = true;
+      }),
+    );
     await expect(
       record.locator(".sg-provenance.repository-declared").first(),
     ).toBeVisible();
@@ -86,10 +94,11 @@ test(
     ).toBeVisible();
     await expect(record.getByText("Needs your decision")).toHaveCount(0);
     const source = record.locator(".sg-contract-source").first();
-    await expect(source).toHaveAttribute(
-      "href",
-      /github\.com\/qa\/fastapi-app\/blob\/[0-9a-f]{40}\/.+#L\d+$/,
-    );
+    // Synthetic repository: the citation names the file and line, and the
+    // invented GitHub page is labelled as demo rather than linked.
+    await expect(source).toContainText(/[\w.\/-]+:\d+/);
+    await expect(source).toContainText("demo · not a real link");
+    await expect(source.locator("a")).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("phase-two-02-contract-established.png"),
       fullPage: true,
@@ -146,6 +155,11 @@ test(
     await expect(record.locator('[data-field="health.path"]')).toContainText(
       "/healthz",
     );
+    const healthGroup = record.locator(
+      '.sg-contract-group:has([data-field="health.path"])',
+    );
+    if (!(await healthGroup.evaluate((el) => (el as HTMLDetailsElement).open)))
+      await healthGroup.locator("summary").click();
     await expect(
       record.locator(
         '[data-field="health.path"] .sg-provenance.user-confirmed',
@@ -154,9 +168,9 @@ test(
     await expect(record.locator('[data-field="health.path"]')).toContainText(
       "You said: “/healthz”",
     );
-    await page.getByRole("tab", { name: "Activity", exact: true }).click();
+    await page.getByRole("button", { name: /^History/ }).click();
     const events = page
-      .getByRole("tabpanel", { name: "Activity", exact: true })
+      .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
     await expect(events.nth(0)).toContainText("Application Contract revised");
     await expect(events.nth(0)).toContainText(
@@ -171,7 +185,6 @@ test(
       path: testInfo.outputPath("phase-two-04-revised-activity.png"),
       fullPage: true,
     });
-    await page.getByRole("tab", { name: "Record", exact: true }).click();
 
     // An invented source is rejected; the attempt still completes and the
     // saved contract is untouched.
@@ -254,7 +267,10 @@ test(
         /\[QA contract\] Proposed Application Contract v1 with 19 fields, 0 blocker\(s\) and 1 conformance item\(s\)/,
       ),
     ).toBeVisible({ timeout: 60_000 });
-    const record = page.getByRole("tabpanel", { name: "Record", exact: true });
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
+    });
     await expect(
       record.getByText("Conformance work for Phase 3"),
     ).toBeVisible();

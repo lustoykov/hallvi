@@ -33,7 +33,6 @@ function render(view = empty) {
       busy={null}
       view={view}
       checks={view.checks}
-      onContinue={() => {}}
       onConformance={() => {}}
       onSelectCheck={() => {}}
     />,

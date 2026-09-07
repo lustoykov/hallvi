@@ -39,6 +39,9 @@ export default async function ApplicationPage({
   return (
     <OperatorShell
       key={applicationId}
+      // Only the QA fixture runs under a fixture root: its repositories are
+      // synthetic, so GitHub links are shown but never followed.
+      demo={Boolean(process.env.SERVER_GUY_QA_ROOT)}
       applications={listApplications().map(
         ({ id, repositoryOwner, repositoryName }) => ({
           id,
