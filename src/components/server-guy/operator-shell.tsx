@@ -1,13 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  CaretDown,
-  Check,
-  Plus,
-  ShieldCheck,
-  Trash,
-} from "@phosphor-icons/react";
+import { CaretDown, Check, GearSix, Plus, Trash } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -477,126 +471,111 @@ export function OperatorShell({
           >
             <span className="sg-app-mark">SG</span>
           </Link>
-          {/* Breadcrumb: the current application is the last crumb and doubles
-              as the switcher. */}
-          <div className="sg-breadcrumb">
-            <Link className="sg-crumb" href="/applications">
-              Applications
-            </Link>
-            <span aria-hidden="true" className="sg-crumb-separator">
-              /
-            </span>
-            <button
-              ref={applicationPicker}
-              className="sg-application-picker"
-              type="button"
-              popoverTarget="application-picker"
-              disabled={busy !== null}
-              aria-label={`Switch application: ${application?.name}`}
-            >
+          {/* The application is the switcher, its repository beneath the
+              name. Environment and policy are saved Phase 1 facts, shown as
+              quiet context rather than status; the phase lives in the strip
+              below, so it is not repeated here. */}
+          <button
+            ref={applicationPicker}
+            className="sg-application-picker"
+            type="button"
+            popoverTarget="application-picker"
+            disabled={busy !== null}
+            aria-label={`Switch application: ${application?.name}`}
+          >
+            <span>
               <strong>{application?.name}</strong>
-              <CaretDown aria-hidden="true" weight="bold" />
-            </button>
-            <span className="sg-environment-label">Production</span>
-            {view.workspace && (
-              <span
-                className="sg-phase-label"
-                title={`Viewing phase ${view.workspace.phaseNumber}${view.workspace.current ? " (current)" : " (completed)"}`}
-              >
-                Phase {view.workspace.phaseNumber} · {view.workspace.name}
-              </span>
-            )}
-            <nav
-              id="application-picker"
-              popover="auto"
-              className="sg-application-menu"
-              aria-label="Applications"
-              onBeforeToggle={(event) => {
-                if (event.newState === "open")
-                  positionApplicationMenu(event.currentTarget);
-              }}
-            >
-              <span className="sg-eyebrow sg-application-menu-label">
-                Switch application
-              </span>
-              {applications.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/applications/${item.id}`}
-                  aria-current={
-                    item.id === application?.id ? "page" : undefined
-                  }
-                  onClick={(event) =>
-                    event.currentTarget
-                      .closest<HTMLElement>("[popover]")
-                      ?.hidePopover()
-                  }
-                >
-                  <span aria-hidden="true" className="sg-application-menu-mark">
-                    {item.repositoryName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <strong>{item.repositoryName}</strong>
-                    <small>
-                      {item.repositoryOwner}/{item.repositoryName}
-                    </small>
-                  </div>
-                  {item.id === application?.id && (
-                    <Check aria-label="Current application" weight="bold" />
-                  )}
-                </Link>
-              ))}
-              <Link
-                className="sg-application-menu-action"
-                href="/applications/new"
-              >
-                <Plus /> Add application
-              </Link>
-              <hr />
-              <button
-                type="button"
-                className="sg-remove-application"
-                disabled={busy !== null}
-                onClick={(event) => {
-                  event.currentTarget
-                    .closest<HTMLElement>("[popover]")
-                    ?.hidePopover();
-                  setRemoveError(null);
-                  setConfirmRemove(true);
-                }}
-              >
-                <Trash /> Remove application…
-              </button>
-            </nav>
-          </div>
-        </div>
-        <div className="sg-topbar-meta">
+              <small>
+                {application?.repositoryOwner}/{application?.repositoryName}
+              </small>
+            </span>
+            <CaretDown aria-hidden="true" weight="bold" />
+          </button>
           {policy && (
             <span
-              className="sg-chip"
-              title={`Permission policy · ${policy.hint}`}
+              className="sg-topbar-context"
+              title={`Saved in Phase 1. ${policy.hint} The server itself is chosen in Phase 5.`}
             >
-              <ShieldCheck aria-hidden="true" weight="bold" />
-              <span>Policy</span>
-              <strong>{policy.label}</strong>
+              <b>Production</b>
+              <i aria-hidden="true" />
+              <span>{policy.label}</span>
             </span>
           )}
-          <Link
-            className="sg-chip"
-            href="/setup/pi"
-            title={
-              initialPiSetup.ready
-                ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                : "Connect ChatGPT to chat with Server Guy"
-            }
+          <nav
+            id="application-picker"
+            popover="auto"
+            className="sg-application-menu"
+            aria-label="Applications"
+            onBeforeToggle={(event) => {
+              if (event.newState === "open")
+                positionApplicationMenu(event.currentTarget);
+            }}
           >
-            <span
-              aria-hidden="true"
-              className={`sg-dot${initialPiSetup.ready ? " ready" : ""}`}
-            />
-            {initialPiSetup.ready ? "Settings" : "Settings · Connect ChatGPT"}
-          </Link>
+            <span className="sg-eyebrow sg-application-menu-label">
+              Switch application
+            </span>
+            {applications.map((item) => (
+              <Link
+                key={item.id}
+                href={`/applications/${item.id}`}
+                aria-current={item.id === application?.id ? "page" : undefined}
+                onClick={(event) =>
+                  event.currentTarget
+                    .closest<HTMLElement>("[popover]")
+                    ?.hidePopover()
+                }
+              >
+                <span aria-hidden="true" className="sg-application-menu-mark">
+                  {item.repositoryName.slice(0, 1).toUpperCase()}
+                </span>
+                <div>
+                  <strong>{item.repositoryName}</strong>
+                  <small>
+                    {item.repositoryOwner}/{item.repositoryName}
+                  </small>
+                </div>
+                {item.id === application?.id && (
+                  <Check aria-label="Current application" weight="bold" />
+                )}
+              </Link>
+            ))}
+            <Link
+              className="sg-application-menu-action"
+              href="/applications/new"
+            >
+              <Plus /> Add application
+            </Link>
+            <hr />
+            <button
+              type="button"
+              className="sg-remove-application"
+              disabled={busy !== null}
+              onClick={(event) => {
+                event.currentTarget
+                  .closest<HTMLElement>("[popover]")
+                  ?.hidePopover();
+                setRemoveError(null);
+                setConfirmRemove(true);
+              }}
+            >
+              <Trash /> Remove application…
+            </button>
+          </nav>
         </div>
+        <Link
+          className="sg-settings-link"
+          href="/setup/pi"
+          title={
+            initialPiSetup.ready
+              ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
+              : "Connect ChatGPT to chat with Server Guy"
+          }
+        >
+          <GearSix aria-hidden="true" />
+          {initialPiSetup.ready
+            ? "Settings · ChatGPT connected"
+            : "Settings · Connect ChatGPT"}
+        </Link>
       </header>
 
       <PhaseRail

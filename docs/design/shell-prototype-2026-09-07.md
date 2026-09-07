@@ -137,6 +137,17 @@ non-clickable "demo · not a real link" label and each page carries a demo
 banner. The prototype keys this on the `qa` owner; production needs an
 explicit signal (the fixture root is only known to the server process).
 
+## Decisions so far
+
+- **Top bar: A** (user, 2026-09-07). Identity with the repository beneath the
+  name, environment and policy as a muted context line, no phase pill, no
+  Policy chip, Settings names its connection state in words. Moved into
+  production in `operator-shell.tsx`.
+- **Buttons** (user, 2026-09-07): smaller and quieter. One solid primary at a
+  time; further pending decisions are outline buttons; card actions are
+  small outline buttons; "Details" is a text row.
+- Right column and action placement: open; recommendation below.
+
 ## Recommendation
 
 Take C as the base, and borrow two things:
@@ -164,14 +175,25 @@ Concretely for production:
   outline read the same view, so a reload shows what the record shows and a
   replaced proposal cannot be approved from anywhere.
 
-## Independent of the choice, being built now
+## Built independently of the open choices
 
-- `describeCurrentStep` as a production module with unit tests (purpose,
-  now, waiting-on, distinct actions, stages, remaining work).
-- A contract-history read route: every saved version with commit, time,
-  changed values and changed sources compared with the previous version,
-  and the message that caused it. Describes a source-only change as such.
-- A server-side demo signal for synthetic repositories, from the page.
+- `src/components/server-guy/current-step.ts`: `describeCurrentStep`
+  (purpose, now, waiting-on, distinct actions with one solid primary,
+  Phase 3 stages, remaining work) with unit tests; the prototype delegates
+  to it.
+- `GET /api/applications/:id/contracts` (`src/server/contract-history.ts`):
+  every saved version newest first, current one marked, field changes
+  classified as value, source, both, work, added or removed, and the
+  message that led to each version quoted. A source-only change is never
+  reported as "x → x". Integration-tested over SQLite.
+- "Saved versions" under the current Application Contract in the Record
+  (`contract-versions.tsx`), read on demand from that route.
+- The Variant A top bar in production.
+
+Still to build once the right-column and action-placement choices land:
+the current-step bar, the outline record, the demo signal from the page
+(the fixture root is known to the server process), and the compact Docker
+line.
 
 ## Needs from Codex (recorded, not blocking)
 

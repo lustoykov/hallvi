@@ -12,15 +12,11 @@ import type {
   RepositoryInspectionSummary,
 } from "@/server/types";
 
+import { ContractVersions } from "./contract-versions";
+import { SOURCE_LABELS } from "./format";
 import { LocalTime } from "./local-time";
 
-const PROVENANCE_LABELS: Record<ContractProvenance["kind"], string> = {
-  "repository-declared": "Declared in repository",
-  "profile-rule": "Profile rule",
-  "user-confirmed": "Your choice",
-  inferred: "Inferred",
-  unresolved: "Unresolved",
-};
+const PROVENANCE_LABELS = SOURCE_LABELS;
 
 function citationOf(provenance: ContractProvenance): ContractCitation | null {
   if ("citation" in provenance && provenance.citation)
@@ -201,6 +197,10 @@ export function ContractRecord({
             </span>
           </div>
           <p className="sg-contract-summary">{contract.body.summary}</p>
+          <ContractVersions
+            applicationId={application.id}
+            currentVersion={contract.version}
+          />
           {contract.gaps.blockers.length > 0 && (
             <div className="sg-contract-gaps blocked">
               <strong>Needs your decision</strong>

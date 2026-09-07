@@ -1,3 +1,4 @@
+import type { ContractHistoryEntry } from "@/server/contract-history";
 import type { ExecutionSetupStatus } from "@/server/execution-setup";
 import type {
   AcceptedPiRun,
@@ -66,6 +67,12 @@ export const api = {
   view(applicationId: string, chatId: string) {
     return jsonRequest<OperatorView>(
       `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}`,
+    );
+  },
+  /** Every saved Application Contract version, newest first. */
+  contractHistory(applicationId: string) {
+    return jsonRequest<{ versions: ContractHistoryEntry[] }>(
+      `/api/applications/${applicationId}/contracts`,
     );
   },
   /** A phase's primary chat: how the phase strip switches the viewed phase. */

@@ -6,16 +6,16 @@
   min-width: 1060px;
   overflow: hidden;
   display: grid;
-  grid-template-rows: 56px auto minmax(0, 1fr);
+  grid-template-rows: 52px auto minmax(0, 1fr);
   color: var(--ink);
   background: #fff;
   font-size: 13px;
 }
 
-/* ---------- Top bar ---------- */
+/* ---------- Top bar: identity, quiet context, Settings ---------- */
 
 .sg-topbar {
-  height: 56px;
+  height: 52px;
   padding: 0 14px;
   display: flex;
   align-items: center;
@@ -47,38 +47,17 @@
   font: 600 11px var(--mono);
   letter-spacing: 0.02em;
 }
-.sg-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-.sg-crumb {
-  padding: 6px 8px;
-  border-radius: 6px;
-  color: #aeb8ca;
-  font-size: 13px;
-  text-decoration: none;
-  transition: color var(--fast) var(--ease);
-}
-.sg-crumb:hover {
-  color: #fff;
-}
-.sg-crumb-separator {
-  color: #56647d;
-  font-size: 15px;
-}
-/* The current application is a text-style crumb that opens the switcher;
-   no select-box chrome at rest. */
+/* The application name opens the switcher; its repository sits beneath.
+   No select-box chrome at rest. */
 .sg-application-picker {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 320px;
-  height: 32px;
-  padding: 0 8px;
+  gap: 8px;
+  max-width: 360px;
+  height: 38px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 8px;
   color: #fff;
   background: transparent;
   cursor: pointer;
@@ -86,13 +65,27 @@
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
 }
+.sg-application-picker > span {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
 .sg-application-picker strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.01em;
+}
+.sg-application-picker small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #aeb8ca;
+  font-size: 11.5px;
+  line-height: 1.3;
 }
 .sg-application-picker svg {
   flex-shrink: 0;
@@ -116,22 +109,30 @@
   cursor: wait;
 }
 .sg-application-picker:focus-visible,
-.sg-crumb:focus-visible,
 .sg-brand:focus-visible,
-.sg-chip:focus-visible {
+.sg-settings-link:focus-visible {
   outline: 2px solid #b1c8ff;
   outline-offset: 3px;
 }
-.sg-environment-label {
+/* Environment and policy: saved Phase 1 facts, read as context. */
+.sg-topbar-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-left: 6px;
-  padding: 2px 8px;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 999px;
-  color: #d0d9e8;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
+  color: #aeb8ca;
+  font-size: 12px;
   white-space: nowrap;
+}
+.sg-topbar-context b {
+  color: #dce5f3;
+  font-weight: 500;
+}
+.sg-topbar-context i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #56647d;
 }
 
 /* Top-layer menu: the picker positions it on open (positionApplicationMenu);
@@ -248,21 +249,18 @@
   background: var(--red-soft);
 }
 
-.sg-topbar-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.sg-chip {
+/* Settings names the connection it needs in words; no colour-only dot. */
+.sg-settings-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 10px;
+  gap: 8px;
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
   border: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 7px;
+  border-radius: 8px;
   color: #dce5f3;
+  font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   text-decoration: none;
@@ -270,42 +268,15 @@
     background-color var(--fast) var(--ease),
     border-color var(--fast) var(--ease);
 }
-.sg-chip svg {
-  width: 14px;
-  height: 14px;
+.sg-settings-link svg {
+  width: 15px;
+  height: 15px;
   color: #aeb8ca;
   flex: none;
 }
-.sg-chip strong {
-  font-weight: 600;
-  color: #fff;
-}
-.sg-chip.status {
-  color: #d0d9e8;
-}
-.sg-chip.status.ready {
-  color: #8be0b8;
-  border-color: rgb(66 201 138 / 45%);
-}
-.sg-chip.status.ready svg {
-  color: #42c98a;
-}
-.sg-chip.status .sg-dot {
-  background: #e6a15c;
-}
-a.sg-chip:hover {
+.sg-settings-link:hover {
   border-color: rgb(255 255 255 / 30%);
   background: var(--navy-2);
-}
-.sg-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #e6a15c;
-  flex: none;
-}
-.sg-dot.ready {
-  background: #42c98a;
 }
 
 /* Section labels for record views and menus. */
@@ -1885,15 +1856,6 @@ a.sg-chip:hover {
 
 /* ---------- Phase 2: phase navigation, transition and the contract ---------- */
 
-.sg-phase-label {
-  margin-left: 6px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgb(255 255 255 / 10%);
-  color: #cad3e3;
-  font-size: 11px;
-  white-space: nowrap;
-}
 .sg-phase-button {
   display: flex;
   align-items: center;
@@ -2505,4 +2467,79 @@ a.sg-chip:hover {
 .sg-diff summary small {
   color: #536078;
   margin-left: 6px;
+}
+
+/* ---------- Saved contract versions ---------- */
+
+.sg-contract-history {
+  display: grid;
+  gap: 8px;
+}
+.sg-contract-history > .sg-text-button {
+  justify-self: start;
+  padding-inline: 4px;
+}
+.sg-contract-history > .sg-text-button svg {
+  transition: transform var(--fast) var(--ease);
+}
+.sg-contract-versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.sg-contract-versions > li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid #d6dee9;
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-contract-versions > li.current {
+  border-left-color: var(--blue);
+}
+.sg-contract-version-head {
+  display: grid;
+  gap: 1px;
+}
+.sg-contract-version-head strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.sg-contract-version-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sg-contract-versions p {
+  margin: 0;
+  color: var(--ink-2);
+}
+.sg-contract-versions ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink-2);
+}
+.sg-contract-versions ul li {
+  overflow-wrap: anywhere;
+}
+.sg-contract-versions a {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--blue-text);
+  text-decoration: none;
+}
+.sg-contract-versions a svg {
+  width: 11px;
+}
+.sg-contract-versions-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
