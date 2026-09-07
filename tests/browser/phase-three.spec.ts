@@ -378,6 +378,9 @@ test(
     await expect(record.getByText("Engine reachable")).toBeVisible({
       timeout: 15_000,
     });
+    await expect(
+      page.getByRole("button", { name: /^Environment.*Docker ready/ }),
+    ).toBeVisible();
     // The staged proposal is still there; nothing was launched by the recovery.
     await expect(
       record.locator('[data-proposal-status="published"]'),

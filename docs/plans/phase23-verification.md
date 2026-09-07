@@ -15,12 +15,12 @@ This is an acceptance record for the consolidated branch, not a claim that all f
 
 ## Checks completed
 
-- Complete application suite: **777 passed** (plus the subsequently added publication-revocation race test passed in the targeted 29-case Phase 3 run), with **15 Docker cases skipped** in the ordinary run.
+- Complete application suite: **778 passed**, with **15 Docker cases skipped** in the ordinary run.
 - Real Docker suite: **15 passed**, run separately with `SERVER_GUY_DOCKER_TESTS=1`.
 - Production build: passed. Existing dynamic Docker socket filesystem tracing warning remains; it is not a test or execution failure.
 - ESLint and complete Prettier check: passed.
-- Desktop browser Phase 2/3 journeys: five existing journeys passed after updating expectations for model-led inspection, deliberate revision adoption and shared checkpoint authorization. A separate run also verifies failed interactive preview startup.
-- Impeccable detector reported no findings for the added dialogs and integrated shell. Manual desktop review checked preparation and the setup-impact dialog; the real application proposal and its passing preview were also reviewed in the browser. Interactive owner confirmation remains pending.
+- Complete desktop browser suite: **32 passed**, including GitHub App consent/renewal/recovery, Phase 1–3, correction history and failed preview startup. Subsequent targeted Phase 3 checks cover the final run-label and Docker-status UI corrections.
+- Impeccable detector reported no findings for the added dialogs and integrated shell. Manual desktop review checked preparation and the setup-impact dialog; the real application proposal and its passing preview were also reviewed in the browser. Screenshot review corrected two inconsistent labels: proposed behavior checks and the current Docker status. Interactive owner confirmation remains pending.
 
 ## Real-provider observations
 

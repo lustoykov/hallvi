@@ -166,7 +166,11 @@ function RunCard({
           ·{" "}
           {run.acceptanceChecksVersion
             ? `behavior v${run.acceptanceChecksVersion}`
-            : "no behavior checks"}
+            : run.results.some(
+                  (result) => result.key === "behavior" && result.steps?.length,
+                )
+              ? "proposed behavior checks"
+              : "no behavior checks"}
           {run.imageDigest ? ` · image ${run.imageDigest.slice(-12)}` : ""} ·{" "}
           <LocalTime
             value={run.finishedAt ?? run.startedAt ?? run.createdAt}
@@ -864,6 +868,8 @@ export function ConformanceRuns({
  * another process's stale answer.
  */
 export function ConformanceEnvironment({
+  environment,
+  setEnvironment,
   application,
   conformance,
   busy,
@@ -871,6 +877,8 @@ export function ConformanceEnvironment({
   offerGrant,
   onAction,
 }: {
+  environment: ExecutionSetupStatus | null;
+  setEnvironment: (status: ExecutionSetupStatus) => void;
   application: ApplicationRecord;
   conformance: ConformanceView;
   busy: string | null;
@@ -879,21 +887,6 @@ export function ConformanceEnvironment({
   offerGrant: boolean;
   onAction: (action: ConformanceAction) => void;
 }) {
-  const [environment, setEnvironment] = useState<ExecutionSetupStatus | null>(
-    conformance.environment
-      ? {
-          environment: conformance.environment,
-          preparation: {
-            running: false,
-            message: null,
-            error: null,
-            finishedAt: null,
-          },
-          images: { runner: "", database: "" },
-          docs: { install: "", getDocker: "" },
-        }
-      : null,
-  );
   const [environmentBusy, setEnvironmentBusy] = useState<
     "check" | "prepare" | null
   >(null);
@@ -934,8 +927,8 @@ export function ConformanceEnvironment({
       active = false;
       window.clearTimeout(timer);
     };
-    // Only when this opens.
-  }, []);
+    // Only when this opens; the parent setter is stable.
+  }, [setEnvironment]);
   useEffect(() => {
     if (!environment?.preparation.running) return;
     const timer = window.setTimeout(() => {
@@ -945,7 +938,7 @@ export function ConformanceEnvironment({
         .catch(() => undefined);
     }, 1_500);
     return () => window.clearTimeout(timer);
-  }, [environment]);
+  }, [environment, setEnvironment]);
 
   return (
     <section

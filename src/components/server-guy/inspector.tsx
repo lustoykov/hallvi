@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import type { ExecutionSetupStatus } from "@/server/execution-setup";
 import type {
   ActivityEvent,
   GateCheck,
@@ -257,6 +258,9 @@ export function Inspector({
     : null;
   const contract = view.contract;
   const conformance = view.conformance;
+  const [executionStatus, setExecutionStatus] =
+    useState<ExecutionSetupStatus | null>(null);
+  const environment = executionStatus?.environment ?? conformance?.environment;
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const filterId = useId();
 
@@ -347,14 +351,14 @@ export function Inspector({
         key: "environment",
         title: "Environment",
         summary: `Docker ${
-          conformance.environment
-            ? conformance.environment.ready
+          environment
+            ? environment.ready
               ? "ready"
               : "needs attention"
             : "not checked"
         } · publishing ${conformance.grant ? "allowed" : "not allowed"}`,
         badge:
-          conformance.environment && !conformance.environment.ready
+          environment && !environment.ready
             ? { text: "Needs attention", tone: "attention" }
             : undefined,
         defaultOpen: true,
@@ -500,6 +504,8 @@ export function Inspector({
             )}
             {spec.key === "environment" && view.application && conformance && (
               <ConformanceEnvironment
+                environment={executionStatus}
+                setEnvironment={setExecutionStatus}
                 application={view.application}
                 busy={busy}
                 conformance={conformance}
