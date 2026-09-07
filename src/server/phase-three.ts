@@ -1,3 +1,4 @@
+import { duringApplicationOperation } from "./application-operations";
 // Phase 3, Make launch-ready: the brief, Pi's staged changes and previews,
 // approval and publication, external returns, the exact candidate and the
 // authoritative conformance run. The controller owns every source tree; a
@@ -934,6 +935,16 @@ export async function publishProposal(
   proposalId: string,
   signal?: AbortSignal,
 ) {
+  return duringApplicationOperation(applicationId, () =>
+    publishProposalImpl(applicationId, proposalId, signal),
+  );
+}
+
+async function publishProposalImpl(
+  applicationId: string,
+  proposalId: string,
+  signal?: AbortSignal,
+) {
   const { application, workspace, contract, proposal } = requireProposal(
     applicationId,
     proposalId,
@@ -1178,6 +1189,16 @@ async function returnedChanges(
  * rules apply. The worker's own report is never trusted for anything.
  */
 export async function returnExternalChange(
+  applicationId: string,
+  reference: string,
+  signal?: AbortSignal,
+) {
+  return duringApplicationOperation(applicationId, () =>
+    returnExternalChangeImpl(applicationId, reference),
+  );
+}
+
+async function returnExternalChangeImpl(
   applicationId: string,
   reference: string,
   signal?: AbortSignal,
@@ -1430,6 +1451,15 @@ async function verifyCandidateContents(
  * commits. The complete selected revision is checked against the proposal.
  */
 export async function refreshCandidate(
+  applicationId: string,
+  signal?: AbortSignal,
+) {
+  return duringApplicationOperation(applicationId, () =>
+    refreshCandidateImpl(applicationId),
+  );
+}
+
+async function refreshCandidateImpl(
   applicationId: string,
   signal?: AbortSignal,
 ) {
@@ -1778,6 +1808,15 @@ function recordedInstallationId(applicationId: string) {
  * change ends it because the grant names the connection.
  */
 export async function grantPublication(
+  applicationId: string,
+  signal?: AbortSignal,
+) {
+  return duringApplicationOperation(applicationId, () =>
+    grantPublicationImpl(applicationId),
+  );
+}
+
+async function grantPublicationImpl(
   applicationId: string,
   signal?: AbortSignal,
 ) {

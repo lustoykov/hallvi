@@ -92,7 +92,7 @@ export interface PhaseWorkspaceView extends PhaseWorkspaceRecord {
   name: string;
   deliverable: string;
   status: "in-progress" | "ready" | "completed";
-  /** Whether this is the application's current (latest) phase. */
+  /** Whether this is the application's current phase; later work can be paused. */
   current: boolean;
 }
 

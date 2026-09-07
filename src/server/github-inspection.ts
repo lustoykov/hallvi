@@ -81,6 +81,7 @@ export async function fetchRepositoryTree(
     .map((entry) => ({
       path: entry.path,
       type: entry.type as "blob" | "tree",
+      ...(entry.sha ? { sha: entry.sha } : {}),
       ...(entry.type === "blob" && entry.size !== undefined
         ? { size: entry.size }
         : {}),

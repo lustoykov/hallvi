@@ -15,7 +15,7 @@ export const PHASE_TWO_CHECKS = [
     key: "profile-resolved",
     label: "Supported application profile",
     definition:
-      "Server Guy selects a supported Application Profile by interpreting cited repository files at the selected commit. This is an assessment of applicable capabilities, not proof that the application builds or runs.",
+      "To pass, Server Guy must identify a supported Application Profile from cited repository files at the selected commit. This assesses applicable capabilities; it does not prove that the application builds or runs.",
   },
   {
     key: "contract-complete",

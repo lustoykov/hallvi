@@ -243,6 +243,31 @@ export function completeWorkspace(id: string, evidence: unknown) {
   );
 }
 
+/** Reopening retains the old deliverable as a historical Observation. */
+export function reopenWorkspace(id: string) {
+  const workspace = getWorkspaceById(id);
+  if (!workspace) throw new Error("Workspace not found.");
+  if (workspace.completedAt)
+    insertObservation({
+      applicationId: workspace.applicationId,
+      kind: "phase-completion-history",
+      status: "passed",
+      summary: `Retained ${workspace.phaseKey} completion before correction.`,
+      sourceLabel: "Earlier phase completion",
+      sourceUrl: null,
+      raw: {
+        workspaceId: id,
+        completedAt: workspace.completedAt,
+        evidence: workspace.deliverableEvidence,
+      },
+    });
+  db()
+    .update(phaseWorkspaces)
+    .set({ completedAt: null, deliverableEvidence: null })
+    .where(eq(phaseWorkspaces.id, id))
+    .run();
+}
+
 // Chats and messages
 
 export function insertChat(

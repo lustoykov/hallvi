@@ -41,6 +41,7 @@ import type {
 } from "./types";
 import { APPROVAL_MODES } from "./types";
 import {
+  currentWorkspace,
   loadApplication,
   loadChat,
   NotFoundError,
@@ -140,7 +141,7 @@ function workspaceView(
     deliverable: phase.deliverable,
     status: workspace.completedAt
       ? "completed"
-      : checks.every((check) => check.status === "passed")
+      : current && checks.every((check) => check.status === "passed")
         ? "ready"
         : "in-progress",
     current,
@@ -222,7 +223,7 @@ export const getPhaseOneOperatorView = getOperatorView;
 export function listApplicationSummaries() {
   return listApplications().map((application) => {
     const workspaces = listWorkspaces(application.id);
-    const current = workspaces.at(-1)!;
+    const current = currentWorkspace(workspaces)!;
     const { checks } = evaluatePhase(application, current, workspaces);
     return {
       application,

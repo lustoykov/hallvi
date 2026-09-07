@@ -256,6 +256,7 @@ export interface InspectedTreeEntry {
   path: string;
   type: "blob" | "tree";
   size?: number;
+  sha?: string;
 }
 
 /** A supported capability selected by Pi from cited repository evidence.

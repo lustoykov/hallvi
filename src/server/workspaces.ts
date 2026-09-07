@@ -24,9 +24,15 @@ export function primaryChatTitle(key: PhaseKey) {
   return phaseDefinition(key).deliverable;
 }
 
+export function currentWorkspace(workspaces: PhaseWorkspaceRecord[]) {
+  return (
+    workspaces.find((workspace) => !workspace.completedAt) ?? workspaces.at(-1)
+  );
+}
+
 /**
  * An application with every phase workspace it has. The current workspace is
- * the latest one; earlier workspaces are completed history.
+ * the earliest unfinished phase; later work pauses during a correction.
  */
 export function loadApplication(applicationId: string): {
   application: ApplicationRecord;
@@ -35,7 +41,7 @@ export function loadApplication(applicationId: string): {
 } {
   const application = getApplication(applicationId);
   const workspaces = application ? listWorkspaces(application.id) : [];
-  const current = workspaces.at(-1);
+  const current = currentWorkspace(workspaces);
   if (!application || !current)
     throw new NotFoundError("Application not found.");
   return { application, workspaces, current };
@@ -64,6 +70,11 @@ export function chatReadOnlyReason(
   if (chat.archivedAt) return "This Chat is archived.";
   if (workspace.completedAt)
     return `Phase ${phaseDefinition(workspace.phaseKey).number} is complete; its chats are read-only.`;
+  if (
+    currentWorkspace(listWorkspaces(workspace.applicationId))?.id !==
+    workspace.id
+  )
+    return "An earlier phase is being reviewed. Complete it before continuing here.";
   return null;
 }
 

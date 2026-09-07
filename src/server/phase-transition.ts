@@ -5,6 +5,7 @@ import {
   insertChat,
   insertMessage,
   insertWorkspace,
+  listChats,
   withTransaction,
 } from "./db";
 import { getOperatorView } from "./operator-view";
@@ -147,7 +148,7 @@ export function completeInspectApp(applicationId: string) {
     const existing = workspaces.find(
       (workspace) => workspace.phaseKey === PHASE_THREE.key,
     );
-    if (existing)
+    if (existing && current.phaseKey !== PHASE_TWO.key)
       return { application, workspace: existing, created: false as const };
     if (current.phaseKey !== PHASE_TWO.key || current.completedAt)
       throw new Error("The Inspect app phase is not the current phase.");
@@ -192,12 +193,12 @@ export function completeInspectApp(applicationId: string) {
     };
     if (!completeWorkspace(current.id, retained))
       throw new Error("The Inspect app phase was already completed.");
-    const workspace = insertWorkspace(application.id, PHASE_THREE.key);
-    const chat = insertChat(
-      workspace.id,
-      primaryChatTitle(PHASE_THREE.key),
-      true,
-    );
+    const workspace =
+      existing ?? insertWorkspace(application.id, PHASE_THREE.key);
+    const chat =
+      listChats(workspace.id).find(
+        (item) => item.isPrimary && !item.archivedAt,
+      ) ?? insertChat(workspace.id, primaryChatTitle(PHASE_THREE.key), true);
     const gaps = contractGapReport(contract.body);
     const required = gaps.conformance.length;
     insertMessage(

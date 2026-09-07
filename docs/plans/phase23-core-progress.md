@@ -30,6 +30,10 @@
 
 ## Integration notes
 
+The user accepted Fable's prototype recommendation: A's top bar, C's current-step bar and outline Record, A's detailed-evidence drawer, and B's reply reference lines without duplicate actions. See the accepted experience direction in `phase23-followups.md`. Fable's local branch is now at `abf40ed`, verified clean: the current-step bar, outline Record, reply references, compact environment status and explicit demo labels are implemented. The prototype is removed from that branch. Fable reports 759 passing unit/integration tests and 19 synthetic browser journeys; those are not integrated-branch or real-provider acceptance. The profile-check definition now explicitly describes the condition for passing rather than implying a blocked check has already succeeded. The source-only Activity wording fix is already in the core branch.
+
+Fable's next integration depends on core preparation, preview/acceptance and correction interfaces. Its shared browser specifications now use the Record complementary landmark, named section regions, page-level decision buttons and non-clickable demo citation labels. Preserve those changes when integrating; reconcile their expectations with the new model-led inspection and application-image execution behavior. Do not treat Fable's existing workflow stages as the final shared-branch/preview lifecycle.
+
 Fable continues to own the experience worktree. The existing data shapes remain available; profile resolution can now be `pending`, GitHub setup's retired `detected` entry is always empty, and the contract may include `imageBuild`. There are no new preview or correction endpoints yet; do not present fixtures for those surfaces as completed functionality.
 
 The image builder supports repository-selected build recipes independently of runtime profile. The current conformance checks still support the simple Python/uv/PostgreSQL case; this checkpoint does not claim Next.js, TanStack, arbitrary services or private registry support. Interactive preview will need to retain its exact image; ordinary conformance runs currently remove their temporary image tag after checks finish.

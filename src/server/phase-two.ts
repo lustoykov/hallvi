@@ -286,12 +286,21 @@ async function performInspection(
   workspace: PhaseWorkspaceRecord,
 ): Promise<Observation> {
   const checkedAt = new Date().toISOString();
+  const previousInspection = latestInspection(application.id);
+  const selected = inspectionRaw(previousInspection).commitSha;
   const name = fullName(application);
   const record = (
     status: Observation["status"],
     summary: string,
     raw: InspectionRaw,
   ) => {
+    if (
+      latestInspection(application.id)?.id !== previousInspection?.id ||
+      loadApplication(application.id).current.id !== workspace.id
+    )
+      throw new Error(
+        "The selected revision or phase changed during inspection. Run it again.",
+      );
     const observation = insertObservation({
       applicationId: application.id,
       kind: INSPECTION_OBSERVATION,
@@ -327,9 +336,14 @@ async function performInspection(
     return record(
       identity.status,
       `Repository inspection did not pass: ${identity.summary}`,
-      { connectionId: identity.raw.connectionId, error: identity.raw.error },
+      {
+        ...inspectionRaw(previousInspection),
+        connectionId: identity.raw.connectionId,
+        error: identity.raw.error,
+      },
     );
-  const { commitSha, connectionId, defaultBranch, repositoryId } = identity.raw;
+  const { connectionId, defaultBranch, repositoryId } = identity.raw;
+  const commitSha = selected ?? identity.raw.commitSha;
   if (!commitSha || !connectionId)
     return record(
       "unavailable",
@@ -372,7 +386,7 @@ async function performInspection(
 }
 
 /**
- * Pins the default branch to an exact commit and records the bounded tree.
+ * First inspection selects the default branch commit; reruns keep that commit.
  * All file choices belong to Pi during a Run. Concurrent requests share
  * one inspection.
  */

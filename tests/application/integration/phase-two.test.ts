@@ -39,12 +39,17 @@ import {
 import * as phaseOne from "../../../src/server/phase-one";
 import {
   completeLaunchBrief,
+  completeInspectApp,
   INSPECTION_REQUEST,
 } from "../../../src/server/phase-transition";
 import {
   inspectRepository,
   repositoryEvidence,
 } from "../../../src/server/phase-two";
+import {
+  previewRevisionCorrection,
+  applyRevisionCorrection,
+} from "../../../src/server/revision-correction";
 import * as runs from "../../../src/server/pi-runs";
 import { executePiRun } from "../../../src/server/pi-worker";
 import {
@@ -950,7 +955,7 @@ describe("Pi's adaptive inspection through the real SDK tool loop", () => {
     expect(store.listContracts(app.id)).toHaveLength(3);
   }, 30_000);
 
-  it("fails the attempt and saves nothing when a re-inspection changes the commit under a citation-free revision", async () => {
+  it("fails the attempt if stored inspection changes under a citation-free revision", async () => {
     const app = await inspected();
     expect((await work()).status).toBe("succeeded");
     const first = contractOf(app.id)!;
@@ -972,12 +977,21 @@ describe("Pi's adaptive inspection through the real SDK tool loop", () => {
     });
     const holding = executePiRun(runs.claimNextPiRun()!);
     await reached;
-    // The proposal is staged at the first commit. A push and a re-inspection
-    // from the check drawer pin a new one before the Run finishes.
+    // Defence in depth: inject a concurrent stored revision change. The user
+    // correction operation separately refuses to do this during a Run.
     github.revision = "2";
     const later = await inspectRepository(app.id);
     expect(later.status).toBe("passed");
     const secondCommit = fixtureCommitSha("qa/fastapi-app", "2");
+    store.insertObservation({
+      applicationId: app.id,
+      kind: later.kind,
+      status: later.status,
+      summary: later.summary,
+      sourceLabel: later.sourceLabel,
+      sourceUrl: later.sourceUrl,
+      raw: { ...(later.raw as object), commitSha: secondCommit },
+    });
     expect(repositoryEvidence(app.id).commitSha).toBe(secondCommit);
     pause.release!();
     await holding;
@@ -1067,11 +1081,18 @@ describe("invalidation, isolation and removal", () => {
     ).toBe(false);
   }, 30_000);
 
-  it("marks the contract stale when a re-inspection pins a new commit, and Phase 1 stays as recorded", async () => {
+  it("adopts a new commit only through reviewed impact, and Phase 1 stays as recorded", async () => {
     const app = await inspected();
     expect((await work()).status).toBe("succeeded");
     github.revision = "2";
     await inspectRepository(app.id);
+    expect(repositoryEvidence(app.id).commitSha).toBe(
+      fixtureCommitSha("qa/fastapi-app"),
+    );
+    const impact = await previewRevisionCorrection(app.id, {
+      reference: "main",
+    });
+    applyRevisionCorrection(app.id, { impactId: impact.id });
     const view = getOperatorView(app.id);
     expect(view.checks.map((c) => c.status)).toEqual([
       "not-yet",
@@ -1116,4 +1137,114 @@ describe("invalidation, isolation and removal", () => {
     expect(store.listWorkspaces(other.id)).toHaveLength(2);
     expect(repositoryEvidence(other.id).inspection).not.toBeNull();
   }, 30_000);
+});
+
+describe("explicit revision correction", () => {
+  it("previews without changing state, applies the reviewed SHA despite later pushes, and resumes the existing phase", async () => {
+    const app = await inspected();
+    await work();
+    const phase3 = completeInspectApp(app.id);
+    const priorChat = phase3.selectedChatId!;
+    const oldContract = contractOf(app.id)!;
+    github.revision = "2";
+    const impact = await previewRevisionCorrection(app.id, {
+      reference: "main",
+    });
+    expect(getOperatorView(app.id).workspace?.phaseKey).toBe(
+      "make-launch-ready",
+    );
+    expect(impact.required).toHaveLength(3);
+    github.revision = "3";
+    const adopted = applyRevisionCorrection(app.id, { impactId: impact.id });
+    expect(adopted.commitSha).toBe(fixtureCommitSha("qa/fastapi-app", "2"));
+    expect(getOperatorView(app.id).workspace?.phaseKey).toBe("inspect-app");
+    expect(store.getContract(oldContract.id)).not.toBeNull();
+    expect(
+      store
+        .listObservations(app.id)
+        .some((o) => o.kind === "phase-completion-history"),
+    ).toBe(true);
+    expect(() =>
+      runs.sendChatMessage(app.id, priorChat, "continue", randomUUID()),
+    ).toThrow("earlier phase");
+    expect(applyRevisionCorrection(app.id, { impactId: impact.id })).toEqual(
+      adopted,
+    );
+    expect(
+      feed(app.workspaceId).filter((kind) => kind === "revision-changed"),
+    ).toHaveLength(1);
+    runs.sendChatMessage(
+      app.id,
+      app.chatId,
+      "contract: correct /healthz",
+      randomUUID(),
+    );
+    await work();
+    const resumed = completeInspectApp(app.id);
+    expect(resumed.selectedChatId).toBe(priorChat);
+    expect(store.listWorkspaces(app.id)).toHaveLength(3);
+  });
+
+  it("rejects changed base state, expired impact, another application's impact and pending work", async () => {
+    const app = await inspected();
+    await work();
+    github.revision = "2";
+    const impact = await previewRevisionCorrection(app.id, {
+      reference: "main",
+    });
+    const other = await application("another-app");
+    expect(() =>
+      applyRevisionCorrection(other.id, { impactId: impact.id }),
+    ).toThrow("not found");
+    runs.sendChatMessage(
+      app.id,
+      app.chatId,
+      "contract: correct /healthz",
+      randomUUID(),
+    );
+    expect(() =>
+      applyRevisionCorrection(app.id, { impactId: impact.id }),
+    ).toThrow("current work");
+    await work();
+    expect(() =>
+      applyRevisionCorrection(app.id, { impactId: impact.id }),
+    ).toThrow("out of date");
+    const fresh = await previewRevisionCorrection(app.id, {
+      reference: "main",
+    });
+    const clock = vi
+      .spyOn(Date, "now")
+      .mockReturnValue(Date.parse(fresh.expiresAt) + 1);
+    try {
+      expect(() =>
+        applyRevisionCorrection(app.id, { impactId: fresh.id }),
+      ).toThrow("out of date");
+    } finally {
+      clock.mockRestore();
+    }
+    saveGithubConnection(login(SECOND));
+    expect(() =>
+      applyRevisionCorrection(app.id, { impactId: fresh.id }),
+    ).toThrow("out of date");
+  });
+
+  it("retains the selected commit after an unavailable inspection and refuses a provider failure during impact", async () => {
+    const app = await inspected();
+    await work();
+    github.revision = "2";
+    github.failing = [/\/commits\//];
+    expect((await inspectRepository(app.id)).status).toBe("unavailable");
+    github.failing = [];
+    await inspectRepository(app.id);
+    expect(repositoryEvidence(app.id).commitSha).toBe(
+      fixtureCommitSha("qa/fastapi-app"),
+    );
+    github.failing = [/\/git\/trees\//];
+    await expect(
+      previewRevisionCorrection(app.id, { reference: "main" }),
+    ).rejects.toThrow();
+    expect(repositoryEvidence(app.id).commitSha).toBe(
+      fixtureCommitSha("qa/fastapi-app"),
+    );
+  });
 });

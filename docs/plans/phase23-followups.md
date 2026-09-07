@@ -7,7 +7,7 @@ Agreed after the PR #19/#20 walkthrough, 2026-09-07. This is the implementation 
 Both workstreams start from PR20 head `c76b4a851c1a3e4609abdcfe9d44b8a710a14582`, which already includes PR19. Keep both existing PR branches unchanged during parallel implementation. Integrate reviewed follow-ups into the stack only after validation; do not merge anything into main automatically.
 
 - Codex: `codex/phase23-core-followups`, `/private/tmp/server-guy-phase23-core` (created).
-- Fable: `codex/phase23-experience-followups`, separate worktree, to be created by Fable.
+- Fable: `codex/phase23-experience-followups`, `/private/tmp/server-guy-phase23-experience` (created).
 - User forwards the Fable prompt. No task or message has been dispatched to Fable.
 
 ## Codex workstream
@@ -79,6 +79,13 @@ Detailed source notes remain at `/Users/aiwithlyubomir/.codex/visualizations/202
 
 No marketplace implementation, arbitrary microservice orchestration, all-stack support claim, actual production provisioning, automatic merge policy, extra trace persistence, or broad compatibility work. Development database recreation is acceptable; do not delete an existing user database casually.
 
-## User clarification: action placement
+## Accepted experience direction after Fable's prototype
 
-The rest of the split is accepted. Putting actions in Chat is not settled: Fable should compare placement options in the prototype and recommend a coherent workflow. Discoverable next actions, context and authoritative current state are the requirements; a specific screen location is not. Existing references to chat cards in earlier notes describe one candidate design, not an instruction to choose it.
+On 2026-09-07, the user shared Fable's recap and confirmed agreement with its recommendations. This settles the previously open right-column and action-placement choices:
+
+- Keep Variant A's production top bar and quieter buttons, with one solid primary action at a time.
+- Use Variant C as the workflow base: a persistent current-step bar above the transcript, including the Phase 3 stage sequence, and an outline Record with Checks, Contract and saved versions, Change and behavior checks, Runs, Environment, and History.
+- Borrow Variant A's drawer for detailed evidence and Variant B's small reference line under replies. References point to the authoritative action; they do not duplicate buttons or approval state in Chat.
+- Fable owns production integration, the compact Docker status line, and a server-provided demo indicator. Remove the prototype from the production branch once integrated; retain it on the prototype branch.
+
+Verified local experience HEAD at the time of this update: `7427709`. Its current-step model, history route, saved-version control and top bar are present; the recommended complete layout is still follow-up work. Fable reports passing synthetic browser journeys and other checks, not real Pi/GitHub/Docker acceptance. Core preparation, preview and correction operations remain separate unfinished dependencies.
