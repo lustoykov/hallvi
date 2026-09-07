@@ -1,13 +1,10 @@
 "use client";
 
 import {
-  ArrowClockwise,
-  ArrowRight,
   ArrowSquareOut,
   Check,
   Copy,
   GitPullRequest,
-  Play,
   SpinnerGap,
   Warning,
   X,
@@ -26,8 +23,11 @@ import type {
 
 import { api } from "./api";
 import { ExecutionEnvironmentCard } from "./execution-setup-screen";
+import { ExternalLink } from "./external-link";
 import { LocalTime } from "./local-time";
 
+/** Every Phase 3 operation the shell can run; the current-step bar and the
+ * Record both dispatch these, never a second store. */
 export type ConformanceAction =
   | { type: "continue" }
   | { type: "return"; reference: string }
@@ -49,7 +49,10 @@ const OUTCOME_LABELS: Record<ConformanceCheckResult["outcome"], string> = {
   "not-applicable": "Not applicable",
 };
 
-const STATUS_LABELS: Record<ConformanceProposalRecord["status"], string> = {
+export const PROPOSAL_STATUS_LABELS: Record<
+  ConformanceProposalRecord["status"],
+  string
+> = {
   proposed: "Waiting for your approval",
   approved: "Approved · not published yet",
   published: "Published",
@@ -61,21 +64,21 @@ function short(sha: string | null | undefined) {
   return sha?.slice(0, 8) ?? "unknown";
 }
 
+type Definitions = NonNullable<
+  ConformanceView["brief"]
+>["acceptance"]["checks"];
+
 function CheckResults({
   results,
   definitions,
 }: {
   results: ConformanceCheckResult[];
-  definitions: ConformanceView["brief"] extends infer B
-    ? B extends { acceptance: { checks: infer C } }
-      ? C
-      : never
-    : never;
+  definitions: Definitions;
 }) {
   return (
     <ul className="sg-check-results">
       {results.map((result) => {
-        const definition = definitions?.find((item) => item.key === result.key);
+        const definition = definitions.find((item) => item.key === result.key);
         return (
           <li key={result.key} data-check={result.key}>
             <div className="sg-check-result-row">
@@ -135,15 +138,11 @@ function CheckResults({
 function RunCard({
   run,
   title,
-  busy,
   definitions,
-  onCancel,
 }: {
   run: ConformanceRunRecord;
   title: string;
-  busy: boolean;
-  definitions: Parameters<typeof CheckResults>[0]["definitions"];
-  onCancel?: () => void;
+  definitions: Definitions;
 }) {
   const active = run.status === "queued" || run.status === "running";
   return (
@@ -190,16 +189,6 @@ function RunCard({
         >
           Raw run <ArrowSquareOut aria-hidden="true" />
         </a>
-        {active && onCancel && (
-          <button
-            className="sg-secondary-button"
-            disabled={busy}
-            onClick={onCancel}
-            type="button"
-          >
-            <X aria-hidden="true" weight="bold" /> Cancel run
-          </button>
-        )}
       </div>
     </article>
   );
@@ -266,14 +255,216 @@ function ProposalDiff({ proposalId }: { proposalId: string }) {
   );
 }
 
+function ProposalBlock({
+  application,
+  conformance,
+  proposal,
+  current,
+}: {
+  application: ApplicationRecord;
+  conformance: ConformanceView;
+  proposal: ConformanceProposalRecord;
+  current: boolean;
+}) {
+  const [showDiff, setShowDiff] = useState(false);
+  const previewFor = conformance.runs.find(
+    (run) =>
+      run.kind === "preview" &&
+      run.source.overlayDigest === proposal.filesDigest,
+  );
+  const pullUrl =
+    proposal.publication?.pullRequestUrl ??
+    proposal.external?.pullRequestUrl ??
+    null;
+  const pullState =
+    proposal.publication?.state ?? proposal.external?.state ?? null;
+  const replaced = !current || proposal.status === "superseded";
+  return (
+    <div
+      className={`sg-conformance-proposal${replaced ? " replaced" : ""}`}
+      data-proposal-status={proposal.status}
+      data-proposal-origin={proposal.origin}
+    >
+      <div className="sg-contract-heading">
+        <strong>
+          {proposal.origin === "no-change"
+            ? "No change required"
+            : proposal.origin === "external"
+              ? "Returned change"
+              : "Proposed change"}{" "}
+          · {replaced ? "Replaced" : PROPOSAL_STATUS_LABELS[proposal.status]}
+        </strong>
+        <span>
+          base {short(proposal.baseSha)} · contract v{proposal.contractVersion}{" "}
+          · <LocalTime value={proposal.createdAt} variant="compact" /> ·{" "}
+          <a
+            href={`/api/conformance/proposals/${proposal.id}`}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Record <ArrowSquareOut aria-hidden="true" />
+          </a>
+        </span>
+      </div>
+      {replaced && (
+        <p className="sg-conformance-replaced">
+          <Warning aria-hidden="true" weight="bold" /> This proposal was
+          replaced. Its approval no longer applies; the current proposal is
+          reviewed instead.
+        </p>
+      )}
+      <p className="sg-contract-summary">{proposal.summary}</p>
+      {proposal.changes.length > 0 && (
+        <>
+          <ul className="sg-changed-files">
+            {proposal.changes.map((change) => (
+              <li key={change.path}>
+                <code>{change.path}</code>
+                {change.content === null ? (
+                  <small>deleted</small>
+                ) : change.baseObservationId ? null : (
+                  <small>new</small>
+                )}
+              </li>
+            ))}
+          </ul>
+          <button
+            className="sg-text-button"
+            onClick={() => setShowDiff((value) => !value)}
+            type="button"
+          >
+            {showDiff
+              ? "Hide diff"
+              : `Show complete diff (${proposal.changes.length} file${proposal.changes.length === 1 ? "" : "s"})`}
+          </button>
+          {showDiff && <ProposalDiff proposalId={proposal.id} />}
+        </>
+      )}
+      {proposal.mapping.length > 0 && (
+        <div className="sg-conformance-mapping">
+          <span className="sg-eyebrow">Required change → files</span>
+          <ul>
+            {proposal.mapping.map((entry) => (
+              <li key={entry.field}>
+                <b>{entry.field}</b> → {entry.paths.join(", ")}{" "}
+                <i>{entry.explanation}</i>
+              </li>
+            ))}
+          </ul>
+          {proposal.origin === "external" && (
+            <small>
+              Mapping for a returned change is established by the conformance
+              run, not by the worker&apos;s report.
+            </small>
+          )}
+        </div>
+      )}
+      {proposal.origin === "server-guy" && current && (
+        <p
+          className={`sg-conformance-preview ${previewFor ? previewFor.status : "untested"}`}
+          data-preview={previewFor ? previewFor.status : "untested"}
+        >
+          {previewFor ? (
+            <>
+              Preview {previewFor.status} over this exact change (tree{" "}
+              {short(previewFor.source.treeDigest)}) ·{" "}
+              <LocalTime
+                value={previewFor.finishedAt ?? previewFor.createdAt}
+                variant="compact"
+              />{" "}
+              · worker evidence, not the gate
+            </>
+          ) : (
+            <>
+              Untested since last edit: no preview ran over this exact change.
+            </>
+          )}
+        </p>
+      )}
+      {proposal.verification && !proposal.verification.scope.ok && (
+        <div className="sg-contract-gaps blocked">
+          <strong>Out of scope</strong>
+          <ul>
+            {proposal.verification.scope.violations.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {proposal.verification &&
+        proposal.candidate &&
+        !proposal.verification.changesComplete && (
+          <div className="sg-contract-gaps blocked">
+            <strong>The candidate differs from the reviewed change</strong>
+            <ul>
+              {proposal.verification.differences.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      {proposal.publicationError && (
+        <p className="sg-error" role="alert">
+          Publication did not complete: {proposal.publicationError}
+        </p>
+      )}
+      {pullUrl && (
+        <p className="sg-conformance-pull">
+          <GitPullRequest aria-hidden="true" />{" "}
+          <ExternalLink href={pullUrl}>
+            {proposal.publication
+              ? `${proposal.publication.branch} · pull request #${proposal.publication.pullRequestNumber}`
+              : `pull request #${proposal.external?.pullRequestNumber}`}
+          </ExternalLink>{" "}
+          {pullState ? `· ${pullState}` : ""}
+          {proposal.publication?.adopted
+            ? " · adopted from an earlier attempt"
+            : ""}
+          {pullState === "open"
+            ? " · merge it on GitHub, then refresh; an unmerged head gets preview results only"
+            : ""}
+        </p>
+      )}
+      {proposal.external && !pullUrl && (
+        <p className="sg-conformance-pull">
+          Returned {proposal.external.reference} →{" "}
+          {short(proposal.external.headSha)}
+          {proposal.external.branch ? ` (${proposal.external.branch})` : ""}
+        </p>
+      )}
+      {proposal.candidate && (
+        <p
+          className="sg-conformance-candidate"
+          data-candidate={proposal.candidate.sha}
+        >
+          <Check aria-hidden="true" weight="bold" /> Candidate revision{" "}
+          <ExternalLink
+            href={`${application.repositoryUrl}/commit/${proposal.candidate.sha}`}
+          >
+            {short(proposal.candidate.sha)}
+          </ExternalLink>{" "}
+          on {proposal.candidate.defaultBranch} ·{" "}
+          {proposal.candidate.source === "contract-commit"
+            ? "the contract commit"
+            : proposal.candidate.merge
+              ? `pull request #${proposal.candidate.merge.pullRequestNumber} merged (${proposal.candidate.merge.method})`
+              : "returned change on the default branch"}{" "}
+          ·{" "}
+          <LocalTime value={proposal.candidate.resolvedAt} variant="compact" />
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
- * The Conformance Result as it stands: the brief, the working environment
- * choice, the execution prerequisite, the proposed change with its diff and
- * mapping, approval and publication, the exact candidate, and every run's
- * per-check evidence. Everything renders from records; nothing here is a
- * model's claim.
+ * The change and its behavior checks as they stand: the brief and its
+ * required changes, the behavior checks and their acceptance, the current
+ * proposal with its diff, publication and candidate, earlier proposals marked
+ * as replaced, and the other ways to do the work. Decisions are taken in the
+ * current-step bar; everything here renders from records.
  */
-export function ConformanceRecord({
+export function ConformanceChange({
   application,
   conformance,
   approvalMode,
@@ -288,105 +479,20 @@ export function ConformanceRecord({
   readOnly: boolean;
   onAction: (action: ConformanceAction) => void;
 }) {
-  const {
-    brief,
-    proposal,
-    acceptance,
-    proposedAcceptance,
-    grant,
-    latestCandidateRun,
-  } = conformance;
+  const { brief, proposal, acceptance, proposedAcceptance } = conformance;
   const [exported, setExported] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [reference, setReference] = useState("");
-  const [showDiff, setShowDiff] = useState(false);
-  const [environment, setEnvironment] = useState<ExecutionSetupStatus | null>(
-    conformance.environment
-      ? {
-          environment: conformance.environment,
-          preparation: {
-            running: false,
-            message: null,
-            error: null,
-            finishedAt: null,
-          },
-          images: { runner: "", database: "" },
-          docs: { install: "", getDocker: "" },
-        }
-      : null,
-  );
-  const [environmentBusy, setEnvironmentBusy] = useState<
-    "check" | "prepare" | null
-  >(null);
-  const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const disabled = busy !== null || readOnly;
-  const definitions = brief?.acceptance.checks ?? [];
-  const running =
-    conformance.runs.find(
-      (run) => run.status === "running" || run.status === "queued",
-    ) ?? null;
-  const previewFor = conformance.runs.find(
-    (run) =>
-      run.kind === "preview" &&
-      proposal &&
-      run.source.overlayDigest === proposal.filesDigest,
-  );
-
-  async function checkEnvironment(action: "check" | "prepare") {
-    setEnvironmentBusy(action);
-    setEnvironmentError(null);
-    try {
-      setEnvironment(await api.executionSetup(action));
-    } catch (caught) {
-      setEnvironmentError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not check the execution environment.",
-      );
-    } finally {
-      setEnvironmentBusy(null);
-    }
-  }
-  // The prerequisite is checked once when the Record opens, so the card
-  // never shows another process's stale answer; the engineer re-checks
-  // explicitly after fixing it.
-  useEffect(() => {
-    let active = true;
-    const timer = window.setTimeout(() => {
-      setEnvironmentBusy("check");
-      api
-        .executionSetup("check")
-        .then((status) => {
-          if (active) setEnvironment(status);
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          if (active) setEnvironmentBusy(null);
-        });
-    }, 0);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-    // Only when the Record opens.
-  }, []);
-  useEffect(() => {
-    if (!environment?.preparation.running) return;
-    const timer = window.setTimeout(() => {
-      api
-        .executionSetup()
-        .then(setEnvironment)
-        .catch(() => undefined);
-    }, 1_500);
-    return () => window.clearTimeout(timer);
-  }, [environment]);
 
   async function exportBrief() {
     try {
+      setExportError(null);
       const { text } = await api.conformance(application.id).exportBrief();
       setExported(text);
     } catch (caught) {
-      setEnvironmentError(
+      setExportError(
         caught instanceof Error
           ? caught.message
           : "Could not export the brief.",
@@ -396,10 +502,7 @@ export function ConformanceRecord({
 
   if (!brief)
     return (
-      <section
-        className="sg-record-section sg-conformance"
-        aria-label="Conformance Result"
-      >
+      <section className="sg-record-section-inner sg-conformance">
         <p className="sg-contract-empty">
           {conformance.contractBlocked ??
             "Complete Inspect app before conformance work can start."}
@@ -407,19 +510,14 @@ export function ConformanceRecord({
       </section>
     );
 
-  const canContinue = !readOnly && !running;
-  const environmentReady = environment?.environment?.ready ?? false;
-  const pullUrl =
-    proposal?.publication?.pullRequestUrl ??
-    proposal?.external?.pullRequestUrl ??
-    null;
-  const pullState =
-    proposal?.publication?.state ?? proposal?.external?.state ?? null;
+  const earlier = conformance.proposals.filter(
+    (item) => item.id !== proposal?.id,
+  );
 
   return (
     <section
-      className="sg-record-section sg-conformance"
-      aria-label="Conformance Result"
+      className="sg-record-section-inner sg-conformance"
+      aria-label="Change and behavior checks"
     >
       {conformance.contractBlocked && (
         <div className="sg-contract-gaps blocked">
@@ -432,14 +530,11 @@ export function ConformanceRecord({
         <div className="sg-contract-heading">
           <strong>Conformance brief · base {short(brief.baseSha)}</strong>
           <span>
-            <a
+            <ExternalLink
               href={`${application.repositoryUrl}/tree/${brief.baseSha}`}
-              rel="noreferrer"
-              target="_blank"
             >
-              {brief.repository.owner}/{brief.repository.name}{" "}
-              <ArrowSquareOut aria-hidden="true" />
-            </a>{" "}
+              {brief.repository.owner}/{brief.repository.name}
+            </ExternalLink>{" "}
             · Application Contract v{brief.contract.version} ·{" "}
             {brief.contract.profileLabel} v{brief.contract.profileVersion}
           </span>
@@ -563,51 +658,62 @@ export function ConformanceRecord({
           </ul>
         )}
         {proposedAcceptance && (
-          <div className="sg-conformance-actions">
-            <span>
-              Proposed v{proposedAcceptance.version}:{" "}
-              {proposedAcceptance.rationale}
-            </span>
-            <button
-              className="sg-primary-button"
-              disabled={disabled}
-              onClick={() =>
-                onAction({
-                  type: "accept-checks",
-                  acceptanceId: proposedAcceptance.id,
-                })
-              }
-              type="button"
-            >
-              <Check aria-hidden="true" weight="bold" /> Accept behavior checks
-              v{proposedAcceptance.version}
-            </button>
-          </div>
+          <p className="sg-conformance-note">
+            Proposed v{proposedAcceptance.version}:{" "}
+            {proposedAcceptance.rationale} Accepting the test plan is separate
+            from approving the code; accept it above the chat.
+          </p>
         )}
       </div>
 
-      {(!proposal || proposal.origin === "no-change") && (
+      {proposal && (
+        <ProposalBlock
+          application={application}
+          conformance={conformance}
+          proposal={proposal}
+          current
+        />
+      )}
+      {earlier.length > 0 && (
+        <details className="sg-conformance-earlier">
+          <summary>
+            Earlier proposals ({earlier.length}) · replaced or withdrawn
+          </summary>
+          {earlier.map((item) => (
+            <ProposalBlock
+              application={application}
+              conformance={conformance}
+              current={false}
+              key={item.id}
+              proposal={item}
+            />
+          ))}
+        </details>
+      )}
+      {proposal && (
+        <p className="sg-conformance-note">
+          Server Guy publishes a reviewable branch and pull request under the{" "}
+          <b>
+            {approvalMode === "always-ask"
+              ? "Always ask"
+              : approvalMode === "full-autonomy"
+                ? "Full autonomy"
+                : "Let Server Guy decide"}
+          </b>{" "}
+          policy; merging is yours on GitHub in every policy. After the merge,
+          Refresh records the exact merged revision as the candidate.
+        </p>
+      )}
+
+      {(!proposal || proposal.origin === "no-change") && !readOnly && (
         <div className="sg-conformance-choice">
-          <span className="sg-eyebrow">Working environment</span>
+          <span className="sg-eyebrow">Other ways to do the work</span>
           <p>
             {proposal?.origin === "no-change"
-              ? "No source change is required. Continue with Server Guy (recommended) to propose the behavior checks from the routes it reads and preview the current revision, or return a change made elsewhere."
-              : "Continue with Server Guy (recommended): it reads the repository, stages the change, verifies it in an isolated preview and proposes the behavior checks. Or export the same brief for Codex, Claude, another harness or manual work, then return the change."}
+              ? "No source change is required. Server Guy proposes the behavior checks from the routes it reads and previews the current revision; or return a change made elsewhere."
+              : "Continue with Server Guy above the chat, or export the same brief for Codex, Claude, another harness or manual work, then return the change here."}
           </p>
           <div className="sg-conformance-actions">
-            <button
-              className="sg-primary-button"
-              disabled={!canContinue || busy !== null}
-              onClick={() => onAction({ type: "continue" })}
-              type="button"
-            >
-              {busy === "continue" ? (
-                <SpinnerGap className="spin" aria-hidden="true" />
-              ) : (
-                <ArrowRight aria-hidden="true" weight="bold" />
-              )}
-              Continue with Server Guy
-            </button>
             <button
               className="sg-secondary-button"
               disabled={disabled}
@@ -616,17 +722,12 @@ export function ConformanceRecord({
             >
               Export brief for external work
             </button>
-            {brief.requiredChanges.length === 0 && !proposal && (
-              <button
-                className="sg-secondary-button"
-                disabled={disabled}
-                onClick={() => onAction({ type: "select-current" })}
-                type="button"
-              >
-                Verify the current revision
-              </button>
-            )}
           </div>
+          {exportError && (
+            <p className="sg-error" role="alert">
+              {exportError}
+            </p>
+          )}
           {exported && (
             <div className="sg-conformance-export">
               <textarea
@@ -684,343 +785,173 @@ export function ConformanceRecord({
           </form>
         </div>
       )}
+    </section>
+  );
+}
 
-      {proposal && (
-        <div
-          className="sg-conformance-proposal"
-          data-proposal-status={proposal.status}
-          data-proposal-origin={proposal.origin}
-        >
-          <div className="sg-contract-heading">
-            <strong>
-              {proposal.origin === "no-change"
-                ? "No change required"
-                : proposal.origin === "external"
-                  ? "Returned change"
-                  : "Proposed change"}{" "}
-              · {STATUS_LABELS[proposal.status]}
-            </strong>
-            <span>
-              base {short(proposal.baseSha)} · contract v
-              {proposal.contractVersion} ·{" "}
-              <LocalTime value={proposal.createdAt} variant="compact" /> ·{" "}
-              <a
-                href={`/api/conformance/proposals/${proposal.id}`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                Record <ArrowSquareOut aria-hidden="true" />
-              </a>
-            </span>
-          </div>
-          <p className="sg-contract-summary">{proposal.summary}</p>
-          {proposal.changes.length > 0 && (
-            <>
-              <ul className="sg-changed-files">
-                {proposal.changes.map((change) => (
-                  <li key={change.path}>
-                    <code>{change.path}</code>
-                    {change.content === null ? (
-                      <small>deleted</small>
-                    ) : change.baseObservationId ? null : (
-                      <small>new</small>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <button
-                className="sg-text-button"
-                onClick={() => setShowDiff((value) => !value)}
-                type="button"
-              >
-                {showDiff
-                  ? "Hide diff"
-                  : `Show complete diff (${proposal.changes.length} file${proposal.changes.length === 1 ? "" : "s"})`}
-              </button>
-              {showDiff && <ProposalDiff proposalId={proposal.id} />}
-            </>
-          )}
-          {proposal.mapping.length > 0 && (
-            <div className="sg-conformance-mapping">
-              <span className="sg-eyebrow">Required change → files</span>
-              <ul>
-                {proposal.mapping.map((entry) => (
-                  <li key={entry.field}>
-                    <b>{entry.field}</b> → {entry.paths.join(", ")}{" "}
-                    <i>{entry.explanation}</i>
-                  </li>
-                ))}
-              </ul>
-              {proposal.origin === "external" && (
-                <small>
-                  Mapping for a returned change is established by the
-                  conformance run, not by the worker&apos;s report.
-                </small>
-              )}
-            </div>
-          )}
-          {proposal.origin === "server-guy" && (
-            <p
-              className={`sg-conformance-preview ${previewFor ? previewFor.status : "untested"}`}
-              data-preview={previewFor ? previewFor.status : "untested"}
-            >
-              {previewFor ? (
-                <>
-                  Preview {previewFor.status} over this exact change (tree{" "}
-                  {short(previewFor.source.treeDigest)}) ·{" "}
-                  <LocalTime
-                    value={previewFor.finishedAt ?? previewFor.createdAt}
-                    variant="compact"
-                  />{" "}
-                  · worker evidence, not the gate
-                </>
-              ) : (
-                <>
-                  Untested since last edit: no preview ran over this exact
-                  change.
-                </>
-              )}
-            </p>
-          )}
-          {proposal.verification && !proposal.verification.scope.ok && (
-            <div className="sg-contract-gaps blocked">
-              <strong>Out of scope</strong>
-              <ul>
-                {proposal.verification.scope.violations.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {proposal.verification &&
-            proposal.candidate &&
-            !proposal.verification.changesComplete && (
-              <div className="sg-contract-gaps blocked">
-                <strong>The candidate differs from the reviewed change</strong>
-                <ul>
-                  {proposal.verification.differences.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          {proposal.publicationError && (
-            <p className="sg-error" role="alert">
-              Publication did not complete: {proposal.publicationError}
-            </p>
-          )}
-          {pullUrl && (
-            <p className="sg-conformance-pull">
-              <GitPullRequest aria-hidden="true" />{" "}
-              <a href={pullUrl} rel="noreferrer" target="_blank">
-                {proposal.publication
-                  ? `${proposal.publication.branch} · pull request #${proposal.publication.pullRequestNumber}`
-                  : `pull request #${proposal.external?.pullRequestNumber}`}{" "}
-                <ArrowSquareOut aria-hidden="true" />
-              </a>{" "}
-              {pullState ? `· ${pullState}` : ""}
-              {proposal.publication?.adopted
-                ? " · adopted from an earlier attempt"
-                : ""}
-              {pullState === "open"
-                ? " · merge it on GitHub, then refresh; an unmerged head gets preview results only"
-                : ""}
-            </p>
-          )}
-          {proposal.external && !pullUrl && (
-            <p className="sg-conformance-pull">
-              Returned {proposal.external.reference} →{" "}
-              {short(proposal.external.headSha)}
-              {proposal.external.branch ? ` (${proposal.external.branch})` : ""}
-            </p>
-          )}
-          {proposal.candidate && (
-            <p
-              className="sg-conformance-candidate"
-              data-candidate={proposal.candidate.sha}
-            >
-              <Check aria-hidden="true" weight="bold" /> Candidate revision{" "}
-              <a
-                href={`${application.repositoryUrl}/commit/${proposal.candidate.sha}`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {short(proposal.candidate.sha)}{" "}
-                <ArrowSquareOut aria-hidden="true" />
-              </a>{" "}
-              on {proposal.candidate.defaultBranch} ·{" "}
-              {proposal.candidate.source === "contract-commit"
-                ? "the contract commit"
-                : proposal.candidate.merge
-                  ? `pull request #${proposal.candidate.merge.pullRequestNumber} merged (${proposal.candidate.merge.method})`
-                  : "returned change on the default branch"}{" "}
-              ·{" "}
-              <LocalTime
-                value={proposal.candidate.resolvedAt}
-                variant="compact"
-              />
-            </p>
-          )}
-          <div className="sg-conformance-actions">
-            {proposal.status === "proposed" && (
-              <button
-                className="sg-primary-button"
-                disabled={disabled}
-                onClick={() =>
-                  onAction({ type: "approve", proposalId: proposal.id })
-                }
-                type="button"
-              >
-                <Check aria-hidden="true" weight="bold" /> Approve change
-              </button>
-            )}
-            {proposal.status === "approved" &&
-              proposal.origin === "server-guy" &&
-              (grant ? (
-                <button
-                  className="sg-primary-button"
-                  disabled={disabled}
-                  onClick={() =>
-                    onAction({ type: "publish", proposalId: proposal.id })
-                  }
-                  type="button"
-                >
-                  {busy === "publish" ? (
-                    <SpinnerGap className="spin" aria-hidden="true" />
-                  ) : (
-                    <GitPullRequest aria-hidden="true" />
-                  )}
-                  Publish branch and pull request
-                </button>
-              ) : (
-                <span className="sg-conformance-warning">
-                  Allow publishing below before the pull request can be
-                  published.
-                </span>
-              ))}
-            {(proposal.status === "published" || proposal.external) &&
-              !proposal.candidate &&
-              proposal.origin !== "no-change" && (
-                <button
-                  className="sg-secondary-button"
-                  disabled={disabled}
-                  onClick={() => onAction({ type: "refresh" })}
-                  type="button"
-                >
-                  {busy === "refresh" ? (
-                    <SpinnerGap className="spin" aria-hidden="true" />
-                  ) : (
-                    <ArrowClockwise aria-hidden="true" />
-                  )}
-                  Refresh from GitHub
-                </button>
-              )}
-            {proposal.candidate && (
-              <button
-                className="sg-primary-button"
-                disabled={disabled || Boolean(running)}
-                onClick={() => onAction({ type: "verify" })}
-                type="button"
-              >
-                {busy === "verify" ? (
-                  <SpinnerGap className="spin" aria-hidden="true" />
-                ) : (
-                  <Play aria-hidden="true" weight="fill" />
-                )}
-                {latestCandidateRun &&
-                latestCandidateRun.source.commitSha === proposal.candidate.sha
-                  ? "Run conformance checks again"
-                  : "Verify candidate"}
-              </button>
-            )}
-            {proposal.candidate && proposal.origin !== "no-change" && (
-              <button
-                className="sg-secondary-button"
-                disabled={disabled}
-                onClick={() => onAction({ type: "refresh" })}
-                type="button"
-              >
-                <ArrowClockwise aria-hidden="true" /> Refresh from GitHub
-              </button>
-            )}
-            {(proposal.status === "proposed" ||
-              proposal.status === "approved" ||
-              proposal.status === "published") && (
-              <button
-                className="sg-text-button"
-                disabled={disabled}
-                onClick={() =>
-                  onAction({ type: "withdraw", proposalId: proposal.id })
-                }
-                type="button"
-              >
-                Withdraw
-              </button>
-            )}
-          </div>
-          <p className="sg-conformance-note">
-            Server Guy publishes a reviewable branch and pull request under the{" "}
-            <b>
-              {approvalMode === "always-ask"
-                ? "Always ask"
-                : approvalMode === "full-autonomy"
-                  ? "Full autonomy"
-                  : "Let Server Guy decide"}
-            </b>{" "}
-            policy; merging is yours on GitHub in every policy. After the merge,
-            Refresh records the exact merged revision as the candidate.
-          </p>
-        </div>
+/** Every run's per-check evidence: the one in progress, the latest candidate
+ * run, and the most recent previews. Cancelling is a current-step action. */
+export function ConformanceRuns({
+  conformance,
+}: {
+  conformance: ConformanceView;
+}) {
+  const definitions = conformance.brief?.acceptance.checks ?? [];
+  const running =
+    conformance.runs.find(
+      (run) => run.status === "running" || run.status === "queued",
+    ) ?? null;
+  const latest = conformance.latestCandidateRun;
+  if (!conformance.runs.length)
+    return (
+      <p className="sg-conformance-note">
+        No run yet. Previews are worker evidence; only a conformance run over
+        the exact candidate can pass the gate.
+      </p>
+    );
+  return (
+    <section
+      className="sg-record-section-inner sg-conformance"
+      aria-label="Runs"
+    >
+      {running && (
+        <RunCard
+          run={running}
+          title={
+            running.kind === "candidate"
+              ? "Conformance run in progress"
+              : `${running.kind} in progress`
+          }
+          definitions={definitions}
+        />
       )}
-
-      {(proposal?.origin === "server-guy" ||
-        (!proposal && environment && !environmentReady)) && (
-        <div
-          className="sg-conformance-grant"
-          data-grant={grant ? "granted" : "none"}
-        >
-          <span className="sg-eyebrow">
-            Publishing to {application.repositoryOwner}/
-            {application.repositoryName}
-          </span>
-          {grant ? (
-            <p>
-              <Check aria-hidden="true" weight="bold" /> Allowed with the
-              current {grant.mechanism === "app" ? "GitHub App" : "GitHub CLI"}{" "}
-              connection since{" "}
-              <LocalTime value={grant.grantedAt} variant="compact" />; a
-              replaced connection ends it.{" "}
-              <button
-                className="sg-text-button"
-                disabled={disabled}
-                onClick={() => onAction({ type: "revoke" })}
-                type="button"
-              >
-                Stop allowing
-              </button>
-            </p>
-          ) : (
-            <p>
-              The GitHub connection is read-only until you allow publishing:
-              Server Guy verifies push and pull-request permission for this
-              repository and records the grant. A broadly scoped token is not a
-              grant.{" "}
-              <button
-                className="sg-secondary-button"
-                disabled={disabled}
-                onClick={() => onAction({ type: "grant" })}
-                type="button"
-              >
-                {busy === "grant" ? (
-                  <SpinnerGap className="spin" aria-hidden="true" />
-                ) : null}
-                Allow publishing
-              </button>
-            </p>
-          )}
-        </div>
+      {latest && latest.id !== running?.id && (
+        <RunCard
+          run={latest}
+          title="Conformance run over the candidate"
+          definitions={definitions}
+        />
       )}
+      {conformance.runs
+        .filter((run) => run.kind !== "candidate" && run.id !== running?.id)
+        .slice(0, 3)
+        .map((run) => (
+          <RunCard
+            key={run.id}
+            run={run}
+            title={
+              run.kind === "preview"
+                ? "Preview run (worker evidence)"
+                : "Command run (worker evidence)"
+            }
+            definitions={definitions}
+          />
+        ))}
+      {conformance.runs.length > 4 && (
+        <p className="sg-conformance-note">
+          Earlier runs stay in the raw records; every attempt is retained as
+          history.
+        </p>
+      )}
+    </section>
+  );
+}
 
+/**
+ * The execution environment on the machine running Server Guy, compact while
+ * healthy and recovery-first when not, and the publishing grant for this
+ * repository. The prerequisite is checked once when this opens, never trusting
+ * another process's stale answer.
+ */
+export function ConformanceEnvironment({
+  application,
+  conformance,
+  busy,
+  readOnly,
+  offerGrant,
+  onAction,
+}: {
+  application: ApplicationRecord;
+  conformance: ConformanceView;
+  busy: string | null;
+  readOnly: boolean;
+  /** The current-step bar already offers "Allow publishing". */
+  offerGrant: boolean;
+  onAction: (action: ConformanceAction) => void;
+}) {
+  const [environment, setEnvironment] = useState<ExecutionSetupStatus | null>(
+    conformance.environment
+      ? {
+          environment: conformance.environment,
+          preparation: {
+            running: false,
+            message: null,
+            error: null,
+            finishedAt: null,
+          },
+          images: { runner: "", database: "" },
+          docs: { install: "", getDocker: "" },
+        }
+      : null,
+  );
+  const [environmentBusy, setEnvironmentBusy] = useState<
+    "check" | "prepare" | null
+  >(null);
+  const [environmentError, setEnvironmentError] = useState<string | null>(null);
+  const disabled = busy !== null || readOnly;
+  const grant = conformance.grant;
+
+  async function checkEnvironment(action: "check" | "prepare") {
+    setEnvironmentBusy(action);
+    setEnvironmentError(null);
+    try {
+      setEnvironment(await api.executionSetup(action));
+    } catch (caught) {
+      setEnvironmentError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not check the execution environment.",
+      );
+    } finally {
+      setEnvironmentBusy(null);
+    }
+  }
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setEnvironmentBusy("check");
+      api
+        .executionSetup("check")
+        .then((status) => {
+          if (active) setEnvironment(status);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (active) setEnvironmentBusy(null);
+        });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+    // Only when this opens.
+  }, []);
+  useEffect(() => {
+    if (!environment?.preparation.running) return;
+    const timer = window.setTimeout(() => {
+      api
+        .executionSetup()
+        .then(setEnvironment)
+        .catch(() => undefined);
+    }, 1_500);
+    return () => window.clearTimeout(timer);
+  }, [environment]);
+
+  return (
+    <section
+      className="sg-record-section-inner sg-conformance"
+      aria-label="Environment"
+    >
       <div className="sg-conformance-environment">
         {environment ? (
           <ExecutionEnvironmentCard
@@ -1050,53 +981,53 @@ export function ConformanceRecord({
         )}
       </div>
 
-      {running && (
-        <RunCard
-          run={running}
-          title={
-            running.kind === "candidate"
-              ? "Conformance run in progress"
-              : `${running.kind} in progress`
-          }
-          busy={disabled}
-          definitions={definitions}
-          onCancel={
-            running.kind === "candidate"
-              ? () => onAction({ type: "cancel-run", runId: running.id })
-              : undefined
-          }
-        />
-      )}
-      {latestCandidateRun && latestCandidateRun.id !== running?.id && (
-        <RunCard
-          run={latestCandidateRun}
-          title="Conformance run over the candidate"
-          busy={disabled}
-          definitions={definitions}
-        />
-      )}
-      {conformance.runs
-        .filter((run) => run.kind !== "candidate" && run.id !== running?.id)
-        .slice(0, 3)
-        .map((run) => (
-          <RunCard
-            key={run.id}
-            run={run}
-            title={
-              run.kind === "preview"
-                ? "Preview run (worker evidence)"
-                : `Command run (worker evidence)`
-            }
-            busy={disabled}
-            definitions={definitions}
-          />
-        ))}
-      {conformance.runs.length > 4 && (
-        <p className="sg-conformance-note">
-          Earlier runs stay in the raw records; every attempt is retained as
-          history.
-        </p>
-      )}
+      <div
+        className="sg-conformance-grant"
+        data-grant={grant ? "granted" : "none"}
+      >
+        <span className="sg-eyebrow">
+          Publishing to {application.repositoryOwner}/
+          {application.repositoryName}
+        </span>
+        {grant ? (
+          <p>
+            <Check aria-hidden="true" weight="bold" /> Allowed with the current{" "}
+            {grant.mechanism === "app" ? "GitHub App" : "GitHub CLI"} connection
+            since <LocalTime value={grant.grantedAt} variant="compact" />; a
+            replaced connection ends it.{" "}
+            {!readOnly && (
+              <button
+                className="sg-text-button"
+                disabled={disabled}
+                onClick={() => onAction({ type: "revoke" })}
+                type="button"
+              >
+                Stop allowing
+              </button>
+            )}
+          </p>
+        ) : (
+          <p>
+            Not allowed yet: the GitHub connection stays read-only until you
+            allow publishing. Server Guy then verifies push and pull-request
+            permission for this repository and records the grant. A broadly
+            scoped token is not a grant.{" "}
+            {!offerGrant && !readOnly && (
+              <button
+                className="sg-secondary-button"
+                disabled={disabled}
+                onClick={() => onAction({ type: "grant" })}
+                type="button"
+              >
+                {busy === "grant" ? (
+                  <SpinnerGap className="spin" aria-hidden="true" />
+                ) : null}
+                Allow publishing
+              </button>
+            )}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

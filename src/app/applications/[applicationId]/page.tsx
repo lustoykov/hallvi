@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 
 import { OperatorShell } from "@/components/server-guy/operator-shell";
-import { ShellPrototype } from "@/components/server-guy/prototype/shell-prototype";
 import { listApplications } from "@/server/db";
 import { getOperatorView, NotFoundError } from "@/server/phase-one";
 import { getPiSetupStatus } from "@/server/pi-setup";
@@ -16,11 +15,9 @@ export default async function ApplicationPage({
   searchParams: Promise<{
     chat?: string | string[];
     phase?: string | string[];
-    /** PROTOTYPE: `?variant=A|B|C` renders the shell prototype instead. */
-    variant?: string | string[];
   }>;
 }) {
-  const [{ applicationId }, { chat, phase, variant }] = await Promise.all([
+  const [{ applicationId }, { chat, phase }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -39,19 +36,12 @@ export default async function ApplicationPage({
     if (error instanceof NotFoundError) notFound();
     throw error;
   }
-  // PROTOTYPE (throwaway): the shell variants, never in production builds.
-  if (typeof variant === "string" && process.env.NODE_ENV !== "production")
-    return (
-      <ShellPrototype
-        key={`${applicationId}:${variant}`}
-        piSetup={await getPiSetupStatus()}
-        variant={variant}
-        view={view}
-      />
-    );
   return (
     <OperatorShell
       key={applicationId}
+      // Only the QA fixture runs under a fixture root: its repositories are
+      // synthetic, so GitHub links are shown but never followed.
+      demo={Boolean(process.env.SERVER_GUY_QA_ROOT)}
       applications={listApplications().map(
         ({ id, repositoryOwner, repositoryName }) => ({
           id,

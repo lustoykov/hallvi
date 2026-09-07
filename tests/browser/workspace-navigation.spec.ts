@@ -106,7 +106,7 @@ test(
 );
 
 test(
-  "Record tabs support keyboard navigation and long Decisions fit the desktop inspector",
+  "Record sections open from the jump nav and long Decisions fit the desktop inspector",
   journey("chat-navigation"),
   async ({ page }, testInfo) => {
     await page.goto("/applications/new");
@@ -119,34 +119,36 @@ test(
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/, {
       timeout: 30_000,
     });
-    const tabs = page.getByRole("tablist", {
-      name: "Application record views",
+    // The Record is one outline: Checks open by default, History collapsed;
+    // the jump nav opens a section and its header toggles it.
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
     });
-    await tabs.getByRole("tab", { name: "Record", exact: true }).focus();
-    for (const name of ["Activity", "Changes", "Receipts", "Record"]) {
-      await page.keyboard.press("ArrowRight");
-      await expect(tabs.getByRole("tab", { name, exact: true })).toBeFocused();
-      await expect(
-        tabs.getByRole("tab", { name, exact: true }),
-      ).toHaveAttribute("aria-selected", "true");
-      await expect(
-        page.getByRole("tabpanel", { name, exact: true }),
-      ).toBeVisible();
-    }
-    await page.keyboard.press("End");
+    const sections = record.getByRole("navigation", {
+      name: "Record sections",
+    });
     await expect(
-      tabs.getByRole("tab", { name: "Receipts", exact: true }),
-    ).toBeFocused();
-    await page.keyboard.press("Home");
+      record.getByRole("region", { name: "Checks", exact: true }),
+    ).toBeVisible();
     await expect(
-      tabs.getByRole("tab", { name: "Record", exact: true }),
-    ).toBeFocused();
+      record.getByRole("region", { name: "History", exact: true }),
+    ).toHaveCount(0);
+    await sections.getByRole("link", { name: "History", exact: true }).click();
     await expect(
-      page
-        .getByRole("tabpanel", { name: "Record", exact: true })
-        .getByText(
-          /Hetzner access|Cloudflare access|Domain starting state|Later phases/,
-        ),
+      record.getByRole("region", { name: "History", exact: true }),
+    ).toBeVisible();
+    const historyToggle = record.getByRole("button", { name: /^History/ });
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "true");
+    await historyToggle.click();
+    await expect(
+      record.getByRole("region", { name: "History", exact: true }),
+    ).toHaveCount(0);
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      record.getByText(
+        /Hetzner access|Cloudflare access|Domain starting state|Later phases/,
+      ),
     ).toHaveCount(0);
     const message = `priority: ${"reliability-".repeat(24)}`;
     await page

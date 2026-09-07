@@ -13,6 +13,7 @@ import type {
 } from "@/server/types";
 
 import { ContractVersions } from "./contract-versions";
+import { ExternalLink } from "./external-link";
 import { SOURCE_LABELS } from "./format";
 import { LocalTime } from "./local-time";
 
@@ -50,15 +51,13 @@ function SourceLink({
       ? `${citation.absent} absent from tree`
       : `${citation.path}${citation.line ? `:${citation.line}` : ""}`;
   return (
-    <a
+    <ExternalLink
       className="sg-contract-source"
       href={sourceHref(application, commitSha, citation)}
-      rel="noreferrer"
-      target="_blank"
       title={"absent" in citation ? "Open the inspected tree" : "Open source"}
     >
-      {label} <ArrowSquareOut aria-hidden="true" />
-    </a>
+      {label}
+    </ExternalLink>
   );
 }
 
@@ -154,13 +153,11 @@ export function ContractRecord({
             {inspection.status === "passed" && inspection.commitSha ? (
               <>
                 Inspected {inspection.defaultBranch} ·{" "}
-                <a
+                <ExternalLink
                   href={`${application.repositoryUrl}/tree/${inspection.commitSha}`}
-                  rel="noreferrer"
-                  target="_blank"
                 >
                   {inspection.commitSha.slice(0, 8)}
-                </a>{" "}
+                </ExternalLink>{" "}
                 · {inspection.filesRead} file
                 {inspection.filesRead === 1 ? "" : "s"} read ·{" "}
                 <LocalTime value={inspection.observedAt} variant="compact" />
@@ -263,9 +260,29 @@ export function ContractRecord({
                 )?.group === group,
             );
             if (!fields.length) return null;
+            // A group opens on its own only when something in it needs
+            // attention; otherwise its values preview on one line.
+            const attention = fields.some(
+              (field) =>
+                field.provenance.kind === "unresolved" || field.conformance,
+            );
+            const preview = fields
+              .slice(0, 3)
+              .map((field) => field.value ?? "unresolved")
+              .join(" · ");
             return (
-              <div className="sg-contract-group" key={group}>
-                <span className="sg-eyebrow">{label}</span>
+              <details
+                className="sg-contract-group"
+                key={group}
+                open={attention}
+              >
+                <summary>
+                  <span className="sg-eyebrow">{label}</span>
+                  <small>
+                    {fields.length} field{fields.length === 1 ? "" : "s"} ·{" "}
+                    {preview}
+                  </small>
+                </summary>
                 <dl>
                   {fields.map((field) => {
                     const definition = APPLICATION_PROFILE.fields.find(
@@ -327,7 +344,7 @@ export function ContractRecord({
                     );
                   })}
                 </dl>
-              </div>
+              </details>
             );
           })}
         </>

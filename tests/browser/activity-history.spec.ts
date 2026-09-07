@@ -66,15 +66,9 @@ test(
   async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await addApplication(page, "activity-history");
-    const activityTab = page.getByRole("tab", {
-      name: "Activity",
-      exact: true,
-    });
+    const activityTab = page.getByRole("button", { name: /^History/ });
     await activityTab.click();
-    const activity = page.getByRole("tabpanel", {
-      name: "Activity",
-      exact: true,
-    });
+    const activity = page.getByRole("region", { name: "History", exact: true });
     const events = activity.locator(".sg-event");
     await expect(events).toHaveCount(2);
     await expect(events.nth(0)).toContainText("Repository identity recorded");
@@ -91,7 +85,7 @@ test(
     await expect(events).toHaveCount(3);
     await expect(events.nth(0)).toContainText("Requirement saved");
     await expect(events.nth(0)).toContainText("Data stays in the EU");
-    await expect(activityTab).toHaveAttribute("aria-selected", "true");
+    await expect(activityTab).toHaveAttribute("aria-expanded", "true");
 
     // A replacement: one old → new event, no extra per-reply item.
     await send(page, "replace-priority: Data stays in Germany");
@@ -167,12 +161,9 @@ test(
   async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const path = await addApplication(page, "activity-invalidation");
-    const activityTab = page.getByRole("tab", {
-      name: "Activity",
-      exact: true,
-    });
+    const activityTab = page.getByRole("button", { name: /^History/ });
     const events = page
-      .getByRole("tabpanel", { name: "Activity", exact: true })
+      .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
     await activityTab.click();
     await expect(events).toHaveCount(2);
@@ -210,7 +201,6 @@ test(
       fullPage: true,
     });
     // The check itself is no longer current, without claiming lost access.
-    await page.getByRole("tab", { name: "Record", exact: true }).click();
     await expect(
       page.getByRole("button", {
         name: /Check 2 GitHub repository access.*Not yet/,
@@ -237,7 +227,6 @@ test(
     await expect(
       events.filter({ hasText: "Repository verification invalidated" }),
     ).toHaveCount(1);
-    await page.getByRole("tab", { name: "Record", exact: true }).click();
     await expect(
       page.getByRole("button", {
         name: /Check 2 GitHub repository access.*Passed/,

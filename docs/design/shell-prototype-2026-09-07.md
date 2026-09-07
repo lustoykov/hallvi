@@ -1,10 +1,11 @@
 # Workspace shell prototype: top bar, inspector, action placement
 
-Date: 2026-09-07. Branch `codex/phase23-experience-followups` (prototype
-commit kept on `prototype/phase23-shell`). Throwaway code lives in
-`src/components/server-guy/prototype/`; only `phase-copy.ts` is written to be
-lifted. Walkthrough items addressed: 3, 10, 15, 16, 17, 18, 19, 22, 23 and the
-action-placement clarification.
+Date: 2026-09-07. Branch `codex/phase23-experience-followups`. The throwaway
+prototype (`src/components/server-guy/prototype/`, three variants behind
+`?variant=`) is kept on the branch `prototype/phase23-shell` and is no longer
+on this branch; the decisions below are folded into production. Walkthrough
+items addressed: 3, 10, 15, 16, 17, 18, 19, 22, 23 and the action-placement
+clarification.
 
 ## The question
 
@@ -17,6 +18,8 @@ controls?
 
 ## How to run it
 
+From a checkout of `prototype/phase23-shell`:
+
 ```bash
 node tests/browser/qa-fixture.mjs 3210 success ready
 # then, with the `state` path the fixture prints:
@@ -26,7 +29,8 @@ node src/components/server-guy/prototype/seed-fixture.mjs 3210 <state dir>
 The seed prints one URL per application; add `?variant=A`, `B` or `C`
 (the floating bar and the ← → keys switch too). Every action is stubbed and
 reported in the bar; nothing is sent to the server. The variants are hidden
-in production builds.
+in production builds. The same seed, run against this branch's fixture,
+produces the applications for the production shell (no `?variant`).
 
 Applications the prototype was judged on (all synthetic `qa/…` repositories,
 labelled as such in every variant):
@@ -146,7 +150,13 @@ explicit signal (the fixture root is only known to the server process).
 - **Buttons** (user, 2026-09-07): smaller and quieter. One solid primary at a
   time; further pending decisions are outline buttons; card actions are
   small outline buttons; "Details" is a text row.
-- Right column and action placement: open; recommendation below.
+- **Right column and action placement: C as the base, with the two borrowed
+  pieces** (user, 2026-09-07: "I agree with your recommendations"). In
+  production: the current-step bar above the transcript
+  (`current-step-bar.tsx`), the outline Record with a jump nav
+  (`inspector.tsx`), reference lines under replies (`record-references.ts`),
+  demo-aware GitHub links (`external-link.tsx`), the compact Docker line, and
+  no decision buttons anywhere but the bar.
 
 ## Recommendation
 

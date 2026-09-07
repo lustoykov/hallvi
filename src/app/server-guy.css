@@ -1071,57 +1071,21 @@
   border-left: 1px solid var(--line);
   background: var(--panel);
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
-.sg-inspector-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--line);
-}
-.sg-inspector-tabs button {
-  position: relative;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color var(--fast) var(--ease);
-}
-.sg-inspector-tabs button::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: transparent;
-  transition: background-color var(--fast) var(--ease);
-}
-.sg-inspector-tabs button:hover {
-  color: var(--ink);
-}
-.sg-inspector-tabs button.selected {
-  color: var(--ink);
-  font-weight: 600;
-}
-.sg-inspector-tabs button.selected::after {
-  background: var(--blue);
-}
-.sg-inspector :is(button, a, [role="tabpanel"]):focus-visible {
+.sg-inspector :is(button, a, [role="region"]):focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
-.sg-inspector-tabs button:focus-visible {
-  outline-offset: -4px;
-}
+/* Block flow, not a grid: sections keep their content height inside the
+   scrolling column even though they clip horizontally. */
 .sg-inspector-body {
-  padding: 16px 14px 28px;
+  padding: 10px 12px 40px;
   overflow-y: auto;
+  scroll-behavior: smooth;
+}
+.sg-inspector-body > * + * {
+  margin-top: 10px;
 }
 .sg-record-heading {
   display: grid;
@@ -2542,4 +2506,553 @@
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* ---------- Current step: above the transcript in every chat of the phase ---------- */
+
+.sg-chat-column {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.sg-step {
+  display: grid;
+  gap: 10px;
+  padding: 14px 24px 12px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #f7f9fc, #fff);
+}
+.sg-step-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sg-step-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.sg-step-head h2 small {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.sg-step-purpose {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+/* The sentence keeps a readable width; the actions sit beside it when
+   there is room and drop below it when there is not. */
+.sg-step-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #bfd0f5;
+  border-radius: 10px;
+  background: #fff;
+}
+.sg-step-now > p {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.sg-step-now > .sg-step-actions {
+  margin-left: auto;
+}
+.sg-step-now.idle {
+  border-color: var(--line);
+}
+.sg-step-now.done {
+  border-color: #b9e0cc;
+}
+.sg-step-now > p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sg-step-now > p b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sg-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Quiet controls: small buttons, one solid primary at a time. */
+.sg-step-actions .sg-primary-button,
+.sg-step-actions .sg-secondary-button {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.sg-step-actions .sg-text-button {
+  font-size: 12px;
+  text-decoration: none;
+}
+.sg-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sg-waiting::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sg-waiting.you {
+  background: var(--blue-soft);
+  color: var(--blue-text);
+}
+.sg-waiting.server-guy {
+  background: #eef1f6;
+  color: var(--ink-2);
+}
+.sg-waiting.server-guy::before {
+  animation: sg-pulse 1.2s ease-in-out infinite;
+}
+.sg-waiting.github {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+}
+.sg-waiting.none {
+  background: var(--green-soft);
+  color: var(--green-text);
+}
+@keyframes sg-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.sg-stages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.sg-stages li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: #fff;
+  font-size: 12px;
+}
+.sg-stage-mark {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #c6d0e0;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.sg-stage-mark svg {
+  width: 10px;
+}
+.sg-stage-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.sg-stage-copy strong {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.sg-stage-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sg-stages li.done .sg-stage-mark {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.sg-stages li.done strong {
+  color: var(--muted);
+}
+.sg-stages li.current {
+  border-color: #bfd0f5;
+  background: var(--blue-soft);
+}
+.sg-stages li.current .sg-stage-mark {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+.sg-stages li.current strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.sg-stages li.skipped .sg-stage-mark {
+  border-style: dashed;
+}
+.sg-stages li.skipped strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.sg-demo-banner {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px dashed #d8b46f;
+  border-radius: var(--radius);
+  background: #fff8e8;
+  color: #6f4d0c;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.sg-demo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.sg-demo-link em {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fff1d6;
+  color: #7a4a00;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- Reply references: what a reply saved, pointing at the Record ---------- */
+
+.sg-message-refs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.sg-message-refs > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sg-message-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease);
+}
+.sg-message-ref:hover {
+  border-color: #9eb6e7;
+}
+.sg-message-ref em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--blue-text);
+}
+.sg-message-ref.done em {
+  color: var(--green-text);
+}
+.sg-message-ref.replaced {
+  border-style: dashed;
+}
+.sg-message-ref.replaced em {
+  color: var(--muted);
+}
+
+/* ---------- Record outline: jump nav and collapsible sections ---------- */
+
+.sg-record-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+/* Grid children default to their content width; the column is fixed. */
+.sg-inspector-body > * {
+  min-width: 0;
+}
+.sg-record-nav a {
+  padding: 5px 9px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.sg-record-nav a:hover {
+  background: #eef2f8;
+  color: var(--ink);
+}
+.sg-record-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  scroll-margin-top: 8px;
+}
+.sg-record-section.open {
+  box-shadow: var(--shadow-s);
+}
+.sg-record-toggle {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.sg-record-toggle > svg {
+  align-self: center;
+  width: 10px;
+  flex: none;
+  color: var(--muted);
+  transition: transform var(--fast) var(--ease);
+}
+.sg-record-section.open .sg-record-toggle > svg {
+  transform: rotate(90deg);
+}
+.sg-record-toggle strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sg-record-toggle small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sg-record-toggle em {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sg-record-toggle em.good {
+  color: var(--green-text);
+}
+.sg-record-toggle em.attention {
+  color: var(--amber-text);
+}
+.sg-record-body {
+  min-width: 0;
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--line-2);
+  display: grid;
+  gap: 10px;
+}
+.sg-record-body > .sg-record-section-inner,
+.sg-record-body > .sg-contract {
+  margin-top: 4px;
+}
+.sg-record-remaining {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sg-history-filters button {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sg-history-filters button[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue-text);
+  font-weight: 600;
+}
+.sg-source-read {
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
+}
+.sg-source-read:not(:last-child)::before,
+.sg-event:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 6.5px;
+  top: 16px;
+  bottom: -14px;
+  width: 1px;
+  background: var(--line);
+}
+.sg-source-read .sg-event-dot.source {
+  background: #fff;
+  border: 1.5px solid #9aa6ba;
+  box-shadow: none;
+}
+.sg-source-read strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.sg-source-read strong em {
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sg-source-read strong em.passed {
+  color: var(--green-text);
+}
+.sg-source-read strong em.failed {
+  color: var(--amber-text);
+}
+.sg-source-read p {
+  margin: 3px 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-source-read time {
+  color: var(--muted);
+  font-size: 11px;
+}
+.sg-source-read .sg-receipt-actions {
+  flex-wrap: wrap;
+}
+
+/* Contract groups collapse to a preview line until opened. */
+.sg-contract-group > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  list-style: none;
+  cursor: pointer;
+}
+.sg-contract-group > summary::-webkit-details-marker {
+  display: none;
+}
+.sg-contract-group > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 10px;
+}
+.sg-contract-group[open] > summary::before {
+  content: "▾";
+}
+.sg-contract-group > summary small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Replaced proposals and the compact healthy environment line. */
+.sg-conformance-proposal.replaced {
+  border-style: dashed;
+  background: #fafbfd;
+}
+.sg-conformance-replaced {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 12px;
+}
+.sg-conformance-replaced svg {
+  width: 14px;
+  flex: none;
+}
+.sg-conformance-earlier summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #2852a6;
+}
+.sg-conformance-earlier .sg-conformance-proposal {
+  margin-top: 8px;
+}
+.sg-execution.compact {
+  margin: 0;
+  padding: 8px 12px;
+}
+.sg-execution-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-execution-line small {
+  color: #536078;
+  font-size: 12px;
+}
+.sg-execution-line .sg-text-button {
+  padding: 2px 6px;
+  font-size: 12px;
+  text-decoration: none;
 }

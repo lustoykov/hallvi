@@ -47,7 +47,10 @@ test(
     test.setTimeout(300_000);
     scenario(fixture.state, { docker: "ready" });
     await throughPhaseTwo(page, "fastapi-p3-nohealth");
-    const record = page.getByRole("tabpanel", { name: "Record", exact: true });
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
+    });
     await expect(
       record.getByText("Conformance work for Phase 3"),
     ).toBeVisible();
@@ -86,7 +89,7 @@ test(
 
     // Continue with Server Guy: the request is Server Guy's, the change is
     // staged, previewed in the (scripted) runner and behavior checks proposed.
-    await record
+    await page
       .getByRole("button", { name: "Continue with Server Guy", exact: true })
       .click();
     await expect(
@@ -124,24 +127,26 @@ test(
     expect(proposed.conformance.latestPreview.status).toBe("passed");
 
     // Accept the behavior checks, approve, allow publishing, publish.
-    await record
+    await page
       .getByRole("button", { name: /Accept behavior checks v1/ })
       .click();
     await expect(
       record.locator('[data-acceptance-status="accepted"]'),
     ).toBeVisible();
-    await record
+    await page
       .getByRole("button", { name: "Approve change", exact: true })
       .click();
     await expect(
       record.getByText("Approved · not published yet"),
     ).toBeVisible();
-    await expect(record.getByText("Allow publishing below")).toBeVisible();
-    await record
+    await expect(
+      page.getByText(/Waiting for you: allow publishing/),
+    ).toBeVisible();
+    await page
       .getByRole("button", { name: "Allow publishing", exact: true })
       .click();
     await expect(record.locator('[data-grant="granted"]')).toBeVisible();
-    await record
+    await page
       .getByRole("button", {
         name: "Publish branch and pull request",
         exact: true,
@@ -160,22 +165,20 @@ test(
       path: testInfo.outputPath("phase-three-03-published.png"),
       fullPage: true,
     });
-    await page.getByRole("tab", { name: "Activity", exact: true }).click();
+    await page.getByRole("button", { name: /^History/ }).click();
     const events = page
-      .getByRole("tabpanel", { name: "Activity", exact: true })
+      .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
     await expect(events.nth(0)).toContainText(
       "Branch and pull request published",
     );
     await expect(events.nth(1)).toContainText("Publishing allowed");
     await expect(events.nth(2)).toContainText("Conformance change approved");
-    await page.getByRole("tab", { name: "Record", exact: true }).click();
 
     // Unmerged: refresh keeps the candidate open; merge on GitHub (squash),
     // refresh records the observed default-branch head.
-    await record
+    await page
       .getByRole("button", { name: "Refresh from GitHub", exact: true })
-      .first()
       .click();
     await expect(
       page.getByRole("button", {
@@ -183,9 +186,8 @@ test(
       }),
     ).toContainText("unmerged head gets preview results only");
     githubScenario(fixture.state, { mergePull: 1, mergeMethod: "squash" });
-    await record
+    await page
       .getByRole("button", { name: "Refresh from GitHub", exact: true })
-      .first()
       .click();
     await expect(record.locator(".sg-conformance-candidate")).toContainText(
       "merged (squash)",
@@ -206,7 +208,7 @@ test(
     });
 
     // Verify the candidate: the worker runs the (scripted) check set.
-    await record
+    await page
       .getByRole("button", { name: "Verify candidate", exact: true })
       .click();
     await expect(
@@ -326,13 +328,16 @@ test(
         exact: true,
       })
       .click();
-    const record = page.getByRole("tabpanel", { name: "Record", exact: true });
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
+    });
     // The Record checks the engine when it opens, never trusting another
     // process's earlier answer.
     await expect(record.getByText("No engine found")).toBeVisible({
       timeout: 30_000,
     });
-    await record
+    await page
       .getByRole("button", { name: "Continue with Server Guy", exact: true })
       .click();
     await expect(
@@ -375,11 +380,14 @@ test(
         exact: true,
       })
       .click();
-    const record = page.getByRole("tabpanel", { name: "Record", exact: true });
+    const record = page.getByRole("complementary", {
+      name: "Record",
+      exact: true,
+    });
     await expect(
       record.getByText("The contract records no required changes").first(),
     ).toBeVisible({ timeout: 30_000 });
-    await record
+    await page
       .getByRole("button", { name: "Verify the current revision", exact: true })
       .click();
     await expect(
@@ -390,7 +398,7 @@ test(
         name: /Check 3 Profile conformance checks pass/,
       }),
     ).toContainText("No application-behavior check");
-    await record
+    await page
       .getByRole("button", { name: "Continue with Server Guy", exact: true })
       .click();
     await expect(
@@ -398,10 +406,10 @@ test(
         /\[QA conformance\] no change needed; preview passed; behavior checks proposed/,
       ),
     ).toBeVisible({ timeout: 90_000 });
-    await record
+    await page
       .getByRole("button", { name: /Accept behavior checks v1/ })
       .click();
-    await record
+    await page
       .getByRole("button", { name: "Verify candidate", exact: true })
       .click();
     await expect(

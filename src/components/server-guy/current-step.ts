@@ -450,11 +450,11 @@ function launchReadyStep(
         kind: "primary",
       },
       {
-        key: "export-brief",
-        label: "Export brief for external work",
+        key: "reveal:change",
+        label: "Other ways to do the work",
         explanation:
-          "The same brief for Codex, Claude, another harness or manual work; return the change afterwards.",
-        kind: "secondary",
+          "Export the brief for Codex, Claude, another harness or manual work, or return a change made elsewhere.",
+        kind: "link",
       },
     ];
     if (!required.length)

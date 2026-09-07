@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ChatPane } from "../../../src/components/server-guy/chat-pane";
 import { ContractRecord } from "../../../src/components/server-guy/contract-record";
+import { describeCurrentStep } from "../../../src/components/server-guy/current-step";
+import { CurrentStepBar } from "../../../src/components/server-guy/current-step-bar";
 import { Inspector } from "../../../src/components/server-guy/inspector";
 import { PhaseRail } from "../../../src/components/server-guy/phase-rail";
 import type {
@@ -206,16 +208,15 @@ describe("phase strip", () => {
   });
 });
 
-describe("inspector record", () => {
+describe("current step bar", () => {
   const render = (v: OperatorView) =>
     renderToStaticMarkup(
-      <Inspector
+      <CurrentStepBar
         busy={null}
-        checks={v.checks}
-        onContinue={() => {}}
-        onConformance={() => {}}
-        onSelectCheck={() => {}}
-        view={v}
+        demo={false}
+        onAction={() => {}}
+        repository="qa/todo"
+        step={describeCurrentStep(v)}
       />,
     );
   it("offers Continue only on a ready, current Launch Brief", () => {
@@ -229,7 +230,7 @@ describe("inspector record", () => {
       render(
         view({
           workspace: completedStart,
-          workspaces: [completedStart, inspect],
+          workspaces: [completedStart, { ...inspect, current: true }],
         }),
       ),
     ).not.toContain("Continue to Inspect app");
@@ -237,6 +238,67 @@ describe("inspector record", () => {
       render(view({ workspace: { ...inspect, status: "ready" } })),
     ).not.toContain("Continue to Inspect app");
   });
+  it("names the phase's purpose and offers Continue to Phase 3 when the contract is ready", () => {
+    const html = render(
+      view({
+        workspace: { ...inspect, status: "ready" },
+        workspaces: [completedStart, { ...inspect, status: "ready" }],
+        // Ready means no blocker is left; the fixture contract keeps its one
+        // required change for Phase 3.
+        contract: { ...contract, gaps: { ...contract.gaps, blockers: [] } },
+        inspection: {
+          observationId: "insp",
+          status: "passed",
+          summary: "Inspected",
+          observedAt: at,
+          commitSha: COMMIT,
+          defaultBranch: "main",
+          connectionCurrent: true,
+          current: true,
+          entries: 12,
+          truncated: false,
+          filesRead: 3,
+          profile: {
+            status: "matched",
+            profileId: "fastapi-uv",
+            profileVersion: 1,
+            label: "FastAPI + uv",
+            criteria: [],
+            reason: null,
+          },
+        },
+      }),
+    );
+    expect(html).toContain(
+      "Understand the application and identify required changes",
+    );
+    expect(html).toContain("Continue to Make launch-ready");
+    expect(html).toContain("Waiting for you");
+    expect(html).toContain("1 required change remains for Phase 3");
+  });
+  it("sends a completed phase to the current one instead of offering its Continue", () => {
+    const html = render(
+      view({
+        workspace: completedStart,
+        workspaces: [completedStart, { ...inspect, current: true }],
+      }),
+    );
+    expect(html).toContain("Go to Phase 2 · Inspect app");
+    expect(html).toContain("retained as recorded then");
+  });
+});
+
+describe("inspector record", () => {
+  const render = (v: OperatorView) =>
+    renderToStaticMarkup(
+      <Inspector
+        busy={null}
+        checks={v.checks}
+        onConformance={() => {}}
+        onSelectCheck={() => {}}
+        view={v}
+      />,
+    );
   it("explains a completed phase as retained evidence and names the viewed deliverable", () => {
     const html = render(
       view({
@@ -248,7 +310,7 @@ describe("inspector record", () => {
     expect(html).toContain("Launch Brief");
     expect(html).toContain("Completed");
   });
-  it("shows the contract record for Inspect app and offers Continue to Phase 3 when ready", () => {
+  it("shows the contract record for Inspect app without a Continue of its own", () => {
     const html = render(
       view({
         workspace: { ...inspect, status: "ready" },
@@ -257,7 +319,8 @@ describe("inspector record", () => {
       }),
     );
     expect(html).toContain("Application Contract v2");
-    expect(html).toContain("Continue to Make launch-ready");
+    expect(html).toContain("Ready for review");
+    expect(html).not.toContain("Continue to Make launch-ready");
     expect(
       render(
         view({ workspace: inspect, workspaces: [completedStart, inspect] }),
@@ -413,7 +476,10 @@ describe("chat pane phase states", () => {
       /SG<\/span><strong>Server Guy<\/strong><span class="sg-source-tag">Started automatically/,
     );
     expect(html).toMatch(/You<\/span><strong>You<\/strong>/);
-    expect(html).toContain("Working toward the Application Contract");
+    // The phase's state lives in the current-step bar; the chat header only
+    // names the chat.
+    expect(html).toContain("Main phase chat");
+    expect(html).not.toContain("Working toward");
   });
   it("makes a completed phase read-only with an explicit reason", () => {
     const html = base({

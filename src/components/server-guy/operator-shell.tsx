@@ -29,8 +29,12 @@ import { ChatPane } from "./chat-pane";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import type { ConformanceAction } from "./conformance-record";
+import { describeCurrentStep, type StepAction } from "./current-step";
+import { CurrentStepBar } from "./current-step-bar";
+import { DemoContext } from "./external-link";
 import { Inspector } from "./inspector";
 import { PhaseRail } from "./phase-rail";
+import { recordReferences, type RecordSection } from "./record-references";
 
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map(current.map((message) => [message.id, message]));
@@ -65,6 +69,7 @@ export function OperatorShell({
   initialView,
   initialPiSetup,
   applications,
+  demo = false,
 }: {
   initialView: OperatorView;
   initialPiSetup: PiSetupStatus;
@@ -72,10 +77,16 @@ export function OperatorShell({
     ApplicationRecord,
     "id" | "repositoryOwner" | "repositoryName"
   >[];
+  /** The repository is synthetic: GitHub links are shown, never followed. */
+  demo?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{
+    section: RecordSection;
+    nonce: number;
+  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
@@ -100,6 +111,14 @@ export function OperatorShell({
   const { selection } = initialPiSetup;
   const applicationId = application?.id;
   const selectedChatId = view.selectedChatId;
+  // The current-step bar, the Record and the reply references all read the
+  // same view, so a reload and a reply say the same thing.
+  const step = describeCurrentStep(view, { demo });
+  const references = recordReferences(view);
+
+  function revealSection(section: RecordSection) {
+    setReveal((current) => ({ section, nonce: (current?.nonce ?? 0) + 1 }));
+  }
 
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
@@ -327,6 +346,46 @@ export function OperatorShell({
     void run("new-chat", () => api.createChat(application.id));
   }
 
+  // Every current-step action is one of the existing operations; nothing here
+  // keeps state of its own.
+  function stepAction(action: StepAction) {
+    const [kind, id = ""] = action.key.split(":");
+    switch (kind) {
+      case "continue":
+        return continueToNextPhase();
+      case "rerun":
+        return rerunCheck(id as NonNullable<GateCheck["rerun"]>["key"]);
+      case "phase":
+        return selectPhase(id as PhaseKey);
+      case "reveal":
+        return revealSection(id as RecordSection);
+      case "ask":
+        return document
+          .querySelector<HTMLTextAreaElement>("#pi-composer")
+          ?.focus();
+      case "continue-with-server-guy":
+        return conformanceAction({ type: "continue" });
+      case "select-current":
+        return conformanceAction({ type: "select-current" });
+      case "accept-checks":
+        return conformanceAction({ type: "accept-checks", acceptanceId: id });
+      case "approve":
+        return conformanceAction({ type: "approve", proposalId: id });
+      case "publish":
+        return conformanceAction({ type: "publish", proposalId: id });
+      case "withdraw":
+        return conformanceAction({ type: "withdraw", proposalId: id });
+      case "grant":
+        return conformanceAction({ type: "grant" });
+      case "refresh":
+        return conformanceAction({ type: "refresh" });
+      case "verify":
+        return conformanceAction({ type: "verify" });
+      case "cancel-run":
+        return conformanceAction({ type: "cancel-run", runId: id });
+    }
+  }
+
   function archiveActiveChat() {
     if (!application || !activeChat || activeChat.isPrimary) return;
     void run("archive", () => api.archiveChat(application.id, activeChat.id));
@@ -461,191 +520,211 @@ export function OperatorShell({
   }
 
   return (
-    <main className="sg-shell">
-      <header className="sg-topbar">
-        <div className="sg-app-identity">
-          <Link
-            className="sg-brand"
-            href="/applications"
-            aria-label="Server Guy, all applications"
-          >
-            <span className="sg-app-mark">SG</span>
-          </Link>
-          {/* The application is the switcher, its repository beneath the
+    <DemoContext.Provider value={demo}>
+      <main className="sg-shell">
+        <header className="sg-topbar">
+          <div className="sg-app-identity">
+            <Link
+              className="sg-brand"
+              href="/applications"
+              aria-label="Server Guy, all applications"
+            >
+              <span className="sg-app-mark">SG</span>
+            </Link>
+            {/* The application is the switcher, its repository beneath the
               name. Environment and policy are saved Phase 1 facts, shown as
               quiet context rather than status; the phase lives in the strip
               below, so it is not repeated here. */}
-          <button
-            ref={applicationPicker}
-            className="sg-application-picker"
-            type="button"
-            popoverTarget="application-picker"
-            disabled={busy !== null}
-            aria-label={`Switch application: ${application?.name}`}
-          >
-            <span>
-              <strong>{application?.name}</strong>
-              <small>
-                {application?.repositoryOwner}/{application?.repositoryName}
-              </small>
-            </span>
-            <CaretDown aria-hidden="true" weight="bold" />
-          </button>
-          {policy && (
-            <span
-              className="sg-topbar-context"
-              title={`Saved in Phase 1. ${policy.hint} The server itself is chosen in Phase 5.`}
-            >
-              <b>Production</b>
-              <i aria-hidden="true" />
-              <span>{policy.label}</span>
-            </span>
-          )}
-          <nav
-            id="application-picker"
-            popover="auto"
-            className="sg-application-menu"
-            aria-label="Applications"
-            onBeforeToggle={(event) => {
-              if (event.newState === "open")
-                positionApplicationMenu(event.currentTarget);
-            }}
-          >
-            <span className="sg-eyebrow sg-application-menu-label">
-              Switch application
-            </span>
-            {applications.map((item) => (
-              <Link
-                key={item.id}
-                href={`/applications/${item.id}`}
-                aria-current={item.id === application?.id ? "page" : undefined}
-                onClick={(event) =>
-                  event.currentTarget
-                    .closest<HTMLElement>("[popover]")
-                    ?.hidePopover()
-                }
-              >
-                <span aria-hidden="true" className="sg-application-menu-mark">
-                  {item.repositoryName.slice(0, 1).toUpperCase()}
-                </span>
-                <div>
-                  <strong>{item.repositoryName}</strong>
-                  <small>
-                    {item.repositoryOwner}/{item.repositoryName}
-                  </small>
-                </div>
-                {item.id === application?.id && (
-                  <Check aria-label="Current application" weight="bold" />
-                )}
-              </Link>
-            ))}
-            <Link
-              className="sg-application-menu-action"
-              href="/applications/new"
-            >
-              <Plus /> Add application
-            </Link>
-            <hr />
             <button
+              ref={applicationPicker}
+              className="sg-application-picker"
               type="button"
-              className="sg-remove-application"
+              popoverTarget="application-picker"
               disabled={busy !== null}
-              onClick={(event) => {
-                event.currentTarget
-                  .closest<HTMLElement>("[popover]")
-                  ?.hidePopover();
-                setRemoveError(null);
-                setConfirmRemove(true);
+              aria-label={`Switch application: ${application?.name}`}
+            >
+              <span>
+                <strong>{application?.name}</strong>
+                <small>
+                  {application?.repositoryOwner}/{application?.repositoryName}
+                </small>
+              </span>
+              <CaretDown aria-hidden="true" weight="bold" />
+            </button>
+            {policy && (
+              <span
+                className="sg-topbar-context"
+                title={`Saved in Phase 1. ${policy.hint} The server itself is chosen in Phase 5.`}
+              >
+                <b>Production</b>
+                <i aria-hidden="true" />
+                <span>{policy.label}</span>
+              </span>
+            )}
+            <nav
+              id="application-picker"
+              popover="auto"
+              className="sg-application-menu"
+              aria-label="Applications"
+              onBeforeToggle={(event) => {
+                if (event.newState === "open")
+                  positionApplicationMenu(event.currentTarget);
               }}
             >
-              <Trash /> Remove application…
-            </button>
-          </nav>
-        </div>
-        <Link
-          className="sg-settings-link"
-          href="/setup/pi"
-          title={
-            initialPiSetup.ready
-              ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-              : "Connect ChatGPT to chat with Server Guy"
-          }
-        >
-          <GearSix aria-hidden="true" />
-          {initialPiSetup.ready
-            ? "Settings · ChatGPT connected"
-            : "Settings · Connect ChatGPT"}
-        </Link>
-      </header>
+              <span className="sg-eyebrow sg-application-menu-label">
+                Switch application
+              </span>
+              {applications.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/applications/${item.id}`}
+                  aria-current={
+                    item.id === application?.id ? "page" : undefined
+                  }
+                  onClick={(event) =>
+                    event.currentTarget
+                      .closest<HTMLElement>("[popover]")
+                      ?.hidePopover()
+                  }
+                >
+                  <span aria-hidden="true" className="sg-application-menu-mark">
+                    {item.repositoryName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{item.repositoryName}</strong>
+                    <small>
+                      {item.repositoryOwner}/{item.repositoryName}
+                    </small>
+                  </div>
+                  {item.id === application?.id && (
+                    <Check aria-label="Current application" weight="bold" />
+                  )}
+                </Link>
+              ))}
+              <Link
+                className="sg-application-menu-action"
+                href="/applications/new"
+              >
+                <Plus /> Add application
+              </Link>
+              <hr />
+              <button
+                type="button"
+                className="sg-remove-application"
+                disabled={busy !== null}
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest<HTMLElement>("[popover]")
+                    ?.hidePopover();
+                  setRemoveError(null);
+                  setConfirmRemove(true);
+                }}
+              >
+                <Trash /> Remove application…
+              </button>
+            </nav>
+          </div>
+          <Link
+            className="sg-settings-link"
+            href="/setup/pi"
+            title={
+              initialPiSetup.ready
+                ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
+                : "Connect ChatGPT to chat with Server Guy"
+            }
+          >
+            <GearSix aria-hidden="true" />
+            {initialPiSetup.ready
+              ? "Settings · ChatGPT connected"
+              : "Settings · Connect ChatGPT"}
+          </Link>
+        </header>
 
-      <PhaseRail
-        busy={busy !== null}
-        checks={checks}
-        onSelectPhase={selectPhase}
-        viewedPhaseKey={view.workspace?.phaseKey ?? null}
-        workspaces={view.workspaces}
-      />
-
-      <section className="sg-workspace">
-        <ChatList
+        <PhaseRail
           busy={busy !== null}
-          chats={view.chats}
-          hasApplication={application !== null}
-          onCreate={createChat}
-          onSelect={selectChat}
-          selectedChatId={view.selectedChatId}
-          workspace={view.workspace}
-        />
-        <ChatPane
-          activeChat={activeChat}
-          busy={busy}
-          composer={composer}
-          error={error}
-          pendingMessage={pendingMessage}
-          piReady={initialPiSetup.ready}
-          onArchive={archiveActiveChat}
-          onComposerChange={setComposer}
-          onSend={sendMessage}
-          runs={runs.filter((run) => run.chatId === activeChat?.id)}
-          reconnecting={reconnecting}
-          onRunAction={runAction}
-          onNewChat={createChat}
-          view={view}
-        />
-        <Inspector
-          busy={busy}
           checks={checks}
-          onConformance={conformanceAction}
-          onContinue={continueToNextPhase}
-          onSelectCheck={setSelectedCheckKey}
-          view={view}
+          onSelectPhase={selectPhase}
+          viewedPhaseKey={view.workspace?.phaseKey ?? null}
+          workspaces={view.workspaces}
         />
-      </section>
 
-      {selectedCheck && (
-        <CheckDrawer
-          busy={busy !== null}
-          check={selectedCheck}
-          onAsk={askAboutCheck}
-          onClose={closeCheck}
-          onRerun={rerunCheck}
-        />
-      )}
-      {confirmRemove && application && (
-        <ConfirmActionDialog
-          title={`Remove ${application.name}?`}
-          description="Permanently removes this application’s chats, decisions, observations, and activity from Server Guy. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
-          action="Remove application"
-          confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
-          busy={busy === "remove"}
-          error={removeError}
-          onCancel={() => {
-            setConfirmRemove(false);
-            requestAnimationFrame(() => applicationPicker.current?.focus());
-          }}
-          onConfirm={() => void removeApplication()}
-        />
-      )}
-    </main>
+        <section className="sg-workspace">
+          <ChatList
+            busy={busy !== null}
+            chats={view.chats}
+            hasApplication={application !== null}
+            onCreate={createChat}
+            onSelect={selectChat}
+            selectedChatId={view.selectedChatId}
+            workspace={view.workspace}
+          />
+          <div className="sg-chat-column">
+            <CurrentStepBar
+              busy={busy}
+              demo={demo}
+              onAction={stepAction}
+              repository={
+                application
+                  ? `${application.repositoryOwner}/${application.repositoryName}`
+                  : null
+              }
+              step={step}
+            />
+            <ChatPane
+              activeChat={activeChat}
+              busy={busy}
+              composer={composer}
+              error={error}
+              pendingMessage={pendingMessage}
+              piReady={initialPiSetup.ready}
+              onArchive={archiveActiveChat}
+              onComposerChange={setComposer}
+              onSend={sendMessage}
+              runs={runs.filter((run) => run.chatId === activeChat?.id)}
+              reconnecting={reconnecting}
+              onRunAction={runAction}
+              onNewChat={createChat}
+              onReveal={revealSection}
+              references={references}
+              view={view}
+            />
+          </div>
+          <Inspector
+            busy={busy}
+            checks={checks}
+            offerGrant={step.actions.some((action) => action.key === "grant")}
+            onConformance={conformanceAction}
+            onSelectCheck={setSelectedCheckKey}
+            reveal={reveal}
+            view={view}
+          />
+        </section>
+
+        {selectedCheck && (
+          <CheckDrawer
+            busy={busy !== null}
+            check={selectedCheck}
+            onAsk={askAboutCheck}
+            onClose={closeCheck}
+            onRerun={rerunCheck}
+          />
+        )}
+        {confirmRemove && application && (
+          <ConfirmActionDialog
+            title={`Remove ${application.name}?`}
+            description="Permanently removes this application’s chats, decisions, observations, and activity from Server Guy. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
+            action="Remove application"
+            confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
+            busy={busy === "remove"}
+            error={removeError}
+            onCancel={() => {
+              setConfirmRemove(false);
+              requestAnimationFrame(() => applicationPicker.current?.focus());
+            }}
+            onConfirm={() => void removeApplication()}
+          />
+        )}
+      </main>
+    </DemoContext.Provider>
   );
 }

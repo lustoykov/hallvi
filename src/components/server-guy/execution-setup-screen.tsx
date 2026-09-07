@@ -52,6 +52,67 @@ export function ExecutionEnvironmentCard({
   const ready = environment?.ready ?? false;
   const verified = environment?.verified ?? null;
   const preparing = status.preparation.running;
+  // Healthy and compact: one line with the last check and an optional
+  // refresh. Refreshing re-reads the engine; it is not an application test.
+  if (compact && environment && ready)
+    return (
+      <section
+        className="sg-execution ready compact"
+        aria-label="Execution environment"
+        aria-live="polite"
+      >
+        <p className="sg-execution-line">
+          <span className="sg-execution-state ready">
+            <Check weight="bold" aria-hidden="true" />
+            {ENVIRONMENT_LABELS[environment.state]}
+          </span>
+          <small>
+            on {environment.host.hostname} · checked{" "}
+            <LocalTime value={environment.checkedAt} variant="compact" /> ·{" "}
+            {verified
+              ? "runner images prepared"
+              : "runner images are pulled on the first run"}
+          </small>
+          <button
+            className="sg-text-button"
+            disabled={busy !== null || preparing}
+            onClick={onCheck}
+            type="button"
+          >
+            {busy === "check" ? (
+              <SpinnerGap className="spin" aria-hidden="true" />
+            ) : (
+              <ArrowClockwise aria-hidden="true" />
+            )}
+            Refresh
+          </button>
+          {onPrepare && !verified && (
+            <button
+              className="sg-text-button"
+              disabled={busy !== null || preparing}
+              onClick={onPrepare}
+              type="button"
+            >
+              Prepare images now
+            </button>
+          )}
+          <Link className="sg-text-button" href="/setup/execution">
+            Execution settings
+          </Link>
+        </p>
+        {preparing && (
+          <p className="sg-execution-progress" role="status">
+            <SpinnerGap className="spin" aria-hidden="true" />
+            {status.preparation.message ?? "Preparing…"}
+          </p>
+        )}
+        {status.preparation.error && !preparing && (
+          <p className="sg-error" role="alert">
+            {status.preparation.error}
+          </p>
+        )}
+      </section>
+    );
   return (
     <section
       className={`sg-execution ${ready ? "ready" : "attention"}`}

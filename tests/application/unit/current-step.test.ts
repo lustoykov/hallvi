@@ -472,7 +472,7 @@ describe("Phase 3", () => {
     expect(step.now).toMatch(/^1 required change recorded on the contract/);
     expect(step.actions.map((action) => [action.key, action.kind])).toEqual([
       ["continue-with-server-guy", "primary"],
-      ["export-brief", "secondary"],
+      ["reveal:change", "link"],
     ]);
     expect(step.stages.map((stage) => stage.state)).toEqual([
       "current",
