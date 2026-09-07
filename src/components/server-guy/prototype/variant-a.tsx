@@ -224,7 +224,7 @@ export function VariantA({
             )}
 
             <button
-              className={`sg-secondary-button ${p.aDetailsButton}`}
+              className={p.aDetailsLink}
               onClick={() => setSection(phaseThree ? "changes" : "contract")}
               type="button"
             >

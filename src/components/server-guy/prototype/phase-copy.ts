@@ -514,6 +514,11 @@ function launchReadyStep(view: OperatorView, base: Base): CurrentStep {
           },
     );
   if (pending.length) {
+    // One solid button at a time: the first decision is primary, the rest
+    // wait as quieter secondary buttons.
+    pending.forEach((action, index) => {
+      action.kind = index === 0 ? "primary" : "secondary";
+    });
     const preview = previewNote(conformance);
     return {
       ...withStages,

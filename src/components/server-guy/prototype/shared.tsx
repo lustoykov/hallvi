@@ -789,7 +789,7 @@ export function ProposalCard({
         </a>
         {showActions && current && proposal.status === "proposed" && (
           <button
-            className="sg-primary-button"
+            className={`sg-secondary-button ${p.smallButton}`}
             onClick={() => act("Approve change")}
             type="button"
           >
@@ -801,7 +801,7 @@ export function ProposalCard({
           proposal.status === "approved" &&
           proposal.origin === "server-guy" && (
             <button
-              className="sg-primary-button"
+              className={`sg-secondary-button ${p.smallButton}`}
               onClick={() =>
                 act(
                   conformance?.grant
@@ -925,7 +925,7 @@ export function AcceptanceCard({
             Accepting the test plan is separate from approving the code.
           </span>
           <button
-            className="sg-primary-button"
+            className={`sg-secondary-button ${p.smallButton}`}
             onClick={() => act(`Accept behavior checks v${record.version}`)}
             type="button"
           >
