@@ -172,10 +172,27 @@ export const contractFieldSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** The typed tool input; profile identity and commit are bound server-side. */
+const profileSelectionSchema = Type.Object(
+  {
+    profileId: text(80),
+    rationale: text(CONTRACT_LIMITS.textCharacters),
+    citations: Type.Array(repositoryCitationSchema, {
+      minItems: 1,
+      maxItems: 8,
+    }),
+  },
+  {
+    additionalProperties: false,
+    description:
+      "Your evidence-backed choice from the available supported profiles. Explain the actual application, distinguish development tooling from runtime services, and cite the files you chose to read. A profile selection is interpretation, not a successful build or execution.",
+  },
+);
+
+/** Pi selects a supported profile; the commit is bound server-side. */
 export const contractProposalParameters = Type.Object(
   {
     summary: text(CONTRACT_LIMITS.textCharacters),
+    profileSelection: Type.Optional(profileSelectionSchema),
     fields: Type.Array(contractFieldSchema, {
       minItems: 1,
       maxItems: CONTRACT_LIMITS.fields,
@@ -198,6 +215,7 @@ export const contractBodySchema = Type.Object(
     profileVersion: Type.Integer({ minimum: 1 }),
     commitSha: Type.String({ pattern: "^[a-f0-9]{40}$" }),
     summary: text(CONTRACT_LIMITS.textCharacters),
+    profileSelection: Type.Optional(profileSelectionSchema),
     fields: Type.Array(
       Type.Object(
         {
@@ -410,11 +428,21 @@ export function validateContractProposal(
           `${path}: credential-shaped text is never recorded in a contract; remove it and describe the setting by name`,
       ),
     );
-  if (context.profile.status !== "matched")
+  const selection =
+    input.profileSelection ?? context.currentContract?.body.profileSelection;
+  if (!selection)
     throw new ContractValidationError([
-      `The repository does not resolve to a supported profile (${context.profile.status}); a contract cannot be proposed until it does.`,
+      "Select an available application profile with profileSelection: explain your interpretation and cite the repository files you read. Filenames alone do not select a profile.",
     ]);
   const issues: string[] = [];
+  if (selection.profileId !== APPLICATION_PROFILE.id)
+    issues.push(
+      `Profile ${selection.profileId} is not currently supported. Describe the application accurately and explain the capability limitation; do not relabel it as ${APPLICATION_PROFILE.label}.`,
+    );
+  for (const citation of selection.citations) {
+    const resolved = resolveCitation(citation, context);
+    if (!resolved.ok) issues.push(`Profile selection: ${resolved.reason}`);
+  }
   const seen = new Set<string>();
   const fields: ContractField[] = [];
   for (const field of input.fields) {
@@ -603,6 +631,7 @@ export function validateContractProposal(
       profileVersion: context.profile.profileVersion,
       commitSha: context.commitSha,
       summary: input.summary.trim(),
+      profileSelection: selection,
       fields: APPLICATION_PROFILE.fields.map((definition) =>
         fields.find((field) => field.key === definition.key)!,
       ),
@@ -739,6 +768,23 @@ export function describeContractChanges(
   });
   const describe = (field: ContractField) => {
     const old = before.get(field.key);
+    if (old && old.value === field.value) {
+      const details: string[] = [];
+      if (old.provenance.kind !== field.provenance.kind)
+        details.push(
+          `source changed from ${old.provenance.kind} to ${field.provenance.kind}`,
+        );
+      if (
+        JSON.stringify(old.conformance ?? null) !==
+        JSON.stringify(field.conformance ?? null)
+      )
+        details.push(
+          field.conformance
+            ? "required source change updated"
+            : "required source change resolved",
+        );
+      return `${contractFieldLabel(field.key)}: ${details.join(", ")} (value unchanged)`;
+    }
     const show = (item: ContractField | undefined) =>
       item === undefined
         ? "(new)"

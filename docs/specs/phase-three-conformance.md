@@ -17,7 +17,7 @@ Proposal saved (approved per policy) ←──── returned pull request, bran
         ↓ explicit grant + policy
 Server Guy publishes one branch and one pull request (never merges)
         ↓ the engineer merges on GitHub
-Refresh: the observed default-branch head is the candidate; the reviewed
+Refresh: the exact PR merge result is the candidate; the reviewed
 change is compared with it; scope is checked on the reviewed diff
         ↓ Verify candidate
 Worker runs the check set over the exact commit in disposable containers
@@ -77,7 +77,7 @@ The GitHub connection stays read-only until the engineer chooses **Allow publish
 
 Publication is a controller-side effect outside any Run: inputs are rechecked immediately before it (proposal state and digest, the approval's digest, the contract version, the grant and connection), then one commit is created from the staged files on the base commit through the Git Data API, one branch named after the proposal, and one pull request against the default branch. Every retry reconciles first: a branch whose commit carries this proposal's trailer, or an existing pull request for the branch, is adopted; a branch of the same name made by someone else is refused, never overwritten. Receipts and failures land on the proposal; Activity records the publication or its failure. **Server Guy never merges**: the pull request is reviewable on GitHub and the engineer merges it, in every Approval Mode, and the UI says so.
 
-**Refresh from GitHub** observes the pull request and the default branch. An open pull request keeps P3.G1 and P3.G2 unsatisfied (preview results only). Once merged, the candidate is the **observed default-branch head**, whatever the merge method (merge, squash or rebase, classified from the merge commit when visible); the reviewed change is then compared with that exact commit file by file, and the reviewed diff is checked against the scope rules. Differences, out-of-scope files or unexpected files keep P3.G2 blocked until a reviewed replacement. A later push to the default branch moves the candidate and makes the previous run's evidence history.
+**Refresh from GitHub** observes the pull request and the default branch. An open pull request keeps P3.G1 and P3.G2 unsatisfied (preview results only). Once merged into the application's default branch, the candidate is the **exact merge result reported by GitHub**, including squash and rebase results. A missing or unreadable merge result is an error, never a reason to substitute the latest branch head. The reviewed files and the complete diff from the proposal base to this candidate are checked. Differences, out-of-scope files or unexpected files keep P3.G2 blocked until review. A later default-branch push does not change the selected candidate or invalidate evidence for that unchanged commit. For a returned external commit without a PR, the selected commit is that returned revision once it is included in the default branch; descendants are not automatically adopted. Deliberate adoption/impact review is separate follow-up work.
 
 **External returns** accept a pull request URL or number, a branch, or a commit against this repository only; the diff from the brief's base is fetched independently and the same scope rules apply. The worker's own report is displayed at most and never counted; the mapping for a returned change is established by the conformance run. **No change required** selects the contract commit as the candidate; it still needs a current conformance run.
 
@@ -112,7 +112,7 @@ Built-in execution needs a reachable Docker Engine on the controller host (the m
 
 | Check | Satisfied when | Otherwise |
 | --- | --- | --- |
-| P3.G1 Exact candidate revision identified | The active proposal has a candidate: the observed default-branch head after the merge, or the contract commit on the no-change path. | Not yet while nothing is proposed, a change waits for approval or publication, or a pull request is open; a closed pull request is named. |
+| P3.G1 Exact candidate revision identified | The active proposal has a candidate: the exact PR merge result, the returned external commit included in the default branch, or the contract commit on the no-change path. | Not yet while nothing is proposed, a change waits for approval or publication, or a pull request is open; a closed pull request is named. |
 | P3.G2 Required source changes resolved | Every conformance item is mapped, the reviewed diff is within scope, and the candidate contains the reviewed change exactly. | Blocked on unmapped items, out-of-scope or unexpected files, or a candidate that differs; not yet while unmerged. |
 | P3.G3 Profile conformance checks pass | An accepted behavior definition exists and the latest run over the exact candidate with current bindings passed every required check. | Blocked without an accepted definition, on failure or an incomplete run; not yet with no run, a running run or stale bindings. |
 

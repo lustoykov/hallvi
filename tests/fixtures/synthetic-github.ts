@@ -262,12 +262,27 @@ export class SyntheticGithub {
     const method = options.method ?? "GET";
     if (path === "/user")
       return { data: { id: 1, login: "fixture" }, scopes: ["repo"] };
-    if (path.startsWith("/user/installations/")) {
+    if (path.startsWith("/user/installations?"))
       return {
-        data: { id: 7, permissions: this.installationPermissions },
+        data: {
+          installations: [
+            {
+              id: 7,
+              app_slug: "server-guy-test",
+              account: { id: 2, login: this.fullName.split("/")[0] },
+              permissions: {
+                contents: this.permissions.push ? "write" : "read",
+                pull_requests: this.permissions.push ? "write" : "read",
+              },
+              repository_selection: "selected",
+              suspended_at: null,
+            },
+          ],
+        },
         scopes: [],
       };
-    }
+    if (path.startsWith("/user/installations/7/repositories"))
+      return { data: { repositories: [{ id: 99 }] }, scopes: [] };
     const match = /^\/repos\/([^/]+\/[^/]+)(\/.*)?$/.exec(path);
     if (!match) throw new Error(`Unexpected GitHub path ${path}`);
     const [, fullName, rest = ""] = match;

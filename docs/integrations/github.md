@@ -2,14 +2,11 @@
 
 Server Guy reads repositories through an explicitly chosen, installation-wide connection. Application records and repository-check evidence remain application-scoped. Phases 1 and 2 are read-only. Phase 3 can publish a reviewable branch and pull request, but only after an explicit per-application [publishing grant](#publishing-in-phase-3) that Server Guy verifies against the connection; it never merges, changes workflows, or deploys.
 
-## Two login paths
+## One GitHub App connection
 
-| Choice in Settings → GitHub | What is real | What Server Guy saves |
-| --- | --- | --- |
-| Use existing login | The server's `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token --hostname github.com`, in that precedence order. A read-only `/user` request identifies it automatically. | Account ID/login, credential source, token fingerprint, connection ID and consent time. The token is not copied. |
-| Connect another account | GitHub App device login. The same GitHub account may be used; this is a separate Server Guy authorization. | Access and refresh tokens with their expiries, account identity and connection ID. No App private key or client secret. |
+Connect GitHub through Server Guy's configured GitHub App device flow. Server Guy stores the resulting user access/refresh tokens, expiries and connection identity in its own protected settings file. It does not discover, adopt or borrow `gh`, `GH_TOKEN` or `GITHUB_TOKEN` credentials. An older saved CLI selection is rejected with instructions to reconnect; Server Guy does not sign the host CLI out or alter its account.
 
-Detection does not activate a connection. Existing machine credentials can have broader permissions than Server Guy needs; their reuse is an explicit choice. If their token/source changes, choose the login again. Server Guy never signs the CLI in/out or changes its active account.
+The parallel UX follow-up removes the retired CLI controls. Until it is integrated, the setup response retains an empty `detected` field for the existing consumer; the server never populates or accepts that option.
 
 ## Register a local GitHub App once
 
@@ -72,10 +69,9 @@ Make launch-ready publishes Server Guy's staged change as one commit on the cont
 
 | Connection | Minimum verified before the grant is recorded | Where to change it |
 | --- | --- | --- |
-| Existing CLI/environment login | The login can push to the repository (`permissions.push`). | The account's repository role on GitHub. |
 | GitHub App | The installation grants **Contents: Read and write** and **Pull requests: Read and write** for the repository (Metadata read stays mandatory). | Edit the App's repository permissions in its registration, then re-approve the installation at [installed GitHub Apps](https://github.com/settings/installations); a registration made for Phases 1 and 2 has Contents read only. |
 
-**Allow publishing** in the Conformance Result performs that verification and records the grant with the connection id and what GitHub reported; replacing or disconnecting the connection ends it, and **Stop allowing** revokes it. Before every publication Server Guy rechecks the proposal, its approval digest, the contract version and the grant. Retries reconcile against GitHub first: a branch whose commit carries the proposal trailer, or an existing pull request for it, is adopted; a branch of the same name made by someone else is refused. Merging is always yours on GitHub; Server Guy only observes the default branch afterwards. Both mechanisms were exercised against GitHub itself on September 6 (see the testing guide): the CLI login published through its `repo` scope, and the GitHub App login verified a real installation's write permissions and published through the App user token. That verification reads the paginated `GET /user/installations` list and selects the recorded installation; `GET /user/installations/{id}` does not exist for a user token, which the first real grant exposed.
+**Allow publishing** in the Conformance Result performs that verification and records the grant with the connection id and what GitHub reported; replacing or disconnecting the connection ends it, and **Stop allowing** revokes it. Before every publication Server Guy rechecks the proposal, its approval digest, the contract version and the grant. Retries reconcile against GitHub first: a branch whose commit carries the proposal trailer, or an existing pull request for it, is adopted; a branch of the same name made by someone else is refused. Merging is always yours on GitHub; Server Guy records the exact merged revision afterwards. Historical September 6 tests exercised both mechanisms; CLI is now retired. The GitHub App test verified installation write permissions and published through the App user token; that historical result is not fresh verification of subsequent changes. That verification reads the paginated `GET /user/installations` list and selects the recorded installation; `GET /user/installations/{id}` does not exist for a user token, which the first real grant exposed.
 
 ## Verification
 

@@ -436,6 +436,21 @@ export function buildContractProposal(
   return {
     summary: `FastAPI service managed with uv at ${inspection.inspection?.commitSha.slice(0, 8) ?? "unknown"}: ${fields.length} fields, ${blockers} blocker${blockers === 1 ? "" : "s"}, ${conformance} conformance item${conformance === 1 ? "" : "s"}.`,
     fields,
+    ...(pyproject
+      ? {
+          profileSelection: {
+            profileId: "fastapi-uv",
+            rationale:
+              "The fixture model interprets this as one FastAPI service managed with uv; build and runtime checks are still required.",
+            citations: [
+              cite(
+                pyproject,
+                line(pyproject, /fastapi/) ?? pyproject.content!.split("\n")[0],
+              ),
+            ],
+          },
+        }
+      : {}),
     ...(options.revises ? { revises: options.revises } : {}),
   };
 }

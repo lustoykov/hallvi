@@ -9,7 +9,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import * as store from "../../../src/server/db";
 import {
-  credentialFingerprint,
   saveGithubConnection,
   type GithubConnection,
 } from "../../../src/server/github-connection";
@@ -28,9 +27,11 @@ const SECOND = "00000000-0000-4000-8000-000000000002";
 function login(id: string): GithubConnection {
   return {
     id,
-    mode: "cli",
-    source: "gh",
-    fingerprint: credentialFingerprint("QA-GITHUB-TOKEN", "gh"),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   };
@@ -193,11 +194,10 @@ describe("repository evidence into the Phase 2 gate", () => {
       commitSha: COMMIT,
     });
     const check = profileCheck(app.id);
-    // The manifest was not captured in this fixture, so the profile is
-    // unmatched with that reason; the inspection itself is current.
-    expect(check.status).toBe("blocked");
+    // Repository context is available, but no model-backed selection was saved.
+    expect(check.status).toBe("not-yet");
     expect(check.result).toContain(
-      "pyproject.toml is in the tree but its content was not captured",
+      "propose an evidence-backed application profile",
     );
   });
 });

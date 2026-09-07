@@ -261,7 +261,7 @@ export interface ProfileCriterion {
 }
 
 export interface ProfileResolution {
-  status: "matched" | "unmatched" | "ambiguous" | "not-inspected";
+  status: "matched" | "pending" | "unmatched" | "ambiguous" | "not-inspected";
   profileId: string;
   profileVersion: number;
   label: string;
@@ -362,6 +362,12 @@ export interface ApplicationContractBody {
   commitSha: string;
   summary: string;
   fields: ContractField[];
+  /** Pi's interpretation of repository evidence, not proof of execution. */
+  profileSelection?: {
+    profileId: string;
+    rationale: string;
+    citations: RepositoryCitation[];
+  };
 }
 
 export interface ApplicationContractRecord {

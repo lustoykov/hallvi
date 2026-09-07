@@ -32,7 +32,6 @@ import {
   interruptConformanceRuns,
 } from "../../../src/server/conformance-runs";
 import {
-  credentialFingerprint,
   saveGithubConnection,
   type GithubConnection,
 } from "../../../src/server/github-connection";
@@ -119,9 +118,11 @@ const TOKEN = "QA-GITHUB-TOKEN";
 function login(id: string): GithubConnection {
   return {
     id,
-    mode: "cli",
-    source: "gh",
-    fingerprint: credentialFingerprint(TOKEN, "gh"),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   };
@@ -129,6 +130,7 @@ function login(id: string): GithubConnection {
 
 // One synthetic GitHub per repository name; every request routes by name.
 const githubs = new Map<string, SyntheticGithub>();
+let lastGithubName = "fastapi-app";
 function github(name: string) {
   const fullName = `qa/${name}`;
   let synthetic = githubs.get(fullName);
@@ -143,8 +145,8 @@ mocks.githubJson.mockImplementation(
     if (path === "/user")
       return { data: { id: 1, login: "fixture" }, scopes: ["repo"] };
     const match = /^\/repos\/qa\/([^/]+)/.exec(path);
-    const name =
-      match?.[1] ?? [...githubs.keys()][0]?.split("/")[1] ?? "fastapi-app";
+    const name = match?.[1] ?? lastGithubName;
+    if (match) lastGithubName = name;
     try {
       return await github(name).request(path, options as never);
     } catch (error) {
@@ -865,13 +867,18 @@ describe("approval, publication and the exact merged candidate", () => {
     await expect(publishProposal(app.id, proposal.id)).rejects.toThrow(
       /needs your explicit grant/,
     );
-    await expect(grantPublication(app.id)).rejects.toThrow(/cannot push/);
+    await expect(grantPublication(app.id)).rejects.toThrow(
+      /publication needs write access/,
+    );
     github(app.name).permissions = { pull: true, push: true, admin: false };
     const grant = await grantPublication(app.id);
     expect(grant).toMatchObject({
-      mechanism: "cli",
+      mechanism: "app",
       connectionId: FIRST,
-      verifiedPermissions: { accountRepositoryPermissions: { push: true } },
+      verifiedPermissions: {
+        installationId: 7,
+        permissions: { contents: "write", pull_requests: "write" },
+      },
     });
     const published = await publishProposal(app.id, proposal.id);
     expect(published.status).toBe("published");
@@ -923,7 +930,7 @@ describe("approval, publication and the exact merged candidate", () => {
   }, 60_000);
 
   it.each(["merge", "squash", "rebase"] as const)(
-    "records the observed default-branch head after a %s merge and verifies the reviewed change there",
+    "pins the exact %s merge result even when main advances before Refresh",
     async (method) => {
       const app = await proposed();
       const proposal = conformance(app.id).proposal!;
@@ -935,6 +942,11 @@ describe("approval, publication and the exact merged candidate", () => {
         published.publication!.pullRequestNumber,
         method,
       );
+      const laterHead = github(app.name).pushToMain([
+        ...github(app.name).filesAt(merged)!,
+        { path: "unrelated.txt", content: "A later change, not selected" },
+      ]);
+      expect(laterHead).not.toBe(merged);
       const refreshed = await refreshCandidate(app.id);
       expect(refreshed.candidate).toMatchObject({
         sha: merged,
@@ -1026,7 +1038,7 @@ describe("approval, publication and the exact merged candidate", () => {
     90_000,
   );
 
-  it("blocks when the merged candidate differs from the reviewed change, and a later push makes the run stale", async () => {
+  it("blocks changed reviewed content but keeps a verified candidate when main advances", async () => {
     const app = await proposed();
     const proposal = conformance(app.id).proposal!;
     approveProposal(app.id, proposal.id);
@@ -1056,7 +1068,7 @@ describe("approval, publication and the exact merged candidate", () => {
     expect(results(app.id)["changes-resolved"]).toContain(
       "app/main.py differs from the reviewed content",
     );
-    // A push to main after a passing run: the candidate moved.
+    // A push to main after a passing run must not select a new candidate.
     const app2 = await proposed("fastapi-nohealth-two");
     const proposal2 = conformance(app2.id).proposal!;
     approveProposal(app2.id, proposal2.id);
@@ -1072,19 +1084,68 @@ describe("approval, publication and the exact merged candidate", () => {
       app2.id,
       conformance(app2.id).proposedAcceptance!.id,
     );
-    expect((await verifyCandidate(app2.id)).status).toBe("passed");
+    const verified = await verifyCandidate(app2.id);
+    expect(verified.status).toBe("passed");
     expect(checks(app2.id)["conformance-passed"]).toBe("passed");
-    github(app2.name).pushToMain(
-      github(app2.name).filesAt(github(app2.name).head()!)!,
-    );
+    github(app2.name).pushToMain([
+      ...github(app2.name).filesAt(github(app2.name).head()!)!,
+      { path: "unrelated.txt", content: "Do not deploy this automatically" },
+    ]);
     await refreshCandidate(app2.id);
-    expect(checks(app2.id)["conformance-passed"]).toBe("not-yet");
-    expect(results(app2.id)["conformance-passed"]).toContain(
-      "No conformance run for candidate",
+    expect(conformance(app2.id).proposal?.candidate?.sha).toBe(
+      verified.source.commitSha,
     );
+    expect(checks(app2.id)["conformance-passed"]).toBe("passed");
     expect(
       conformance(app2.id).runs.filter((run) => run.kind === "candidate"),
     ).toHaveLength(1);
+  }, 90_000);
+
+  it("does not substitute main when the merged revision is unavailable", async () => {
+    const app = await proposed();
+    const proposal = conformance(app.id).proposal!;
+    approveProposal(app.id, proposal.id);
+    github(app.name).permissions = { pull: true, push: true, admin: false };
+    await grantPublication(app.id);
+    const published = await publishProposal(app.id, proposal.id);
+    github(app.name).merge(published.publication!.pullRequestNumber, "merge");
+    const snapshot = github(app.name).snapshot();
+    snapshot.pulls[0].mergeCommitSha = null;
+    github(app.name).restore(snapshot);
+    await expect(refreshCandidate(app.id)).rejects.toThrow(
+      "has not reported the merged revision",
+    );
+    expect(conformance(app.id).proposal?.candidate).toBeNull();
+  }, 90_000);
+
+  it("checks the complete merged tree, not just the PR head's diff", async () => {
+    const app = await proposed();
+    const proposal = conformance(app.id).proposal!;
+    approveProposal(app.id, proposal.id);
+    github(app.name).permissions = { pull: true, push: true, admin: false };
+    await grantPublication(app.id);
+    const published = await publishProposal(app.id, proposal.id);
+    const merged = github(app.name).merge(
+      published.publication!.pullRequestNumber,
+      "merge",
+    );
+    // Model a merge incorporating an unrelated base change without changing
+    // the reviewed PR head. The final candidate must expose that difference.
+    const snapshot = github(app.name).snapshot();
+    const mergeCommit = snapshot.commits.find(
+      (commit) => commit.sha === merged,
+    )!;
+    mergeCommit.files = [
+      ...mergeCommit.files,
+      { path: "unreviewed.txt", content: "from the updated base" },
+    ];
+    github(app.name).restore(snapshot);
+    const refreshed = await refreshCandidate(app.id);
+    expect(refreshed.verification?.scope).toMatchObject({
+      ok: false,
+      violations: ["unreviewed.txt was not part of the reviewed change"],
+    });
+    expect(checks(app.id)["changes-resolved"]).toBe("blocked");
   }, 90_000);
 
   it("publishes automatically under Full autonomy once a grant exists, and under Let Server Guy decide when Pi asks for no approval", async () => {

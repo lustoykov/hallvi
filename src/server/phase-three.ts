@@ -1374,7 +1374,6 @@ async function verifyCandidateContents(
   repository: string,
   proposal: ConformanceProposalRecord,
   candidateSha: string,
-  reviewedHead: string | null,
   signal?: AbortSignal,
 ): Promise<CandidateVerification> {
   const differences: string[] = [];
@@ -1392,34 +1391,30 @@ async function verifyCandidateContents(
     else if (content !== change.content)
       differences.push(`${change.path} differs from the reviewed content`);
   }
-  const scope = reviewedHead
-    ? await (async () => {
-        const compared = await compareCommits(
-          token,
-          repository,
-          proposal.baseSha,
-          reviewedHead,
-          signal,
-        );
-        const proposed = new Set(proposal.changes.map((change) => change.path));
-        const violations = compared.flatMap((file) => {
-          const sensitive = sensitivePathReason(file.filename);
-          if (sensitive) return [`${file.filename} (${sensitive})`];
-          if (proposal.origin === "server-guy" && !proposed.has(file.filename))
-            return [`${file.filename} was not part of the reviewed change`];
-          return [];
-        });
-        return {
-          ok: violations.length === 0,
-          violations,
-          changedFiles: compared.map((file) => file.filename),
-        };
-      })()
-    : (proposal.verification?.scope ?? {
-        ok: true,
-        violations: [],
-        changedFiles: [],
-      });
+  // Inspect the full candidate, including changes incorporated while merging.
+  // Comparing only the PR head would miss changes from its updated base.
+  const scope = await (async () => {
+    const compared = await compareCommits(
+      token,
+      repository,
+      proposal.baseSha,
+      candidateSha,
+      signal,
+    );
+    const proposed = new Set(proposal.changes.map((change) => change.path));
+    const violations = compared.flatMap((file) => {
+      const sensitive = sensitivePathReason(file.filename);
+      if (sensitive) return [`${file.filename} (${sensitive})`];
+      if (proposal.origin === "server-guy" && !proposed.has(file.filename))
+        return [`${file.filename} was not part of the reviewed change`];
+      return [];
+    });
+    return {
+      ok: violations.length === 0,
+      violations,
+      changedFiles: compared.map((file) => file.filename),
+    };
+  })();
   return {
     candidateSha,
     verifiedAt: new Date().toISOString(),
@@ -1430,9 +1425,9 @@ async function verifyCandidateContents(
 }
 
 /**
- * Observes the pull request and the default branch on GitHub. A merged pull
- * request makes the observed default-branch head the candidate, whatever the
- * merge method; the reviewed change is then compared with that exact commit.
+ * Selects the PR's exact merge result, or the returned external commit once
+ * it is on the default branch. Refresh never adopts later default-branch
+ * commits. The complete selected revision is checked against the proposal.
  */
 export async function refreshCandidate(
   applicationId: string,
@@ -1484,27 +1479,51 @@ export async function refreshCandidate(
     defaultBranch,
     signal,
   );
-  let merged = Boolean(pull?.merged);
+  let candidateSha: string | null = null;
   let mergeInfo: CandidateResolution["merge"] = null;
   if (pull?.merged) {
-    const mergeCommit = pull.mergeCommitSha
-      ? await observeCommit(
-          credential.token,
-          repository,
-          pull.mergeCommitSha,
-          signal,
-        ).catch(() => null)
-      : null;
+    if (pull.baseRef !== defaultBranch)
+      throw new Error(
+        `The pull request was merged into ${pull.baseRef}, not ${defaultBranch}. Return a change merged into the application's default branch.`,
+      );
+    if (!pull.mergeCommitSha)
+      throw new Error(
+        "GitHub has not reported the merged revision yet. Refresh again; the latest branch head will not be selected instead.",
+      );
+    const mergeCommit = await observeCommit(
+      credential.token,
+      repository,
+      pull.mergeCommitSha,
+      signal,
+    );
+    if (mergeCommit.sha !== pull.mergeCommitSha)
+      throw new Error(
+        "GitHub returned a different commit from the pull request's merged revision.",
+      );
+    candidateSha = mergeCommit.sha;
+    if (
+      candidateSha !== head &&
+      !(await isAncestor(
+        credential.token,
+        repository,
+        candidateSha,
+        head,
+        signal,
+      ))
+    )
+      throw new Error(
+        "The merged revision is no longer included in the default branch. Review the repository history before selecting a deployment revision.",
+      );
     mergeInfo = {
       pullRequestNumber: pull.number,
       mergedAt: pull.mergedAt,
       mergeCommitSha: pull.mergeCommitSha,
-      method: mergeCommit ? classifyMerge(mergeCommit, pull.number) : "unknown",
+      method: classifyMerge(mergeCommit, pull.number),
     };
   } else if (!pull && proposal.external) {
     // A returned commit or branch without a pull request: it is the candidate
     // only when the default branch contains it, observed as an ancestor.
-    merged =
+    const included =
       head === proposal.external.headSha ||
       (await isAncestor(
         credential.token,
@@ -1513,24 +1532,27 @@ export async function refreshCandidate(
         head,
         signal,
       ));
+    if (included) candidateSha = proposal.external.headSha;
   }
-  if (!merged) {
+  if (!candidateSha) {
     const updated =
       updateConformanceProposal(proposal.id, [proposal.status], patch) ??
       proposal;
     return updated;
   }
-  const reviewedHead = pull?.headSha ?? proposal.external?.headSha ?? null;
+  if (proposal.candidate && proposal.candidate.sha !== candidateSha)
+    throw new Error(
+      "The returned change now identifies a different revision. Return it as a new change to review it; Refresh keeps the selected revision.",
+    );
   const verification = await verifyCandidateContents(
     credential.token,
     repository,
     proposal,
-    head,
-    reviewedHead,
+    candidateSha,
     signal,
   );
   const candidate: CandidateResolution = {
-    sha: head,
+    sha: candidateSha,
     defaultBranch,
     resolvedAt: observedAt,
     source: proposal.origin === "external" ? "external" : "merged-pull-request",
@@ -1543,13 +1565,13 @@ export async function refreshCandidate(
   });
   if (!updated)
     throw new Error("The proposal changed while GitHub was being observed.");
-  if (proposal.candidate?.sha !== head)
+  if (proposal.candidate?.sha !== candidateSha)
     recordActivityOnce(
-      `candidate:${proposal.id}:${head}`,
+      `candidate:${proposal.id}:${candidateSha}`,
       workspace.id,
       "candidate-recorded",
       "Candidate revision recorded",
-      `${shortSha(head)} on ${defaultBranch}${mergeInfo ? ` · pull request #${mergeInfo.pullRequestNumber} merged (${mergeInfo.method})` : ""}${
+      `${shortSha(candidateSha)} on ${defaultBranch}${mergeInfo ? ` · pull request #${mergeInfo.pullRequestNumber} merged (${mergeInfo.method})` : ""}${
         verification.changesComplete
           ? " · reviewed change present"
           : ` · differs: ${verification.differences.join(", ")}`

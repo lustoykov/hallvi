@@ -29,7 +29,6 @@ import * as store from "../../../src/server/db";
 import { diagnosticLogPath } from "../../../src/server/diagnostics";
 import { GithubAccessError } from "../../../src/server/github-api";
 import {
-  credentialFingerprint,
   saveGithubConnection,
   type GithubConnection,
 } from "../../../src/server/github-connection";
@@ -85,9 +84,11 @@ const TOKEN = "QA-GITHUB-TOKEN";
 function login(id: string): GithubConnection {
   return {
     id,
-    mode: "cli",
-    source: "gh",
-    fingerprint: credentialFingerprint(TOKEN, "gh"),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   };
@@ -108,6 +109,24 @@ mocks.githubJson.mockImplementation(
       throw new GithubAccessError("GitHub is unavailable. Try again later.");
     if (path === "/user")
       return { data: { id: 1, login: "fixture" }, scopes: ["repo"] };
+    if (path.startsWith("/user/installations?"))
+      return {
+        data: {
+          installations: [
+            {
+              id: 7,
+              app_slug: "server-guy-test",
+              account: { id: 2, login: "qa" },
+              permissions: { contents: "read" },
+              repository_selection: "selected",
+              suspended_at: null,
+            },
+          ],
+        },
+        scopes: [],
+      };
+    if (path.startsWith("/user/installations/7/repositories"))
+      return { data: { repositories: [{ id: 99 }] }, scopes: [] };
     const match = /^\/repos\/([^/]+\/[^/]+)(\/.*)?$/.exec(path);
     if (!match) throw new Error(`Unexpected GitHub path ${path}`);
     const [, fullName, rest = ""] = match;
@@ -533,16 +552,16 @@ describe("the explicit Phase 1 → Phase 2 transition", () => {
       "repository-inspected",
       "phase-started",
     ]);
-    // Inspection: the tree plus only the profile's manifest, then the
+    // Inspection: only the tree, with all file choices left to Pi, then the
     // auto-started request attributed to Server Guy, queued for the worker.
     const inspection = repositoryEvidence(app.id);
     expect(inspection.inspection?.status).toBe("passed");
     expect(inspection.current).toBe(true);
-    expect(inspection.resolution.status).toBe("matched");
+    expect(inspection.resolution.status).toBe("pending");
     expect(
       inspection.files.map((f) => (f.raw as { path: string }).path),
-    ).toEqual(["pyproject.toml"]);
-    expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 2);
+    ).toEqual([]);
+    expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 1);
     expect(view.messages.map((m) => [m.role, m.source, m.status])).toEqual([
       ["assistant", "server-guy", "completed"],
       ["user", "server-guy", "completed"],
@@ -550,7 +569,7 @@ describe("the explicit Phase 1 → Phase 2 transition", () => {
     ]);
     expect(view.messages[1].body).toBe(INSPECTION_REQUEST);
     expect(checks(app.id)).toEqual({
-      "profile-resolved": "passed",
+      "profile-resolved": "not-yet",
       "contract-complete": "not-yet",
       "contract-provenance": "not-yet",
       "contract-gaps": "not-yet",
@@ -558,7 +577,7 @@ describe("the explicit Phase 1 → Phase 2 transition", () => {
     // Idempotent: no second workspace, inspection or request.
     const again = await completeLaunchBrief(app.id);
     expect(again.workspace?.id).toBe(view.workspace?.id);
-    expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 2);
+    expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 1);
     expect(store.listMessages(view.selectedChatId!)).toHaveLength(3);
     expect(store.listWorkspaces(app.id)).toHaveLength(2);
   });
@@ -651,29 +670,23 @@ describe("inspection outcomes", () => {
         .listObservations(app.id)
         .filter((o) => o.kind === "github-repository-inspection"),
     ).toHaveLength(2);
-    expect(checks(app.id)["profile-resolved"]).toBe("passed");
+    expect(checks(app.id)["profile-resolved"]).toBe("not-yet");
   });
 
-  it("reports an unmatched profile honestly with its criteria and starts nothing", async () => {
+  it("lets Pi inspect unfamiliar and mixed-manifest repositories instead of rejecting filenames", async () => {
     const app = await application("django-site");
     const view = await completeLaunchBrief(app.id);
-    expect(runs.claimNextPiRun()).toBeNull();
-    const check = getOperatorView(app.id).checks[0];
-    expect(check.status).toBe("blocked");
-    expect(check.result).toContain("no pyproject.toml at the root");
-    expect(view.inspection?.profile.criteria.map((c) => c.matched)).toEqual([
-      false,
-      false,
-      false,
-      false,
-    ]);
-    expect(view.messages[1].body).toContain("did not match");
+    const firstRun = runs.claimNextPiRun()!;
+    expect(firstRun).not.toBeNull();
+    runs.cancelPiRun(app.id, firstRun.chatId, firstRun.id);
+    expect(view.inspection?.profile.criteria).toEqual([]);
+    expect(view.messages[1].body).toBe(INSPECTION_REQUEST);
     const ambiguous = await application("ambiguous-app");
     await completeLaunchBrief(ambiguous.id);
     expect(getOperatorView(ambiguous.id).checks[0].result).toContain(
-      "package.json",
+      "propose an evidence-backed application profile",
     );
-    expect(runs.claimNextPiRun()).toBeNull();
+    expect(runs.claimNextPiRun()).not.toBeNull();
   });
 
   it("treats a tree failure as unavailable, not as a failed profile", async () => {
@@ -721,8 +734,8 @@ describe("Pi's adaptive inspection through the real SDK tool loop", () => {
         "README.md",
       ].sort(),
     );
-    // pyproject.toml was captured at inspection; the model's read was served
-    // from the saved Observation without another network call.
+    // pyproject.toml is fetched only when the model asks; subsequent reads
+    // use the saved Observation without another network call.
     expect(
       github.calls.filter((p) => p.includes("/contents/pyproject.toml")),
     ).toHaveLength(1);
@@ -1061,7 +1074,7 @@ describe("invalidation, isolation and removal", () => {
     await inspectRepository(app.id);
     const view = getOperatorView(app.id);
     expect(view.checks.map((c) => c.status)).toEqual([
-      "passed",
+      "not-yet",
       "blocked",
       "not-yet",
       "not-yet",

@@ -53,7 +53,7 @@ The permission scope is recorded as **Current application launch** in this slice
 
 ## Run
 
-Requirements: Node.js and a supported ChatGPT subscription for Pi. The Pi SDK is installed with the app; a separate Pi CLI installation is not required. GitHub is connected explicitly in Settings, either by choosing a detected GitHub CLI/environment login or by signing in through a configured GitHub App.
+Requirements: Node.js and a supported ChatGPT subscription for Pi. The Pi SDK is installed with the app; a separate Pi CLI installation is not required. GitHub is connected explicitly in Settings through a configured GitHub App. Server Guy does not borrow GitHub CLI or environment credentials.
 
 ```bash
 npm install

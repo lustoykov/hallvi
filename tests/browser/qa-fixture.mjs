@@ -12,7 +12,6 @@ import {
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   createTemporaryRoot,
   removeTemporaryRoot,
@@ -125,11 +124,11 @@ if (initialSetup === "ready") {
     join(state, "github-connection.json"),
     JSON.stringify({
       id: "00000000-0000-4000-8000-000000000001",
-      mode: "cli",
-      source: "gh",
-      fingerprint: createHash("sha256")
-        .update("gh\0QA-GITHUB-TOKEN")
-        .digest("hex"),
+      mode: "app",
+      clientId: "Iv1.qa-fixture",
+      slug: "qa-server-guy",
+      token: "ghu_QA-SYNTHETIC",
+      expiresAt: null,
       account: { id: 42, login: "qa-fixture-user" },
       connectedAt: new Date().toISOString(),
     }),

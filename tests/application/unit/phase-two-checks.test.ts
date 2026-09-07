@@ -220,7 +220,7 @@ describe("Phase 2 checks", () => {
       "contract-gaps": "not-yet",
     });
     expect(results(checks)["profile-resolved"]).toBe(
-      "FastAPI + uv v1 · cccccccc",
+      "FastAPI + uv selected from repository evidence · cccccccc · execution not yet verified",
     );
     expect(results(checks)["contract-complete"]).toContain(
       "No Application Contract yet",

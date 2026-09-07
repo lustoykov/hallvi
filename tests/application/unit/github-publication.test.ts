@@ -38,7 +38,7 @@ function synthetic(
 ) {
   const state = {
     ref: initial.refSha ?? null,
-    commits: new Map<string, { message: string }>(),
+    commits: new Map<string, { message: string; parents?: string[] }>(),
     pulls: initial.pulls ?? [],
     created: [] as string[],
   };
@@ -68,7 +68,9 @@ function synthetic(
           data: {
             sha,
             message: state.commits.get(sha)?.message ?? "",
-            parents: [{ sha: BASE }],
+            parents: (state.commits.get(sha)?.parents ?? [BASE]).map((sha) => ({
+              sha,
+            })),
             tree: { sha: "t" },
           },
           scopes: [],
@@ -158,9 +160,54 @@ describe("publication through the Git Data API", () => {
   it("refuses to overwrite a branch that was not created from this proposal", async () => {
     synthetic({ refSha: "e".repeat(40), refMessage: "Someone else's work" });
     await expect(publishToGithub("token", request)).rejects.toThrow(
-      /already exists .* was not created from this change/,
+      /already exists .* could not be identified/,
     );
   });
+
+  it("preserves collaborator commits when recovering a lost publication receipt", async () => {
+    const published = "d".repeat(40);
+    const collaborator = "e".repeat(40);
+    const state = synthetic({
+      refSha: collaborator,
+      refMessage: "User adds a route",
+      pulls: [{ number: 7, state: "open" }],
+    });
+    state.commits.set(collaborator, {
+      message: "User adds a route",
+      parents: [published],
+    });
+    state.commits.set(published, {
+      message: `Earlier\n\nServer-Guy-Proposal: ${request.proposalId}`,
+      parents: [BASE],
+    });
+    expect(await publishToGithub("token", request)).toMatchObject({
+      commitSha: published,
+      pullRequestNumber: 7,
+      adopted: true,
+    });
+    expect(state.ref).toBe(collaborator);
+    expect(state.created.some((call) => /^(POST|PATCH)/.test(call))).toBe(
+      false,
+    );
+  });
+
+  it.each(["similar-id", "different-base"])(
+    "does not adopt a misleading proposal marker: %s",
+    async (kind) => {
+      const head = "e".repeat(40);
+      const state = synthetic({ refSha: head });
+      state.commits.set(head, {
+        message: `Server-Guy-Proposal: ${request.proposalId}${kind === "similar-id" ? "-other" : ""}`,
+        parents: kind === "different-base" ? ["f".repeat(40)] : [BASE],
+      });
+      await expect(publishToGithub("token", request)).rejects.toThrow(
+        /could not be identified/,
+      );
+      expect(state.created.some((call) => /^(POST|PATCH)/.test(call))).toBe(
+        false,
+      );
+    },
+  );
 
   it("classifies merge methods from the merge commit", () => {
     expect(

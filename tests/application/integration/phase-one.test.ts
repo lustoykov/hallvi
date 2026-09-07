@@ -61,9 +61,11 @@ beforeAll(async () => {
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", databaseDirectory);
   saveGithubConnection({
     id: passingInspection.raw.connectionId,
-    mode: "cli",
-    source: "gh",
-    fingerprint: "0".repeat(64),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   });
@@ -76,9 +78,11 @@ beforeAll(async () => {
 beforeEach(() => {
   saveGithubConnection({
     id: passingInspection.raw.connectionId,
-    mode: "cli",
-    source: "gh",
-    fingerprint: "0".repeat(64),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   });
@@ -111,9 +115,11 @@ describe("repository verification after reconnecting", () => {
   function reconnect() {
     saveGithubConnection({
       id: connectionId,
-      mode: "cli",
-      source: "gh",
-      fingerprint: "0".repeat(64),
+      mode: "app",
+      clientId: "Iv1.fixture",
+      slug: "server-guy-test",
+      token: "ghu_QA-SYNTHETIC-TOKEN",
+      expiresAt: null,
       account: { id: 2, login: "new-login" },
       connectedAt: new Date().toISOString(),
     });
@@ -212,9 +218,11 @@ describe("repository verification after reconnecting", () => {
           ? null
           : {
               id: passingInspection.raw.connectionId,
-              mode: "cli",
-              source: "gh",
-              fingerprint: "0".repeat(64),
+              mode: "app",
+              clientId: "Iv1.fixture",
+              slug: "server-guy-test",
+              token: "ghu_QA-SYNTHETIC-TOKEN",
+              expiresAt: null,
               account: { id: 1, login: "replacement" },
               connectedAt: new Date().toISOString(),
             },

@@ -113,7 +113,7 @@ A precise explanation derived when an unresolved condition prevents an Operation
 _Avoid_: Generic error, vague risk, failed task
 
 **Application Profile**:
-A supported stack-specific interpretation of the Application Contract, including the conventions Server Guy can inspect, establish, and operate.
+A supported set of application conventions and operational capabilities. Pi selects an applicable profile by interpreting repository evidence; the selection is revisable and does not establish that the application builds or runs.
 _Avoid_: Plugin, deployment template
 
 **Application Contract**:

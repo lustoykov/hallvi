@@ -21,6 +21,7 @@ import {
   contractGapReport,
   describeContractChanges,
   reviewContractProvenance,
+  resolveCitation,
   validateContractProposal,
   type ContractValidationContext,
 } from "./application-contract";
@@ -65,7 +66,6 @@ interface InspectionRaw {
   entries?: InspectedTreeEntry[];
   truncated?: boolean;
   checkedAt?: string;
-  resolutionFiles?: string[];
   error?: string;
 }
 
@@ -123,12 +123,21 @@ export function repositoryEvidence(applicationId: string): RepositoryEvidence {
   const files = commitSha
     ? listRepositoryFileObservations(applicationId, commitSha)
     : [];
-  const contents = new Map<string, string>();
-  for (const file of files) {
-    const { path, content } = fileRaw(file);
-    if (typeof path === "string" && typeof content === "string")
-      contents.set(path, content);
-  }
+  const contract = currentContract(applicationId);
+  const selection =
+    contract?.commitSha === commitSha &&
+    contract.profileVersion === APPLICATION_PROFILE.version
+      ? contract.body.profileSelection
+      : undefined;
+  const selectionCurrent =
+    selection?.citations.every(
+      (citation) =>
+        resolveCitation(citation, {
+          applicationId,
+          commitSha: commitSha!,
+          lookups: { observation: getObservation },
+        }).ok,
+    ) ?? false;
   return {
     inspection,
     connectionId,
@@ -141,8 +150,7 @@ export function repositoryEvidence(applicationId: string): RepositoryEvidence {
     files,
     resolution: resolveApplicationProfile({
       inspected: current,
-      entries,
-      files: contents,
+      selection: selectionCurrent ? selection : undefined,
     }),
   };
 }
@@ -336,28 +344,6 @@ async function performInspection(
         "auth",
       );
     const tree = await fetchRepositoryTree(name, commitSha, credential.token);
-    const resolutionFiles: string[] = [];
-    for (const path of APPLICATION_PROFILE.resolutionFiles) {
-      const entry = tree.entries.find(
-        (candidate) => candidate.path === path && candidate.type === "blob",
-      );
-      if (!entry) continue;
-      try {
-        await recordRepositoryFile(
-          application,
-          connectionId,
-          commitSha,
-          path,
-          credential.token,
-          { size: entry.size },
-        );
-        resolutionFiles.push(path);
-      } catch (error) {
-        // A denied or unreadable manifest is reported by the profile
-        // criteria; a provider failure is not, so it fails the inspection.
-        if (!(error instanceof RepositoryPathError)) throw error;
-      }
-    }
     const blobs = tree.entries.filter((entry) => entry.type === "blob").length;
     const directories = tree.entries.length - blobs;
     return record(
@@ -371,7 +357,6 @@ async function performInspection(
         treeUrl: `${application.repositoryUrl}/tree/${commitSha}`,
         entries: tree.entries,
         truncated: tree.truncated,
-        resolutionFiles,
       },
     );
   } catch (error) {
@@ -387,9 +372,9 @@ async function performInspection(
 }
 
 /**
- * Pins the default branch to an exact commit, records the bounded tree and
- * reads only the profile's resolution manifest. Every other file is Pi's
- * choice during a Run. Concurrent requests share one inspection.
+ * Pins the default branch to an exact commit and records the bounded tree.
+ * All file choices belong to Pi during a Run. Concurrent requests share
+ * one inspection.
  */
 export async function inspectRepository(applicationId: string) {
   const { application, current } = loadApplication(applicationId);
@@ -566,22 +551,17 @@ export async function readRepositoryFileForRun(
     throw new RepositoryPathError(
       `${path} is a directory; list it with get_repository_inspection using prefix "${path}/".`,
     );
-  const existing = findRepositoryFileObservation(
-    application.id,
-    commitSha,
-    path,
-  );
-  if (existing) {
-    const raw = fileRaw(existing) as ReturnType<typeof fileRaw> & {
+  const receipt = (observation: Observation, cached: boolean) => {
+    const raw = fileRaw(observation) as ReturnType<typeof fileRaw> & {
       truncated?: boolean;
       binary?: boolean;
       redactedCount?: number;
     };
     return {
       status: "read" as const,
-      cached: true,
-      observationId: existing.id,
-      observedAt: existing.observedAt,
+      cached,
+      observationId: observation.id,
+      observedAt: observation.observedAt,
       path,
       commitSha,
       size: raw.size,
@@ -590,7 +570,13 @@ export async function readRepositoryFileForRun(
       redactedCount: raw.redactedCount ?? 0,
       ...bound(raw.content ?? ""),
     };
-  }
+  };
+  const existing = findRepositoryFileObservation(
+    application.id,
+    commitSha,
+    path,
+  );
+  if (existing) return receipt(existing, true);
   if (budget.reads >= INSPECTION_LIMITS.readsPerRun)
     throw new Error(
       `This request has reached its limit of ${INSPECTION_LIMITS.readsPerRun} repository reads. Work with what was read, or ask the engineer to continue in a new message.`,
@@ -615,24 +601,7 @@ export async function readRepositoryFileForRun(
   );
   budget.reads++;
   budget.bytes += entry.size ?? 0;
-  const raw = fileRaw(observation) as ReturnType<typeof fileRaw> & {
-    truncated?: boolean;
-    binary?: boolean;
-    redactedCount?: number;
-  };
-  return {
-    status: "read" as const,
-    cached: false,
-    observationId: observation.id,
-    observedAt: observation.observedAt,
-    path,
-    commitSha,
-    size: raw.size,
-    truncated: Boolean(raw.truncated),
-    binary: Boolean(raw.binary),
-    redactedCount: raw.redactedCount ?? 0,
-    ...bound(raw.content ?? ""),
-  };
+  return receipt(observation, false);
 }
 
 // Contract proposals: validated when proposed, guarded when committed.
@@ -698,6 +667,9 @@ function stripComputed(citation: ContractCitation): ContractCitation {
 export function proposalInput(proposal: ApplicationContractProposal) {
   return {
     summary: proposal.body.summary,
+    ...(proposal.body.profileSelection
+      ? { profileSelection: proposal.body.profileSelection }
+      : {}),
     fields: proposal.body.fields.map((field) => {
       const provenance = field.provenance;
       const normalized =

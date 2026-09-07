@@ -1,4 +1,4 @@
-import type { ProfileCriterion, ProfileResolution } from "./types";
+import type { ApplicationContractBody, ProfileResolution } from "./types";
 
 /**
  * The one supported Application Profile in this build: a single FastAPI
@@ -14,19 +14,6 @@ export const APPLICATION_PROFILE = {
   label: "FastAPI + uv",
   description:
     "One FastAPI service whose dependencies are locked with uv, started by an ASGI server inside a container, with PostgreSQL as the intended database.",
-  /** Files Server Guy reads at inspection so the profile can be resolved
-   * without a model; every other read is Pi's choice. */
-  resolutionFiles: ["pyproject.toml"],
-  /** A second root-level runtime manifest means this single-service profile
-   * cannot describe the whole repository. */
-  competingManifests: [
-    "package.json",
-    "go.mod",
-    "Cargo.toml",
-    "Gemfile",
-    "pom.xml",
-    "composer.json",
-  ],
   /** Each rule governs exactly one material field; a rule cited for any
    * other field is not provenance, whatever value it carries. */
   rules: {
@@ -271,64 +258,11 @@ export interface InspectedTreeEntry {
   size?: number;
 }
 
-/**
- * A deliberately small reading of pyproject.toml: the `[project]` table's
- * `requires-python` and `dependencies`, and whether a `[tool.uv]` table
- * exists. Dynamic dependencies or unusual layouts do not match, and the
- * criteria say so instead of guessing.
- */
-export function readPyproject(text: string) {
-  let section = "";
-  let requiresPython: string | null = null;
-  const dependencies: string[] = [];
-  let hasToolUv = false;
-  let dynamicDependencies = false;
-  const lines = text.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index].trim();
-    const header = /^\[([^\]]+)\]$/.exec(line);
-    if (header) {
-      section = header[1].trim();
-      if (section === "tool.uv") hasToolUv = true;
-      continue;
-    }
-    if (section !== "project") continue;
-    const pair = /^([A-Za-z0-9_-]+)\s*=\s*(.*)$/.exec(line);
-    if (!pair) continue;
-    const [, key, rest] = pair;
-    if (key === "requires-python") {
-      const literal = /^["']([^"']*)["']/.exec(rest);
-      requiresPython = literal?.[1] ?? null;
-    }
-    if (key === "dynamic" && /dependencies/.test(rest))
-      dynamicDependencies = true;
-    if (key === "dependencies") {
-      let array = rest;
-      while (!/\]/.test(array) && index + 1 < lines.length)
-        array += "\n" + lines[++index];
-      for (const match of array.matchAll(/["']([^"']+)["']/g))
-        dependencies.push(match[1]);
-    }
-  }
-  return { requiresPython, dependencies, hasToolUv, dynamicDependencies };
-}
-
-/** PEP 508 distribution name of one dependency specifier, normalized. */
-export function dependencyName(specifier: string) {
-  return (
-    /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(specifier)?.[1] ?? ""
-  ).toLowerCase();
-}
-
-/**
- * Deterministic profile resolution from an inspection's tree and the files it
- * captured. Every criterion reports what it found and where, so an unmatched
- * or ambiguous repository is an explanation, not a silent failure.
- */
+/** A supported capability selected by Pi from cited repository evidence.
+ * No file-name or dependency heuristics decide what the application is. */
 export function resolveApplicationProfile(input: {
   inspected: boolean;
-  entries: readonly InspectedTreeEntry[];
-  files: ReadonlyMap<string, string>;
+  selection?: ApplicationContractBody["profileSelection"];
 }): ProfileResolution {
   const base = {
     profileId: APPLICATION_PROFILE.id,
@@ -340,79 +274,35 @@ export function resolveApplicationProfile(input: {
       ...base,
       status: "not-inspected",
       criteria: [],
-      reason: "The repository has not been inspected yet.",
+      reason:
+        "The repository has not been inspected with the current connection.",
     };
-  const has = (path: string) =>
-    input.entries.some((entry) => entry.path === path);
-  const pyprojectText = input.files.get("pyproject.toml");
-  const pyproject =
-    pyprojectText === undefined ? null : readPyproject(pyprojectText);
-  const fastapi = pyproject?.dependencies.find(
-    (dependency) => dependencyName(dependency) === "fastapi",
-  );
-  const criteria: ProfileCriterion[] = [
-    {
-      id: "pyproject-present",
-      label: "pyproject.toml at the repository root",
-      matched: has("pyproject.toml"),
-      evidence: has("pyproject.toml")
-        ? pyprojectText === undefined
-          ? "pyproject.toml is in the tree but its content was not captured"
-          : "pyproject.toml is in the tree and was read"
-        : "no pyproject.toml at the root",
-    },
-    {
-      id: "fastapi-dependency",
-      label: "fastapi in [project] dependencies",
-      matched: Boolean(fastapi),
-      evidence: fastapi
-        ? `pyproject.toml declares "${fastapi}"`
-        : pyproject?.dynamicDependencies
-          ? "pyproject.toml marks dependencies as dynamic"
-          : pyproject
-            ? "pyproject.toml declares no fastapi dependency"
-            : "pyproject.toml was not read",
-    },
-    {
-      id: "uv-managed",
-      label: "uv.lock at the root or a [tool.uv] table",
-      matched: has("uv.lock") || Boolean(pyproject?.hasToolUv),
-      evidence: has("uv.lock")
-        ? "uv.lock is in the tree"
-        : pyproject?.hasToolUv
-          ? "pyproject.toml has a [tool.uv] table"
-          : "neither uv.lock nor [tool.uv] was found",
-    },
-    {
-      id: "requires-python",
-      label: "requires-python declared",
-      matched: Boolean(pyproject?.requiresPython),
-      evidence: pyproject?.requiresPython
-        ? `requires-python = "${pyproject.requiresPython}"`
-        : "no requires-python in [project]",
-    },
-  ];
-  // Criteria are only meaningful once the manifest was readable; an
-  // uncaptured pyproject.toml is reported by the first criterion alone.
-  if (has("pyproject.toml") && pyprojectText === undefined)
-    criteria[0].matched = false;
-  const rejected = criteria.filter((criterion) => !criterion.matched);
-  if (rejected.length)
+  if (!input.selection)
+    return {
+      ...base,
+      status: "pending",
+      criteria: [],
+      reason:
+        "Repository context is ready. Server Guy must inspect the relevant files and propose an evidence-backed application profile.",
+    };
+  if (input.selection.profileId !== APPLICATION_PROFILE.id)
     return {
       ...base,
       status: "unmatched",
-      criteria,
-      reason: `${APPLICATION_PROFILE.label} did not match: ${rejected
-        .map((criterion) => criterion.evidence)
-        .join("; ")}.`,
+      criteria: [],
+      reason: `The selected profile ${input.selection.profileId} is not currently supported.`,
     };
-  const competing = APPLICATION_PROFILE.competingManifests.filter(has);
-  if (competing.length)
-    return {
-      ...base,
-      status: "ambiguous",
-      criteria,
-      reason: `The FastAPI service matched, but ${competing.join(", ")} at the root shows another runtime this single-service profile cannot describe.`,
-    };
-  return { ...base, status: "matched", criteria, reason: null };
+  return {
+    ...base,
+    status: "matched",
+    reason: null,
+    criteria: [
+      {
+        id: "model-selection",
+        label: "Profile selected from repository evidence",
+        matched: true,
+        evidence: input.selection.rationale,
+      },
+    ],
+  };
 }

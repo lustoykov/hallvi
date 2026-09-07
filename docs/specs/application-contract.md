@@ -4,7 +4,7 @@ Status: implemented on `codex/phase-two-application-contract` as a read-only ver
 
 ## Outcome
 
-An engineer whose Launch Brief is ready presses **Continue to Inspect app**. Server Guy pins the repository's default branch to one commit, records the tree, resolves the supported Application Profile and starts one request of its own: inspect the repository and propose the Application Contract. Pi reads the files that matter through scoped, read-only tools; every read is saved as a source-attributed Observation before the model sees the content. Pi proposes the contract through a typed tool that validates provenance immediately and again in the final transaction. The engineer sees every field with its source, the conformance work Phase 3 owes, the values that need their decision, and the product policies that stay open until later gates. They can correct a field in chat, re-inspect after a push, and read Phase 1 as completed, read-only history.
+An engineer whose Launch Brief is ready presses **Continue to Inspect app**. Server Guy pins the repository's default branch to one commit, records the tree and starts one request of its own: inspect the repository and propose the Application Contract. Pi chooses the files to read and proposes a supported Application Profile with citations and an explanation through the contract tool; every read is saved as a source-attributed Observation before the model sees the content. Pi proposes the contract through a typed tool that validates provenance immediately and again in the final transaction. The engineer sees every field with its source, the conformance work Phase 3 owes, the values that need their decision, and the product policies that stay open until later gates. They can correct a field in chat, re-inspect after a push, and read Phase 1 as completed, read-only history.
 
 ```text
 Launch Brief ready ──Continue──▶ one immediate transaction
@@ -16,7 +16,7 @@ Launch Brief ready ──Continue──▶ one immediate transaction
                      deterministic inspection (network, outside the transaction)
                                   ├── identity + default-branch commit (existing GitHub adapter)
                                   ├── bounded recursive tree at that commit
-                                  └── the profile's resolution manifest (pyproject.toml)
+                                  └── no automatic file reads or stack classification
                                 ▼
                      one Run, requested by Server Guy, attributed to Server Guy
                                   ├── get_repository_inspection   (local)
@@ -43,7 +43,7 @@ The transition is explicit. Nothing moves to Phase 2 automatically, because gate
 
 - `POST /api/applications/{id}/phases/inspect-app` (same-origin) runs `completeLaunchBrief`. In one immediate SQLite transaction it re-evaluates the four Phase 1 checks and refuses if any is not passed, refuses while any Pi Run for the application is queued or running, marks the Phase 1 workspace `completed_at` with `deliverable_evidence` (the check results as evaluated, the cited repository Observation, commit, connection, environment, Approval Mode and scope), creates the `inspect-app` workspace with its primary Chat **Application Contract** and an opening Server Guy message, and records **Launch Brief completed** in the Phase 1 feed and **Inspect app started** in the Phase 2 feed.
 - Repeating the request returns the current view; the unique `(application, phase)` constraint guarantees one workspace. Concurrent requests cannot create two.
-- After the commit, the inspection runs (below). If it passes and the profile matches, one Run is enqueued whose accepted message is `Inspect the repository and propose the Application Contract.` with `source: server-guy`. The chat renders it as **Server Guy · Started automatically**, never as the engineer's words. Without a worker it stays visibly queued. If the inspection did not pass or the profile did not match, no Run starts and a Server Guy message explains the result and points to **Re-inspect repository**.
+- After the commit, the inspection runs (below). If repository access and tree inspection pass, one Run is enqueued whose accepted message is `Inspect the repository and propose the Application Contract.` with `source: server-guy`. The chat renders it as **Server Guy · Started automatically**, never as the engineer's words. Without a worker it stays visibly queued. If the inspection did not pass, no Run starts and a Server Guy message explains the result and points to **Re-inspect repository**.
 - A completed workspace is read-only at every boundary: `sendChatMessage`, `retryPiRun`, `archiveChat`, the worker's pre-model check and `completePiRun` reject it the way they reject archived Chats, so an attempt that outlives a phase completion fails instead of writing across it. Its chats stay readable; new chats always open in the current phase.
 - The Operator View distinguishes the **current** phase (the latest workspace) from the **viewed** phase (the selected chat's). Viewing a completed phase shows its retained evidence as recorded, marked as not re-evaluated; later changes show in the current phase's checks. Future workspaces are not pre-created, and Phase 3 has no Continue in this build.
 
@@ -55,7 +55,7 @@ The transition is explicit. Nothing moves to Phase 2 automatically, because gate
 | --- | --- |
 | Identity and commit | `inspectGithubRepository` verifies account, repository ID, App installation and default-branch head exactly as Phase 1 does. A failure records a failed or unavailable inspection Observation and no Run. |
 | Tree | `GET /repos/{o}/{r}/git/trees/{sha}?recursive=1`, at most 3,000 entries retained, `truncated` recorded when GitHub or the bound cuts it. |
-| Resolution manifest | Only the profile's `resolutionFiles` (`pyproject.toml`) are read at inspection, so P2.G1 is computable without a model. Every other file is Pi's choice during a Run. |
+| Repository context | Only repository identity and tree are read initially. Every file path is Pi's choice during a Run; manifest names never reject an application before Pi investigates it. |
 | File reads | Contents API at the pinned commit; files over 512 KiB are refused, content over 64 KiB is cut and flagged, binary files store no content, credential-shaped values are redacted and counted. |
 | Deny list | `.env*` except `.env.example`-style samples, key material (`.pem`, `.key`, `.p12`, `id_rsa*`), `.netrc`, registry credential files and paths naming secrets or credentials are never fetched. Content is scanned regardless of filename. |
 | Per-Run budget | 24 network reads and 256 KiB per Run; the model receives at most 24,000 characters per read. A path already saved at that commit is served from the Observation without a network call. |
@@ -64,7 +64,7 @@ The transition is explicit. Nothing moves to Phase 2 automatically, because gate
 
 Observations:
 
-- `github-repository-inspection`: status, summary, the tree entries, truncation, commit, default branch, connection, limits and which resolution files were read. Activity: **Repository inspected** or **Repository inspection did not pass**.
+- `github-repository-inspection`: status, summary, the tree entries, truncation, commit, default branch, connection, limits. No file contents are fetched by this step. Activity: **Repository inspected** or **Repository inspection did not pass**.
 - `github-repository-file`: one per path and commit, with the (bounded, redacted) content, blob SHA, size, flags and the connection used. Saved inside the tool before the content reaches the model, so it survives cancellation. No Activity: reads are diagnostic steps (`read_repository_file`) in local logs and optional spans.
 
 The tree decides absence: a path missing from an untruncated tree is reported as absent with the inspection Observation to cite; a provider failure is a failed read and never proof that a file is absent.
@@ -73,14 +73,9 @@ The tree decides absence: a path missing from an untruncated tree is reported as
 
 The one supported profile in this build: a single FastAPI service managed with uv, started by an ASGI server in a container, with PostgreSQL as the intended database. Its definition is versioned in [`application-profile.ts`](../../src/server/application-profile.ts); changing a convention is a new version, which makes contracts built under the old version stale until revised. This does not decide how many profiles V1 supports (U2). PostgreSQL is the profile's target, not an observed fact about any repository.
 
-Resolution criteria, each reported as matched or rejected with what was found:
+Profile selection is model-authored interpretation, saved on the Application Contract as `profileSelection` (supported profile ID, rationale and citations). The model distinguishes actual runtime components from development tooling and may use unfamiliar layouts. There is no pyproject parser, required manifest list or competing-manifest classifier. Code validates the selected capability exists and every cited snippet belongs to this application's inspected commit; those checks establish source attribution, not correctness of the interpretation or successful execution. Unsupported applications must be described accurately in the reply rather than relabeled to fit the available profile.
 
-1. `pyproject.toml` at the repository root.
-2. `fastapi` in `[project].dependencies` (PEP 508 name match; dynamic dependencies do not match).
-3. `uv.lock` at the root or a `[tool.uv]` table.
-4. `requires-python` declared.
-
-All four must match. A matching repository with a second root-level runtime manifest (`package.json`, `go.mod`, `Cargo.toml`, `Gemfile`, `pom.xml`, `composer.json`) resolves as **ambiguous**: the single-service profile cannot describe the whole repository. The manifest reader is deliberately small: the `[project]` table's `requires-python` and `dependencies`, and the `[tool.uv]` header. Unusual layouts do not match and say so.
+Before that selection exists, profile status is `pending`: repository context is available and Pi can investigate. The selection and complete contract are saved together only after a successful reply, using the existing proposal transaction. A cancelled or stale proposal does not publish a profile selection. Revisions can reuse a saved selection only when its evidence still resolves at the selected commit.
 
 Profile rules with stable identities (`fastapi-uv@1/<rule>`), each governing exactly one material field: `package-manager` = uv (`build.packageManager`), `port` = 8000 (`network.port`), `bind-host` = 0.0.0.0 (`network.bindHost`), `health-path` = /health (`health.path`), `database` = PostgreSQL (`persistence.database`), `logging` = stdout (`observability.logging`).
 
@@ -134,7 +129,7 @@ Projections computed on every read from the latest inspection, its connection, t
 
 | Check | Passed when | Otherwise |
 | --- | --- | --- |
-| P2.G1 Supported application profile | The latest inspection passed with the current GitHub connection and the profile matched. | Not yet without an inspection or under a previous login; blocked when the inspection failed or the profile is unmatched or ambiguous, with the criteria's findings. Offers **Inspect repository** / **Re-inspect repository**. |
+| P2.G1 Supported application profile | The latest inspection passed with the current connection and the current contract contains a cited selection of the supported profile. | Not yet without a current inspection or while Pi has not selected a profile; blocked for failed access or unsupported selections. Offers **Inspect repository** / **Re-inspect repository**. |
 | P2.G2 Application Contract complete | A current contract exists at the latest inspection commit under the current profile version with every material field. | Not yet without a contract; blocked when the repository or the profile definition changed since the contract was built. |
 | P2.G3 Every field has a source | The provenance review finds every citation, rule, quote and Decision still current. | Blocked naming the fields whose source no longer resolves. |
 | P2.G4 No unresolved contract gaps | No unresolved field carries `unknown`, `contradiction` or `unsupported`. | Blocked listing the values that need a decision. Conformance items and policy fields are reported in the result and never block. |
@@ -177,4 +172,4 @@ Prototype schema **version 8**. Version 7 was an abandoned branch with incompati
 
 ## Deliberately out of scope
 
-No deployment, provisioning, DNS, paid infrastructure, repository writes or pull requests; no clone, install, build or code execution; no second profile; no Phase 3 conformance execution or Continue; no U3 contract-confirmation gate; no defaults for U1, U15, U16 or F-8; no reopening of completed phases; no on-demand file reads outside a Run beyond the profile manifest; no legacy import; no workflow engine, queue service, second worker or telemetry backend. Real-repository inspection and live model behavior are separate, explicitly authorized checks.
+No deployment, provisioning, DNS, paid infrastructure, repository writes or pull requests; no clone, install, build or code execution; no second profile; no Phase 3 conformance execution or Continue; no U3 contract-confirmation gate; no defaults for U1, U15, U16 or F-8; no reopening of completed phases; no file reads outside a Run; no legacy import; no workflow engine, queue service, second worker or telemetry backend. Real-repository inspection and live model behavior are separate, explicitly authorized checks.

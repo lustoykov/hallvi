@@ -695,19 +695,81 @@ describe("Application Contract validation", () => {
     );
   });
 
-  it("refuses proposals without a matched profile or with a stale revises", () => {
+  it("rejects profile selections with fabricated, foreign or stale evidence", () => {
     const s = scenario("fastapi-conforming");
+    const proposed = buildContractProposal(s.seen, s.reads);
+    const citation = proposed.profileSelection!.citations[0];
+    const input = (patch: Partial<typeof citation>) => ({
+      ...proposed,
+      profileSelection: {
+        ...proposed.profileSelection!,
+        citations: [{ ...citation, ...patch }],
+      },
+    });
     rejects(
       () =>
-        validateContractProposal(buildContractProposal(s.seen, s.reads), {
-          ...s.context,
-          profile: { ...matched, status: "unmatched" },
-        }),
-      "does not resolve to a supported profile (unmatched)",
+        validateContractProposal(
+          input({ snippet: "invented runtime claim" }),
+          s.context,
+        ),
+      "Profile selection",
+      "does not occur verbatim",
     );
+    const original = s.observations.get(citation.observationId)!;
+    s.observations.set(original.id, {
+      ...original,
+      applicationId: "another-app",
+    });
+    rejects(
+      () => validateContractProposal(proposed, s.context),
+      "Profile selection",
+    );
+    s.observations.set(original.id, {
+      ...original,
+      raw: { ...(original.raw as object), commitSha: OTHER_COMMIT },
+    });
+    rejects(
+      () => validateContractProposal(proposed, s.context),
+      "Profile selection",
+    );
+  });
+
+  it("requires an available profile selection and a current revision reference", () => {
+    const s = scenario("fastapi-conforming");
+    const proposed = buildContractProposal(s.seen, s.reads);
+    rejects(
+      () =>
+        validateContractProposal(
+          { ...proposed, profileSelection: undefined },
+          s.context,
+        ),
+      "Select an available application profile",
+    );
+    rejects(
+      () =>
+        validateContractProposal(
+          {
+            ...proposed,
+            profileSelection: {
+              ...proposed.profileSelection!,
+              profileId: "django",
+            },
+          },
+          s.context,
+        ),
+      "not currently supported",
+    );
+    // The old classifier has no veto: the model selects from cited evidence.
+    expect(
+      validateContractProposal(proposed, {
+        ...s.context,
+        profile: { ...matched, status: "pending" },
+      }).body.profileSelection?.profileId,
+    ).toBe("fastapi-uv");
     const existing = {
       id: "contract-1",
       version: 1,
+      body: validateContractProposal(proposed, s.context).body,
     } as ApplicationContractRecord;
     rejects(
       () =>
@@ -807,6 +869,17 @@ describe("Application Contract validation", () => {
     expect(describeContractChanges(first.body, revised.body)).toEqual({
       count: 1,
       detail: "Health endpoint: /health → /healthz",
+    });
+    const confirmationOnly = {
+      ...revised.body,
+      fields: revised.body.fields.map((field) =>
+        field.key === "health.path" ? { ...field, value: "/health" } : field,
+      ),
+    };
+    expect(describeContractChanges(first.body, confirmationOnly)).toEqual({
+      count: 1,
+      detail:
+        "Health endpoint: source changed from repository-declared to user-confirmed (value unchanged)",
     });
   });
 });

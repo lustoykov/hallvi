@@ -15,7 +15,7 @@ export const PHASE_TWO_CHECKS = [
     key: "profile-resolved",
     label: "Supported application profile",
     definition:
-      "Server Guy inspected the repository at an exact commit and matched it to one supported Application Profile. An unmatched or ambiguous repository cannot advance; the criteria say what was found.",
+      "Server Guy selects a supported Application Profile by interpreting cited repository files at the selected commit. This is an assessment of applicable capabilities, not proof that the application builds or runs.",
   },
   {
     key: "contract-complete",
@@ -141,12 +141,12 @@ export function computePhaseTwoChecks(input: {
           : resolution.status === "matched"
             ? {
                 status: "passed",
-                result: `${resolution.label} v${resolution.profileVersion} · ${short(commit)}`,
+                result: `${resolution.label} selected from repository evidence · ${short(commit)} · execution not yet verified`,
                 evidence: inspectionEvidence,
                 rerun: REINSPECT,
               }
             : {
-                status: "blocked",
+                status: resolution.status === "pending" ? "not-yet" : "blocked",
                 result:
                   resolution.reason ??
                   `${resolution.label} did not match this repository.`,
@@ -156,42 +156,52 @@ export function computePhaseTwoChecks(input: {
 
   const profilePassed = profile.status === "passed";
   const complete: Omit<GateCheck, "key" | "label" | "definition"> =
-    !profilePassed
+    contract &&
+    inspection?.status === "passed" &&
+    input.inspectionConnectionCurrent &&
+    contract.commitSha !== commit
       ? {
-          status: "not-yet",
-          result: "Resolve the application profile first.",
-          evidence: [],
+          status: "blocked",
+          result: `The repository changed since the contract was built (${short(contract.commitSha)} → ${short(commit)}). Ask Server Guy to revise the contract.`,
+          evidence: [contractEvidence(contract), ...inspectionEvidence],
           rerun: null,
         }
-      : !contract
+      : !profilePassed
         ? {
             status: "not-yet",
-            result:
-              "No Application Contract yet. Ask Server Guy to propose it from the inspected repository.",
-            evidence: inspectionEvidence,
+            result: "Resolve the application profile first.",
+            evidence: [],
             rerun: null,
           }
-        : contract.commitSha !== commit
+        : !contract
           ? {
-              status: "blocked",
-              result: `The repository changed since the contract was built (${short(contract.commitSha)} → ${short(commit)}). Ask Server Guy to revise the contract.`,
-              evidence: [contractEvidence(contract), ...inspectionEvidence],
+              status: "not-yet",
+              result:
+                "No Application Contract yet. Ask Server Guy to propose it from the inspected repository.",
+              evidence: inspectionEvidence,
               rerun: null,
             }
-          : contract.profileId !== resolution.profileId ||
-              contract.profileVersion !== resolution.profileVersion
+          : contract.commitSha !== commit
             ? {
                 status: "blocked",
-                result: `The profile definition changed (${contract.profileId} v${contract.profileVersion} → ${resolution.profileId} v${resolution.profileVersion}). Ask Server Guy to revise the contract.`,
+                result: `The repository changed since the contract was built (${short(contract.commitSha)} → ${short(commit)}). Ask Server Guy to revise the contract.`,
                 evidence: [contractEvidence(contract), ...inspectionEvidence],
                 rerun: null,
               }
-            : {
-                status: "passed",
-                result: `Application Contract v${contract.version} · ${contract.body.fields.length} fields · ${short(contract.commitSha)}`,
-                evidence: [contractEvidence(contract), ...inspectionEvidence],
-                rerun: null,
-              };
+            : contract.profileId !== resolution.profileId ||
+                contract.profileVersion !== resolution.profileVersion
+              ? {
+                  status: "blocked",
+                  result: `The profile definition changed (${contract.profileId} v${contract.profileVersion} → ${resolution.profileId} v${resolution.profileVersion}). Ask Server Guy to revise the contract.`,
+                  evidence: [contractEvidence(contract), ...inspectionEvidence],
+                  rerun: null,
+                }
+              : {
+                  status: "passed",
+                  result: `Application Contract v${contract.version} · ${contract.body.fields.length} fields · ${short(contract.commitSha)}`,
+                  evidence: [contractEvidence(contract), ...inspectionEvidence],
+                  rerun: null,
+                };
 
   const contractCurrent = complete.status === "passed" && contract;
   const provenance: Omit<GateCheck, "key" | "label" | "definition"> =

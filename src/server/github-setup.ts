@@ -8,7 +8,6 @@ import {
 } from "./github-api";
 import {
   canRefreshGithubConnection,
-  detectGithubCliLogin,
   githubAccountSchema,
   githubAppRegistration,
   githubConnectionIssue,
@@ -17,6 +16,7 @@ import {
   readGithubConnection,
   saveGithubConnection,
 } from "./github-connection";
+import type { detectGithubCliLogin } from "./github-connection";
 
 export const useGithubCliSchema = z.strictObject({
   candidateId: z.string().length(64),
@@ -82,12 +82,10 @@ function publicAttempt(attempt: PendingLogin) {
 
 export async function getGithubSetupStatus() {
   let connection = null;
-  let expectedCliFingerprint: string | null = null;
   let issue: string | null = null;
   try {
     const saved = readGithubConnection();
     if (saved) {
-      if (saved.mode === "cli") expectedCliFingerprint = saved.fingerprint;
       issue = githubConnectionIssue(saved);
       connection = {
         id: saved.id,
@@ -109,20 +107,16 @@ export async function getGithubSetupStatus() {
         ? error.message
         : "GitHub settings are unavailable.";
   }
-  const detected = await detectGithubCliLogin();
-  if (
-    !issue &&
-    expectedCliFingerprint &&
-    detected.candidate?.id !== expectedCliFingerprint
-  )
-    issue =
-      detected.issue ??
-      "Your existing GitHub login changed or is missing. Choose a connection again.";
+  // Keep the response shape while the parallel UI removes the retired choice.
+  const detected: Awaited<ReturnType<typeof detectGithubCliLogin>> = {
+    candidate: null,
+    issue: null,
+  };
   const attempt = coordinator().attempt;
   return {
     connection,
     issue,
-    detected,
+    detected: detected as Awaited<ReturnType<typeof detectGithubCliLogin>>,
     registration: githubAppRegistration(),
     storagePath: githubConnectionPath(),
     attempt: attempt ? publicAttempt(attempt) : null,
@@ -133,28 +127,11 @@ export type GithubSetupStatus = Awaited<
 >;
 
 export async function adoptGithubCliLogin(candidateId: string) {
-  const state = coordinator();
-  cancelPending(state);
-  const version = state.version;
-  const { candidate } = await detectGithubCliLogin();
-  if (version !== state.version)
-    throw new GithubAccessError(
-      "Connection changed. Refresh Settings before continuing.",
-      "auth",
-    );
-  if (!candidate || candidate.id !== candidateId)
-    throw new GithubAccessError(
-      "The detected GitHub login changed. Refresh and choose it again.",
-      "auth",
-    );
-  saveGithubConnection({
-    id: randomUUID(),
-    mode: "cli",
-    account: candidate.account,
-    source: candidate.source,
-    fingerprint: candidate.id,
-    connectedAt: new Date().toISOString(),
-  });
+  void candidateId;
+  throw new GithubAccessError(
+    "CLI connections are no longer supported. Connect through Server Guy's GitHub App.",
+    "auth",
+  );
 }
 
 export function disconnectGithub() {

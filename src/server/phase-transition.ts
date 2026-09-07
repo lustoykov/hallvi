@@ -119,11 +119,7 @@ export async function completeLaunchBrief(applicationId: string) {
   // The inspection is a bounded network read outside the transaction; its
   // outcome is recorded as an Observation either way.
   const inspection = await inspectRepository(application.id);
-  const view = getOperatorView(application.id, chat.id);
-  if (
-    inspection.status === "passed" &&
-    view.inspection?.profile.status === "matched"
-  ) {
+  if (inspection.status === "passed") {
     // The first Run is Server Guy's request, recorded as such; the engineer
     // wrote nothing. Without a worker it stays visibly queued.
     enqueueServerGuyRequest(application.id, chat.id, INSPECTION_REQUEST);
@@ -131,9 +127,7 @@ export async function completeLaunchBrief(applicationId: string) {
     insertMessage(
       chat.id,
       "assistant",
-      inspection.status === "passed"
-        ? `${inspection.summary} ${view.inspection?.profile.reason ?? "The repository did not resolve to a supported profile."} Check 1 explains what was found; Re-inspect repository runs the inspection again after changes.`
-        : `${inspection.summary} Use Re-inspect repository in the check details once the repository is readable again.`,
+      `${inspection.summary} Use Re-inspect repository in the check details once the repository is readable again.`,
       "server-guy",
     );
   }

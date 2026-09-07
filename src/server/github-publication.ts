@@ -51,11 +51,48 @@ export interface PublicationReceipt {
   adopted: boolean;
 }
 
+/** Find the published change without mistaking later collaborator commits for
+ * the approved change. Only follow first parents back to the selected base;
+ * an unrelated merged branch carrying a matching message is not ownership. */
+async function publishedProposalCommit(
+  token: string,
+  request: PublicationRequest,
+  head: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const trailer = `${PROPOSAL_TRAILER} ${request.proposalId}`;
+  let sha = head;
+  const visited = new Set<string>();
+  for (let depth = 0; depth < 100 && sha !== request.baseSha; depth++) {
+    if (visited.has(sha)) return null;
+    visited.add(sha);
+    const commit = commitSchema.parse(
+      (
+        await githubJson(
+          `/repos/${request.fullName}/git/commits/${sha}`,
+          token,
+          { signal },
+        )
+      ).data,
+    );
+    if (
+      commit.message.split(/\r?\n/).some((line) => line === trailer) &&
+      commit.parents.length === 1 &&
+      commit.parents[0].sha === request.baseSha
+    )
+      return commit.sha;
+    const parent = commit.parents[0];
+    if (!parent) return null;
+    sha = parent.sha;
+  }
+  return null;
+}
+
 /**
  * Creates the branch and pull request for a proposal, or adopts the ones an
  * interrupted earlier attempt already created. A branch of the same name
- * whose commit does not carry this proposal's trailer is refused, never
- * overwritten.
+ * whose history does not contain this proposal from its selected base is
+ * refused, never overwritten. Collaborator commits above it are preserved.
  */
 export async function publishToGithub(
   token: string,
@@ -73,21 +110,18 @@ export async function publishToGithub(
   );
   if (existing.data) {
     const { object } = refSchema.parse(existing.data);
-    const commit = commitSchema.parse(
-      (
-        await githubJson(
-          `/repos/${fullName}/git/commits/${object.sha}`,
-          token,
-          { signal },
-        )
-      ).data,
+    const published = await publishedProposalCommit(
+      token,
+      request,
+      object.sha,
+      signal,
     );
-    if (!commit.message.includes(trailer))
+    if (!published)
       throw new GithubAccessError(
-        `Branch ${branch} already exists in ${fullName} and was not created from this change. Delete or rename it on GitHub, then retry.`,
+        `Branch ${branch} already exists in ${fullName}, but this change could not be identified in its history. Review the branch before retrying; no commits were changed.`,
         "access",
       );
-    commitSha = commit.sha;
+    commitSha = published;
     adopted = true;
   } else {
     const tree: Array<Record<string, unknown>> = [];
@@ -160,17 +194,14 @@ export async function publishToGithub(
       );
       if (!again.data) throw error;
       const ref = refSchema.parse(again.data);
-      const existingCommit = commitSchema.parse(
-        (
-          await githubJson(
-            `/repos/${fullName}/git/commits/${ref.object.sha}`,
-            token,
-            { signal },
-          )
-        ).data,
+      const published = await publishedProposalCommit(
+        token,
+        request,
+        ref.object.sha,
+        signal,
       );
-      if (!existingCommit.message.includes(trailer)) throw error;
-      commitSha = existingCommit.sha;
+      if (!published) throw error;
+      commitSha = published;
       adopted = true;
     }
   }
