@@ -140,6 +140,43 @@ const rejects = (work: () => unknown, ...fragments: string[]) => {
 };
 
 describe("Application Contract validation", () => {
+  it("retains the model's image build recipe and records a recipe-only change", () => {
+    const s = scenario("fastapi-conforming");
+    const input = buildContractProposal(s.seen, s.reads);
+    const standard = validateContractProposal(input, s.context);
+    const imageBuild = {
+      dockerfile: "deploy/Dockerfile",
+      context: "services/api",
+      target: "production",
+    };
+    const chosen = validateContractProposal(
+      { ...input, imageBuild },
+      s.context,
+    );
+    expect(chosen.body.imageBuild).toEqual(imageBuild);
+    expect(describeContractChanges(standard.body, chosen.body)).toEqual({
+      count: 1,
+      detail: "Application image build configuration changed",
+    });
+  });
+
+  it.each([
+    { dockerfile: "../Dockerfile" },
+    { dockerfile: "/tmp/Dockerfile" },
+    { dockerfile: "Dockerfile", context: "../elsewhere" },
+    { dockerfile: "." },
+  ])("rejects image build paths outside the repository: %j", (imageBuild) => {
+    const s = scenario("fastapi-conforming");
+    rejects(
+      () =>
+        validateContractProposal(
+          { ...buildContractProposal(s.seen, s.reads), imageBuild },
+          s.context,
+        ),
+      "inside the repository",
+    );
+  });
+
   it("accepts a conforming proposal, computes source lines and orders the fields", () => {
     const s = scenario("fastapi-conforming");
     const proposal = validateContractProposal(

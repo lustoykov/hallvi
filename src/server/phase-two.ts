@@ -667,6 +667,9 @@ function stripComputed(citation: ContractCitation): ContractCitation {
 export function proposalInput(proposal: ApplicationContractProposal) {
   return {
     summary: proposal.body.summary,
+    ...(proposal.body.imageBuild
+      ? { imageBuild: proposal.body.imageBuild }
+      : {}),
     ...(proposal.body.profileSelection
       ? { profileSelection: proposal.body.profileSelection }
       : {}),

@@ -42,14 +42,14 @@ export const RUNTIME_DEPENDENCIES = [
 
 const dockerfile = (host: string) =>
   [
-    "FROM python:3.12-slim",
-    "COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /bin/uv",
+    "FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
     "WORKDIR /app",
     "COPY pyproject.toml uv.lock ./",
-    "RUN uv sync --frozen --no-dev",
+    "RUN uv sync --locked --no-dev",
+    'ENV PATH="/app/.venv/bin:$PATH"',
     "COPY . .",
     "EXPOSE 8000",
-    `CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "${host}", "--port", "8000"]`,
+    `CMD ["uvicorn", "app.main:app", "--host", "${host}", "--port", "8000"]`,
     "",
   ].join("\n");
 

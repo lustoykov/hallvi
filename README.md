@@ -40,11 +40,11 @@ Local Node worker
 ├── Pi SDK adapter with per-phase instructions and scoped tools
 ├── One native Pi JSONL session per Chat, with Pi-owned compaction
 └── Disposable runner: Docker Engine on this machine, one container per
-    step, internal network, allowlisting proxy for installation only
+    step, internal network, restricted proxy for installation and image builds
 
 Docker Engine (controller host)          GitHub
-└── runner image, PostgreSQL image        └── the reviewable pull request; the
-    per attempt, removed on every end         engineer merges, never Server Guy
+└── rootless builder, application image,  └── the reviewable pull request; the
+    source runner and PostgreSQL              engineer merges, never Server Guy
 ```
 
 There is no separate API service, distributed queue or workflow engine. Repository code runs only inside the disposable runner, never in the web or worker process. The first real intake repository is `lustoykov/todo-fastapi`; its actual layout has not been inspected by this code yet, and the supported profile is defined by conventions tested on synthetic repositories.

@@ -90,13 +90,13 @@ export const APPLICATION_PROFILE = {
       group: "build",
       label: "Container build",
       definition:
-        "How the container image is produced: a repository Dockerfile, or unresolved until build ownership is settled.",
+        "How the deployment image is built from the repository; local verification uses the selected Dockerfile, context and stage.",
       policy: {
         dependency: "F-8",
         requiredBeforePhase: 8,
         optional: true,
         question:
-          "Build ownership and location (F-8) is not settled; a repository Dockerfile resolves this field for now.",
+          "Registry publication and production image retention (F-8) remain later choices; selecting and verifying a repository Dockerfile is supported now.",
       },
     },
     {

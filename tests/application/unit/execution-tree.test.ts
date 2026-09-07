@@ -73,8 +73,6 @@ describe("execution trees", () => {
 
   it("takes the start command from the tree's Dockerfile, exec or shell form", () => {
     expect(dockerfileStartCommand(files("fastapi-conforming"))).toEqual([
-      "uv",
-      "run",
       "uvicorn",
       "app.main:app",
       "--host",

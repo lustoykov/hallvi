@@ -108,7 +108,12 @@ describe.skipIf(!optedIn)("the Docker conformance executor", () => {
       expect(
         outcome.status,
         JSON.stringify(
-          outcome.results.map((r) => [r.key, r.outcome, r.summary]),
+          outcome.results.map((r) => [
+            r.key,
+            r.outcome,
+            r.summary,
+            r.outcome === "failed" ? r.output : null,
+          ]),
         ),
       ).toBe("passed");
       expect(outcomes(outcome.results)).toEqual({

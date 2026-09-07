@@ -357,6 +357,8 @@ export interface ContractField {
 }
 
 export interface ApplicationContractBody {
+  /** Repository build recipe selected by Pi, independent of runtime profile. */
+  imageBuild?: { dockerfile: string; context?: string; target?: string };
   profileId: string;
   profileVersion: number;
   commitSha: string;
@@ -522,6 +524,8 @@ export interface ConformanceRunSource {
 }
 
 export interface ConformanceRunConfiguration {
+  /** Defaults to the root Dockerfile; the builder accepts other paths. */
+  build?: { dockerfile: string; context?: string; target?: string };
   startCommand: string[];
   startCommandSource: "dockerfile" | "contract";
   port: number;
@@ -760,7 +764,12 @@ export interface ConformanceBrief {
     applicationBehavior: AcceptanceChecksRecord | null;
     configuration: Pick<
       ConformanceRunConfiguration,
-      "port" | "healthPath" | "environment" | "database" | "migrationTool"
+      | "build"
+      | "port"
+      | "healthPath"
+      | "environment"
+      | "database"
+      | "migrationTool"
     >;
   };
   exclusions: string[];

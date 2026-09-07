@@ -83,6 +83,7 @@ export function executionConfiguration(
     ?.value?.trim()
     .toLowerCase();
   return {
+    build: contract.body.imageBuild ?? { dockerfile: "Dockerfile" },
     port: Number.isInteger(port) && port > 0 ? port : 8000,
     healthPath: value(contract, "health.path")?.value?.trim() || "/health",
     environment,
@@ -140,6 +141,7 @@ export function briefExportText(brief: ConformanceBrief) {
           )
           .join("; ")}`
       : "- Application behavior: not yet established; Server Guy proposes it from the repository's routes.",
+    `- Application image: Dockerfile ${brief.acceptance.configuration.build?.dockerfile ?? "Dockerfile"}, context ${brief.acceptance.configuration.build?.context ?? "."}, stage ${brief.acceptance.configuration.build?.target ?? "final"}. Build and test this image; do not substitute the source runner for runtime verification.`,
     `- Runner configuration: port ${brief.acceptance.configuration.port}, health path ${brief.acceptance.configuration.healthPath}, database ${brief.acceptance.configuration.database === "postgresql" ? "disposable PostgreSQL with synthetic credentials" : "none"}, migrations ${brief.acceptance.configuration.migrationTool ?? "none"}, variables ${Object.keys(brief.acceptance.configuration.environment).join(", ") || "none"}.`,
     "",
     "## Exclusions",
@@ -194,7 +196,7 @@ export function buildConformanceBrief(
     })),
     scope: {
       allowed:
-        "Application source, configuration examples, migrations, tests and the Dockerfile under the repository root, as needed to resolve the required changes.",
+        "Application source, configuration examples, migrations, tests and the selected Dockerfile within the repository, as needed to resolve the required changes.",
       forbidden: SENSITIVE_PATH_PATTERNS.map((entry) => entry.reason).filter(
         (reason, index, all) => all.indexOf(reason) === index,
       ),
@@ -210,7 +212,7 @@ export function buildConformanceBrief(
       "No deployment, infrastructure, DNS, hostname or production database work; those are later phases.",
       "No merge by Server Guy: it publishes a reviewable branch and pull request, and the engineer merges on GitHub.",
       "No workflow, hook, credential or secret file changes; they are separately sensitive scope.",
-      "No release artifact or image build decisions (F-8), backup or telemetry policy (U1), rollback expectation (U16) or required verification set (U15): still open.",
+      "No registry publication or production artifact-retention decisions (F-8), backup or telemetry policy (U1), rollback expectation (U16) or required verification set (U15): still open. Local Dockerfile builds are part of verification.",
       "No changes that resolve a blocker by choosing for the engineer.",
     ],
     exportText: "",

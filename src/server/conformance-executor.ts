@@ -1,14 +1,16 @@
-// The disposable verification runner. Every execution materializes one exact
-// tree into a fresh workspace volume and runs the check set through separate
-// containers on an internal network: non-root, all capabilities dropped,
-// no new privileges, read-only root, bounded memory, CPU, processes, time and
-// output. The controller's credentials, state, home directory, Docker socket
-// and host network are never mounted or reachable; dependency downloads leave
-// only through an allowlisting proxy that is removed before the application
-// starts. Everything an execution creates carries its labels and is removed
-// when it ends, however it ends.
+// Verification of one exact source tree. Source checks use a disposable
+// Python workspace; runtime checks use the image built from the Dockerfile.
+// Application containers have bounded resources, no host mounts or Docker
+// socket, and no outbound network. Rootless image builds use a separate
+// restricted download proxy. The trusted sibling probe records HTTP results.
+// Owned resources are removed on completion or recovered after interruption.
 import { createHash, randomBytes } from "node:crypto";
 
+import {
+  buildApplicationImage,
+  removeBuiltImage,
+  type BuiltApplicationImage,
+} from "./application-image";
 import {
   CHECK_ORDER,
   checkDefinition,
@@ -154,6 +156,59 @@ class DockerRun {
     this.network = `${this.prefix}-net`;
     this.volume = `${this.prefix}-workspace`;
     this.deadline = Date.now() + limits.attemptSeconds * 1000;
+  }
+
+  private applicationImage: BuiltApplicationImage | null = null;
+
+  get applicationImageId() {
+    return this.applicationImage?.imageId ?? null;
+  }
+
+  async installAndBuild(): Promise<ConformanceCheckResult> {
+    const installed = await this.install();
+    if (installed.outcome !== "passed") return installed;
+    try {
+      this.applicationImage = await buildApplicationImage(
+        this.client,
+        this.plan.files,
+        this.plan.configuration.build ?? { dockerfile: "Dockerfile" },
+        {
+          labels: this.labels,
+          signal: this.signal,
+          onProgress: (message) => this.say("build", message),
+        },
+      );
+      const output = bound(
+        [installed.output, this.applicationImage.output]
+          .filter(Boolean)
+          .join("\n"),
+      );
+      return {
+        ...installed,
+        summary: `Locked dependencies installed and the application Dockerfile built successfully: ${this.applicationImage.imageId}.`,
+        output: output.output,
+        outputTruncated:
+          installed.outputTruncated ||
+          this.applicationImage.outputTruncated ||
+          output.truncated,
+        finishedAt: now(),
+      };
+    } catch (error) {
+      if (this.signal?.aborted) throw error;
+      const failedOutput = bound(
+        error instanceof Error ? error.message : String(error),
+      );
+      return {
+        ...installed,
+        outcome: "failed",
+        exitCode: null,
+        summary:
+          "Locked dependencies installed, but the application image did not build. No application checks ran.",
+        output: failedOutput.output,
+        outputTruncated: failedOutput.truncated,
+        finishedAt: now(),
+      };
+    }
   }
 
   private check() {
@@ -342,7 +397,7 @@ class DockerRun {
         finishedAt: run.finishedAt,
       };
     } finally {
-      // The only egress path is removed before any repository code runs.
+      // Remove installation egress before application runtime checks.
       await this.client.removeContainer(proxy.Id).catch(() => undefined);
     }
     return result;
@@ -354,6 +409,22 @@ class DockerRun {
     environment: Record<string, string>,
     aliases: string[] = [],
   ) {
+    if (
+      this.applicationImage &&
+      ["app", "configuration", "migrations"].includes(name)
+    ) {
+      const startup = name !== "migrations";
+      return {
+        Image: this.applicationImage.imageId,
+        // The image owns its entrypoint, command, user and working directory.
+        // A migration uses its explicit command, not the server entrypoint.
+        ...(startup ? {} : { Entrypoint: [], Cmd: command }),
+        Env: environmentList(environment),
+        HostConfig: this.hostConfig({ Binds: [] }),
+        name,
+        aliases,
+      };
+    }
     return {
       Image: CONFORMANCE_DEFINITION.runnerImage,
       Cmd: wrapped(command),
@@ -554,7 +625,9 @@ class DockerRun {
     this.say("migrations", "Applying alembic migrations to the empty database");
     const { name, aliases, ...config } = this.workload(
       "migrations",
-      ["uv", "run", "--frozen", "alembic", "upgrade", "head"],
+      this.applicationImage
+        ? ["alembic", "upgrade", "head"]
+        : ["uv", "run", "--frozen", "alembic", "upgrade", "head"],
       this.plan.configuration.environment,
     );
     const run = await this.runToCompletion(
@@ -631,7 +704,9 @@ class DockerRun {
     const healthRecord = observations.find((item) => item.phase === "health");
     const healthy = healthRecord?.status === 200;
     const appOutput = bound(appLogs);
-    const commandNote = `Start command from ${startCommandSource === "dockerfile" ? "the tree's Dockerfile CMD" : "the Application Contract"}: ${startCommand.join(" ")}.`;
+    const commandNote = this.applicationImage
+      ? `Started the built image ${this.applicationImage.imageId} with its declared ENTRYPOINT/CMD, working directory and user.`
+      : `Start command from ${startCommandSource === "dockerfile" ? "the tree's Dockerfile CMD" : "the Application Contract"}: ${startCommand.join(" ")}.`;
     const startupResult: ConformanceCheckResult = {
       key: "startup",
       label: startup.label,
@@ -865,6 +940,11 @@ class DockerRun {
       await this.client.removeContainer(id).catch(() => undefined);
     await this.client.removeNetwork(this.network).catch(() => undefined);
     await this.client.removeVolume(this.volume).catch(() => undefined);
+    if (this.applicationImage)
+      await removeBuiltImage(
+        this.client,
+        this.applicationImage.reference,
+      ).catch(() => undefined);
   }
 }
 
@@ -1046,12 +1126,16 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
               notRun("command", "Not run: the locked installation failed."),
             );
         } else {
-          const install = await executing.install();
+          const install = await executing.installAndBuild();
+          imageDigest = executing.applicationImageId;
           results.push(install);
           if (install.outcome !== "passed") {
             for (const key of CHECK_ORDER.slice(1))
               results.push(
-                notRun(key, "Not run: the locked installation failed."),
+                notRun(
+                  key,
+                  "Not run: dependency installation or application image build failed.",
+                ),
               );
           } else {
             results.push(await executing.configuration());
@@ -1138,7 +1222,7 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
       if (!client) return 0;
       const labels = { [OWNER_LABEL]: ownerId() };
       const keep = (runId: string | undefined) =>
-        runIds && runId && !runIds.includes(runId);
+        runIds !== undefined && (!runId || !runIds.includes(runId));
       let removed = 0;
       for (const container of await client.listContainers(labels)) {
         if (keep(container.Labels[RUN_LABEL])) continue;
@@ -1146,12 +1230,22 @@ export function dockerConformanceExecutor(): ConformanceExecutor {
         removed++;
       }
       for (const network of await client.listNetworks(labels)) {
+        if (keep(network.Labels?.[RUN_LABEL])) continue;
         await client.removeNetwork(network.Id).catch(() => undefined);
         removed++;
       }
       for (const volume of await client.listVolumes(labels)) {
+        if (keep(volume.Labels?.[RUN_LABEL])) continue;
         await client.removeVolume(volume.Name).catch(() => undefined);
         removed++;
+      }
+      for (const image of await client.listImages(labels)) {
+        if (keep(image.Labels?.[RUN_LABEL])) continue;
+        for (const reference of image.RepoTags ?? []) {
+          if (!/^server-guy-build:[a-f0-9]{24}$/.test(reference)) continue;
+          await removeBuiltImage(client, reference).catch(() => undefined);
+          removed++;
+        }
       }
       return removed;
     },

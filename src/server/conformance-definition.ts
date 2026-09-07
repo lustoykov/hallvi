@@ -9,7 +9,7 @@ import type { ConformanceCheckDefinition, ConformanceCheckKey } from "./types";
  */
 export const CONFORMANCE_DEFINITION = {
   id: "fastapi-uv/conformance",
-  version: 1,
+  version: 2,
   runnerImage: "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
   databaseImage: "postgres:16-alpine",
   limits: {
@@ -36,11 +36,11 @@ export const CONFORMANCE_DEFINITION = {
   checks: [
     {
       key: "install",
-      label: "Locked dependency installation",
+      label: "Locked dependencies and application image",
       proves:
-        "uv sync --locked succeeds in a fresh container: uv.lock is consistent with pyproject.toml and every locked distribution installs for the runner's platform.",
+        "uv sync --locked succeeds in a fresh source runner, and the repository Dockerfile builds into the exact application image used for configuration, migrations, startup, health and behavior checks.",
       limits:
-        "Downloads go through an allowlisted proxy to the package index only; a lockfile that resolves but pins a broken package is not detected until later checks run it.",
+        "Both installation and image builds use a restricted download proxy. A successful build does not prove the app starts; later checks exercise the image. Only public supported registries and dependency hosts are available.",
       required: true,
     },
     {
@@ -74,9 +74,9 @@ export const CONFORMANCE_DEFINITION = {
       key: "startup",
       label: "Application starts",
       proves:
-        "The start command from the executed tree loads the ASGI application with the synthetic configuration and keeps running until the health probe connects.",
+        "The built application image starts with synthetic configuration and stays running until the health probe connects.",
       limits:
-        "Runs in Server Guy's runner image, not the repository's Dockerfile image (build ownership is the open F-8 policy); a slow import that exceeds the startup bound counts as a failure.",
+        "Runs the built application image using its declared entrypoint, command, working directory and user. A slow startup that exceeds the bound counts as a failure; production networking is not tested.",
       required: true,
     },
     {

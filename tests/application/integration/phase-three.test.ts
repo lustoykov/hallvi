@@ -716,6 +716,9 @@ describe("Pi's edit, preview and fix loop through the real SDK tool loop", () =>
         ?.content.toString(),
     ).toContain("/health");
     expect(executor.plans[0].configuration.startCommand).toContain("0.0.0.0");
+    expect(executor.plans[0].configuration.build).toEqual({
+      dockerfile: "Dockerfile",
+    });
     expect(executor.plans[0].configuration.environment.SECRET_KEY).toMatch(
       /^synthetic-/,
     );
@@ -1443,7 +1446,7 @@ describe("external returns, the no-change path and contract revisions", () => {
       "changes-resolved": "passed",
       "conformance-passed": "passed",
     });
-    expect(results(app.id)["conformance-passed"]).toContain("check set v1");
+    expect(results(app.id)["conformance-passed"]).toContain("check set v2");
   }, 60_000);
 
   it("a same-turn revision that drops a mapped required change saves nothing, the revision included", async () => {

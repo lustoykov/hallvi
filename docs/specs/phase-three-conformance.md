@@ -43,7 +43,7 @@ Derived deterministically on every read from the contract in force, never stored
 | Blockers | Unresolved required values, listed as blockers and never converted into changes or choices. |
 | Allowed scope | Application source under the repository root as needed; the sensitive path patterns that are never changed (workflows and repository automation, git internals and hooks, commit hooks, environment files, key material, secrets and credential files, SSH keys). |
 | Acceptance bar | The versioned check set with what each check proves and its limits, the accepted or proposed application-behavior definition, and the runner configuration derived from the contract (port, health path, database, migration tool, required variables with synthetic values). |
-| Exclusions | No deployment or infrastructure, no merge by Server Guy, no workflow/hook/credential changes, no F-8/U1/U15/U16 decisions, no change that resolves a blocker by choosing for the engineer. |
+| Exclusions | No deployment or infrastructure, no merge by Server Guy, no workflow/hook/credential changes, no U1/U15/U16 decisions, no change that resolves a blocker by choosing for the engineer. |
 
 **Export** produces the same brief as text for Codex, Claude, another harness or manual work, with the return instruction. The export is recorded once per contract version as Activity; it does not start a handoff timer (G-HANDOFF-TIMEOUT stays open).
 
@@ -83,24 +83,28 @@ Publication is a controller-side effect outside any Run: inputs are rechecked im
 
 ## The check set and its runner
 
-Check set `fastapi-uv/conformance` v1, executed by Server Guy over an exact tree (the archive at the commit, plus the staged overlay for previews; nothing is ever reconstructed from Phase 2's redacted or truncated Observations):
+Check set `fastapi-uv/conformance` v2, executed by Server Guy over an exact tree (the archive at the commit, plus the staged overlay for previews; nothing is ever reconstructed from Phase 2's redacted or truncated Observations):
 
 | Check | Proves | Limits |
 | --- | --- | --- |
-| Locked dependency installation | `uv sync --locked` succeeds in a fresh container. | Downloads only through the allowlisting proxy; a broken package is caught later. |
+| Locked dependencies and application image | `uv sync --locked` succeeds in a fresh source runner and the repository Dockerfile builds. | Public supported registries and dependency hosts only, through the restricted proxy. A build alone does not prove startup. |
 | Required configuration is enforced | Without the contract's secret variables the application refuses to start and names a missing variable. | Only recorded secrets are withheld; name match on bounded output. |
 | Disposable PostgreSQL is reachable | A fresh PostgreSQL with synthetic credentials accepts connections on the internal network. | The runner's database, never production; not applicable without PostgreSQL in the contract. |
 | Migrations apply to an empty database | `alembic upgrade head` succeeds against it. | Forward only (U16 open); other tools are explicit failures, not passes. |
-| Application starts | The tree's start command (Dockerfile CMD, else the contract's) loads the ASGI application and keeps running. | Runs in Server Guy's runner image, not the repository's Dockerfile image (F-8 open). |
+| Application starts | The built image starts with its declared entrypoint, command, working directory and user. | Synthetic configuration and a private network; production networking is checked later. |
 | Health endpoint answers from outside the process | A sibling container receives HTTP 200 from the contract's health path on the contract's port. | Private-network probe; the public hostname is P8.G4. |
 | Accepted application behavior | The accepted steps receive their expected statuses and bodies through the running application and its database. | Only the accepted definition; not run until one is accepted. |
 | Repository tests pass | pytest passes with the disposable database available. | Authors' choice of coverage; never a substitute. |
 
 Outcomes are `passed`, `failed`, `not-run` (a prerequisite failed, the run was cancelled or timed out) and `not-applicable` with the record that proves it. A required check that is not run cannot satisfy the gate; an unsupported configuration is an explicit failure.
 
-Runner boundary, enforced and tested with real containers: the exact tree is copied into a fresh workspace volume owned by the workload user; every step is its own container with `User 1000:1000`, all capabilities dropped, `no-new-privileges`, a read-only root, a tmpfs `/tmp`, bounded memory, CPU, processes, time and captured output; no bind mount of any host directory, no Docker socket, no host network, never privileged. Installation is the only step with a way out: an allowlisting CONNECT proxy in a sibling container (package index and interpreter downloads only) that is removed before any repository code runs; the application, its database and the probe share an internal network with no route out. The probe is Server Guy's own script in a sibling container; its captured output is the evidence, so neither the model nor the application can author a pass. Output is redacted with the same credential patterns as repository reads and bounded. Every resource carries the run's labels; the run's end, cancellation, timeout, failure and a worker restart remove them, and an interrupted attempt is recorded as interrupted, never passed. A rerun appends a new attempt.
+Execution boundary: installation and repository tests use a fresh source workspace and a non-root Python runner. Configuration, migrations, startup, health and behavior use the actual built application image; its working directory, user and startup metadata are preserved, and the source workspace is not mounted over it. Runtime containers drop capabilities, disallow new privileges, have a read-only root and bounded temporary storage, memory, CPU, processes, time and output. No host directory or Docker socket is mounted, and no host network or privileged mode is used. The application, disposable database and trusted sibling probe share an internal network with no outbound route. The probe's output, not application-authored claims, supplies the check evidence.
 
-Every run is bound to the exact commit or tree digest, the contract id and version, the profile version, the check-set version, the accepted behavior-check version, the runner image digest and the execution configuration. Any change makes the result history; the latest run over the current candidate with current bindings is the only input to P3.G3.
+Image builds use a disposable rootless BuildKit container, with its own internal network and an allowlisting HTTPS proxy for public image registries and supported dependency hosts. The builder receives only the selected source tree and explicit build arguments; it receives no controller environment, registry credentials, SSH agent or Docker socket. Rootless BuildKit requires relaxed seccomp/AppArmor and unmasked system paths inside that non-root builder; these settings are not applied to application workloads. Hosts that cannot run this configuration report a build failure; there is no fallback to privileged execution. Builds are time/resource bounded and image transfer is capped at 2 GiB; build-layer disk usage remains subject to the Docker engine's available storage. The image streams directly from builder to Docker without extracting layers onto the controller. The image builder accepts Dockerfile/context/target configuration independently of the current Python check profile; the saved contract selects these paths and stage, defaulting to the repository-root Dockerfile when no alternate recipe is recorded. Missing Dockerfiles fail explicitly.
+
+Build containers and proxy networks are removed on success, failure and cancellation. Execution resources carry run ownership labels for crash cleanup. Successful image tags are removed after the checks complete; preserving an image for an interactive owner preview remains separate follow-up work. A rerun appends a new attempt; prior v1 runner results do not satisfy the v2 check set.
+
+Every run is bound to the exact commit or tree digest, the contract id and version, the profile version, the check-set version, the accepted behavior-check version, the built application image ID and the execution configuration. Any change makes the result history; the latest run over the current candidate with current bindings is the only input to P3.G3.
 
 ## The Docker prerequisite
 
@@ -126,7 +130,7 @@ Activity records the meaningful outcomes: Inspect app completed, Make launch-rea
 
 ## Deliberately not in this slice
 
-Deployment, provisioning, DNS, paid infrastructure, production migrations and public-hostname verification (later phases); merging (the engineer); remote Docker contexts and any file-transfer semantics they need; more than one runner image; migration tools other than alembic (explicit failure); a workflow-file proposal path (workflow changes are out of scope, not a separate approved item yet); a handoff timeout; the U1, U15, U16 and F-8 policies, which remain visible on the contract and are required at their later gates; Phase 4 and its Continue.
+Deployment, provisioning, DNS, paid infrastructure, production migrations and public-hostname verification (later phases); merging (the engineer); remote Docker contexts and any file-transfer semantics they need; arbitrary dependency services; migration tools other than alembic (explicit failure); a workflow-file proposal path (workflow changes are out of scope, not a separate approved item yet); a handoff timeout; the U1, U15 and U16 policies, which remain visible on the contract and are required at their later gates; Phase 4 and its Continue.
 
 ## Owning code
 

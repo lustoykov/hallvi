@@ -173,3 +173,7 @@ Prototype schema **version 8**. Version 7 was an abandoned branch with incompati
 ## Deliberately out of scope
 
 No deployment, provisioning, DNS, paid infrastructure, repository writes or pull requests; no clone, install, build or code execution; no second profile; no Phase 3 conformance execution or Continue; no U3 contract-confirmation gate; no defaults for U1, U15, U16 or F-8; no reopening of completed phases; no file reads outside a Run; no legacy import; no workflow engine, queue service, second worker or telemetry backend. Real-repository inspection and live model behavior are separate, explicitly authorized checks.
+
+## Image build selection
+
+The model may include `imageBuild: { dockerfile, context?, target? }` in a contract proposal. Paths are repository-relative and validated before saving; context defaults to the repository root and omission uses the standard root Dockerfile. The `build.containerImage` field explains the choice with repository evidence. The saved recipe becomes part of execution configuration, so changing it requires new verification. The builder implements Dockerfile semantics independently of the supported runtime profile; it does not generate a Python-specific image behind the user's back.

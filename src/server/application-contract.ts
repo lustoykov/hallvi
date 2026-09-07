@@ -8,6 +8,7 @@ import {
   type ProfileField,
 } from "./application-profile";
 import { looksLikeSecret } from "./secrets";
+import { normalizeTarPath } from "./tar";
 import type {
   ApplicationContractBody,
   ApplicationContractProposal,
@@ -188,11 +189,27 @@ const profileSelectionSchema = Type.Object(
   },
 );
 
+const imageBuildSchema = Type.Object(
+  {
+    dockerfile: text(512),
+    context: Type.Optional(text(512)),
+    target: Type.Optional(
+      Type.String({ pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$" }),
+    ),
+  },
+  {
+    additionalProperties: false,
+    description:
+      "Build the application's deployment image from this repository-relative Dockerfile, context (default .), and optional stage. Explain this choice with the build.containerImage field's repository evidence. Omit to use the standard root Dockerfile.",
+  },
+);
+
 /** Pi selects a supported profile; the commit is bound server-side. */
 export const contractProposalParameters = Type.Object(
   {
     summary: text(CONTRACT_LIMITS.textCharacters),
     profileSelection: Type.Optional(profileSelectionSchema),
+    imageBuild: Type.Optional(imageBuildSchema),
     fields: Type.Array(contractFieldSchema, {
       minItems: 1,
       maxItems: CONTRACT_LIMITS.fields,
@@ -216,6 +233,7 @@ export const contractBodySchema = Type.Object(
     commitSha: Type.String({ pattern: "^[a-f0-9]{40}$" }),
     summary: text(CONTRACT_LIMITS.textCharacters),
     profileSelection: Type.Optional(profileSelectionSchema),
+    imageBuild: Type.Optional(imageBuildSchema),
     fields: Type.Array(
       Type.Object(
         {
@@ -435,6 +453,22 @@ export function validateContractProposal(
       "Select an available application profile with profileSelection: explain your interpretation and cite the repository files you read. Filenames alone do not select a profile.",
     ]);
   const issues: string[] = [];
+  const imageBuild =
+    input.imageBuild ?? context.currentContract?.body.imageBuild;
+  if (imageBuild) {
+    for (const path of [imageBuild.dockerfile, imageBuild.context ?? "."]) {
+      if (path === "." && path !== imageBuild.dockerfile) continue;
+      try {
+        if (normalizeTarPath(path, 0) !== path)
+          throw new Error("not normalized");
+      } catch {
+        issues.push(
+          `Image build path ${path} must stay inside the repository and use a normalized relative path.`,
+        );
+      }
+    }
+  }
+
   if (selection.profileId !== APPLICATION_PROFILE.id)
     issues.push(
       `Profile ${selection.profileId} is not currently supported. Describe the application accurately and explain the capability limitation; do not relabel it as ${APPLICATION_PROFILE.label}.`,
@@ -632,6 +666,7 @@ export function validateContractProposal(
       commitSha: context.commitSha,
       summary: input.summary.trim(),
       profileSelection: selection,
+      ...(imageBuild ? { imageBuild } : {}),
       fields: APPLICATION_PROFILE.fields.map((definition) =>
         fields.find((field) => field.key === definition.key)!,
       ),
@@ -793,7 +828,18 @@ export function describeContractChanges(
           : item.value;
     return `${contractFieldLabel(field.key)}: ${show(old)} → ${show(field)}`;
   };
+  const buildIdentity = (body: ApplicationContractBody) =>
+    JSON.stringify([
+      body.imageBuild?.dockerfile ?? "Dockerfile",
+      body.imageBuild?.context ?? ".",
+      body.imageBuild?.target ?? null,
+    ]);
+  const buildChanged = buildIdentity(previous) !== buildIdentity(next);
   const shown = changed.slice(0, 5).map(describe);
   if (changed.length > 5) shown.push(`and ${changed.length - 5} more`);
-  return { count: changed.length, detail: shown.join("; ") };
+  if (buildChanged) shown.push("Application image build configuration changed");
+  return {
+    count: changed.length + Number(buildChanged),
+    detail: shown.join("; "),
+  };
 }

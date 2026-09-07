@@ -4,7 +4,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { homedir, hostname, platform, arch } from "node:os";
-import { request as httpRequest } from "node:http";
+import { request as httpRequest, type IncomingMessage } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { join } from "node:path";
 
 import type { ExecutionEnvironmentStatus } from "./types";
@@ -94,7 +96,7 @@ export class DockerError extends Error {
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "HEAD";
-  body?: Buffer | string;
+  body?: Buffer | string | Readable;
   headers?: Record<string, string>;
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -157,7 +159,7 @@ export class DockerClient {
           method,
           headers: {
             Host: "docker",
-            ...(body !== undefined
+            ...(body !== undefined && !(body instanceof Readable)
               ? { "Content-Length": String(Buffer.byteLength(body)) }
               : {}),
             ...headers,
@@ -166,7 +168,14 @@ export class DockerClient {
         },
         (res) => {
           res.on("data", (chunk: Buffer) => {
-            options.onChunk?.(chunk);
+            try {
+              options.onChunk?.(chunk);
+            } catch (error) {
+              req.destroy(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+              return;
+            }
             if (received >= maxBytes) {
               truncated = true;
               return;
@@ -204,7 +213,47 @@ export class DockerClient {
             : new DockerError(error.message, 0, error.code),
         ),
       );
-      if (body !== undefined) req.write(body);
+      if (body instanceof Readable) {
+        void pipeline(body, req).catch(reject);
+      } else {
+        if (body !== undefined) req.write(body);
+        req.end();
+      }
+    });
+  }
+
+  /** A bounded consumer must drain or destroy this stream. */
+  archiveStream(
+    id: string,
+    path: string,
+    signal?: AbortSignal,
+  ): Promise<IncomingMessage> {
+    return new Promise((resolve, reject) => {
+      const req = httpRequest(
+        {
+          socketPath: this.socketPath,
+          path: `/${this.apiVersion}/containers/${encodeURIComponent(id)}/archive?path=${encodeURIComponent(path)}`,
+          method: "GET",
+          signal,
+        },
+        (response) => {
+          if ((response.statusCode ?? 500) >= 400) {
+            response.destroy();
+            reject(
+              new DockerError(
+                "Could not read the built image archive.",
+                response.statusCode ?? 500,
+              ),
+            );
+          } else resolve(response);
+        },
+      );
+      req.on("error", reject);
+      req.setTimeout(120_000, () =>
+        req.destroy(
+          new DockerError("Image transfer timed out.", 0, "ETIMEDOUT"),
+        ),
+      );
       req.end();
     });
   }
@@ -253,9 +302,18 @@ export class DockerClient {
   }
 
   async inspectImage(reference: string) {
-    return this.json<{ Id: string; RepoDigests?: string[] }>(
-      `/images/${encodeURIComponent(reference)}/json`,
-    );
+    return this.json<{
+      Id: string;
+      RepoDigests?: string[];
+      Config?: {
+        Entrypoint?: string[] | null;
+        Cmd?: string[] | null;
+        WorkingDir?: string;
+        User?: string;
+        Env?: string[];
+        Labels?: Record<string, string>;
+      };
+    }>(`/images/${encodeURIComponent(reference)}/json`);
   }
 
   /** Pulls an image; progress lines are bounded and never stored verbatim. */
@@ -484,22 +542,35 @@ export class DockerClient {
     >(`/containers/json?all=true&filters=${encodeURIComponent(filters)}`);
   }
 
+  listImages(labels: Record<string, string>) {
+    const filters = JSON.stringify({
+      label: Object.entries(labels).map(([key, value]) => `${key}=${value}`),
+    });
+    return this.json<
+      Array<{
+        Id: string;
+        RepoTags?: string[];
+        Labels?: Record<string, string>;
+      }>
+    >(`/images/json?filters=${encodeURIComponent(filters)}`);
+  }
+
   listNetworks(labels: Record<string, string>) {
     const filters = JSON.stringify({
       label: Object.entries(labels).map(([key, value]) => `${key}=${value}`),
     });
-    return this.json<Array<{ Id: string; Name: string }>>(
-      `/networks?filters=${encodeURIComponent(filters)}`,
-    );
+    return this.json<
+      Array<{ Id: string; Name: string; Labels?: Record<string, string> }>
+    >(`/networks?filters=${encodeURIComponent(filters)}`);
   }
 
   async listVolumes(labels: Record<string, string>) {
     const filters = JSON.stringify({
       label: Object.entries(labels).map(([key, value]) => `${key}=${value}`),
     });
-    const result = await this.json<{ Volumes: Array<{ Name: string }> | null }>(
-      `/volumes?filters=${encodeURIComponent(filters)}`,
-    );
+    const result = await this.json<{
+      Volumes: Array<{ Name: string; Labels?: Record<string, string> }> | null;
+    }>(`/volumes?filters=${encodeURIComponent(filters)}`);
     return result.Volumes ?? [];
   }
 }
