@@ -114,25 +114,36 @@ export function CurrentStepBar({
         )}
       </div>
       {step.stages.length > 0 && (
-        <ol className="sg-stages" aria-label="Phase 3 stages">
-          {step.stages.map((stage, index) => (
-            <li className={stage.state} key={stage.key}>
-              <span className="sg-stage-mark" aria-hidden="true">
-                {stage.state === "done" ? (
-                  <Check weight="bold" />
-                ) : stage.state === "skipped" ? (
-                  <Minus weight="bold" />
-                ) : (
-                  index + 1
-                )}
-              </span>
-              <span className="sg-stage-copy">
-                <strong>{stage.label}</strong>
-                {stage.note && <small>{stage.note}</small>}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <details className="sg-stage-disclosure">
+          <summary>
+            Phase progress ·{" "}
+            {
+              step.stages.filter(
+                (stage) => stage.state === "done" || stage.state === "skipped",
+              ).length
+            }{" "}
+            of {step.stages.length} steps complete
+          </summary>
+          <ol className="sg-stages" aria-label="Phase 3 stages">
+            {step.stages.map((stage, index) => (
+              <li className={stage.state} key={stage.key}>
+                <span className="sg-stage-mark" aria-hidden="true">
+                  {stage.state === "done" ? (
+                    <Check weight="bold" />
+                  ) : stage.state === "skipped" ? (
+                    <Minus weight="bold" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <span className="sg-stage-copy">
+                  <strong>{stage.label}</strong>
+                  {stage.note && <small>{stage.note}</small>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
       )}
       {demo && (
         <p className="sg-demo-banner">

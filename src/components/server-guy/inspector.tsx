@@ -5,6 +5,9 @@ import {
   CaretRight,
   Check,
   GithubLogo,
+  ArrowsOutSimple,
+  ArrowsInSimple,
+  X,
   Warning,
 } from "@phosphor-icons/react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -206,16 +209,15 @@ function RecordSectionShell({
         <small>{spec.summary}</small>
         {spec.badge && <em className={spec.badge.tone}>{spec.badge.text}</em>}
       </button>
-      {open && (
-        <div
-          aria-label={spec.title}
-          className="sg-record-body"
-          id={`${id}-body`}
-          role="region"
-        >
-          {children}
-        </div>
-      )}
+      <div
+        hidden={!open}
+        aria-label={spec.title}
+        className="sg-record-body"
+        id={`${id}-body`}
+        role="region"
+      >
+        {children}
+      </div>
     </section>
   );
 }
@@ -234,6 +236,10 @@ export function Inspector({
   onConformance,
   reveal = null,
   offerGrant = false,
+  hidden = false,
+  wide = false,
+  onToggleWidth,
+  onHide,
 }: {
   view: OperatorView;
   checks: GateCheck[];
@@ -244,6 +250,10 @@ export function Inspector({
   reveal?: { section: RecordSection; nonce: number } | null;
   /** The current-step bar already offers the publishing grant. */
   offerGrant?: boolean;
+  hidden?: boolean;
+  wide?: boolean;
+  onToggleWidth: () => void;
+  onHide: () => void;
 }) {
   const workspace = view.workspace;
   const phaseKey = workspace?.phaseKey ?? "start";
@@ -345,7 +355,7 @@ export function Inspector({
         summary: conformance.runs.length
           ? `${conformance.runs.length} · latest ${conformance.runs[0].kind} ${conformance.runs[0].status}`
           : "none yet",
-        defaultOpen: conformance.runs.length > 0,
+        defaultOpen: false,
       },
       {
         key: "environment",
@@ -361,7 +371,7 @@ export function Inspector({
           environment && !environment.ready
             ? { text: "Needs attention", tone: "attention" }
             : undefined,
-        defaultOpen: true,
+        defaultOpen: false,
       },
     );
   }
@@ -396,26 +406,59 @@ export function Inspector({
   }, [reveal]);
 
   return (
-    <aside className="sg-inspector" aria-label="Record">
-      <nav className="sg-record-nav" aria-label="Record sections">
-        {sections.map((spec) => (
-          <a
-            href={`#record-${spec.key}`}
-            key={spec.key}
-            onClick={(event) => {
-              event.preventDefault();
-              setOpen((current) => ({ ...current, [spec.key]: true }));
+    <aside
+      className="sg-inspector"
+      aria-label="Record"
+      id="application-record"
+      hidden={hidden}
+    >
+      <header className="sg-record-toolbar">
+        <strong>Record</strong>
+        <label className="sg-record-jump">
+          <select
+            aria-label="Find in Record"
+            value=""
+            onChange={(event) => {
+              const section = event.target.value as RecordSection;
+              setOpen((current) => ({ ...current, [section]: true }));
               requestAnimationFrame(() =>
                 document
-                  .getElementById(`record-${spec.key}`)
+                  .getElementById(`record-${section}`)
                   ?.scrollIntoView({ behavior: "smooth", block: "start" }),
               );
             }}
           >
-            {spec.title}
-          </a>
-        ))}
-      </nav>
+            <option value="" disabled>
+              Jump to…
+            </option>
+            {sections.map((spec) => (
+              <option key={spec.key} value={spec.key}>
+                {spec.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={onToggleWidth}
+          aria-label={wide ? "Narrow Record" : "Widen Record"}
+          title={wide ? "Narrow Record" : "Widen Record for detailed review"}
+        >
+          {wide ? (
+            <ArrowsInSimple aria-hidden="true" />
+          ) : (
+            <ArrowsOutSimple aria-hidden="true" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onHide}
+          aria-label="Hide Record"
+          title="Hide Record"
+        >
+          <X aria-hidden="true" />
+        </button>
+      </header>
       <div className="sg-inspector-body" ref={bodyRef}>
         {sections.map((spec) => (
           <RecordSectionShell

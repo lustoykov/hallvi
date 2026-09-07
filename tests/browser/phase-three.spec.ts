@@ -84,6 +84,16 @@ test(
       fullPage: true,
     });
 
+    // Secondary evidence starts collapsed and opens when the person needs it.
+    await expect(
+      record.getByRole("button", { name: /^Environment/ }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await record
+      .getByRole("combobox", { name: "Find in Record" })
+      .selectOption("environment");
+    await record
+      .getByRole("combobox", { name: "Find in Record" })
+      .selectOption("runs");
     // The engine is reachable; the brief names the runner configuration.
     await expect(record.getByText("Engine reachable")).toBeVisible();
 
@@ -347,6 +357,9 @@ test(
     });
     // The Record checks the engine when it opens, never trusting another
     // process's earlier answer.
+    await record
+      .getByRole("combobox", { name: "Find in Record" })
+      .selectOption("environment");
     await expect(record.getByText("No engine found")).toBeVisible({
       timeout: 30_000,
     });
@@ -375,6 +388,9 @@ test(
     await record
       .getByRole("button", { name: "Check again", exact: true })
       .click();
+    await record
+      .getByRole("combobox", { name: "Find in Record" })
+      .selectOption("environment");
     await expect(record.getByText("Engine reachable")).toBeVisible({
       timeout: 15_000,
     });

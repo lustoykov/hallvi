@@ -30,6 +30,8 @@ const empty: PhaseOneOperatorView = {
 function render(view = empty) {
   return renderToStaticMarkup(
     <Inspector
+      onHide={() => undefined}
+      onToggleWidth={() => undefined}
       busy={null}
       view={view}
       checks={view.checks}

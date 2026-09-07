@@ -87,8 +87,8 @@ test(
       page.getByText(/\[QA contract\] Proposed Application Contract v2/),
     ).toBeVisible({ timeout: 60_000 });
     await page
-      .getByRole("link", { name: "Application Contract", exact: true })
-      .click();
+      .getByRole("combobox", { name: "Find in Record" })
+      .selectOption("contract");
     await page.getByRole("button", { name: /^Saved versions/ }).click();
     await expect(page.getByText(/v1/).first()).toBeVisible();
     await page.screenshot({

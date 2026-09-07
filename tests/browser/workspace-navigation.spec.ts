@@ -125,16 +125,14 @@ test(
       name: "Record",
       exact: true,
     });
-    const sections = record.getByRole("navigation", {
-      name: "Record sections",
-    });
+    const sections = record.getByRole("combobox", { name: "Find in Record" });
     await expect(
       record.getByRole("region", { name: "Checks", exact: true }),
     ).toBeVisible();
     await expect(
       record.getByRole("region", { name: "History", exact: true }),
     ).toHaveCount(0);
-    await sections.getByRole("link", { name: "History", exact: true }).click();
+    await sections.selectOption("history");
     await expect(
       record.getByRole("region", { name: "History", exact: true }),
     ).toBeVisible();
@@ -145,6 +143,29 @@ test(
       record.getByRole("region", { name: "History", exact: true }),
     ).toHaveCount(0);
     await expect(historyToggle).toHaveAttribute("aria-expanded", "false");
+    // The reader chooses the width; hiding preserves selected content.
+    await sections.selectOption("history");
+    const originalWidth = (await record.boundingBox())!.width;
+    await record
+      .getByRole("button", { name: "Widen Record", exact: true })
+      .click();
+    expect((await record.boundingBox())!.width).toBeGreaterThan(originalWidth);
+    await record
+      .getByRole("button", { name: "Hide Record", exact: true })
+      .click();
+    const showRecord = page.getByRole("button", {
+      name: "Record",
+      exact: true,
+    });
+    await expect(showRecord).toBeFocused();
+    await expect(record).not.toBeVisible();
+    await showRecord.click();
+    await expect(historyToggle).toHaveAttribute("aria-expanded", "true");
+    await record
+      .getByRole("button", { name: "Narrow Record", exact: true })
+      .click();
+    await historyToggle.click();
+
     await expect(
       record.getByText(
         /Hetzner access|Cloudflare access|Domain starting state|Later phases/,

@@ -292,6 +292,8 @@ describe("inspector record", () => {
   const render = (v: OperatorView) =>
     renderToStaticMarkup(
       <Inspector
+        onHide={() => undefined}
+        onToggleWidth={() => undefined}
         busy={null}
         checks={v.checks}
         onConformance={() => {}}

@@ -83,6 +83,9 @@ export function OperatorShell({
   demo?: boolean;
 }) {
   const router = useRouter();
+  const [recordVisible, setRecordVisible] = useState(true);
+  const [recordWide, setRecordWide] = useState(false);
+  const recordButton = useRef<HTMLButtonElement>(null);
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [revisionOpen, setRevisionOpen] = useState(false);
@@ -145,6 +148,7 @@ export function OperatorShell({
   const references = recordReferences(view);
 
   function revealSection(section: RecordSection) {
+    setRecordVisible(true);
     setReveal((current) => ({ section, nonce: (current?.nonce ?? 0) + 1 }));
   }
 
@@ -710,20 +714,32 @@ export function OperatorShell({
               </button>
             </nav>
           </div>
-          <Link
-            className="sg-settings-link"
-            href="/setup/pi"
-            title={
-              initialPiSetup.ready
-                ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                : "Connect ChatGPT to chat with Server Guy"
-            }
-          >
-            <GearSix aria-hidden="true" />
-            {initialPiSetup.ready
-              ? "Settings · ChatGPT connected"
-              : "Settings · Connect ChatGPT"}
-          </Link>
+          <div className="sg-topbar-tools">
+            <button
+              type="button"
+              className="sg-record-visibility"
+              ref={recordButton}
+              aria-controls="application-record"
+              aria-expanded={recordVisible}
+              onClick={() => setRecordVisible((visible) => !visible)}
+            >
+              Record
+            </button>
+            <Link
+              className="sg-settings-link"
+              href="/setup/pi"
+              title={
+                initialPiSetup.ready
+                  ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
+                  : "Connect ChatGPT to chat with Server Guy"
+              }
+            >
+              <GearSix aria-hidden="true" />
+              {initialPiSetup.ready
+                ? "Settings · ChatGPT connected"
+                : "Settings · Connect ChatGPT"}
+            </Link>
+          </div>
         </header>
 
         <PhaseRail
@@ -734,7 +750,9 @@ export function OperatorShell({
           workspaces={view.workspaces}
         />
 
-        <section className="sg-workspace">
+        <section
+          className={`sg-workspace${!recordVisible ? " sg-record-hidden" : recordWide ? " sg-record-wide" : ""}`}
+        >
           <ChatList
             busy={busy !== null}
             chats={view.chats}
@@ -812,6 +830,14 @@ export function OperatorShell({
             />
           </div>
           <Inspector
+            key={view.workspace?.id ?? "record"}
+            hidden={!recordVisible}
+            wide={recordWide}
+            onToggleWidth={() => setRecordWide((wide) => !wide)}
+            onHide={() => {
+              setRecordVisible(false);
+              recordButton.current?.focus();
+            }}
             busy={busy}
             checks={checks}
             offerGrant={step.actions.some((action) => action.key === "grant")}

@@ -424,7 +424,7 @@
 .sg-workspace {
   min-height: 0;
   display: grid;
-  grid-template-columns: 240px minmax(520px, 1fr) 400px;
+  grid-template-columns: 220px minmax(380px, 1fr) 400px;
 }
 .sg-chat-list,
 .sg-chat-pane,
@@ -510,6 +510,7 @@
 }
 .sg-session-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
   min-width: 0;
@@ -1696,7 +1697,7 @@
 
 @media (max-width: 1280px) {
   .sg-workspace {
-    grid-template-columns: 220px minmax(500px, 1fr) 360px;
+    grid-template-columns: 190px minmax(360px, 1fr) 360px;
   }
   .sg-messages {
     padding-inline: 20px;
@@ -2646,6 +2647,19 @@
     opacity: 0.3;
   }
 }
+.sg-stage-disclosure summary {
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.sg-stage-disclosure[open] summary {
+  margin-bottom: 8px;
+}
+.sg-record-wide .sg-stages {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .sg-stages {
   margin: 0;
   padding: 0;
@@ -2797,49 +2811,99 @@
 
 /* ---------- Record outline: jump nav and collapsible sections ---------- */
 
-.sg-record-nav {
+.sg-workspace.sg-record-wide {
+  grid-template-columns: 190px minmax(340px, 1fr) min(48vw, 760px);
+}
+.sg-workspace.sg-record-hidden {
+  grid-template-columns: 220px minmax(380px, 1fr);
+}
+.sg-inspector[hidden],
+.sg-record-body[hidden] {
+  display: none;
+}
+.sg-topbar-tools {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 8px 10px;
+  align-items: center;
+  gap: 16px;
+}
+.sg-record-visibility {
+  color: #fff;
+  background: transparent;
+  border: 1px solid #586479;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.sg-record-visibility[aria-expanded="true"] {
+  background: #34435c;
+}
+.sg-record-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line);
 }
-/* Grid children default to their content width; the column is fixed. */
+.sg-record-toolbar > strong {
+  font-size: 14px;
+}
+.sg-record-jump {
+  margin-left: auto;
+}
+.sg-record-jump select {
+  max-width: 150px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.sg-record-toolbar > button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.sg-record-toolbar > button svg {
+  width: 18px;
+  height: 18px;
+}
+.sg-record-toolbar > button:hover {
+  background: #e9eef6;
+}
 .sg-inspector-body > * {
   min-width: 0;
-}
-.sg-record-nav a {
-  padding: 5px 9px;
-  border-radius: 6px;
-  color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.sg-record-nav a:hover {
-  background: #eef2f8;
-  color: var(--ink);
 }
 .sg-record-section {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   scroll-margin-top: 8px;
 }
 .sg-record-section.open {
-  box-shadow: var(--shadow-s);
+  box-shadow: none;
 }
 .sg-record-toggle {
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 8px;
+  padding: 15px 4px;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -2863,6 +2927,8 @@
   white-space: nowrap;
 }
 .sg-record-toggle small {
+  grid-column: 2 / -1;
+  grid-row: 2;
   min-width: 0;
   color: var(--muted);
   font-size: 11.5px;
@@ -2871,6 +2937,8 @@
   text-overflow: ellipsis;
 }
 .sg-record-toggle em {
+  grid-column: 3;
+  grid-row: 1;
   margin-left: auto;
   flex: none;
   font-size: 11px;
@@ -2887,8 +2955,8 @@
 }
 .sg-record-body {
   min-width: 0;
-  padding: 4px 12px 12px;
-  border-top: 1px solid var(--line-2);
+  padding: 4px 0 20px;
+  border-top: 0;
   display: grid;
   gap: 10px;
 }
