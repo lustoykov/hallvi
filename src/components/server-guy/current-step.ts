@@ -573,6 +573,27 @@ function launchReadyStep(
       ],
     };
   }
+  if (candidate && !acceptance && !proposedAcceptance && noChange)
+    return {
+      ...withStages,
+      now: `The current revision ${short(candidate.sha)} is the candidate. Server Guy still has to propose the behavior checks from the routes it reads and preview the revision; a health response alone is not sufficient.`,
+      waitingOn: "you",
+      actions: [
+        {
+          key: "continue-with-server-guy",
+          label: "Continue with Server Guy",
+          explanation:
+            "Proposes the behavior checks from the routes it reads and previews the current revision.",
+          kind: "primary",
+        },
+        {
+          key: "reveal:change",
+          label: "Other ways to do the work",
+          explanation: "Return a change made elsewhere.",
+          kind: "link",
+        },
+      ],
+    };
   if (candidate && !acceptance)
     return {
       ...withStages,

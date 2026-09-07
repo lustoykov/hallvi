@@ -75,6 +75,11 @@ test(
       record.getByText(/^Application Contract v1 · [0-9a-f]{8}$/),
     ).toBeVisible();
     await expect(record.getByText("Ready for review")).toBeVisible();
+    await record.locator(".sg-contract-group").evaluateAll((groups) =>
+      groups.forEach((group) => {
+        (group as HTMLDetailsElement).open = true;
+      }),
+    );
     await expect(
       record.locator(".sg-provenance.repository-declared").first(),
     ).toBeVisible();
@@ -89,10 +94,11 @@ test(
     ).toBeVisible();
     await expect(record.getByText("Needs your decision")).toHaveCount(0);
     const source = record.locator(".sg-contract-source").first();
-    await expect(source).toHaveAttribute(
-      "href",
-      /github\.com\/qa\/fastapi-app\/blob\/[0-9a-f]{40}\/.+#L\d+$/,
-    );
+    // Synthetic repository: the citation names the file and line, and the
+    // invented GitHub page is labelled as demo rather than linked.
+    await expect(source).toContainText(/[\w.\/-]+:\d+/);
+    await expect(source).toContainText("demo · not a real link");
+    await expect(source.locator("a")).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("phase-two-02-contract-established.png"),
       fullPage: true,

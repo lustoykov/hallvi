@@ -724,4 +724,32 @@ describe("Phase 3", () => {
       key: "accept-checks:acceptance-proposed",
     });
   });
+
+  it("offers Continue with Server Guy when the current revision is the candidate but no checks exist", () => {
+    const noChange = proposal({
+      origin: "no-change",
+      status: "approved",
+      changes: [],
+      candidate: {
+        sha: COMMIT,
+        defaultBranch: "main",
+        resolvedAt: at,
+        source: "contract-commit",
+        merge: null,
+      },
+    });
+    const step = describeCurrentStep(
+      phaseThree({
+        brief: brief(0),
+        proposal: noChange,
+        proposals: [noChange],
+      }),
+    );
+    expect(step.waitingOn).toBe("you");
+    expect(step.actions.map((action) => action.key)).toEqual([
+      "continue-with-server-guy",
+      "reveal:change",
+    ]);
+    expect(step.now).toMatch(/a health response alone is not sufficient/);
+  });
 });
