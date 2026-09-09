@@ -33,6 +33,7 @@ import {
   chatSummaries,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
+import { assertOutsideRecoveryQuarantine } from "./recovery-quarantine.mjs";
 import type {
   AcceptanceChecksRecord,
   ActivityEvent,
@@ -71,10 +72,14 @@ declare global {
 }
 
 export function databasePath() {
-  return (
+  const path =
     process.env.SERVER_GUY_DB_PATH ??
-    join(process.cwd(), ".server-guy", "server-guy.db")
+    join(process.cwd(), ".server-guy", "server-guy.db");
+  assertOutsideRecoveryQuarantine(
+    path,
+    process.env.SERVER_GUY_CONFIG_DIR ?? join(process.cwd(), ".server-guy"),
   );
+  return path;
 }
 
 export function db(): ServerGuyDatabase {

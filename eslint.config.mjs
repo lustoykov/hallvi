@@ -28,6 +28,7 @@ export default defineConfig([
   },
   globalIgnores([
     ".claude/**",
+    ".server-guy/**",
     ".next/**",
     "node_modules/**",
     "coverage/**",
