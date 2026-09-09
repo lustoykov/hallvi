@@ -124,6 +124,8 @@ export interface DeploymentRecord {
   repository: string;
   recommendationId?: string;
   verificationPending?: string | null;
+  /** Candidate ID supplied for recovery; verified against the unique marker before deletion. */
+  verificationRecoveryId?: string | null;
   repositoryId?: number;
   githubConnectionId?: string;
   inspectedRevision?: string | null;

@@ -27,6 +27,7 @@ export function DeploymentDecision({
   onOpen: (destination: ApplicationSection) => void;
 }) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [verificationObjectId, setVerificationObjectId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function post(body: unknown) {
@@ -186,6 +187,24 @@ export function DeploymentDecision({
         role="group"
         aria-label="Deployment recovery"
       >
+        {record.verificationPending && !record.cleanup && (
+          <label>
+            Recover verification test object
+            <p>
+              Find the object containing{" "}
+              <code>{record.verificationPending}</code> in your application and
+              enter its ID. Server Guy verifies the marker before removing only
+              that object and resuming checks. An empty result is not proof the
+              earlier request had no effect.
+            </p>
+            <input
+              value={verificationObjectId}
+              maxLength={200}
+              onChange={(event) => setVerificationObjectId(event.target.value)}
+              placeholder="Test object ID"
+            />
+          </label>
+        )}
         {error && (
           <p role="alert" className="sg-deployment-error">
             {error}
@@ -197,7 +216,13 @@ export function DeploymentDecision({
             disabled={busy}
             type="button"
             onClick={() =>
-              void post({ action: "retry", deploymentId: record.id })
+              void post({
+                action: "retry",
+                deploymentId: record.id,
+                ...(verificationObjectId.trim()
+                  ? { verificationObjectId: verificationObjectId.trim() }
+                  : {}),
+              })
             }
           >
             Retry this deployment

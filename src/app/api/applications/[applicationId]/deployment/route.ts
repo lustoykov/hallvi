@@ -49,8 +49,13 @@ const schema = z.discriminatedUnion("action", [
     inputs: z.record(z.string(), z.string().max(2000)),
   }),
   z.strictObject({
-    action: z.enum(["retry", "logs", "cancel"]),
+    action: z.enum(["logs", "cancel"]),
     deploymentId: z.uuid(),
+  }),
+  z.strictObject({
+    action: z.literal("retry"),
+    deploymentId: z.uuid(),
+    verificationObjectId: z.string().min(1).max(200).optional(),
   }),
 ]);
 export function POST(request: Request, context: Context) {
@@ -154,6 +159,13 @@ export function POST(request: Request, context: Context) {
           const tracked = syncDeploymentOperation(record);
           const retried = retryOperation(tracked.id, tracked.updatedAt);
           record.operationId = retried.id;
+          if (input.verificationObjectId) {
+            if (!record.verificationPending || record.cleanup)
+              throw new Error(
+                "There is no unresolved test-object creation to recover.",
+              );
+            record.verificationRecoveryId = input.verificationObjectId;
+          }
           record.status = record.authority ? "deploy-queued" : "queued";
           record.error = null;
           saveDeployment(record);

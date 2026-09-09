@@ -412,3 +412,52 @@ it("does not repeat test creation after an unknown POST outcome", async () => {
   ).rejects.toThrow("unknown outcome");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it.each([true, false])(
+  "reconciles a supplied test ID only when its unique marker matches (%s)",
+  async (matches) => {
+    const value = record();
+    value.address = "203.0.113.10";
+    value.verificationPending = "sg-check-lost";
+    value.verificationRecoveryId = "candidate";
+    value.plan = {
+      ...plan,
+      checks: [
+        {
+          name: "Read",
+          method: "GET",
+          path: "/todos/{id}",
+          body: null,
+          expectedStatus: 200,
+          contains: "SG_VERIFY_TOKEN",
+          captureId: null,
+        },
+        {
+          name: "Delete",
+          method: "DELETE",
+          path: "/todos/{id}",
+          body: null,
+          expectedStatus: 204,
+          contains: "",
+          captureId: null,
+        },
+      ],
+    };
+    const fetcher = vi.fn(async (url: URL, init: RequestInit = {}) => {
+      if (url.pathname === "/health") return new Response("ok");
+      expect(url.pathname).toBe("/todos/candidate");
+      if (init.method === "DELETE") return new Response(null, { status: 204 });
+      return new Response(matches ? "sg-check-lost" : "real user data");
+    });
+    vi.stubGlobal("fetch", fetcher);
+    // The deliberately incomplete next check fails after recovery. It must not
+    // hide whether cleanup was safely completed or left unresolved.
+    await expect(
+      verifyDeployment(value, new AbortController().signal),
+    ).rejects.toThrow(matches ? "captured object ID" : "Nothing was deleted");
+    expect(value.verificationPending).toBe(matches ? null : "sg-check-lost");
+    expect(
+      fetcher.mock.calls.filter((c) => c[1]?.method === "DELETE"),
+    ).toHaveLength(matches ? 1 : 0);
+  },
+);

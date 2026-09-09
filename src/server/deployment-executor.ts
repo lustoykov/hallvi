@@ -1,11 +1,12 @@
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { isIP } from "node:net";
-import { piConfigDir } from "./pi-configuration";
+import { deploymentDirectory } from "./deployment-files";
+export { deploymentDirectory } from "./deployment-files";
 import {
   hetzner,
   hetznerConnectionId,
@@ -32,11 +33,6 @@ import { fetchBaseTree } from "./execution-tree";
 import { writeTar } from "./tar";
 import { deniedPathReason, redactSecrets } from "./secrets";
 
-export function deploymentDirectory(record: DeploymentRecord) {
-  const directory = join(piConfigDir(), "deployments", record.id);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  return directory;
-}
 export function saveDeploymentInputs(
   record: DeploymentRecord,
   input: Record<string, string>,
@@ -659,8 +655,47 @@ export async function verifyDeployment(
       );
     record.cleanup = null;
     record.verificationPending = null;
+    record.verificationRecoveryId = null;
     deploymentEvent(record, "Removed the verification test object");
   };
+  if (
+    record.verificationPending &&
+    !record.cleanup &&
+    record.verificationRecoveryId
+  ) {
+    const read = record.plan!.checks.find(
+      (c) =>
+        c.method === "GET" &&
+        c.path.includes("{id}") &&
+        c.contains.includes("SG_VERIFY_TOKEN"),
+    );
+    const removal = record.plan!.checks.find(
+      (c) => c.method === "DELETE" && c.path.includes("{id}"),
+    );
+    if (!read || !removal)
+      throw new Error(
+        "The approved checks do not define safe test-object recovery.",
+      );
+    const id = encodeURIComponent(record.verificationRecoveryId);
+    const response = await request(read.path.replaceAll("{id}", id));
+    const text = await response.text();
+    if (
+      response.status !== read.expectedStatus ||
+      !text.includes(record.verificationPending)
+    )
+      throw new Error(
+        "This object does not contain the pending verification marker. Nothing was deleted and verification remains paused.",
+      );
+    record.cleanup = {
+      path: removal.path.replaceAll("{id}", id),
+      expectedStatus: removal.expectedStatus,
+      marker: record.verificationPending,
+    };
+    deploymentEvent(
+      record,
+      "Located the pending verification object and verified its unique marker before cleanup",
+    );
+  }
   await cleanup();
   if (record.verificationPending)
     throw new Error(
@@ -698,6 +733,10 @@ export async function verifyDeployment(
         captured = String(value);
       }
       if (check.method === "POST" && captured) {
+        if (response.status !== check.expectedStatus || !text.includes(marker))
+          throw new Error(
+            "The create response did not prove ownership of the test object. Resolve its marker before retrying.",
+          );
         const removal = record.plan!.checks.find(
           (c) => c.method === "DELETE" && c.path.includes("{id}"),
         );

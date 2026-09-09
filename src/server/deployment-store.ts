@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { db, getApplication, getChat, insertMessage } from "./db";
 import { deployments } from "./db-schema";
 import type { DeploymentRecord } from "./deployment-types";
+import { removeCancelledDeploymentFiles } from "./deployment-files";
 
 const snapshots = new WeakMap<DeploymentRecord, DeploymentRecord>();
 function remember(record: DeploymentRecord | null) {
@@ -78,6 +79,16 @@ export function saveDeployment(record: DeploymentRecord) {
 // Called only when no create attempt remains and no server was recorded. A
 // failed or expired connection cannot strand a definitively uncreated setup.
 export function cancelDeployment(record: DeploymentRecord) {
+  if (
+    record.serverId ||
+    record.serverCreateAttempted ||
+    !["queued", "awaiting-approval", "deploy-queued", "failed"].includes(
+      record.status,
+    )
+  )
+    throw new Error(
+      "Only definitively uncreated, stopped or queued deployment setup can be cancelled.",
+    );
   const previous = snapshots.get(record);
   if (!previous) throw new DeploymentConflictError();
   db().transaction(
@@ -100,6 +111,7 @@ export function cancelDeployment(record: DeploymentRecord) {
     },
     { behavior: "immediate" },
   );
+  removeCancelledDeploymentFiles(record.id);
 }
 export function deploymentEvent(record: DeploymentRecord, message: string) {
   record.events.push({ at: new Date().toISOString(), message });
