@@ -1,0 +1,14 @@
+.git
+.server-guy
+.claude
+.worktrees
+.env
+.env.*
+node_modules
+.next
+out
+coverage
+data
+tests/results
+*.tsbuildinfo
+**/__pycache__
