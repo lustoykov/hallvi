@@ -477,6 +477,13 @@ export function ApplicationOverview({
       </div>
       <section className="sg-overview-block" aria-label="Recent changes">
         <h3>Recent changes</h3>
+        <button
+          type="button"
+          className="sg-op-link"
+          onClick={() => onOpenDestination("history")}
+        >
+          All history <ArrowRight />
+        </button>
         {changes.length ? (
           <ol className="sg-changes">
             {changes.map((operation) => (

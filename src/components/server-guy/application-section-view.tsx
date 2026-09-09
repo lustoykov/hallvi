@@ -21,6 +21,7 @@ import { CacheView } from "./views/cache-view";
 import { DatabaseView } from "./views/database-view";
 import { DeploymentView } from "./views/deployment-view";
 import { DomainsView } from "./views/domains-view";
+import { HistoryView } from "./views/history-view";
 import { JobsView } from "./views/jobs-view";
 import { LogsView } from "./views/logs-view";
 import { MonitoringView } from "./views/monitoring-view";
@@ -30,6 +31,8 @@ import { VariablesView } from "./views/variables-view";
 import type { ViewProps } from "./views/bits";
 
 const descriptions: Record<ApplicationSection, string> = {
+  history:
+    "Every operation across your conversations and automatic work, in one record.",
   overview:
     "What is running, what needs you, what changed, and how fresh the evidence is.",
   architecture: "How your source, application, host and data fit together.",
@@ -47,7 +50,7 @@ const descriptions: Record<ApplicationSection, string> = {
   logs: "Inspect the latest collected output from your application host.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
-  domains: "Public addresses, HTTPS and delivery for your application.",
+  domains: "Your application’s domain, HTTPS and optional CDN caching.",
   variables: "Configuration your application needs to build and run.",
 };
 
@@ -74,6 +77,7 @@ export function ApplicationSectionView({
   busy,
   bar,
   children,
+  decisionFor,
 }: {
   section: ApplicationSection;
   view: OperatorView;
@@ -95,6 +99,7 @@ export function ApplicationSectionView({
   /** The bar above the header: the way back to the conversation. */
   bar?: ReactNode;
   children?: ReactNode;
+  decisionFor?: (operation: ApplicationOperation) => ReactNode;
 }) {
   const app = view.application;
   if (!app) return null;
@@ -113,7 +118,7 @@ export function ApplicationSectionView({
     onAction,
     busy,
   };
-  const activity = section !== "overview" && (
+  const activity = section !== "overview" && section !== "history" && (
     <DestinationActivity
       section={section}
       operations={operations}
@@ -151,6 +156,9 @@ export function ApplicationSectionView({
           busy={busy}
         />
       );
+      break;
+    case "history":
+      content = <HistoryView {...viewProps} decisionFor={decisionFor} />;
       break;
     case "deployment":
       content = <DeploymentView {...viewProps}>{children}</DeploymentView>;

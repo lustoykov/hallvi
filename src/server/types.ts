@@ -204,6 +204,7 @@ export interface ActivityEvent {
  * their Pi Runs and the application's Activity.
  */
 export interface ChatRunSnapshot {
+  operations?: import("./operation-record").ApplicationOperation[];
   messages: ChatMessage[];
   runs: PiRun[];
   activity: ActivityEvent[];
@@ -796,6 +797,7 @@ export interface ConformanceView {
 }
 
 export interface OperatorView {
+  operations?: import("./operation-record").ApplicationOperation[];
   preparation?: PreparationBranch | null;
   preview?: ApplicationPreview | null;
   application: ApplicationRecord | null;

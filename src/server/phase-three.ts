@@ -960,8 +960,14 @@ export async function publishProposal(
   proposalId: string,
   signal?: AbortSignal,
 ) {
-  return duringApplicationOperation(applicationId, () =>
-    publishProposalImpl(applicationId, proposalId, signal),
+  return duringApplicationOperation(
+    applicationId,
+    () => publishProposalImpl(applicationId, proposalId, signal),
+    {
+      command: { type: "publish-proposal", proposalId },
+      kind: "change",
+      title: "Publish the approved source proposal",
+    },
   );
 }
 
@@ -1222,8 +1228,14 @@ export async function returnExternalChange(
   reference: string,
   signal?: AbortSignal,
 ) {
-  return duringApplicationOperation(applicationId, () =>
-    returnExternalChangeImpl(applicationId, reference, signal),
+  return duringApplicationOperation(
+    applicationId,
+    () => returnExternalChangeImpl(applicationId, reference, signal),
+    {
+      command: { type: "return-change", reference },
+      kind: "inspection",
+      title: "Inspect an external source change",
+    },
   );
 }
 
@@ -1483,8 +1495,14 @@ export async function refreshCandidate(
   applicationId: string,
   signal?: AbortSignal,
 ) {
-  return duringApplicationOperation(applicationId, () =>
-    refreshCandidateImpl(applicationId, signal),
+  return duringApplicationOperation(
+    applicationId,
+    () => refreshCandidateImpl(applicationId, signal),
+    {
+      command: { type: "refresh-candidate" },
+      kind: "inspection",
+      title: "Inspect the release candidate",
+    },
   );
 }
 
@@ -1840,8 +1858,14 @@ export async function grantPublication(
   applicationId: string,
   signal?: AbortSignal,
 ) {
-  return duringApplicationOperation(applicationId, () =>
-    grantPublicationImpl(applicationId, signal),
+  return duringApplicationOperation(
+    applicationId,
+    () => grantPublicationImpl(applicationId, signal),
+    {
+      command: { type: "grant-publication" },
+      kind: "inspection",
+      title: "Check source publication access",
+    },
   );
 }
 

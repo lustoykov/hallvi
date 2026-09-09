@@ -4,7 +4,7 @@ import {
   Condition,
   Facts,
   Pill,
-  Planned,
+  LinkButton,
   Possible,
   SubHeading,
   When,
@@ -23,6 +23,7 @@ export function DomainsView(props: ViewProps) {
   if (!domains)
     return (
       <>
+        <SubHeading>Domain & HTTPS</SubHeading>
         <Facts
           rows={[
             [
@@ -31,7 +32,6 @@ export function DomainsView(props: ViewProps) {
             ],
             ["Custom domain", "Not connected"],
             ["HTTPS", "Not configured"],
-            ["CDN", "Not configured"],
             [
               "Private services",
               postgres || stack.services.length
@@ -51,10 +51,7 @@ export function DomainsView(props: ViewProps) {
           only when it helps. You do the one step only you can: pointing the
           domain. Domain setup is not available yet.
         </Possible>
-        <Planned title="A domain, HTTPS and delivery that fit your app">
-          Routing, certificates and CDN caching will be configured and verified
-          here. Cloudflare access will be requested only when it is needed.
-        </Planned>
+        <CdnSection {...props} />
       </>
     );
   const domain = domains.domain;
@@ -93,6 +90,7 @@ export function DomainsView(props: ViewProps) {
           <p>{domain.userStep}</p>
         </div>
       )}
+      <SubHeading>Domain & HTTPS</SubHeading>
       <Facts
         rows={[
           ["Address", domains.address ?? "No public address recorded"],
@@ -152,21 +150,6 @@ export function DomainsView(props: ViewProps) {
               "Not configured"
             ),
           ],
-          [
-            "CDN",
-            domains.cdn.state === "active" ? (
-              <>
-                <Pill tone="ok">Active</Pill> {domains.cdn.provider} ·{" "}
-                {domains.cdn.detail}
-              </>
-            ) : domains.cdn.state === "partial" ? (
-              <>
-                <Pill tone="warn">Partial</Pill> {domains.cdn.detail}
-              </>
-            ) : (
-              domains.cdn.detail
-            ),
-          ],
         ]}
       />
       <SubHeading>Routes</SubHeading>
@@ -190,9 +173,72 @@ export function DomainsView(props: ViewProps) {
       </div>
       <p className="sg-section-note">
         Private services stay inside the Compose network; only listed routes are
-        reachable from outside. A CDN counts as active only when eligible
-        content is observed cached.
+        reachable from outside.
       </p>
+      <CdnSection {...props} />
     </>
+  );
+}
+
+function CdnSection({ facts, onAsk }: ViewProps) {
+  const cdn = facts.domains?.cdn;
+  const configured = cdn?.state === "active" || cdn?.state === "partial";
+  return (
+    <section aria-label="CDN">
+      <SubHeading>CDN</SubHeading>
+      <p className="sg-section-note">
+        An optional layer that serves cached copies of eligible files closer to
+        visitors. Your domain and HTTPS work independently of it.
+      </p>
+      <Facts
+        rows={[
+          [
+            "Status",
+            <Pill
+              key="state"
+              tone={
+                cdn?.state === "active"
+                  ? "ok"
+                  : cdn?.state === "partial"
+                    ? "warn"
+                    : "muted"
+              }
+            >
+              {cdn?.state === "active"
+                ? "Active"
+                : cdn?.state === "partial"
+                  ? "Partially configured"
+                  : "Not enabled"}
+            </Pill>,
+          ],
+          ...(configured
+            ? [["Provider", cdn.provider ?? "Not recorded"] as [string, string]]
+            : []),
+          [
+            configured ? "Caching" : "Recommendation",
+            cdn?.state === "not-configured" || !cdn
+              ? "No CDN configured. Server Guy can help assess whether this application would benefit."
+              : cdn.detail,
+          ],
+        ]}
+      />
+      <LinkButton
+        onClick={() =>
+          onAsk(
+            null,
+            configured
+              ? "I want to clear the CDN cache for this application. Show me the scope and impact before doing anything."
+              : "Would a CDN help this application? Explain what should be cached and recommend a setup if it makes sense.",
+          )
+        }
+      >
+        {configured ? "Ask to clear cache" : "Discuss CDN setup"}
+      </LinkButton>
+      {!facts.domains && (
+        <p className="sg-section-note">
+          CDN setup and cache clearing are not implemented yet.
+        </p>
+      )}
+    </section>
   );
 }

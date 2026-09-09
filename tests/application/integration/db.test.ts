@@ -91,6 +91,7 @@ describe("Phase 1 schema", () => {
       "acceptance_checks",
       "activity_events",
       "application_contracts",
+      "application_operation_processes",
       "application_operations",
       "application_previews",
       "applications",

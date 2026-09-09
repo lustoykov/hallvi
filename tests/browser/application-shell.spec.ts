@@ -131,7 +131,7 @@ test(
       "Backups",
       "Logs",
       "Monitoring",
-      "Domains",
+      "Domains & CDN",
       "Environment Variables",
     ]) {
       await nav.getByRole("button", { name: section, exact: true }).click();

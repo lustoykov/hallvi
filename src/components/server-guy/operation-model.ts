@@ -14,6 +14,8 @@ import type { ChatSummary } from "@/server/types";
 export const stateLabel: Record<OperationState, string> = {
   proposed: "Waiting for you",
   working: "Working",
+  queued: "Queued",
+  cancelled: "Cancelled",
   inspected: "Inspected",
   verified: "Verified",
   failed: "Failed",
@@ -73,6 +75,7 @@ export function activeOperations(operations: ApplicationOperation[]) {
     operations.filter(
       (operation) =>
         operation.state === "working" ||
+        operation.state === "queued" ||
         operation.state === "proposed" ||
         unresolved(operation, operations),
     ),
@@ -102,6 +105,8 @@ export function recentOperations(operations: ApplicationOperation[]) {
 }
 
 export function stepDetail(operation: ApplicationOperation) {
+  if (operation.state === "queued")
+    return `after ${operation.waitingForTitle ?? "the current change"}`;
   if (operation.state !== "working" || !operation.steps) return null;
   const active = operation.steps.findIndex((step) => step.state === "active");
   return active < 0 ? null : `step ${active + 1} of ${operation.steps.length}`;
@@ -116,7 +121,9 @@ export function featuredOperation(
   section: ApplicationSection | null,
   chatId: string | null,
 ) {
-  const active = activeOperations(operations);
+  const active = activeOperations(operations).filter(
+    (operation) => operation.kind === "change" && operation.state === "working",
+  );
   return (
     (section &&
       active.find((operation) => operation.destinations.includes(section))) ||
@@ -146,7 +153,10 @@ export function navigationIndicators(
     if (!list.length) continue;
     const failed = list.find((operation) => unresolved(operation, operations));
     const proposed = list.find((operation) => operation.state === "proposed");
-    const working = list.filter((operation) => operation.state === "working");
+    const working = list.filter(
+      (operation) =>
+        operation.state === "working" || operation.state === "queued",
+    );
     const others = working.length
       ? ` · ${count(working.length, "operation")} working`
       : "";
@@ -202,7 +212,8 @@ export function conversationMarks(
     const live =
       own.find((operation) => unresolved(operation, operations)) ??
       own.find((operation) => operation.state === "proposed") ??
-      own.find((operation) => operation.state === "working");
+      own.find((operation) => operation.state === "working") ??
+      own.find((operation) => operation.state === "queued");
     if (!live) continue;
     marks[chat.id] = {
       tone:

@@ -43,6 +43,7 @@ import {
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
 import { DeploymentPanel } from "./deployment-panel";
+import { OperationControls } from "./operation-controls";
 import { DeploymentDecision } from "./deployment-decision";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import "./application-shell.css";
@@ -236,7 +237,7 @@ export function OperatorShell({
     const value = await response.json();
     setDeployment(value.deployment);
     setHetznerConnected(value.connected);
-    if (value.deployment) {
+    {
       const next = await api.view(applicationId, selectedChatId);
       setView((current) =>
         current.selectedChatId === next.selectedChatId
@@ -289,8 +290,8 @@ export function OperatorShell({
     });
   const references = recordReferences(view);
   const operations = useMemo(
-    () => applicationOperations(deployment),
-    [deployment],
+    () => view.operations ?? applicationOperations(deployment),
+    [deployment, view.operations],
   );
   const stack = useMemo(() => stackOf(deployment), [deployment]);
   const [stackRevealed, setStackRevealed] = useState(false);
@@ -325,6 +326,7 @@ export function OperatorShell({
               ...current,
               messages: mergeMessages(current.messages, snapshot.messages),
               activity: snapshot.activity ?? current.activity,
+              operations: snapshot.operations ?? current.operations,
             }
           : current,
       );
@@ -928,6 +930,18 @@ export function OperatorShell({
               operations={operations}
               now={now}
               onRefresh={refreshDeployment}
+              decisionFor={(operation) =>
+                (operation.source.type !== "deployment" ||
+                  operation.state === "queued") &&
+                applicationId ? (
+                  <OperationControls
+                    key={operation.id}
+                    applicationId={applicationId}
+                    operation={operation}
+                    onRefresh={refreshDeployment}
+                  />
+                ) : null
+              }
               onOpenDestination={selectSection}
               onOpenConversation={openConversation}
               onAsk={askInConversation}
@@ -1048,7 +1062,10 @@ export function OperatorShell({
               highlight={highlight}
               decisionFor={(operation) =>
                 operation.source.type === "deployment" &&
+                operation.state !== "queued" &&
                 deployment &&
+                operation.id ===
+                  (deployment.operationId ?? `deployment:${deployment.id}`) &&
                 applicationId &&
                 showDeployment ? (
                   <DeploymentDecision
@@ -1057,6 +1074,15 @@ export function OperatorShell({
                     connected={hetznerConnected}
                     onRefresh={refreshDeployment}
                     onOpen={selectSection}
+                  />
+                ) : (operation.source.type !== "deployment" ||
+                    operation.state === "queued") &&
+                  applicationId ? (
+                  <OperationControls
+                    key={operation.id}
+                    applicationId={applicationId}
+                    operation={operation}
+                    onRefresh={refreshDeployment}
                   />
                 ) : null
               }

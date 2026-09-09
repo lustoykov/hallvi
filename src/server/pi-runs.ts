@@ -1,3 +1,4 @@
+import { operationsFor } from "./operation-store";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
@@ -46,6 +47,7 @@ export function chatRunSnapshot(
       .all();
     return {
       messages: listMessages(chatId),
+      operations: operationsFor(applicationId),
       runs,
       activity: listActivity(workspace.id),
     };

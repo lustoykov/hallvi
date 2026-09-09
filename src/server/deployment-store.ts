@@ -1,3 +1,8 @@
+import {
+  syncDeploymentOperation,
+  operation,
+  cancelOperation,
+} from "./operation-store";
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db, getApplication, getChat, insertMessage } from "./db";
@@ -65,6 +70,7 @@ export function saveDeployment(record: DeploymentRecord) {
         .run();
       if (result.changes !== 1) throw new DeploymentConflictError();
       remember(record);
+      syncDeploymentOperation(record);
     },
     { behavior: "immediate" },
   );
@@ -83,6 +89,10 @@ export function cancelDeployment(record: DeploymentRecord) {
         )
         .run();
       if (result.changes !== 1) throw new DeploymentConflictError();
+      const tracked = operation(
+        record.operationId ?? `deployment:${record.id}`,
+      );
+      if (tracked) cancelOperation(tracked.id, tracked.updatedAt);
       deploymentMessage(
         record,
         `Deployment setup ${record.id} was cancelled by the user after confirming that no server was created. Revision: ${record.revision ?? "not yet selected"}. No running application was removed.`,
@@ -202,6 +212,7 @@ export function requestDeployment(
         })
         .run();
       remember(record);
+      syncDeploymentOperation(record);
       return record;
     },
     { behavior: "immediate" },
@@ -216,8 +227,17 @@ export function pendingDeployments() {
     .filter((record) => ["queued", "deploy-queued"].includes(record.status));
 }
 export function interruptDeployments() {
+  // Called only after acquiring the exclusive deployment-worker lock. A
+  // crash can happen between claiming an operation and writing `deploying`.
   for (const { body } of db().select().from(deployments).all()) {
-    if (!["planning", "deploying"].includes(body.status)) continue;
+    const claimedBeforeExecution =
+      body.status === "deploy-queued" &&
+      operation(body.operationId ?? `deployment:${body.id}`)?.executorPid;
+    if (
+      !claimedBeforeExecution &&
+      !["planning", "deploying"].includes(body.status)
+    )
+      continue;
     remember(body);
     body.status = "failed";
     body.error =

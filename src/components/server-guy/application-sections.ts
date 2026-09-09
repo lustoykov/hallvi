@@ -2,6 +2,7 @@ import {
   SquaresFour,
   Graph,
   RocketLaunch,
+  ClockCounterClockwise,
   Cpu,
   Database,
   Lightning,
@@ -38,6 +39,12 @@ export const applicationSections = [
     id: "deployment",
     label: "Deployment",
     icon: RocketLaunch,
+    group: "application",
+  },
+  {
+    id: "history",
+    label: "History",
+    icon: ClockCounterClockwise,
     group: "application",
   },
   // `available` says whether any backend can record the resource today.
@@ -79,7 +86,7 @@ export const applicationSections = [
   { id: "backups", label: "Backups", icon: Archive, group: "care" },
   { id: "logs", label: "Logs", icon: TerminalWindow, group: "care" },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
-  { id: "domains", label: "Domains", icon: Globe, group: "care" },
+  { id: "domains", label: "Domains & CDN", icon: Globe, group: "care" },
   {
     id: "variables",
     label: "Environment Variables",

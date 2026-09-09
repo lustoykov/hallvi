@@ -43,7 +43,9 @@ import {
   getDeployment,
   saveDeployment,
   DeploymentConflictError,
+  interruptDeployments,
 } from "../../../src/server/deployment-store";
+import { claimOperation, operation } from "../../../src/server/operation-store";
 import { POST } from "../../../src/app/api/applications/[applicationId]/deployment/route";
 let root: string;
 let app: string;
@@ -103,6 +105,26 @@ function recommendation() {
   external.price.mockResolvedValue(r.offer);
   return r;
 }
+it("recovers a crash after claiming a deployment but before execution starts", async () => {
+  const r = recommendation();
+  const response = await post({
+    action: "approve",
+    deploymentId: r.id,
+    recommendationId: r.recommendationId,
+    maxMonthly: 5,
+    inputs: {},
+  });
+  expect(response.status).toBe(200);
+  const id = `deployment:${r.id}`;
+  // Ordinary unclaimed approvals survive restart and remain executable.
+  interruptDeployments();
+  expect(getDeployment(r.id)?.status).toBe("deploy-queued");
+  expect(claimOperation(id)?.executorPid).toBe(process.pid);
+  interruptDeployments();
+  expect(getDeployment(r.id)?.status).toBe("failed");
+  expect(operation(id)?.state).toBe("failed");
+  expect(operation(id)?.executorPid).toBeNull();
+});
 it("agent initiation preserves provenance and repeating it reuses the request", () => {
   const r = requestDeployment(app, chat, "server-guy");
   expect(requestDeployment(app, chat, "server-guy").id).toBe(r.id);

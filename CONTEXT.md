@@ -18,7 +18,17 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 ## Execution and evidence
 
-**Operation**: Recorded work affecting or inspecting an application, with target, origin, state and evidence. The current UI projects operations from deployment data; this term does not require a generic operation engine.
+**Operation**: Application-owned work with a target, origin, state and evidence, shared by every conversation and view.
+
+**Change**: An operation that modifies the application or its surroundings. Only one change executes at a time for an Application.
+
+**Inspection**: An operation that reads evidence without changing the application. Inspections can run alongside changes.
+
+**Queued change**: An approved operation waiting for an earlier change. Its assumptions must still hold when execution begins; changed assumptions require a new decision.
+
+**Cancelled operation**: A proposal or stopped attempt the user chose not to continue. Its record remains part of the application's history.
+
+**Unknown remote outcome**: An attempted external action whose result has not been established. A stopped controller does not establish that the external action stopped.
 
 **Observation**: A timestamped fact attributed to its source, such as a probe result, command output, metric sample or provider response.
 

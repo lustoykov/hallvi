@@ -154,6 +154,12 @@ export function ChatPane({
         operation={operation}
         now={now}
         onOpen={openDestination}
+        onOpenOperation={(id) => {
+          const linked = operations.find((item) => item.id === id);
+          if (linked?.origin)
+            openConversation(linked.origin.chatId, linked.origin.messageId);
+          else openDestination("history");
+        }}
         decision={decisionFor?.(operation)}
       />
     ));

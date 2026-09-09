@@ -116,6 +116,7 @@ export type DeploymentStatus =
   | "live"
   | "failed";
 export interface DeploymentRecord {
+  operationId?: string;
   id: string;
   applicationId: string;
   chatId: string;
