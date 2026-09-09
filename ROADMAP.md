@@ -22,13 +22,15 @@ While Fable owns the UI, backend work should start from the actual supported-sta
 - [x] Reconcile the [legacy acceptance](docs/archive/implementation/phase-one-acceptance.md), [retained checklist](docs/archive/previous-direction/docs/plans/implementation-history.md) and [merge review](docs/reviews/2026-09-08-fable-merge-readiness.md) against the current candidate. Record applicable fixes or deliberate retirement; do not treat archived work as silently waived. Dispositions are recorded in the [final integration report](docs/testing/2026-09-09-final-integration.md).
 - [ ] Run the relevant tests, build and browser journeys on the exact candidate and get the final review. Historical passing results and a working prototype are insufficient to call it ready for main.
 
-Retained checks needing explicit disposition: unreviewed live-model semantic cases, source/connection provenance, owner-merged candidate verification, durable request cancellation/retry, populated database migration and history preservation. Earlier AWS labs, workflow-engine research and UI presentation cleanups are not merge requirements unless a concrete current defect requires them. The deployment spending card already supplies an explicit authority boundary; do not recreate a generic phase gate merely to satisfy an old checklist.
+Retained checks and their [recorded disposition](docs/testing/2026-09-09-final-integration.md): unreviewed live-model semantic cases, source/connection provenance, owner-merged candidate verification, durable request cancellation/retry, populated database migration and history preservation. Earlier AWS labs, workflow-engine research and UI presentation cleanups are not merge requirements unless a concrete current defect requires them. The deployment spending card already supplies an explicit authority boundary; do not recreate a generic phase gate merely to satisfy an old checklist.
 
 ## Delivery sequence
 
 Each increment must connect conversation, durable state, execution and verification. These are engineering increments, never user-facing stages. Implement the smallest useful case within each; do not wait for every compatibility case to finish before exercising a working lifecycle.
 
 ### 1. Complete the single-instance runtime
+
+Close the [reviewed recovery gaps](docs/reviews/2026-09-09-final-integration-review.md) before expanding the executor: provide evidence-backed resolution for an uncertain purchase with no recovered host and for an unknown verification object; clean private material for definitively abandoned setup. Do not clear uncertainty merely because the user retries.
 
 Reuse actual Dockerfiles/Compose and support upstream image intake, required services, configuration mounts, persistent files, private connections and explicit ports. Prepare repository and host without discarding existing workloads. Add BYOM through the same Linux-host lifecycle as Hetzner; record the observed prerequisites and unsupported cases.
 

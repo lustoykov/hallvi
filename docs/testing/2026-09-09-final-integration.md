@@ -30,6 +30,10 @@ The browser and application tests use synthetic provider/model fixtures. They do
 - **Live-model semantic casebook:** previously unreviewed answers remain unreviewed. This merge does not certify broad model reliability or mark the historical casebook complete. The supported live deployment retains its separate dated evidence.
 - **Legacy UI:** mandatory phase navigation was replaced by conversation-first deployment. Optional preparation and its prerequisite/evidence machinery remain; further retirement is still tracked in the roadmap.
 
+## Independent review follow-up
+
+The [final Fable review](../reviews/2026-09-09-final-integration-review.md) found no merge blockers. Its additional approval/reference race was corrected after the main test pass; all 11 deployment-state tests passed, including unchanged recommendation approval during a cross-chat reference and rejection when the recommendation actually changes. Final GitHub checks must cover this follow-up revision. Unresolved purchase and verification outcomes remain conservative stops with no in-product resolution action; the review records these limits explicitly.
+
 ## Product limits
 
 The implemented executor is a first-deployment slice: a local controller, a fresh Hetzner instance, one source-built HTTP application and optional private persistent PostgreSQL. BYOM, HTTPS/CDN, general image/Compose intake, SQLite and worker/broker orchestration, off-host backups/restoration, ongoing monitoring and routine release history remain delivery work. Neither polished placeholders nor this merge imply those capabilities are operational.

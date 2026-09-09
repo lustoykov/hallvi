@@ -31,6 +31,13 @@ export function applicationDeployment(applicationId: string) {
       .get()?.body ?? null,
   );
 }
+export function deploymentExecutionState(value: DeploymentRecord) {
+  return JSON.stringify({
+    ...value,
+    mentions: undefined,
+    updatedAt: undefined,
+  });
+}
 export function saveDeployment(record: DeploymentRecord) {
   const previous = snapshots.get(record);
   if (!previous) throw new DeploymentConflictError();
@@ -39,9 +46,10 @@ export function saveDeployment(record: DeploymentRecord) {
       const latest = getDeployment(record.id);
       // Conversation references are presentation metadata. Adding one must
       // not strand a worker holding the same execution state between effects.
-      const executionState = (value: DeploymentRecord) =>
-        JSON.stringify({ ...value, mentions: undefined, updatedAt: undefined });
-      if (!latest || executionState(latest) !== executionState(previous))
+      if (
+        !latest ||
+        deploymentExecutionState(latest) !== deploymentExecutionState(previous)
+      )
         throw new DeploymentConflictError();
       const mentions = new Map(
         [...(latest.mentions ?? []), ...(record.mentions ?? [])].map(

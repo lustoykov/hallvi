@@ -220,6 +220,34 @@ it("rejects cross-origin and rebinding-host requests before preparing work", asy
   expect(listMessages(chat)).toHaveLength(0);
 });
 
+it("approves unchanged execution state when another chat follows during pricing", async () => {
+  const r = recommendation();
+  const other = insertChat(
+    getChat(chat)!.workspaceId,
+    "Follow deployment",
+    false,
+  ).id;
+  external.price.mockImplementationOnce(async () => {
+    requestDeployment(app, other, "server-guy");
+    return r.offer;
+  });
+  const response = await post({
+    action: "approve",
+    deploymentId: r.id,
+    recommendationId: r.recommendationId,
+    maxMonthly: 5,
+    inputs: { APP_TOKEN: "test-only" },
+  });
+  expect(response.status).toBe(200);
+  expect(external.inputs).toHaveBeenCalledOnce();
+  const saved = getDeployment(r.id)!;
+  expect(saved.status).toBe("deploy-queued");
+  expect(saved.authority?.maxMonthly).toBe(5);
+  expect(saved.mentions).toHaveLength(1);
+  expect(saved.mentions?.[0]?.chatId).toBe(other);
+  expect((await response.json()).deployment.mentions).toEqual(saved.mentions);
+});
+
 it("a recommendation changed during pricing cannot overwrite its private inputs", async () => {
   const r = recommendation();
   external.price.mockImplementationOnce(async () => {

@@ -6,6 +6,7 @@ import { handle } from "@/server/http";
 import { parseJsonRequest } from "@/server/schemas";
 import {
   DeploymentConflictError,
+  deploymentExecutionState,
   cancelDeployment,
   applicationDeployment,
   requestDeployment,
@@ -89,7 +90,10 @@ export function POST(request: Request, context: Context) {
           const latest = applicationDeployment(applicationId);
           if (latest?.status !== "awaiting-approval")
             return { deployment: latest };
-          if (JSON.stringify(latest) !== JSON.stringify(record))
+          if (
+            deploymentExecutionState(latest) !==
+            deploymentExecutionState(record)
+          )
             throw new DeploymentConflictError();
           if (hetznerConnectionId() !== connectionId)
             throw new Error(

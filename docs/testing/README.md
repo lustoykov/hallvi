@@ -11,6 +11,7 @@
 
 ## Dated evidence
 
+- [9 September independent review](../reviews/2026-09-09-final-integration-review.md): approval race fix and explicit disposition of recovery limitations.
 - [9 September final integration](2026-09-09-final-integration.md): combined-candidate tests, browser rerun, cross-conversation race correction and explicit legacy acceptance disposition.
 
 - [8 September real deployment](2026-09-08-real-deployment-acceptance.md): one source application plus PostgreSQL on Hetzner, verified through the product.
