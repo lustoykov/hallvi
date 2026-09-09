@@ -13,6 +13,7 @@ export default async function PrototypeNewApplicationPage({
   const { state } = await searchParams;
   return (
     <NewApplicationScreen
+      preview
       githubLogin={state === "no-github" ? null : "example"}
     />
   );

@@ -21,20 +21,25 @@ export interface ApplicationListItem {
 export function ApplicationsScreen({
   applications,
   piReady,
+  preview = false,
   hrefFor = (id) => `/applications/${id}`,
 }: {
   applications: ApplicationListItem[];
   piReady: boolean;
+  preview?: boolean;
   /** The prototype links its own routes; the product links the workspace. */
   hrefFor?: (id: string) => string;
 }) {
   return (
     <main className={s.page}>
       <header className={s.topbar}>
-        <Link className={s.brand} href="/applications">
+        <Link
+          className={s.brand}
+          href={preview ? "/prototype/applications" : "/applications"}
+        >
           <span className="sg-app-mark">SG</span>Server Guy
         </Link>
-        <Link href="/setup/pi">
+        <Link href={preview ? "/prototype/settings/connections" : "/setup/pi"}>
           {piReady ? "Settings" : "Settings · Connect ChatGPT"}
         </Link>
       </header>
@@ -45,7 +50,10 @@ export function ApplicationsScreen({
             <p>Each application has its own conversations, records and host.</p>
           </div>
           {applications.length > 0 && (
-            <Link className={s.primary} href="/applications/new">
+            <Link
+              className={s.primary}
+              href={preview ? "/prototype/new" : "/applications/new"}
+            >
               Add application
             </Link>
           )}
@@ -54,10 +62,13 @@ export function ApplicationsScreen({
           <div className={s.empty}>
             <h2>Add your first application</h2>
             <p>
-              Start with a GitHub repository or an upstream image. Server Guy
-              inspects it, recommends a server and deploys when you approve.
+              Start with a GitHub repository. Server Guy inspects it, recommends
+              a server and deploys when you approve.
             </p>
-            <Link className={s.primary} href="/applications/new">
+            <Link
+              className={s.primary}
+              href={preview ? "/prototype/new" : "/applications/new"}
+            >
               Add application
             </Link>
             <small>Nothing is bought or changed until you approve it.</small>

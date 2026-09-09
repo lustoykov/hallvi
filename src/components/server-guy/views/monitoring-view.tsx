@@ -4,6 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react";
 
 import type { Issue } from "@/server/application-facts";
 
+import { monitoringStatus } from "../fact-status";
 import { relativeTime } from "../operation-model";
 import {
   Condition,
@@ -142,33 +143,11 @@ export function MonitoringView(props: ViewProps) {
         </Planned>
       </>
     );
-  const open = monitoring.issues.filter((issue) => issue.state !== "recovered");
-  const failing = monitoring.checks.filter(
-    (check) => check.state === "failing",
-  );
   const collector = monitoring.collector;
-  const tone =
-    collector.state !== "running"
-      ? "muted"
-      : open.some((issue) => issue.state === "open")
-        ? "bad"
-        : failing.length || open.length
-          ? "warn"
-          : "ok";
+  const status = monitoringStatus(monitoring, now);
   return (
     <>
-      <Condition
-        tone={tone}
-        title={
-          collector.state === "not-running"
-            ? "Not monitored"
-            : collector.state === "stale"
-              ? "Monitoring is stale"
-              : open.length
-                ? `${open.length} issue${open.length === 1 ? "" : "s"} need${open.length === 1 ? "s" : ""} attention`
-                : "All checks passing"
-        }
-      >
+      <Condition tone={status.tone} title={status.title}>
         {collector.detail}
         {collector.lastObservationAt
           ? ` · last observation ${relativeTime(collector.lastObservationAt, now)}`

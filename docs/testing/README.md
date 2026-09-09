@@ -11,6 +11,8 @@
 
 ## Dated evidence
 
+- [9 September final UI integration](2026-09-09-final-ui-integration.md): Fable’s completed reference screens integrated with the hardened deployment branch, with live/reference isolation and combined validation.
+
 - [9 September independent review](../reviews/2026-09-09-final-integration-review.md): approval race fix and explicit disposition of recovery limitations.
 - [9 September final integration](2026-09-09-final-integration.md): combined-candidate tests, browser rerun, cross-conversation race correction and explicit legacy acceptance disposition.
 

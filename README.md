@@ -24,6 +24,7 @@ Start with **Product → Roadmap → Architecture**.
 | [Testing](docs/testing/README.md) | Acceptance navigation and dated results; [runner instructions](tests/README.md) own commands. |
 | [Design](src/components/server-guy/DESIGN.md) | Fable's current visual language and interaction rules. |
 | [UI integration](docs/design/2026-09-09-conversation-first-integration.md) | What the conversation-first shell actually binds to. |
+| [Final screen reference](docs/design/2026-09-09-final-ui-screens-reference.md) | Reusable views and replayable development-only scenarios; [combined acceptance](docs/testing/2026-09-09-final-ui-integration.md) records integration checks. |
 | [Supported-stack brief](docs/design/2026-09-09-fable-supported-stack-brief.md) | Current handoff to Fable, leaving layout decisions to the designer. |
 | [Terminology](CONTEXT.md) | Domain glossary, not another specification. |
 | [Architecture decisions](docs/architecture/README.md) | Accepted boundaries and historical PR diagrams. |

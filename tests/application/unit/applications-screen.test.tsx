@@ -44,6 +44,16 @@ describe("application navigation", () => {
     expect(html).toContain('href="/applications/new"');
     expect(html).toContain("Settings · Connect ChatGPT");
     expect(html).not.toContain("todo-fastapi");
+    expect(html).not.toContain("upstream image");
+  });
+
+  it("keeps reference application navigation inside the prototype", () => {
+    const html = renderToStaticMarkup(
+      <ApplicationsScreen applications={[]} piReady preview />,
+    );
+    expect(html).toContain('href="/prototype/new"');
+    expect(html).toContain('href="/prototype/applications"');
+    expect(html).not.toContain('href="/applications/new"');
   });
 
   it("lists the condition and stack of each application from its records", () => {

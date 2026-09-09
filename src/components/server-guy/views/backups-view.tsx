@@ -4,6 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react";
 
 import { persistentState } from "@/server/application-stack";
 
+import { protectionStatus } from "../fact-status";
 import { relativeTime } from "../operation-model";
 import {
   Condition,
@@ -91,17 +92,11 @@ export function BackupsView(props: ViewProps) {
         </Planned>
       </>
     );
-  const behind = protection.coverage.some((item) => item.state === "behind");
-  const failed =
-    protection.lastAttempt?.outcome === "failed" ||
-    protection.coverage.some((item) => item.state === "failed");
-  const unprotected = protection.coverage.some(
-    (item) => item.state === "unprotected",
-  );
+  const status = protectionStatus(protection);
+  const failed = status.tone === "bad";
   const last = protection.history.find(
     (item) => item.kind === "backup" && item.outcome === "succeeded",
   );
-  const tone = failed ? "bad" : behind || unprotected ? "warn" : "ok";
   const destination = protection.destination;
   const policyOperation = operations.find(
     (operation) => operation.id === protection.policy?.operationId,
@@ -109,16 +104,8 @@ export function BackupsView(props: ViewProps) {
   return (
     <>
       <Condition
-        tone={tone}
-        title={
-          failed
-            ? "The last backup attempt failed"
-            : behind
-              ? "Protection is behind the agreed policy"
-              : unprotected
-                ? "Some state is still not backed up"
-                : `Protected · ${protection.policy?.schedule ?? "scheduled"}`
-        }
+        tone={status.tone}
+        title={status.title}
         aside={
           props.onAction && (
             <div className="sg-op-links">

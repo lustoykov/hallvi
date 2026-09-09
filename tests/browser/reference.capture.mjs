@@ -2,7 +2,7 @@
 // in its populated state, the other screens and a few interactions. Evidence
 // for the handoff; not a test. Usage:
 //   node tests/browser/reference.capture.mjs http://127.0.0.1:3300 [quick]
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
 const base = process.argv[2] ?? "http://127.0.0.1:3300";
@@ -45,8 +45,26 @@ await page.goto(`${base}/prototype/applications`);
 await shot("01-applications");
 await page.goto(`${base}/prototype/applications?state=empty`);
 await shot("01b-applications-empty");
-await page.goto(`${base}/prototype/new`);
+await page.getByRole("link", { name: "Add application", exact: true }).click();
+await expect(page).toHaveURL(`${base}/prototype/new`);
 await shot("02-add-application");
+// The shared form must remain a simulation here, even with a real connected
+// controller. Abort unexpected API requests before they can mutate anything.
+const creationRequests = [];
+const blockCreation = async (route) => {
+  creationRequests.push(route.request().url());
+  await route.abort();
+};
+await page.route("**/api/applications", blockCreation);
+await page
+  .getByLabel("GitHub repository", { exact: true })
+  .fill("https://github.com/example/reference-only");
+await page
+  .getByRole("button", { name: "Add application", exact: true })
+  .click();
+await expect(page).toHaveURL(/\/prototype\/app\?scenario=simple&step=0/);
+expect(creationRequests).toEqual([]);
+await page.unroute("**/api/applications", blockCreation);
 await page.goto(`${base}/prototype/new?state=no-github`);
 await shot("02b-add-application-no-github");
 await page.goto(`${base}/prototype/settings/connections`);

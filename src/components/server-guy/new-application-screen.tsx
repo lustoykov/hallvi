@@ -14,14 +14,22 @@ import s from "./applications.module.css";
 const permissionOptions = Object.entries(APPROVAL_MODES) as Array<
   [ApprovalMode, (typeof APPROVAL_MODES)[ApprovalMode]]
 >;
-const draftKey = "server-guy:add-application:v1";
 
 export function NewApplicationScreen({
   githubLogin = null,
+  preview = false,
 }: {
   githubLogin?: string | null;
+  /** Reference-only: keep drafts separate and never create a real record. */
+  preview?: boolean;
 }) {
   const router = useRouter();
+  const draftKey = preview
+    ? "server-guy:reference-add:v1"
+    : "server-guy:add-application:v1";
+  const applicationsHref = preview
+    ? "/prototype/applications"
+    : "/applications";
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [name, setName] = useState("");
   const creationRequest = useRef<{ key: string; settings: string } | null>(
@@ -67,7 +75,7 @@ export function NewApplicationScreen({
     return () => {
       active.current = false;
     };
-  }, []);
+  }, [draftKey]);
 
   function keepDraft() {
     try {
@@ -88,6 +96,10 @@ export function NewApplicationScreen({
 
   async function createApplication() {
     if (busy || !githubLogin) return;
+    if (preview) {
+      router.push("/prototype/app?scenario=simple&step=0");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -131,10 +143,10 @@ export function NewApplicationScreen({
   return (
     <main className={s.page}>
       <header className={s.topbar}>
-        <Link className={s.brand} href="/applications">
+        <Link className={s.brand} href={applicationsHref}>
           <span className="sg-app-mark">SG</span>Server Guy
         </Link>
-        <Link href="/applications">All applications</Link>
+        <Link href={applicationsHref}>All applications</Link>
       </header>
       <section
         className={`${s.content} ${s.newContent}`}
@@ -143,7 +155,11 @@ export function NewApplicationScreen({
         <div className={s.heading}>
           <div>
             <h1 id="new-application-heading">Add application</h1>
-            <p>Each application has its own chats, decisions, and checks.</p>
+            <p>
+              {preview
+                ? "Prototype · invented data. Adding an application opens the scripted scenario."
+                : "Each application has its own chats, decisions, and checks."}
+            </p>
           </div>
         </div>
         <form
@@ -166,7 +182,14 @@ export function NewApplicationScreen({
                   : "Choose the login Server Guy should use for this repository."}
               </p>
             </div>
-            <Link href="/setup/github?from=add" onClick={keepDraft}>
+            <Link
+              href={
+                preview
+                  ? "/prototype/settings/connections"
+                  : "/setup/github?from=add"
+              }
+              onClick={keepDraft}
+            >
               {githubLogin ? "Change" : "Connect GitHub"}
             </Link>
           </div>
@@ -238,7 +261,7 @@ export function NewApplicationScreen({
             </p>
           )}
           <div className={s.actions}>
-            <Link href="/applications">
+            <Link href={applicationsHref}>
               {busy ? "Back to applications" : "Cancel"}
             </Link>
             <button

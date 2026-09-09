@@ -12,6 +12,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
+import { monitoringStatus, protectionStatus } from "./fact-status";
 import { LocalTime } from "./local-time";
 import {
   attentionItems,
@@ -86,42 +87,29 @@ export function ApplicationOverview({
   const postgres = stack.databases.find((item) => item.kind === "postgres");
   const protectable = persistentState(stack);
   const protection = facts.protection;
-  const protectionState = !protection
-    ? null
-    : protection.lastAttempt?.outcome === "failed" ||
-        protection.coverage.some((item) => item.state === "failed")
-      ? "bad"
-      : protection.coverage.some(
-            (item) => item.state === "behind" || item.state === "unprotected",
-          )
-        ? "warn"
-        : "ok";
+  const protectionSummary = protection ? protectionStatus(protection) : null;
+  const protectionState = protectionSummary?.tone;
   const workers = stack.processes.filter((item) => item.role === "worker");
   const absent = [
     ...(stack.services.length || stack.queues.length ? [] : ["cache or queue"]),
     ...(workers.length ? [] : ["workers"]),
     ...(stack.jobs.length ? [] : ["scheduled jobs"]),
   ];
-  const condition = watching
-    ? issues.some((issue) => issue.state === "open")
-      ? `Running with ${issues.length} open issue${issues.length === 1 ? "" : "s"} · observed ${relativeTime(lastObservation!, now)}`
-      : failingChecks.length
-        ? `Running · ${failingChecks.length} check${failingChecks.length === 1 ? "" : "s"} failing · observed ${relativeTime(lastObservation!, now)}`
-        : `Running · all checks passing · observed ${relativeTime(lastObservation!, now)}`
-    : monitoring
-      ? `${monitoring.collector.detail}${lastObservation ? ` · last observed ${relativeTime(lastObservation, now)}` : ""}`
-      : verifiedAt
-        ? stale
-          ? `Last verified ${relativeTime(verifiedAt, now)} · not checked since`
-          : live
-            ? `Running · verified ${relativeTime(verifiedAt, now)} · HTTP`
-            : `Last verified ${relativeTime(verifiedAt, now)} · later work failed`
-        : "Deployment not verified";
-  const dotLive =
-    (watching &&
-      !issues.some((issue) => issue.state === "open") &&
-      !failingChecks.length) ||
-    (!monitoring && live && !stale);
+  const monitoringSummary = monitoring
+    ? monitoringStatus(monitoring, now)
+    : null;
+  const condition = monitoringSummary
+    ? `${monitoringSummary.title}${lastObservation ? ` · last observed ${relativeTime(lastObservation, now)}` : ""}`
+    : verifiedAt
+      ? stale
+        ? `Last verified ${relativeTime(verifiedAt, now)} · not checked since`
+        : live
+          ? `Running · verified ${relativeTime(verifiedAt, now)} · HTTP`
+          : `Last verified ${relativeTime(verifiedAt, now)} · later work failed`
+      : "Deployment not verified";
+  const dotLive = monitoringSummary
+    ? monitoringSummary.tone === "ok"
+    : live && !stale;
   const freshness: {
     fact: string;
     at?: string | null;
@@ -459,16 +447,7 @@ export function ApplicationOverview({
                 {protection
                   ? protectionState === "ok"
                     ? `${protection.policy?.schedule ?? "Scheduled"} to ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
-                    : protectionState === "bad"
-                      ? `Last backup failed · ${protection.lastAttempt?.reason ?? "see Backups"}`
-                      : `Behind policy · ${protection.coverage
-                          .filter(
-                            (item) =>
-                              item.state === "behind" ||
-                              item.state === "unprotected",
-                          )
-                          .map((item) => item.label)
-                          .join(", ")}`
+                    : protectionSummary!.title
                   : protectable.length
                     ? `Not backed up · ${protectable.map((item) => item.label).join(", ")}`
                     : stack.recorded

@@ -1,6 +1,6 @@
 # Final UI screens: the reference prototype
 
-9 September 2026, Fable. Worktree `.worktrees/final-ui-screens`, branch `claude/final-ui-screens`, started from the combined state of `codex/self-hosted-shell` (snapshot commit `e847fb0`). This is the complete visual and interaction reference for Server Guy: every page, application view, settings screen and important dialog, in the accepted [conversation-first design language](../../src/components/server-guy/DESIGN.md), with invented data where the backend does not exist yet. It is separate from PR #21 and is the reference Codex integrates against.
+9 September 2026, Fable. Worktree `.worktrees/final-ui-screens`, branch `claude/final-ui-screens`, started from the combined state of `codex/self-hosted-shell` (snapshot commit `e847fb0`). This is the complete visual and interaction reference for Server Guy: every page, application view, settings screen and important dialog, in the accepted [conversation-first design language](../../src/components/server-guy/DESIGN.md), with invented data where the backend does not exist yet. Originally delivered separately, its reusable views and development-only scenarios are now integrated into the #21 candidate. See the [combined integration acceptance](../testing/2026-09-09-final-ui-integration.md) for validation and the boundary between live and simulated behavior.
 
 ## Running it
 
@@ -31,7 +31,7 @@ Nothing in the reference touches a host, a provider, the database or the real de
 | Screen | Where | States covered | Gaps |
 | --- | --- | --- | --- |
 | Applications | `/prototype/applications`, real `/applications` | Populated (running, running with an open issue, not backed up, protected); empty first run; ChatGPT not connected | Sorting and search once there are many applications |
-| Add application | `/prototype/new`, real `/new` | Repository or upstream image, name, permission policy; GitHub not connected blocks the form | The real form is used; no staged “reading the repository” or “repository unreadable” state |
+| Add application | `/prototype/new`, real `/applications/new` | GitHub repository, name, permission policy; GitHub not connected blocks the form | The shared form simulates creation on this reference route; no staged “reading the repository” or “repository unreadable” state |
 | Workspace · conversation | `/prototype/app` | First deployment (inspecting, recommendation, deploying, verified), proposals with cost and inputs, protected inputs, working steps, inspected evidence, failed with recovery inputs, recorded events, references to work started elsewhere, investigation conversations adopting automatic work, new conversation, archived (read-only) | The reply interpreter answers only status, logs, backups, jobs, releases and domains |
 | Overview | section `overview` | Healthy, open issue, acknowledged issue, failed automatic work, stale host, unprotected and protected, recent changes, evidence freshness | — |
 | Architecture | `architecture` | Simple (source, application, host, SQLite volume) and rich (PostgreSQL, Valkey, worker) | Nodes do not yet reflect a failing process |

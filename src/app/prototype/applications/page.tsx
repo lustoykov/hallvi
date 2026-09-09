@@ -14,6 +14,7 @@ export default async function PrototypeApplicationsPage({
   const { state } = await searchParams;
   return (
     <ApplicationsScreen
+      preview
       applications={state === "empty" ? [] : referenceApplicationItems()}
       piReady={state !== "no-chatgpt"}
       hrefFor={(id) =>
