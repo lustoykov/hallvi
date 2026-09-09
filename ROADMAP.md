@@ -13,14 +13,14 @@ The only active delivery plan. [Product](PRODUCT.md) owns scope, [architecture](
 | Runtime limit | The planner/executor currently represents one source-built HTTP application plus optional PostgreSQL. The broader Compose, image, SQLite, broker, worker and storage targets below are not implemented by documenting them. |
 | Lifecycle gaps | BYOM adoption, public HTTPS/CDN, routine release history, verified backups/restoration and ongoing care still need end-to-end implementation. The controller currently enforces local access; shared/separate remote hosting requires authenticated bootstrap. |
 
-## Next: finish and reconcile the integration
+## Integration acceptance and remaining reconciliation
 
 While Fable owns the UI, backend work should start from the actual supported-stack gaps and acceptance fixtures. Do not build a second shell or another competing plan.
 
-- [ ] Verify the final conversation-first implementation with real state and synthetic failure journeys: approvals, retries, multiple conversations, reload, lost responses, stale observations and drafts.
+- [x] Verify the implemented conversation-first slice with persisted state and synthetic failure journeys: approvals, retries, multiple conversations, reload and drafts. The [acceptance report](docs/testing/2026-09-09-final-integration.md) distinguishes passing checks from unresolved-outcome and broader lifecycle gaps.
 - [ ] Remove remaining mandatory phase ceremony only after preserving prerequisite checks and evidence access. Enforce the narrow operability-PR boundary in all source-writing paths.
 - [x] Reconcile the [legacy acceptance](docs/archive/implementation/phase-one-acceptance.md), [retained checklist](docs/archive/previous-direction/docs/plans/implementation-history.md) and [merge review](docs/reviews/2026-09-08-fable-merge-readiness.md) against the current candidate. Record applicable fixes or deliberate retirement; do not treat archived work as silently waived. Dispositions are recorded in the [final integration report](docs/testing/2026-09-09-final-integration.md).
-- [ ] Run the relevant tests, build and browser journeys on the exact candidate and get the final review. Historical passing results and a working prototype are insufficient to call it ready for main.
+- [x] Run the relevant local tests, build and browser journeys and get the [independent review](docs/reviews/2026-09-09-final-integration-review.md). The approval follow-up has a passing regression test. Merge remains conditional on green GitHub checks for the pushed candidate; historical results and a prototype are insufficient.
 
 Retained checks and their [recorded disposition](docs/testing/2026-09-09-final-integration.md): unreviewed live-model semantic cases, source/connection provenance, owner-merged candidate verification, durable request cancellation/retry, populated database migration and history preservation. Earlier AWS labs, workflow-engine research and UI presentation cleanups are not merge requirements unless a concrete current defect requires them. The deployment spending card already supplies an explicit authority boundary; do not recreate a generic phase gate merely to satisfy an old checklist.
 
