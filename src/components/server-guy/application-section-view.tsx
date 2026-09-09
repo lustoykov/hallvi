@@ -50,7 +50,7 @@ const descriptions: Record<ApplicationSection, string> = {
   logs: "Inspect the latest collected output from your application host.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
-  domains: "Public addresses, HTTPS and delivery for your application.",
+  domains: "Your application’s domain, HTTPS and optional CDN caching.",
   variables: "Configuration your application needs to build and run.",
 };
 
