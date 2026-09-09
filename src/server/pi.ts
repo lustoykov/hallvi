@@ -502,14 +502,19 @@ export async function askPi(
       name: "prepare_deployment",
       label: "Prepare deployment",
       description:
-        "Start a read-only repository inspection and priced deployment recommendation when the user asks to deploy. No server purchase or host change happens until the user accepts the inline recommendation.",
-      parameters: Type.Object({}, { additionalProperties: false }),
-      async execute() {
+        "Start a read-only repository inspection and priced deployment recommendation when the user asks to deploy. Supply ref only when the user names a branch, tag or commit; otherwise use the default branch. No server purchase or host change happens until the user accepts the inline recommendation.",
+      parameters: Type.Object(
+        { ref: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })) },
+        { additionalProperties: false },
+      ),
+      async execute(_id, params) {
         options.signal?.throwIfAborted();
         const record = requestDeployment(
           input.run.applicationId,
           input.run.chatId,
           "server-guy",
+          input.userMessage,
+          params.ref,
         );
         return {
           content: [
@@ -551,13 +556,15 @@ export async function askPi(
         name: "propose_change",
         label: "Propose an application change",
         description:
-          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Supported executors currently cover initial deployment and authorized source preparation/publication; do not invent backups, restarts or other executors.",
+          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Supported executors cover initial deployment, recreating the accepted containers without removing volumes, reading host logs and authorized source preparation/publication. collect-logs is read-only and starts immediately; recreation asks approval. Do not invent backups or other executors.",
         parameters: Type.Object(
           {
             action: Type.Union([
               Type.Literal("deployment"),
               Type.Literal("start-preparation"),
               Type.Literal("publish-proposal"),
+              Type.Literal("recreate-deployment"),
+              Type.Literal("collect-logs"),
             ]),
             proposalId: Type.Optional(Type.String()),
           },

@@ -157,7 +157,7 @@ export function DatabaseView(props: ViewProps) {
                         <>
                           {coverage
                             ? protectionText
-                            : "Backed up with the application’s files as a consistent copy, not a live file copy"}{" "}
+                            : "Not backed up. SQLite requires a consistent snapshot; a live file copy is not a verified backup."}{" "}
                           · {backupsLink}
                         </>,
                       ],

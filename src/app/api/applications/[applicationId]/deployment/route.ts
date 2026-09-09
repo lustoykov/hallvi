@@ -18,6 +18,7 @@ import {
   requestDeployment,
   saveDeployment,
   deploymentMessage,
+  deploymentEvent,
 } from "@/server/deployment-store";
 import {
   hetzner,
@@ -40,6 +41,12 @@ export function GET(_request: Request, context: Context) {
   }));
 }
 const schema = z.discriminatedUnion("action", [
+  z.strictObject({
+    action: z.literal("resolve-purchase"),
+    deploymentId: z.uuid(),
+    confirmedNotCreated: z.literal(true),
+    providerReference: z.string().trim().min(5).max(200),
+  }),
   z.strictObject({ action: z.literal("prepare"), chatId: z.uuid() }),
   z.strictObject({
     action: z.literal("approve"),
@@ -69,6 +76,39 @@ export function POST(request: Request, context: Context) {
       throw new Error(
         "The deployment recommendation changed. Reload it before proceeding.",
       );
+    if (input.action === "resolve-purchase") {
+      if (
+        record.status !== "failed" ||
+        !record.serverCreateAttempted ||
+        record.serverId ||
+        !record.authority ||
+        record.authority.connectionId !== hetznerConnectionId()
+      )
+        throw new Error(
+          "Only an unresolved creation in the approved Hetzner project can be reconciled this way.",
+        );
+      const connectionId = hetznerConnectionId();
+      const query = `?label_selector=${encodeURIComponent(`sg-deployment=${record.id}`)}`;
+      const { servers } = await hetzner<{ servers: unknown[] }>(
+        `/servers${query}`,
+      );
+      if (servers.length)
+        throw new Error(
+          "A matching server exists. Retry to recover it; do not clear the purchase record.",
+        );
+      if (hetznerConnectionId() !== connectionId)
+        throw new Error("Hetzner access changed during reconciliation.");
+      record.serverCreateAttempted = false;
+      record.authority = null;
+      record.error =
+        "The owner recorded Hetzner confirmation of non-creation. Retry to prepare a fresh recommendation, or cancel setup.";
+      deploymentEvent(
+        record,
+        `Owner-attested provider confirmation that the original request completed without creating a server: ${input.providerReference}. Current label lookup found no matching server. Spending authority cleared; a new purchase requires approval.`,
+      );
+      deploymentMessage(record, record.error);
+      return { deployment: record };
+    }
     if (input.action === "approve") {
       if (record.status !== "awaiting-approval") return { deployment: record };
       if (record.recommendationId !== input.recommendationId)

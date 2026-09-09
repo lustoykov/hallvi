@@ -12,6 +12,22 @@ async function dispatch(record: StoredOperation) {
   const phase = await import("./phase-three");
   const preparation = await import("./preparation");
   switch (command.type) {
+    case "recreate-deployment":
+    case "collect-logs": {
+      const { getDeployment } = await import("./deployment-store");
+      const executor = await import("./deployment-executor");
+      const deployment = getDeployment(command.deploymentId);
+      if (!deployment || deployment.applicationId !== id)
+        throw new Error("Deployment no longer belongs to this application.");
+      const signal = AbortSignal.timeout(10 * 60000);
+      if (command.type === "recreate-deployment")
+        return executor.recreateDeployment(deployment, signal);
+      await executor.collectDeploymentLogs(deployment, signal);
+      return {
+        evidence: `Collected host logs at ${deployment.logsCollectedAt}.`,
+        collectedAt: deployment.logsCollectedAt,
+      };
+    }
     case "start-preparation":
       return preparation.startPreparation(id);
     case "refresh-preparation":

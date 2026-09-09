@@ -1,5 +1,5 @@
 import { getChat, getConformanceProposal } from "./db";
-import { requestDeployment } from "./deployment-store";
+import { requestDeployment, applicationDeployment } from "./deployment-store";
 import {
   claimOperation,
   currentOperationFacts,
@@ -33,12 +33,42 @@ export function operationContext(applicationId: string) {
 export function proposeAgentChange(
   applicationId: string,
   chatId: string,
-  action: "deployment" | "start-preparation" | "publish-proposal",
+  action:
+    | "deployment"
+    | "start-preparation"
+    | "publish-proposal"
+    | "recreate-deployment"
+    | "collect-logs",
   proposalId?: string,
 ) {
   if (action === "deployment") {
     requestDeployment(applicationId, chatId, "server-guy");
     return operationContext(applicationId);
+  }
+  if (action === "recreate-deployment" || action === "collect-logs") {
+    const deployment = applicationDeployment(applicationId);
+    if (!deployment || deployment.status !== "live")
+      throw new Error("Deploy and verify this application first.");
+    const logs = action === "collect-logs";
+    return publicOperation(
+      proposeOperation({
+        applicationId,
+        chatId,
+        source: { type: logs ? "logs" : "release", id: deployment.id },
+        target: action,
+        kind: logs ? "inspection" : "change",
+        title: logs
+          ? "Collect application logs"
+          : "Recreate application containers",
+        summary: logs
+          ? "Read current container logs from the application host."
+          : "Recreate all containers from their accepted images on the existing host. Expect brief downtime. Persistent volumes are retained; no images are rebuilt or pulled.",
+        destinations: logs
+          ? ["logs", "history"]
+          : ["deployment", "processes", "database", "storage", "history"],
+        command: { type: action, deploymentId: deployment.id },
+      }),
+    );
   }
   let command: OperationCommand;
   let title: string;

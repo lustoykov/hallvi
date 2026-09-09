@@ -34,7 +34,12 @@ async function runClaimedOperation<T>(
         claimed.id,
         claimed.executionId!,
         claimed.kind === "change" ? "verified" : "inspected",
-        `${claimed.title} completed. See its recorded source evidence.`,
+        result &&
+          typeof result === "object" &&
+          "evidence" in result &&
+          typeof result.evidence === "string"
+          ? result.evidence.slice(0, 12000)
+          : `${claimed.title} completed. See its recorded source evidence.`,
         false,
         result,
       );

@@ -330,3 +330,37 @@ it("removes only the cancelled setup's private files, retaining other deployment
   expect(existsSync(deploymentPath(r.id))).toBe(false);
   expect(existsSync(join(deploymentPath(other.id), "client"))).toBe(true);
 });
+
+it("requires owner-confirmed provider evidence and clears spending authority after reconciliation", async () => {
+  const r = recommendation();
+  r.status = "failed";
+  r.serverCreateAttempted = true;
+  r.authority = {
+    connectionId: "hetzner-a",
+    acceptedAt: new Date().toISOString(),
+    maxMonthly: 5,
+  };
+  saveDeployment(r);
+  const input = {
+    action: "resolve-purchase",
+    deploymentId: r.id,
+    confirmedNotCreated: true,
+    providerReference: "Support ticket TEST-123",
+  };
+  expect((await post({ ...input, confirmedNotCreated: false })).status).toBe(
+    400,
+  );
+  external.provider.mockResolvedValueOnce({ servers: [{ id: 8 }] });
+  expect((await post(input)).status).toBe(400);
+  expect(getDeployment(r.id)?.serverCreateAttempted).toBe(true);
+  external.provider.mockResolvedValueOnce({ servers: [] });
+  expect((await post(input)).status).toBe(200);
+  const resolved = getDeployment(r.id)!;
+  expect(resolved.serverCreateAttempted).toBe(false);
+  expect(resolved.authority).toBeNull();
+  expect(resolved.events.at(-1)?.message).toContain("Owner-attested");
+  expect((await post({ action: "retry", deploymentId: r.id })).status).toBe(
+    200,
+  );
+  expect(getDeployment(r.id)?.status).toBe("queued"); // inspect, never purchase
+});

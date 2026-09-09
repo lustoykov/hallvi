@@ -114,3 +114,50 @@ it("the request proxy rejects a rebound host on reads, before a route can return
   });
   expect(proxy(local).status).toBe(200);
 });
+
+it("accepts pinned images and persistent SQLite while rejecting unsafe Compose fields", () => {
+  const image = {
+    ...base,
+    image: "louislam/uptime-kuma@sha256:" + "a".repeat(64),
+    volumes: [
+      {
+        name: "data",
+        target: "/app/data",
+        kind: "database",
+        sqlite: "/app/data/kuma.db",
+      },
+    ],
+    configs: [],
+    services: [],
+    httpAccess: "controller",
+    checks: [
+      {
+        name: "Content",
+        method: "GET",
+        path: "/",
+        body: null,
+        expectedStatus: 200,
+        contains: "Uptime Kuma",
+        captureId: null,
+      },
+    ],
+  };
+  expect(deploymentPlanSchema.safeParse(image).success).toBe(true);
+  for (const bad of [
+    { ...image, privileged: true },
+    { ...image, image: "https://untrusted.example/image:2" },
+    {
+      ...image,
+      volumes: [{ ...image.volumes[0], name: "/var/run/docker.sock" }],
+    },
+    {
+      ...image,
+      volumes: [{ ...image.volumes[0], sqlite: "/tmp/ephemeral.db" }],
+    },
+    {
+      ...image,
+      configs: [{ name: "config", target: "/app/../etc/file", content: "x" }],
+    },
+  ])
+    expect(deploymentPlanSchema.safeParse(bad).success).toBe(false);
+});

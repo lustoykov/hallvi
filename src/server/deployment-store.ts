@@ -111,7 +111,7 @@ export function cancelDeployment(record: DeploymentRecord) {
     },
     { behavior: "immediate" },
   );
-  removeCancelledDeploymentFiles(record.id);
+  if (!db().$client.inTransaction) removeCancelledDeploymentFiles(record.id);
 }
 export function deploymentEvent(record: DeploymentRecord, message: string) {
   record.events.push({ at: new Date().toISOString(), message });
@@ -159,6 +159,8 @@ export function requestDeployment(
   applicationId: string,
   chatId: string,
   origin: "user" | "server-guy" = "user",
+  requirements?: string,
+  requestedRef?: string,
 ) {
   const app = getApplication(applicationId);
   const chat = getChat(chatId);
@@ -178,6 +180,8 @@ export function requestDeployment(
     chatId,
     status: "queued",
     repository: `${app.repositoryOwner}/${app.repositoryName}`,
+    requirements: requirements?.slice(0, 5000),
+    requestedRef,
     revision: null,
     plan: null,
     offer: null,

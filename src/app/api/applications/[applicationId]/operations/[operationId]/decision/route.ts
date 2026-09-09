@@ -1,3 +1,4 @@
+import { removeCancelledDeploymentFiles } from "@/server/deployment-files";
 import { db } from "@/server/db";
 import {
   applicationDeployment,
@@ -36,7 +37,7 @@ export function POST(
       input.action === "cancel" &&
       record.state === "queued"
     ) {
-      return db().transaction(
+      const cancelled = db().transaction(
         () => {
           const latest = operation(operationId);
           if (
@@ -59,6 +60,8 @@ export function POST(
         },
         { behavior: "immediate" },
       );
+      removeCancelledDeploymentFiles(record.source.id);
+      return cancelled;
     }
     if (record.command?.type === "deployment")
       throw new Error(

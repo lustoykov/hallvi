@@ -461,3 +461,57 @@ it.each([true, false])(
     ).toHaveLength(matches ? 1 : 0);
   },
 );
+
+it("reuses official images and preserves data/config mounts without publishing private services", () => {
+  const value: DeploymentPlan = {
+    ...plan,
+    postgres: null,
+    image: "grafana/grafana@sha256:" + "a".repeat(64),
+    volumes: [
+      {
+        name: "grafana-data",
+        target: "/var/lib/grafana",
+        kind: "database",
+        sqlite: "/var/lib/grafana/grafana.db",
+      },
+    ],
+    configs: [
+      {
+        name: "datasource",
+        target: "/etc/grafana/provisioning/datasources/prometheus.yaml",
+        content: "url: http://prometheus:9090",
+      },
+    ],
+    services: [
+      {
+        name: "prometheus",
+        image: "prom/prometheus@sha256:" + "b".repeat(64),
+        command: null,
+        environment: [],
+        volumes: [
+          {
+            name: "metrics",
+            target: "/prometheus",
+            kind: "files",
+            sqlite: null,
+          },
+        ],
+        configs: [],
+        port: 9090,
+        healthPath: "/-/ready",
+        checks: [],
+      },
+    ],
+  };
+  const compose = composeDefinition(value, "a".repeat(40), "id", "unused", {});
+  expect(compose.services.app).not.toHaveProperty("build");
+  expect(compose.services.app).toMatchObject({
+    image: value.image,
+    volumes: [
+      "grafana-data:/var/lib/grafana",
+      "./configs/app-datasource:/etc/grafana/provisioning/datasources/prometheus.yaml:ro",
+    ],
+  });
+  expect(compose.services.prometheus).not.toHaveProperty("ports");
+  expect(compose.volumes).toEqual({ "grafana-data": {}, metrics: {} });
+});
