@@ -1,0 +1,619 @@
+"use client";
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+export type MascotMood =
+  | "ready"
+  | "checking"
+  | "working"
+  | "attention"
+  | "dancing"
+  | "celebrating"
+  | "waving"
+  | "resting";
+export type MascotDance =
+  "shuffle" | "robot" | "floss" | "backflip" | "cartwheel";
+import { mascotColors } from "./mascot-palette";
+
+/** Little Server geometry. Native controls outside the canvas set its state. */
+export function MascotScene({
+  color = 0,
+  mood = "ready",
+  paused = false,
+  gesture = 0,
+  ambient = false,
+  slot = 0,
+  dance = "shuffle",
+  danceRequest = 0,
+}: {
+  color?: number;
+  mood?: MascotMood;
+  paused?: boolean;
+  gesture?: number;
+  ambient?: boolean;
+  slot?: number;
+  dance?: MascotDance;
+  danceRequest?: number;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+  const state = useRef({
+    mood,
+    paused,
+    gesture,
+    ambient,
+    slot,
+    dance,
+    danceRequest,
+  });
+  useEffect(() => {
+    state.current = {
+      mood,
+      paused,
+      gesture,
+      ambient,
+      slot,
+      dance,
+      danceRequest,
+    };
+  }, [mood, paused, gesture, ambient, slot, dance, danceRequest]);
+  useEffect(() => {
+    const host = root.current!;
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      host.dataset.fallback = "true";
+      return;
+    }
+    delete host.dataset.fallback;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    host.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+    camera.position.set(0.8, 1.95, 6.25);
+    camera.lookAt(0, 1.05, 0);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x9b9a84, 2.2));
+    const light = new THREE.DirectionalLight(0xfff4de, 3.3);
+    light.position.set(-3, 6, 4);
+    light.castShadow = true;
+    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.normalBias = 0.03;
+    scene.add(light);
+    const fill = new THREE.DirectionalLight(0xddeaff, 1.4);
+    fill.position.set(3, 3, -4);
+    scene.add(fill);
+    const body = new THREE.Group();
+    scene.add(body);
+    const geometries: THREE.BufferGeometry[] = [];
+    const materials: THREE.Material[] = [];
+    const paint = new THREE.Color(mascotColors[color]);
+    const mesh = (
+      w: number,
+      h: number,
+      d: number,
+      radius: number,
+      tint: THREE.ColorRepresentation,
+      x = 0,
+      y = 0,
+      z = 0,
+    ) => {
+      const geometry = new RoundedBoxGeometry(w, h, d, 5, radius);
+      const material = new THREE.MeshStandardMaterial({
+        color: tint,
+        roughness: 0.44,
+        metalness: 0.07,
+      });
+      geometries.push(geometry);
+      materials.push(material);
+      const object = new THREE.Mesh(geometry, material);
+      object.position.set(x, y, z);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      body.add(object);
+      return object;
+    };
+    const faceY = 1.45,
+      faceZ = 0.795,
+      eyeGap = 0.28;
+
+    mesh(1.6, 1.8, 1.45, 0.19, paint, 0, 1.1);
+    mesh(1.38, 0.72, 0.08, 0.12, 0x2a3830, 0, 1.4, 0.735);
+    for (let i = 0; i < 6; i++)
+      mesh(0.035, 0.28, 0.025, 0.013, 0x71826b, -0.35 + i * 0.14, 0.61, 0.738);
+    mesh(0.38, 0.035, 0.32, 0.045, 0xc5d0b9, 0.32, 2.01, -0.15);
+    const feet = [-0.49, 0.49].map((x) =>
+      mesh(0.32, 0.16, 0.82, 0.07, 0x394337, x, 0.13, 0.02),
+    );
+    const eyes = [-eyeGap, eyeGap].map((x) =>
+      mesh(0.115, 0.25, 0.035, 0.05, 0xe1efbb, x, faceY, faceZ),
+    );
+    const stroke = (points: number[][], radius = 0.018) => {
+      const geo = new THREE.TubeGeometry(
+        new THREE.CatmullRomCurve3(
+          points.map(
+            (p) => new THREE.Vector3(...(p as [number, number, number])),
+          ),
+        ),
+        20,
+        radius,
+        8,
+        false,
+      );
+      geometries.push(geo);
+      return geo;
+    };
+    const mouths = {
+      smile: stroke([
+        [-0.15, -0.24, 0],
+        [0, -0.285, 0.01],
+        [0.15, -0.24, 0],
+      ]),
+      flat: stroke([
+        [-0.1, -0.25, 0],
+        [0, -0.25, 0.01],
+        [0.1, -0.25, 0],
+      ]),
+      concern: stroke([
+        [-0.12, -0.29, 0],
+        [0, -0.245, 0.01],
+        [0.12, -0.29, 0],
+      ]),
+      joy: stroke(
+        [
+          [-0.21, -0.2, 0],
+          [0, -0.31, 0.01],
+          [0.21, -0.2, 0],
+        ],
+        0.023,
+      ),
+    };
+    const mouthMat = new THREE.MeshStandardMaterial({
+      color: 0xc9dda4,
+    });
+    materials.push(mouthMat);
+    const mouth = new THREE.Mesh(mouths.smile, mouthMat);
+    mouth.position.set(0, faceY, faceZ);
+    body.add(mouth);
+    const happyEyes = [-eyeGap, eyeGap].map((x) => {
+      const eye = new THREE.Mesh(
+        stroke(
+          [
+            [-0.09, 0, 0],
+            [0, 0.075, 0.01],
+            [0.09, 0, 0],
+          ],
+          0.025,
+        ),
+        mouthMat,
+      );
+      eye.position.set(x, faceY, faceZ);
+      body.add(eye);
+      return eye;
+    });
+    const brows = [-eyeGap, eyeGap].map((x) =>
+      mesh(0.16, 0.025, 0.02, 0.01, 0xc9dda4, x, faceY + 0.19, faceZ),
+    );
+
+    // Shoulder, elbow and mitten share a local rig; props move with the hand.
+    const shoulderWidth = 0.84,
+      shoulderY = 1.05;
+    const arms = [-1, 1].map((side) => {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * shoulderWidth, shoulderY, 0.15);
+      body.add(shoulder);
+      const sleeve = mesh(0.22, 0.36, 0.24, 0.1, paint, side * 0.05, -0.14, 0);
+      shoulder.add(sleeve);
+
+      const elbow = new THREE.Group();
+      elbow.position.set(side * 0.08, -0.29, 0.02);
+      shoulder.add(elbow);
+      const forearm = mesh(0.18, 0.27, 0.19, 0.08, 0xe2dfcc, 0, -0.1, 0.03);
+      elbow.add(forearm);
+
+      const wrist = new THREE.Group();
+      wrist.position.set(0, -0.24, 0.05);
+      elbow.add(wrist);
+      const palm = mesh(0.25, 0.27, 0.21, 0.1, 0xe9e5d4, 0, 0, 0);
+      const thumb = mesh(
+        0.11,
+        0.15,
+        0.15,
+        0.05,
+        0xe9e5d4,
+        -side * 0.115,
+        0.04,
+        0.045,
+      );
+      wrist.add(palm, thumb);
+      return { shoulder, elbow, wrist };
+    });
+    const clipboard = new THREE.Group();
+    arms[0].wrist.add(clipboard);
+    clipboard.position.set(-0.06, 0.17, 0.16);
+    clipboard.rotation.z = -0.1;
+    clipboard.add(mesh(0.52, 0.7, 0.06, 0.035, 0x536650));
+    clipboard.add(mesh(0.43, 0.54, 0.018, 0.014, 0xe9e7d7, 0, -0.025, 0.041));
+    clipboard.add(mesh(0.2, 0.09, 0.07, 0.025, 0x829174, 0, 0.335, 0.055));
+    for (let i = 0; i < 3; i++) {
+      clipboard.add(
+        mesh(0.22, 0.018, 0.016, 0.007, 0x9aa28b, 0.045, 0.14 - i * 0.12, 0.06),
+      );
+      clipboard.add(
+        mesh(
+          0.035,
+          0.035,
+          0.017,
+          0.012,
+          0x75925f,
+          -0.14,
+          0.14 - i * 0.12,
+          0.06,
+        ),
+      );
+    }
+    const wrench = new THREE.Group();
+    arms[1].wrist.add(wrench);
+    wrench.position.set(0.025, 0.14, 0.15);
+    wrench.rotation.z = -0.2;
+    wrench.add(mesh(0.105, 0.58, 0.085, 0.04, 0x65766e, 0, 0.12));
+    wrench.add(mesh(0.29, 0.14, 0.1, 0.045, 0x65766e, 0, 0.44));
+    for (const side of [-1, 1]) {
+      const jaw = mesh(0.09, 0.2, 0.1, 0.025, 0x65766e, side * 0.13, 0.55);
+      jaw.rotation.z = -side * 0.3;
+      wrench.add(jaw);
+    }
+    const ringGeo = new THREE.TorusGeometry(0.075, 0.028, 8, 20);
+    geometries.push(ringGeo);
+    const ring = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshStandardMaterial({ color: 0x65766e }),
+    );
+    materials.push(ring.material);
+    ring.position.y = -0.21;
+    wrench.add(ring);
+    const floorGeo = new THREE.PlaneGeometry(200, 200);
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.14 });
+    geometries.push(floorGeo);
+    materials.push(floorMat);
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    floor.position.y = 0.015;
+    scene.add(floor);
+    let pointerX = 0,
+      pointerY = 0;
+    const move = (e: PointerEvent) => {
+      const rect = host.getBoundingClientRect();
+      pointerX = (e.clientX - rect.left) / rect.width - 0.5;
+      pointerY = (e.clientY - rect.top) / rect.height - 0.5;
+    };
+    const leave = () => {
+      pointerX = 0;
+      pointerY = 0;
+    };
+    host.addEventListener("pointermove", move);
+    host.addEventListener("pointerleave", leave);
+    const resize = () => {
+      const { width, height } = host.getBoundingClientRect();
+      renderer.setSize(width, height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(host);
+    resize();
+    let visible = true;
+    const visibility = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+    });
+    visibility.observe(host);
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0,
+      previousMood = state.current.mood,
+      previousGesture = state.current.gesture,
+      moodStart = performance.now(),
+      previousDanceRequest = 0,
+      danceStart = -Infinity;
+    const render = (t: number) => {
+      frame = requestAnimationFrame(render);
+      if (document.hidden || !visible) return;
+      const still = state.current.paused || reduced.matches;
+      let current = state.current.mood;
+      if (
+        previousMood !== current ||
+        previousGesture !== state.current.gesture
+      ) {
+        previousGesture = state.current.gesture;
+        previousMood = current;
+        moodStart = t;
+      }
+      if (previousDanceRequest !== state.current.danceRequest) {
+        previousDanceRequest = state.current.danceRequest;
+        if (previousDanceRequest > 0) danceStart = t;
+      }
+      const special =
+        state.current.dance === "backflip" ||
+        state.current.dance === "cartwheel";
+      const requestedDance = t - danceStart < (special ? 2600 : 5200) && !still;
+      const routine =
+        special && state.current.ambient && !requestedDance
+          ? "shuffle"
+          : state.current.dance;
+      let elapsed = t - moodStart;
+      if (state.current.ambient) {
+        // One short gesture per nine-second slot; the other caretakers rest.
+        const phase = (t - state.current.slot * 9000 + 27000) % 27000;
+        const greeting =
+          state.current.mood === "waving" && elapsed < 2600 && !still;
+        if (!greeting) {
+          current =
+            !still && phase < 2600
+              ? Math.floor(t / 27000) % 2 === 0
+                ? "waving"
+                : "dancing"
+              : "ready";
+          elapsed = phase;
+        }
+      }
+      if (requestedDance) {
+        current = "dancing";
+        elapsed = t - danceStart;
+      }
+      const danceDuration = special
+        ? 2600
+        : requestedDance || !state.current.ambient
+          ? 5200
+          : 2600;
+      if (host.dataset.dance !== routine) host.dataset.dance = routine;
+      if (host.dataset.expression !== current)
+        host.dataset.expression = current;
+      const working = current === "working",
+        checking = current === "checking";
+      const attention = current === "attention",
+        resting = current === "resting";
+      const dancing = current === "dancing";
+      const happy =
+        current === "celebrating" || current === "waving" || dancing;
+      const celebrate = current === "celebrating";
+      const waving = current === "waving";
+      const animatedGreeting = !still && elapsed < 2600;
+      const blink = !still && t % 5700 > 5500;
+      body.rotation.y = still
+        ? 0
+        : THREE.MathUtils.lerp(
+            body.rotation.y,
+            pointerX * 0.16 +
+              (checking ? -0.08 : Math.sin(t * 0.00055) * 0.025),
+            0.06,
+          );
+      body.rotation.z = still
+        ? 0
+        : attention
+          ? -0.07
+          : checking
+            ? 0.055
+            : happy && animatedGreeting
+              ? Math.sin(elapsed * 0.008) * 0.045
+              : Math.sin(t * 0.001) * 0.009;
+      body.rotation.x = still
+        ? 0
+        : resting
+          ? 0.05
+          : checking
+            ? 0.06
+            : pointerY * 0.06;
+      body.position.y =
+        celebrate && animatedGreeting
+          ? Math.abs(Math.sin(elapsed * 0.007)) * 0.16 * (1 - elapsed / 2600)
+          : 0;
+      const danceActive = dancing && !still && elapsed < danceDuration;
+      const envelope = danceActive
+        ? Math.min(1, elapsed / 220, (danceDuration - elapsed) / 350)
+        : 0;
+      const beat = elapsed / 460;
+      const swing = Math.sin(beat * Math.PI);
+      const danceStep = swing * envelope;
+      // Brief sharp transitions followed by holds make the robot mechanical.
+      const robotPoses = [-1, -1, 0, 1, 1, 0, -1, 0];
+      const poseIndex = Math.floor(beat) % robotPoses.length;
+      const poseMix = THREE.MathUtils.smoothstep(beat % 1, 0, 0.22);
+      const robotBeat =
+        THREE.MathUtils.lerp(
+          robotPoses[poseIndex],
+          robotPoses[(poseIndex + 1) % robotPoses.length],
+          poseMix,
+        ) * envelope;
+      body.position.x = danceStep * (routine === "floss" ? -0.12 : 0.065);
+      if (dancing) {
+        // Keep the downbeat and pivots grounded.
+        body.position.y = (1 - Math.cos(beat * Math.PI * 2)) * 0.012 * envelope;
+        body.rotation.y =
+          routine === "robot" ? robotBeat * 0.3 : danceStep * 0.2;
+        body.rotation.z =
+          routine === "robot" ? robotBeat * 0.04 : -danceStep * 0.065;
+      }
+      feet.forEach((foot, i) => {
+        const side = i === 0 ? -1 : 1;
+        const shuffle = routine === "shuffle";
+        foot.position.y = 0.13;
+        foot.position.x =
+          side * 0.49 +
+          (shuffle ? Math.cos(beat * Math.PI) * side * 0.045 * envelope : 0);
+        foot.position.z = 0.02;
+        foot.rotation.x = 0;
+        foot.rotation.z = 0;
+        foot.rotation.y = shuffle ? danceStep * 0.28 : -body.rotation.y * 0.6;
+      });
+      mouth.geometry = happy
+        ? mouths.joy
+        : attention
+          ? mouths.concern
+          : working || resting
+            ? mouths.flat
+            : mouths.smile;
+      eyes.forEach((eye, i) => {
+        eye.visible = !happy;
+        eye.scale.y = resting
+          ? 0.1
+          : blink
+            ? 0.12
+            : working
+              ? 0.65
+              : checking && i === 0
+                ? 0.7
+                : 1;
+        eye.position.x = (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0);
+        eye.rotation.z = attention ? (i === 0 ? -0.12 : 0.12) : 0;
+        (eye.material as THREE.MeshStandardMaterial).color.set(
+          attention ? 0xf0c37b : 0xe1efbb,
+        );
+        happyEyes[i].visible = happy;
+        brows[i].visible = checking || attention;
+        brows[i].rotation.z = attention
+          ? i === 0
+            ? -0.22
+            : 0.22
+          : i === 0
+            ? 0.15
+            : -0.08;
+      });
+      clipboard.visible = checking;
+      wrench.visible = working;
+      arms.forEach((arm, i) => {
+        const side = i === 0 ? -1 : 1;
+        let angle = side * 0.13,
+          elbow = 0;
+        if (checking && i === 0) {
+          angle = -0.65;
+          elbow = -0.2;
+        }
+        if (working && i === 1) {
+          angle = 0.95 + (!still ? Math.sin(t * 0.004) * 0.12 : 0);
+          elbow = 0.22;
+        }
+        if (celebrate)
+          angle =
+            side *
+            (animatedGreeting ? 2.2 + Math.sin(elapsed * 0.012) * 0.15 : 0.65);
+        if (waving && i === 1)
+          angle = animatedGreeting
+            ? 2.4 + Math.sin(elapsed * 0.009) * 0.22
+            : 0.5;
+        arm.shoulder.rotation.x = 0;
+        arm.shoulder.rotation.y = 0;
+        arm.elbow.rotation.z = 0;
+        arm.wrist.rotation.z = 0;
+        if (dancing) {
+          if (routine === "floss") {
+            // Both hands sweep together; the torso counter-swings.
+            angle = side * 0.16 + danceStep * 1.1;
+            arm.shoulder.rotation.x =
+              -(0.8 + Math.cos(beat * Math.PI) * side * 0.65) * envelope;
+            arm.shoulder.rotation.y = danceStep * 0.35;
+            elbow = -0.12 * envelope;
+          } else if (routine === "robot") {
+            angle = side * (0.9 + robotBeat * side * 0.5) * envelope;
+            arm.shoulder.rotation.x = -0.45 * envelope;
+            elbow = (-1.15 + robotBeat * side * 0.55) * envelope;
+            arm.elbow.rotation.z = side * 0.65 * envelope;
+            arm.wrist.rotation.z = -robotBeat * side * 0.65;
+          } else {
+            // Both hands pop out, then come in on the same beat.
+            const open = (0.5 + 0.5 * Math.cos(beat * Math.PI)) * envelope;
+            angle = side * (0.4 + open * 1.05);
+            arm.shoulder.rotation.x = -0.35 * envelope;
+            elbow = (-0.35 - open * 0.6) * envelope;
+            arm.wrist.rotation.z = side * open * 0.3;
+          }
+        }
+        if (attention && i === 0) angle = -0.7;
+        arm.shoulder.rotation.z = still
+          ? angle
+          : THREE.MathUtils.lerp(arm.shoulder.rotation.z, angle, 0.12);
+        arm.elbow.rotation.x = checking && i === 0 ? -0.25 : elbow;
+      });
+      // Rotate around the character's center, with a clean takeoff and landing.
+      const acrobatics =
+        dancing &&
+        danceActive &&
+        (routine === "backflip" || routine === "cartwheel");
+      body.position.z = 0;
+      body.scale.set(1, 1, 1);
+      if (acrobatics) {
+        const progress = elapsed / 2600;
+        const flight = THREE.MathUtils.clamp((progress - 0.16) / 0.57, 0, 1);
+        const turn = THREE.MathUtils.smoothstep(flight, 0, 1) * Math.PI * 2;
+        const jump =
+          Math.sin(flight * Math.PI) * (routine === "backflip" ? 1.05 : 0.65);
+        const windup =
+          progress < 0.16 ? Math.sin((progress / 0.16) * Math.PI) * 0.15 : 0;
+        const landing =
+          progress > 0.73 && progress < 0.9
+            ? Math.sin(((progress - 0.73) / 0.17) * Math.PI) * 0.17
+            : 0;
+        const squash = windup + landing;
+        body.scale.set(1 + squash * 0.4, 1 - squash, 1 + squash * 0.25);
+        body.rotation.set(0, 0, 0);
+        body.position.set(0, 1.05 + jump - Math.cos(turn) * 1.05, 0);
+        if (routine === "backflip") {
+          body.rotation.x = -turn;
+          body.position.z = Math.sin(turn) * 1.05;
+        } else {
+          body.rotation.z = -turn;
+          body.position.x =
+            -0.6 * Math.sin(flight * Math.PI) - Math.sin(turn) * 1.05;
+        }
+        const tuck = Math.sin(flight * Math.PI);
+        arms.forEach((arm, i) => {
+          const side = i === 0 ? -1 : 1;
+          arm.shoulder.rotation.set(
+            routine === "backflip" ? -tuck * 0.9 : 0,
+            0,
+            side * (routine === "cartwheel" ? 1.8 * tuck : 0.3 + 0.5 * tuck),
+          );
+          arm.elbow.rotation.set(-tuck * 0.8, 0, 0);
+        });
+        feet.forEach((foot, i) => {
+          foot.position.set(
+            (i === 0 ? -1 : 1) * 0.49,
+            0.13 + tuck * 0.13,
+            0.02,
+          );
+          foot.rotation.set(-tuck * 0.45, 0, 0);
+        });
+      }
+      const targetFov = acrobatics ? 43 : 32;
+      camera.fov = still
+        ? targetFov
+        : THREE.MathUtils.lerp(camera.fov, targetFov, 0.12);
+      camera.updateProjectionMatrix();
+      if (host.dataset.trick !== (acrobatics ? routine : "none"))
+        host.dataset.trick = acrobatics ? routine : "none";
+      renderer.render(scene, camera);
+    };
+    frame = requestAnimationFrame(render);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      visibility.disconnect();
+      host.removeEventListener("pointermove", move);
+      host.removeEventListener("pointerleave", leave);
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, [color]);
+  return (
+    <div className="mascot-scene" ref={root} aria-hidden="true">
+      <span className="mascot-fallback">
+        ▰<br />• •<br />⌣
+      </span>
+    </div>
+  );
+}
