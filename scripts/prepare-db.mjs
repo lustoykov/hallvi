@@ -1,3 +1,4 @@
+import { assertOutsideRecoveryQuarantine } from "../src/server/recovery-quarantine.mjs";
 // Stop the app and worker before upgrading. Known schemas are backed up before
 // migration; unknown schemas require investigation, never an automatic reset.
 import Database from "better-sqlite3";
@@ -9,6 +10,7 @@ import { migrateChatOwnership } from "./migrate-chat-ownership.mjs";
 const path =
   process.env.SERVER_GUY_DB_PATH ??
   join(process.cwd(), ".server-guy", "server-guy.db");
+assertOutsideRecoveryQuarantine(path);
 const { version } = JSON.parse(
   readFileSync(
     new URL("../src/server/schema-version.json", import.meta.url),
