@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -47,12 +47,17 @@ import {
 } from "../../../src/server/deployment-store";
 import { claimOperation, operation } from "../../../src/server/operation-store";
 import { POST } from "../../../src/app/api/applications/[applicationId]/deployment/route";
+import {
+  deploymentDirectory,
+  deploymentPath,
+} from "../../../src/server/deployment-files";
 let root: string;
 let app: string;
 let chat: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sg-deployment-state-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "db.sqlite"));
+  vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "private"));
   pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
   app = insertApplication({
     name: "Test",
@@ -309,4 +314,53 @@ it("records the announcing reply and refers a second conversation to the same de
   ]);
   // The original conversation is not touched by the reference.
   expect(listMessages(chat)).toHaveLength(2);
+});
+
+it("removes only the cancelled setup's private files, retaining other deployments", async () => {
+  const r = recommendation();
+  writeFileSync(
+    join(deploymentDirectory(r), "inputs.json"),
+    "synthetic secret",
+  );
+  const other = { id: randomUUID() };
+  writeFileSync(join(deploymentDirectory(other), "client"), "other key");
+  expect((await post({ action: "cancel", deploymentId: r.id })).status).toBe(
+    200,
+  );
+  expect(existsSync(deploymentPath(r.id))).toBe(false);
+  expect(existsSync(join(deploymentPath(other.id), "client"))).toBe(true);
+});
+
+it("requires owner-confirmed provider evidence and clears spending authority after reconciliation", async () => {
+  const r = recommendation();
+  r.status = "failed";
+  r.serverCreateAttempted = true;
+  r.authority = {
+    connectionId: "hetzner-a",
+    acceptedAt: new Date().toISOString(),
+    maxMonthly: 5,
+  };
+  saveDeployment(r);
+  const input = {
+    action: "resolve-purchase",
+    deploymentId: r.id,
+    confirmedNotCreated: true,
+    providerReference: "Support ticket TEST-123",
+  };
+  expect((await post({ ...input, confirmedNotCreated: false })).status).toBe(
+    400,
+  );
+  external.provider.mockResolvedValueOnce({ servers: [{ id: 8 }] });
+  expect((await post(input)).status).toBe(400);
+  expect(getDeployment(r.id)?.serverCreateAttempted).toBe(true);
+  external.provider.mockResolvedValueOnce({ servers: [] });
+  expect((await post(input)).status).toBe(200);
+  const resolved = getDeployment(r.id)!;
+  expect(resolved.serverCreateAttempted).toBe(false);
+  expect(resolved.authority).toBeNull();
+  expect(resolved.events.at(-1)?.message).toContain("Owner-attested");
+  expect((await post({ action: "retry", deploymentId: r.id })).status).toBe(
+    200,
+  );
+  expect(getDeployment(r.id)?.status).toBe("queued"); // inspect, never purchase
 });

@@ -28,7 +28,7 @@ export function formatTimestamp(value: string) {
   }).format(new Date(value))} UTC`;
 }
 
-export type LocalTimeVariant = "full" | "compact" | "title";
+export type LocalTimeVariant = "full" | "compact" | "date" | "title";
 
 /** Local-time formats; only call after hydration or in event handlers. */
 export function formatLocalTimestamp(
@@ -37,6 +37,15 @@ export function formatLocalTimestamp(
   now = new Date(),
 ) {
   const date = new Date(value);
+  // A day heading: the weekday and date, never "today", because the
+  // reader's clock and the record's clock are not always the same one.
+  if (variant === "date")
+    return new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+      ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+    }).format(date);
   if (variant === "title")
     return new Intl.DateTimeFormat("en-GB", {
       dateStyle: "full",

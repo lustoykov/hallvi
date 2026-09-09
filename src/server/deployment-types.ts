@@ -1,8 +1,19 @@
 import { z } from "zod";
+import {
+  imageReferenceSchema,
+  volumeMountSchema,
+  configMountSchema,
+  composeServiceSchema,
+} from "./compose-plan";
 
 const path = z.string().regex(/^(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/);
 export const deploymentPlanSchema = z
   .strictObject({
+    image: imageReferenceSchema.optional(),
+    volumes: z.array(volumeMountSchema).max(8).optional(),
+    configs: z.array(configMountSchema).max(8).optional(),
+    services: z.array(composeServiceSchema).max(5).optional(),
+    httpAccess: z.enum(["public", "controller"]).optional(),
     summary: z.string().min(20).max(1500),
     dockerfile: path,
     // Only deployment packaging may be generated; never patch application code.
@@ -71,6 +82,38 @@ export const deploymentPlanSchema = z
       fail(
         "Include a content assertion on an application route beyond the health endpoint.",
       );
+    if (plan.image && plan.generatedDockerfile)
+      fail("Choose an image or a Dockerfile build, not both.");
+    const services = [
+      { name: "app", volumes: plan.volumes ?? [], configs: plan.configs ?? [] },
+      ...(plan.services ?? []),
+    ];
+    if (new Set(services.map((s) => s.name)).size !== services.length)
+      fail("Service names must be unique.");
+    const volumes = new Set<string>(plan.postgres ? ["database"] : []);
+    for (const service of services) {
+      const targets = [...service.volumes, ...service.configs].map(
+        (m) => m.target,
+      );
+      if (new Set(targets).size !== targets.length)
+        fail("Mount targets must be unique per service.");
+      if (
+        new Set(service.configs.map((c) => c.name)).size !==
+        service.configs.length
+      )
+        fail("Configuration names must be unique per service.");
+      for (const volume of service.volumes) {
+        if (volumes.has(volume.name))
+          fail("Use a distinct named volume for each data owner.");
+        volumes.add(volume.name);
+        if (
+          volume.sqlite &&
+          (!volume.sqlite.startsWith(volume.target.replace(/\/$/, "") + "/") ||
+            volume.sqlite.includes(".."))
+        )
+          fail("SQLite must be inside its persistent volume.");
+      }
+    }
     const mutations = plan.checks.filter((c) => c.method !== "GET");
     if (mutations.length) {
       const create = mutations[0];
@@ -122,8 +165,13 @@ export interface DeploymentRecord {
   chatId: string;
   status: DeploymentStatus;
   repository: string;
+  /** The initiating user request, kept separate from repository evidence. */
+  requirements?: string;
+  requestedRef?: string;
   recommendationId?: string;
   verificationPending?: string | null;
+  /** Candidate ID is verified against the unique marker before deletion. */
+  verificationRecoveryId?: string | null;
   repositoryId?: number;
   githubConnectionId?: string;
   inspectedRevision?: string | null;
@@ -140,6 +188,11 @@ export interface DeploymentRecord {
   serverCreateAttempted: boolean;
   address: string | null;
   imageId: string | null;
+  /** Every service image observed on the host, keyed by service name. */
+  serviceImages?: Record<string, string>;
+  bundleHashes?: Record<string, string>;
+  /** Public HTTP is limited to this controller address when requested. */
+  httpSourceIp?: string;
   url: string | null;
   verifiedAt: string | null;
   error: string | null;

@@ -18,6 +18,7 @@ import {
   verifiedText,
   type ViewProps,
 } from "./bits";
+import { Meter, Tally } from "./visuals";
 
 function usage(used: number, total: number) {
   return Math.round((used / total) * 100);
@@ -120,7 +121,13 @@ export function MonitoringView(props: ViewProps) {
   if (!monitoring)
     return (
       <>
+        <Condition tone="muted" title="Not monitored yet">
+          Server Guy has verified this application once, at deployment. Nothing
+          is watching it between those checks, so nothing here should be read as
+          proof that it is healthy now.
+        </Condition>
         <Facts
+          wide
           rows={[
             ["Last application verification", verifiedText(deployment)],
             ["Continuous monitoring", "Not running"],
@@ -145,6 +152,18 @@ export function MonitoringView(props: ViewProps) {
     );
   const collector = monitoring.collector;
   const status = monitoringStatus(monitoring, now);
+  const checks = monitoring.checks;
+  const failing = checks.filter((check) => check.state === "failing");
+  const unknown = checks.filter((check) => check.state === "unknown");
+  const passing = checks.filter((check) => check.state === "passing");
+  // Failing first, then unknown: the row order is the reading order.
+  const ordered = [...failing, ...unknown, ...passing];
+  const unresolved = monitoring.issues.filter(
+    (issue) => issue.state !== "recovered",
+  );
+  const recovered = monitoring.issues.filter(
+    (issue) => issue.state === "recovered",
+  );
   return (
     <>
       <Condition tone={status.tone} title={status.title}>
@@ -154,11 +173,11 @@ export function MonitoringView(props: ViewProps) {
           : ""}
         {collector.hostReachable === false ? " · host unreachable" : ""}
       </Condition>
-      {monitoring.issues.length > 0 && (
-        <>
-          <SubHeading>Issues</SubHeading>
+      {unresolved.length > 0 && (
+        <section className="sg-band" aria-label="Issues">
+          <SubHeading>Needs you</SubHeading>
           <div className="sg-issues">
-            {monitoring.issues.map((issue) => (
+            {unresolved.map((issue) => (
               <IssueCard
                 key={issue.id}
                 issue={issue}
@@ -170,130 +189,154 @@ export function MonitoringView(props: ViewProps) {
               />
             ))}
           </div>
-        </>
+        </section>
       )}
-      <SubHeading>Checks</SubHeading>
-      <div className="sg-checks">
-        <div className="sg-check-row sg-table-head">
-          <span>Check</span>
-          <span>Target</span>
-          <span>State</span>
-          <span>Last result</span>
+      <section className="sg-band" aria-label="Checks">
+        <div className="sg-band-head">
+          <h2>Checks</h2>
+          <span className="sg-visual-caption">
+            {collector.state === "running"
+              ? "Collected on the host, whether or not this page is open"
+              : collector.detail}
+          </span>
         </div>
-        {monitoring.checks.map((check) => (
-          <div className="sg-check-row" key={check.id}>
-            <span>
-              <strong>{check.name}</strong>
-              <small>{check.kind}</small>
-            </span>
-            <span>
-              <code>{check.target}</code>
-            </span>
-            <span>
-              <Pill
-                tone={
-                  check.state === "passing"
-                    ? "ok"
-                    : check.state === "failing"
-                      ? "bad"
-                      : "muted"
-                }
-              >
-                {check.state === "passing"
-                  ? "Passing"
-                  : check.state === "failing"
-                    ? "Failing"
-                    : "Unknown"}
-              </Pill>
-            </span>
-            <span>
-              {check.lastAt ? <When at={check.lastAt} now={now} /> : "Never"}
-              <small>{check.detail}</small>
-            </span>
+        <Tally
+          label="Check results"
+          items={[
+            { label: "failing", count: failing.length, tone: "bad" },
+            { label: "unknown", count: unknown.length, tone: "muted" },
+            { label: "passing", count: passing.length, tone: "ok" },
+          ]}
+        />
+        <div className="sg-checks">
+          <div className="sg-check-row sg-table-head">
+            <span>Check</span>
+            <span>Target</span>
+            <span>State</span>
+            <span>Last result</span>
           </div>
-        ))}
-      </div>
-      <SubHeading>Resources</SubHeading>
-      {monitoring.resources ? (
-        <div className="sg-resources">
-          {[
-            {
-              label: "CPU",
-              percent: monitoring.resources.cpuPercent,
-              detail: `${monitoring.resources.cpuPercent}% of the instance`,
-            },
-            {
-              label: "Memory",
-              percent: usage(
-                monitoring.resources.memoryUsedMb,
-                monitoring.resources.memoryTotalMb,
-              ),
-              detail: `${(monitoring.resources.memoryUsedMb / 1024).toFixed(1)} of ${(monitoring.resources.memoryTotalMb / 1024).toFixed(0)} GB`,
-            },
-            {
-              label: "Disk",
-              percent: usage(
-                monitoring.resources.diskUsedGb,
-                monitoring.resources.diskTotalGb,
-              ),
-              detail: `${monitoring.resources.diskUsedGb} of ${monitoring.resources.diskTotalGb} GB`,
-            },
-          ].map((item) => (
-            <div className="sg-resource" key={item.label}>
-              <div className="sg-resource-head">
-                <strong>{item.label}</strong>
-                <span
-                  className={
-                    item.percent >= 90
-                      ? "sg-outcome-bad"
-                      : item.percent >= 75
-                        ? "sg-outcome-warn"
-                        : undefined
+          {ordered.map((check) => (
+            <div
+              className={`sg-check-row${check.state === "failing" ? " sg-row-bad" : ""}`}
+              key={check.id}
+            >
+              <span>
+                <strong>{check.name}</strong>
+                <small>{check.kind}</small>
+              </span>
+              <span>
+                <code>{check.target}</code>
+              </span>
+              <span>
+                <Pill
+                  tone={
+                    check.state === "passing"
+                      ? "ok"
+                      : check.state === "failing"
+                        ? "bad"
+                        : "muted"
                   }
                 >
-                  {item.detail}
-                </span>
-              </div>
-              <div className="sg-meter" aria-hidden="true">
-                <span
-                  className={
-                    item.percent >= 90
-                      ? "bad"
-                      : item.percent >= 75
-                        ? "warn"
-                        : ""
-                  }
-                  style={{ width: `${Math.min(100, item.percent)}%` }}
-                />
-              </div>
+                  {check.state === "passing"
+                    ? "Passing"
+                    : check.state === "failing"
+                      ? "Failing"
+                      : "Unknown"}
+                </Pill>
+              </span>
+              <span>
+                {check.lastAt ? <When at={check.lastAt} now={now} /> : "Never"}
+                <small>{check.detail}</small>
+              </span>
             </div>
           ))}
-          <p className="sg-section-note">
-            Sampled on the host{" "}
-            <When at={monitoring.resources.measuredAt} now={now} />. Samples
-            continue while this dashboard is closed.
-          </p>
         </div>
-      ) : (
-        <p className="sg-section-note">Resources are not measured yet.</p>
+      </section>
+      <section className="sg-band" aria-label="Resources">
+        <SubHeading>Resources</SubHeading>
+        {monitoring.resources ? (
+          <>
+            <div className="sg-gauges">
+              {[
+                {
+                  label: "CPU",
+                  percent: monitoring.resources.cpuPercent,
+                  detail: `${monitoring.resources.cpuPercent}% of the instance`,
+                },
+                {
+                  label: "Memory",
+                  percent: usage(
+                    monitoring.resources.memoryUsedMb,
+                    monitoring.resources.memoryTotalMb,
+                  ),
+                  detail: `${(monitoring.resources.memoryUsedMb / 1024).toFixed(1)} of ${(monitoring.resources.memoryTotalMb / 1024).toFixed(0)} GB`,
+                },
+                {
+                  label: "Disk",
+                  percent: usage(
+                    monitoring.resources.diskUsedGb,
+                    monitoring.resources.diskTotalGb,
+                  ),
+                  detail: `${monitoring.resources.diskUsedGb} of ${monitoring.resources.diskTotalGb} GB`,
+                },
+              ].map((item) => (
+                <Meter
+                  key={item.label}
+                  label={item.label}
+                  percent={item.percent}
+                  detail={item.detail}
+                />
+              ))}
+            </div>
+            <p className="sg-visual-caption">
+              Sampled on the host{" "}
+              <When at={monitoring.resources.measuredAt} now={now} />. The two
+              marks on each bar are 75% and 90%; samples continue while this
+              dashboard is closed.
+            </p>
+          </>
+        ) : (
+          <p className="sg-section-note">Resources are not measured yet.</p>
+        )}
+      </section>
+      {recovered.length > 0 && (
+        <section className="sg-band" aria-label="Recovered issues">
+          <SubHeading>Recovered</SubHeading>
+          <div className="sg-issues">
+            {recovered.map((issue) => (
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                now={now}
+                chats={props.chats}
+                onOpenConversation={props.onOpenConversation}
+                onAction={props.onAction}
+                busy={props.busy}
+              />
+            ))}
+          </div>
+        </section>
       )}
-      <SubHeading>Notifications</SubHeading>
-      <Facts
-        rows={[
-          [
-            "In app",
-            `Issues stay here with unread state · ${monitoring.issues.filter((issue) => issue.unread).length} unread`,
-          ],
-          [
-            "External",
-            monitoring.providers.length
-              ? monitoring.providers
-                  .map((provider) => `${provider.kind} · ${provider.detail}`)
-                  .join(", ")
-              : "No provider connected · Server Guy cannot reach you outside the app yet",
-          ],
-        ]}
-      />
+      <section className="sg-band" aria-label="Notifications">
+        <SubHeading>Notifications</SubHeading>
+        <Facts
+          wide
+          rows={[
+            [
+              "In app",
+              `Issues stay here with unread state · ${monitoring.issues.filter((issue) => issue.unread).length} unread`,
+            ],
+            [
+              "External",
+              monitoring.providers.length
+                ? monitoring.providers
+                    .map((provider) => `${provider.kind} · ${provider.detail}`)
+                    .join(", ")
+                : "No provider connected · Server Guy cannot reach you outside the app yet",
+            ],
+          ]}
+        />
+      </section>
       <p className="sg-section-note">
         Monitoring runs on the host; a stale collector is shown as stale, never
         as healthy.{" "}

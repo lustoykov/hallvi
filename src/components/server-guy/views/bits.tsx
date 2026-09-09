@@ -31,9 +31,16 @@ export interface ViewProps {
   busy?: string | null;
 }
 
-export function Facts({ rows }: { rows: Array<[string, ReactNode]> }) {
+export function Facts({
+  rows,
+  wide,
+}: {
+  rows: Array<[string, ReactNode]>;
+  /** One column, for values that are sentences rather than values. */
+  wide?: boolean;
+}) {
   return (
-    <dl className="sg-section-facts">
+    <dl className={`sg-section-facts${wide ? " sg-facts-wide" : ""}`}>
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>
@@ -143,7 +150,7 @@ export function Possible({
           Ask in the conversation <ArrowRight aria-hidden="true" />
         </LinkButton>
         {!available && (
-          <span className="sg-availability">Not available yet</span>
+          <span className="sg-availability">Not implemented yet</span>
         )}
       </div>
     </div>

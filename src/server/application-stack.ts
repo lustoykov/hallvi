@@ -75,17 +75,40 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
   if (!record || !plan) return emptyStack;
   const state: StackState = record.status === "live" ? "running" : "planned";
   const extra = record.stack ?? {};
+  const imageServices = plan.services ?? [];
+  const plannedVolumes = [
+    { name: "app", volumes: plan.volumes ?? [] },
+    ...imageServices,
+  ].flatMap((service) =>
+    service.volumes.map((v) => ({
+      name: v.name,
+      usedBy: service.name,
+      mount: v.target,
+      kind: v.kind,
+      sqlite: v.sqlite,
+    })),
+  );
   const processes: StackProcess[] = [
     {
       name: "app",
       role: "web",
       command: plan.command?.join(" ") ?? null,
-      image: record.imageId ?? null,
+      image: plan.image ?? record.imageId ?? null,
       port: plan.port,
       healthPath: plan.healthPath,
       consumes: null,
       state,
     },
+    ...imageServices.map((service) => ({
+      name: service.name,
+      role: "web" as const,
+      command: service.command?.join(" ") ?? null,
+      image: service.image,
+      port: null,
+      healthPath: service.healthPath,
+      consumes: null,
+      state,
+    })),
     ...(extra.processes ?? []).map((process) => ({
       name: process.name,
       role: process.role,
@@ -109,6 +132,15 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
           },
         ]
       : []),
+    ...plannedVolumes
+      .filter((v) => v.sqlite)
+      .map((v) => ({
+        kind: "sqlite" as const,
+        name: v.usedBy,
+        version: null,
+        location: v.sqlite!,
+        state,
+      })),
     ...(extra.databases ?? []).map((database) => ({
       kind: database.kind,
       name: database.name,
@@ -129,6 +161,13 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
           },
         ]
       : []),
+    ...plannedVolumes.map((v) => ({
+      name: v.name,
+      usedBy: v.usedBy,
+      mount: v.mount,
+      kind: v.kind,
+      state,
+    })),
     ...(extra.volumes ?? []).map((volume) => ({ ...volume, state })),
   ];
   return {

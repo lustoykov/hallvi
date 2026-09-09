@@ -212,3 +212,60 @@
     transition: none;
   }
 }
+
+/* The identity-placement comparison: three live shells, scaled to fit. */
+.sg-variant-page {
+  max-width: 1120px;
+}
+.sg-variant-screens {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.sg-variant {
+  margin: 34px 0;
+  padding-top: 26px;
+  border-top: 1px solid #e7e9ee;
+}
+.sg-variant-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sg-variant-head h2 {
+  margin: 0;
+  font-size: 17px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.sg-variant-head h2 span {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #285ad8;
+  background: #edf3ff;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.sg-variant-trade {
+  color: #868f9e;
+}
+.sg-variant-frame {
+  margin-top: 14px;
+  border: 1px solid #e7e9ee;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  height: 520px;
+}
+.sg-variant-frame iframe {
+  border: 0;
+  display: block;
+  transform: scale(0.578);
+  transform-origin: top left;
+}

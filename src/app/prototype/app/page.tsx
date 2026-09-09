@@ -20,14 +20,20 @@ export default async function PrototypeApplicationPage({
     return typeof value === "string" ? value : undefined;
   };
   const scenario = one("scenario") === "rich" ? "rich" : "simple";
+  const identity = one("identity");
+  const identityVariant =
+    identity === "topbar" || identity === "breadcrumb"
+      ? identity
+      : "navigation";
   const step = Number.parseInt(one("step") ?? "0", 10);
   return (
     <ReferenceShell
-      key={scenario}
+      key={`${scenario}:${identityVariant}`}
       scenarioId={scenario}
       initialStep={Number.isFinite(step) ? step : 0}
       initialSection={one("section") ?? null}
       initialChat={one("chat") ?? null}
+      identityVariant={identityVariant}
     />
   );
 }

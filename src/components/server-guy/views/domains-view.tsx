@@ -4,41 +4,122 @@ import {
   Condition,
   Facts,
   Pill,
-  LinkButton,
   Possible,
   SubHeading,
+  TextLink,
   When,
   type ViewProps,
 } from "./bits";
+import { Flow, type FlowStage } from "./visuals";
 
 /**
- * Delivery is four separate facts: the address that answers, the domain
- * and who resolves it, the certificate and its renewal, and whether a CDN is
- * actually caching. Each can be pending, failed or not configured on its own.
+ * The name this application answers on, and the certificate behind it.
+ * Delivery is a path whose stages each carry their own state: the name can
+ * resolve while the certificate is still pending. The path is drawn once at
+ * the top so the gap is obvious; caching is its own destination, because a
+ * stale cached copy is a different failure from a name that will not resolve.
  */
 export function DomainsView(props: ViewProps) {
   const { stack, facts, deployment, now } = props;
   const domains = facts.domains;
   const postgres = stack.databases.some((item) => item.kind === "postgres");
+  const address = domains?.address ?? deployment?.url ?? null;
+  const domain = domains?.domain ?? null;
+  const tls = domains?.tls;
+  const cdn = domains?.cdn;
+  const configured = cdn?.state === "active" || cdn?.state === "partial";
+  const serviceStage = domains?.routes[0]
+    ? `${domains.routes[0].service} · port ${domains.routes[0].port}`
+    : deployment?.plan?.port
+      ? `app · port ${deployment.plan.port}`
+      : "the application";
+
+  const stages: FlowStage[] = [
+    {
+      key: "domain",
+      label: "Name",
+      value: domain ? domain.name : "No custom domain",
+      detail: domain
+        ? domain.provider === "cloudflare"
+          ? "DNS at Cloudflare"
+          : "DNS at your provider"
+        : "Visitors use the instance address",
+      state: !domain
+        ? "absent"
+        : domain.state === "resolving"
+          ? "ok"
+          : domain.state === "failed"
+            ? "failed"
+            : "pending",
+      note: domain?.userStep ?? null,
+      noteLabel: "One step only you can do",
+    },
+    {
+      key: "cdn",
+      label: "CDN",
+      value: configured
+        ? (cdn?.provider ?? "Configured")
+        : cdn?.state === "not-useful"
+          ? "Not useful here"
+          : "Not enabled",
+      detail: configured ? cdn?.detail : "Requests reach the host directly",
+      state: configured
+        ? cdn?.state === "partial"
+          ? "pending"
+          : "ok"
+        : cdn?.state === "not-useful"
+          ? "skipped"
+          : "absent",
+      note: (
+        <>
+          Caching, delivery and clearing the cache live in{" "}
+          <TextLink onClick={() => props.onOpenDestination("cdn")}>
+            CDN
+          </TextLink>
+          .
+        </>
+      ),
+      noteLabel: "CDN",
+    },
+    {
+      key: "tls",
+      label: "HTTPS",
+      value:
+        tls?.state === "valid"
+          ? "Certificate valid"
+          : tls?.state === "pending"
+            ? "Certificate pending"
+            : tls?.state === "failed"
+              ? "Certificate failed"
+              : "HTTP only",
+      detail:
+        tls?.state === "valid"
+          ? (tls.issuer ?? "Issued")
+          : (tls?.detail ?? "No certificate requested"),
+      state:
+        tls?.state === "valid"
+          ? "ok"
+          : tls?.state === "pending"
+            ? "pending"
+            : tls?.state === "failed"
+              ? "failed"
+              : "absent",
+    },
+    {
+      key: "service",
+      label: "Serves",
+      value: serviceStage,
+      detail: address ?? "No public address recorded",
+      state: deployment?.status === "live" || domains ? "ok" : "absent",
+    },
+  ];
+
   if (!domains)
     return (
       <>
-        <SubHeading>Domain & HTTPS</SubHeading>
-        <Facts
-          rows={[
-            [
-              "Current address",
-              deployment?.url ?? "No public address recorded",
-            ],
-            ["Custom domain", "Not connected"],
-            ["HTTPS", "Not configured"],
-            [
-              "Private services",
-              postgres || stack.services.length
-                ? "Reachable only inside the Compose network"
-                : "None recorded",
-            ],
-          ]}
+        <Flow
+          stages={stages}
+          caption="Recorded delivery today. Nothing between the visitor and the application is configured yet."
         />
         <Possible
           title="No domain connected"
@@ -49,12 +130,26 @@ export function DomainsView(props: ViewProps) {
           Server Guy connects your existing DNS, routes the hostname to the
           right service, issues and renews the certificate, and recommends a CDN
           only when it helps. You do the one step only you can: pointing the
-          domain. Domain setup is not available yet.
+          domain. Domain setup is not implemented yet.
         </Possible>
-        <CdnSection {...props} />
+        <div className="sg-band">
+          <SubHeading>Domain &amp; HTTPS</SubHeading>
+          <Facts
+            rows={[
+              ["Current address", address ?? "No public address recorded"],
+              ["Custom domain", "Not connected"],
+              ["HTTPS", "Not configured"],
+              [
+                "Private services",
+                postgres || stack.services.length
+                  ? "Reachable only inside the Compose network"
+                  : "None recorded",
+              ],
+            ]}
+          />
+        </div>
       </>
     );
-  const domain = domains.domain;
   const tone =
     domain?.state === "failed" || domains.tls.state === "failed"
       ? "bad"
@@ -84,161 +179,101 @@ export function DomainsView(props: ViewProps) {
         {domain?.detail ??
           "No custom domain yet; the instance address answers over HTTP."}
       </Condition>
-      {domain?.userStep && (
-        <div className="sg-user-step">
-          <strong>One step only you can do</strong>
-          <p>{domain.userStep}</p>
-        </div>
-      )}
-      <SubHeading>Domain & HTTPS</SubHeading>
-      <Facts
-        rows={[
-          ["Address", domains.address ?? "No public address recorded"],
-          [
-            "Domain",
-            domain ? (
-              <>
-                {domain.name} ·{" "}
-                {domain.provider === "cloudflare"
-                  ? "DNS at Cloudflare"
-                  : "DNS at your provider"}{" "}
-                ·{" "}
-                <Pill
-                  tone={
-                    domain.state === "resolving"
-                      ? "ok"
+      <Flow
+        stages={stages}
+        caption="Each stage is recorded separately: a resolving name does not imply a valid certificate, and a valid certificate does not imply a CDN."
+      />
+      <div className="sg-band">
+        <SubHeading>Domain &amp; HTTPS</SubHeading>
+        <Facts
+          rows={[
+            ["Address", domains.address ?? "No public address recorded"],
+            [
+              "Domain",
+              domain ? (
+                <>
+                  {domain.name} ·{" "}
+                  {domain.provider === "cloudflare"
+                    ? "DNS at Cloudflare"
+                    : "DNS at your provider"}{" "}
+                  ·{" "}
+                  <Pill
+                    tone={
+                      domain.state === "resolving"
+                        ? "ok"
+                        : domain.state === "failed"
+                          ? "bad"
+                          : "warn"
+                    }
+                  >
+                    {domain.state === "resolving"
+                      ? "Resolving here"
                       : domain.state === "failed"
-                        ? "bad"
-                        : "warn"
-                  }
-                >
-                  {domain.state === "resolving"
-                    ? "Resolving here"
-                    : domain.state === "failed"
-                      ? "Not resolving"
-                      : "Pending DNS"}
-                </Pill>
-              </>
-            ) : (
-              "Not connected"
-            ),
-          ],
-          [
-            "HTTPS",
-            domains.tls.state === "valid" ? (
-              <>
-                <Pill tone="ok">Valid</Pill> {domains.tls.issuer}
-                {domains.tls.expiresAt && (
-                  <>
-                    {" "}
-                    · expires <When at={domains.tls.expiresAt} now={now} />
-                  </>
-                )}
-                {domains.tls.renewal && (
-                  <small className="sg-fact-note">{domains.tls.renewal}</small>
-                )}
-              </>
-            ) : domains.tls.state === "pending" ? (
-              <>
-                <Pill tone="warn">Pending</Pill> {domains.tls.detail}
-              </>
-            ) : domains.tls.state === "failed" ? (
-              <>
-                <Pill tone="bad">Failed</Pill> {domains.tls.detail}
-              </>
-            ) : (
-              "Not configured"
-            ),
-          ],
-        ]}
-      />
-      <SubHeading>Routes</SubHeading>
-      <div className="sg-routes">
-        <div className="sg-route-row sg-table-head">
-          <span>Host</span>
-          <span>Service</span>
-          <span>Protocol</span>
-        </div>
-        {domains.routes.map((route) => (
-          <div className="sg-route-row" key={`${route.host}-${route.port}`}>
-            <span>
-              <code>{route.host}</code>
-            </span>
-            <span>
-              <code>{route.service}</code> · port {route.port}
-            </span>
-            <span>{route.protocol}</span>
-          </div>
-        ))}
+                        ? "Not resolving"
+                        : "Pending DNS"}
+                  </Pill>
+                </>
+              ) : (
+                "Not connected"
+              ),
+            ],
+            [
+              "HTTPS",
+              domains.tls.state === "valid" ? (
+                <>
+                  <Pill tone="ok">Valid</Pill> {domains.tls.issuer}
+                  {domains.tls.expiresAt && (
+                    <>
+                      {" "}
+                      · expires <When at={domains.tls.expiresAt} now={now} />
+                    </>
+                  )}
+                  {domains.tls.renewal && (
+                    <small className="sg-fact-note">
+                      {domains.tls.renewal}
+                    </small>
+                  )}
+                </>
+              ) : domains.tls.state === "pending" ? (
+                <>
+                  <Pill tone="warn">Pending</Pill> {domains.tls.detail}
+                </>
+              ) : domains.tls.state === "failed" ? (
+                <>
+                  <Pill tone="bad">Failed</Pill> {domains.tls.detail}
+                </>
+              ) : (
+                "Not configured"
+              ),
+            ],
+          ]}
+        />
       </div>
-      <p className="sg-section-note">
-        Private services stay inside the Compose network; only listed routes are
-        reachable from outside.
-      </p>
-      <CdnSection {...props} />
-    </>
-  );
-}
-
-function CdnSection({ facts, onAsk }: ViewProps) {
-  const cdn = facts.domains?.cdn;
-  const configured = cdn?.state === "active" || cdn?.state === "partial";
-  return (
-    <section aria-label="CDN">
-      <SubHeading>CDN</SubHeading>
-      <p className="sg-section-note">
-        An optional layer that serves cached copies of eligible files closer to
-        visitors. Your domain and HTTPS work independently of it.
-      </p>
-      <Facts
-        rows={[
-          [
-            "Status",
-            <Pill
-              key="state"
-              tone={
-                cdn?.state === "active"
-                  ? "ok"
-                  : cdn?.state === "partial"
-                    ? "warn"
-                    : "muted"
-              }
-            >
-              {cdn?.state === "active"
-                ? "Active"
-                : cdn?.state === "partial"
-                  ? "Partially configured"
-                  : "Not enabled"}
-            </Pill>,
-          ],
-          ...(configured
-            ? [["Provider", cdn.provider ?? "Not recorded"] as [string, string]]
-            : []),
-          [
-            configured ? "Caching" : "Recommendation",
-            cdn?.state === "not-configured" || !cdn
-              ? "No CDN configured. Server Guy can help assess whether this application would benefit."
-              : cdn.detail,
-          ],
-        ]}
-      />
-      <LinkButton
-        onClick={() =>
-          onAsk(
-            null,
-            configured
-              ? "I want to clear the CDN cache for this application. Show me the scope and impact before doing anything."
-              : "Would a CDN help this application? Explain what should be cached and recommend a setup if it makes sense.",
-          )
-        }
-      >
-        {configured ? "Ask to clear cache" : "Discuss CDN setup"}
-      </LinkButton>
-      {!facts.domains && (
+      <div className="sg-band">
+        <SubHeading>Routes</SubHeading>
+        <div className="sg-routes">
+          <div className="sg-route-row sg-table-head">
+            <span>Host</span>
+            <span>Service</span>
+            <span>Protocol</span>
+          </div>
+          {domains.routes.map((route) => (
+            <div className="sg-route-row" key={`${route.host}-${route.port}`}>
+              <span>
+                <code>{route.host}</code>
+              </span>
+              <span>
+                <code>{route.service}</code> · port {route.port}
+              </span>
+              <span>{route.protocol}</span>
+            </div>
+          ))}
+        </div>
         <p className="sg-section-note">
-          CDN setup and cache clearing are not implemented yet.
+          Private services stay inside the Compose network; only listed routes
+          are reachable from outside.
         </p>
-      )}
-    </section>
+      </div>
+    </>
   );
 }

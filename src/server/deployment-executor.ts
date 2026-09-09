@@ -1,11 +1,12 @@
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { isIP } from "node:net";
-import { piConfigDir } from "./pi-configuration";
+import { deploymentDirectory } from "./deployment-files";
+export { deploymentDirectory } from "./deployment-files";
 import {
   hetzner,
   hetznerConnectionId,
@@ -32,11 +33,6 @@ import { fetchBaseTree } from "./execution-tree";
 import { writeTar } from "./tar";
 import { deniedPathReason, redactSecrets } from "./secrets";
 
-export function deploymentDirectory(record: DeploymentRecord) {
-  const directory = join(piConfigDir(), "deployments", record.id);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  return directory;
-}
 export function saveDeploymentInputs(
   record: DeploymentRecord,
   input: Record<string, string>,
@@ -96,16 +92,21 @@ export function composeDefinition(
   // Compose interprets dollars in values, including user secrets. Escape once
   // at serialization; never let a remote shell expand these strings.
   const literal = (value: string) => value.replaceAll("$", () => "$$");
+  const volumes: Record<string, object> = plan.postgres ? { database: {} } : {};
   const services: Record<string, unknown> = {
     app: {
-      image: `server-guy-${id}:${revision}`,
-      build: {
-        context: `./source/${plan.context}`,
-        dockerfile:
-          plan.context === "."
-            ? plan.dockerfile
-            : `${"../".repeat(plan.context.split("/").length)}${plan.dockerfile}`,
-      },
+      image: plan.image ?? `server-guy-${id}:${revision}`,
+      ...(plan.image
+        ? {}
+        : {
+            build: {
+              context: `./source/${plan.context}`,
+              dockerfile:
+                plan.context === "."
+                  ? plan.dockerfile
+                  : `${"../".repeat(plan.context.split("/").length)}${plan.dockerfile}`,
+            },
+          }),
       restart: "unless-stopped",
       ports: [`80:${plan.port}`],
       environment: Object.fromEntries(
@@ -148,7 +149,44 @@ export function composeDefinition(
         options: { "max-size": "10m", "max-file": "3" },
       },
     };
-  return { services, ...(plan.postgres ? { volumes: { database: {} } } : {}) };
+  const mount = (service: {
+    name: string;
+    volumes?: DeploymentPlan["volumes"];
+    configs?: DeploymentPlan["configs"];
+  }) => {
+    const result: string[] = [];
+    for (const volume of service.volumes ?? []) {
+      volumes[volume.name] = {};
+      result.push(`${volume.name}:${volume.target}`);
+    }
+    for (const config of service.configs ?? [])
+      result.push(
+        `./configs/${service.name}-${config.name}:${config.target}:ro`,
+      );
+    return result;
+  };
+  (services.app as Record<string, unknown>).volumes = mount({
+    name: "app",
+    volumes: plan.volumes,
+    configs: plan.configs,
+  });
+  for (const service of plan.services ?? []) {
+    services[service.name] = {
+      image: service.image,
+      restart: "unless-stopped",
+      ...(service.command ? { command: service.command.map(literal) } : {}),
+      environment: Object.fromEntries(
+        service.environment.map((e) => [e.name, literal(e.value)]),
+      ),
+      volumes: mount(service),
+      labels: { "server-guy.revision": revision, "server-guy.deployment": id },
+      logging: {
+        driver: "json-file",
+        options: { "max-size": "10m", "max-file": "3" },
+      },
+    };
+  }
+  return { services, volumes };
 }
 
 async function command(
@@ -292,7 +330,10 @@ export async function provision(record: DeploymentRecord, signal: AbortSignal) {
         await provider<{ firewall: { id: number } }>("/firewalls", {
           name,
           labels: { "sg-deployment": record.id },
-          rules: [22, 80].map((port) => ({
+          rules: (record.plan?.httpAccess === "controller"
+            ? [22]
+            : [22, 80]
+          ).map((port) => ({
             direction: "in",
             protocol: "tcp",
             port: String(port),
@@ -431,6 +472,14 @@ export async function executeDeployment(
       "The application source changed. This deployment cannot be applied to another repository.",
     );
   deploymentPlanSchema.parse(record.plan);
+  for (const image of [
+    record.plan.image,
+    ...(record.plan.services ?? []).map((s) => s.image),
+  ].filter(Boolean))
+    if (!/@sha256:[0-9a-f]{64}$/.test(image!))
+      throw new Error(
+        "Resolve container images to immutable digests before approval.",
+      );
   await checkDeploymentSource(record);
   databasePassword(record);
   record.status = "deploying";
@@ -466,6 +515,70 @@ export async function executeDeployment(
     throw new Error(
       "SSH or host preparation is not ready. The existing server is retained for investigation.",
     );
+  if (record.plan.httpAccess === "controller") {
+    const peer = (
+      await command(
+        "ssh",
+        [...sshArgs(record), 'printf "%s" "$SSH_CONNECTION"'],
+        signal,
+      )
+    )
+      .trim()
+      .split(/\s+/)[0];
+    if (isIP(peer) !== 4)
+      throw new Error(
+        "Could not identify the controller address for restricted HTTP access.",
+      );
+    const query = `?label_selector=${encodeURIComponent(`sg-deployment=${record.id}`)}`;
+    if (record.authority.connectionId !== hetznerConnectionId())
+      throw new Error("Hetzner access changed.");
+    const firewalls = (
+      await hetzner<{ firewalls: { id: number }[] }>(`/firewalls${query}`)
+    ).firewalls;
+    if (firewalls.length !== 1)
+      throw new Error("The deployment firewall identity is ambiguous.");
+    const change = await hetzner<{ actions: { id: number }[] }>(
+      `/firewalls/${firewalls[0].id}/actions/set_rules`,
+      {
+        rules: [
+          {
+            direction: "in",
+            protocol: "tcp",
+            port: "22",
+            source_ips: ["0.0.0.0/0", "::/0"],
+          },
+          {
+            direction: "in",
+            protocol: "tcp",
+            port: "80",
+            source_ips: [`${peer}/32`],
+          },
+        ],
+      },
+    );
+    for (const started of change.actions) {
+      let done = false;
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const { action } = await hetzner<{ action: { status: string } }>(
+          `/actions/${started.id}`,
+        );
+        if (action.status === "error")
+          throw new Error("The HTTP access restriction failed.");
+        if (action.status === "success") {
+          done = true;
+          break;
+        }
+        await delay(1000, undefined, { signal });
+      }
+      if (!done)
+        throw new Error("The HTTP access restriction is not confirmed yet.");
+    }
+    record.httpSourceIp = peer;
+    deploymentEvent(
+      record,
+      "HTTP restricted to this controller's network during application setup",
+    );
+  }
   await hardenDeploymentHost(record, signal);
   deploymentEvent(
     record,
@@ -494,12 +607,9 @@ export async function executeDeployment(
       "Host prepared; uploading the exact source revision and deployment configuration",
     );
     const { token } = await checkDeploymentSource(record);
-    const files = await fetchBaseTree(
-      record.repository,
-      record.revision,
-      token,
-      signal,
-    );
+    const files = record.plan.image
+      ? []
+      : await fetchBaseTree(record.repository, record.revision, token, signal);
     const safe = files.filter((file) => !deniedPathReason(file.path));
     if (safe.length !== files.length)
       throw new Error(
@@ -518,14 +628,34 @@ export async function executeDeployment(
       databasePassword(record),
       inputs(record),
     );
-    const archive = await writeTar([
+    const bundle = [
       ...safe.map((file) => ({ ...file, path: `source/${file.path}` })),
+      ...[
+        { name: "app", configs: record.plan.configs ?? [] },
+        ...(record.plan.services ?? []),
+      ].flatMap((service) =>
+        service.configs.map((config) => ({
+          path: `configs/${service.name}-${config.name}`,
+          content: Buffer.from(config.content),
+          mode: 0o644,
+        })),
+      ),
       {
         path: "compose.json",
         content: Buffer.from(JSON.stringify(compose)),
         mode: 0o600,
       },
-    ]);
+    ];
+    record.bundleHashes = Object.fromEntries(
+      bundle
+        .filter((f) => !f.path.startsWith("source/"))
+        .map((f) => [
+          f.path,
+          createHash("sha256").update(f.content).digest("hex"),
+        ]),
+    );
+    saveDeployment(record);
+    const archive = await writeTar(bundle);
     const root = `/opt/server-guy/${record.id}`;
     await command(
       "ssh",
@@ -571,18 +701,22 @@ export async function executeDeployment(
     record,
     "Checking public HTTP and application behavior from outside the host",
   );
+  await verifyServiceImages(record, signal);
   await verifyDeployment(record, signal);
+  await verifyPrivateServices(record, signal);
   await collectDeploymentLogs(record, signal);
   record.status = "live";
   record.url = `http://${record.address}`;
   record.verifiedAt = new Date().toISOString();
   deploymentEvent(
     record,
-    "Public application behavior verified against the deployed revision",
+    record.plan.image
+      ? "Application behavior verified against the accepted image and configuration revision"
+      : "Public application behavior verified against the deployed revision",
   );
   deploymentMessage(
     record,
-    `Your application is running at ${record.url}. I verified the serving revision and the application checks: ${record.plan.checks.map((c) => c.name).join(", ")}.${record.plan.postgres ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
+    `Your application is running at ${record.url}.${record.httpSourceIp ? " HTTP access is restricted to this controller’s network; use an SSH tunnel for private admin setup until HTTPS is configured." : ""} I verified ${record.plan.image ? "the accepted image and configuration revision" : "the serving revision"} and the application checks: ${record.plan.checks.map((c) => c.name).join(", ")}.${record.plan.postgres ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
   );
 }
 export async function collectDeploymentLogs(
@@ -659,8 +793,47 @@ export async function verifyDeployment(
       );
     record.cleanup = null;
     record.verificationPending = null;
+    record.verificationRecoveryId = null;
     deploymentEvent(record, "Removed the verification test object");
   };
+  if (
+    record.verificationPending &&
+    !record.cleanup &&
+    record.verificationRecoveryId
+  ) {
+    const read = record.plan!.checks.find(
+      (c) =>
+        c.method === "GET" &&
+        c.path.includes("{id}") &&
+        c.contains.includes("SG_VERIFY_TOKEN"),
+    );
+    const removal = record.plan!.checks.find(
+      (c) => c.method === "DELETE" && c.path.includes("{id}"),
+    );
+    if (!read || !removal)
+      throw new Error(
+        "The approved checks do not define safe test-object recovery.",
+      );
+    const id = encodeURIComponent(record.verificationRecoveryId);
+    const response = await request(read.path.replaceAll("{id}", id));
+    const text = await response.text();
+    if (
+      response.status !== read.expectedStatus ||
+      !text.includes(record.verificationPending)
+    )
+      throw new Error(
+        "This object does not contain the pending verification marker. Nothing was deleted and verification remains paused.",
+      );
+    record.cleanup = {
+      path: removal.path.replaceAll("{id}", id),
+      expectedStatus: removal.expectedStatus,
+      marker: record.verificationPending,
+    };
+    deploymentEvent(
+      record,
+      "Located the pending verification object and verified its unique marker before cleanup",
+    );
+  }
   await cleanup();
   if (record.verificationPending)
     throw new Error(
@@ -698,6 +871,10 @@ export async function verifyDeployment(
         captured = String(value);
       }
       if (check.method === "POST" && captured) {
+        if (response.status !== check.expectedStatus || !text.includes(marker))
+          throw new Error(
+            "The create response did not prove ownership of the test object. Resolve its marker before retrying.",
+          );
         const removal = record.plan!.checks.find(
           (c) => c.method === "DELETE" && c.path.includes("{id}"),
         );
@@ -712,7 +889,10 @@ export async function verifyDeployment(
       }
       if (
         response.status !== check.expectedStatus ||
-        !text.includes(check.contains.replaceAll("SG_VERIFY_TOKEN", marker))
+        !responseContains(
+          text,
+          check.contains.replaceAll("SG_VERIFY_TOKEN", marker),
+        )
       )
         throw new Error(
           `Application behavior check failed: ${check.name} (HTTP ${response.status}).`,
@@ -734,4 +914,224 @@ export async function verifyDeployment(
     }
     throw error;
   }
+}
+
+/** Ignore JSON serialization whitespace, never whitespace inside values. */
+export function responseContains(body: string, expected: string) {
+  if (body.includes(expected)) return true;
+  try {
+    return JSON.stringify(JSON.parse(body)).includes(expected);
+  } catch {
+    return false;
+  }
+}
+
+/** Observe every image, not just the web container, before claiming a stack. */
+export async function verifyServiceImages(
+  record: DeploymentRecord,
+  signal: AbortSignal,
+) {
+  const expected = [
+    "app",
+    ...(record.plan?.postgres ? ["postgres"] : []),
+    ...(record.plan?.services ?? []).map((s) => s.name),
+  ];
+  const output = await command(
+    "ssh",
+    [
+      ...sshArgs(record),
+      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
+    ],
+    signal,
+  );
+  // Inspect only identities/state, never container environment secrets.
+  const containers = output
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const [Image, reference, service, running] = JSON.parse(line) as [
+        string,
+        string,
+        string,
+        boolean,
+      ];
+      return { Image, reference, service, running };
+    });
+  const images: Record<string, string> = {};
+  for (const name of expected) {
+    const matches = containers.filter((c) => c.service === name);
+    if (matches.length !== 1 || !matches[0].running)
+      throw new Error(`Compose service ${name} is not running exactly once.`);
+    const container = matches[0];
+    const pinned =
+      name === "app"
+        ? record.plan!.image
+        : record.plan!.services?.find((s) => s.name === name)?.image;
+    if (pinned && container.reference !== pinned)
+      throw new Error(`Service ${name} differs from its approved image.`);
+    if (
+      record.serviceImages?.[name] &&
+      record.serviceImages[name] !== container.Image
+    )
+      throw new Error(`Service ${name} changed since it was recorded.`);
+    images[name] = container.Image;
+  }
+  record.serviceImages = images;
+  saveDeployment(record);
+}
+
+export async function verifyPrivateServices(
+  record: DeploymentRecord,
+  signal: AbortSignal,
+) {
+  for (const service of record.plan!.services ?? []) {
+    if (!service.port || !service.healthPath) continue;
+    const output = await command(
+      "ssh",
+      [
+        ...sshArgs(record),
+        `cd /opt/server-guy/${record.id} && docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${service.name})`,
+      ],
+      signal,
+    );
+    const address = output.trim();
+    if (isIP(address) !== 4)
+      throw new Error(`No private address for ${service.name}.`);
+    for (const check of [
+      { path: service.healthPath, contains: "", jsonPath: null, equals: null },
+      ...service.checks,
+    ]) {
+      const url = `http://${address}:${service.port}${check.path}`;
+      // JSON stdin keeps paths and responses out of shell evaluation. Host
+      // Python probes the private bridge; no auxiliary port is published.
+      const script = `import json,sys,urllib.request\nx=json.load(sys.stdin)\nclass NoRedirect(urllib.request.HTTPRedirectHandler):\n def redirect_request(self,*args,**kwargs): return None\nr=urllib.request.build_opener(NoRedirect).open(x["url"],timeout=20)\ns=r.read(1000000).decode()\nassert r.status==200 and x["contains"] in s\nif x["jsonPath"]:\n v=json.loads(s)\n for p in x["jsonPath"].split("."): v=v[int(p)] if isinstance(v,list) else v[p]\n assert v==x["equals"]\nprint("verified")`;
+      const encoded = Buffer.from(script).toString("base64");
+      await command(
+        "ssh",
+        [
+          ...sshArgs(record),
+          `python3 -c "import base64;exec(base64.b64decode('${encoded}'))"`,
+        ],
+        signal,
+        JSON.stringify({ ...check, url }),
+      );
+      deploymentEvent(
+        record,
+        `Verified private ${service.name}: ${check.path}`,
+      );
+    }
+  }
+}
+
+/** Recreate the accepted stack without pulling or deleting volumes. */
+export async function recreateDeployment(
+  record: DeploymentRecord,
+  signal: AbortSignal,
+) {
+  if (
+    record.status !== "live" ||
+    !record.plan ||
+    !record.imageId ||
+    !record.serverId
+  )
+    throw new Error(
+      "A verified deployment is required before recreating its containers.",
+    );
+  if (!record.bundleHashes)
+    throw new Error(
+      "This older deployment has no recorded configuration fingerprints. Reconcile its configuration before recreation.",
+    );
+  const files = Object.keys(record.bundleHashes);
+  if (files.some((path) => !/^(compose\.json|configs\/[a-z0-9-]+)$/.test(path)))
+    throw new Error("Invalid recorded configuration path.");
+  const hashes = await command(
+    "ssh",
+    [
+      ...sshArgs(record),
+      `cd /opt/server-guy/${record.id} && sha256sum -- ${files.join(" ")}`,
+    ],
+    signal,
+  );
+  for (const line of hashes.trim().split("\n")) {
+    const [hash, path] = line.trim().split(/\s+/);
+    if (record.bundleHashes[path] !== hash)
+      throw new Error(
+        "Remote deployment configuration changed. Review it before recreation.",
+      );
+  }
+  if (hashes.trim().split("\n").length !== files.length)
+    throw new Error("Configuration verification was incomplete.");
+  const compose = `docker compose -p sg-${record.id.slice(0, 8)} -f compose.json`;
+  const root = `/opt/server-guy/${record.id}`;
+  const ids = async () =>
+    (
+      await command(
+        "ssh",
+        [...sshArgs(record), `cd ${root} && ${compose} ps -q`],
+        signal,
+      )
+    )
+      .trim()
+      .split(/\s+/)
+      .sort();
+  const before = await ids();
+  const volumeNames = [
+    ...(record.plan.postgres ? ["database"] : []),
+    ...(record.plan.volumes ?? []).map((v) => v.name),
+    ...(record.plan.services ?? []).flatMap((s) =>
+      s.volumes.map((v) => v.name),
+    ),
+  ];
+  // Compose creates missing named volumes automatically. Refuse that during
+  // recreation: a deleted data volume must become an explicit recovery task.
+  if (volumeNames.length) {
+    await command(
+      "ssh",
+      [
+        ...sshArgs(record),
+        `docker volume inspect --format '{{.Name}}' ${volumeNames.map((name) => `sg-${record.id.slice(0, 8)}_${name}`).join(" ")}`,
+      ],
+      signal,
+    );
+  }
+  const { recordOperationRemoteEffect } =
+    await import("./application-operations");
+  recordOperationRemoteEffect();
+  deploymentEvent(
+    record,
+    "Recreating the accepted containers without rebuilding images or removing persistent volumes",
+  );
+  await command(
+    "ssh",
+    [
+      ...sshArgs(record),
+      `cd ${root} && flock -n recreate.lock ${compose} up -d --force-recreate --no-build --pull never --wait --wait-timeout 120`,
+    ],
+    signal,
+    undefined,
+    (text) => logOutput(record, text),
+  );
+  const after = await ids();
+  if (before.length !== after.length || after.some((id) => before.includes(id)))
+    throw new Error(
+      "Container replacement did not complete for the entire accepted stack.",
+    );
+  await verifyServiceImages(record, signal);
+  await verifyDeployment(record, signal);
+  await verifyPrivateServices(record, signal);
+  await collectDeploymentLogs(record, signal);
+  record.verifiedAt = new Date().toISOString();
+  deploymentEvent(
+    record,
+    "Recreated containers and reverified the accepted image identities and application checks; persistent volumes were retained",
+  );
+  deploymentMessage(
+    record,
+    "The containers were recreated from the same images and passed verification. Named data volumes were retained. This is not a backup or a restore test.",
+  );
+  return {
+    evidence: `Replaced ${after.length} containers, retained their named volumes, and verified the accepted image identities and application checks.`,
+    before,
+    after,
+  };
 }

@@ -27,6 +27,9 @@ export function DeploymentDecision({
   onOpen: (destination: ApplicationSection) => void;
 }) {
   const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [providerReference, setProviderReference] = useState("");
+  const [providerConfirmed, setProviderConfirmed] = useState(false);
+  const [verificationObjectId, setVerificationObjectId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function post(body: unknown) {
@@ -121,8 +124,26 @@ export function DeploymentDecision({
               : ""}
           </p>
           <pre>
-            {record.plan.generatedDockerfile ??
-              `Reuse ${record.plan.dockerfile}`}
+            {record.plan.image
+              ? `Use pinned image ${record.plan.image}`
+              : (record.plan.generatedDockerfile ??
+                `Reuse ${record.plan.dockerfile}`)}
+            {record.plan.services
+              ?.map((s) => `\nPrivate service ${s.name}: ${s.image}`)
+              .join("")}
+            {record.plan.volumes
+              ?.map((v) => `\nPersist ${v.target} in ${v.name}`)
+              .join("")}
+            {record.plan.configs
+              ?.map((c) => `\nRead-only ${c.target}:\n${c.content}`)
+              .join("")}
+            {record.plan.services
+              ?.flatMap((s) =>
+                s.configs.map(
+                  (c) => `\n${s.name} read-only ${c.target}:\n${c.content}`,
+                ),
+              )
+              .join("")}
           </pre>
           {record.inspectedRevision &&
             record.inspectedRevision !== record.revision && (
@@ -145,6 +166,9 @@ export function DeploymentDecision({
               .join("; ")}
           </p>
           <p>
+            {record.plan.httpAccess === "controller"
+              ? "HTTP will be restricted to this controller’s network for protected setup. "
+              : ""}
             Application code stays unchanged. This first release uses HTTP;
             domain and HTTPS setup comes next.
           </p>
@@ -186,6 +210,71 @@ export function DeploymentDecision({
         role="group"
         aria-label="Deployment recovery"
       >
+        {record.serverCreateAttempted && !record.serverId && (
+          <details>
+            <summary>Hetzner confirmed no server was created</summary>
+            <p>
+              Use this only after Hetzner has confirmed the original request
+              finished without creating a server. An empty server list alone is
+              not sufficient. This records your confirmation, checks the project
+              again, and removes the old spending authority.
+            </p>
+            <label>
+              Hetzner support or incident reference
+              <input
+                value={providerReference}
+                maxLength={200}
+                onChange={(e) => setProviderReference(e.target.value)}
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={providerConfirmed}
+                onChange={(e) => setProviderConfirmed(e.target.checked)}
+              />
+              I confirmed with Hetzner that the request completed without
+              creating a server.
+            </label>
+            <button
+              type="button"
+              className="sg-secondary-button"
+              disabled={
+                busy ||
+                !providerConfirmed ||
+                providerReference.trim().length < 5
+              }
+              onClick={() =>
+                void post({
+                  action: "resolve-purchase",
+                  deploymentId: record.id,
+                  confirmedNotCreated: true,
+                  providerReference: providerReference.trim(),
+                })
+              }
+            >
+              Record Hetzner confirmation
+            </button>
+          </details>
+        )}
+        {record.verificationPending && !record.cleanup && (
+          <label>
+            Recover verification test object
+            <p>
+              Find the object containing{" "}
+              <code>{record.verificationPending}</code> in your application and
+              enter its ID. Server Guy verifies the marker before removing only
+              that object and resuming checks. An empty result is not proof the
+              earlier request had no effect.
+            </p>
+            <input
+              value={verificationObjectId}
+              maxLength={200}
+              onChange={(event) => setVerificationObjectId(event.target.value)}
+              placeholder="Test object ID"
+            />
+          </label>
+        )}
         {error && (
           <p role="alert" className="sg-deployment-error">
             {error}
@@ -197,7 +286,13 @@ export function DeploymentDecision({
             disabled={busy}
             type="button"
             onClick={() =>
-              void post({ action: "retry", deploymentId: record.id })
+              void post({
+                action: "retry",
+                deploymentId: record.id,
+                ...(verificationObjectId.trim()
+                  ? { verificationObjectId: verificationObjectId.trim() }
+                  : {}),
+              })
             }
           >
             Retry this deployment

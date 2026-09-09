@@ -1,0 +1,1728 @@
+/* Refinements to the stable views: rhythm, grouping and the small visual
+   vocabulary in views/visuals.tsx. Loaded after application-shell.css, so
+   the rules here are the later word on the same selectors. */
+
+.sg-adaptive-shell {
+  --ok: #0f7a4e;
+  --ok-bg: #eaf8f1;
+  --warn: #b25a16;
+  --warn-bg: #fff4e9;
+  --bad: #a6312b;
+  --bad-bg: #fdf1f0;
+  --working: #2852a6;
+  --working-bg: #edf3ff;
+  --quiet: #f7f8fa;
+  --hairline: #eef0f4;
+  --view-title: 24px;
+  --view-body: 14px;
+  --view-meta: 13px;
+}
+
+/* ---------- Section rhythm ---------- */
+
+/* A view is a sequence of bands, not a stack of cards. One measure for
+   prose, a wider one for evidence, and a single vertical rhythm. */
+.sg-section-content {
+  padding: 26px 36px 64px;
+  max-width: 1120px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.sg-section-content > * {
+  margin: 0;
+}
+.sg-section-header {
+  padding: 24px 36px 20px;
+  align-items: baseline;
+}
+.sg-section-header h1 {
+  margin: 0 0 6px;
+  font-size: var(--view-title);
+}
+.sg-section-header p {
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+/* A titled band. The rule above the title is the only separator needed;
+   surfaces are reserved for things that need attention. */
+.sg-band {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sg-band > h2,
+.sg-subheading {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sg-band-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sg-band-head > h2 {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sg-band-head .sg-op-links {
+  margin: 0;
+}
+.sg-section-content .sg-section-note {
+  font-size: var(--view-meta);
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 74ch;
+}
+
+/* ---------- Facts ---------- */
+
+/* Two columns on a wide screen: a fact and its value stay close together
+   instead of stretching a label across a metre of empty page. */
+.sg-section-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0 40px;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--view-body);
+}
+.sg-section-facts > div {
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  align-items: baseline;
+}
+.sg-section-facts dt {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.sg-section-facts dd {
+  line-height: 1.6;
+}
+.sg-section-facts dd small,
+.sg-fact-note {
+  display: block;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  margin-top: 2px;
+}
+/* A fact whose value is a paragraph gets the full width instead of a
+   narrow column it would wrap to pieces in. */
+.sg-facts-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sg-facts-wide > div {
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+
+/* ---------- Condition ---------- */
+
+.sg-condition {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+.sg-condition-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #8b95a5;
+}
+.sg-condition h2 {
+  font-size: 15.5px;
+  margin: 0 0 3px;
+  letter-spacing: -0.01em;
+}
+.sg-condition p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 78ch;
+}
+.sg-condition-ok {
+  background: #f6fcf9;
+  border-color: #d6ecdf;
+}
+.sg-condition-warn {
+  background: var(--warn-bg);
+  border-color: #ecd6b8;
+}
+.sg-condition-bad {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.sg-condition-working {
+  background: var(--working-bg);
+  border-color: #c7d6f5;
+}
+/* The aside is a div, and `.sg-condition > div` claims flex: 1; this has to
+   out-specify it or the action grows to half the band. */
+.sg-condition > .sg-condition-aside {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.sg-condition-aside .sg-op-links {
+  margin: 0;
+}
+
+/* ---------- Headline statistics ---------- */
+
+.sg-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.sg-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 128px;
+  flex: 1 1 128px;
+  padding: 11px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: #fff;
+  text-align: left;
+}
+.sg-stat strong {
+  font-size: 20px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.sg-stat > span {
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.sg-stat small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  margin-top: 2px;
+}
+.sg-stat-button {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.sg-stat-button:hover {
+  border-color: #ccd5e3;
+  background: #fbfcfe;
+}
+.sg-stat-ok {
+  color: var(--ok);
+}
+.sg-stat-warn {
+  color: var(--warn);
+}
+.sg-stat-bad {
+  color: var(--bad);
+}
+.sg-stat-working {
+  color: var(--working);
+}
+
+/* ---------- Fills shared by every visual ---------- */
+
+.sg-fill-ok {
+  background: #2f9e6c;
+}
+.sg-fill-warn {
+  background: #d68a2e;
+}
+.sg-fill-bad {
+  background: #c1524a;
+}
+.sg-fill-working {
+  background: #4a7ad8;
+}
+.sg-fill-muted {
+  background: #c3cad6;
+}
+.sg-shade-0 {
+  background: #4a7ad8;
+}
+.sg-shade-1 {
+  background: #7aa0e4;
+}
+.sg-shade-2 {
+  background: #a9c1ee;
+}
+.sg-shade-3 {
+  background: #cbd9f4;
+}
+.sg-shade-4 {
+  background: #5d93c4;
+}
+.sg-shade-5 {
+  background: #9dbcd8;
+}
+.sg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.sg-section-content .sg-visual-caption,
+.sg-visual-caption {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.6;
+  max-width: 82ch;
+}
+
+/* ---------- Tally ---------- */
+
+.sg-tally {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sg-tally-bar {
+  display: flex;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 2px;
+  background: #eef0f4;
+}
+.sg-tally-bar > span {
+  border-radius: 999px;
+  min-width: 4px;
+}
+.sg-tally-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.sg-tally-keys li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sg-tally-keys strong {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+/* ---------- Composition ---------- */
+
+.sg-composition {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sg-composition-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eef0f4;
+  border: 1px solid var(--hairline);
+}
+.sg-composition-bar > span {
+  min-width: 2px;
+}
+.sg-composition-free {
+  background: repeating-linear-gradient(
+    135deg,
+    #f2f4f8,
+    #f2f4f8 4px,
+    #e9ecf2 4px,
+    #e9ecf2 8px
+  );
+}
+.sg-composition-bar.warn {
+  border-color: #ecd6b8;
+}
+.sg-composition-bar.bad {
+  border-color: #f2d3d0;
+}
+.sg-composition-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.sg-composition-keys li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sg-composition-keys strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.sg-composition-remainder {
+  color: var(--muted);
+}
+
+/* ---------- Gauge ---------- */
+
+.sg-gauges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px 28px;
+}
+.sg-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sg-gauge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--view-meta);
+}
+.sg-gauge-head strong {
+  font-weight: 600;
+}
+.sg-gauge-head span {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.sg-gauge-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.sg-gauge-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #4a7ad8;
+}
+.sg-gauge-fill.warn {
+  background: #d68a2e;
+}
+.sg-gauge-fill.bad {
+  background: #c1524a;
+}
+.sg-gauge-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgb(255 255 255 / 75%);
+}
+.sg-gauge-note {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+
+/* ---------- Flow ---------- */
+
+.sg-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sg-flow-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.sg-flow-stage {
+  position: relative;
+  flex: 1 1 150px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px 12px 15px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: #fff;
+}
+/* The chevron between stages: the path is read left to right. */
+.sg-flow-stage + .sg-flow-stage::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid #ccd5e3;
+  border-right: 1.5px solid #ccd5e3;
+  transform: translateY(-50%) rotate(45deg);
+}
+.sg-flow-mark {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #c3cad6;
+}
+.sg-flow-label {
+  font-size: var(--view-meta);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.sg-flow-value {
+  font-size: var(--view-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sg-flow-detail {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sg-flow-ok .sg-flow-mark {
+  background: #2f9e6c;
+}
+.sg-flow-pending {
+  background: #fffdfa;
+  border-color: #ecd6b8;
+}
+.sg-flow-pending .sg-flow-mark {
+  background: #d68a2e;
+}
+.sg-flow-failed {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.sg-flow-failed .sg-flow-mark {
+  background: #c1524a;
+}
+.sg-flow-absent {
+  background: #fbfcfd;
+  border-style: dashed;
+}
+.sg-flow-absent .sg-flow-value,
+.sg-flow-skipped .sg-flow-value {
+  color: var(--muted);
+  font-weight: 500;
+}
+.sg-flow-skipped {
+  background: #fbfcfd;
+}
+.sg-flow-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--view-meta);
+  color: #606d80;
+}
+.sg-flow-notes li {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: #fbfcfe;
+  border: 1px solid var(--hairline);
+  line-height: 1.6;
+}
+.sg-flow-notes li.sg-flow-pending {
+  background: var(--warn-bg);
+  border-color: #ecd6b8;
+}
+.sg-flow-notes li.sg-flow-failed {
+  background: var(--bad-bg);
+  border-color: #f2d3d0;
+}
+.sg-flow-notes strong {
+  display: block;
+  color: var(--ink);
+  font-size: var(--view-meta);
+  margin-bottom: 2px;
+}
+
+/* ---------- Timeline ---------- */
+
+.sg-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sg-timeline-track {
+  position: relative;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(#fafbfd, #f4f6f9);
+  border: 1px solid var(--hairline);
+}
+.sg-timeline-point {
+  position: absolute;
+  top: 6px;
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  transform: translateX(-2px);
+}
+.sg-timeline-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+
+/* ---------- Outcome strip ---------- */
+
+.sg-outcome-strip {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  vertical-align: middle;
+}
+.sg-outcome-strip i {
+  width: 5px;
+  height: 13px;
+  border-radius: 1.5px;
+  display: block;
+}
+
+/* ---------- Bars ---------- */
+
+.sg-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: var(--view-meta);
+}
+.sg-bars li {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.1fr) minmax(80px, 2fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+.sg-bars-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-bars-track {
+  height: 7px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.sg-bars-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.sg-bars-value {
+  color: #606d80;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Loading ---------- */
+
+.sg-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sg-loading-row {
+  height: 15px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f3f7 25%, #e8ebf1 50%, #f1f3f7 75%);
+  background-size: 320px 100%;
+  animation: sg-shimmer 1.4s linear infinite;
+}
+.sg-loading-row:nth-child(2n) {
+  width: 78%;
+}
+.sg-loading-row:nth-child(3n) {
+  width: 56%;
+}
+@keyframes sg-shimmer {
+  to {
+    background-position: 320px 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-loading-row {
+    animation: none;
+  }
+}
+
+/* ---------- Tables ---------- */
+
+/* Every recorded list shares one table: a quiet header, tight rows, and
+   a tinted row only when something is wrong. */
+.sg-rows {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--view-meta);
+  border-top: 1px solid var(--hairline);
+}
+.sg-row {
+  display: grid;
+  gap: 16px;
+  align-items: baseline;
+  padding: 11px 10px 11px 12px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  margin-left: -12px;
+}
+.sg-row.sg-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-weight: 600;
+}
+.sg-row-bad {
+  background: #fffafa;
+  border-left-color: #d9847e;
+}
+.sg-row-warn {
+  background: #fffdfa;
+  border-left-color: #e0ab6b;
+}
+.sg-row strong {
+  font-weight: 600;
+}
+.sg-row small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.sg-row code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--view-meta);
+}
+.sg-row-end {
+  text-align: right;
+}
+
+/* The existing lists adopt the same rhythm. */
+.sg-volume-row,
+.sg-variable-row,
+.sg-check-row,
+.sg-route-row,
+.sg-job-row,
+.sg-coverage-row {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-meta);
+}
+.sg-volume-list .sg-table-head,
+.sg-variable-list .sg-table-head,
+.sg-checks .sg-table-head,
+.sg-routes .sg-table-head,
+.sg-job-list .sg-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  font-weight: 600;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* ---------- Stack items ---------- */
+
+/* A process, a database or a service: a titled group, not a card. */
+.sg-stack-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  background: #fff;
+}
+.sg-stack-item + .sg-stack-item {
+  border-top: 1px solid var(--hairline);
+  margin-top: 0;
+  padding-top: 16px;
+}
+.sg-stack-item h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.sg-stack-item h2 code {
+  font-size: 14px;
+}
+.sg-stack-item .sg-section-facts {
+  border-top: 0;
+}
+.sg-stack-item .sg-section-facts > div:first-child,
+.sg-stack-item .sg-section-facts > div:nth-child(2) {
+  padding-top: 0;
+}
+.sg-stack-item-bad {
+  border-color: #f2d3d0;
+  background: #fffbfb;
+}
+.sg-role {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------- Empty and unavailable ---------- */
+
+.sg-section-empty,
+.sg-possible {
+  padding: 22px 20px;
+  border: 1px dashed #d9dfe8;
+  border-radius: 11px;
+  background: #fbfcfd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sg-section-empty h2,
+.sg-possible h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sg-section-empty p,
+.sg-possible p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.7;
+  max-width: 72ch;
+}
+.sg-possible .sg-op-links {
+  margin-top: 4px;
+}
+.sg-planned-section {
+  padding: 16px 0 0;
+  margin: 0;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sg-planned-section h2 {
+  margin: 0;
+  font-size: var(--view-body);
+  font-weight: 600;
+}
+.sg-planned-section p {
+  margin: 0;
+  font-size: var(--view-meta);
+  max-width: 74ch;
+}
+.sg-planned-section .sg-availability {
+  align-self: flex-start;
+}
+
+/* ---------- Overview ---------- */
+
+.sg-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* The one thing to read first: state, in a sentence, at a size that wins. */
+.sg-hero {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px 22px;
+  border: 1px solid var(--hairline);
+  border-left: 3px solid #c3cad6;
+  border-radius: 12px;
+  background: #fcfdfe;
+}
+.sg-hero-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #8b95a5;
+  flex-shrink: 0;
+}
+.sg-hero-text {
+  min-width: 0;
+}
+.sg-hero h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.sg-section-content .sg-hero p {
+  margin: 0;
+  font-size: var(--view-body);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 84ch;
+}
+.sg-hero-action {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.sg-hero-ok {
+  border-left-color: #2f9e6c;
+}
+.sg-hero-ok .sg-hero-dot {
+  background: #2f9e6c;
+}
+.sg-hero-warn {
+  border-left-color: #d68a2e;
+  background: #fffdfa;
+}
+.sg-hero-warn .sg-hero-dot {
+  background: #d68a2e;
+}
+.sg-hero-bad {
+  border-left-color: #c1524a;
+  background: #fffbfb;
+}
+.sg-hero-bad .sg-hero-dot {
+  background: #c1524a;
+}
+.sg-hero-working {
+  border-left-color: #4a7ad8;
+  background: #fbfcff;
+}
+.sg-hero-working .sg-hero-dot {
+  background: #4a7ad8;
+}
+
+/* What is running: a grid of small facts, not a column of rows. */
+/* Separators live on the cells, so a row that does not fill the grid
+   leaves white space rather than a block of background. */
+.sg-runlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sg-run {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 15px;
+  background: #fff;
+  border: 0;
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+}
+.sg-run-open {
+  cursor: pointer;
+}
+.sg-run-open:hover {
+  background: #fafbfd;
+}
+.sg-run-label {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+.sg-run-value {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-run-value code {
+  font-size: var(--view-body);
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sg-run-note {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  line-height: 1.5;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sg-run-note .sg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  align-self: center;
+}
+.sg-run-warn {
+  color: var(--warn);
+}
+.sg-run-bad {
+  color: var(--bad);
+}
+
+/* Evidence: one line each, two columns, the dot carries the freshness. */
+.sg-fresh-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0 36px;
+}
+.sg-fresh-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-meta);
+}
+.sg-fresh-list .sg-dot {
+  border-radius: 50%;
+  align-self: center;
+}
+.sg-fresh-list li > span {
+  margin-left: auto;
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: var(--view-meta);
+}
+.sg-fresh-list li.never > span {
+  color: #a4acb9;
+}
+
+.sg-overview-empty {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  padding: 14px 16px;
+  border: 1px dashed #e2e6ec;
+  border-radius: 9px;
+  background: #fcfdfe;
+  margin: 0;
+}
+.sg-changes li {
+  border-bottom: 1px solid var(--hairline);
+  padding: 10px 0;
+  font-size: var(--view-meta);
+}
+.sg-change-meta {
+  font-size: var(--view-meta);
+}
+
+/* ---------- Application identity ---------- */
+
+.sg-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  min-width: 0;
+}
+.sg-identity:hover {
+  background: #edeff3;
+}
+.sg-identity-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #243149;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  flex-shrink: 0;
+}
+.sg-identity-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.sg-identity-text strong {
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-identity-text small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-identity svg {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #99a2b0;
+  width: 13px;
+  height: 13px;
+}
+.sg-identity[disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+.sg-navigation-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 18px;
+}
+.sg-navigation-home {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 5px;
+  font-size: var(--view-meta);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.sg-navigation-home:hover {
+  color: var(--ink);
+}
+.sg-navigation-home svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* The top bar now carries where you are and what is running. */
+.sg-adaptive-shell .sg-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+}
+.sg-topbar-where {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.sg-topbar-where strong {
+  font-size: 13.5px;
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-topbar-where span {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sg-adaptive-shell .sg-workstrip {
+  margin-left: auto;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 1180px) {
+  .sg-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .sg-section-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .sg-section-content {
+    padding: 20px 16px 56px;
+    gap: 22px;
+  }
+  .sg-section-header {
+    padding: 18px 16px 16px;
+  }
+  .sg-section-facts > div,
+  .sg-facts-wide > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    padding: 10px 0;
+  }
+  .sg-overview-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .sg-stat {
+    flex-basis: 44%;
+    min-width: 0;
+    padding: 10px 12px;
+  }
+  .sg-stat strong {
+    font-size: 17px;
+  }
+  .sg-flow-stage {
+    flex-basis: 100%;
+  }
+  .sg-flow-stage + .sg-flow-stage::before {
+    left: 50%;
+    top: -8px;
+    transform: translateX(-50%) rotate(135deg);
+  }
+  .sg-bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+  }
+  .sg-bars-track {
+    grid-column: 1 / -1;
+  }
+  .sg-condition {
+    flex-wrap: wrap;
+    padding: 13px 14px;
+  }
+  .sg-condition > .sg-condition-aside {
+    margin: 4px 0 0 21px;
+    flex: 0 0 100%;
+  }
+  .sg-stack-item {
+    padding: 14px;
+  }
+  .sg-navigation-head {
+    padding-bottom: 10px;
+  }
+  .sg-topbar-where span {
+    display: none;
+  }
+  .sg-fresh table,
+  .sg-fresh thead,
+  .sg-fresh tbody,
+  .sg-fresh th,
+  .sg-fresh td,
+  .sg-fresh tr {
+    display: block;
+  }
+  .sg-fresh thead {
+    display: none;
+  }
+  .sg-fresh tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .sg-fresh td {
+    border: 0;
+    padding: 1px 0;
+  }
+}
+
+/* Identity placements the prototype compares. */
+.sg-identity-topbar .sg-identity {
+  width: auto;
+  max-width: 320px;
+  padding: 5px 8px;
+}
+.sg-identity-topbar .sg-identity:hover {
+  background: #f2f4f8;
+}
+.sg-identity-breadcrumb {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--view-body);
+}
+.sg-identity-breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.sg-identity-breadcrumb a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.sg-identity-breadcrumb > span {
+  color: #c3cad6;
+}
+.sg-identity-breadcrumb strong {
+  font-weight: 620;
+}
+.sg-identity-breadcrumb small {
+  font-size: var(--view-meta);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* With identity in the top bar the sidebar keeps the product mark. */
+.sg-identity-topbar + .sg-topbar-where,
+.sg-identity-breadcrumb + .sg-topbar-where {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+/* A link-shaped control inside a column stack must not stretch. */
+.sg-overview-block > .sg-op-link,
+.sg-band > .sg-op-link,
+.sg-section-content > .sg-op-link,
+.sg-section-content > .sg-op-links {
+  align-self: flex-start;
+}
+.sg-overview-block .sg-band-head h3 {
+  margin: 0;
+  font-size: var(--view-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sg-overview-block .sg-band-head .sg-op-link {
+  align-self: baseline;
+}
+
+/* A state word sits at its own width, not the column's. */
+.sg-coverage-row > .sg-pill,
+.sg-check-row .sg-pill,
+.sg-job-row .sg-pill {
+  justify-self: start;
+}
+.sg-coverage-row,
+.sg-check-row,
+.sg-route-row {
+  padding: 11px 10px 11px 12px;
+  margin-left: -12px;
+  border-left: 2px solid transparent;
+  font-size: var(--view-meta);
+}
+.sg-coverage-row small,
+.sg-check-row small,
+.sg-job-row small,
+.sg-volume-row small,
+.sg-variable-row small {
+  color: var(--muted);
+  font-size: var(--view-meta);
+}
+.sg-volume-row,
+.sg-variable-row,
+.sg-job-row {
+  padding-left: 12px;
+  margin-left: -12px;
+  border-left: 2px solid transparent;
+}
+
+/* Logs */
+.sg-stream-bar {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: #eef0f4;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.sg-stream-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.sg-logs-output {
+  line-height: 1.75;
+  font-size: var(--view-meta);
+  background: #fcfdfe;
+}
+.sg-log-severe {
+  display: block;
+  color: #96302a;
+  background: #fdf1f0;
+}
+.sg-log-warn {
+  display: block;
+  color: #8a4712;
+}
+.sg-log-empty {
+  color: var(--muted);
+}
+.sg-logs-collecting {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  border: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  background: #fcfdfe;
+}
+
+/* History */
+.sg-history-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sg-filter-count {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  margin-left: 3px;
+}
+.sg-history-filters button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.sg-band > h2 + .sg-operation-history {
+  margin: 0;
+}
+
+/* The switcher menu is a nav inside the sidebar; the mobile rule that lays
+   the workspace nav out as a row must not un-hide a closed popover. */
+.sg-application-navigation .sg-application-menu {
+  display: none;
+}
+.sg-application-navigation .sg-application-menu:popover-open {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  /* The destinations already scroll sideways; keep the scrollbar quiet. */
+  .sg-destinations {
+    scrollbar-width: none;
+  }
+  .sg-destinations::-webkit-scrollbar {
+    display: none;
+  }
+  .sg-navigation-head {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+  .sg-navigation-home {
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .sg-navigation-head .sg-app-identity {
+    min-width: 0;
+    flex: 1;
+  }
+  .sg-identity {
+    padding: 4px 6px;
+  }
+  .sg-identity-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+  /* The section heading is directly below; the bar keeps only live work. */
+  .sg-adaptive-shell .sg-topbar {
+    min-height: 0;
+    padding: 0 12px;
+    border-bottom: 0;
+  }
+  .sg-topbar-where {
+    display: none;
+  }
+  .sg-adaptive-shell .sg-workstrip {
+    margin: 8px 0;
+  }
+}
+
+/* Architecture: the detail strip carries the way into the destination. */
+.sg-canvas-detail {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.sg-canvas-detail > div {
+  min-width: 0;
+}
+.sg-canvas-legend {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+.sg-canvas-legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sg-canvas-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Activity marks: one thing moves at a time. A change that touches five
+   destinations sets five marks, but only the destination it is mainly
+   about animates; the rest are quiet, smaller and static. */
+.sg-nav-indicator.working,
+.sg-nav-indicator.needs-you,
+.sg-nav-indicator.failed {
+  animation: none;
+}
+.sg-nav-indicator:not(.primary) {
+  width: 5px;
+  height: 5px;
+  opacity: 0.5;
+}
+.sg-nav-indicator.working.primary {
+  animation: sg-mark-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-nav-indicator.working.primary {
+    animation: none;
+  }
+}
+
+/* Grouped variables drop the source column: the group heading says it. */
+.sg-variable-list-grouped .sg-variable-row {
+  grid-template-columns: minmax(0, 1.6fr) 150px minmax(0, 1.2fr);
+}
+.sg-pending-inputs ul {
+  margin: 0;
+}
+
+/* Inbound rules: the port, what it serves, and who can reach it. */
+.sg-rules {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+}
+.sg-rule-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1.2fr) minmax(0, 1.4fr) 120px;
+  gap: 20px;
+  align-items: baseline;
+  padding: 11px 10px 11px 12px;
+  margin-left: -12px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  font-size: var(--view-meta);
+}
+.sg-rule-row.sg-table-head {
+  font-size: var(--view-meta);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  font-weight: 600;
+  border-top: 0;
+}
+.sg-rule-row code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--view-meta);
+}
+.sg-rule-row code + code {
+  margin-left: 6px;
+}
+.sg-rule-row .sg-pill {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .sg-rule-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .sg-rule-row.sg-table-head {
+    display: none;
+  }
+  .sg-rule-row span[data-label]::before {
+    content: attr(data-label) ": ";
+    color: #99a2b0;
+  }
+}
+
+/* Reading and keyboard affordances shared by the live operation views. */
+.sg-section-content {
+  font-size: var(--view-body);
+}
+.sg-history-open {
+  color: var(--ink);
+  border-radius: 6px;
+}
+.sg-history-open strong {
+  font-size: var(--view-body);
+}
+.sg-history-open small,
+.sg-history-open .sg-op-rel {
+  font-size: var(--view-meta);
+}
+.sg-history-open:hover strong {
+  color: var(--blue-text);
+}
+.sg-history-open:focus-visible,
+.sg-run-open:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+.sg-history-details {
+  margin-top: 10px;
+  font-size: var(--view-meta);
+}
+.sg-history-details summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  padding: 4px 0;
+}
+.sg-history-details p {
+  margin: 8px 0;
+  line-height: 1.65;
+  max-width: 75ch;
+}
+.sg-history-resolved {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  margin: 8px 0 0;
+  color: var(--ok);
+  font-size: var(--view-meta);
+}
+.sg-op-more {
+  font-size: var(--view-meta);
+}
+.sg-op-more summary {
+  cursor: pointer;
+  color: var(--blue-text);
+  padding: 4px 0;
+}
+.sg-op-more .sg-op-links {
+  margin-top: 6px;
+}
+
+.sg-preparation-toggle {
+  padding: 20px 36px;
+  border-top: 1px solid var(--line);
+  font-size: var(--view-body);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sg-deployment-summary > p {
+  font-size: var(--view-meta);
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .sg-preparation-toggle {
+    padding: 18px;
+  }
+}
+
+.sg-open-application {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-end;
+  max-width: 240px;
+}
+.sg-open-application small {
+  color: var(--muted);
+  font-size: var(--view-meta);
+  text-align: right;
+}
+.sg-fresh-list li {
+  flex-wrap: wrap;
+}
+.sg-evidence-detail {
+  flex-basis: 100%;
+  margin-left: 16px;
+  color: var(--muted);
+  font-size: var(--view-meta);
+  line-height: 1.5;
+}
+.sg-fresh-list li.never > span {
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .sg-open-application {
+    align-items: flex-start;
+    max-width: none;
+  }
+  .sg-open-application small {
+    text-align: left;
+  }
+}
+
+.sg-history-reason {
+  color: var(--ink);
+  font-size: var(--view-meta);
+  margin: 10px 0 0;
+}
+.sg-variable-names {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sg-variable-names li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--view-body);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .sg-view-back {
+    display: none;
+  }
+  .sg-view-bar:not(:has(.sg-suggest)) {
+    display: none;
+  }
+  .sg-destinations {
+    padding-right: 24px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+  }
+}
+
+.sg-variable-names code {
+  font-family:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}

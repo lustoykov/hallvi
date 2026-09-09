@@ -18,6 +18,7 @@ import { ArchitectureCanvas } from "./architecture-canvas";
 import { DestinationActivity } from "./destination-activity";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
+import { CdnView } from "./views/cdn-view";
 import { DatabaseView } from "./views/database-view";
 import { DeploymentView } from "./views/deployment-view";
 import { DomainsView } from "./views/domains-view";
@@ -26,9 +27,11 @@ import { JobsView } from "./views/jobs-view";
 import { LogsView } from "./views/logs-view";
 import { MonitoringView } from "./views/monitoring-view";
 import { ProcessesView } from "./views/processes-view";
+import { SecurityView } from "./views/security-view";
 import { StorageView } from "./views/storage-view";
 import { VariablesView } from "./views/variables-view";
 import type { ViewProps } from "./views/bits";
+import { Loading } from "./views/visuals";
 
 const descriptions: Record<ApplicationSection, string> = {
   history:
@@ -50,7 +53,9 @@ const descriptions: Record<ApplicationSection, string> = {
   logs: "Inspect the latest collected output from your application host.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
-  domains: "Your application’s domain, HTTPS and optional CDN caching.",
+  domains: "The name your application answers on, and the HTTPS behind it.",
+  cdn: "Cached copies of eligible files, served closer to your visitors.",
+  security: "What can reach this application, and over which ports.",
   variables: "Configuration your application needs to build and run.",
 };
 
@@ -75,6 +80,7 @@ export function ApplicationSectionView({
   onRevealStack,
   onAction,
   busy,
+  loading,
   bar,
   children,
   decisionFor,
@@ -96,6 +102,8 @@ export function ApplicationSectionView({
   /** Starts a view action when the product can; absent hides the control. */
   onAction?: (action: ViewAction) => void;
   busy?: string | null;
+  /** The record has not been read yet; the view shows its shape, not "none". */
+  loading?: boolean;
   /** The bar above the header: the way back to the conversation. */
   bar?: ReactNode;
   children?: ReactNode;
@@ -138,6 +146,23 @@ export function ApplicationSectionView({
     />
   );
   let content: ReactNode;
+  if (loading && !deployment)
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        {bar}
+        <header className="sg-section-header">
+          <div>
+            <h1>
+              {applicationSections.find((item) => item.id === section)?.label}
+            </h1>
+            <p>{descriptions[section]}</p>
+          </div>
+        </header>
+        <div className="sg-section-content">
+          <Loading rows={5} label="Reading the recorded facts" />
+        </div>
+      </div>
+    );
   switch (section) {
     case "overview":
       content = (
@@ -192,6 +217,17 @@ export function ApplicationSectionView({
     case "domains":
       content = <DomainsView {...viewProps} />;
       break;
+    case "cdn":
+      content = <CdnView {...viewProps} />;
+      break;
+    case "security":
+      content = (
+        <>
+          {children}
+          <SecurityView {...viewProps} />
+        </>
+      );
+      break;
     case "variables":
       content = <VariablesView {...viewProps} />;
       break;
@@ -210,14 +246,19 @@ export function ApplicationSectionView({
           <p>{descriptions[section]}</p>
         </div>
         {(live || facts.releases?.serving) && address && (
-          <a
-            className="sg-section-open-app"
-            href={address}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open application <ArrowSquareOut />
-          </a>
+          <div className="sg-open-application">
+            <a
+              className="sg-section-open-app"
+              href={address}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open application <ArrowSquareOut aria-hidden="true" />
+            </a>
+            {deployment?.plan?.httpAccess === "controller" && (
+              <small>Restricted to the controller’s network</small>
+            )}
+          </div>
         )}
       </header>
       {section === "architecture" ? (
@@ -227,6 +268,8 @@ export function ApplicationSectionView({
             application={app}
             deployment={deployment}
             stack={stack}
+            facts={facts}
+            onOpenDestination={onOpenDestination}
           />
         </>
       ) : (

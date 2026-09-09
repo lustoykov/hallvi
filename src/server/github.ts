@@ -226,7 +226,27 @@ async function inspectGithubRepositoryAttempt(
         "GitHub returned a different repository. Check the selected repository URL.",
         "access",
       );
-    const scope = await verifyInstallation(token, connection, repo);
+    let scope: Pick<
+      GithubInspection["raw"],
+      "installationId" | "repositorySelection" | "grantedPermissions"
+    >;
+    try {
+      scope = await verifyInstallation(token, connection, repo);
+    } catch (error) {
+      if (
+        !(error instanceof GithubAccessError) ||
+        error.kind !== "access" ||
+        repo.visibility !== "public"
+      )
+        throw error;
+      // Public upstream software is readable without installing our App in
+      // its owner's account. This is read authority only; publication still
+      // requires the exact installation and its separate write checks.
+      scope = {
+        repositorySelection: "public-read",
+        grantedPermissions: { contents: "read" },
+      };
+    }
     const commit = z
       .object({ sha: z.string().regex(/^[a-f0-9]{40}$/) })
       .parse(
@@ -237,6 +257,15 @@ async function inspectGithubRepositoryAttempt(
           )
         ).data,
       );
+    if (scope.repositorySelection === "public-read") {
+      const tree = await githubJson(
+        `/repos/${fullName}/git/trees/${commit.sha}`,
+        token,
+      );
+      z.object({ tree: z.array(z.object({ path: z.string() })) }).parse(
+        tree.data,
+      );
+    }
     if (currentGithubConnectionId() !== connection.id)
       throw new GithubAccessError(
         "The connection changed during this check. Run it again.",

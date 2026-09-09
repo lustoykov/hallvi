@@ -109,7 +109,37 @@ test(
     ).toHaveCount(0);
     await nav.getByRole("button", { name: "Show more", exact: true }).click();
     await expect(
-      nav.getByRole("button", { name: "Jobs not available yet", exact: true }),
+      nav.getByRole("button", {
+        name: "Jobs nothing recorded yet",
+        exact: true,
+      }),
+    ).toBeVisible();
+    // Delivery is three destinations: Domains is always listed, while CDN and
+    // Security wait until a CDN caches or a host is available to inspect.
+    await expect(
+      nav.getByRole("button", { name: "Domains", exact: true }),
+    ).toHaveCount(1);
+    for (const hidden of ["CDN", "Security"])
+      await expect(
+        nav.getByRole("button", {
+          name:
+            hidden === "Security"
+              ? "Security check firewall rules"
+              : "CDN nothing recorded yet",
+          exact: true,
+        }),
+      ).toBeVisible();
+    await nav
+      .getByRole("button", {
+        name: "Security check firewall rules",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Exposure has not been read back",
+        exact: true,
+      }),
     ).toBeVisible();
     await nav
       .getByRole("button", { name: "Database after deployment", exact: true })
@@ -119,7 +149,10 @@ test(
     ).toBeVisible();
     await nav.getByRole("button", { name: "Show less", exact: true }).click();
     await expect(
-      nav.getByRole("button", { name: "Jobs not available yet", exact: true }),
+      nav.getByRole("button", {
+        name: "Jobs nothing recorded yet",
+        exact: true,
+      }),
     ).toHaveCount(0);
     // The viewed destination stays listed while open, even when hidden.
     await expect(
@@ -131,7 +164,7 @@ test(
       "Backups",
       "Logs",
       "Monitoring",
-      "Domains & CDN",
+      "Domains",
       "Environment Variables",
     ]) {
       await nav.getByRole("button", { name: section, exact: true }).click();

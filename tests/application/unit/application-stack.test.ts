@@ -6,7 +6,10 @@ import {
   persistentState,
   stackOf,
 } from "../../../src/server/application-stack";
-import { visibleSections } from "../../../src/components/server-guy/application-sections";
+import {
+  hiddenSections,
+  visibleSections,
+} from "../../../src/components/server-guy/application-sections";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
 
 const base: DeploymentRecord = {
@@ -148,5 +151,44 @@ describe("stackOf", () => {
   it("keeps the viewed destination listed even when nothing is recorded", () => {
     const ids = visibleSections(stackOf(null), "jobs").map((s) => s.id);
     expect(ids).toContain("jobs");
+  });
+
+  it("keeps Security available for a provisioned host before the first read", () => {
+    const stack = stackOf(base);
+    const ids = visibleSections(stack, null).map((section) => section.id);
+    expect(ids).toContain("domains");
+    expect(ids).not.toContain("cdn");
+    expect(ids).not.toContain("security");
+    const notes = Object.fromEntries(
+      hiddenSections(stack, null).map((section) => [section.id, section.note]),
+    );
+    expect(notes.cdn).toBe("nothing recorded yet");
+    expect(notes.security).toBe("check firewall rules");
+    expect(
+      visibleSections(stack, null, {}, true).some(
+        (item) => item.id === "security",
+      ),
+    ).toBe(true);
+  });
+
+  it("lists CDN once one caches and Security once the firewall is read back", () => {
+    const stack = stackOf(base);
+    const ids = visibleSections(stack, null, {
+      domains: {
+        address: "https://example.dev",
+        domain: null,
+        tls: { state: "valid" },
+        cdn: { state: "active", provider: "Cloudflare", detail: "Caching" },
+        routes: [],
+      },
+      security: {
+        firewall: { state: "active", provider: "Hetzner Cloud", detail: "One" },
+        rules: [],
+        ssh: { state: "key-only", detail: "Keys only" },
+        privateServices: [],
+      },
+    }).map((section) => section.id);
+    expect(ids).toContain("cdn");
+    expect(ids).toContain("security");
   });
 });

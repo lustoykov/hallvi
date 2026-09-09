@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
 import type { ApplicationFacts, ViewAction } from "@/server/application-facts";
 import {
@@ -22,8 +23,54 @@ import {
   relativeTime,
   stepDetail,
 } from "./operation-model";
-import { DestinationLinks, StateChip } from "./operation-receipt";
+import { StateChip } from "./operation-receipt";
 import { IssueCard } from "./views/monitoring-view";
+
+interface Run {
+  key: string;
+  label: string;
+  value: ReactNode;
+  note?: ReactNode;
+  tone?: "warn" | "bad";
+  destination?: ApplicationSection;
+}
+
+/**
+ * One thing this application runs: its name, what it is, and one fact about
+ * it. Laid out as a grid rather than a column of label-and-value rows, so
+ * eight components read as one block instead of eight lines.
+ */
+function RunEntry({
+  run,
+  onOpen,
+}: {
+  run: Run;
+  onOpen: (destination: ApplicationSection) => void;
+}) {
+  const body = (
+    <>
+      <span className="sg-run-label">{run.label}</span>
+      <strong className="sg-run-value">{run.value}</strong>
+      {run.note && (
+        <span className={`sg-run-note${run.tone ? ` sg-run-${run.tone}` : ""}`}>
+          {run.tone && <i className="sg-dot" aria-hidden="true" />}
+          {run.note}
+        </span>
+      )}
+    </>
+  );
+  return run.destination ? (
+    <button
+      type="button"
+      className="sg-run sg-run-open"
+      onClick={() => onOpen(run.destination!)}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="sg-run">{body}</div>
+  );
+}
 
 /**
  * Overview answers four questions in order: what is running, what needs you,
@@ -98,18 +145,212 @@ export function ApplicationOverview({
   const monitoringSummary = monitoring
     ? monitoringStatus(monitoring, now)
     : null;
-  const condition = monitoringSummary
-    ? `${monitoringSummary.title}${lastObservation ? ` · last observed ${relativeTime(lastObservation, now)}` : ""}`
+  // The headline is the state, not the name: the name is in navigation.
+  const headline = monitoringSummary
+    ? monitoringSummary.title
     : verifiedAt
       ? stale
-        ? `Last verified ${relativeTime(verifiedAt, now)} · not checked since`
+        ? "Last verified over a day ago"
         : live
-          ? `Running · verified ${relativeTime(verifiedAt, now)} · HTTP`
-          : `Last verified ${relativeTime(verifiedAt, now)} · later work failed`
-      : "Deployment not verified";
-  const dotLive = monitoringSummary
-    ? monitoringSummary.tone === "ok"
-    : live && !stale;
+          ? "Running"
+          : "Running · later work failed"
+      : deployment
+        ? "Deployment not verified"
+        : "Not deployed yet";
+  const detail = monitoringSummary
+    ? [
+        monitoring?.collector.detail,
+        lastObservation
+          ? `last observed ${relativeTime(lastObservation, now)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : verifiedAt
+      ? `Verified ${relativeTime(verifiedAt, now)} ${deployment?.plan?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
+      : "Nothing has been verified on a host yet.";
+  const conditionTone = monitoringSummary
+    ? monitoringSummary.tone
+    : verifiedAt
+      ? stale
+        ? "warn"
+        : live
+          ? "ok"
+          : "warn"
+      : "muted";
+
+  const runs: Run[] = [
+    {
+      key: "application",
+      label: "Application",
+      value: facts.releases?.serving ? (
+        <code>{facts.releases.serving.revision.slice(0, 12)}</code>
+      ) : deployment?.revision ? (
+        <code>{deployment.revision.slice(0, 12)}</code>
+      ) : (
+        "Not deployed"
+      ),
+      note:
+        facts.releases?.serving?.message ??
+        (verifiedAt
+          ? `Verified ${relativeTime(verifiedAt, now)}`
+          : deployment?.revision
+            ? "Not deployed yet"
+            : "No revision selected"),
+      destination: "deployment",
+    },
+    {
+      key: "host",
+      label: "Host",
+      value: deployment?.offer?.serverType.toUpperCase() ?? "No host recorded",
+      note: deployment?.address
+        ? `${deployment.address}${deployment.offer ? ` · ${deployment.offer.location}` : ""}`
+        : "Selected and priced at deployment",
+      destination: "architecture",
+    },
+  ];
+  if (stack.recorded)
+    runs.push({
+      key: "processes",
+      label: "Processes",
+      value: `${stack.processes.length - workers.length} web${
+        workers.length
+          ? ` · ${workers.length} worker${workers.length === 1 ? "" : "s"}`
+          : ""
+      }`,
+      note: failingChecks.some((check) => check.kind === "process")
+        ? "One is unhealthy"
+        : monitoring
+          ? "All responding"
+          : "Health not watched",
+      tone: failingChecks.some((check) => check.kind === "process")
+        ? "bad"
+        : undefined,
+      destination: "processes",
+    });
+  if (facts.domains)
+    runs.push({
+      key: "address",
+      label: "Address",
+      value: facts.domains.domain
+        ? `${facts.domains.tls.state === "valid" ? "https://" : "http://"}${facts.domains.domain.name}`
+        : (facts.domains.address ?? "No public address"),
+      note: !facts.domains.domain
+        ? "No custom domain"
+        : facts.domains.domain.state !== "resolving"
+          ? "Not resolving here yet"
+          : facts.domains.tls.state === "valid"
+            ? "Certificate valid"
+            : "HTTPS pending",
+      tone:
+        facts.domains.domain && facts.domains.domain.state !== "resolving"
+          ? "warn"
+          : undefined,
+      destination: "domains",
+    });
+  for (const database of stack.databases)
+    runs.push({
+      key: `database:${database.name}`,
+      label: "Database",
+      value:
+        database.kind === "postgres"
+          ? `PostgreSQL ${database.version}`
+          : "Embedded SQLite",
+      note: facts.database
+        ? `${facts.database.sizeGb < 1 ? `${Math.round(facts.database.sizeGb * 1024)} MB` : `${facts.database.sizeGb.toFixed(1)} GB`} measured`
+        : database.kind === "postgres"
+          ? "Storage not measured"
+          : database.location,
+      destination: "database",
+    });
+  if (!stack.databases.length)
+    runs.push({
+      key: "database",
+      label: "Database",
+      value: "None",
+      note: "This application keeps no database",
+    });
+  for (const service of stack.services)
+    runs.push({
+      key: `service:${service.name}`,
+      label: "Cache & queue",
+      value: `${service.kind === "valkey" ? "Valkey" : "Redis"}${service.version ? ` ${service.version}` : ""}`,
+      note: stack.queues.length
+        ? `${service.role} · ${stack.queues.map((queue) => queue.library).join(", ")}`
+        : service.role,
+      destination: "cache",
+    });
+  if (stack.volumes.length)
+    runs.push({
+      key: "storage",
+      label: "Storage",
+      value: `${stack.volumes.length} volume${stack.volumes.length === 1 ? "" : "s"}`,
+      note: facts.storage?.hostDisk
+        ? `Disk ${facts.storage.hostDisk.usedGb} of ${facts.storage.hostDisk.totalGb} GB used`
+        : "Sizes not measured",
+      destination: "storage",
+    });
+  if (stack.jobs.length)
+    runs.push({
+      key: "jobs",
+      label: "Jobs",
+      value: `${stack.jobs.length} scheduled`,
+      note: stack.jobs.some(
+        (job) => job.lastRun && job.lastRun.outcome !== "succeeded",
+      )
+        ? "A recent run did not succeed"
+        : "Last runs succeeded",
+      tone: stack.jobs.some(
+        (job) => job.lastRun && job.lastRun.outcome !== "succeeded",
+      )
+        ? "warn"
+        : undefined,
+      destination: "jobs",
+    });
+  runs.push({
+    key: "protection",
+    label: "Protection",
+    value: protection
+      ? protectionState === "ok"
+        ? (protection.policy?.schedule ?? "Scheduled")
+        : protectionSummary!.title
+      : protectable.length
+        ? "Not backed up"
+        : "Nothing to protect",
+    note: protection
+      ? protectionState === "ok"
+        ? `To ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
+        : (protection.lastAttempt?.reason ?? "Off-host copies are incomplete")
+      : protectable.length
+        ? protectable.map((item) => item.label).join(", ")
+        : stack.recorded
+          ? "No database or file volume recorded"
+          : "Known after the first deployment",
+    tone:
+      protectionState === "bad"
+        ? "bad"
+        : protectionState === "ok"
+          ? undefined
+          : protectable.length || protection
+            ? "warn"
+            : undefined,
+    destination: "backups",
+  });
+  runs.push({
+    key: "watching",
+    label: "Watching",
+    value: monitoring
+      ? `${monitoring.checks.length} check${monitoring.checks.length === 1 ? "" : "s"}`
+      : "Not watched",
+    note: monitoring
+      ? failingChecks.length
+        ? `${failingChecks.length} failing`
+        : "All passing"
+      : "Verified once, at deployment",
+    tone: failingChecks.length ? "bad" : undefined,
+    destination: "monitoring",
+  });
+
   const freshness: {
     fact: string;
     at?: string | null;
@@ -119,7 +360,10 @@ export function ApplicationOverview({
     {
       fact: "Application responds and behaves",
       at: verifiedAt,
-      detail: "Public HTTP checks at deployment · not continuous",
+      detail:
+        deployment?.plan?.httpAccess === "controller"
+          ? "HTTP checks from the controller’s network · not continuous"
+          : "Public HTTP checks at deployment · not continuous",
       destination: "deployment",
     },
     ...(monitoring
@@ -170,26 +414,22 @@ export function ApplicationOverview({
       destination: "backups",
     },
   ];
+  const known = freshness.filter((row) => row.at).length;
+  const fresh = freshness.filter(
+    (row) => row.at && !isStale(row.at, now),
+  ).length;
   return (
     <div className="sg-overview">
-      <div className="sg-overview-condition">
-        <span className={`sg-status-dot${dotLive ? " live" : ""}`} />
-        <div>
-          <h2>{application.name}</h2>
-          <p>
-            {condition}
-            {!monitoring && (
-              <span className="sg-op-muted">
-                {" "}
-                · no continuous monitoring yet
-              </span>
-            )}
-          </p>
+      <section className={`sg-hero sg-hero-${conditionTone}`}>
+        <span className="sg-hero-dot" aria-hidden="true" />
+        <div className="sg-hero-text">
+          <h2>{headline}</h2>
+          <p>{detail}</p>
         </div>
         {verifiedAt && stale && !monitoring && (
           <button
             type="button"
-            className="sg-secondary-button sg-overview-ask"
+            className="sg-secondary-button sg-hero-action"
             onClick={() =>
               onAsk(
                 deployment?.chatId ?? null,
@@ -200,10 +440,10 @@ export function ApplicationOverview({
             Ask about the last verification
           </button>
         )}
-      </div>
-      <div className="sg-overview-grid">
-        <section className="sg-overview-block" aria-label="Needs you">
-          <h3>Needs you</h3>
+      </section>
+      {(issues.length > 0 || attention.length > 0) && (
+        <section className="sg-band" aria-label="Needs you">
+          <h2>Needs you</h2>
           {issues.length > 0 && (
             <div className="sg-issues sg-issues-overview">
               {issues.map((issue) => (
@@ -219,7 +459,7 @@ export function ApplicationOverview({
               ))}
             </div>
           )}
-          {attention.length ? (
+          {attention.length > 0 && (
             <ul className="sg-attention">
               {attention.map((operation) => (
                 <li key={operation.id} className={operation.state}>
@@ -279,211 +519,44 @@ export function ApplicationOverview({
                 </li>
               ))}
             </ul>
-          ) : issues.length ? null : (
-            <p className="sg-overview-empty">Nothing needs you right now.</p>
           )}
         </section>
-        <section className="sg-overview-block" aria-label="Running">
-          <h3>Running</h3>
-          <dl className="sg-overview-facts">
-            <div>
-              <dt>Application</dt>
-              <dd>
-                {facts.releases?.serving ? (
-                  <>
-                    Revision{" "}
-                    <code>{facts.releases.serving.revision.slice(0, 12)}</code>{" "}
-                    · {facts.releases.serving.message}
-                  </>
-                ) : verifiedAt && deployment?.revision ? (
-                  <>
-                    Revision <code>{deployment.revision.slice(0, 12)}</code> ·
-                    port 80 → {deployment.plan?.port}
-                  </>
-                ) : deployment?.revision ? (
-                  <>
-                    Revision <code>{deployment.revision.slice(0, 12)}</code> ·
-                    not deployed yet
-                  </>
-                ) : (
-                  "Not deployed"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>Host</dt>
-              <dd>
-                {deployment?.address
-                  ? `${deployment.offer?.serverType.toUpperCase() ?? "Hetzner"} · ${deployment.address}${deployment.offer ? ` · ${deployment.offer.location}` : ""}`
-                  : "No host recorded"}
-              </dd>
-            </div>
-            {facts.domains?.domain && (
-              <div>
-                <dt>Address</dt>
-                <dd>
-                  <button
-                    type="button"
-                    className="sg-op-text-link"
-                    onClick={() => onOpenDestination("domains")}
-                  >
-                    {facts.domains.tls.state === "valid"
-                      ? "https://"
-                      : "http://"}
-                    {facts.domains.domain.name}
-                  </button>
-                  {facts.domains.domain.state !== "resolving"
-                    ? " · not resolving here yet"
-                    : facts.domains.tls.state === "valid"
-                      ? " · certificate valid"
-                      : " · HTTPS pending"}
-                </dd>
-              </div>
-            )}
-            {stack.recorded && (
-              <div>
-                <dt>Processes</dt>
-                <dd>
-                  <button
-                    type="button"
-                    className="sg-op-text-link"
-                    onClick={() => onOpenDestination("processes")}
-                  >
-                    {stack.processes.length - workers.length} web
-                    {workers.length
-                      ? ` · ${workers.length} worker${workers.length === 1 ? "" : "s"}`
-                      : ""}
-                  </button>
-                  {failingChecks.some((check) => check.kind === "process")
-                    ? " · one is unhealthy"
-                    : ""}
-                </dd>
-              </div>
-            )}
-            {stack.databases.map((database) => (
-              <div key={database.name}>
-                <dt>Database</dt>
-                <dd>
-                  {database.kind === "postgres"
-                    ? `PostgreSQL ${database.version} · ${verifiedAt ? "persistent volume" : "planned with the application"}`
-                    : `Embedded SQLite · ${database.location}`}
-                  {facts.database
-                    ? ` · ${facts.database.sizeGb < 1 ? `${Math.round(facts.database.sizeGb * 1024)} MB` : `${facts.database.sizeGb.toFixed(1)} GB`}`
-                    : " · storage not measured"}
-                </dd>
-              </div>
-            ))}
-            {!stack.databases.length && (
-              <div>
-                <dt>Database</dt>
-                <dd>No database recorded</dd>
-              </div>
-            )}
-            {stack.services.map((service) => (
-              <div key={service.name}>
-                <dt>Cache & queue</dt>
-                <dd>
-                  {service.kind === "valkey" ? "Valkey" : "Redis"}
-                  {service.version ? ` ${service.version}` : ""} ·{" "}
-                  {service.role}
-                  {stack.queues.length
-                    ? ` · ${stack.queues.map((queue) => queue.library).join(", ")}`
-                    : ""}
-                </dd>
-              </div>
-            ))}
-            {stack.jobs.length > 0 && (
-              <div>
-                <dt>Jobs</dt>
-                <dd>
-                  <button
-                    type="button"
-                    className="sg-op-text-link"
-                    onClick={() => onOpenDestination("jobs")}
-                  >
-                    {stack.jobs.length} scheduled command
-                    {stack.jobs.length === 1 ? "" : "s"}
-                  </button>
-                  {stack.jobs.some(
-                    (job) => job.lastRun && job.lastRun.outcome !== "succeeded",
-                  )
-                    ? " · a recent run did not succeed"
-                    : ""}
-                </dd>
-              </div>
-            )}
-            {stack.volumes.length > 0 && (
-              <div>
-                <dt>Storage</dt>
-                <dd>
-                  <button
-                    type="button"
-                    className="sg-op-text-link"
-                    onClick={() => onOpenDestination("storage")}
-                  >
-                    {stack.volumes.length} persistent volume
-                    {stack.volumes.length === 1 ? "" : "s"}
-                  </button>{" "}
-                  ·{" "}
-                  {facts.storage?.hostDisk
-                    ? `disk ${facts.storage.hostDisk.usedGb} of ${facts.storage.hostDisk.totalGb} GB used`
-                    : "not measured"}
-                </dd>
-              </div>
-            )}
-            <div>
-              <dt>Protection</dt>
-              <dd
-                className={
-                  protectionState === "ok"
-                    ? "sg-protection-ok"
-                    : protectionState === "bad"
-                      ? "sg-protection-bad"
-                      : protectionState === "warn" || protectable.length
-                        ? "sg-protection-warn"
-                        : undefined
-                }
-              >
-                {protection
-                  ? protectionState === "ok"
-                    ? `${protection.policy?.schedule ?? "Scheduled"} to ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
-                    : protectionSummary!.title
-                  : protectable.length
-                    ? `Not backed up · ${protectable.map((item) => item.label).join(", ")}`
-                    : stack.recorded
-                      ? "Nothing persistent recorded"
-                      : "No database recorded"}
-              </dd>
-            </div>
-            {stack.recorded && absent.length > 0 && (
-              <div>
-                <dt>Not used</dt>
-                <dd className="sg-op-muted">
-                  No {absent.join(", ")} recorded for this application.{" "}
-                  {onRevealStack && (
-                    <button
-                      type="button"
-                      className="sg-op-text-link"
-                      onClick={onRevealStack}
-                    >
-                      Show what else it could run
-                    </button>
-                  )}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </section>
-      </div>
-      <section className="sg-overview-block" aria-label="Recent changes">
-        <h3>Recent changes</h3>
-        <button
-          type="button"
-          className="sg-op-link"
-          onClick={() => onOpenDestination("history")}
-        >
-          All history <ArrowRight />
-        </button>
+      )}
+      <section className="sg-band" aria-label="What is running">
+        <div className="sg-band-head">
+          <h2>What is running</h2>
+          {stack.recorded && absent.length > 0 && (
+            <span className="sg-visual-caption">
+              No {absent.join(", ")} recorded.{" "}
+              {onRevealStack && (
+                <button
+                  type="button"
+                  className="sg-op-text-link"
+                  onClick={onRevealStack}
+                >
+                  Show what else it could run
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="sg-runlist">
+          {runs.map((run) => (
+            <RunEntry key={run.key} run={run} onOpen={onOpenDestination} />
+          ))}
+        </div>
+      </section>
+      <section className="sg-band" aria-label="Recent changes">
+        <div className="sg-band-head">
+          <h2>Recent changes</h2>
+          <button
+            type="button"
+            className="sg-op-link"
+            onClick={() => onOpenDestination("history")}
+          >
+            All history <ArrowRight />
+          </button>
+        </div>
         {changes.length ? (
           <ol className="sg-changes">
             {changes.map((operation) => (
@@ -515,17 +588,15 @@ export function ApplicationOverview({
                         operation.source.type,
                       ) ? (
                       "automatic"
+                    ) : operation.source.type === "logs" ? (
+                      "Log collection"
                     ) : (
                       `from the ${labelOf(operation.destinations[0])} view`
                     )}{" "}
                     · {relativeTime(operation.updatedAt, now)} ·{" "}
-                    <LocalTime value={operation.updatedAt} variant="compact" />
+                    {labelOf(operation.destinations[0])}
                   </span>
                 </div>
-                <DestinationLinks
-                  destinations={operation.destinations}
-                  onOpen={onOpenDestination}
-                />
               </li>
             ))}
           </ol>
@@ -536,62 +607,60 @@ export function ApplicationOverview({
           </p>
         )}
       </section>
-      <section
-        className="sg-overview-block sg-fresh"
-        aria-label="Evidence freshness"
-      >
-        <h3>Evidence freshness</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Fact</th>
-              <th>Last checked</th>
-              <th>Freshness</th>
-            </tr>
-          </thead>
-          <tbody>
-            {freshness.map((row) => {
-              const tone = !row.at
-                ? "never"
-                : isStale(row.at, now)
-                  ? "stale"
-                  : "fresh";
-              return (
-                <tr key={row.fact}>
-                  <td>
-                    <button
-                      type="button"
-                      className="sg-op-text-link"
-                      onClick={() => onOpenDestination(row.destination)}
-                    >
-                      {row.fact}
-                    </button>
-                    <small>{row.detail}</small>
-                  </td>
-                  <td>
-                    {row.at ? (
-                      <>
-                        <LocalTime value={row.at} variant="compact" />{" "}
-                        <span className="sg-op-muted">
-                          · {relativeTime(row.at, now)}
-                        </span>
-                      </>
-                    ) : (
-                      "Never"
-                    )}
-                  </td>
-                  <td className={tone}>
-                    {tone === "never"
-                      ? "No evidence"
+      <section className="sg-band sg-fresh" aria-label="Evidence freshness">
+        <div className="sg-band-head">
+          <h2>Evidence</h2>
+          <span className="sg-visual-caption">
+            {fresh} of {freshness.length} checked in the last 24 hours
+            {freshness.length - known
+              ? ` · ${freshness.length - known} never checked`
+              : ""}
+          </span>
+        </div>
+        <ul className="sg-fresh-list">
+          {freshness.map((row) => {
+            const tone = !row.at
+              ? "never"
+              : isStale(row.at, now)
+                ? "stale"
+                : "fresh";
+            return (
+              <li key={row.fact} className={tone}>
+                <i
+                  className={`sg-dot ${
+                    tone === "fresh"
+                      ? "sg-fill-ok"
                       : tone === "stale"
-                        ? "Stale · over 24 h"
-                        : "Fresh"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        ? "sg-fill-warn"
+                        : "sg-fill-muted"
+                  }`}
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  className="sg-op-text-link"
+                  onClick={() => onOpenDestination(row.destination)}
+                >
+                  {row.fact}
+                </button>
+                <span>
+                  {row.at ? (
+                    <>
+                      <LocalTime value={row.at} variant="compact" />
+                      <span className="sg-op-muted">
+                        {" "}
+                        · {relativeTime(row.at, now)}
+                      </span>
+                    </>
+                  ) : (
+                    "Not recorded"
+                  )}
+                </span>
+                <small className="sg-evidence-detail">{row.detail}</small>
+              </li>
+            );
+          })}
+        </ul>
       </section>
       <p className="sg-section-note">
         {monitoring

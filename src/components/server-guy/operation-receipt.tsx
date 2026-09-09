@@ -92,7 +92,7 @@ export function DestinationLinks({
   return (
     <div className="sg-op-links">
       {prefix && <span className="sg-op-links-label">{prefix}</span>}
-      {destinations.map((destination) => (
+      {destinations.slice(0, 3).map((destination) => (
         <button
           key={destination}
           type="button"
@@ -102,6 +102,23 @@ export function DestinationLinks({
           Open {labelOf(destination)} <ArrowRight aria-hidden="true" />
         </button>
       ))}
+      {destinations.length > 3 && (
+        <details className="sg-op-more">
+          <summary>{destinations.length - 3} more destinations</summary>
+          <div className="sg-op-links">
+            {destinations.slice(3).map((destination) => (
+              <button
+                key={destination}
+                type="button"
+                className="sg-op-link"
+                onClick={() => onOpen(destination)}
+              >
+                Open {labelOf(destination)} <ArrowRight aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -148,9 +165,11 @@ export function OperationReceipt({
           {relativeTime(operation.updatedAt, now)}
         </span>
       </div>
-      {operation.state !== "queued" && (
-        <p className="sg-op-summary">{operation.summary}</p>
-      )}
+      {operation.state !== "queued" &&
+        !(
+          operation.evidence === operation.summary &&
+          (operation.state === "verified" || operation.state === "inspected")
+        ) && <p className="sg-op-summary">{operation.summary}</p>}
       {operation.state === "queued" && operation.waitingForId && (
         <button
           type="button"

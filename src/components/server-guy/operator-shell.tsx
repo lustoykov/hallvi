@@ -1,13 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ArrowLeft,
-  CaretDown,
-  Check,
-  Plus,
-  Trash,
-} from "@phosphor-icons/react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -33,10 +26,15 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
+import { useFirewallFacts } from "./use-firewall-facts";
+import {
+  ApplicationIdentity,
+  type IdentityVariant,
+} from "./application-identity";
 import { ApplicationSectionView } from "./application-section-view";
 import {
   applicationSections,
-  hiddenStackSections,
+  hiddenSections,
   sectionFromHash,
   visibleSections,
   type ApplicationSection,
@@ -47,6 +45,7 @@ import { OperationControls } from "./operation-controls";
 import { DeploymentDecision } from "./deployment-decision";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import "./application-shell.css";
+import "./views.css";
 import { ChatPane, type MessageHighlight } from "./chat-pane";
 import {
   conversationMarks,
@@ -125,6 +124,7 @@ export function OperatorShell({
   initialPiSetup,
   applications,
   demo = false,
+  identityVariant = "navigation",
 }: {
   initialView: OperatorView;
   initialPiSetup: PiSetupStatus;
@@ -134,16 +134,35 @@ export function OperatorShell({
   >[];
   /** The repository is synthetic: GitHub links are shown, never followed. */
   demo?: boolean;
+  /** Where the application identity sits; the prototype compares placements. */
+  identityVariant?: IdentityVariant;
 }) {
   const router = useRouter();
   const showDeployment = !demo;
   const [deployment, setDeployment] = useState<DeploymentRecord | null>(null);
+  // Until the first response arrives a view cannot honestly say a resource
+  // is absent, so it shows the shape of the answer instead.
+  const [recordLoaded, setRecordLoaded] = useState(demo);
   const [hetznerConnected, setHetznerConnected] = useState(false);
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
     null,
   );
+  const firewall = useFirewallFacts(deployment, activeSection === "security");
   const recordVisible = activeSection !== null;
-  const [seen, setSeen] = useState(() => readSeen(initialView.application?.id));
+  const [seen, setSeen] = useState<Partial<Record<ApplicationSection, string>>>(
+    {},
+  );
+  const [seenApplicationId, setSeenApplicationId] = useState<string | null>(
+    null,
+  );
+  const seenLoaded = seenApplicationId === initialView.application?.id;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSeen(readSeen(initialView.application?.id));
+      setSeenApplicationId(initialView.application?.id ?? null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialView.application?.id]);
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -152,13 +171,13 @@ export function OperatorShell({
   }, []);
   useEffect(() => {
     const id = initialView.application?.id;
-    if (!id) return;
+    if (!id || !seenLoaded) return;
     try {
       localStorage.setItem(`sg-seen:${id}`, JSON.stringify(seen));
     } catch {
       /* a browser without storage simply forgets what was looked at */
     }
-  }, [seen, initialView.application?.id]);
+  }, [seen, seenLoaded, initialView.application?.id]);
   // Leaving a destination records that it was looked at; the marks derive
   // from that timestamp and the operations, and clear on their own.
   function selectSection(section: ApplicationSection | null) {
@@ -208,7 +227,6 @@ export function OperatorShell({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const applicationPicker = useRef<HTMLButtonElement>(null);
   const focusComposerAfterClose = useRef(false);
   const submittingChat = useRef<string | null>(null);
 
@@ -233,6 +251,7 @@ export function OperatorShell({
     const response = await fetch(
       `/api/applications/${applicationId}/deployment`,
     );
+    setRecordLoaded(true);
     if (!response.ok) return;
     const value = await response.json();
     setDeployment(value.deployment);
@@ -251,7 +270,7 @@ export function OperatorShell({
   }, [applicationId, selectedChatId, demo]);
   useEffect(() => {
     const initial = window.setTimeout(() => {
-      void refreshDeployment().catch(() => undefined);
+      void refreshDeployment().catch(() => setRecordLoaded(true));
     }, 0);
     const timer = setInterval(
       () => void refreshDeployment().catch(() => undefined),
@@ -297,6 +316,12 @@ export function OperatorShell({
   const [stackRevealed, setStackRevealed] = useState(false);
   // The open destination is being looked at: it never shows "updated".
   const indicators = navigationIndicators(operations, seen);
+  // Browser read marks become available only after hydration. Keep the server
+  // and first client render identical, and do not flash old work as new.
+  if (!seenLoaded)
+    for (const section of applicationSections)
+      if (indicators[section.id]?.tone === "updated")
+        delete indicators[section.id];
   if (activeSection && indicators[activeSection]?.tone === "updated")
     delete indicators[activeSection];
   const chatMarks = conversationMarks(operations, view.chats);
@@ -416,17 +441,6 @@ export function OperatorShell({
   function setComposer(value: string) {
     if (!activeChat) return;
     setDrafts((current) => ({ ...current, [activeChat.id]: value }));
-  }
-
-  // The menu lives in the top layer, so it cannot be positioned by its parent;
-  // hang it under the picker.
-  function positionApplicationMenu(menu: HTMLElement) {
-    const anchor = applicationPicker.current?.getBoundingClientRect();
-    if (!anchor) return;
-    const width = 320;
-    menu.style.top = `${anchor.bottom + 6}px`;
-    menu.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12))}px`;
-    menu.style.minWidth = `${anchor.width}px`;
   }
 
   function applyView(next: OperatorView) {
@@ -798,89 +812,37 @@ export function OperatorShell({
     setSelectedCheckKey(null);
   }
 
+  const identity = (
+    <ApplicationIdentity
+      variant={identityVariant}
+      application={application}
+      applications={applications}
+      menuId="application-picker"
+      hrefFor={(item) => `/applications/${item.id}`}
+      addHref="/applications/new"
+      disabled={busy !== null}
+      onRemove={() => {
+        setRemoveError(null);
+        setConfirmRemove(true);
+      }}
+    />
+  );
+  // The top bar says where you are: the open destination, or the
+  // conversation you are in when none is.
+  const where = activeSection
+    ? { title: labelOf(activeSection), detail: null as string | null }
+    : {
+        title: activeChat?.title ?? "Conversation",
+        detail: activeChat?.archivedAt ? "Archived" : null,
+      };
   return (
     <DemoContext.Provider value={demo}>
       <main className="sg-shell sg-adaptive-shell">
         <header className="sg-topbar">
-          <div className="sg-app-identity">
-            <button
-              ref={applicationPicker}
-              className="sg-application-picker"
-              type="button"
-              popoverTarget="application-picker"
-              disabled={busy !== null}
-              aria-label={`Switch application: ${application?.name}`}
-            >
-              <span>
-                <strong>{application?.name}</strong>
-                <small>
-                  {application?.repositoryOwner}/{application?.repositoryName}
-                </small>
-              </span>
-              <CaretDown aria-hidden="true" weight="bold" />
-            </button>
-            <nav
-              id="application-picker"
-              popover="auto"
-              className="sg-application-menu"
-              aria-label="Applications"
-              onBeforeToggle={(event) => {
-                if (event.newState === "open")
-                  positionApplicationMenu(event.currentTarget);
-              }}
-            >
-              <span className="sg-eyebrow sg-application-menu-label">
-                Switch application
-              </span>
-              {applications.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/applications/${item.id}`}
-                  aria-current={
-                    item.id === application?.id ? "page" : undefined
-                  }
-                  onClick={(event) =>
-                    event.currentTarget
-                      .closest<HTMLElement>("[popover]")
-                      ?.hidePopover()
-                  }
-                >
-                  <span aria-hidden="true" className="sg-application-menu-mark">
-                    {item.repositoryName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <strong>{item.repositoryName}</strong>
-                    <small>
-                      {item.repositoryOwner}/{item.repositoryName}
-                    </small>
-                  </div>
-                  {item.id === application?.id && (
-                    <Check aria-label="Current application" weight="bold" />
-                  )}
-                </Link>
-              ))}
-              <Link
-                className="sg-application-menu-action"
-                href="/applications/new"
-              >
-                <Plus /> Add application
-              </Link>
-              <hr />
-              <button
-                type="button"
-                className="sg-remove-application"
-                disabled={busy !== null}
-                onClick={(event) => {
-                  event.currentTarget
-                    .closest<HTMLElement>("[popover]")
-                    ?.hidePopover();
-                  setRemoveError(null);
-                  setConfirmRemove(true);
-                }}
-              >
-                <Trash /> Remove application…
-              </button>
-            </nav>
+          {identityVariant !== "navigation" && identity}
+          <div className="sg-topbar-where">
+            <strong>{where.title}</strong>
+            {where.detail && <span>{where.detail}</span>}
           </div>
           {activeSection && featured && (
             <button
@@ -903,6 +865,7 @@ export function OperatorShell({
         </header>
 
         <ApplicationNavigation
+          head={identityVariant === "navigation" ? identity : undefined}
           chats={view.chats}
           selectedChatId={view.selectedChatId}
           section={activeSection}
@@ -912,8 +875,18 @@ export function OperatorShell({
           onCreate={createChat}
           indicators={indicators}
           chatMarks={chatMarks}
-          sections={visibleSections(stack, activeSection)}
-          hidden={hiddenStackSections(stack, activeSection)}
+          sections={visibleSections(
+            stack,
+            activeSection,
+            firewall.facts,
+            Boolean(deployment?.serverId),
+          )}
+          hidden={hiddenSections(
+            stack,
+            activeSection,
+            firewall.facts,
+            Boolean(deployment?.serverId),
+          )}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
         />
@@ -929,6 +902,14 @@ export function OperatorShell({
               stack={stack}
               operations={operations}
               now={now}
+              loading={!recordLoaded}
+              facts={firewall.facts}
+              busy={firewall.loading ? "check-firewall" : null}
+              onAction={
+                activeSection === "security" && deployment?.serverId
+                  ? () => firewall.refresh()
+                  : undefined
+              }
               onRefresh={refreshDeployment}
               decisionFor={(operation) =>
                 (operation.source.type !== "deployment" ||
@@ -981,6 +962,17 @@ export function OperatorShell({
                     connected={hetznerConnected}
                     onRefresh={refreshDeployment}
                   />
+                )}
+              {activeSection === "security" &&
+                (firewall.loading || firewall.error) && (
+                  <p role="status" className="sg-section-note">
+                    {firewall.loading
+                      ? "Checking Hetzner firewall rules…"
+                      : firewall.error}
+                    {firewall.error &&
+                      firewall.facts.security &&
+                      " The last successful check is shown below."}
+                  </p>
                 )}
             </ApplicationSectionView>
           )}
@@ -1088,11 +1080,14 @@ export function OperatorShell({
               }
             />
           </div>
-          <div
+          <details
             className="sg-dashboard-record"
             hidden={activeSection !== "deployment"}
+            open={deployment?.status !== "live" || Boolean(reveal)}
           >
-            <h2 className="sg-record-heading">Preparation record</h2>
+            <summary className="sg-preparation-toggle">
+              Preparation record
+            </summary>
             <Inspector
               key={view.workspace?.id ?? "record"}
               hidden={activeSection !== "deployment"}
@@ -1108,8 +1103,8 @@ export function OperatorShell({
               onSelectCheck={setSelectedCheckKey}
               reveal={reveal}
               view={view}
-            />{" "}
-          </div>
+            />
+          </details>
         </section>
 
         {selectedCheck && (
@@ -1131,7 +1126,13 @@ export function OperatorShell({
             error={removeError}
             onCancel={() => {
               setConfirmRemove(false);
-              requestAnimationFrame(() => applicationPicker.current?.focus());
+              requestAnimationFrame(() =>
+                document
+                  .querySelector<HTMLButtonElement>(
+                    '[popovertarget="application-picker"]',
+                  )
+                  ?.focus(),
+              );
             }}
             onConfirm={() => void removeApplication()}
           />

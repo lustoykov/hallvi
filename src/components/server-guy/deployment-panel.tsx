@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LocalTime } from "./local-time";
 import type { DeploymentRecord } from "@/server/deployment-types";
 
 /**
@@ -119,6 +120,52 @@ export function DeploymentPanel({
                   ? "Needs attention"
                   : "Recommendation waiting for your approval"}
           </h2>
+          {record.status === "live" && record.verifiedAt && (
+            <div className="sg-deployment-summary">
+              <p>
+                Last verified <LocalTime value={record.verifiedAt} />. This is a
+                recorded check, not continuous monitoring.
+              </p>
+              <dl className="sg-section-facts">
+                <div>
+                  <dt>
+                    {record.plan?.image
+                      ? "Configuration revision"
+                      : "Serving revision"}
+                  </dt>
+                  <dd>
+                    <code>
+                      {record.revision?.slice(0, 12) ?? "Not recorded"}
+                    </code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Runtime</dt>
+                  <dd>
+                    {record.plan?.image
+                      ? "Pinned container image"
+                      : "Built from source"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Server</dt>
+                  <dd>
+                    {record.offer
+                      ? `${record.offer.serverType.toUpperCase()} · ${record.offer.location}`
+                      : "Not recorded"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>HTTP access</dt>
+                  <dd>
+                    {record.plan?.httpAccess === "controller"
+                      ? "Restricted to the controller’s network"
+                      : "Public"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
           {record.error && (
             <p className="sg-deployment-error" role="alert">
               {record.error}

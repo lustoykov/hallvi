@@ -694,7 +694,7 @@ describe("exact repository access", () => {
     });
   });
   it.each(["missing-scope", "not-installed", "not-selected", "suspended"])(
-    "fails App access with %s, even if repository metadata is public",
+    "fails private repository access with %s",
     async (failure) => {
       await appLogin();
       const original = json.getMockImplementation()!;
@@ -726,6 +726,25 @@ describe("exact repository access", () => {
       );
     },
   );
+  it("reads public upstream source without granting publication access", async () => {
+    await appLogin();
+    const original = json.getMockImplementation()!;
+    json.mockImplementation(async (...args) => {
+      if (args[0].startsWith("/user/installations?"))
+        return { data: { installations: [] }, scopes: [] };
+      if (args[0].includes("/git/trees/"))
+        return { data: { tree: [{ path: "README.md" }] }, scopes: [] };
+      const response = await original(...args);
+      if (args[0] === "/repos/test-owner/example")
+        (response.data as { visibility: string }).visibility = "public";
+      return response;
+    });
+    const result = await inspectGithubRepository(repository);
+    expect(result.status).toBe("passed");
+    expect(result.raw.repositorySelection).toBe("public-read");
+    expect(result.raw.installationId).toBeUndefined();
+    expect(result.raw.grantedPermissions).toEqual({ contents: "read" });
+  });
   it("invalidates a rejected credential and never exposes its raw error", async () => {
     await reuse();
     json.mockRejectedValue(new api.GithubAccessError("Reconnect", "auth"));

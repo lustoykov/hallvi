@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Condition,
   Facts,
   LinkButton,
   Planned,
@@ -12,15 +13,18 @@ import {
   type ViewProps,
 } from "./bits";
 import { LocalTime } from "../local-time";
+import { Meter } from "./visuals";
 
 /**
  * The database as recorded, then what was measured on the host when a
- * measurement exists. Measurements never come from the plan.
+ * measurement exists. Measurements never come from the plan; a size with
+ * no measurement behind it is shown as not measured, never as zero.
  */
 export function DatabaseView(props: ViewProps) {
   const { stack, facts, deployment, now, onAction, busy } = props;
   const verified = verifiedText(deployment);
   const measured = facts.database;
+  const disk = facts.storage?.hostDisk;
   const backupsLink = (
     <TextLink onClick={() => props.onOpenDestination("backups")}>
       Backups
@@ -49,8 +53,62 @@ export function DatabaseView(props: ViewProps) {
   ) : (
     "Not configured"
   );
+  const primary = stack.databases[0];
+  // Weeks of headroom, when both a size and a growth rate were measured.
+  const weeksLeft =
+    measured && disk && measured.growthMbPerWeek
+      ? Math.round(
+          ((disk.totalGb - disk.usedGb) * 1024) / measured.growthMbPerWeek,
+        )
+      : null;
   return (
     <>
+      {primary && (
+        <Condition
+          tone={
+            coverage?.state === "failed"
+              ? "bad"
+              : coverage?.state === "protected"
+                ? "ok"
+                : "warn"
+          }
+          title={
+            primary.kind === "postgres"
+              ? `PostgreSQL ${primary.version}${measured ? ` · ${measured.sizeGb.toFixed(1)} GB` : ""}`
+              : `Embedded SQLite${measured ? ` · ${Math.round(measured.sizeGb * 1024)} MB` : ""}`
+          }
+        >
+          {primary.kind === "postgres"
+            ? "Running privately beside the application on the same instance, on a persistent volume."
+            : "A file inside the application’s own storage, backed up with its files as a consistent copy."}{" "}
+          {coverage
+            ? coverage.state === "protected"
+              ? "It has an off-host copy."
+              : "It has no current off-host copy."
+            : "Off-host protection is not configured."}
+        </Condition>
+      )}
+      {measured && disk && (
+        <div className="sg-band">
+          <h2>Storage used</h2>
+          <Meter
+            label="Database on the instance disk"
+            percent={(measured.sizeGb / disk.totalGb) * 100}
+            detail={`${measured.sizeGb.toFixed(1)} of ${disk.totalGb} GB`}
+            note={
+              <>
+                Measured <When at={measured.measuredAt} now={now} />
+                {measured.growthMbPerWeek != null
+                  ? ` · growing about ${measured.growthMbPerWeek} MB a week`
+                  : " · not enough samples for a growth rate yet"}
+                {weeksLeft != null && weeksLeft < 520
+                  ? ` · roughly ${weeksLeft} weeks of free disk at that rate`
+                  : ""}
+              </>
+            }
+          />
+        </div>
+      )}
       {stack.databases.length ? (
         stack.databases.map((database) => (
           <section
@@ -157,7 +215,7 @@ export function DatabaseView(props: ViewProps) {
                         <>
                           {coverage
                             ? protectionText
-                            : "Backed up with the application’s files as a consistent copy, not a live file copy"}{" "}
+                            : "Not backed up. SQLite requires a consistent snapshot; a live file copy is not a verified backup."}{" "}
                           · {backupsLink}
                         </>,
                       ],

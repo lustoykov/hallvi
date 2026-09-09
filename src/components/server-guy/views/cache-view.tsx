@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Condition,
   Facts,
   Planned,
   Possible,
@@ -10,14 +11,64 @@ import {
   verifiedText,
   type ViewProps,
 } from "./bits";
+import { Bars } from "./visuals";
 
 /** The cache or broker, and the application's own queue on it. */
 export function CacheView(props: ViewProps) {
   const { stack, facts, deployment, now } = props;
   const verified = verifiedText(deployment);
   const observed = facts.jobs?.queues ?? [];
+  const backlogs = observed.filter((item) => item.observedAt);
+  const waiting = backlogs.reduce((sum, item) => sum + (item.backlog ?? 0), 0);
+  const failing = backlogs.reduce(
+    (sum, item) => sum + (item.failedLastHour ?? 0),
+    0,
+  );
+  const oldest = Math.max(
+    0,
+    ...backlogs.map((item) => item.oldestWaitingSeconds ?? 0),
+  );
   return (
     <>
+      {backlogs.length > 0 && (
+        <Condition
+          tone={failing > 0 ? "bad" : oldest > 900 ? "warn" : "ok"}
+          title={
+            waiting === 0
+              ? "Nothing waiting in the queue"
+              : `${waiting} task${waiting === 1 ? "" : "s"} waiting`
+          }
+        >
+          {oldest
+            ? `The oldest has waited ${Math.round(oldest / 60)} minutes. `
+            : ""}
+          {failing
+            ? `${failing} task${failing === 1 ? "" : "s"} failed in the last hour. `
+            : ""}
+          Observed through the application’s own queue library, not inferred
+          from the broker.
+        </Condition>
+      )}
+      {backlogs.length > 0 && (
+        <div className="sg-band">
+          <h2>Pending work</h2>
+          <Bars
+            rows={backlogs.map((item) => ({
+              key: item.library,
+              label: item.library,
+              value: item.backlog ?? 0,
+              tone: item.failedLastHour ? "bad" : "working",
+              text: `${item.backlog ?? 0} waiting${
+                item.failedLastHour ? ` · ${item.failedLastHour} failed` : ""
+              }`,
+            }))}
+          />
+          <p className="sg-visual-caption">
+            Observed <When at={backlogs[0].observedAt!} now={now} />. A backlog
+            is only ever shown when a supported integration reported it.
+          </p>
+        </div>
+      )}
       {stack.services.map((service) => (
         <section
           className="sg-stack-item"

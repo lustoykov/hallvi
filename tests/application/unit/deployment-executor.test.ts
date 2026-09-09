@@ -412,3 +412,121 @@ it("does not repeat test creation after an unknown POST outcome", async () => {
   ).rejects.toThrow("unknown outcome");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it.each([true, false])(
+  "reconciles a supplied test ID only when its unique marker matches (%s)",
+  async (matches) => {
+    const value = record();
+    value.address = "203.0.113.10";
+    value.verificationPending = "sg-check-lost";
+    value.verificationRecoveryId = "candidate";
+    value.plan = {
+      ...plan,
+      checks: [
+        {
+          name: "Read",
+          method: "GET",
+          path: "/todos/{id}",
+          body: null,
+          expectedStatus: 200,
+          contains: "SG_VERIFY_TOKEN",
+          captureId: null,
+        },
+        {
+          name: "Delete",
+          method: "DELETE",
+          path: "/todos/{id}",
+          body: null,
+          expectedStatus: 204,
+          contains: "",
+          captureId: null,
+        },
+      ],
+    };
+    const fetcher = vi.fn(async (url: URL, init: RequestInit = {}) => {
+      if (url.pathname === "/health") return new Response("ok");
+      expect(url.pathname).toBe("/todos/candidate");
+      if (init.method === "DELETE") return new Response(null, { status: 204 });
+      return new Response(matches ? "sg-check-lost" : "real user data");
+    });
+    vi.stubGlobal("fetch", fetcher);
+    // The deliberately incomplete next check fails after recovery. It must not
+    // hide whether cleanup was safely completed or left unresolved.
+    await expect(
+      verifyDeployment(value, new AbortController().signal),
+    ).rejects.toThrow(matches ? "captured object ID" : "Nothing was deleted");
+    expect(value.verificationPending).toBe(matches ? null : "sg-check-lost");
+    expect(
+      fetcher.mock.calls.filter((c) => c[1]?.method === "DELETE"),
+    ).toHaveLength(matches ? 1 : 0);
+  },
+);
+
+it("reuses official images and preserves data/config mounts without publishing private services", () => {
+  const value: DeploymentPlan = {
+    ...plan,
+    postgres: null,
+    image: "grafana/grafana@sha256:" + "a".repeat(64),
+    volumes: [
+      {
+        name: "grafana-data",
+        target: "/var/lib/grafana",
+        kind: "database",
+        sqlite: "/var/lib/grafana/grafana.db",
+      },
+    ],
+    configs: [
+      {
+        name: "datasource",
+        target: "/etc/grafana/provisioning/datasources/prometheus.yaml",
+        content: "url: http://prometheus:9090",
+      },
+    ],
+    services: [
+      {
+        name: "prometheus",
+        image: "prom/prometheus@sha256:" + "b".repeat(64),
+        command: null,
+        environment: [],
+        volumes: [
+          {
+            name: "metrics",
+            target: "/prometheus",
+            kind: "files",
+            sqlite: null,
+          },
+        ],
+        configs: [],
+        port: 9090,
+        healthPath: "/-/ready",
+        checks: [],
+      },
+    ],
+  };
+  const compose = composeDefinition(value, "a".repeat(40), "id", "unused", {});
+  expect(compose.services.app).not.toHaveProperty("build");
+  expect(compose.services.app).toMatchObject({
+    image: value.image,
+    volumes: [
+      "grafana-data:/var/lib/grafana",
+      "./configs/app-datasource:/etc/grafana/provisioning/datasources/prometheus.yaml:ro",
+    ],
+  });
+  expect(compose.services.prometheus).not.toHaveProperty("ports");
+  expect(compose.volumes).toEqual({ "grafana-data": {}, metrics: {} });
+});
+
+it("verifies JSON content independently of formatting without changing values", async () => {
+  const { responseContains } =
+    await import("../../../src/server/deployment-executor");
+  expect(responseContains('{\n  "database": "ok"\n}', '"database":"ok"')).toBe(
+    true,
+  );
+  expect(responseContains('{"database":"not ok"}', '"database":"ok"')).toBe(
+    false,
+  );
+  expect(responseContains('{"message":"not ok"}', '"message":"notok"')).toBe(
+    false,
+  );
+  expect(responseContains("<p>not ok</p>", "notok")).toBe(false);
+});

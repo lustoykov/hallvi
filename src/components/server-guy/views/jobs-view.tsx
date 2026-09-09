@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import {
+  Condition,
   Facts,
   LinkButton,
   Pill,
@@ -14,6 +15,7 @@ import {
   type ViewProps,
 } from "./bits";
 import { LocalTime } from "../local-time";
+import { OutcomeStrip, type Tone } from "./visuals";
 
 const outcomeWord = {
   succeeded: "Succeeded",
@@ -23,14 +25,14 @@ const outcomeWord = {
   running: "Running",
   unknown: "Unknown",
 } as const;
-const outcomeTone = {
+const outcomeTone: Record<string, Tone> = {
   succeeded: "ok",
   failed: "bad",
   "timed-out": "bad",
   missed: "warn",
   running: "working",
   unknown: "muted",
-} as const;
+};
 
 function brokerName(stack: ViewProps["stack"], backend: "postgres" | "redis") {
   if (backend === "postgres") return "PostgreSQL";
@@ -39,9 +41,9 @@ function brokerName(stack: ViewProps["stack"], backend: "postgres" | "redis") {
 
 /**
  * Schedules, the queue that retains work and the workers that execute it,
- * kept apart. A job shows its schedule, next run and last result; runs keep
- * the revision they ran on and their output on demand. Backlog appears only
- * when a supported integration observed it.
+ * kept apart. A job shows its schedule, next run and last result, plus the
+ * rhythm of its recent runs; runs keep the revision they ran on and their
+ * output on demand. Backlog appears only when an integration observed it.
  */
 export function JobsView(props: ViewProps) {
   const { stack, facts, now, onAction, busy } = props;
@@ -50,86 +52,127 @@ export function JobsView(props: ViewProps) {
   const queues = facts.jobs?.queues ?? [];
   const workers = stack.processes.filter((item) => item.role === "worker");
   const running = runs.filter((run) => run.outcome === "running");
+  const troubled = stack.jobs.filter(
+    (job) => job.lastRun && job.lastRun.outcome !== "succeeded",
+  );
+  const paused = stack.jobs.filter((job) => job.paused);
   return (
     <>
+      {stack.jobs.length > 0 && (
+        <Condition
+          tone={troubled.length ? "bad" : paused.length ? "warn" : "ok"}
+          title={
+            troubled.length
+              ? `${troubled.map((job) => job.name).join(", ")} did not succeed`
+              : `${stack.jobs.length} scheduled command${stack.jobs.length === 1 ? "" : "s"}`
+          }
+        >
+          {paused.length
+            ? `${paused.length} paused. `
+            : running.length
+              ? `${running.length} running now. `
+              : ""}
+          Server Guy runs commands the application already owns, on a host-side
+          schedule; runs never overlap.
+        </Condition>
+      )}
       {stack.jobs.length ? (
-        <div className="sg-job-list">
-          <div className="sg-job-row sg-table-head">
-            <span>Job</span>
-            <span>Schedule</span>
-            <span>Next run</span>
-            <span>Last result</span>
+        <div className="sg-band">
+          <h2>Schedules</h2>
+          <div className="sg-job-list">
+            <div className="sg-job-row sg-table-head">
+              <span>Job</span>
+              <span>Schedule</span>
+              <span>Next run</span>
+              <span>Last result</span>
+            </div>
+            {stack.jobs.map((job) => {
+              const live = running.find((run) => run.jobName === job.name);
+              const recent = runs
+                .filter((run) => run.jobName === job.name)
+                .slice(0, 8)
+                .reverse();
+              const bad = job.lastRun && job.lastRun.outcome !== "succeeded";
+              return (
+                <div
+                  className={`sg-job-row${bad ? " sg-row-bad" : ""}`}
+                  key={job.name}
+                >
+                  <span>
+                    <strong>{job.name}</strong>
+                    <small>
+                      <code>{job.command}</code> · runs in{" "}
+                      <code>{job.runsIn}</code>
+                    </small>
+                    {onAction && (
+                      <span className="sg-op-links sg-job-actions">
+                        <LinkButton
+                          disabled={
+                            Boolean(live) || busy === `run-job:${job.name}`
+                          }
+                          onClick={() =>
+                            onAction({ type: "run-job", job: job.name })
+                          }
+                        >
+                          Run now
+                        </LinkButton>
+                        <LinkButton
+                          disabled={busy === `pause-job:${job.name}`}
+                          onClick={() =>
+                            onAction({
+                              type: job.paused ? "resume-job" : "pause-job",
+                              job: job.name,
+                            })
+                          }
+                        >
+                          {job.paused ? "Resume" : "Pause"}
+                        </LinkButton>
+                      </span>
+                    )}
+                  </span>
+                  <span data-label="Schedule">
+                    {job.schedule}
+                    <small>{job.timezone}</small>
+                  </span>
+                  <span data-label="Next run">
+                    {job.paused ? (
+                      <Pill tone="muted">Paused</Pill>
+                    ) : live ? (
+                      <Pill tone="working">Running now</Pill>
+                    ) : job.nextRunAt ? (
+                      <LocalTime value={job.nextRunAt} variant="compact" />
+                    ) : (
+                      "Not scheduled"
+                    )}
+                  </span>
+                  <span data-label="Last result">
+                    {job.lastRun ? (
+                      <>
+                        <Pill tone={outcomeTone[job.lastRun.outcome]}>
+                          {outcomeWord[job.lastRun.outcome]}
+                        </Pill>
+                        <small>
+                          <When at={job.lastRun.at} now={now} />
+                          {job.lastRun.durationSeconds != null &&
+                            ` · ${job.lastRun.durationSeconds}s`}
+                        </small>
+                        <OutcomeStrip
+                          label={`Recent runs of ${job.name}`}
+                          outcomes={recent.map((run) => ({
+                            id: run.id,
+                            tone: outcomeTone[run.outcome] ?? "muted",
+                            title: `${outcomeWord[run.outcome]} · ${run.startedAt}`,
+                          }))}
+                        />
+                      </>
+                    ) : (
+                      "No run yet"
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          {stack.jobs.map((job) => {
-            const live = running.find((run) => run.jobName === job.name);
-            return (
-              <div className="sg-job-row" key={job.name}>
-                <span>
-                  <strong>{job.name}</strong>
-                  <small>
-                    <code>{job.command}</code> · runs in{" "}
-                    <code>{job.runsIn}</code>
-                  </small>
-                  {onAction && (
-                    <span className="sg-op-links sg-job-actions">
-                      <LinkButton
-                        disabled={
-                          Boolean(live) || busy === `run-job:${job.name}`
-                        }
-                        onClick={() =>
-                          onAction({ type: "run-job", job: job.name })
-                        }
-                      >
-                        Run now
-                      </LinkButton>
-                      <LinkButton
-                        disabled={busy === `pause-job:${job.name}`}
-                        onClick={() =>
-                          onAction({
-                            type: job.paused ? "resume-job" : "pause-job",
-                            job: job.name,
-                          })
-                        }
-                      >
-                        {job.paused ? "Resume" : "Pause"}
-                      </LinkButton>
-                    </span>
-                  )}
-                </span>
-                <span data-label="Schedule">
-                  {job.schedule}
-                  <small>{job.timezone}</small>
-                </span>
-                <span data-label="Next run">
-                  {job.paused ? (
-                    <Pill tone="muted">Paused</Pill>
-                  ) : live ? (
-                    <Pill tone="working">Running now</Pill>
-                  ) : job.nextRunAt ? (
-                    <LocalTime value={job.nextRunAt} variant="compact" />
-                  ) : (
-                    "Not scheduled"
-                  )}
-                </span>
-                <span data-label="Last result">
-                  {job.lastRun ? (
-                    <>
-                      <Pill tone={outcomeTone[job.lastRun.outcome]}>
-                        {outcomeWord[job.lastRun.outcome]}
-                      </Pill>
-                      <small>
-                        <When at={job.lastRun.at} now={now} />
-                        {job.lastRun.durationSeconds != null &&
-                          ` · ${job.lastRun.durationSeconds}s`}
-                      </small>
-                    </>
-                  ) : (
-                    "No run yet"
-                  )}
-                </span>
-              </div>
-            );
-          })}
         </div>
       ) : (
         <Possible
@@ -142,11 +185,11 @@ export function JobsView(props: ViewProps) {
           host-side schedule, reusing a schedule the application already owns
           rather than adding a second trigger. Each job would show its schedule,
           next run, last result and the conversation that set it up. Scheduled
-          execution is not available yet.
+          execution is not implemented yet.
         </Possible>
       )}
       {(queues.length > 0 || stack.queues.length > 0 || workers.length > 0) && (
-        <>
+        <div className="sg-band">
           <SubHeading>Queued work</SubHeading>
           <Facts
             rows={[
@@ -162,7 +205,7 @@ export function JobsView(props: ViewProps) {
                       .join(" · ")}{" "}
                     ·{" "}
                     <TextLink onClick={() => props.onOpenDestination("cache")}>
-                      Cache & queue
+                      Cache &amp; queue
                     </TextLink>
                   </>
                 ) : (
@@ -207,10 +250,10 @@ export function JobsView(props: ViewProps) {
               ],
             ]}
           />
-        </>
+        </div>
       )}
       {runs.length > 0 && (
-        <>
+        <div className="sg-band">
           <SubHeading>Recent runs</SubHeading>
           <ol className="sg-runs">
             {runs.slice(0, 8).map((run) => (
@@ -251,7 +294,7 @@ export function JobsView(props: ViewProps) {
               </li>
             ))}
           </ol>
-        </>
+        </div>
       )}
       {stack.jobs.length > 0 && !onAction && (
         <Planned title="Run now, pause and run history">
