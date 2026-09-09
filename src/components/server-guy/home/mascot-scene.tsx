@@ -77,8 +77,8 @@ export function MascotScene({
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
     camera.position.set(0.8, 1.95, 6.25);
     camera.lookAt(0, 1.05, 0);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x9b9a84, 2.2));
-    const light = new THREE.DirectionalLight(0xfff4de, 3.3);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x647089, 2.2));
+    const light = new THREE.DirectionalLight(0xffffff, 3.3);
     light.position.set(-3, 6, 4);
     light.castShadow = true;
     light.shadow.mapSize.set(1024, 1024);
@@ -122,15 +122,15 @@ export function MascotScene({
       eyeGap = 0.28;
 
     mesh(1.6, 1.8, 1.45, 0.19, paint, 0, 1.1);
-    mesh(1.38, 0.72, 0.08, 0.12, 0x2a3830, 0, 1.4, 0.735);
+    mesh(1.38, 0.72, 0.08, 0.12, 0x192338, 0, 1.4, 0.735);
     for (let i = 0; i < 6; i++)
-      mesh(0.035, 0.28, 0.025, 0.013, 0x71826b, -0.35 + i * 0.14, 0.61, 0.738);
-    mesh(0.38, 0.035, 0.32, 0.045, 0xc5d0b9, 0.32, 2.01, -0.15);
+      mesh(0.035, 0.28, 0.025, 0.013, 0x647089, -0.35 + i * 0.14, 0.61, 0.738);
+    mesh(0.38, 0.035, 0.32, 0.045, 0xd6e0f0, 0.32, 2.01, -0.15);
     const feet = [-0.49, 0.49].map((x) =>
-      mesh(0.32, 0.16, 0.82, 0.07, 0x394337, x, 0.13, 0.02),
+      mesh(0.32, 0.16, 0.82, 0.07, 0x3e4a60, x, 0.13, 0.02),
     );
     const eyes = [-eyeGap, eyeGap].map((x) =>
-      mesh(0.115, 0.25, 0.035, 0.05, 0xe1efbb, x, faceY, faceZ),
+      mesh(0.115, 0.25, 0.035, 0.05, 0xedf3ff, x, faceY, faceZ),
     );
     const stroke = (points: number[][], radius = 0.018) => {
       const geo = new THREE.TubeGeometry(
@@ -173,7 +173,7 @@ export function MascotScene({
       ),
     };
     const mouthMat = new THREE.MeshStandardMaterial({
-      color: 0xc9dda4,
+      color: 0xd6e5ff,
     });
     materials.push(mouthMat);
     const mouth = new THREE.Mesh(mouths.smile, mouthMat);
@@ -196,7 +196,7 @@ export function MascotScene({
       return eye;
     });
     const brows = [-eyeGap, eyeGap].map((x) =>
-      mesh(0.16, 0.025, 0.02, 0.01, 0xc9dda4, x, faceY + 0.19, faceZ),
+      mesh(0.16, 0.025, 0.02, 0.01, 0xd6e5ff, x, faceY + 0.19, faceZ),
     );
 
     // Shoulder, elbow and mitten share a local rig; props move with the hand.
@@ -212,19 +212,19 @@ export function MascotScene({
       const elbow = new THREE.Group();
       elbow.position.set(side * 0.08, -0.29, 0.02);
       shoulder.add(elbow);
-      const forearm = mesh(0.18, 0.27, 0.19, 0.08, 0xe2dfcc, 0, -0.1, 0.03);
+      const forearm = mesh(0.18, 0.27, 0.19, 0.08, 0xd6e0f0, 0, -0.1, 0.03);
       elbow.add(forearm);
 
       const wrist = new THREE.Group();
       wrist.position.set(0, -0.24, 0.05);
       elbow.add(wrist);
-      const palm = mesh(0.25, 0.27, 0.21, 0.1, 0xe9e5d4, 0, 0, 0);
+      const palm = mesh(0.25, 0.27, 0.21, 0.1, 0xedf3ff, 0, 0, 0);
       const thumb = mesh(
         0.11,
         0.15,
         0.15,
         0.05,
-        0xe9e5d4,
+        0xedf3ff,
         -side * 0.115,
         0.04,
         0.045,
@@ -236,12 +236,12 @@ export function MascotScene({
     arms[0].wrist.add(clipboard);
     clipboard.position.set(-0.06, 0.17, 0.16);
     clipboard.rotation.z = -0.1;
-    clipboard.add(mesh(0.52, 0.7, 0.06, 0.035, 0x536650));
-    clipboard.add(mesh(0.43, 0.54, 0.018, 0.014, 0xe9e7d7, 0, -0.025, 0.041));
-    clipboard.add(mesh(0.2, 0.09, 0.07, 0.025, 0x829174, 0, 0.335, 0.055));
+    clipboard.add(mesh(0.52, 0.7, 0.06, 0.035, 0x3e4a60));
+    clipboard.add(mesh(0.43, 0.54, 0.018, 0.014, 0xf7f9fc, 0, -0.025, 0.041));
+    clipboard.add(mesh(0.2, 0.09, 0.07, 0.025, 0x647089, 0, 0.335, 0.055));
     for (let i = 0; i < 3; i++) {
       clipboard.add(
-        mesh(0.22, 0.018, 0.016, 0.007, 0x9aa28b, 0.045, 0.14 - i * 0.12, 0.06),
+        mesh(0.22, 0.018, 0.016, 0.007, 0x8c9fb9, 0.045, 0.14 - i * 0.12, 0.06),
       );
       clipboard.add(
         mesh(
@@ -249,7 +249,7 @@ export function MascotScene({
           0.035,
           0.017,
           0.012,
-          0x75925f,
+          0x285ad8,
           -0.14,
           0.14 - i * 0.12,
           0.06,
@@ -260,10 +260,10 @@ export function MascotScene({
     arms[1].wrist.add(wrench);
     wrench.position.set(0.025, 0.14, 0.15);
     wrench.rotation.z = -0.2;
-    wrench.add(mesh(0.105, 0.58, 0.085, 0.04, 0x65766e, 0, 0.12));
-    wrench.add(mesh(0.29, 0.14, 0.1, 0.045, 0x65766e, 0, 0.44));
+    wrench.add(mesh(0.105, 0.58, 0.085, 0.04, 0x647089, 0, 0.12));
+    wrench.add(mesh(0.29, 0.14, 0.1, 0.045, 0x647089, 0, 0.44));
     for (const side of [-1, 1]) {
-      const jaw = mesh(0.09, 0.2, 0.1, 0.025, 0x65766e, side * 0.13, 0.55);
+      const jaw = mesh(0.09, 0.2, 0.1, 0.025, 0x647089, side * 0.13, 0.55);
       jaw.rotation.z = -side * 0.3;
       wrench.add(jaw);
     }
@@ -271,7 +271,7 @@ export function MascotScene({
     geometries.push(ringGeo);
     const ring = new THREE.Mesh(
       ringGeo,
-      new THREE.MeshStandardMaterial({ color: 0x65766e }),
+      new THREE.MeshStandardMaterial({ color: 0x647089 }),
     );
     materials.push(ring.material);
     ring.position.y = -0.21;
@@ -470,7 +470,7 @@ export function MascotScene({
         eye.position.x = (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0);
         eye.rotation.z = attention ? (i === 0 ? -0.12 : 0.12) : 0;
         (eye.material as THREE.MeshStandardMaterial).color.set(
-          attention ? 0xf0c37b : 0xe1efbb,
+          attention ? 0xf0c37b : 0xedf3ff,
         );
         happyEyes[i].visible = happy;
         brows[i].visible = checking || attention;

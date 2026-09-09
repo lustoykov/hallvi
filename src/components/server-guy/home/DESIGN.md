@@ -12,8 +12,10 @@ The selected D / Together composition comes from `codex/homepage-exploration` at
   body 15px; app names 16px desktop and 18px mobile; secondary labels 12–14px.
   Miniature interface artwork uses 7–14px labels because it is an illustration,
   not the product's readable operational interface.
-- Keep Little Server's original box silhouette. Sage, blue, peach, and neutral
+- Keep Little Server's original box silhouette. Slate, silver-blue, periwinkle, and cornflower
   palettes distinguish caretakers and their associated app illustrations.
+  Navy faces, ice-blue expressions, and cool neutral hardware match the app's
+  ink and blue-soft colors; neutral lighting preserves the cooler palette.
   These colors identify applications, not health or operational state.
 - Keep the mascot above the complete miniature application. Three columns on
   wide screens, two on medium screens, one on phones. Real names can wrap.
