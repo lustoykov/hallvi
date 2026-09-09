@@ -1,11 +1,17 @@
 import { PiWorkerDrainError, runPiWorker } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
 
+import { runDeploymentWorker } from "./server/deployment-worker";
+
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => controller.abort());
-runPiWorker(controller.signal)
+Promise.all([
+  runPiWorker(controller.signal),
+  runDeploymentWorker(controller.signal),
+])
   .catch((error) => {
+    controller.abort();
     console.error(
       error instanceof Error ? error.message : "The Pi worker could not start.",
     );

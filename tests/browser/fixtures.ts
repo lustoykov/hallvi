@@ -50,6 +50,25 @@ export const test = base.extend<
             { timeout: 90_000, intervals: [500, 1000] },
           )
           .toBe(true);
+        // Compile conversation handlers before interaction deadlines begin.
+        // GETs against nonexistent IDs create no application, chat or run.
+        // Compilation is fixture setup, not an application response-time check.
+        const missing = "00000000-0000-4000-8000-000000000000";
+        for (const path of [
+          `/api/applications/${missing}`,
+          `/api/applications/${missing}/chats`,
+          `/api/applications/${missing}/chats/${missing}/messages`,
+          `/api/applications/${missing}/chats/${missing}/events`,
+        ]) {
+          const response = await fetch(`${url}${path}`, {
+            headers: { origin: url },
+            signal: AbortSignal.timeout(60_000),
+          });
+          await response.body?.cancel();
+          expect([200, 400, 404, 405], `Fixture warm-up: ${path}`).toContain(
+            response.status,
+          );
+        }
         await provide({ url, state });
       } finally {
         if (child.pid && child.exitCode === null && child.signalCode === null) {
@@ -74,7 +93,7 @@ export const test = base.extend<
         if (root) removeTemporaryRoot(root);
       }
     },
-    { scope: "worker", timeout: 100_000 },
+    { scope: "worker", timeout: 180_000 },
   ],
   baseURL: async ({ fixture }, provide) => {
     await provide(fixture.url);

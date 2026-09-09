@@ -1,5 +1,7 @@
 # Testing workbench: product opportunity and competitors
 
+> Dated research/reference, not an active requirement or implementation plan. Current scope is in [Product](../../PRODUCT.md) and delivery is in [Roadmap](../../ROADMAP.md). Recheck version-sensitive facts before use.
+
 **Research date:** 2026-09-04. Official documentation, repositories, and product pages only. This is a bounded competitor scan, not a hands-on product comparison or a market-demand study. Feature availability and product packaging can change.
 
 ## Recommendation

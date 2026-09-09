@@ -61,9 +61,11 @@ beforeAll(async () => {
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", databaseDirectory);
   saveGithubConnection({
     id: passingInspection.raw.connectionId,
-    mode: "cli",
-    source: "gh",
-    fingerprint: "0".repeat(64),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   });
@@ -76,9 +78,11 @@ beforeAll(async () => {
 beforeEach(() => {
   saveGithubConnection({
     id: passingInspection.raw.connectionId,
-    mode: "cli",
-    source: "gh",
-    fingerprint: "0".repeat(64),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: 1, login: "fixture" },
     connectedAt: new Date().toISOString(),
   });
@@ -111,9 +115,11 @@ describe("repository verification after reconnecting", () => {
   function reconnect() {
     saveGithubConnection({
       id: connectionId,
-      mode: "cli",
-      source: "gh",
-      fingerprint: "0".repeat(64),
+      mode: "app",
+      clientId: "Iv1.fixture",
+      slug: "server-guy-test",
+      token: "ghu_QA-SYNTHETIC-TOKEN",
+      expiresAt: null,
       account: { id: 2, login: "new-login" },
       connectedAt: new Date().toISOString(),
     });
@@ -212,9 +218,11 @@ describe("repository verification after reconnecting", () => {
           ? null
           : {
               id: passingInspection.raw.connectionId,
-              mode: "cli",
-              source: "gh",
-              fingerprint: "0".repeat(64),
+              mode: "app",
+              clientId: "Iv1.fixture",
+              slug: "server-guy-test",
+              token: "ghu_QA-SYNTHETIC-TOKEN",
+              expiresAt: null,
               account: { id: 1, login: "replacement" },
               connectedAt: new Date().toISOString(),
             },
@@ -413,15 +421,32 @@ describe("Phase 1 application workspace", () => {
     expect(result.view.decisions).toEqual([]);
   });
 
-  it("is idempotent for the same policy and rejects a conflicting policy", async () => {
-    const first = await createApplication();
-    const repeated = await createApplication();
+  it("deduplicates a creation request without making repository identity unique", async () => {
+    const input = {
+      requestKey: "00000000-0000-4000-8000-000000000099",
+      repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
+      environment: "production" as const,
+      approvalMode: "pi-decides" as const,
+    };
+    const first = await phaseOne.createPhaseOneApplication(input);
+    const repeated = await phaseOne.createPhaseOneApplication(input);
 
     expect(repeated.created).toBe(false);
     expect(repeated.view.application?.id).toBe(first.view.application?.id);
-    await expect(createApplication("always-ask")).rejects.toBeInstanceOf(
-      phaseOne.ExistingApplicationConflictError,
-    );
+    const separate = await phaseOne.createPhaseOneApplication({
+      ...input,
+      requestKey: "00000000-0000-4000-8000-000000000098",
+      name: "Staging",
+    });
+    expect(separate.view.application?.id).not.toBe(first.view.application?.id);
+    expect(separate.view.application?.name).toBe("Staging");
+    expect(separate.view.selectedChatId).not.toBe(first.view.selectedChatId);
+    await expect(
+      phaseOne.createPhaseOneApplication({
+        ...input,
+        approvalMode: "always-ask",
+      }),
+    ).rejects.toBeInstanceOf(phaseOne.ExistingApplicationConflictError);
   });
 
   it.each([

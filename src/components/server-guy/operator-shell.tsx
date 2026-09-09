@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import {
+  ArrowLeft,
   CaretDown,
   Check,
   Plus,
-  ShieldCheck,
   Trash,
 } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
@@ -13,28 +13,58 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 
+import { applicationOperations } from "@/server/operation-record";
+import { stackOf } from "@/server/application-stack";
+
 import type { PiSetupStatus } from "@/server/pi-setup";
-import { APPROVAL_MODES } from "@/server/types";
 import type {
   ApplicationRecord,
   ChatRunSnapshot,
   GateCheck,
-  PhaseOneOperatorView,
+  OperatorView,
+  PhaseKey,
   PiRun,
   ChatMessage,
 } from "@/server/types";
 
 import { api } from "./api";
-import { ChatList } from "./chat-list";
-import { ChatPane } from "./chat-pane";
+import { ApplicationSectionView } from "./application-section-view";
+import {
+  applicationSections,
+  hiddenStackSections,
+  sectionFromHash,
+  visibleSections,
+  type ApplicationSection,
+} from "./application-sections";
+import { ApplicationNavigation } from "./application-navigation";
+import { DeploymentPanel } from "./deployment-panel";
+import { DeploymentDecision } from "./deployment-decision";
+import type { DeploymentRecord } from "@/server/deployment-types";
+import "./application-shell.css";
+import { ChatPane, type MessageHighlight } from "./chat-pane";
+import {
+  conversationMarks,
+  featuredOperation,
+  labelOf,
+  navigationIndicators,
+  stepDetail,
+} from "./operation-model";
+import { StateChip } from "./operation-receipt";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
+import type { ConformanceAction } from "./conformance-record";
+import { describeCurrentStep, type StepAction } from "./current-step";
+import { CurrentStepBar } from "./current-step-bar";
+import { DemoContext } from "./external-link";
+import { SetupDialog } from "./setup-dialog";
+import { RevisionDialog } from "./revision-dialog";
 import { Inspector } from "./inspector";
-import { PhaseRail } from "./phase-rail";
+import { recordReferences, type RecordSection } from "./record-references";
 
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map(current.map((message) => [message.id, message]));
@@ -48,6 +78,30 @@ function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
     }),
     ...current.filter((message) => !received.has(message.id)),
   ];
+}
+
+/**
+ * When each destination was last looked at, per browser. A confirmed change
+ * newer than this shows a mark until the destination is opened. A first
+ * visit counts everything as seen, so old work does not glow.
+ */
+function readSeen(applicationId: string | undefined) {
+  const all = () =>
+    Object.fromEntries(
+      applicationSections.map((section) => [
+        section.id,
+        new Date().toISOString(),
+      ]),
+    ) as Partial<Record<ApplicationSection, string>>;
+  if (typeof window === "undefined" || !applicationId) return all();
+  try {
+    const stored = localStorage.getItem(`sg-seen:${applicationId}`);
+    return stored
+      ? (JSON.parse(stored) as Partial<Record<ApplicationSection, string>>)
+      : all();
+  } catch {
+    return all();
+  }
 }
 
 function readSubmission(chatId: string) {
@@ -69,17 +123,82 @@ export function OperatorShell({
   initialView,
   initialPiSetup,
   applications,
+  demo = false,
 }: {
-  initialView: PhaseOneOperatorView;
+  initialView: OperatorView;
   initialPiSetup: PiSetupStatus;
   applications: Pick<
     ApplicationRecord,
     "id" | "repositoryOwner" | "repositoryName"
   >[];
+  /** The repository is synthetic: GitHub links are shown, never followed. */
+  demo?: boolean;
 }) {
   const router = useRouter();
+  const showDeployment = !demo;
+  const [deployment, setDeployment] = useState<DeploymentRecord | null>(null);
+  const [hetznerConnected, setHetznerConnected] = useState(false);
+  const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
+    null,
+  );
+  const recordVisible = activeSection !== null;
+  const [seen, setSeen] = useState(() => readSeen(initialView.application?.id));
+  const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const id = initialView.application?.id;
+    if (!id) return;
+    try {
+      localStorage.setItem(`sg-seen:${id}`, JSON.stringify(seen));
+    } catch {
+      /* a browser without storage simply forgets what was looked at */
+    }
+  }, [seen, initialView.application?.id]);
+  // Leaving a destination records that it was looked at; the marks derive
+  // from that timestamp and the operations, and clear on their own.
+  function selectSection(section: ApplicationSection | null) {
+    setActiveSection((current) => {
+      if (current && current !== section)
+        setSeen((seen) => ({ ...seen, [current]: new Date().toISOString() }));
+      return section;
+    });
+    const url = new URL(window.location.href);
+    const hash = section ? `#${section}` : "";
+    if (url.hash !== hash) {
+      url.hash = hash;
+      window.history.pushState(null, "", url);
+    }
+  }
+  // The preparation Record lives with Deployment.
+  function setRecordVisible(visible: boolean) {
+    selectSection(visible ? "deployment" : null);
+  }
+  useEffect(() => {
+    const restore = () =>
+      setActiveSection(sectionFromHash(window.location.hash));
+    const timer = window.setTimeout(restore, 0);
+    window.addEventListener("popstate", restore);
+    window.addEventListener("hashchange", restore);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("popstate", restore);
+      window.removeEventListener("hashchange", restore);
+    };
+  }, []);
+  const [recordWide, setRecordWide] = useState(false);
+  const [preparationOpen, setPreparationOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
   const [view, setView] = useState(initialView);
   const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{
+    section: RecordSection;
+    nonce: number;
+  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
@@ -93,17 +212,99 @@ export function OperatorShell({
   const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
-  const checks = view.checks;
+  const checks = view.checks
+    .filter((check) => check.key !== "target-environment")
+    .map((check) =>
+      check.key === "application-identity"
+        ? { ...check, result: check.result.replace(" · Production", "") }
+        : check,
+    );
   const activeChat =
     view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
   const composer = activeChat ? (drafts[activeChat.id] ?? "") : "";
   const selectedCheck =
     checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
-  const policy = application ? APPROVAL_MODES[application.approvalMode] : null;
-  const { selection } = initialPiSetup;
   const applicationId = application?.id;
   const selectedChatId = view.selectedChatId;
+  const refreshDeployment = useCallback(async () => {
+    if (!applicationId || !selectedChatId || demo) return;
+    const response = await fetch(
+      `/api/applications/${applicationId}/deployment`,
+    );
+    if (!response.ok) return;
+    const value = await response.json();
+    setDeployment(value.deployment);
+    setHetznerConnected(value.connected);
+    if (value.deployment) {
+      const next = await api.view(applicationId, selectedChatId);
+      setView((current) =>
+        current.selectedChatId === next.selectedChatId
+          ? {
+              ...next,
+              messages: mergeMessages(current.messages, next.messages),
+            }
+          : current,
+      );
+    }
+  }, [applicationId, selectedChatId, demo]);
+  useEffect(() => {
+    const initial = window.setTimeout(() => {
+      void refreshDeployment().catch(() => undefined);
+    }, 0);
+    const timer = setInterval(
+      () => void refreshDeployment().catch(() => undefined),
+      2500,
+    );
+    return () => {
+      window.clearTimeout(initial);
+      clearInterval(timer);
+    };
+  }, [refreshDeployment]);
+  // The current-step bar, the Record and the reply references all read the
+  // same view, so a reload and a reply say the same thing.
+  const step = describeCurrentStep(view, { demo });
+  if (
+    view.workspace?.current &&
+    ["inspect-app", "make-launch-ready"].includes(view.workspace.phaseKey)
+  )
+    step.actions.push({
+      key: "change-revision",
+      label: "Change selected revision",
+      explanation: "Review the impact before adopting another commit.",
+      kind: "link",
+    });
+  if (
+    application &&
+    ["start", "inspect-app", "make-launch-ready"].includes(
+      view.workspaces.find((w) => w.current)?.phaseKey ?? "",
+    )
+  )
+    step.actions.push({
+      key: "edit-setup",
+      label: "Edit application setup",
+      explanation:
+        "Review the impact before changing the repository or permission policy.",
+      kind: "link",
+    });
+  const references = recordReferences(view);
+  const operations = useMemo(
+    () => applicationOperations(deployment),
+    [deployment],
+  );
+  const stack = useMemo(() => stackOf(deployment), [deployment]);
+  const [stackRevealed, setStackRevealed] = useState(false);
+  // The open destination is being looked at: it never shows "updated".
+  const indicators = navigationIndicators(operations, seen);
+  if (activeSection && indicators[activeSection]?.tone === "updated")
+    delete indicators[activeSection];
+  const chatMarks = conversationMarks(operations, view.chats);
+  const featured = featuredOperation(operations, activeSection, selectedChatId);
+
+  function revealSection(section: RecordSection) {
+    setRecordVisible(true);
+    setReveal((current) => ({ section, nonce: (current?.nonce ?? 0) + 1 }));
+  }
 
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
@@ -177,6 +378,33 @@ export function OperatorShell({
     };
   }, [applicationId, selectedChatId]);
 
+  const previewActive =
+    view.preview?.status === "starting" || view.preview?.status === "ready";
+  const conformancePending = view.conformance?.runs.some((item) =>
+    ["queued", "running"].includes(item.status),
+  );
+  useEffect(() => {
+    if (
+      !applicationId ||
+      !selectedChatId ||
+      (!previewActive && !conformancePending)
+    )
+      return;
+    let active = true;
+    const timer = setInterval(() => {
+      void api
+        .view(applicationId, selectedChatId)
+        .then((next) => {
+          if (active) setView(next);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [applicationId, selectedChatId, previewActive, conformancePending]);
+
   useLayoutEffect(() => {
     if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
     focusComposerAfterClose.current = false;
@@ -199,7 +427,7 @@ export function OperatorShell({
     menu.style.minWidth = `${anchor.width}px`;
   }
 
-  function applyView(next: PhaseOneOperatorView) {
+  function applyView(next: OperatorView) {
     setView((current) =>
       current.selectedChatId === next.selectedChatId
         ? { ...next, messages: mergeMessages(current.messages, next.messages) }
@@ -237,7 +465,7 @@ export function OperatorShell({
   // current one.
   async function run(
     label: string,
-    work: () => Promise<PhaseOneOperatorView>,
+    work: () => Promise<OperatorView>,
     recover?: () => Promise<void>,
   ) {
     if (busy) return;
@@ -262,13 +490,176 @@ export function OperatorShell({
   }
 
   function selectChat(chatId: string) {
+    setRecordVisible(false);
     if (!application || chatId === view.selectedChatId) return;
     void run("chat", () => api.view(application.id, chatId));
   }
 
+  // The phase strip switches the viewed phase; a completed phase opens its
+  // read-only chats and retained evidence, never a re-evaluation.
+  function selectPhase(phaseKey: PhaseKey) {
+    if (!application || view.workspace?.phaseKey === phaseKey) return;
+    void run("chat", () => api.viewPhase(application.id, phaseKey));
+  }
+
+  // The explicit Continue from a ready deliverable into the next phase.
+  function continueToNextPhase() {
+    if (!application) return;
+    const phase = view.workspace?.phaseKey;
+    void run("continue", () =>
+      phase === "inspect-app"
+        ? api.continueToMakeLaunchReady(application.id)
+        : api.continueToInspectApp(application.id),
+    );
+  }
+
+  // Phase 3 actions: every one asks the server for the whole view again. A
+  // returned view for the phase's primary chat replaces the current selection
+  // only when the current chat belongs to that phase.
+  function conformanceAction(action: ConformanceAction) {
+    if (!application) return;
+    const conformance = api.conformance(application.id);
+    const work = () => {
+      switch (action.type) {
+        case "continue":
+          return conformance.continueWithServerGuy();
+        case "return":
+          return conformance.returnChange(action.reference);
+        case "select-current":
+          return conformance.selectCurrentRevision();
+        case "refresh":
+          return conformance.refresh();
+        case "verify":
+          return conformance.verify();
+        case "approve":
+          return conformance.approve(action.proposalId);
+        case "publish":
+          return conformance.publish(action.proposalId);
+        case "withdraw":
+          return conformance.withdraw(action.proposalId);
+        case "accept-checks":
+          return conformance.acceptChecks(action.acceptanceId);
+        case "cancel-run":
+          return conformance.cancelRun(action.runId);
+        case "grant":
+          return conformance.grant();
+        case "revoke":
+          return conformance.revoke();
+      }
+    };
+    void run(action.type, async () => {
+      const next = await work();
+      return activeChat && next.selectedChatId !== activeChat.id
+        ? api.view(application.id, activeChat.id)
+        : next;
+    });
+  }
+
   function createChat() {
+    setRecordVisible(false);
     if (!application) return;
     void run("new-chat", () => api.createChat(application.id));
+  }
+
+  // A receipt link, an origin line or an Overview item opens the conversation
+  // at the reply that started the work; the transcript scrolls there.
+  function openConversation(chatId: string, messageId: string | null) {
+    const reveal = () => {
+      if (messageId)
+        setHighlight((current) => ({
+          messageId,
+          nonce: (current?.nonce ?? 0) + 1,
+        }));
+    };
+    setRecordVisible(false);
+    if (!application || chatId === view.selectedChatId) {
+      reveal();
+      return;
+    }
+    void run("chat", () => api.view(application.id, chatId)).then(reveal);
+  }
+
+  // Drafts a message in a conversation without sending it.
+  function askInConversation(chatId: string | null, draft: string) {
+    const target = chatId ?? view.selectedChatId;
+    if (!target) return;
+    setDrafts((current) => ({ ...current, [target]: draft }));
+    focusComposerAfterClose.current = true;
+    if (application && target !== view.selectedChatId)
+      void run("chat", () => api.view(application.id, target));
+    setRecordVisible(false);
+    setSelectedCheckKey(null);
+  }
+
+  // Every current-step action is one of the existing operations; nothing here
+  // keeps state of its own.
+  function stepAction(action: StepAction) {
+    const [kind, id = ""] = action.key.split(":");
+    switch (kind) {
+      case "preparation-start":
+        return setPreparationOpen(true);
+      case "preparation-refresh":
+        return (
+          applicationId &&
+          void run("preparation-refresh", () =>
+            api.preparation(applicationId, "refresh"),
+          )
+        );
+      case "preview-start":
+        return (
+          applicationId &&
+          void run("preview-start", () => api.preview(applicationId, "start"))
+        );
+      case "preview-stop":
+        return (
+          applicationId &&
+          void run("preview-stop", () => api.preview(applicationId, "stop", id))
+        );
+      case "preview-confirm":
+        return (
+          applicationId &&
+          void run("preview-confirm", () =>
+            api.preview(applicationId, "confirm", id),
+          )
+        );
+      case "edit-setup":
+        setSetupOpen(true);
+        return;
+      case "change-revision":
+        return setRevisionOpen(true);
+      case "continue":
+        return continueToNextPhase();
+      case "rerun":
+        return rerunCheck(id as NonNullable<GateCheck["rerun"]>["key"]);
+      case "phase":
+        return selectPhase(id as PhaseKey);
+      case "reveal":
+        return revealSection(id as RecordSection);
+      case "ask":
+        return document
+          .querySelector<HTMLTextAreaElement>("#pi-composer")
+          ?.focus();
+      case "continue-with-server-guy":
+        return conformanceAction({ type: "continue" });
+      case "select-current":
+        return conformanceAction({ type: "select-current" });
+      case "accept-checks":
+        return conformanceAction({ type: "accept-checks", acceptanceId: id });
+      case "approve":
+        return conformanceAction({ type: "approve", proposalId: id });
+      case "publish":
+        return conformanceAction({ type: "publish", proposalId: id });
+      case "withdraw":
+        return conformanceAction({ type: "withdraw", proposalId: id });
+      case "grant":
+        return conformanceAction({ type: "grant" });
+      case "refresh":
+        return conformanceAction({ type: "refresh" });
+      case "verify":
+        return conformanceAction({ type: "verify" });
+      case "cancel-run":
+        return conformanceAction({ type: "cancel-run", runId: id });
+    }
   }
 
   function archiveActiveChat() {
@@ -339,56 +730,77 @@ export function OperatorShell({
     });
   }
 
-  function rerunRepositoryCheck() {
+  function rerunCheck(key: NonNullable<GateCheck["rerun"]>["key"]) {
     if (!application) return;
     void run("rerun", async () => {
-      const next = await api.rerunRepositoryCheck(application.id);
-      setSelectedCheckKey("repository-readable");
+      const next = await api.rerunCheck(application.id, key);
+      setSelectedCheckKey(
+        key === "repository-readable"
+          ? "repository-readable"
+          : key === "repository-inspection"
+            ? "profile-resolved"
+            : key === "conformance-refresh"
+              ? "candidate-identified"
+              : "conformance-passed",
+      );
       return activeChat && next.selectedChatId !== activeChat.id
         ? api.view(application.id, activeChat.id)
         : next;
     });
   }
 
+  // A conformance run progresses in the worker; while one is queued or
+  // running, the view is refreshed so its progress and outcome appear.
+  const runInProgress = Boolean(
+    view.conformance?.runs.some(
+      (item) => item.status === "queued" || item.status === "running",
+    ),
+  );
+  useEffect(() => {
+    if (!runInProgress || !applicationId || !selectedChatId) return;
+    const timer = window.setInterval(() => {
+      void api
+        .view(applicationId, selectedChatId)
+        .then((next) => applyView(next))
+        .catch(() => undefined);
+    }, 3_000);
+    return () => window.clearInterval(timer);
+    // applyView is stable enough for a poll; the interval is short-lived.
+  }, [runInProgress, applicationId, selectedChatId]);
+
   async function askAboutCheck(check: GateCheck) {
     const question = `Explain “${check.label}”, its current result, and what I can verify myself.`;
-    if (application && activeChat?.archivedAt) {
-      const primary = view.chats.find(
-        (chat) => chat.isPrimary && !chat.archivedAt,
-      );
-      if (!primary) return;
+    const readOnly =
+      activeChat?.archivedAt || view.workspace?.status === "completed";
+    if (application && readOnly) {
+      // From read-only history, ask in the current phase's main chat.
+      const current = view.workspaces.find((item) => item.current);
+      const primary =
+        current && current.id === view.workspace?.id
+          ? view.chats.find((chat) => chat.isPrimary && !chat.archivedAt)
+          : null;
       await run("chat", async () => {
-        const next = await api.view(application.id, primary.id);
-        setDrafts((current) => ({ ...current, [primary.id]: question }));
+        const next = primary
+          ? await api.view(application.id, primary.id)
+          : await api.viewPhase(application.id, current?.phaseKey ?? "start");
+        const target = primary?.id ?? next.selectedChatId;
+        if (target)
+          setDrafts((current) => ({ ...current, [target]: question }));
         return next;
       });
     } else {
       setComposer(question);
     }
+    setRecordVisible(false);
     focusComposerAfterClose.current = true;
     setSelectedCheckKey(null);
   }
 
   return (
-    <main className="sg-shell">
-      <header className="sg-topbar">
-        <div className="sg-app-identity">
-          <Link
-            className="sg-brand"
-            href="/applications"
-            aria-label="Server Guy, all applications"
-          >
-            <span className="sg-app-mark">SG</span>
-          </Link>
-          {/* Breadcrumb: the current application is the last crumb and doubles
-              as the switcher. */}
-          <div className="sg-breadcrumb">
-            <Link className="sg-crumb" href="/applications">
-              Applications
-            </Link>
-            <span aria-hidden="true" className="sg-crumb-separator">
-              /
-            </span>
+    <DemoContext.Provider value={demo}>
+      <main className="sg-shell sg-adaptive-shell">
+        <header className="sg-topbar">
+          <div className="sg-app-identity">
             <button
               ref={applicationPicker}
               className="sg-application-picker"
@@ -397,10 +809,14 @@ export function OperatorShell({
               disabled={busy !== null}
               aria-label={`Switch application: ${application?.name}`}
             >
-              <strong>{application?.name}</strong>
+              <span>
+                <strong>{application?.name}</strong>
+                <small>
+                  {application?.repositoryOwner}/{application?.repositoryName}
+                </small>
+              </span>
               <CaretDown aria-hidden="true" weight="bold" />
             </button>
-            <span className="sg-environment-label">Production</span>
             <nav
               id="application-picker"
               popover="auto"
@@ -464,94 +880,237 @@ export function OperatorShell({
               </button>
             </nav>
           </div>
-        </div>
-        <div className="sg-topbar-meta">
-          {policy && (
-            <span
-              className="sg-chip"
-              title={`Permission policy · ${policy.hint}`}
+          {activeSection && featured && (
+            <button
+              type="button"
+              className="sg-workstrip"
+              onClick={() =>
+                featured.origin
+                  ? openConversation(
+                      featured.origin.chatId,
+                      featured.origin.messageId,
+                    )
+                  : selectSection(featured.destinations[0])
+              }
+              aria-label={`Active work: ${featured.title}`}
             >
-              <ShieldCheck aria-hidden="true" weight="bold" />
-              <span>Policy</span>
-              <strong>{policy.label}</strong>
-            </span>
+              <StateChip state={featured.state} detail={stepDetail(featured)} />
+              <span>{featured.title}</span>
+            </button>
           )}
-          <Link
-            className="sg-chip"
-            href="/setup/pi"
-            title={
-              initialPiSetup.ready
-                ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                : "Connect ChatGPT to chat with Server Guy"
-            }
-          >
-            <span
-              aria-hidden="true"
-              className={`sg-dot${initialPiSetup.ready ? " ready" : ""}`}
-            />
-            {initialPiSetup.ready ? "Settings" : "Settings · Connect ChatGPT"}
-          </Link>
-        </div>
-      </header>
+        </header>
 
-      <PhaseRail checks={checks} />
-
-      <section className="sg-workspace">
-        <ChatList
-          busy={busy !== null}
+        <ApplicationNavigation
           chats={view.chats}
-          hasApplication={application !== null}
-          onCreate={createChat}
-          onSelect={selectChat}
           selectedChatId={view.selectedChatId}
-        />
-        <ChatPane
-          activeChat={activeChat}
-          busy={busy}
-          composer={composer}
-          error={error}
-          pendingMessage={pendingMessage}
-          piReady={initialPiSetup.ready}
-          onArchive={archiveActiveChat}
-          onComposerChange={setComposer}
-          onSend={sendMessage}
-          runs={runs.filter((run) => run.chatId === activeChat?.id)}
-          reconnecting={reconnecting}
-          onRunAction={runAction}
-          onNewChat={createChat}
-          view={view}
-        />
-        <Inspector
-          checks={checks}
-          onSelectCheck={setSelectedCheckKey}
-          view={view}
-        />
-      </section>
-
-      {selectedCheck && (
-        <CheckDrawer
+          section={activeSection}
           busy={busy !== null}
-          check={selectedCheck}
-          onAsk={askAboutCheck}
-          onClose={closeCheck}
-          onRerun={rerunRepositoryCheck}
+          onSection={selectSection}
+          onChat={selectChat}
+          onCreate={createChat}
+          indicators={indicators}
+          chatMarks={chatMarks}
+          sections={visibleSections(stack, activeSection)}
+          hidden={hiddenStackSections(stack, activeSection)}
+          revealed={stackRevealed}
+          onReveal={setStackRevealed}
         />
-      )}
-      {confirmRemove && application && (
-        <ConfirmActionDialog
-          title={`Remove ${application.name}?`}
-          description="Permanently removes this application’s chats, decisions, observations, and activity from Server Guy. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
-          action="Remove application"
-          confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
-          busy={busy === "remove"}
-          error={removeError}
-          onCancel={() => {
-            setConfirmRemove(false);
-            requestAnimationFrame(() => applicationPicker.current?.focus());
-          }}
-          onConfirm={() => void removeApplication()}
-        />
-      )}
-    </main>
+        <section
+          className={`sg-workspace${recordVisible ? " sg-dashboard-open" : ""}`}
+        >
+          {activeSection && (
+            <ApplicationSectionView
+              key={`${applicationId}:${activeSection}`}
+              section={activeSection}
+              view={view}
+              deployment={deployment}
+              stack={stack}
+              operations={operations}
+              now={now}
+              onRefresh={refreshDeployment}
+              onOpenDestination={selectSection}
+              onOpenConversation={openConversation}
+              onAsk={askInConversation}
+              onRevealStack={() => setStackRevealed(true)}
+              bar={
+                <div className="sg-view-bar">
+                  <button
+                    type="button"
+                    className="sg-view-back"
+                    onClick={() => setRecordVisible(false)}
+                  >
+                    <ArrowLeft aria-hidden="true" />
+                    Back to {activeChat?.title ?? "the conversation"}
+                  </button>
+                  {featured &&
+                    !featured.destinations.includes(activeSection) && (
+                      <button
+                        type="button"
+                        className="sg-suggest"
+                        onClick={() => selectSection(featured.destinations[0])}
+                      >
+                        Server Guy is in {labelOf(featured.destinations[0])} ·
+                        show
+                      </button>
+                    )}
+                </div>
+              }
+            >
+              {activeSection === "deployment" &&
+                showDeployment &&
+                applicationId &&
+                selectedChatId && (
+                  <DeploymentPanel
+                    applicationId={applicationId}
+                    chatId={selectedChatId}
+                    record={deployment}
+                    connected={hetznerConnected}
+                    onRefresh={refreshDeployment}
+                  />
+                )}
+            </ApplicationSectionView>
+          )}
+          <div
+            className={`sg-chat-column${recordVisible ? " sg-chat-parked" : ""}`}
+            inert={recordVisible || undefined}
+          >
+            <details className="sg-legacy-preparation">
+              <summary>Repository preparation details</summary>
+              <CurrentStepBar
+                busy={busy}
+                demo={demo}
+                onAction={stepAction}
+                repository={
+                  application
+                    ? `${application.repositoryOwner}/${application.repositoryName}`
+                    : null
+                }
+                step={step}
+              />
+            </details>
+            {preparationOpen && applicationId && (
+              <ConfirmActionDialog
+                title="Work on a shared GitHub branch?"
+                destructive={false}
+                description="Server Guy may create a preparation branch and publish source checkpoints to a draft PR for the current contract. You can follow along and commit there too. You review and merge the PR on GitHub when ready."
+                action="Start shared preparation"
+                busy={busy !== null}
+                error={error}
+                onCancel={() => setPreparationOpen(false)}
+                onConfirm={() =>
+                  void run("preparation-start", async () => {
+                    const next = await api.preparation(applicationId, "start");
+                    setPreparationOpen(false);
+                    return next;
+                  })
+                }
+              />
+            )}
+            {setupOpen && application && (
+              <SetupDialog
+                application={application}
+                onClose={() => setSetupOpen(false)}
+                onApplied={async (phase) =>
+                  applyView(await api.viewPhase(application.id, phase))
+                }
+              />
+            )}
+            {revisionOpen && applicationId && (
+              <RevisionDialog
+                applicationId={applicationId}
+                onClose={() => setRevisionOpen(false)}
+                onApplied={async () =>
+                  applyView(await api.viewPhase(applicationId, "inspect-app"))
+                }
+              />
+            )}
+            <ChatPane
+              activeChat={activeChat}
+              busy={busy}
+              composer={composer}
+              error={error}
+              pendingMessage={pendingMessage}
+              piReady={initialPiSetup.ready}
+              onArchive={archiveActiveChat}
+              onComposerChange={setComposer}
+              onSend={sendMessage}
+              runs={runs.filter((run) => run.chatId === activeChat?.id)}
+              reconnecting={reconnecting}
+              onRunAction={runAction}
+              onNewChat={createChat}
+              onReveal={revealSection}
+              references={references}
+              view={view}
+              operations={operations}
+              now={now}
+              onOpenDestination={selectSection}
+              onOpenConversation={openConversation}
+              highlight={highlight}
+              decisionFor={(operation) =>
+                operation.source.type === "deployment" &&
+                deployment &&
+                applicationId &&
+                showDeployment ? (
+                  <DeploymentDecision
+                    applicationId={applicationId}
+                    record={deployment}
+                    connected={hetznerConnected}
+                    onRefresh={refreshDeployment}
+                    onOpen={selectSection}
+                  />
+                ) : null
+              }
+            />
+          </div>
+          <div
+            className="sg-dashboard-record"
+            hidden={activeSection !== "deployment"}
+          >
+            <h2 className="sg-record-heading">Preparation record</h2>
+            <Inspector
+              key={view.workspace?.id ?? "record"}
+              hidden={activeSection !== "deployment"}
+              wide={recordWide}
+              onToggleWidth={() => setRecordWide((wide) => !wide)}
+              onHide={() => {
+                setRecordVisible(false);
+              }}
+              busy={busy}
+              checks={checks}
+              offerGrant={step.actions.some((action) => action.key === "grant")}
+              onConformance={conformanceAction}
+              onSelectCheck={setSelectedCheckKey}
+              reveal={reveal}
+              view={view}
+            />{" "}
+          </div>
+        </section>
+
+        {selectedCheck && (
+          <CheckDrawer
+            busy={busy !== null}
+            check={selectedCheck}
+            onAsk={askAboutCheck}
+            onClose={closeCheck}
+            onRerun={rerunCheck}
+          />
+        )}
+        {confirmRemove && application && (
+          <ConfirmActionDialog
+            title={`Remove ${application.name}?`}
+            description="Permanently removes this application’s chats, decisions, observations, and activity from Server Guy. Your repository, other applications, and login stay unchanged. You can then add the same repository again to start fresh."
+            action="Remove application"
+            confirmation={`${application.repositoryOwner}/${application.repositoryName}`}
+            busy={busy === "remove"}
+            error={removeError}
+            onCancel={() => {
+              setConfirmRemove(false);
+              requestAnimationFrame(() => applicationPicker.current?.focus());
+            }}
+            onConfirm={() => void removeApplication()}
+          />
+        )}
+      </main>
+    </DemoContext.Provider>
   );
 }

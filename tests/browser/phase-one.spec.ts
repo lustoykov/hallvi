@@ -1,3 +1,4 @@
+import { openConversation } from "./workspace-helpers";
 import { test, expect } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { journey } from "./journeys";
@@ -21,7 +22,7 @@ async function view(page: Page) {
   return (await page.request.get(`/api${new URL(page.url()).pathname}`)).json();
 }
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox").fill(message);
+  await page.getByRole("textbox", { name: "Message Server Guy" }).fill(message);
   const applicationUrl = new URL(page.url());
   // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
   const [accepted] = await Promise.all([
@@ -40,6 +41,7 @@ async function send(page: Page, message: string) {
     page.getByRole("button", { name: "Send", exact: true }).click(),
   ]);
   expect(accepted.status()).toBe(202);
+  await openConversation(page);
   await expect(
     page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
   ).toBeVisible();
@@ -75,23 +77,31 @@ test(
       })
       .toBe("succeeded");
     await page.goto(route);
+    await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Hello [slow]", { exact: true }),
     ).toBeVisible();
+    await openConversation(page);
     await expect(
       page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
 
-    await page.getByRole("textbox").fill("Cancel **me** [slow-cancel]");
+    await page
+      .getByRole("textbox", { name: "Message Server Guy" })
+      .fill("Cancel **me** [slow-cancel]");
+    await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Cancel request" }),
     ).toBeVisible();
+    await openConversation(page);
     await expect(page.locator(".sg-run-progress")).toContainText(
       "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
-    await expect(page.getByRole("textbox")).toBeEnabled();
+    await expect(
+      page.getByRole("textbox", { name: "Message Server Guy" }),
+    ).toBeEnabled();
     await expect(page.locator(".sg-busy-bar")).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("durable-reply-in-progress.png"),
@@ -110,6 +120,7 @@ test(
     ).toBeVisible();
     await expect(page.locator(".sg-busy-bar")).toHaveCount(0);
     await page.getByText("Show unfinished draft", { exact: true }).click();
+    await openConversation(page);
     await expect(page.locator(".sg-run-progress details")).toContainText(
       "[QA fixture reply]",
     );
@@ -119,16 +130,19 @@ test(
       fullPage: true,
     });
     await page.getByRole("button", { name: "Retry reply" }).click();
+    await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Cancel me [slow-cancel]", {
         exact: true,
       }),
     ).toBeVisible();
+    await openConversation(page);
     await expect(
       page
         .locator(".sg-messages")
         .getByText("Cancel me [slow-cancel]", { exact: true }),
     ).toHaveCount(1);
+    await openConversation(page);
     await expect(
       page
         .locator(".sg-messages .sg-message-response strong")
@@ -145,6 +159,7 @@ test(
       path: testInfo.outputPath("durable-retried-reply.png"),
       fullPage: true,
     });
+    await openConversation(page);
     await send(page, "Continue after cancellation");
   },
 );
@@ -159,12 +174,14 @@ test(
     await page.goto("/");
     await expect(page).toHaveURL(/\/applications$/);
     await addApplication(page, "smoke-app");
+    await openConversation(page);
     await send(page, "priority: Fast recovery matters most");
     await page.reload();
     const saved = await view(page);
     expect(saved.decisions).toHaveLength(1);
     expect(saved.decisions[0].value).toBe("Fast recovery matters most");
     expect(saved.decisions[0].sourceMessageId).toBe(saved.messages.at(-2).id);
+    await openConversation(page);
     await expect(
       page.getByText(
         "[QA fixture reply] priority: Fast recovery matters most",
@@ -231,14 +248,20 @@ test(
   async ({ page }) => {
     await addApplication(page, "failure-app");
     const before = await view(page);
-    await page.getByRole("textbox").fill("Hello [fail-once]");
+    await page
+      .getByRole("textbox", { name: "Message Server Guy" })
+      .fill("Hello [fail-once]");
+    await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     // The pane shows one user-safe line for any failed attempt; the worker's
     // exact error stays in the run record.
     await expect(
       page.getByText("Something went wrong. Please retry.", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByRole("textbox")).toHaveValue("");
+    await expect(
+      page.getByRole("textbox", { name: "Message Server Guy" }),
+    ).toHaveValue("");
+    await openConversation(page);
     await expect(
       page
         .locator(".sg-messages")
@@ -249,9 +272,11 @@ test(
     );
     await page.reload();
     await page.getByRole("button", { name: "Retry reply" }).click();
+    await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Hello [fail-once]", { exact: true }),
     ).toBeVisible();
+    await openConversation(page);
     await expect(
       page
         .locator(".sg-messages")
@@ -268,10 +293,15 @@ test(
   journey("isolation"),
   async ({ page }) => {
     const first = await addApplication(page, "isolation-first");
+    await openConversation(page);
     await send(page, "priority: First app only");
-    await page.getByRole("textbox").fill("Unsent draft");
+    await page
+      .getByRole("textbox", { name: "Message Server Guy" })
+      .fill("Unsent draft");
     await addApplication(page, "isolation-second");
-    await expect(page.getByRole("textbox")).toHaveValue("");
+    await expect(
+      page.getByRole("textbox", { name: "Message Server Guy" }),
+    ).toHaveValue("");
     expect((await view(page)).decisions).toEqual([]);
     await page.goto(first);
     expect((await view(page)).decisions[0].value).toBe("First app only");
@@ -283,15 +313,21 @@ test(
   journey("revision"),
   async ({ page }) => {
     await addApplication(page, "revision-app");
+    await openConversation(page);
     await send(page, "priority: Lowest cost");
     const oldId = (await view(page)).decisions[0].id;
+    await openConversation(page);
     await send(page, "replace-priority: Fast recovery");
     const revised = await view(page);
     expect(revised.decisions).toHaveLength(1);
     expect(revised.decisions[0].id).not.toBe(oldId);
     expect(revised.decisions[0].value).toBe("Fast recovery");
-    await page.getByRole("textbox").fill("invalid-replacement: reject this");
+    await page
+      .getByRole("textbox", { name: "Message Server Guy" })
+      .fill("invalid-replacement: reject this");
+    await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
+    await openConversation(page);
     await expect(
       page.getByText(
         "[QA fixture reply] Replacement rejected; no Decision was staged.",
@@ -310,6 +346,7 @@ test(
   journey("removal"),
   async ({ page }) => {
     const oldPath = await addApplication(page, "removal-app");
+    await openConversation(page);
     await send(page, "priority: Disposable decision");
     await page
       .getByRole("button", { name: "Switch application: removal-app" })
@@ -337,6 +374,7 @@ test(
   journey("disconnect"),
   async ({ page }) => {
     const path = await addApplication(page, "disconnect-app");
+    await openConversation(page);
     await send(page, "Hello before disconnect");
     const before = await view(page);
     await page.goto("/setup/pi");
@@ -352,7 +390,9 @@ test(
       page.getByRole("button", { name: "View applications" }),
     ).toBeDisabled();
     await page.goto(path);
-    await expect(page.getByRole("textbox")).toBeDisabled();
+    await expect(
+      page.getByRole("textbox", { name: "Message Server Guy" }),
+    ).toBeDisabled();
     expect((await view(page)).messages).toEqual(before.messages);
   },
 );
@@ -363,7 +403,7 @@ test(
   async ({ page }, testInfo) => {
     await addApplication(page, "slow-send-app");
     const before = await view(page);
-    const composer = page.getByRole("textbox");
+    const composer = page.getByRole("textbox", { name: "Message Server Guy" });
     let release!: () => void;
     let requests = 0;
     const held = new Promise<void>((resolve) => {
@@ -378,22 +418,30 @@ test(
       },
     );
     try {
+      await openConversation(page);
       await composer.fill("Hello [slow]");
+      await openConversation(page);
       await composer.press("Enter");
+      await openConversation(page);
       await composer.press("Enter");
+      await openConversation(page);
       await expect(
         page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
       ).toBeVisible();
+      await openConversation(page);
       await expect(
         page.locator(".sg-messages").getByText("Pending", { exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole("status").filter({ hasText: "Saving message" }),
       ).toBeVisible();
+      await openConversation(page);
       await expect(
         page.getByText("[QA fixture reply] Hello [slow]", { exact: true }),
       ).toHaveCount(0);
+      await openConversation(page);
       await expect(composer).toHaveValue("");
+      await openConversation(page);
       await composer.fill("Next unsent draft");
       await expect.poll(() => requests).toBe(1);
       expect((await view(page)).messages).toEqual(before.messages);
@@ -404,18 +452,22 @@ test(
     } finally {
       release();
     }
+    await openConversation(page);
     await expect(
       page.getByText("[QA fixture reply] Hello [slow]", { exact: true }),
     ).toBeVisible();
+    await openConversation(page);
     await expect(
       page.locator(".sg-messages").getByText("Hello [slow]", { exact: true }),
     ).toHaveCount(1);
+    await openConversation(page);
     await expect(
       page.locator(".sg-messages").getByText("Pending", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("status").filter({ hasText: "Saving message" }),
     ).toHaveCount(0);
+    await openConversation(page);
     await expect(composer).toHaveValue("Next unsent draft");
     expect(requests).toBe(1);
     expect((await view(page)).messages).toHaveLength(

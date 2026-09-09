@@ -169,6 +169,8 @@ export function saveGithubConnection(connection: GithubConnection | null) {
 export function githubConnectionIssue(
   connection: GithubConnection,
 ): string | null {
+  if (connection.mode === "cli")
+    return "CLI connections are no longer supported. Connect through Server Guy's GitHub App in Settings → GitHub.";
   if (connection.invalidReason) return connection.invalidReason;
   if (
     connection.mode === "app" &&
@@ -356,17 +358,10 @@ export async function connectedGithubCredential() {
         : connection;
     return { connection: current, token: current.token };
   }
-  const credential = await readGithubCliCredential();
-  if (
-    !credential ||
-    credential.source !== connection.source ||
-    credentialFingerprint(credential.token, credential.source) !==
-      connection.fingerprint
-  ) {
-    const reason =
-      "Your GitHub CLI login changed or is missing. Choose a connection again in Settings → GitHub.";
-    invalidateGithubConnection(connection, reason);
-    throw new GithubAccessError(reason, "auth");
-  }
-  return { connection, token: credential.token };
+  // Older saved CLI selections remain readable only to explain reconnection.
+  // Never inspect or borrow the host user's shell credentials.
+  throw new GithubAccessError(
+    "Connect through Server Guy's GitHub App.",
+    "auth",
+  );
 }

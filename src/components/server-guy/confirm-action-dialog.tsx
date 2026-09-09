@@ -9,6 +9,7 @@ export function ConfirmActionDialog({
   description,
   action,
   confirmation,
+  destructive = true,
   busy,
   error,
   onCancel,
@@ -18,6 +19,7 @@ export function ConfirmActionDialog({
   description: string;
   action: string;
   confirmation?: string;
+  destructive?: boolean;
   busy: boolean;
   error: string | null;
   onCancel: () => void;
@@ -86,7 +88,7 @@ export function ConfirmActionDialog({
             Cancel
           </button>
           <button
-            className={s.danger}
+            className={destructive ? s.danger : s.primary}
             type="submit"
             disabled={busy || Boolean(confirmation && typed !== confirmation)}
           >

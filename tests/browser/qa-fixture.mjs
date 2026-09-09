@@ -4,6 +4,7 @@
 // checkout.
 import {
   cpSync,
+  readFileSync,
   mkdirSync,
   writeFileSync,
   symlinkSync,
@@ -12,7 +13,6 @@ import {
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   createTemporaryRoot,
   removeTemporaryRoot,
@@ -67,6 +67,22 @@ for (const name of [
 ]) {
   cpSync(join(source, name), join(app, name), { recursive: true });
 }
+// Keep synthetic repository labels, but exercise deployment UI in this isolated
+// copy. Deployment browser tests intercept its endpoint; no provider credential
+// files are copied and the unconnected state performs no external operation.
+const shellPath = join(app, "src/components/server-guy/operator-shell.tsx");
+writeFileSync(
+  shellPath,
+  readFileSync(shellPath, "utf8")
+    .replace(
+      "!applicationId || !selectedChatId || demo",
+      "!applicationId || !selectedChatId",
+    )
+    .replaceAll(
+      "const showDeployment = !demo;",
+      "const showDeployment = true;",
+    ),
+);
 symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
 renameSync(
   join(app, "src/server/pi-configuration.ts"),
@@ -80,6 +96,21 @@ cpSync(
   join(source, "tests/browser-fixtures/github-api.ts.txt"),
   join(app, "src/server/github-api.ts"),
 );
+// The runner is scripted too: no containers in the desktop journeys. The real
+// executor module stays beside it for the shared types and helpers.
+renameSync(
+  join(app, "src/server/conformance-executor.ts"),
+  join(app, "src/server/conformance-executor-real.ts"),
+);
+cpSync(
+  join(source, "tests/browser-fixtures/conformance-executor.ts.txt"),
+  join(app, "src/server/conformance-executor.ts"),
+);
+// Synthetic repositories, GitHub tree/contents responses and the scripted
+// contract builder, shared with the deterministic tests and eval seeds.
+cpSync(join(source, "tests/fixtures"), join(app, "src/server/qa-fixtures"), {
+  recursive: true,
+});
 cpSync(
   join(source, "tests/browser-fixtures/login-fixture.ts.txt"),
   join(app, "src/server/qa-login-fixture.ts"),
@@ -110,11 +141,11 @@ if (initialSetup === "ready") {
     join(state, "github-connection.json"),
     JSON.stringify({
       id: "00000000-0000-4000-8000-000000000001",
-      mode: "cli",
-      source: "gh",
-      fingerprint: createHash("sha256")
-        .update("gh\0QA-GITHUB-TOKEN")
-        .digest("hex"),
+      mode: "app",
+      clientId: "Iv1.qa-fixture",
+      slug: "qa-server-guy",
+      token: "ghu_QA-SYNTHETIC",
+      expiresAt: null,
       account: { id: 42, login: "qa-fixture-user" },
       connectedAt: new Date().toISOString(),
     }),
@@ -180,7 +211,7 @@ const manifest = {
   initialSetup,
   database: env.SERVER_GUY_DB_PATH,
   externalAdapters:
-    "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials are synthetic. ChatGPT OAuth " +
+    "Production Pi adapter, native SDK sessions and tools; only model responses, GitHub API/credentials (fixture repository trees, contents, branches and pull requests at synthetic commits) and the conformance runner are synthetic. ChatGPT OAuth " +
     loginMode +
     " and GitHub device flow are simulated without provider calls",
 };

@@ -41,13 +41,6 @@ async function request<T>(
 }
 const waiting = (attempt: GithubLoginAttempt | null) =>
   attempt?.status === "waiting" || attempt?.status === "starting";
-const sourceLabel = (source: string) =>
-  source === "gh"
-    ? "Existing GitHub CLI login"
-    : source === "Server Guy"
-      ? "Separate login for Server Guy"
-      : `${source} environment variable`;
-
 /**
  * Extend the chosen Pi setup layout: account, repository access, then one
  * Continue action.
@@ -80,7 +73,6 @@ export function GithubSetupScreen({
   const inFlight = useRef(false);
   const working = waiting(attempt);
   const connected = Boolean(status.connection && !status.issue);
-  const candidate = status.detected.candidate;
   const visibleCheck =
     repositoryCheck?.connectionId === status.connection?.id
       ? repositoryCheck
@@ -218,20 +210,6 @@ export function GithubSetupScreen({
     setAttempt(fresh.attempt);
     return fresh;
   }
-  async function useExisting() {
-    generation.current++;
-    const fresh = await request<GithubSetupStatus>(
-      "/api/github/setup",
-      "POST",
-      { candidateId: candidate?.id },
-    );
-    setStatus(fresh);
-    setAttempt(null);
-    setChoosing(false);
-    router.refresh();
-    if (fresh.connection && !fresh.issue)
-      await checkRepositories(fresh.connection.id, generation.current);
-  }
   async function disconnect() {
     generation.current++;
     const fresh = await request<GithubSetupStatus>(
@@ -265,7 +243,10 @@ export function GithubSetupScreen({
         <SettingsNav current="github" />
         <div className={s.heading}>
           <h1>Connect GitHub</h1>
-          <p>Choose which login Server Guy uses to read your repositories.</p>
+          <p>
+            Connect through the Server Guy GitHub App and choose which
+            repositories it can access.
+          </p>
         </div>
         <section className={s.card}>
           <section
@@ -344,7 +325,7 @@ export function GithubSetupScreen({
                       <Check />
                       Connected as {status.connection.account.login}
                     </strong>
-                    <p>{sourceLabel(status.connection.source)}</p>
+                    <p>Separate login for Server Guy</p>
                   </div>
                   <button
                     className={s.textButton}
@@ -369,52 +350,7 @@ export function GithubSetupScreen({
               </>
             ) : (
               <div className={s.actions}>
-                {candidate && (
-                  <>
-                    <div className={s.savedLogin}>
-                      <Check />
-                      <div>
-                        <strong>Found {candidate.account.login}</strong>
-                        <p>{sourceLabel(candidate.source)}</p>
-                      </div>
-                    </div>
-                    <div className={s.choiceActions}>
-                      <button
-                        className={s.primary}
-                        disabled={busy}
-                        onClick={() => void act(useExisting)}
-                      >
-                        Use existing login
-                      </button>
-                      {status.registration && (
-                        <button
-                          className={s.textButton}
-                          disabled={busy}
-                          onClick={() =>
-                            void act(async () => {
-                              generation.current++;
-                              setCopied(false);
-                              setAttempt(
-                                await request<GithubLoginAttempt>(
-                                  "/api/github/setup/login",
-                                  "POST",
-                                  {},
-                                ),
-                              );
-                            })
-                          }
-                        >
-                          Connect another account
-                        </button>
-                      )}
-                    </div>
-                    <p className={s.hint}>
-                      Uses this login’s existing permissions. Server Guy will
-                      only read repositories in this phase.
-                    </p>
-                  </>
-                )}
-                {!candidate && status.registration && (
+                {status.registration && (
                   <button
                     className={s.primary}
                     disabled={busy}
@@ -436,8 +372,8 @@ export function GithubSetupScreen({
                   </button>
                 )}
                 {!status.registration && (
-                  <details className={s.connectionHelp} open={!candidate}>
-                    <summary>Enable a separate GitHub login</summary>
+                  <details className={s.connectionHelp} open>
+                    <summary>Register the Server Guy GitHub App</summary>
                     <p>
                       The owner of this Server Guy installation needs to
                       register its GitHub App. Set these values, then restart
@@ -449,8 +385,9 @@ export function GithubSetupScreen({
                       SERVER_GUY_GITHUB_APP_SLUG
                     </code>
                     <p>
-                      Enable device flow and Contents: read-only. Keep
-                      user-token expiration enabled.
+                      Enable device flow, Contents: read and write, and Pull
+                      requests: read and write. Keep user-token expiration
+                      enabled.
                     </p>
                     <a
                       href="https://github.com/settings/apps/new"
@@ -628,14 +565,7 @@ export function GithubSetupScreen({
             <X />
           </button>
         </header>
-        <h3>Existing login</h3>
-        <p>
-          Server Guy reads the GitHub CLI’s login or the server’s GH_TOKEN /
-          GITHUB_TOKEN environment variable. It checks the account with GitHub
-          automatically. Reuse requires your choice; tokens are never copied
-          from the CLI into Server Guy’s settings.
-        </p>
-        <h3>Separate login</h3>
+        <h3>GitHub App login</h3>
         <p>
           GitHub sign-in stores access and refresh tokens in the file below.
           They are not encrypted; the file is readable and writable only by the
@@ -651,16 +581,16 @@ export function GithubSetupScreen({
         <h3>Permissions</h3>
         <p>
           The GitHub App limits access to installed repositories and its granted
-          permissions. Reusing a CLI login keeps that credential’s existing
-          scope, which may be broader. Server Guy currently makes only read
-          requests to the repository.
+          permissions. Repository inspection is read-only. Publishing a
+          preparation branch and pull request also requires your permission
+          within Server Guy.
         </p>
         <h3>Disconnect</h3>
         <p>
-          Disconnect removes Server Guy’s saved login and both tokens. The CLI
-          login and environment variables stay intact. Application history
-          remains, and repository checks require a new connection and
-          re-verification. To revoke the authorization on GitHub too, open{" "}
+          Disconnect removes Server Guy’s saved login and both tokens.
+          Application history remains, and repository checks require a new
+          connection and re-verification. To revoke the authorization on GitHub
+          too, open{" "}
           <a
             href="https://github.com/settings/apps/authorizations"
             target="_blank"
@@ -674,7 +604,7 @@ export function GithubSetupScreen({
       {confirmDisconnect && (
         <ConfirmActionDialog
           title="Disconnect GitHub?"
-          description="Removes Server Guy’s saved connection. Application history stays; repository access must be checked again after reconnecting. Your GitHub CLI login is unchanged."
+          description="Removes Server Guy’s saved connection. Application history stays; repository access must be checked again after reconnecting."
           action="Disconnect"
           busy={busy}
           error={error}

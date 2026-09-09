@@ -5,6 +5,7 @@ import { ChatList } from "../../../src/components/server-guy/chat-list";
 
 const chat = {
   id: "chat-1",
+  applicationId: "application",
   workspaceId: "workspace",
   title: "Launch Brief",
   isPrimary: true,
@@ -33,6 +34,19 @@ describe("chat list", () => {
         onCreate={() => {}}
         onSelect={() => {}}
         selectedChatId="chat-1"
+        workspace={{
+          id: "workspace",
+          applicationId: "app",
+          phaseKey: "start",
+          createdAt: chat.createdAt,
+          completedAt: null,
+          deliverableEvidence: null,
+          phaseNumber: 1,
+          name: "Start",
+          deliverable: "Launch Brief",
+          status: "in-progress",
+          current: true,
+        }}
       />,
     );
     expect(html).toContain('<time dateTime="2026-09-05T10:30:00.000Z"');

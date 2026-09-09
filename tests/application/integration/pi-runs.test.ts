@@ -127,10 +127,12 @@ describe("durable Pi acceptance and outcomes", () => {
       userMessage: "What priority?",
     });
     expect(Object.keys(secondInput).sort()).toEqual([
+      "phaseKey",
       "run",
       "runContext",
       "userMessage",
     ]);
+    expect(secondInput.phaseKey).toBe("start");
     expect(JSON.parse(secondInput.runContext)).toMatchObject({
       chatId: second,
       applicationId,
@@ -303,6 +305,7 @@ describe("minimal native Run context", () => {
         "createdAt",
         "previousAttempt",
         "runId",
+        "userMessageId",
       ]);
       expect(context).not.toHaveProperty("currentApplication");
       expect(context).not.toHaveProperty("decisions");
@@ -511,6 +514,11 @@ function createWorkerFixture(name: string) {
     "tests/browser-fixtures/pi-configuration.ts.txt",
     join(copy, "src/server/pi-configuration.ts"),
   );
+  // The synthetic provider's scripted Phase 2 flow imports the shared fixture
+  // modules, copied the way the disposable browser app copies them.
+  cpSync("tests/fixtures", join(copy, "src/server/qa-fixtures"), {
+    recursive: true,
+  });
   const authPath = join(root, "synthetic-auth.json");
   writeFileSync(
     authPath,

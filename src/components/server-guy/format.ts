@@ -1,4 +1,13 @@
-import type { GateCheck } from "@/server/types";
+import type { ContractProvenance, GateCheck } from "@/server/types";
+
+/** How a contract value was established, in plain words: its source. */
+export const SOURCE_LABELS: Record<ContractProvenance["kind"], string> = {
+  "repository-declared": "Declared in repository",
+  "profile-rule": "Profile rule",
+  "user-confirmed": "Your choice",
+  inferred: "Inferred",
+  unresolved: "Unresolved",
+};
 
 export function statusLabel(status: GateCheck["status"]) {
   if (status === "passed") return "Passed";

@@ -1,3 +1,4 @@
+import { sweepApplicationPreviews } from "./application-preview";
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -5,8 +6,8 @@ import { databasePath, listMessages } from "./db";
 import { beginRunDiagnostics } from "./tracing";
 import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
-import { loadChat } from "./phase-one";
 import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
+import { assertChatWritable, loadChat } from "./workspaces";
 import {
   claimNextPiRun,
   completePiRun,
@@ -16,6 +17,18 @@ import {
   persistPiDraft,
   recordPiCall,
 } from "./pi-runs";
+import { StaleContractProposalError } from "./phase-two";
+import {
+  conformanceExecutor,
+  executeClaimedConformanceRun,
+  publishIfAutomatic,
+  StaleConformanceProposalError,
+} from "./phase-three";
+import {
+  claimNextConformanceRun,
+  interruptConformanceRuns,
+} from "./conformance-runs";
+import { getWorkspaceById } from "./db";
 import type { PiRun } from "./types";
 import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 
@@ -40,6 +53,17 @@ export function acquireWorkerLock() {
   return () => {
     lock.close();
   };
+}
+
+/**
+ * Make launch-ready Runs execute isolated previews that take minutes; the
+ * inspection can include many reads and a substantial contract proposal.
+ */
+export function defaultRunTimeoutMs(run: PiRun) {
+  const phase = getWorkspaceById(run.workspaceId)?.phaseKey;
+  if (phase === "make-launch-ready") return 30 * 60_000;
+  if (phase === "inspect-app") return 10 * 60_000;
+  return 120_000;
 }
 
 export async function executePiRun(
@@ -71,14 +95,17 @@ export async function executePiRun(
       savedDraft = draft;
     }
   }, 250);
-  const timeout = setTimeout(() => {
-    finishPiRun(
-      run.id,
-      "timed-out",
-      "The reply exceeded the execution time limit. Retry when ready; no Decisions were saved.",
-    );
-    controller.abort();
-  }, options.timeoutMs ?? 120_000);
+  const timeout = setTimeout(
+    () => {
+      finishPiRun(
+        run.id,
+        "timed-out",
+        "The reply exceeded the execution time limit. Retry when ready; no Decisions were saved.",
+      );
+      controller.abort();
+    },
+    options.timeoutMs ?? defaultRunTimeoutMs(run),
+  );
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
   const stage: { value: "context" | "model" | "save" } = { value: "context" };
@@ -86,8 +113,12 @@ export async function executePiRun(
     const work = async () => {
       controller.signal.throwIfAborted();
       diagnostics.signal({ type: "start", key: "context", kind: "context" });
-      const { chat } = loadChat(run.applicationId, run.chatId);
-      if (chat.archivedAt) throw new Error("This Chat is archived.");
+      const { chat, workspace } = loadChat(run.applicationId, run.chatId);
+      if (workspace.id !== run.workspaceId)
+        throw new Error(
+          "Application execution context changed. Start a new request with the current state.",
+        );
+      assertChatWritable(chat, workspace);
       // No application summary is injected: Pi reads current state through
       // get_application_status when an answer depends on it.
       const runContext = buildPiRunContext(run);
@@ -98,7 +129,12 @@ export async function executePiRun(
       diagnostics.signal({ type: "end", key: "context" });
       stage.value = "model";
       const reply = await askPi(
-        { run, userMessage: user.body, runContext },
+        {
+          run,
+          userMessage: user.body,
+          runContext,
+          phaseKey: workspace.phaseKey,
+        },
         {
           signal: controller.signal,
           onActivity: diagnostics.signal,
@@ -121,12 +157,21 @@ export async function executePiRun(
         });
         // completePiRun has committed before either the log or span can claim
         // success. A cancelled/stale result leaves this step incomplete.
-        if (saved)
+        if (saved) {
           diagnostics.signal({
             type: "end",
             key: "save",
-            metadata: { requirements: reply.decisionProposals.length },
+            metadata: {
+              requirements: reply.decisionProposals.length,
+              contract: reply.contractProposal ? 1 : 0,
+              sourceChange: reply.sourceProposal ? 1 : 0,
+            },
           });
+          // Publication under an automatic policy is an external effect after
+          // the commit; its own receipt or failure lands on the proposal.
+          if (reply.sourceProposal)
+            await publishIfAutomatic(run.applicationId, run.workspaceId);
+        }
       } catch (error) {
         diagnostics.signal({ type: "end", key: "save", failed: true });
         throw error;
@@ -180,7 +225,9 @@ export async function executePiRun(
     finishPiRun(
       run.id,
       "failed",
-      error instanceof NativeSessionError
+      error instanceof NativeSessionError ||
+        error instanceof StaleContractProposalError ||
+        error instanceof StaleConformanceProposalError
         ? error.message
         : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
       failure,
@@ -200,18 +247,50 @@ export async function executePiRun(
 export async function runPiWorker(signal: AbortSignal) {
   const release = acquireWorkerLock();
   let unsettled = false;
+  let previewTimer: ReturnType<typeof setInterval> | undefined;
   try {
     interruptRunningPiRuns();
+    const interrupted = interruptConformanceRuns();
+    await sweepApplicationPreviews(true).catch(() => undefined);
+    let sweeping = false;
+    previewTimer = setInterval(() => {
+      if (sweeping) return;
+      sweeping = true;
+      void sweepApplicationPreviews()
+        .catch(() => undefined)
+        .finally(() => {
+          sweeping = false;
+        });
+    }, 30_000);
+    previewTimer.unref();
+    // Containers of interrupted attempts are removed by label; a failure here
+    // only leaves leftovers for the next start, never a false outcome.
+    await conformanceExecutor()
+      .cleanupLeftovers()
+      .then((removed) => {
+        if (removed || interrupted.length)
+          console.info(
+            `Removed ${removed} leftover runner resource${removed === 1 ? "" : "s"}; ${interrupted.length} interrupted conformance run${interrupted.length === 1 ? "" : "s"} recorded.`,
+          );
+      })
+      .catch(() => undefined);
     console.info("Pi worker ready. Watching saved requests, one at a time.");
     while (!signal.aborted) {
       const run = claimNextPiRun();
       if (run) await executePiRun(run, { signal });
-      else await delay(250, undefined, { signal }).catch(() => undefined);
+      else {
+        const conformance = claimNextConformanceRun();
+        if (conformance)
+          await executeClaimedConformanceRun(conformance, signal);
+        else await delay(250, undefined, { signal }).catch(() => undefined);
+      }
     }
   } catch (error) {
     unsettled = error instanceof PiWorkerDrainError;
     throw error;
   } finally {
+    if (previewTimer) clearInterval(previewTimer);
+    await sweepApplicationPreviews(true).catch(() => undefined);
     // A poisoned worker keeps the OS lock until process exit, not merely until
     // this function rejects. No next writer may overlap an unresponsive SDK.
     if (unsettled) unsettledWorkerLocks.add(release);

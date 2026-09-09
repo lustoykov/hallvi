@@ -252,10 +252,7 @@ async function inspectGithubRepositoryAttempt(
         repository: repo.full_name,
         repositoryId: repo.id,
         connectionId: connection.id,
-        credentialSource:
-          connection.mode === "cli"
-            ? connection.source
-            : "Server Guy GitHub App",
+        credentialSource: "Server Guy GitHub App",
         accountId: account.id,
         scopes: identity.scopes,
         ...scope,

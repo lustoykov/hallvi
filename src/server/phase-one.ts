@@ -1,9 +1,8 @@
+import { applicationDeployment } from "./deployment-store";
 import {
   archiveChat as archiveChatRecord,
   deleteApplication,
   getApplication,
-  getApplicationByRepository,
-  getChat,
   getWorkspace,
   insertActivity,
   insertApplication,
@@ -13,13 +12,10 @@ import {
   insertObservation,
   insertWorkspace,
   latestObservation,
-  listActiveDecisions,
-  listActivity,
   listApplications,
-  listChats,
-  listChatSummaries,
-  listMessages,
+  listApplicationChats,
   listObservations,
+  listApplicationPreviews,
   recordActivityOnce,
   supersedeDecision,
   withTransaction,
@@ -30,73 +26,37 @@ import {
   readGithubConnection,
 } from "./github-connection";
 import {
-  PHASE_ONE,
-  computeChecks,
-  deriveUpcomingRequirements,
-  observationMatchesConnection,
-} from "./phase-one-spec";
-import { APPROVAL_MODES, isApprovalMode } from "./types";
+  getApplicationStatus,
+  getOperatorView,
+  getPhaseOneOperatorView,
+  listApplicationSummaries,
+} from "./operator-view";
+import {
+  currentPhaseOneChecks,
+  REPOSITORY_OBSERVATION,
+} from "./phase-one-evidence";
+import { INSPECTION_OBSERVATION } from "./phase-two";
 import { removeNativeApplicationSessions } from "./pi-sessions";
-import type {
-  ApplicationRecord,
-  ApplicationStatus,
-  CreateApplicationInput,
-  GateCheck,
-  PhaseOneOperatorView,
-  PhaseWorkspaceRecord,
-  PhaseWorkspaceView,
-  PiDecision,
-} from "./types";
+import { APPROVAL_MODES, isApprovalMode } from "./types";
+import type { CreateApplicationInput, GateCheck, PiDecision } from "./types";
+import {
+  assertChatWritable,
+  ExistingApplicationConflictError,
+  loadApplication,
+  loadChat,
+  NotFoundError,
+  primaryChatTitle,
+} from "./workspaces";
 
-export class ExistingApplicationConflictError extends Error {}
-export class NotFoundError extends Error {}
-
-const REPOSITORY_OBSERVATION = "github-repository-identity";
-
-function loadWorkspace(applicationId: string) {
-  const application = getApplication(applicationId);
-  const workspace = application ? getWorkspace(application.id) : null;
-  if (!application || !workspace)
-    throw new NotFoundError("Application not found.");
-  return { application, workspace };
-}
-
-export function loadChat(applicationId: string, chatId: string) {
-  const { application, workspace } = loadWorkspace(applicationId);
-  const chat = getChat(chatId);
-  if (!chat || chat.workspaceId !== workspace.id) {
-    throw new NotFoundError("Chat not found.");
-  }
-  return { application, workspace, chat };
-}
-
-// The latest repository Observation and the login it must match. Every gate
-// evaluation reads both from current records; nothing caches a result.
-function currentRepositoryEvidence(application: ApplicationRecord) {
-  return {
-    repository: latestObservation(application.id, REPOSITORY_OBSERVATION),
-    connectionId: currentGithubConnectionId(),
-  };
-}
-
-function currentChecks(application: ApplicationRecord) {
-  const { repository, connectionId } = currentRepositoryEvidence(application);
-  return computeChecks(application, repository, connectionId);
-}
-
-function workspaceView(
-  workspace: PhaseWorkspaceRecord,
-  checks: GateCheck[],
-): PhaseWorkspaceView {
-  return {
-    ...workspace,
-    phaseNumber: PHASE_ONE.number,
-    deliverable: PHASE_ONE.deliverable,
-    status: checks.every((check) => check.status === "passed")
-      ? "ready"
-      : "in-progress",
-  };
-}
+export {
+  ExistingApplicationConflictError,
+  NotFoundError,
+  loadChat,
+  getApplicationStatus,
+  getOperatorView,
+  getPhaseOneOperatorView,
+  listApplicationSummaries,
+};
 
 export async function createPhaseOneApplication(input: CreateApplicationInput) {
   if (input.environment !== "production") {
@@ -108,33 +68,41 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
     throw new Error("Choose a valid permission policy.");
   }
   const repository = parseGithubRepository(input.repositoryUrl);
-  const existing = getApplicationByRepository(repository.canonicalUrl);
+  const name = input.name?.trim() || repository.name;
+  const existing = input.requestKey ? getApplication(input.requestKey) : null;
   if (existing) {
-    if (existing.approvalMode !== input.approvalMode) {
+    if (
+      existing.approvalMode !== input.approvalMode ||
+      existing.repositoryUrl !== repository.canonicalUrl ||
+      existing.name !== name
+    ) {
       throw new ExistingApplicationConflictError(
-        `An application already exists for this repository with ${APPROVAL_MODES[existing.approvalMode].label}. Open it instead of replacing its permission policy.`,
+        "This creation request was already used with different application settings. Open the existing application or start a new creation request.",
       );
     }
-    return { view: getPhaseOneOperatorView(existing.id), created: false };
+    return { view: getOperatorView(existing.id), created: false };
   }
 
   const application = withTransaction(() => {
-    const application = insertApplication({
-      name: repository.name,
-      repositoryUrl: repository.canonicalUrl,
-      repositoryOwner: repository.owner,
-      repositoryName: repository.name,
-      environment: "production",
-      approvalMode: input.approvalMode,
-      approvalScope: "Current application launch",
-    });
+    const application = insertApplication(
+      {
+        name,
+        repositoryUrl: repository.canonicalUrl,
+        repositoryOwner: repository.owner,
+        repositoryName: repository.name,
+        environment: "production",
+        approvalMode: input.approvalMode,
+        approvalScope: "Current application launch",
+      },
+      input.requestKey,
+    );
     const workspace = insertWorkspace(application.id);
-    const chat = insertChat(workspace.id, "Launch Brief", true);
+    const chat = insertChat(workspace.id, "Deploy application", true);
 
     insertMessage(
       chat.id,
       "assistant",
-      `I created the ${repository.name} application. I’m checking the exact GitHub repository identity now. No code, infrastructure, domain, or paid resource has been changed.`,
+      `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
       "server-guy",
     );
     insertActivity(
@@ -147,7 +115,7 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
   });
 
   await observeRepository(application.id);
-  return { view: getPhaseOneOperatorView(application.id), created: true };
+  return { view: getOperatorView(application.id), created: true };
 }
 
 export async function observeRepository(
@@ -162,7 +130,11 @@ export async function observeRepository(
       "The GitHub connection changed. Check repositories with the current login.",
     );
   }
-  const { application, workspace } = loadWorkspace(applicationId);
+  const { application } = loadApplication(applicationId);
+  // Repository identity evidence belongs to the Launch Brief workspace, even
+  // after Phase 1 completed: the check may still be rerun after a reconnect.
+  const workspace = getWorkspace(application.id, "start");
+  if (!workspace) throw new NotFoundError("Application not found.");
   const recorded = listObservations(application.id).find(
     (observation) =>
       observation.kind === REPOSITORY_OBSERVATION &&
@@ -186,6 +158,14 @@ export async function observeRepository(
     },
     expectedId,
   );
+
+  if (
+    loadApplication(applicationId).application.repositoryUrl !==
+    application.repositoryUrl
+  )
+    throw new Error(
+      "The repository changed during its access check. Check the current repository again.",
+    );
 
   // A slow check from a previous login must not overwrite the new login's
   // evidence.
@@ -271,7 +251,7 @@ export async function recheckGithubRepositories(connectionId: string) {
       ) {
         await observeRepository(application.id, connectionId);
       }
-      const check = currentChecks(application).find(
+      const check = currentPhaseOneChecks(application).find(
         (item) => item.key === "repository-readable",
       )!;
       results.push({
@@ -302,37 +282,54 @@ function observationConnectionId(observation: { raw: unknown }) {
 
 /**
  * Disconnecting or replacing the GitHub login is installation-wide; its
- * application consequence is that a passing repository check made with the
- * previous login no longer counts as current. That does not show access was
- * lost. The event ID is derived from the invalidated Observation, so a retried
- * or concurrent request, a later read, or a view refresh cannot add a second
- * item; a fresh check under the current login records its own outcome.
+ * application consequence is that a passing repository check or inspection
+ * made with the previous login no longer counts as current. That does not
+ * show access was lost. The event ID is derived from the invalidated
+ * Observation, so a retried or concurrent request, a later read, or a view
+ * refresh cannot add a second item; a fresh check under the current login
+ * records its own outcome.
  */
 function invalidateRepositoryVerifications(
   previousConnectionId: string,
   next: "disconnected" | "replaced",
 ) {
+  const cause =
+    next === "disconnected"
+      ? "GitHub was disconnected"
+      : "The GitHub connection was replaced";
   withTransaction(() => {
     for (const application of listApplications()) {
       const latest = latestObservation(application.id, REPOSITORY_OBSERVATION);
+      const workspace = getWorkspace(application.id, "start");
       if (
-        latest?.status !== "passed" ||
-        observationConnectionId(latest) !== previousConnectionId
+        workspace &&
+        latest?.status === "passed" &&
+        observationConnectionId(latest) === previousConnectionId
       )
-        continue;
-      const workspace = getWorkspace(application.id);
-      if (!workspace) continue;
-      recordActivityOnce(
-        `verification-invalidated:${latest.id}`,
-        workspace.id,
-        "repository-verification-invalidated",
-        "Repository verification invalidated",
-        `${
-          next === "disconnected"
-            ? "GitHub was disconnected"
-            : "The GitHub connection was replaced"
-        } after this repository was verified with the previous login, so that check no longer counts as current. This does not show that access was lost. Check the repository again with the current connection to verify access. Earlier result: ${latest.summary}`,
+        recordActivityOnce(
+          `verification-invalidated:${latest.id}`,
+          workspace.id,
+          "repository-verification-invalidated",
+          "Repository verification invalidated",
+          `${cause} after this repository was verified with the previous login, so that check no longer counts as current. This does not show that access was lost. Check the repository again with the current connection to verify access. Earlier result: ${latest.summary}`,
+        );
+      const inspection = latestObservation(
+        application.id,
+        INSPECTION_OBSERVATION,
       );
+      const inspectWorkspace = getWorkspace(application.id, "inspect-app");
+      if (
+        inspectWorkspace &&
+        inspection?.status === "passed" &&
+        observationConnectionId(inspection) === previousConnectionId
+      )
+        recordActivityOnce(
+          `inspection-invalidated:${inspection.id}`,
+          inspectWorkspace.id,
+          "repository-inspection-invalidated",
+          "Repository inspection invalidated",
+          `${cause} after this repository was inspected with the previous login, so that inspection no longer supports the Application Contract checks. Saved file reads keep their content; re-inspect with the current connection to make them citable again. Earlier result: ${inspection.summary}`,
+        );
     }
   });
 }
@@ -366,19 +363,8 @@ export async function withGithubConnectionTransition<T>(
   }
 }
 
-export function listApplicationSummaries() {
-  return listApplications().map((application) => {
-    const checks = currentChecks(application);
-    return {
-      application,
-      passedChecks: checks.filter((check) => check.status === "passed").length,
-      totalChecks: checks.length,
-    };
-  });
-}
-
 export function removeApplication(applicationId: string, repository: string) {
-  const { application } = loadWorkspace(applicationId);
+  const { application } = loadApplication(applicationId);
   if (
     repository !==
     `${application.repositoryOwner}/${application.repositoryName}`
@@ -387,142 +373,61 @@ export function removeApplication(applicationId: string, repository: string) {
       "Type the exact repository owner/name to remove this application.",
     );
   }
+  if (
+    listApplicationPreviews(application.id).some((item) =>
+      ["ready", "starting"].includes(item.status),
+    )
+  )
+    throw new Error(
+      "Stop the application preview before removing this application.",
+    );
+  if (applicationDeployment(application.id))
+    throw new Error(
+      "This application owns a deployment record. Host retirement is not implemented yet; preserve this record to retain access and billing history.",
+    );
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
+  // Contracts, every phase workspace and their native files go with it.
   removeNativeApplicationSessions(application.id, () => {
     deleteApplication(application.id);
   });
   return { removedApplicationId: application.id };
 }
 
-export function getPhaseOneOperatorView(
-  applicationId: string,
-  chatId?: string,
-): PhaseOneOperatorView {
-  const { application, workspace } = loadWorkspace(applicationId);
-
-  const checks = currentChecks(application);
-  const chats = listChatSummaries(workspace.id);
-  const selected =
-    (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
-    chats.find((chat) => !chat.archivedAt && chat.isPrimary) ??
-    chats.find((chat) => !chat.archivedAt) ??
-    chats[0] ??
-    null;
-
-  return {
-    application,
-    workspace: workspaceView(workspace, checks),
-    chats,
-    selectedChatId: selected?.id ?? null,
-    messages: selected ? listMessages(selected.id) : [],
-    checks,
-    decisions: listActiveDecisions(application.id),
-    observations: listObservations(application.id),
-    upcomingRequirements: deriveUpcomingRequirements(),
-    activity: listActivity(workspace.id),
-  };
-}
-
+/** A new Chat in the current phase; completed phases accept none. */
 export function createChat(applicationId: string, title?: string) {
-  const { application, workspace } = loadWorkspace(applicationId);
-  const chatNumber = listChats(workspace.id).length + 1;
+  const { application, current } = loadApplication(applicationId);
+  if (current.completedAt)
+    throw new Error("This phase is complete; its chats are read-only.");
+  const chatNumber = listApplicationChats(application.id).length + 1;
   const chat = insertChat(
-    workspace.id,
-    title?.trim() || `Launch question ${chatNumber}`,
+    current.id,
+    title?.trim() || `Conversation ${chatNumber}`,
   );
   insertMessage(
     chat.id,
     "assistant",
-    "This is a separate Chat for the same Launch Brief. I can see the shared Operator View and checks, but this transcript starts fresh.",
+    `We can continue working on ${application.name} here. The application keeps its configuration and history; this conversation starts fresh.`,
     "server-guy",
   );
   // Chat administration is visible in the chat list; it is not an application
   // event.
-  return getPhaseOneOperatorView(application.id, chat.id);
+  return getOperatorView(application.id, chat.id);
 }
 
 export function archiveChat(applicationId: string, chatId: string) {
-  const { application, chat } = loadChat(applicationId, chatId);
+  const { application, chat, workspace } = loadChat(applicationId, chatId);
   if (chat.isPrimary)
-    throw new Error("The main Launch Brief Chat stays with Phase 1.");
+    throw new Error(
+      `The main ${primaryChatTitle(workspace.phaseKey)} Chat stays with its phase.`,
+    );
+  assertChatWritable(chat, workspace);
   archiveChatRecord(chat.id);
-  return getPhaseOneOperatorView(application.id);
+  return getOperatorView(application.id);
 }
 
 function decisionLabel(decision: PiDecision) {
   return { "launch-priority": "Saved requirement" }[decision.kind];
-}
-
-/**
- * The read-only projection behind Pi's `get_application_status`. The worker
- * binds the application and Chat from the accepted Run, and the Chat must
- * still belong to that application. It reads the same current records and
- * gate evaluation as the Operator View, so an older passing Observation never
- * stands in for the latest failed or invalidated result, and it returns only
- * public check text and the evidence that supports each current check: no
- * credentials, raw provider payloads, transcripts, Activity or Decisions.
- * Reading is not rechecking; `retrievedAt` is when these records were read.
- */
-export function getApplicationStatus(
-  applicationId: string,
-  chatId: string,
-): ApplicationStatus {
-  const { application, workspace } = loadChat(applicationId, chatId);
-  const { repository, connectionId } = currentRepositoryEvidence(application);
-  const checks = computeChecks(application, repository, connectionId);
-  const repositoryCurrent = observationMatchesConnection(
-    repository,
-    connectionId,
-  );
-  const { phaseKey, phaseNumber, deliverable, status } = workspaceView(
-    workspace,
-    checks,
-  );
-  return {
-    retrievedAt: new Date().toISOString(),
-    application: {
-      id: application.id,
-      name: application.name,
-      repositoryUrl: application.repositoryUrl,
-      environment: application.environment,
-      approvalMode: {
-        key: application.approvalMode,
-        label: APPROVAL_MODES[application.approvalMode].label,
-      },
-      updatedAt: application.updatedAt,
-    },
-    workspace: { phaseKey, phaseNumber, deliverable, status },
-    checks: checks.map((check) => ({
-      key: check.key,
-      label: check.label,
-      status: check.status,
-      result: check.result,
-      // The Operator View keeps an invalidated repository check inspectable
-      // as history; the model must not receive it as support for current
-      // access.
-      evidence: check.evidence
-        .filter(
-          (evidence) =>
-            evidence.recordType !== "observation" || repositoryCurrent,
-        )
-        .map(({ recordType, recordId, label, href, observedAt }) => ({
-          recordType,
-          recordId,
-          label,
-          href,
-          observedAt,
-        })),
-    })),
-    upcomingRequirements: deriveUpcomingRequirements().map(
-      ({ key, label, requiredBeforePhase, resolutionPath }) => ({
-        key,
-        label,
-        requiredBeforePhase,
-        resolutionPath,
-      }),
-    ),
-  };
 }
 
 // Called only inside the worker's final transaction. Model text is not a

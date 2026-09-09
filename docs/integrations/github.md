@@ -1,15 +1,14 @@
 # GitHub connection
 
-Server Guy reads repositories through an explicitly chosen, installation-wide connection. Application records and repository-check evidence remain application-scoped. This milestone is read-only: no pushes, pull requests, workflow changes, or deployment writes.
+This is the existing GitHub connection/setup reference, including retained preparation/publication behavior. The [product boundary](../../PRODUCT.md#operating-boundary) governs new work: only narrow operability application-code proposals, with owner merge. [Roadmap](../../ROADMAP.md) tracks enforcement/migration and the separate deployment/release capability.
 
-## Two login paths
+Repository access uses an explicitly chosen installation-wide connection; application records and repository evidence remain scoped to the application. Read-only inspection does not grant publication. The legacy publication path needs an explicit per-application [publishing grant](#publishing-in-phase-3), rechecked against the connection; it does not merge for the owner.
 
-| Choice in Settings → GitHub | What is real | What Server Guy saves |
-| --- | --- | --- |
-| Use existing login | The server's `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token --hostname github.com`, in that precedence order. A read-only `/user` request identifies it automatically. | Account ID/login, credential source, token fingerprint, connection ID and consent time. The token is not copied. |
-| Connect another account | GitHub App device login. The same GitHub account may be used; this is a separate Server Guy authorization. | Access and refresh tokens with their expiries, account identity and connection ID. No App private key or client secret. |
+## One GitHub App connection
 
-Detection does not activate a connection. Existing machine credentials can have broader permissions than Server Guy needs; their reuse is an explicit choice. If their token/source changes, choose the login again. Server Guy never signs the CLI in/out or changes its active account.
+Connect GitHub through Server Guy's configured GitHub App device flow. Server Guy stores the resulting user access/refresh tokens, expiries and connection identity in its own protected settings file. It does not discover, adopt or borrow `gh`, `GH_TOKEN` or `GITHUB_TOKEN` credentials. An older saved CLI selection is rejected with instructions to reconnect; Server Guy does not sign the host CLI out or alter its account.
+
+Legacy response fields are compatibility details, not a second supported login method. GitHub CLI credential adoption is retired.
 
 ## Register a local GitHub App once
 
@@ -62,14 +61,24 @@ The gate requires a passing Observation from the **currently selected connection
 - User access tokens normally expire after eight hours. Server Guy renews them on the next GitHub request, starting within one minute of expiry; there is no timer or background worker. [GitHub supports refreshing device-flow user tokens without a client secret](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens). The refresh token lasts six months and rotates when used. Reading Settings does not perform renewal; its “Access renews automatically” message means a usable local refresh token exists, not that remote authorization was just tested.
 - Concurrent requests share one refresh exchange in the local Node process. Both tokens are validated and saved together before use. Late success or rejection cannot overwrite/invalidate a replacement login or a newer token; a repository request rejected because another request rotated its token retries once with the same connection's new token. Multiple server processes sharing this credential file are not supported: a future multi-process deployment needs cross-process coordination before sharing single-use refresh tokens.
 - Temporary network/provider failures preserve the saved connection for retry. A rejected or expired refresh token requires sign-in; there is never a silent CLI/account fallback. If the provider rotates tokens but its response is lost, or saving fails, a subsequent attempt may also require sign-in because the old refresh token is single-use.
-- Logins saved before automatic renewal was implemented need one new sign-in: their refresh token was not retained and cannot be recovered from the access token. They continue working until their existing access token expires. Reused CLI/environment credentials remain read-only and are not refreshed by Server Guy.
+- Logins saved before automatic renewal was implemented need one new sign-in: their refresh token was not retained and cannot be recovered from the access token. They continue working until their existing access token expires. Legacy CLI selections require reconnecting through the App.
 - Cancelled, denied, expired and interrupted device attempts have visible retry paths. Replacing a connection activates only after success; late completion cannot undo cancellation/disconnect/reuse. Attempts live in one Node process; a restart requires starting sign-in again.
 - App permissions and the user's permissions intersect. Missing installation, missing Contents permission, an unselected/inaccessible private repository, or organization restrictions cannot become a passing check.
+
+## Publishing in Phase 3
+
+Make launch-ready publishes Server Guy's staged change as one commit on the contract's base, one branch named `server-guy/conformance-<proposal>` and one pull request against the default branch, through the Git Data API. That needs write access the read-only connection does not have, and it is granted per application, never inferred from a token:
+
+| Connection | Minimum verified before the grant is recorded | Where to change it |
+| --- | --- | --- |
+| GitHub App | The installation grants **Contents: Read and write** and **Pull requests: Read and write** for the repository (Metadata read stays mandatory). | Edit the App's repository permissions in its registration, then re-approve the installation at [installed GitHub Apps](https://github.com/settings/installations); a registration made for Phases 1 and 2 has Contents read only. |
+
+**Allow publishing** in the Conformance Result performs that verification and records the grant with the connection id and what GitHub reported; replacing or disconnecting the connection ends it, and **Stop allowing** revokes it. Before every publication Server Guy rechecks the proposal, its approval digest, the contract version and the grant. Retries reconcile against GitHub first: a branch with the exact proposal trailer on its original commit from the selected base is adopted, including when collaborators added later commits. The receipt names the original published change, not the later collaborator head. A branch whose history cannot establish this is refused without modifying it. Merging is always yours on GitHub; Server Guy records the exact merged revision afterwards. Historical September 6 tests exercised both mechanisms; CLI is now retired. The GitHub App test verified installation write permissions and published through the App user token; that historical result is not fresh verification of subsequent changes. That verification reads the paginated `GET /user/installations` list and selects the recorded installation; `GET /user/installations/{id}` does not exist for a user token, which the first real grant exposed.
 
 ## Verification
 
 `tests/application/integration/github-setup.test.ts` exercises the real coordinator, connection files, route boundary and repository adapter against synthetic provider responses. `tests/application/unit/github-api.test.ts` tests request/error handling without real tokens or network requests. `tests/browser/github.spec.ts` covers consent, device cancellation/denial/success, disconnect/reconnect, exact saved evidence and permission recovery in a disposable desktop app.
 
-The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](../testing/phase-one-acceptance.md#latest-verification).
+The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](../archive/implementation/phase-one-acceptance.md#latest-verification).
 
 UI conventions for future changes live in the [shared settings design reference](../architecture/settings/DESIGN.md).

@@ -40,6 +40,10 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
   const before: PhaseOneOperatorView = {
     application,
     workspace: null,
+    workspaces: [],
+    inspection: null,
+    contract: null,
+    conformance: null,
     chats: [],
     selectedChatId: "chat",
     messages: [],
@@ -104,13 +108,13 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
 }
 
 describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
-  it("has twenty-nine uniquely named cases with explicit semantic rubrics", () => {
-    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(29);
+  it("has forty-three uniquely named cases with explicit semantic rubrics", () => {
+    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(43);
     expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
   });
 
   it("selects a case subset without silently expanding invalid selections", () => {
-    expect(selectPhaseOneCases().length).toBe(29);
+    expect(selectPhaseOneCases().length).toBe(43);
     expect(
       selectPhaseOneCases("greeting,hypothetical").map((c) => c.id),
     ).toEqual(["greeting", "hypothetical"]);

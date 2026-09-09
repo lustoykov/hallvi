@@ -568,7 +568,12 @@ describe("native Pi adapter", () => {
     const options = mocks.create.mock.calls[0][0] as Options;
     expect(options).toMatchObject({
       noTools: "all",
-      tools: ["propose_decision", "search_decisions", "get_application_status"],
+      tools: [
+        "propose_decision",
+        "search_decisions",
+        "get_application_status",
+        "prepare_deployment",
+      ],
       sessionManager: handles[0].sessionManager,
       settingsManager: { isolated: true },
     });
@@ -576,6 +581,7 @@ describe("native Pi adapter", () => {
       "propose_decision",
       "search_decisions",
       "get_application_status",
+      "prepare_deployment",
     ]);
     expect(mocks.search).not.toHaveBeenCalled();
     // Nothing is read on the model's behalf before it asks.
@@ -603,7 +609,8 @@ describe("native Pi adapter", () => {
       noSkills: true,
       noPromptTemplates: true,
     });
-    expect(loader.systemPromptOverride()).toBe(SYSTEM_PROMPT);
+    expect(loader.systemPromptOverride()).toContain(SYSTEM_PROMPT);
+    expect(loader.systemPromptOverride()).toContain("prepare_deployment");
     expect(loader.systemPromptOverride()).not.toContain(current.runContext);
     expect(loader.systemPromptOverride()).not.toContain("CURRENT DECISIONS");
     expect(loader.agentsFilesOverride()).toEqual({ agentsFiles: [] });
@@ -684,6 +691,9 @@ describe("native Pi adapter", () => {
       decisionProposals: [
         { kind: "launch-priority", value: "Recover quickly" },
       ],
+      contractProposal: null,
+      sourceProposal: null,
+      acceptanceProposal: null,
     });
     expect(
       (mocks.create.mock.calls[0][0] as Options).customTools[0]

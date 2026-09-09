@@ -62,7 +62,7 @@ test(
         "database connections close and these temporary folders are deleted",
         "Only the two journeys tagged @smoke run.",
         "dashboard journey starts its own temporary testing dashboard",
-        "model replies and compaction summaries are not mocked",
+        "model replies, tool choices and compaction summaries are not mocked",
         "the greeting case cannot inherit messages or Decisions from revise-existing",
         "the /tmp/server-guy-pi-eval-* directory is deleted",
         "failed code checks stay failed",

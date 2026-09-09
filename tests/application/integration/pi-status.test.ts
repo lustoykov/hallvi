@@ -610,6 +610,7 @@ describe("status lookup through the actual SDK tool loop", () => {
       "createdAt",
       "previousAttempt",
       "runId",
+      "userMessageId",
     ]);
     expect(JSON.stringify(requests[0].messages)).not.toContain(
       "GitHub repository access",

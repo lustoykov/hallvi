@@ -17,7 +17,6 @@ import {
 } from "vitest";
 import { pushTestDatabase } from "../../test-database";
 import {
-  credentialFingerprint,
   readGithubConnection,
   saveGithubConnection,
   type GithubConnection,
@@ -59,9 +58,11 @@ const SECOND = "00000000-0000-4000-8000-000000000002";
 function login(id: string, account = 1): GithubConnection {
   return {
     id,
-    mode: "cli",
-    source: "gh",
-    fingerprint: "0".repeat(64),
+    mode: "app",
+    clientId: "Iv1.fixture",
+    slug: "server-guy-test",
+    token: "ghu_QA-SYNTHETIC-TOKEN",
+    expiresAt: null,
     account: { id: account, login: `login-${account}` },
     connectedAt: new Date().toISOString(),
   };
@@ -425,7 +426,7 @@ describe("repository verification invalidation", () => {
     expect(feed(app)).toEqual(before);
   });
 
-  it("records the consequence through the disconnect and reuse routes", async () => {
+  it("records disconnect, refuses retired CLI adoption, and rechecks an App connection", async () => {
     const app = await application();
     const { DELETE, POST } =
       await import("../../../src/app/api/github/setup/route");
@@ -446,11 +447,15 @@ describe("repository verification invalidation", () => {
         method: "POST",
         headers: { Origin: origin },
         body: JSON.stringify({
-          candidateId: credentialFingerprint("qa-cli-token", "gh"),
+          candidateId: "0".repeat(64),
         }),
       }),
     );
-    expect(reused.status).toBe(200);
+    expect(reused.status).toBe(400);
+    expect(readGithubConnection()).toBeNull();
+    await phaseOne.withGithubConnectionTransition(() =>
+      saveGithubConnection(login(SECOND)),
+    );
     // Reconnecting after a disconnect finds no current verification to
     // invalidate; the automatic recheck records the new result instead.
     expect(invalidated(app)).toHaveLength(1);

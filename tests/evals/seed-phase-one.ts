@@ -3,6 +3,8 @@ import * as database from "../../src/server/db";
 import { saveGithubConnection } from "../../src/server/github-connection";
 import { getPhaseOneOperatorView } from "../../src/server/phase-one";
 import type { PhaseOneEvalCase } from "./phase-one-cases";
+import { seedPhaseThreeEvalCase } from "./seed-phase-three";
+import { seedPhaseTwoEvalCase } from "./seed-phase-two";
 
 // Eval records are inserted "now"; an older check needs its own time.
 function backdateObservation(id: string, days: number) {
@@ -25,6 +27,8 @@ export function seedPhaseOneEvalCase(
     );
   // Connection state is global to the instance, so reset it between cases too.
   saveGithubConnection(null);
+  if (scenario.phaseThree) return seedPhaseThreeEvalCase(scenario, repetition);
+  if (scenario.phaseTwo) return seedPhaseTwoEvalCase(scenario, repetition);
   const name = `${scenario.id}-${repetition}`;
   const application = database.insertApplication({
     name,

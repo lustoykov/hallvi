@@ -13,10 +13,12 @@ vi.mock("../../../src/server/phase-one", () => ({
 
 import { POST } from "../../../src/app/api/applications/route";
 
-function request(body: unknown) {
+const requestKey = "00000000-0000-4000-8000-000000000099";
+
+function request(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/applications", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ requestKey, ...body }),
     headers: { "content-type": "application/json" },
   });
 }
@@ -49,6 +51,7 @@ describe("POST /api/applications", () => {
 
     expect(response.status).toBe(201);
     expect(mocks.createPhaseOneApplication).toHaveBeenCalledWith({
+      requestKey,
       repositoryUrl: "git@github.com:lustoykov/todo-fastapi.git",
       environment: "production",
       approvalMode: "always-ask",

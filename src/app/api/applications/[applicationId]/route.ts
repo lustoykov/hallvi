@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 
 import { handle } from "@/server/http";
-import { getPhaseOneOperatorView, removeApplication } from "@/server/phase-one";
+import { getOperatorView } from "@/server/operator-view";
+import { removeApplication } from "@/server/phase-one";
 import {
   parseJsonRequest,
   removeApplicationRequestSchema,
@@ -17,7 +18,16 @@ export async function GET(
   return handle(async () => {
     const { applicationId } = await context.params;
     const chatId = request.nextUrl.searchParams.get("chat") ?? undefined;
-    return getPhaseOneOperatorView(applicationId, chatId);
+    const phase = request.nextUrl.searchParams.get("phase");
+    return getOperatorView(
+      applicationId,
+      chatId,
+      phase === "start" ||
+        phase === "inspect-app" ||
+        phase === "make-launch-ready"
+        ? phase
+        : undefined,
+    );
   });
 }
 

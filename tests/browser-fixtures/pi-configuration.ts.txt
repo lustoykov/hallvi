@@ -18,8 +18,221 @@ import {
   readPiCredential,
   type PiSdk,
 } from "./pi-configuration-real";
+import {
+  buildContractProposal,
+  CONTRACT_READ_ORDER,
+  treePaths,
+  type SeenRead,
+} from "./qa-fixtures/contract-builder";
+import {
+  buildAcceptanceChecks,
+  buildSourceChanges,
+  CONFORMANCE_READ_ORDER,
+  type SeenBrief,
+} from "./qa-fixtures/conformance-builder";
 
 export * from "./pi-configuration-real";
+
+const INSPECTION_REQUEST =
+  "Inspect the repository and propose the Application Contract.";
+const CONFORMANCE_REQUEST =
+  "Make the repository launch-ready: resolve every required change in the conformance brief, verify the result in a preview run, and propose the application-behavior checks.";
+
+/**
+ * The scripted Phase 3 flow: read the brief and the files that matter, stage
+ * the change that resolves the required changes, preview it in the (scripted)
+ * runner, propose behavior checks from the todos router, then answer.
+ * "conformance: propose-only" skips the preview; "conformance: scope-violation"
+ * touches a workflow file; "conformance: unmapped" leaves the mapping out.
+ */
+function conformanceStep(
+  user: string,
+  context: Context,
+  userIndex: number,
+): { tool?: ToolCall; answer?: string } {
+  const mode =
+    user === CONFORMANCE_REQUEST
+      ? "full"
+      : user.slice("conformance:".length).trim().split(/\s+/)[0];
+  const results = context.messages
+    .slice(userIndex + 1)
+    .filter((entry) => entry.role === "toolResult")
+    .map((entry) => ({
+      name: entry.toolName,
+      isError: entry.isError,
+      body: textOf(entry),
+    }));
+  const call = (name: string, args: Record<string, unknown>): ToolCall => ({
+    type: "toolCall",
+    id: randomUUID(),
+    name,
+    arguments: args,
+  });
+  const briefResult = results.find(
+    (result) => result.name === "get_conformance_brief" && !result.isError,
+  );
+  const inspectionResult = results.find(
+    (result) => result.name === "get_repository_inspection" && !result.isError,
+  );
+  const changesResult = results.find((result) => result.name === "propose_source_changes");
+  const previewResult = results.find((result) => result.name === "run_conformance_preview");
+  const acceptanceResult = results.find((result) => result.name === "propose_acceptance_checks");
+  if (!briefResult) return { tool: call("get_conformance_brief", {}) };
+  if (!inspectionResult) return { tool: call("get_repository_inspection", {}) };
+  const brief = JSON.parse(briefResult.body) as SeenBrief;
+  const inspection = JSON.parse(inspectionResult.body) as {
+    inspection: { observationId: string; commitSha: string } | null;
+    tree: { entries: string[] };
+  };
+  const paths = treePaths(inspection);
+  const reads: SeenRead[] = results
+    .filter((result) => result.name === "read_repository_file" && !result.isError)
+    .map((result) => JSON.parse(result.body) as SeenRead);
+  const next = CONFORMANCE_READ_ORDER.filter((path) => paths.includes(path)).find(
+    (path) => !reads.some((read) => read.path === path),
+  );
+  if (next) return { tool: call("read_repository_file", { path: next }) };
+  if (!changesResult && brief.brief.requiredChanges.length)
+    return {
+      tool: call(
+        "propose_source_changes",
+        buildSourceChanges(brief, reads, {
+          scopeViolation: mode === "scope-violation",
+          unmapped: mode === "unmapped",
+        }),
+      ),
+    };
+  if (changesResult?.isError)
+    return {
+      answer: `[QA conformance] Change rejected; nothing was saved. ${changesResult.body.split("\n")[1] ?? ""}`,
+    };
+  if (!acceptanceResult && mode !== "propose-only")
+    return { tool: call("propose_acceptance_checks", buildAcceptanceChecks(reads)) };
+  if (!previewResult && mode !== "propose-only")
+    return { tool: call("run_conformance_preview", {}) };
+  const preview = previewResult
+    ? previewResult.isError
+      ? `preview unavailable: ${previewResult.body.split("\n")[0]}`
+      : `preview ${(JSON.parse(previewResult.body) as { status: string }).status}`
+    : "no preview";
+  const changes = changesResult
+    ? `${(JSON.parse(changesResult.body) as { files: string[] }).files.length} file(s) staged`
+    : "no change needed";
+  const acceptance = acceptanceResult
+    ? acceptanceResult.isError
+      ? "behavior checks rejected"
+      : `behavior checks proposed (${(JSON.parse(acceptanceResult.body) as { steps: number }).steps} steps)`
+    : "no behavior checks";
+  return {
+    answer: `[QA conformance] ${changes}; ${preview}; ${acceptance}.`,
+  };
+}
+
+/**
+ * The scripted Phase 2 flow: read the saved inspection, read the fixture
+ * files that matter, propose a contract built from exactly those reads, then
+ * answer. "contract: correct <value>" revises health.path from the engineer's
+ * message; "contract: invented" cites a read that never happened.
+ */
+function contractStep(
+  user: string,
+  context: Context,
+  userIndex: number,
+): { tool?: ToolCall; answer?: string } {
+  const mode =
+    user === INSPECTION_REQUEST
+      ? "propose"
+      : user.slice("contract:".length).trim();
+  const results = context.messages
+    .slice(userIndex + 1)
+    .filter((entry) => entry.role === "toolResult")
+    .map((entry) => ({
+      name: entry.toolName,
+      isError: entry.isError,
+      body: textOf(entry),
+    }));
+  const runContext = context.messages
+    .slice(0, userIndex + 1)
+    .filter((entry) => entry.role === "user" && textOf(entry).startsWith("{"))
+    .map((entry) => JSON.parse(textOf(entry)) as { userMessageId?: string })
+    .at(-1);
+  const call = (name: string, args: Record<string, unknown>): ToolCall => ({
+    type: "toolCall",
+    id: randomUUID(),
+    name,
+    arguments: args,
+  });
+  const inspectionResult = results.find(
+    (result) => result.name === "get_repository_inspection" && !result.isError,
+  );
+  const proposalResult = results.find(
+    (result) => result.name === "propose_application_contract",
+  );
+  const currentResult = results.find(
+    (result) => result.name === "get_application_contract" && !result.isError,
+  );
+  if (!inspectionResult) return { tool: call("get_repository_inspection", {}) };
+  if (proposalResult) {
+    if (proposalResult.isError)
+      return {
+        answer: `[QA contract] Proposal rejected; nothing was saved. ${proposalResult.body.split("\n")[1] ?? ""}`,
+      };
+    const proposal = JSON.parse(proposalResult.body) as {
+      version: number;
+      fields: number;
+      blockers: string[];
+      conformanceItems: string[];
+    };
+    return {
+      answer: `[QA contract] Proposed Application Contract v${proposal.version} with ${proposal.fields} fields, ${proposal.blockers.length} blocker(s) and ${proposal.conformanceItems.length} conformance item(s).`,
+    };
+  }
+  const inspection = JSON.parse(inspectionResult.body) as {
+    inspection: { observationId: string; commitSha: string } | null;
+    tree: { entries: string[] };
+  };
+  if (!inspection.inspection)
+    return {
+      answer:
+        "[QA contract] The repository has not been inspected in this phase.",
+    };
+  const paths = treePaths(inspection);
+  const reads: SeenRead[] = results
+    .filter((result) => result.name === "read_repository_file" && !result.isError)
+    .map((result) => JSON.parse(result.body) as SeenRead);
+  const next = CONTRACT_READ_ORDER.filter((path) => paths.includes(path)).find(
+    (path) => !reads.some((read) => read.path === path),
+  );
+  if (next) return { tool: call("read_repository_file", { path: next }) };
+  if (!currentResult)
+    return { tool: call("get_application_contract", {}) };
+  const current = currentResult
+    ? (JSON.parse(currentResult.body) as { current: { id: string } | null })
+        .current
+    : null;
+  const value = mode.split(" ").at(-1)!;
+  return {
+    tool: call(
+      "propose_application_contract",
+      buildContractProposal(inspection, reads, {
+        ...(current ? { revises: current.id } : {}),
+        ...(mode.startsWith("correct") && current
+          ? {
+              corrections: [
+                {
+                  key: "health.path",
+                  value,
+                  messageId: runContext?.userMessageId ?? "missing",
+                  quote: value,
+                },
+              ],
+            }
+          : {}),
+        invented: mode === "invented",
+      }),
+    ),
+  };
+}
 
 function textOf(message: Context["messages"][number]) {
   return typeof message.content === "string"
@@ -97,7 +310,21 @@ function streamSynthetic(
       const lastSearch = searchResults.at(-1);
       let tool: ToolCall | undefined;
       let answer = `[QA fixture reply] ${userMessage}`;
-      if (lastResult?.isError) {
+      if (
+        userMessage === INSPECTION_REQUEST ||
+        userMessage.startsWith("contract:")
+      ) {
+        const step = contractStep(userMessage, context, userIndex);
+        tool = step.tool;
+        if (step.answer) answer = step.answer;
+      } else if (
+        userMessage === CONFORMANCE_REQUEST ||
+        userMessage.startsWith("conformance:")
+      ) {
+        const step = conformanceStep(userMessage, context, userIndex);
+        tool = step.tool;
+        if (step.answer) answer = step.answer;
+      } else if (lastResult?.isError) {
         answer =
           "[QA fixture reply] Replacement rejected; no Decision was staged.";
       } else if (

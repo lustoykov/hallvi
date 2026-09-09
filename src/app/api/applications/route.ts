@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
       createApplicationRequestSchema,
     );
     const result = await createPhaseOneApplication({
+      requestKey: body.requestKey,
+      ...(body.name ? { name: body.name } : {}),
       repositoryUrl: body.repositoryUrl,
       environment: "production",
       approvalMode: body.approvalMode,

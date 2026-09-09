@@ -5,6 +5,7 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -136,7 +137,18 @@ afterEach(() => {
   rmSync(directory, { recursive: true, force: true });
 });
 async function reuse() {
-  await adoptGithubCliLogin(credentialFingerprint(token, "gh"));
+  const attempt = (await getGithubSetupStatus()).attempt;
+  if (attempt) cancelGithubLogin(attempt.id);
+  saveGithubConnection({
+    id: randomUUID(),
+    mode: "app",
+    account,
+    connectedAt: new Date().toISOString(),
+    clientId: "Iv1.test",
+    slug: "server-guy-test",
+    token: tokenResponse.access_token,
+    expiresAt: null,
+  });
   return readGithubConnection()!;
 }
 async function appLogin() {
@@ -147,16 +159,13 @@ async function appLogin() {
 }
 
 describe("explicit GitHub consent and storage", () => {
-  it("automatically detects an account but neither adopts nor exposes its token", async () => {
+  it("does not inspect the host CLI login when opening Settings", async () => {
     const status = await getGithubSetupStatus();
     expect(status.connection).toBeNull();
-    expect(status.detected.candidate).toMatchObject({
-      account,
-      source: "gh",
-      scopes: ["repo"],
-    });
+    expect(status.detected.candidate).toBeNull();
+    expect(cli).not.toHaveBeenCalled();
+    expect(json).not.toHaveBeenCalled();
     expect(readGithubConnection()).toBeNull();
-    expect(JSON.stringify(status)).not.toContain(token);
   });
   it("works without gh installed or any local credentials", async () => {
     cli.mockResolvedValue(null);
@@ -164,20 +173,25 @@ describe("explicit GitHub consent and storage", () => {
     expect(json).not.toHaveBeenCalled();
     expect((await startGithubLogin()).status).toBe("waiting");
   });
-  it("reuses only the reviewed credential, without copying its token", async () => {
-    const connection = await reuse();
-    expect((await connectedGithubCredential()).token).toBe(token);
-    expect(readFileSync(githubConnectionPath(), "utf8")).not.toContain(token);
-    expect(statSync(githubConnectionPath()).mode & 0o777).toBe(0o600);
-    cli.mockResolvedValue({ token: "changed-token", source: "gh" });
+  it("rejects CLI adoption and explains how to replace an older CLI connection", async () => {
     await expect(
       adoptGithubCliLogin(credentialFingerprint(token, "gh")),
-    ).rejects.toThrow("changed");
-    expect(readGithubConnection()).toEqual(connection);
-    await expect(connectedGithubCredential()).rejects.toThrow(
-      "changed or is missing",
-    );
+    ).rejects.toThrow("no longer supported");
+    expect(cli).not.toHaveBeenCalled();
+    saveGithubConnection({
+      id: randomUUID(),
+      mode: "cli",
+      source: "gh",
+      fingerprint: credentialFingerprint(token, "gh"),
+      account,
+      connectedAt: new Date().toISOString(),
+    });
+    await expect(connectedGithubCredential()).rejects.toThrow("GitHub App");
     expect(currentGithubConnectionId()).toBeNull();
+    expect((await getGithubSetupStatus()).issue).toContain(
+      "no longer supported",
+    );
+    expect(cli).not.toHaveBeenCalled();
   });
   it("disconnects only Server Guy and removes its separate token", async () => {
     await appLogin();
@@ -187,12 +201,14 @@ describe("explicit GitHub consent and storage", () => {
     expect((await detectGithubCliLogin()).candidate?.account).toEqual(account);
     await expect(connectedGithubCredential()).rejects.toThrow("Connect GitHub");
   });
-  it("requires App registration only for a separate login", async () => {
+  it("requires App registration for the supported connection path", async () => {
     vi.stubEnv("SERVER_GUY_GITHUB_CLIENT_ID", "");
     await expect(startGithubLogin()).rejects.toThrow("client ID");
     expect(device).not.toHaveBeenCalled();
-    await reuse();
-    expect(currentGithubConnectionId()).not.toBeNull();
+    await expect(
+      adoptGithubCliLogin(credentialFingerprint(token, "gh")),
+    ).rejects.toThrow("GitHub App");
+    expect(currentGithubConnectionId()).toBeNull();
   });
 });
 
@@ -642,7 +658,7 @@ describe("exact repository access", () => {
       raw: {
         repositoryId: 99,
         connectionId: connection.id,
-        credentialSource: "gh",
+        credentialSource: "Server Guy GitHub App",
         accountId: 42,
         scopes: ["repo"],
         accountRepositoryPermissions: { pull: true },

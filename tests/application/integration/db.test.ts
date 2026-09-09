@@ -88,29 +88,44 @@ describe("Phase 1 schema", () => {
       .map((row) => (row as { name: string }).name);
 
     expect(tables).toEqual([
+      "acceptance_checks",
       "activity_events",
+      "application_contracts",
+      "application_operations",
+      "application_previews",
       "applications",
       "chat_summaries",
       "chats",
+      "conformance_proposals",
+      "conformance_runs",
       "decisions",
+      "deployments",
       "messages",
       "observations",
       "phase_workspaces",
       "pi_runs",
+      "preparation_branches",
+      "publication_grants",
     ]);
     expect(workspaceColumns).toEqual([
       "id",
       "application_id",
       "phase_key",
       "created_at",
+      "completed_at",
+      "deliverable_evidence",
     ]);
     expect(indexes).toEqual([
       "idx_activity_workspace",
+      "idx_conformance_proposals_application",
+      "idx_conformance_runs_application",
+      "idx_conformance_runs_queue",
       "idx_decisions_application",
       "idx_messages_chat",
       "idx_observations_application_kind",
       "idx_pi_runs_chat",
       "idx_pi_runs_queue",
+      "idx_publication_grants_application",
     ]);
     expect(client.pragma("user_version", { simple: true })).toBe(
       schemaVersion.version,

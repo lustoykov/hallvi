@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR 20 — Phase 3: brief, staged changes, reconciled publication, exact candidate, disposable runner</title>
+    <style>
+      :root { color-scheme: light; --ink: #192338; --muted: #536078; --line: #d8e0ec; --accent: #285ad8; --ok: #0c7248; --warn: #7a4a00; --bad: #9c312a; }
+      body { margin: 0; padding: 32px 24px 64px; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #f5f7fb; }
+      main { max-width: 1120px; margin: 0 auto; }
+      h1 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 6px; }
+      h2 { font-size: 18px; margin: 32px 0 10px; }
+      p.lede { color: var(--muted); margin: 0 0 20px; max-width: 80ch; }
+      .note { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+      svg { width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+      text { font: 12px/1.3 system-ui, sans-serif; fill: var(--ink); }
+      text.small { font-size: 11px; fill: var(--muted); }
+      text.title { font-size: 13px; font-weight: 600; }
+      rect.box { fill: #fff; stroke: var(--line); stroke-width: 1.2; rx: 10; }
+      rect.trusted { fill: #eef3ff; stroke: var(--accent); }
+      rect.untrusted { fill: #fff7ed; stroke: #e3b04b; }
+      rect.external { fill: #f2f4f8; stroke: #9aa5b8; stroke-dasharray: 5 4; }
+      rect.unchanged { fill: #f7f8fa; stroke: #c9d2e0; }
+      path.flow { fill: none; stroke: var(--accent); stroke-width: 1.5; marker-end: url(#arrow); }
+      path.effect { fill: none; stroke: var(--bad); stroke-width: 1.5; marker-end: url(#arrowbad); stroke-dasharray: 6 4; }
+      path.observe { fill: none; stroke: var(--ok); stroke-width: 1.5; marker-end: url(#arrowok); }
+      table { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { background: #eef2f8; font-weight: 600; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PR 20 — Phase 3, Make launch-ready</h1>
+      <p class="lede">What changed: the explicit Phase 2 → Phase 3 transition; a deterministic conformance brief; Pi's staged file changes with isolated previews through scoped tools; approval under the Approval Mode and an explicit publishing grant; one reconciled branch and pull request through the Git Data API; the exact merged candidate observed on GitHub; and Server Guy's own conformance run over that commit in disposable containers on the controller host's Docker Engine. Snapshot at the PR; later PRs will move things.</p>
+
+      <h2>1. Boundaries and trust</h2>
+      <svg viewBox="0 0 1120 560" role="img" aria-label="Trust boundaries: controller, disposable runner, GitHub">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#285ad8" /></marker>
+          <marker id="arrowbad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9c312a" /></marker>
+          <marker id="arrowok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0c7248" /></marker>
+        </defs>
+        <rect class="box trusted" x="20" y="20" width="520" height="520" />
+        <text class="title" x="36" y="44">Controller host · Next.js web + one Node worker · SQLite</text>
+        <rect class="box" x="36" y="60" width="230" height="86" /><text class="title" x="48" y="82">Operator UI · Record</text><text class="small" x="48" y="100">brief, diff + mapping, approve / publish,</text><text class="small" x="48" y="116">refresh, verify, per-check evidence,</text><text class="small" x="48" y="132">Settings → Execution (Check again)</text>
+        <rect class="box" x="290" y="60" width="230" height="86" /><text class="title" x="302" y="82">phase-three.ts</text><text class="small" x="302" y="100">brief · staged proposal · preview ·</text><text class="small" x="302" y="116">final-transaction commit · approval ·</text><text class="small" x="302" y="132">publication · candidate · grants</text>
+        <rect class="box" x="36" y="166" width="230" height="86" /><text class="title" x="48" y="188">Pi Run (worker)</text><text class="small" x="48" y="206">get_conformance_brief · read_repository_file</text><text class="small" x="48" y="222">propose_source_changes · propose_acceptance_checks</text><text class="small" x="48" y="238">run_conformance_preview · run_repository_command</text>
+        <rect class="box" x="290" y="166" width="230" height="86" /><text class="title" x="302" y="188">conformance-executor.ts</text><text class="small" x="302" y="206">exact tree (archive + overlay) → volume</text><text class="small" x="302" y="222">one container per check · labels · cleanup</text><text class="small" x="302" y="238">probe + proxy scripts are Server Guy's</text>
+        <rect class="box" x="36" y="272" width="484" height="70" /><text class="title" x="48" y="294">SQLite (v9)</text><text class="small" x="48" y="312">conformance_proposals · conformance_runs · acceptance_checks · publication_grants · contracts · Observations</text><text class="small" x="48" y="328">projections: P3.G1–G3 bound to candidate, contract, profile, check set, behavior checks, image</text>
+        <rect class="box" x="36" y="362" width="484" height="60" /><text class="title" x="48" y="384">Never inside a container</text><text class="small" x="48" y="402">GitHub token · ChatGPT credentials · this database · home directory · Docker socket · host network</text>
+        <rect class="box unchanged" x="36" y="440" width="484" height="80" /><text class="title" x="48" y="462">Deliberately unchanged</text><text class="small" x="48" y="480">Run acceptance/claim/cancel/retry · native Pi sessions · Decision commit · GitHub connection files · Phase 1/2 checks and tools</text><text class="small" x="48" y="496">Activity inclusion rules · local diagnostics/spans · Operator UI shell · no deployment, DNS, hosts, merge, workflow edits</text>
+
+        <rect class="box untrusted" x="580" y="20" width="250" height="520" />
+        <text class="title" x="596" y="44">Docker Engine · disposable per attempt</text>
+        <rect class="box" x="596" y="60" width="218" height="60" /><text class="title" x="608" y="82">materialize (root, CHOWN only)</text><text class="small" x="608" y="100">chown volume → put tar → removed</text>
+        <rect class="box" x="596" y="130" width="218" height="60" /><text class="title" x="608" y="152">install (uid 1000)</text><text class="small" x="608" y="170">uv sync --locked via proxy → proxy removed</text>
+        <rect class="box" x="596" y="200" width="218" height="60" /><text class="title" x="608" y="222">proxy sidecar (Python, allowlist)</text><text class="small" x="608" y="240">internal + bridge · CONNECT :443 only</text>
+        <rect class="box" x="596" y="270" width="218" height="60" /><text class="title" x="608" y="292">db (postgres, uid 70)</text><text class="small" x="608" y="310">synthetic creds · internal network</text>
+        <rect class="box" x="596" y="340" width="218" height="60" /><text class="title" x="608" y="362">migrations · app · tests (uid 1000)</text><text class="small" x="608" y="380">caps dropped · no-new-privileges · ro root</text>
+        <rect class="box" x="596" y="410" width="218" height="60" /><text class="title" x="608" y="432">probe (Server Guy script)</text><text class="small" x="608" y="450">health + behavior → JSON lines = evidence</text>
+        <text class="small" x="596" y="500">network: internal, no route out</text><text class="small" x="596" y="516">limits: 1 GiB · 1 CPU · 256 pids · timeouts</text><text class="small" x="596" y="532">labels: owner · run · application</text>
+
+        <rect class="box external" x="870" y="20" width="230" height="520" />
+        <text class="title" x="886" y="44">GitHub</text>
+        <rect class="box" x="886" y="60" width="198" height="70" /><text class="title" x="898" y="82">Reads (existing)</text><text class="small" x="898" y="100">tree, contents, archive at SHA</text><text class="small" x="898" y="116">compare, commits, pulls</text>
+        <rect class="box" x="886" y="150" width="198" height="90" /><text class="title" x="898" y="172">Writes (grant only)</text><text class="small" x="898" y="190">blobs → tree → commit (trailer)</text><text class="small" x="898" y="206">→ ref → pull request</text><text class="small" x="898" y="222">reconciled before every retry</text>
+        <rect class="box" x="886" y="260" width="198" height="70" /><text class="title" x="898" y="282">The engineer merges</text><text class="small" x="898" y="300">every Approval Mode · merge,</text><text class="small" x="898" y="316">squash or rebase</text>
+        <rect class="box" x="886" y="350" width="198" height="70" /><text class="title" x="898" y="372">Candidate</text><text class="small" x="898" y="390">observed default-branch head,</text><text class="small" x="898" y="406">never the pull-request head</text>
+
+        <path class="flow" d="M520 209 L596 160" /><path class="effect" d="M520 103 L886 190" /><path class="observe" d="M886 385 L520 300" />
+        <text class="small" x="700" y="500" text-anchor="middle"></text>
+      </svg>
+      <p class="note"><strong>Facts survive; effects are guarded.</strong> A preview or command run is a durable row bound to the Pi Run and the exact tree digest; it stays after cancellation as worker evidence and never satisfies a gate. The staged change and behavior checks are effects that only the final transaction saves, guarded against a contract that changed underneath them. Publication is a separate controller-side effect with its own receipt; a lost receipt is reconciled from GitHub before anything is created again.</p>
+
+      <h2>2. Data flow of one Phase 3 pass</h2>
+      <table>
+        <thead><tr><th>Step</th><th>Who</th><th>Records</th><th>Gate effect</th></tr></thead>
+        <tbody>
+          <tr><td>Continue to Make launch-ready</td><td>engineer → <code>completeInspectApp</code></td><td>Inspect app completed with retained contract identity and checks; Phase 3 workspace + chat</td><td>all not yet</td></tr>
+          <tr><td>Brief</td><td>projection</td><td>none; derived from the contract in force</td><td>P3.G2 names the required changes</td></tr>
+          <tr><td>Continue with Server Guy</td><td>Pi Run in the worker</td><td>reads as Observations; preview/command rows; on commit: proposal (approved per policy) + behavior checks (accepted only under Full autonomy when not weaker)</td><td>P3.G1 "waits for review"</td></tr>
+          <tr><td>Approve · Allow publishing · Publish</td><td>engineer / policy → controller</td><td>approval on the proposal; grant with verified permissions; publication receipt (branch, commit, PR) or failure</td><td>P3.G1 "open pull request: preview only"</td></tr>
+          <tr><td>Merge on GitHub</td><td>engineer</td><td>nothing local</td><td>—</td></tr>
+          <tr><td>Refresh from GitHub</td><td>controller</td><td>candidate (observed head, merge method), verification (files compared, scope on the reviewed diff)</td><td>P3.G1 passed; P3.G2 passed or blocked</td></tr>
+          <tr><td>Verify candidate</td><td>worker claims a queued run → Docker</td><td>conformance run with bindings, configuration, per-check results, image digest; Activity passed/failed/incomplete</td><td>P3.G3 passed only for the exact candidate with current bindings and an accepted behavior definition</td></tr>
+        </tbody>
+      </table>
+
+      <h2>3. Invariants a reviewer can check</h2>
+      <table>
+        <tbody>
+          <tr><td><strong>The container is never the source of truth.</strong></td><td><code>materialize</code> copies the controller's exact tree; edits only exist as staged proposals; every run records the tree digest or commit it executed.</td></tr>
+          <tr><td><strong>Nothing the model or the repository prints can pass a check.</strong></td><td>Outcomes come from container exit codes, the probe's own JSON lines and the controller's comparison; the probe and proxy scripts live in <code>runner-scripts.ts</code>.</td></tr>
+          <tr><td><strong>Unrun is not passed.</strong></td><td><code>not-run</code> and <code>unavailable</code> outcomes fail the gate; cancellation, timeout and restart record them.</td></tr>
+          <tr><td><strong>Merge is human.</strong></td><td>No merge endpoint is called anywhere; the candidate is what <code>observeBranchHead</code> returns after the engineer merges.</td></tr>
+          <tr><td><strong>No duplicate publication.</strong></td><td><code>publishToGithub</code> adopts a branch with the proposal trailer and an existing pull request; a foreign branch is refused.</td></tr>
+          <tr><td><strong>Scope is deterministic.</strong></td><td><code>SENSITIVE_PATH_PATTERNS</code> at proposal time and on the reviewed diff; Pi's mapping explanation is interpretation.</td></tr>
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>

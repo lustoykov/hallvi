@@ -29,6 +29,9 @@ export function buildPiRunContext(run: PiRun) {
     runId: run.id,
     applicationId: run.applicationId,
     chatId: run.chatId,
+    // The engineer's accepted message: the only message a contract field may
+    // quote as user-confirmed in this request.
+    userMessageId: run.userMessageId,
     previousAttempt: previous
       ? {
           runId: previous.id,

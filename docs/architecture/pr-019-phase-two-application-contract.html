@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Guy — Phase 2: inspect, then contract</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :root { --paper: #f7f9fc; --ink: #192338; --muted: #59667b; --accent: #285ad8; --green: #14945f; --amber: #b25a16; --rule: #cbd5e5; }
+      body { margin: 0; padding: 48px 32px; color: var(--ink); background: var(--paper); font: 16px/1.6 "Geist", system-ui, sans-serif; }
+      main { max-width: 1100px; margin: auto; }
+      .eyebrow, code { font-family: "Geist Mono", ui-monospace, monospace; }
+      .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { font: 400 40px/1.15 "Instrument Serif", Georgia, serif; margin: 12px 0 16px; }
+      h2 { font-size: 20px; margin: 32px 0 12px; }
+      p { max-width: 880px; margin: 8px 0 20px; }
+      a { color: var(--accent); text-underline-offset: 4px; }
+      svg { display: block; width: 100%; height: auto; }
+      svg text { font-family: "Geist", system-ui, sans-serif; fill: var(--ink); }
+      svg .name { font-size: 16px; font-weight: 600; }
+      svg .small { font-size: 12px; fill: var(--muted); }
+      svg .tech { font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; fill: var(--muted); }
+      table { width: 100%; border-collapse: collapse; font-size: 16px; }
+      th, td { padding: 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+      th { background: #edf3ff; }
+      .note { border-left: 4px solid var(--accent); padding-left: 20px; }
+      footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Server Guy · PR 19 · Phase 2 Application Contract</p>
+      <h1>Inspect at one commit, then write the contract down with its sources.</h1>
+      <p>An explicit Continue completes the Launch Brief and opens Inspect app. Server Guy pins the repository to one commit and records its tree; Pi reads the files it needs through scoped, read-only tools, and every read becomes a saved Observation before the model sees it. The contract Pi proposes is validated field by field against those records, profile rules and the engineer's own words, and saved only with the final answer.</p>
+      <svg viewBox="0 0 1280 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="p2-title p2-desc">
+        <title id="p2-title">Phase 2 flow: transition, inspection, scoped reads, validated contract</title>
+        <desc id="p2-desc">Continue runs one transaction that completes Phase 1 and opens Phase 2; a deterministic inspection pins the commit and tree; a Server Guy request starts one Run in which Pi reads files as Observations and proposes a contract that is validated when proposed and again when committed; the Operator View projects four gate checks from those records.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#59667b" /></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#285ad8" /></marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#14945f" /></marker>
+        </defs>
+        <rect width="1280" height="760" fill="#f7f9fc" />
+
+        <!-- Row 1: transition -->
+        <g>
+          <rect x="40" y="60" width="260" height="120" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="60" y="92">Continue (engineer)</text>
+          <text class="small" x="60" y="116">Launch Brief checks re-evaluated;</text>
+          <text class="small" x="60" y="134">refused while a Run is pending.</text>
+          <text class="tech" x="60" y="164">POST /phases/inspect-app</text>
+        </g>
+        <path d="M 300 120 H 392" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <rect x="304" y="88" width="84" height="24" fill="#f7f9fc" /><text class="tech" x="346" y="104" text-anchor="middle">ONE TXN</text>
+        <g>
+          <rect x="392" y="60" width="300" height="120" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="412" y="92">SQLite: phase workspaces</text>
+          <text class="small" x="412" y="116">Phase 1 completed_at + retained evidence;</text>
+          <text class="small" x="412" y="134">Phase 2 workspace + Application Contract chat.</text>
+          <text class="tech" x="412" y="164">completed phases are read-only everywhere</text>
+        </g>
+        <path d="M 692 120 H 784" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <rect x="696" y="88" width="84" height="24" fill="#f7f9fc" /><text class="tech" x="738" y="104" text-anchor="middle">THEN</text>
+        <g>
+          <rect x="784" y="60" width="456" height="120" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="804" y="92">GitHub adapter: deterministic inspection</text>
+          <text class="small" x="804" y="116">Identity re-verified, default branch pinned to one commit,</text>
+          <text class="small" x="804" y="134">bounded tree, pyproject.toml. Failure recorded, no Run.</text>
+          <text class="tech" x="804" y="164">Observations: repository-inspection, repository-file</text>
+        </g>
+
+        <!-- Row 2: run -->
+        <path d="M 1012 180 V 250" fill="none" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+        <rect x="1020" y="200" width="220" height="24" fill="#f7f9fc" /><text class="tech" x="1028" y="216">MATCHED → ENQUEUE RUN</text>
+        <g>
+          <rect x="784" y="250" width="456" height="112" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="804" y="282">Run requested by Server Guy</text>
+          <text class="small" x="804" y="306">“Inspect the repository and propose the Application Contract.”</text>
+          <text class="small" x="804" y="324">Recorded with source server-guy, shown as Server Guy's request.</text>
+          <text class="tech" x="804" y="350">worker: per-phase prompt + tool set</text>
+        </g>
+        <path d="M 784 306 H 692" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <g>
+          <rect x="392" y="230" width="300" height="152" rx="12" fill="#fff" stroke="#285ad8" />
+          <text class="name" x="412" y="262">Pi in a Phase 2 Run</text>
+          <text class="small" x="412" y="286">get_repository_inspection · local</text>
+          <text class="small" x="412" y="304">read_repository_file · pinned, bounded,</text>
+          <text class="small" x="412" y="322">deny-listed, redacted → saved before seen</text>
+          <text class="small" x="412" y="340">get_application_contract · local</text>
+          <text class="small" x="412" y="358">propose_application_contract · validate, stage</text>
+        </g>
+        <path d="M 392 306 H 300" fill="none" stroke="#14945f" stroke-width="1.2" marker-end="url(#arrow-green)" />
+        <rect x="304" y="274" width="84" height="24" fill="#f7f9fc" /><text class="tech" x="346" y="290" text-anchor="middle">READ ONLY</text>
+        <g>
+          <rect x="40" y="250" width="260" height="112" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="60" y="282">GitHub contents at commit</text>
+          <text class="small" x="60" y="306">20 s per request, stops with the Run,</text>
+          <text class="small" x="60" y="324">24 reads / 256 KiB per Run, 64 KiB per file.</text>
+          <text class="tech" x="60" y="350">absence comes from the tree, not 404</text>
+        </g>
+
+        <!-- Row 3: commit and view -->
+        <path d="M 542 382 V 452" fill="none" stroke="#285ad8" stroke-width="1.2" marker-end="url(#arrow-accent)" />
+        <rect x="552" y="402" width="200" height="24" fill="#f7f9fc" /><text class="tech" x="560" y="418">FINAL TRANSACTION</text>
+        <g>
+          <rect x="392" y="452" width="300" height="140" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="412" y="484">completePiRun</text>
+          <text class="small" x="412" y="508">Validate the staged contract again against</text>
+          <text class="small" x="412" y="526">current reads, rules, messages, Decisions;</text>
+          <text class="small" x="412" y="544">insert application_contracts vN, supersede vN-1,</text>
+          <text class="small" x="412" y="562">answer + Decisions + Activity together.</text>
+          <text class="tech" x="412" y="584">cancel/fail: reads stay, contract dropped</text>
+        </g>
+        <path d="M 692 522 H 784" fill="none" stroke="#59667b" stroke-width="1.2" marker-end="url(#arrow)" />
+        <g>
+          <rect x="784" y="452" width="456" height="140" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="804" y="484">Operator View: projections, never stored</text>
+          <text class="small" x="804" y="508">P2.G1 profile resolved · P2.G2 contract at the latest commit</text>
+          <text class="small" x="804" y="526">P2.G3 every source still resolves · P2.G4 no unknown or</text>
+          <text class="small" x="804" y="544">contradictory required value. Conformance items → Phase 3;</text>
+          <text class="small" x="804" y="562">open policies (U1, U15, U16, F-8) → their later gates.</text>
+          <text class="tech" x="804" y="584">connection or commit change → not current</text>
+        </g>
+        <path d="M 300 306 V 522 H 392" fill="none" stroke="#59667b" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow)" />
+        <rect x="120" y="500" width="160" height="24" fill="#f7f9fc" /><text class="tech" x="128" y="516">CITED BY ID + SNIPPET</text>
+
+        <!-- Row 4: provenance legend -->
+        <g>
+          <rect x="40" y="632" width="1200" height="96" rx="12" fill="#fff" stroke="#cbd5e5" />
+          <text class="name" x="60" y="664">Provenance kinds are not interchangeable</text>
+          <text class="small" x="60" y="690">repository-declared: value verbatim in a quoted snippet of a saved read · profile-rule: exactly the versioned rule value, for the one field the rule governs · user-confirmed: quote of the engineer's own message or an active Decision</text>
+          <text class="small" x="60" y="708">inferred: Server Guy's labeled interpretation of cited content · unresolved: unknown / contradiction / unsupported (block) or policy (visible, decided at a later gate)</text>
+        </g>
+      </svg>
+
+      <p class="note"><strong>Facts survive cancellation; effects do not.</strong> A file read saved during a Run is a receipt of what the repository contained at that commit and stays after cancellation, timeout or failure. The staged contract is an effect that only the final transaction publishes; it stays bound to the commit and profile it was validated against, and the transaction compares that identity with current evidence before revalidating, so a stale revision, a changed commit or profile, or a rejected field fails the attempt and rolls back the answer, Decisions, version, supersede and Activity together. Every proposal string is checked for credential shapes before any reason could echo one. Retry reuses the saved reads.</p>
+
+      <h2>Before → after</h2>
+      <table>
+        <tr><th>Area</th><th>Before (Phase 1 only)</th><th>After (Phases 1–2)</th></tr>
+        <tr><td>Phase model</td><td>One <code>start</code> workspace per application; readiness shown, no transition.</td><td>Explicit Continue completes Phase 1 with retained evidence and opens Inspect app; completed phases are read-only at HTTP, worker, retry and commit boundaries; current and viewed phase are distinct.</td></tr>
+        <tr><td>Repository evidence</td><td>One identity/access Observation per check.</td><td>A pinned inspection Observation (commit, tree, limits) plus one Observation per file read, at that commit, bounded and redacted.</td></tr>
+        <tr><td>Pi tools</td><td><code>search_decisions</code>, <code>propose_decision</code>, <code>get_application_status</code>.</td><td>Phase 2 adds four scoped tools; the status tool is phase-aware; prompts are stable per phase.</td></tr>
+        <tr><td>Durable records</td><td>Applications, workspaces, chats, messages, Runs, Decisions, Observations, Activity.</td><td>Plus versioned <code>application_contracts</code> with superseding revisions; schema v8 (v6 upgraded in place, v7 refused).</td></tr>
+        <tr><td>Gate checks</td><td>P1.G1–G4 from the application record and the latest repository check.</td><td>P2.G1–G4 from inspection, connection, profile version, contract commit and provenance review; invalidation is a projection.</td></tr>
+        <tr><td>Unchanged</td><td colspan="2">Durable Run acceptance and worker settlement, native Pi sessions and compaction, Decision staging and atomic commit, GitHub connection files and renewal, Activity inclusion rules, local diagnostics and optional export, the Operator UI shell.</td></tr>
+      </table>
+
+      <h2>Read these five files first</h2>
+      <p><a href="../../src/server/phase-transition.ts"><code>phase-transition.ts</code></a> (Continue), <a href="../../src/server/phase-two.ts"><code>phase-two.ts</code></a> (inspection, pinned reads, staged proposals, guarded commit), <a href="../../src/server/application-contract.ts"><code>application-contract.ts</code></a> (schema and provenance validation), <a href="../../src/server/phase-two-spec.ts"><code>phase-two-spec.ts</code></a> (the four checks) and <a href="../../src/server/pi.ts"><code>pi.ts</code></a> (per-phase prompt and tools).</p>
+
+      <footer>Implementation snapshot · September 6, 2026 · Architecture, doc-wide, static, Server Guy profile. Simplified to eleven nodes; provider authentication, SSE delivery and the GitHub identity check's internals omitted. See the <a href="../specs/application-contract.md">Application Contract spec</a> and <a href="../../tests/README.md">test map</a>. Fonts fall back to system sans/serif/monospace offline.</footer>
+    </main>
+  </body>
+</html>

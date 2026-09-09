@@ -1,5 +1,7 @@
 # Cloudflare, Hetzner, and EC2 hosting costs for Server Guy
 
+> Dated research/reference, not an active requirement or implementation plan. Current scope is in [Product](../../PRODUCT.md) and delivery is in [Roadmap](../../ROADMAP.md). Recheck version-sensitive facts before use.
+
 **Research date:** 2026-09-04. Primary sources only. Prices exclude taxes; currencies remain as published, with no assumed exchange rate. These are infrastructure estimates, excluding Server Guy fees and model API usage.
 
 ## Always-on Linux VM comparison
@@ -81,7 +83,7 @@ Two separate decisions matter:
 1. **Hosting Server Guy itself.** Current Phase 1 is a local Next.js/Node application. It opens a file-backed SQLite database through `better-sqlite3`, persists Pi configuration through filesystem operations, and invokes the `gh` executable. A Workers deployment requires changing these interfaces and validating the Pi runtime. Containers may accommodate the executable/runtime needs, but durable files still require a new storage design.
 2. **Hosting applications managed by Server Guy.** Current product documentation targets deployment and recovery on a user-controlled Linux host. A Cloudflare-native application target could be useful for compatible greenfield projects, but would operate Workers, bindings, databases and platform deployments rather than producing the same Linux Host Record. Treating it as another VM provider would conceal real differences.
 
-Verified repository references: [README](../../README.md), [database implementation](../../src/server/db.ts), [GitHub subprocess adapter](../../src/server/github.ts), [Pi configuration](../../src/server/pi-configuration.ts), [current AWS direction](../integrations/aws.md), [product workshop notes](../PRODUCT-WORKSHOP-NOTES.md).
+Verified repository references: [README](../../README.md), [database implementation](../../src/server/db.ts), [GitHub subprocess adapter](../../src/server/github.ts), [Pi configuration](../../src/server/pi-configuration.ts), [current AWS direction](../archive/previous-direction/docs/integrations/aws.md), [product workshop notes](../archive/previous-direction/docs/PRODUCT-WORKSHOP-NOTES.md).
 
 The proposed division is:
 

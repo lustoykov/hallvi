@@ -13,6 +13,7 @@ const historyError =
   "Conversation history unavailable. Start a new chat to continue.";
 const chat: Chat = {
   id: "chat-one",
+  applicationId: "app-one",
   workspaceId: "workspace-one",
   title: "Launch Brief",
   isPrimary: true,
@@ -68,10 +69,18 @@ function render({
       applicationId: "app-one",
       phaseKey: "start",
       createdAt: failedAt,
+      completedAt: null,
+      deliverableEvidence: null,
       phaseNumber: 1,
+      name: "Start",
       deliverable: "Launch Brief",
       status: "in-progress",
+      current: true,
     },
+    workspaces: [],
+    inspection: null,
+    contract: null,
+    conformance: null,
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
     messages: [

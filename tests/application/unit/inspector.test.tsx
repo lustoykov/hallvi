@@ -13,6 +13,10 @@ import type {
 const empty: PhaseOneOperatorView = {
   application: null,
   workspace: null,
+  workspaces: [],
+  inspection: null,
+  contract: null,
+  conformance: null,
   selectedChatId: null,
   chats: [],
   messages: [],
@@ -25,7 +29,15 @@ const empty: PhaseOneOperatorView = {
 
 function render(view = empty) {
   return renderToStaticMarkup(
-    <Inspector view={view} checks={view.checks} onSelectCheck={() => {}} />,
+    <Inspector
+      onHide={() => undefined}
+      onToggleWidth={() => undefined}
+      busy={null}
+      view={view}
+      checks={view.checks}
+      onConformance={() => {}}
+      onSelectCheck={() => {}}
+    />,
   );
 }
 

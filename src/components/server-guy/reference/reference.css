@@ -1,0 +1,214 @@
+/* Prototype chrome: a status bar under the shell, never over content. */
+.sg-reference-shell.sg-adaptive-shell {
+  height: calc(100dvh - 44px);
+}
+.sg-reference-page {
+  min-height: calc(100vh - 44px);
+  padding-bottom: 44px;
+}
+.sg-reference-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: #202838;
+  color: #fff;
+  font-size: 12px;
+  z-index: 50;
+}
+.sg-reference-tag {
+  color: #f5c98a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sg-reference-bar select {
+  font: inherit;
+  font-size: 12px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  padding: 3px 8px;
+  max-width: 320px;
+}
+.sg-reference-bar option {
+  color: #202838;
+}
+.sg-reference-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sg-reference-bar button {
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 28%);
+  color: #fff;
+  border-radius: 999px;
+  width: 26px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font: inherit;
+}
+.sg-reference-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sg-reference-bar button[aria-pressed="true"] {
+  background: #fff;
+  color: #202838;
+}
+.sg-reference-bar button svg {
+  width: 12px;
+  height: 12px;
+}
+.sg-reference-note {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 78%);
+}
+.sg-reference-note b {
+  color: #fff;
+}
+.sg-reference-clock {
+  white-space: nowrap;
+  color: rgb(255 255 255 / 60%);
+}
+.sg-reference-link {
+  color: #fff;
+  white-space: nowrap;
+}
+.sg-reference-banner {
+  margin: 0 0 20px;
+  padding: 9px 12px;
+  border: 1px solid #f0dcc4;
+  background: #fff8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--amber-text);
+}
+
+/* The index of screens and scenarios. */
+.sg-reference-index {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 36px 80px;
+  color: var(--ink);
+}
+.sg-reference-index h1 {
+  font-size: 28px;
+  letter-spacing: -0.025em;
+  margin: 0 0 8px;
+}
+.sg-reference-index > p {
+  color: var(--muted);
+  max-width: 70ch;
+  line-height: 1.7;
+}
+.sg-reference-index h2 {
+  font-size: 16px;
+  margin: 36px 0 12px;
+}
+.sg-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.sg-reference-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+}
+.sg-reference-card:hover {
+  border-color: #c7d6f5;
+  background: #fbfcfe;
+}
+.sg-reference-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.sg-reference-card span {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.sg-reference-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.sg-reference-steps li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  align-items: baseline;
+}
+.sg-reference-steps li:last-child {
+  border-bottom: 0;
+}
+.sg-reference-steps li > span:first-child {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sg-reference-steps small {
+  display: block;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.sg-reference-steps a {
+  color: #315bc6;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.sg-reference-inventory {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sg-reference-inventory th,
+.sg-reference-inventory td {
+  text-align: left;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.sg-reference-inventory th {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .sg-reference-note,
+  .sg-reference-clock,
+  .sg-reference-tag {
+    display: none;
+  }
+  .sg-reference-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-reference-bar * {
+    transition: none;
+  }
+}
