@@ -112,6 +112,8 @@
 }
 .sg-section-facts dd {
   line-height: 1.6;
+  /* A fact that is a sentence should not end on a line holding one word. */
+  text-wrap: pretty;
 }
 .sg-section-facts dd small,
 .sg-fact-note {
@@ -127,6 +129,15 @@
 }
 .sg-facts-wide > div {
   grid-template-columns: 180px minmax(0, 1fr);
+}
+/* One reading measure, so a fact that is a sentence reads like a sentence
+   and not like a spreadsheet row stretched across the page. */
+.sg-facts-wide dd {
+  max-width: 72ch;
+}
+/* A checksum is longer than a phone is wide. */
+.sg-section-facts dd code {
+  overflow-wrap: anywhere;
 }
 
 /* ---------- Condition ---------- */
@@ -184,6 +195,43 @@
 }
 .sg-condition-aside .sg-op-links {
   margin: 0;
+}
+
+/* ---------- A band that needs attention ---------- */
+
+/* Some work is outstanding without changing the verdict above it: failed
+   cleanup is not a failed restore. Such a band keeps its own border and
+   tint so it cannot be skimmed past, and never lifts off the page. */
+.sg-band.sg-attention {
+  gap: 10px;
+  padding: 15px 16px;
+  border: 1px solid #f2d3d0;
+  border-radius: 10px;
+  background: #fffbfb;
+}
+.sg-attention > .sg-subheading {
+  color: var(--bad);
+}
+.sg-attention > p {
+  margin: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: #606d80;
+  max-width: 74ch;
+}
+.sg-attention > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sg-attention .sg-section-facts,
+.sg-attention .sg-section-facts > div {
+  border-color: #f2d3d0;
+}
+/* Inside a card the last rule would float above the padding edge. */
+.sg-attention .sg-section-facts > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 /* ---------- Headline statistics ---------- */
@@ -763,6 +811,88 @@
   border-bottom: 1px solid var(--hairline);
 }
 
+/* ---------- Restore evidence ---------- */
+
+/* The disclosure under a verified restore holds several groups of evidence;
+   they need air between them and a heading needs more above than below. */
+.sg-evidence-more > summary ~ * {
+  margin-top: 22px;
+}
+.sg-evidence-more > .sg-subheading + * {
+  margin-top: 8px;
+}
+
+/* Plugins group by what their check established, so the state is said once
+   per group instead of once per plugin. A group whose members all recorded
+   the same result states it in the head and lists only names. */
+.sg-plugin-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 6px;
+}
+.sg-plugin-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 2px;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+  color: var(--muted);
+}
+.sg-plugin-group-head > span:last-child {
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+.sg-plugin-count {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.sg-plugin-list,
+.sg-plugin-names {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--view-meta);
+  line-height: 1.6;
+}
+/* The same label column as the facts above them, so one disclosure has one
+   left edge for its values instead of two. */
+.sg-plugin-list > li {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-top: 1px solid var(--hairline);
+}
+.sg-plugin-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding-top: 7px;
+  border-top: 1px solid var(--hairline);
+}
+.sg-plugin-list strong,
+.sg-plugin-names strong {
+  font-weight: 600;
+}
+
+/* An attempt is state, one clause and its time at the right edge. */
+.sg-attempts {
+  margin: 2px 0 0;
+}
+.sg-attempts > li {
+  align-items: baseline;
+  padding: 9px 0;
+}
+.sg-attempts > li > .sg-op-rel {
+  font-size: var(--view-meta);
+  white-space: nowrap;
+}
+
 /* ---------- Stack items ---------- */
 
 /* A process, a database or a service: a titled group, not a card. */
@@ -1234,6 +1364,23 @@
   .sg-condition > .sg-condition-aside {
     margin: 4px 0 0 21px;
     flex: 0 0 100%;
+  }
+  .sg-band.sg-attention {
+    padding: 13px 14px;
+  }
+  /* A plugin's own limitation belongs under its name, not beside it. */
+  .sg-plugin-list > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  /* The time moves under the clause rather than squeezing it to nothing. */
+  .sg-attempts > li {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+  }
+  .sg-attempts > li > .sg-op-rel {
+    grid-column: 1 / -1;
+    margin-left: 0;
   }
   .sg-stack-item {
     padding: 14px;

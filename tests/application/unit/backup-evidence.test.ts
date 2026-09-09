@@ -626,12 +626,17 @@ describe("what the page says", () => {
     );
     const markup = render();
     expect(markup).toContain("Verified restore");
-    expect(markup).toContain("Not configured");
+    expect(markup).toContain("Nothing is scheduled");
+    expect(markup).toContain("No retention policy");
     expect(markup).toContain("Nothing runs on its own");
     expect(markup).toContain("29 tables");
     expect(markup).toContain(ARCHIVE_SHA);
-    expect(markup).toContain("1 of 1 loaded");
-    expect(markup).toContain("0 passed a functional test");
+    // A plugin that only served its module is grouped as checked, never as
+    // function tested, and keeps the sentence saying so.
+    expect(markup).toContain("1 of 1 matched their archived module hash");
+    expect(markup).toContain("Module checked");
+    expect(markup).toContain("No functional query was tested");
+    expect(markup).not.toContain("Function tested");
     // A proof is never dressed as protection or as a running schedule.
     for (const claim of [
       "Protected",

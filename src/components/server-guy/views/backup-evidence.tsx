@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type {
   BackupEvidenceFacts,
   BackupProof,
@@ -21,6 +23,16 @@ const outcomeTone = {
   incomplete: "muted",
 } as const;
 
+/**
+ * The two limits no receipt can lift, because the product runs neither a
+ * schedule nor a retention policy. They are stated once, as limits, so the
+ * page never repeats "not configured" in four places.
+ */
+const scheduleLimit =
+  "Nothing runs on its own. Every proof is started by hand. It verifies a dated copy and does not keep newer changes backed up.";
+const retentionLimit =
+  "Nothing removes or ages a stored copy. It stays until someone removes it by hand.";
+
 const short = (revision: string) => revision.slice(0, 7);
 
 function megabytes(bytes: number) {
@@ -29,22 +41,23 @@ function megabytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** "a, b and c": what a disclosure is about to open, in one phrase. */
+function listed(parts: string[]) {
+  if (parts.length < 2) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
 /** The revision a proof ran against, and whether it is the one running now. */
 function Revision({ proof }: { proof: BackupProof }) {
   if (!proof.revision) return <>Not recorded</>;
   return (
     <>
       <code>{short(proof.revision)}</code>
-      {proof.revisionCurrent ? (
-        <small className="sg-fact-note">
-          The revision this application runs now.
-        </small>
-      ) : (
-        <small className="sg-fact-note">
-          An earlier revision. This application no longer runs it, so the proof
-          does not describe what is deployed today.
-        </small>
-      )}
+      <small className="sg-fact-note">
+        {proof.revisionCurrent
+          ? "The revision this application runs now."
+          : "An earlier revision, so the proof does not describe what is deployed today."}
+      </small>
     </>
   );
 }
@@ -65,10 +78,45 @@ function Captured({ proof, now }: { proof: BackupProof; now: number }) {
   return <>Not recorded</>;
 }
 
+/**
+ * The one archive the restore read: how large it was, where it came back
+ * from, and what was compared. Size, destination and the round trip were
+ * three rows saying one thing; they are one row saying it once.
+ */
+function RestoredCopy({ proof, now }: { proof: BackupProof; now: number }) {
+  const { archive, destination } = proof;
+  if (!archive && !destination) return <>Not recorded</>;
+  return (
+    <>
+      {archive?.bytes != null ? `${megabytes(archive.bytes)} · ` : ""}
+      {destination ? (
+        <>
+          Cloudflare R2 · <code>{destination.bucket}</code>
+        </>
+      ) : (
+        "Destination not recorded"
+      )}
+      <small className="sg-fact-note">
+        {proof.downloadedCopyVerified
+          ? `Downloaded back from the destination, matched by size${archive ? " and checksum" : ""}, and read by the restore.`
+          : "The round trip through the destination was not recorded."}{" "}
+        {proof.privateBucketCheckedAt ? (
+          <>
+            Private access checked{" "}
+            <When at={proof.privateBucketCheckedAt} now={now} />.
+          </>
+        ) : (
+          "Bucket visibility was not recorded."
+        )}
+      </small>
+    </>
+  );
+}
+
 function GrafanaChecks({ proof }: { proof: BackupProof }) {
   const grafana = proof.grafana;
   if (!grafana) return null;
-  const credential = grafana.credential;
+  const { dashboard, credential, plugins } = grafana;
   return (
     <>
       <SubHeading>Dashboard and credential checks</SubHeading>
@@ -77,8 +125,8 @@ function GrafanaChecks({ proof }: { proof: BackupProof }) {
         rows={[
           [
             "Restored dashboard",
-            grafana.dashboard
-              ? `${grafana.dashboard.panels} panels saved; ${grafana.dashboard.queriesVerified} queries returned restored data.${grafana.dashboard.renderedCharts !== undefined ? ` ${grafana.dashboard.renderedCharts} of ${grafana.dashboard.panels} charts rendered in the browser.` : grafana.dashboard.browserRendered ? " Browser rendering passed; a chart count was not recorded." : " Browser rendering was not recorded."}`
+            dashboard
+              ? `${dashboard.panels} panels saved, ${dashboard.queriesVerified} queries returned restored data.${dashboard.renderedCharts !== undefined ? ` ${dashboard.renderedCharts} of ${dashboard.panels} charts rendered in the browser.` : dashboard.browserRendered ? " Browser rendering passed; a chart count was not recorded." : " Browser rendering was not recorded."}`
               : "No dashboard was checked.",
           ],
           [
@@ -97,22 +145,16 @@ function GrafanaChecks({ proof }: { proof: BackupProof }) {
                 ].join(" ")
               : "No saved credential was checked.",
           ],
-          [
-            "Plugins",
-            grafana.plugins
-              ? `${grafana.plugins.registered} of ${grafana.plugins.total} loaded, ${grafana.plugins.moduleServed} served a frontend module matching its archived hash, ${grafana.plugins.behaviourChecked} passed a functional test.`
-              : "No plugins were checked.",
-          ],
         ]}
       />
-      {grafana.plugins ? (
-        <BackupPlugins plugins={grafana.plugins.items} />
+      {plugins ? (
+        <BackupPlugins plugins={plugins.items} counts={plugins} />
       ) : null}
     </>
   );
 }
 
-/** One attempt in the record, whatever it ended as. */
+/** One attempt in the record: its outcome, one clause, and its time. */
 function Attempt({ proof, now }: { proof: BackupProof; now: number }) {
   const at = proof.finishedAt ?? proof.startedAt;
   return (
@@ -122,18 +164,20 @@ function Attempt({ proof, now }: { proof: BackupProof; now: number }) {
       </Pill>
       <span>
         {proof.outcome === "verified"
-          ? `Restored from the downloaded copy and made ${proof.checks.length} checks.`
+          ? `Restored from the downloaded copy · ${proof.checks.length} checks`
           : proof.outcome === "failed"
-            ? "The run recorded a failure. It is not evidence that a copy can be restored."
-            : "No completed restore is recorded for this attempt."}
+            ? "Recorded a failure · not evidence that a copy restores"
+            : "No completed restore recorded"}
         {proof.revision && (
           <>
-            {" "}
-            Revision <code>{short(proof.revision)}</code>
-            {proof.revisionCurrent ? "." : ", an earlier revision."}
+            {" · "}
+            <code>{short(proof.revision)}</code>
+            {proof.revisionCurrent ? "" : " · earlier revision"}
           </>
         )}
-        <small>{at ? <When at={at} now={now} /> : "Time not recorded"}</small>
+      </span>
+      <span className="sg-op-rel">
+        {at ? <When at={at} now={now} /> : "Time not recorded"}
       </span>
     </li>
   );
@@ -157,27 +201,60 @@ export function BackupEvidencePanel({
   const unverified = facts.proofs.filter(
     (proof) => proof.outcome !== "verified",
   );
+  const uncleaned = facts.proofs.filter(
+    (proof) => proof.cleanupNotes.length > 0,
+  );
+  // Absence stated once. The schedule and retention a proof cannot record
+  // belong with the limits of the proof, not in a section of their own.
+  const notCovered: Array<[string, ReactNode]> = [];
+  if (!facts.scheduleConfigured)
+    notCovered.push(["Nothing is scheduled", scheduleLimit]);
+  if (!facts.retentionConfigured)
+    notCovered.push(["No retention policy", retentionLimit]);
+  for (const gap of verified?.gaps ?? [])
+    if (gap.key !== "schedule" && gap.key !== "retention")
+      notCovered.push([gap.label, gap.detail]);
+  const opened = verified
+    ? listed([
+        `${verified.checks.length} checks`,
+        ...(verified.grafana?.dashboard ? ["the dashboard"] : []),
+        ...(verified.grafana?.credential ? ["a saved credential"] : []),
+        ...(verified.grafana?.plugins
+          ? [
+              `${verified.grafana.plugins.total} plugin${verified.grafana.plugins.total === 1 ? "" : "s"}`,
+            ]
+          : []),
+      ])
+    : "";
   return (
     <>
-      {facts.proofs.some((proof) => proof.cleanupNotes.length > 0) ? (
-        <section className="sg-band" aria-label="Cleanup attention">
+      {uncleaned.length > 0 ? (
+        <section
+          className="sg-band sg-attention"
+          aria-label="Cleanup attention"
+        >
           <SubHeading>Cleanup needs attention</SubHeading>
           <p>
             Cleanup is separate from the restore result. These temporary
             resources may still exist.
           </p>
-          {facts.proofs
-            .filter((proof) => proof.cleanupNotes.length > 0)
-            .map((proof) => (
+          {uncleaned.map((proof) => (
+            <div key={proof.id}>
+              {(proof.finishedAt ?? proof.startedAt) && (
+                <p className="sg-visual-caption">
+                  Left by the proof of{" "}
+                  <When at={(proof.finishedAt ?? proof.startedAt)!} now={now} />
+                </p>
+              )}
               <Facts
-                key={proof.id}
                 wide
                 rows={proof.cleanupNotes.map((note) => [
                   note.label,
                   note.detail,
                 ])}
               />
-            ))}
+            </div>
+          ))}
         </section>
       ) : null}
       {verified ? (
@@ -189,6 +266,7 @@ export function BackupEvidencePanel({
             </span>
           </div>
           <Facts
+            wide
             rows={[
               [
                 "Proved",
@@ -204,77 +282,31 @@ export function BackupEvidencePanel({
                 <Captured key="captured" proof={verified} now={now} />,
               ],
               [
-                "Copy in the destination",
-                verified.destination ? (
-                  <>
-                    Cloudflare R2 · <code>{verified.destination.bucket}</code>
-                    <small className="sg-fact-note">
-                      {verified.privateBucketCheckedAt ? (
-                        <>
-                          Private access checked{" "}
-                          <When
-                            at={verified.privateBucketCheckedAt}
-                            now={now}
-                          />
-                          .
-                        </>
-                      ) : (
-                        "Bucket visibility was not recorded."
-                      )}
-                    </small>
-                  </>
-                ) : (
-                  "Not recorded"
-                ),
+                "Copy restored",
+                <RestoredCopy key="copy" proof={verified} now={now} />,
               ],
-              [
-                "Downloaded copy checked",
-                verified.archive ? (
-                  <>
-                    {verified.archive.bytes !== null
-                      ? `${megabytes(verified.archive.bytes)} · `
-                      : ""}
-                    SHA-256 <code>{verified.archive.sha256.slice(0, 16)}…</code>
-                    <small className="sg-fact-note">
-                      {verified.downloadedCopyVerified
-                        ? "The archive was downloaded back from the destination and matched by size and checksum. The restore read those bytes."
-                        : "The round trip through the destination was not recorded."}
-                    </small>
-                  </>
-                ) : (
-                  "Not recorded"
-                ),
-              ],
-              [
-                "Source pause",
-                verified.sourcePauseSeconds !== null ? (
-                  <>
-                    {verified.sourcePauseSeconds.toFixed(1)} seconds
-                    <small className="sg-fact-note">
-                      The application was stopped for that long so the copy was
-                      consistent. A brief pause can still miss work in flight.
-                    </small>
-                  </>
-                ) : (
-                  "Not recorded"
-                ),
-              ],
+              ...(verified.sourcePauseSeconds !== null
+                ? ([
+                    [
+                      "Source paused",
+                      <>
+                        {verified.sourcePauseSeconds.toFixed(1)} seconds while
+                        the data was copied
+                        <small className="sg-fact-note">
+                          A brief pause can still miss work in flight.
+                        </small>
+                      </>,
+                    ],
+                  ] as Array<[string, ReactNode]>)
+                : []),
             ]}
           />
-          <details className="sg-op-more">
-            <summary>
-              What was checked · {verified.checks.length}
-              {verified.grafana ? " plus dashboard checks" : ""}
-            </summary>
-            <div className="sg-coverage">
-              {verified.checks.map((check) => (
-                <div className="sg-coverage-row" key={check.key}>
-                  <strong>{check.label}</strong>
-                  <Pill tone="ok">Checked</Pill>
-                  <span>{check.detail}</span>
-                </div>
-              ))}
-            </div>
+          <details className="sg-op-more sg-evidence-more">
+            <summary>What the restore checked · {opened}</summary>
+            <Facts
+              wide
+              rows={verified.checks.map((check) => [check.label, check.detail])}
+            />
             <GrafanaChecks proof={verified} />
             {verified.archive && (
               <Facts
@@ -293,67 +325,36 @@ export function BackupEvidencePanel({
         <section className="sg-band" aria-label="Verified restore">
           <SubHeading>Verified restore</SubHeading>
           <p className="sg-outcome-warn">
+            No proof has restored this deployment&rsquo;s data.
             {latest
-              ? "No proof has restored this deployment's data. The attempts below did not finish or recorded a failure, and a failed attempt is not a copy you can rely on."
-              : "No proof has restored this deployment's data."}
+              ? " Every recorded attempt failed or did not finish, and a failed attempt is not a copy you can rely on."
+              : ""}
           </p>
         </section>
       )}
-      <section className="sg-band" aria-label="Scheduling and retention">
-        <SubHeading>Scheduling and retention</SubHeading>
-        <Facts
-          rows={[
-            [
-              "Schedule",
-              facts.scheduleConfigured ? (
-                "Recorded by a proof"
-              ) : (
-                <>
-                  Not configured
-                  <small className="sg-fact-note">
-                    Nothing runs on its own. A copy exists only for the dates
-                    listed here.
-                  </small>
-                </>
-              ),
-            ],
-            [
-              "Retention",
-              facts.retentionConfigured
-                ? "Recorded by a proof"
-                : "Not configured. The stored copies stay until someone removes them.",
-            ],
-            [
-              "Ongoing protection",
-              "None. Running a proof is a manual operation and Server Guy does not offer one from this page yet.",
-            ],
-          ]}
-        />
-      </section>
-      {verified && (
-        <section className="sg-band" aria-label="What this proof does not show">
-          <SubHeading>What this proof does not show</SubHeading>
-          <Facts
-            wide
-            rows={verified.gaps
-              .filter((gap) => !["schedule", "retention"].includes(gap.key))
-              .map((gap) => [gap.label, gap.detail])}
-          />
+      {notCovered.length > 0 && (
+        <section className="sg-band" aria-label="What is not covered">
+          <SubHeading>What is not covered</SubHeading>
+          <Facts wide rows={notCovered} />
         </section>
       )}
       <section className="sg-band" aria-label="Attempts">
         <div className="sg-band-head">
           <h2>Attempts</h2>
           <span className="sg-visual-caption">
-            {facts.proofs.length} recorded
+            {facts.proofs.length} recorded ·{" "}
+            {facts.proofs.length - unverified.length} verified
             {unverified.length
-              ? ` · ${unverified.length} without a verified restore`
+              ? `, ${unverified.length} without a verified restore`
               : ""}
           </span>
         </div>
-        <details className="sg-op-more" open={unverified.length > 0}>
-          <summary>Every recorded attempt</summary>
-          <ol className="sg-history">
+        <details
+          className="sg-op-more"
+          open={latest ? latest.outcome !== "verified" : false}
+        >
+          <summary>Every attempt, newest first</summary>
+          <ol className="sg-history sg-attempts">
             {facts.proofs.map((proof) => (
               <Attempt key={proof.id} proof={proof} now={now} />
             ))}
