@@ -13,6 +13,8 @@ import type { ApplicationRecord } from "./types";
 import type { DeploymentRecord } from "./deployment-types";
 
 function backupEvidenceSummary(facts: BackupEvidenceFacts) {
+  if (facts.proofs.some((proof) => proof.cleanupNotes.length > 0))
+    return "Restore cleanup needs attention";
   return facts.proofs.some((proof) => proof.outcome === "verified")
     ? "Restore proved · not scheduled"
     : facts.proofs.length

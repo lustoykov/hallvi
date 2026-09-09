@@ -11,6 +11,7 @@ try {
   });
   const page = await context.newPage();
   const errors = [];
+  let dashboardCanvases = 0;
   page.on("pageerror", (error) => errors.push(error.message));
   if (!input.pluginsOnly) {
     await page.goto(`${input.url}/d/${input.uid}?from=now-1h&to=now`, {
@@ -23,6 +24,7 @@ try {
     await page.waitForFunction(
       () => document.querySelectorAll("canvas").length >= 2,
     );
+    dashboardCanvases = await page.locator("canvas").count();
     await page.screenshot({
       path: join(input.directory, "restored-dashboard.png"),
       fullPage: true,
@@ -91,7 +93,7 @@ try {
   );
   process.stdout.write(
     JSON.stringify({
-      dashboardCanvases: input.pluginsOnly ? 0 : 2,
+      dashboardCanvases,
       pages: pages.map(({ id, behavior, uiState, errors }) => ({
         id,
         behavior,

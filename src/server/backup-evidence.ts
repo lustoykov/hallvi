@@ -118,6 +118,11 @@ const receiptSchema = z.object({
   rowVerification: z.object({ rowCount: quantity }).optional(),
   schemaVerified: z.boolean().optional(),
   isolatedWriteVerified: z.boolean().optional(),
+  sourceFixturesRemoved: z.boolean().optional(),
+  sourceStagingRemoved: z.boolean().optional(),
+  restoreResourcesRemoved: z.boolean().optional(),
+  restoreTargetRemoved: z.boolean().optional(),
+  canaryRemoved: z.boolean().optional(),
 });
 
 type Receipt = z.infer<typeof receiptSchema>;
@@ -165,7 +170,13 @@ function checksIn(receipt: Receipt): BackupNote[] {
         "The restore read the copy downloaded back from the destination, not the local one.",
     });
   const databases = Object.values(receipt.sqlite ?? {});
-  if (databases.length) {
+  if (
+    databases.length &&
+    databases.every(
+      (item) =>
+        whole(item.tableCount) !== null && whole(item.rowCount) !== null,
+    )
+  ) {
     const tables = databases.reduce((sum, item) => sum + item.tableCount, 0);
     const rows = databases.reduce((sum, item) => sum + item.rowCount, 0);
     checks.push({
@@ -291,6 +302,7 @@ const grafanaChecksSchema = z.object({
       panels: quantity,
       queriesVerified: quantity,
       browserRendered: z.boolean().optional(),
+      renderedCharts: quantity.optional(),
     })
     .optional(),
   credential: z
@@ -336,6 +348,9 @@ function grafanaIn(receipt: Receipt): GrafanaFunctionalChecks | null {
             queriesVerified: queries,
             ...(checks.dashboard?.browserRendered !== undefined
               ? { browserRendered: checks.dashboard.browserRendered }
+              : {}),
+            ...(whole(checks.dashboard?.renderedCharts) !== null
+              ? { renderedCharts: whole(checks.dashboard?.renderedCharts)! }
               : {}),
           }
         : null,
@@ -405,6 +420,7 @@ function proofOf(receipt: Receipt, deployment: DeploymentRecord): BackupProof {
       receipt.privateBucketCheck.customDomains === 0
         ? isoTime(receipt.privateBucketCheck.checkedAt)
         : null,
+    cleanupNotes: cleanupNotes(receipt),
     sourcePauseSeconds: seconds(
       receipt.sourcePauseSeconds ?? receipt.sourceCapture?.pauseSeconds,
     ),
@@ -412,6 +428,38 @@ function proofOf(receipt: Receipt, deployment: DeploymentRecord): BackupProof {
     gaps: gapsIn(receipt),
     grafana: grafanaIn(receipt),
   };
+}
+
+function cleanupNotes(receipt: Receipt): BackupNote[] {
+  const notes: BackupNote[] = [];
+  if (
+    receipt.sourceFixturesRemoved === false ||
+    receipt.canaryRemoved === false
+  )
+    notes.push({
+      key: "source-fixtures",
+      label: "Test data may remain on the live application",
+      detail:
+        "An operator needs to remove the temporary test records identified in the private receipt and verify their removal.",
+    });
+  if (
+    receipt.restoreResourcesRemoved === false ||
+    receipt.restoreTargetRemoved === false
+  )
+    notes.push({
+      key: "restore-resources",
+      label: "Temporary restore resources may remain",
+      detail:
+        "An operator needs to inspect and remove the test containers and volumes identified in the private receipt.",
+    });
+  if (receipt.sourceStagingRemoved === false)
+    notes.push({
+      key: "source-staging",
+      label: "Temporary backup files may remain on the source server",
+      detail:
+        "An operator needs to remove the staging paths identified in the private receipt. They can contain credentials.",
+    });
+  return notes;
 }
 
 function readReceipt(path: string): Receipt | null {

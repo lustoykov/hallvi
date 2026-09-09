@@ -4,7 +4,7 @@ import { Pill, SubHeading } from "./bits";
 const status = {
   verified: { label: "Function tested", tone: "ok" },
   limited: { label: "Needs setup", tone: "warn" },
-  loaded: { label: "Files checked", tone: "muted" },
+  loaded: { label: "Module checked", tone: "muted" },
   "not-verified": { label: "Not verified", tone: "warn" },
 } as const;
 

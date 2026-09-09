@@ -78,7 +78,7 @@ function GrafanaChecks({ proof }: { proof: BackupProof }) {
           [
             "Restored dashboard",
             grafana.dashboard
-              ? `${grafana.dashboard.panels} panels saved; ${grafana.dashboard.queriesVerified} queries returned restored data.${grafana.dashboard.browserRendered ? " Both charts rendered in the browser." : " Browser rendering was not recorded."}`
+              ? `${grafana.dashboard.panels} panels saved; ${grafana.dashboard.queriesVerified} queries returned restored data.${grafana.dashboard.renderedCharts !== undefined ? ` ${grafana.dashboard.renderedCharts} of ${grafana.dashboard.panels} charts rendered in the browser.` : grafana.dashboard.browserRendered ? " Browser rendering passed; a chart count was not recorded." : " Browser rendering was not recorded."}`
               : "No dashboard was checked.",
           ],
           [
@@ -100,7 +100,7 @@ function GrafanaChecks({ proof }: { proof: BackupProof }) {
           [
             "Plugins",
             grafana.plugins
-              ? `${grafana.plugins.registered} of ${grafana.plugins.total} loaded, ${grafana.plugins.moduleServed} matched their archived files, ${grafana.plugins.behaviourChecked} passed a functional test.`
+              ? `${grafana.plugins.registered} of ${grafana.plugins.total} loaded, ${grafana.plugins.moduleServed} served a frontend module matching its archived hash, ${grafana.plugins.behaviourChecked} passed a functional test.`
               : "No plugins were checked.",
           ],
         ]}
@@ -159,6 +159,27 @@ export function BackupEvidencePanel({
   );
   return (
     <>
+      {facts.proofs.some((proof) => proof.cleanupNotes.length > 0) ? (
+        <section className="sg-band" aria-label="Cleanup attention">
+          <SubHeading>Cleanup needs attention</SubHeading>
+          <p>
+            Cleanup is separate from the restore result. These temporary
+            resources may still exist.
+          </p>
+          {facts.proofs
+            .filter((proof) => proof.cleanupNotes.length > 0)
+            .map((proof) => (
+              <Facts
+                key={proof.id}
+                wide
+                rows={proof.cleanupNotes.map((note) => [
+                  note.label,
+                  note.detail,
+                ])}
+              />
+            ))}
+        </section>
+      ) : null}
       {verified ? (
         <section className="sg-band" aria-label="Verified restore">
           <div className="sg-band-head">

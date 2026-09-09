@@ -78,7 +78,8 @@ export function ApplicationsHome({
     (item) =>
       item.protection === "Not backed up" ||
       item.protection.includes("not scheduled") ||
-      item.protection === "Restore proof did not succeed",
+      item.protection === "Restore proof did not succeed" ||
+      item.protection === "Restore cleanup needs attention",
   );
   function greet(id: string) {
     setSelectedId(id);

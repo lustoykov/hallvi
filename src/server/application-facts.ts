@@ -87,6 +87,7 @@ export interface GrafanaFunctionalChecks {
     panels: number;
     queriesVerified: number;
     browserRendered?: boolean;
+    renderedCharts?: number;
   } | null;
   credential: {
     authenticatedQuery: boolean;
@@ -128,6 +129,8 @@ export interface BackupProof {
   downloadedCopyVerified: boolean;
   /** When bucket visibility was checked. It does not prove current access. */
   privateBucketCheckedAt: string | null;
+  /** Cleanup is independent of whether the archived data restored. */
+  cleanupNotes: BackupNote[];
   /** How long the source was paused while its state was copied. */
   sourcePauseSeconds: number | null;
   checks: BackupNote[];

@@ -44,10 +44,11 @@ export function pluginEvidence(
     const known = plugin.id ? knownPlugins[plugin.id] : undefined;
     const label = known?.label ?? "Other installed plugin";
     let state: BackupPluginEvidence["state"] = "not-verified";
-    let detail = "Registration and file integrity were not both verified.";
+    let detail = "Registration and the frontend module were not both verified.";
     if (plugin.registered && plugin.moduleServed) {
       state = "loaded";
-      detail = "Registered and files matched. No functional query was tested.";
+      detail =
+        "Registered and served a frontend module matching its archived hash. No functional query was tested.";
       if (known?.dependency && plugin.uiState === "requires-service") {
         state = "limited";
         detail = `Needs ${known.dependency}. Its data workflow was not tested.`;

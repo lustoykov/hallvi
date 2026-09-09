@@ -146,6 +146,9 @@ export function ApplicationOverview({
   const evidence = facts.backupEvidence;
   const proved = evidence ? lastVerifiedProof(evidence) : null;
   const provedAt = proved?.finishedAt ?? proved?.startedAt ?? null;
+  const cleanupPending = evidence?.proofs.some(
+    (proof) => proof.cleanupNotes.length > 0,
+  );
   const workers = stack.processes.filter((item) => item.role === "worker");
   const absent = [
     ...(stack.services.length || stack.queues.length ? [] : ["cache or queue"]),
@@ -335,15 +338,17 @@ export function ApplicationOverview({
       ? protectionState === "ok"
         ? `To ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
         : (protection.lastAttempt?.reason ?? "Off-host copies are incomplete")
-      : proved
-        ? `${provedAt ? `${relativeTime(provedAt, now)} · ` : ""}${proved.revisionCurrent ? "started by hand" : "an earlier revision"} · nothing scheduled`
-        : evidence
-          ? "The last attempt did not restore this data"
-          : protectable.length
-            ? protectable.map((item) => item.label).join(", ")
-            : stack.recorded
-              ? "No database or file volume recorded"
-              : "Known after the first deployment",
+      : cleanupPending
+        ? "Temporary restore resources need cleanup. Review Backups."
+        : proved
+          ? `${provedAt ? `${relativeTime(provedAt, now)} · ` : ""}${proved.revisionCurrent ? "started by hand" : "an earlier revision"} · nothing scheduled`
+          : evidence
+            ? "The last attempt did not restore this data"
+            : protectable.length
+              ? protectable.map((item) => item.label).join(", ")
+              : stack.recorded
+                ? "No database or file volume recorded"
+                : "Known after the first deployment",
     tone:
       protectionState === "bad"
         ? "bad"

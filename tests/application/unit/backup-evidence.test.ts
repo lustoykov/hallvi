@@ -288,6 +288,45 @@ describe("association with the application and its revision", () => {
 });
 
 describe("what counts as a verified restore", () => {
+  it("keeps verified recovery when cleanup fails and exposes the outstanding work", () => {
+    write(
+      "79310e32-14d8-416e-ba9b-cd297210877e",
+      stackReceipt({
+        sourceFixturesRemoved: false,
+        restoreResourcesRemoved: false,
+        sourceStagingRemoved: false,
+      }),
+    );
+    const facts = backupEvidenceFor(deployment)!;
+    expect(lastVerifiedProof(facts)!.outcome).toBe("verified");
+    expect(facts.proofs[0].cleanupNotes).toHaveLength(3);
+    expect(backupEvidenceStatus(facts)).toEqual({
+      tone: "bad",
+      title: "Temporary restore resources need cleanup",
+    });
+    const markup = renderToStaticMarkup(
+      createElement(BackupEvidencePanel, { facts, now: Date.now() }),
+    );
+    expect(markup).toContain("Verified restore");
+    expect(markup).toContain("Cleanup needs attention");
+    expect(markup).toContain("Test data may remain on the live application");
+    expect(markup).not.toContain("No proof has restored");
+  });
+
+  it("does not render invalid SQLite counters as checked data", () => {
+    write(
+      "79310e32-14d8-416e-ba9b-cd297210877e",
+      stackReceipt({
+        sqlite: { database: { tableCount: -2, rowCount: 0.5 } },
+      }),
+    );
+    expect(
+      backupEvidenceFor(deployment)!.proofs[0].checks.some(
+        (check) => check.key === "sqlite",
+      ),
+    ).toBe(false);
+  });
+
   it("is not verified when the restore never read the off-host copy", () => {
     write(
       "79310e32-14d8-416e-ba9b-cd297210877e",

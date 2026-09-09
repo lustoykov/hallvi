@@ -96,6 +96,11 @@ export function lastVerifiedProof(
  */
 export function backupEvidenceStatus(facts: BackupEvidenceFacts) {
   const latest = latestProof(facts);
+  if (facts.proofs.some((proof) => proof.cleanupNotes.length > 0))
+    return {
+      tone: "bad",
+      title: "Temporary restore resources need cleanup",
+    } as const;
   if (!latest)
     return {
       tone: "muted",

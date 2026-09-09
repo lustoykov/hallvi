@@ -48,6 +48,16 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def finish_cleanup(receipt, tasks):
+    """Attempt every cleanup; its result must never rewrite restore evidence."""
+    for field, operation in tasks:
+        try:
+            operation()
+            receipt[field] = True
+        except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+            receipt[field] = False
+
+
 def safe_extract(archive, destination):
     with tarfile.open(archive) as bundle:
         members = bundle.getmembers()
@@ -506,8 +516,12 @@ def main():
                 browser = functional_module.verify_browser(
                     run, functional_fixture, proof, project, directory, restored, auth
                 )
+                receipt["grafanaFunctionalChecks"]["dashboard"]["renderedCharts"] = (
+                    browser["dashboardCanvases"]
+                )
                 receipt["grafanaFunctionalChecks"]["dashboard"]["browserRendered"] = (
-                    browser["dashboardCanvases"] == 2
+                    browser["dashboardCanvases"]
+                    >= receipt["grafanaFunctionalChecks"]["dashboard"]["panels"]
                 )
                 receipt["grafanaFunctionalChecks"]["postgresPlugin"] = (
                     functional_module.verify_postgres_plugin(
@@ -607,15 +621,19 @@ def main():
     finally:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        tasks = []
         if functional_fixture:
-            try:
-                functional_module.cleanup(run, ssh, deployment_id, functional_fixture)
-                receipt["sourceFixturesRemoved"] = True
-            except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
-                receipt["sourceFixturesRemoved"] = False
-                receipt["status"] = "failed"
+            tasks.append(
+                (
+                    "sourceFixturesRemoved",
+                    lambda: functional_module.cleanup(
+                        run, ssh, deployment_id, functional_fixture
+                    ),
+                )
+            )
         if created:
-            try:
+
+            def remove_restore():
                 helpers = (
                     run(
                         "docker",
@@ -630,29 +648,26 @@ def main():
                 if helpers:
                     run("docker", "rm", "--force", *helpers)
                 run(*compose, "down", "--volumes", "--remove-orphans")
-                receipt["restoreResourcesRemoved"] = True
-            except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
-                receipt["restoreResourcesRemoved"] = False
-                receipt["status"] = "failed"
-        try:
-            # Remove only the unique proof staging paths we created.
-            run(
-                *ssh,
-                "rm -rf -- "
-                + shlex.quote(remote_dir)
-                + " "
-                + shlex.quote(remote_script),
+
+            tasks.append(("restoreResourcesRemoved", remove_restore))
+        tasks.append(
+            (
+                "sourceStagingRemoved",
+                lambda: run(
+                    *ssh,
+                    "rm -rf -- "
+                    + shlex.quote(remote_dir)
+                    + " "
+                    + shlex.quote(remote_script),
+                ),
             )
-            receipt["sourceStagingRemoved"] = True
-        except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
-            receipt["sourceStagingRemoved"] = False
+        )
+        finish_cleanup(receipt, tasks)
         receipt["remoteObjectsMayExist"] = bool(receipt.get("uploadAttempted"))
         receipt["finishedAt"] = time.time()
         save()
         lock_path.unlink()
         print("Proof receipt:", directory / "receipt.json")
-    if receipt["status"] != "verified":
-        raise RuntimeError("Restore cleanup requires attention")
     run(
         *wrangler,
         "put",
@@ -661,6 +676,17 @@ def main():
         str(directory / "receipt.json"),
         "--remote",
     )
+    if any(
+        receipt.get(key) is False
+        for key in (
+            "sourceFixturesRemoved",
+            "restoreResourcesRemoved",
+            "sourceStagingRemoved",
+        )
+    ):
+        raise RuntimeError(
+            "Restore verified; temporary resources need cleanup. See the receipt."
+        )
     print(
         "Verified complete state, R2 round trip, isolated application boot, and recovered business data."
     )

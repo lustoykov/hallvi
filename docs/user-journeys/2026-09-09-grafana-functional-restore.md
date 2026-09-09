@@ -6,11 +6,11 @@ It does not configure a backup schedule or retention policy.
 
 ## Verified result
 
-Final proof `5b304700-4400-4986-807c-203ac3840ce0` passed. Its R2 archive was
-70,707,228 bytes, SHA-256
-`f4e737c4a8aee045caf9d5f4e88af048c89af175174539491b457b983be7337a`.
-It recovered 92 SQLite tables, 1,807 rows, 698 files and 21 identical historical
-Prometheus samples. The source pause was 3.10 seconds. Source fixtures, restore
+Final proof `ec75d66d-0799-4b91-a39c-f4142d91c872` passed. Its R2 archive was
+70,879,737 bytes, SHA-256
+`e38192b8e9a31f251ff1386cc50bb58de839febc797b47256859060cb5f73b9e`.
+It recovered 92 SQLite tables, 1,808 rows, 700 files and 21 identical historical
+Prometheus samples. The source pause was 2.86 seconds. Source fixtures, restore
 resources and source staging were all verified removed.
 
 The receipt and browser screenshots are in the private runtime proof directory.
@@ -106,3 +106,31 @@ owned resources before retrying. Never remove unrelated dashboards or data sourc
 
 API and plugin behavior references: [Grafana data-source API](https://grafana.com/docs/grafana/latest/developer-resources/api-reference/http-api/api-legacy/data_source/),
 [plugin lifecycle](https://grafana.com/developers/plugin-tools/key-concepts/plugin-lifecycle).
+
+## Review and validation
+
+Opus 5 at maximum effort implemented the initial evidence integration and then
+reviewed the completed source, sanitized receipt, and desktop/phone screenshots
+read-only. Its findings were addressed before merge:
+
+- Cleanup is now an independent outcome. A completed restore remains verified
+  even if fixture deletion or Docker teardown fails; the command exits nonzero
+  and the UI calls out resources that need cleanup. A failure-path test verifies
+  that remaining cleanup tasks still run and restore evidence is retained.
+- Browser checks record the measured chart count. The final run recorded **2 of
+  2 charts rendered**, rather than deriving the count from a success flag.
+- Plugin rows describe the running frontend module hash check precisely, separate
+  from full archive integrity and functional query tests.
+- Invalid SQLite counters are not rendered as successful checks.
+
+The final Grafana R2 proof above reran the complete expanded workflow after these
+changes. The Todo PostgreSQL proof was also rerun successfully as
+`7429c87c-c2b7-4f32-b677-caff8119b040`, including canary removal and restore cleanup.
+Kuma uses the previously verified proof `79310e32-14d8-416e-ba9b-cd297210877e`.
+
+Local validation: 45 focused TypeScript tests and 9 Python tests, TypeScript,
+ESLint, Ruff, formatting, and the design detector. Browser checks covered the
+actual three applications and homepage, desktop and phone layouts, detailed
+plugin statuses and absence of contradictory no-copy claims. A homepage server
+rendering failure discovered by this check was fixed by keeping the summary
+helper out of the client UI import graph. No CI result was used as a merge gate.

@@ -26,6 +26,32 @@ functional = load("functional", "scripts/backup-proof/grafana-functional.py")
 
 
 class BackupProofTest(unittest.TestCase):
+    def test_cleanup_failure_preserves_restore_and_attempts_remaining_cleanup(self):
+        receipt = {"status": "verified", "phase": "complete", "offHostVerified": True}
+        calls = []
+
+        def failed_source():
+            calls.append("source")
+            raise RuntimeError("Source unavailable during fixture deletion")
+
+        def failed_local():
+            calls.append("local")
+            raise OSError("Docker unavailable")
+
+        proof.finish_cleanup(
+            receipt,
+            [
+                ("sourceFixturesRemoved", failed_source),
+                ("restoreResourcesRemoved", failed_local),
+                ("sourceStagingRemoved", lambda: calls.append("staging")),
+            ],
+        )
+        self.assertEqual(calls, ["source", "local", "staging"])
+        self.assertEqual(receipt["status"], "verified")
+        self.assertFalse(receipt["sourceFixturesRemoved"])
+        self.assertFalse(receipt["restoreResourcesRemoved"])
+        self.assertTrue(receipt["sourceStagingRemoved"])
+
     def test_functional_verification_rejects_missing_dashboard_data_and_open_auth(self):
         dashboard = {"panels": [{"targets": [{"refId": "A"}]}] * 2}
         fixture = {"uid": "fixture", "dashboard": dashboard, "image": "fixture-image"}
