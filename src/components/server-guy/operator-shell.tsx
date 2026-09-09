@@ -13,6 +13,7 @@ import {
 
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
+import type { ApplicationFacts } from "@/server/application-facts";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
@@ -313,6 +314,9 @@ export function OperatorShell({
     [deployment, view.operations],
   );
   const stack = useMemo(() => stackOf(deployment), [deployment]);
+  // Facts the view already carries, refreshed by the same poll as the record,
+  // under the facts a destination fetches for itself while it is open.
+  const facts: ApplicationFacts = { ...view.facts, ...firewall.facts };
   const [stackRevealed, setStackRevealed] = useState(false);
   // The open destination is being looked at: it never shows "updated".
   const indicators = navigationIndicators(operations, seen);
@@ -878,13 +882,13 @@ export function OperatorShell({
           sections={visibleSections(
             stack,
             activeSection,
-            firewall.facts,
+            facts,
             Boolean(deployment?.serverId),
           )}
           hidden={hiddenSections(
             stack,
             activeSection,
-            firewall.facts,
+            facts,
             Boolean(deployment?.serverId),
           )}
           revealed={stackRevealed}
@@ -903,7 +907,7 @@ export function OperatorShell({
               operations={operations}
               now={now}
               loading={!recordLoaded}
-              facts={firewall.facts}
+              facts={facts}
               busy={firewall.loading ? "check-firewall" : null}
               onAction={
                 activeSection === "security" && deployment?.serverId

@@ -26,6 +26,11 @@ spec = importlib.util.spec_from_file_location(
 )
 capture_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(capture_module)
+functional_spec = importlib.util.spec_from_file_location(
+    "grafana_functional", Path(__file__).with_name("grafana-functional.py")
+)
+functional_module = importlib.util.module_from_spec(functional_spec)
+functional_spec.loader.exec_module(functional_module)
 
 
 def run(*args, input=None, timeout=180):
@@ -144,6 +149,7 @@ def main():
     restore_compose = directory / "restore-compose.json"
     compose = ["docker", "compose", "-p", project, "-f", str(restore_compose)]
     created = False
+    functional_fixture = {}
     os.environ["CLOUDFLARE_ACCOUNT_ID"] = account
     wrangler = ["npx", "--yes", "wrangler@4.130.0", "r2", "object"]
     object_prefix = f"applications/{app}/{proof}"
@@ -184,6 +190,16 @@ def main():
             if platform != "linux/amd64":
                 raise RuntimeError("Restore requires the source linux/amd64 image")
         run("docker", "image", "inspect", "alpine:3.20")
+        if os.environ.get("SG_GRAFANA_FUNCTIONAL") == "1":
+            if not deployment["plan"]["image"].startswith("grafana/grafana@sha256:"):
+                raise RuntimeError(
+                    "Functional fixtures require the Grafana reference stack"
+                )
+            run("docker", "image", "inspect", "postgres:16-alpine")
+            phase("prepare-functional-fixtures")
+            functional_module.setup(
+                run, ssh, deployment_id, proof, directory, functional_fixture
+            )
         source_compose = f"docker compose -p sg-{deployment_id[:8]} -f /opt/server-guy/{deployment_id}/compose.json"
         ids = run(*ssh, source_compose + " ps -q").decode().split()
         if not ids or not all(re.fullmatch(r"[a-f0-9]{64}", value) for value in ids):
@@ -267,6 +283,7 @@ def main():
         manifest = json.loads((restored / "manifest.json").read_text())
         if manifest["proofId"] != proof or manifest["deploymentId"] != deployment_id:
             raise RuntimeError("Backup identity mismatch")
+        receipt["recoveryPointStartedAt"] = manifest["stopStartedAt"]
         for name, expected in manifest["files"].items():
             if sha(restored / name) != expected:
                 raise RuntimeError("Restored file inventory mismatch")
@@ -349,6 +366,10 @@ def main():
                 volume,
             )
         run(*compose, "start")
+        if functional_fixture:
+            functional_module.start_restore_fixture(
+                run, functional_fixture, proof, project, directory
+            )
         endpoints = {}
         for name in definition["services"]:
             port = (
@@ -421,27 +442,30 @@ def main():
                 ).encode()
             ).decode()
 
-            def grafana_get(path):
-                script = 'IFS= read -r auth; wget -T 5 -qO- --header "$auth" "$1"'
-                return json.loads(
-                    run(
-                        "docker",
-                        "run",
-                        "--rm",
-                        "--label",
-                        "sg-backup-proof=" + proof,
-                        "-i",
-                        "--network",
-                        project + "_proof",
-                        "alpine:3.20",
-                        "sh",
-                        "-ec",
-                        script,
-                        "sh",
-                        "http://app:3000" + path,
-                        input=("Authorization: Basic " + auth + "\n").encode(),
-                    )
+            def grafana_get(path, body=None, raw=False):
+                script = 'IFS= read -r auth; wget -T 15 -qO- --header "$auth" "$1"'
+                payload = ("Authorization: Basic " + auth + "\n").encode()
+                if body is not None:
+                    script = 'IFS= read -r auth; cat > /tmp/body; wget -T 15 -qO- --header "$auth" --header "Content-Type: application/json" --post-file /tmp/body "$1"'
+                    payload += json.dumps(body).encode()
+                response = run(
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--label",
+                    "sg-backup-proof=" + proof,
+                    "-i",
+                    "--network",
+                    project + "_proof",
+                    "alpine:3.20",
+                    "sh",
+                    "-ec",
+                    script,
+                    "sh",
+                    "http://app:3000" + path,
+                    input=payload,
                 )
+                return response if raw else json.loads(response)
 
             source_db = sqlite3.connect(f"file:{original_app_db}?mode=ro", uri=True)
             try:
@@ -468,6 +492,48 @@ def main():
             receipt["credentialCoverage"] = (
                 "Keys and configuration preserved; fixture datasource has no configured password"
             )
+            if functional_fixture:
+                phase("verify-grafana-features")
+                receipt["grafanaFunctionalChecks"] = functional_module.verify(
+                    run,
+                    functional_fixture,
+                    proof,
+                    project,
+                    restored,
+                    grafana_get,
+                    manifest,
+                )
+                browser = functional_module.verify_browser(
+                    run, functional_fixture, proof, project, directory, restored, auth
+                )
+                receipt["grafanaFunctionalChecks"]["dashboard"]["browserRendered"] = (
+                    browser["dashboardCanvases"] == 2
+                )
+                receipt["grafanaFunctionalChecks"]["postgresPlugin"] = (
+                    functional_module.verify_postgres_plugin(
+                        run, proof, project, directory, grafana_get
+                    )
+                )
+                receipt["grafanaFunctionalChecks"]["pluginPagesOpened"] = [
+                    page["id"] for page in browser["pages"]
+                ]
+                for plugin in receipt["grafanaFunctionalChecks"]["plugins"]:
+                    page = next(
+                        (p for p in browser["pages"] if p["id"] == plugin["id"]), None
+                    )
+                    if page:
+                        plugin.update(
+                            {
+                                key: page[key]
+                                for key in ("behavior", "uiState", "browserErrors")
+                            }
+                        )
+                    if plugin["id"] == "grafana-postgresql-datasource":
+                        plugin["behavior"] = "postgresql-query"
+                        plugin["uiState"] = "working"
+                receipt["credentialCoverage"] = (
+                    "Recovered encrypted password queried authenticated Prometheus; missing and wrong credentials rejected"
+                )
         # Verify important application records again in the database mounted by
         # the running restored application, not merely the unpacked archive.
         app_id = run(*compose, "ps", "-q", "app").decode().strip()
@@ -541,6 +607,13 @@ def main():
     finally:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        if functional_fixture:
+            try:
+                functional_module.cleanup(run, ssh, deployment_id, functional_fixture)
+                receipt["sourceFixturesRemoved"] = True
+            except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+                receipt["sourceFixturesRemoved"] = False
+                receipt["status"] = "failed"
         if created:
             try:
                 helpers = (

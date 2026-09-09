@@ -75,7 +75,10 @@ export function ApplicationsHome({
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0];
   const addHref = preview ? "/prototype/new" : "/applications/new";
   const unprotected = applications.filter(
-    (item) => item.protection === "Not backed up",
+    (item) =>
+      item.protection === "Not backed up" ||
+      item.protection.includes("not scheduled") ||
+      item.protection === "Restore proof did not succeed",
   );
   function greet(id: string) {
     setSelectedId(id);
@@ -322,7 +325,7 @@ export function ApplicationsHome({
               <p>
                 {unprotected.length} application
                 {unprotected.length === 1 ? " has" : "s have"} persistent data
-                without a recorded backup.
+                without scheduled backups.
               </p>
             </div>
             <Link href={`${unprotected[0].href.split("#")[0]}#backups`}>

@@ -61,6 +61,100 @@ export interface ProtectionFacts {
   }[];
 }
 
+/**
+ * One line a proof states: a check it made, or a limit it has. The label and
+ * detail are composed from validated numbers and booleans in the receipt,
+ * never from a string the receipt carries, so a receipt can never put text of
+ * its own on the page.
+ */
+export interface BackupNote {
+  key: string;
+  /** "Archived files", "Application records after boot". */
+  label: string;
+  /** What was compared and what matched, or what was left untested. */
+  detail: string;
+}
+
+/**
+ * Grafana checks a later proof may record: a dashboard created against the
+ * live source, a private authenticated fixture, and the plugins that fixture
+ * installs. Counts only. Absent means those checks were not made, which is
+ * never the same as passing.
+ */
+export interface GrafanaFunctionalChecks {
+  checkedAt: string | null;
+  dashboard: {
+    panels: number;
+    queriesVerified: number;
+    browserRendered?: boolean;
+  } | null;
+  credential: {
+    authenticatedQuery: boolean;
+    unauthenticatedRejected: boolean;
+    wrongPasswordRejected: boolean;
+  } | null;
+  plugins: {
+    total: number;
+    registered: number;
+    moduleServed: number;
+    behaviourChecked: number;
+    items: import("./backup-plugin-evidence").BackupPluginEvidence[];
+  } | null;
+}
+
+/** One operator proof, as its receipt recorded it and this module read it. */
+export interface BackupProof {
+  id: string;
+  /**
+   * `verified` requires a complete receipt whose restore consumed bytes
+   * downloaded back from the destination. Anything else is `failed` when the
+   * run said so and `incomplete` otherwise, including a run still recorded as
+   * running and one that claimed success without the off-host round trip.
+   */
+  outcome: "verified" | "failed" | "incomplete";
+  /** The application revision the proof ran against, when recorded. */
+  revision: string | null;
+  /** False when the deployment now serves a different revision. */
+  revisionCurrent: boolean;
+  startedAt: string | null;
+  /** When the copied state was taken, when the receipt records that moment. */
+  capturedAt: string | null;
+  uploadedAt: string | null;
+  finishedAt: string | null;
+  destination: { provider: "r2"; bucket: string } | null;
+  /** The archive as measured, with the checksum the round trip compared. */
+  archive: { bytes: number | null; sha256: string } | null;
+  /** The restore read bytes downloaded back from the destination. */
+  downloadedCopyVerified: boolean;
+  /** When bucket visibility was checked. It does not prove current access. */
+  privateBucketCheckedAt: string | null;
+  /** How long the source was paused while its state was copied. */
+  sourcePauseSeconds: number | null;
+  checks: BackupNote[];
+  /** What this proof does not show, stated in the view's own words. */
+  gaps: BackupNote[];
+  grafana: GrafanaFunctionalChecks | null;
+}
+
+/**
+ * Manual restore proofs, read back from the receipts a proof run writes.
+ * Deliberately not `ProtectionFacts`: a proof is a dated test an operator
+ * started by hand, not a schedule, a retention policy or a copy being taken
+ * now. Nothing here may be rendered as ongoing protection, and a missing,
+ * corrupt or mismatched receipt contributes nothing at all.
+ */
+export interface BackupEvidenceFacts {
+  /** Only ever true if a receipt records one. No proof implies a schedule. */
+  scheduleConfigured: boolean;
+  retentionConfigured: boolean;
+  /** Every readable proof for the current deployment, newest first. */
+  proofs: BackupProof[];
+  /** Receipts rejected as unreadable, invalid or self-inconsistent. */
+  unreadable: number;
+  /** Readable receipts belonging to an earlier deployment of this app. */
+  mismatched: number;
+}
+
 export interface Issue {
   id: string;
   title: string;
@@ -276,6 +370,8 @@ export interface JobFacts {
 
 export interface ApplicationFacts {
   protection?: ProtectionFacts;
+  /** Manual restore proofs. Independent of `protection`, never a stand-in. */
+  backupEvidence?: BackupEvidenceFacts;
   security?: SecurityFacts;
   monitoring?: MonitoringFacts;
   domains?: DomainFacts;

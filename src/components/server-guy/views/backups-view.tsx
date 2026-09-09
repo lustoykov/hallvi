@@ -4,9 +4,15 @@ import { ArrowRight } from "@phosphor-icons/react";
 
 import { persistentState } from "@/server/application-stack";
 
-import { protectionStatus } from "../fact-status";
+import {
+  backupEvidenceStatus,
+  lastVerifiedProof,
+  latestProof,
+  protectionStatus,
+} from "../fact-status";
 import { LocalTime } from "../local-time";
 import { relativeTime } from "../operation-model";
+import { BackupEvidencePanel } from "./backup-evidence";
 import {
   Condition,
   Facts,
@@ -49,26 +55,58 @@ const historyTone: Record<string, Tone> = {
 export function BackupsView(props: ViewProps) {
   const { stack, facts, now, operations, onOpenConversation, chats } = props;
   const protection = facts.protection;
+  const evidence = facts.backupEvidence;
   const needed = persistentState(stack);
   const backupsLinkless = needed.length === 0;
-  if (!protection)
+  if (!protection) {
+    // A recorded proof means a copy was made and restored at least once. The
+    // page may not say no copy exists, and it may not say anything is running
+    // on its own either: an operator started every one of these by hand.
+    const proved = evidence ? lastVerifiedProof(evidence) : null;
+    const latest = evidence ? latestProof(evidence) : null;
+    const status = evidence
+      ? backupEvidenceStatus(evidence)
+      : {
+          tone: needed.length ? ("warn" as const) : ("muted" as const),
+          title: needed.length
+            ? needed.length === 1
+              ? `${needed[0].label} is not backed up`
+              : "Your data is not backed up"
+            : stack.recorded
+              ? "Nothing persistent recorded to protect"
+              : "No protection plan configured",
+        };
     return (
       <>
-        <Condition
-          tone={needed.length ? "warn" : "muted"}
-          title={
-            needed.length
-              ? needed.length === 1
-                ? `${needed[0].label} is not backed up`
-                : "Your data is not backed up"
-              : stack.recorded
-                ? "Nothing persistent recorded to protect"
-                : "No protection plan configured"
-          }
-        >
-          {backupsLinkless && stack.recorded
-            ? "This application records no database or file volume. Protection becomes relevant when it keeps state on its instance."
-            : "A persistent volume survives container replacement. It does not protect against losing the host."}
+        <Condition tone={status.tone} title={status.title}>
+          {proved ? (
+            <>
+              An operator restored this application’s data from an off-host copy
+              and checked it
+              {proved.finishedAt ? (
+                <>
+                  {" "}
+                  on <LocalTime value={proved.finishedAt} variant="compact" />
+                </>
+              ) : (
+                ""
+              )}
+              .{" "}
+              {proved.revisionCurrent
+                ? ""
+                : "That proof ran against an earlier revision than the one deployed now. "}
+              {latest && latest.outcome !== "verified"
+                ? "A later attempt has no verified restore result. "
+                : ""}
+              Scheduled backups are not configured.
+            </>
+          ) : latest ? (
+            "No completed restore is recorded. See the attempts below for the available evidence."
+          ) : backupsLinkless && stack.recorded ? (
+            "This application records no database or file volume. Protection becomes relevant when it keeps state on its instance."
+          ) : (
+            "A persistent volume survives container replacement. It does not protect against losing the host."
+          )}
         </Condition>
         {needed.length > 0 && (
           <div className="sg-band">
@@ -82,31 +120,43 @@ export function BackupsView(props: ViewProps) {
                       {item.detail} · would be copied as {item.method}
                     </small>
                   </div>
-                  <Pill tone="warn">Not backed up</Pill>
-                  <span className="sg-op-muted">No copy exists</span>
+                  <Pill tone="warn">
+                    {proved ? "Not scheduled" : "Not backed up"}
+                  </Pill>
+                  <span className="sg-op-muted">
+                    {proved
+                      ? "See the dated restore checks below"
+                      : "No verified restore recorded"}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         )}
-        <div className="sg-band">
-          <SubHeading>Protection setup</SubHeading>
-          <Facts
-            rows={[
-              ["Backup destination", "Not connected"],
-              ["Schedule", "Not configured"],
-              ["Last successful backup", "No backup recorded"],
-              ["Restore verification", "Not tested"],
-            ]}
-          />
-        </div>
+        {evidence ? (
+          <BackupEvidencePanel facts={evidence} now={now} />
+        ) : (
+          <div className="sg-band">
+            <SubHeading>Protection setup</SubHeading>
+            <Facts
+              rows={[
+                ["Backup destination", "Not connected"],
+                ["Schedule", "Not configured"],
+                ["Last successful backup", "No backup recorded"],
+                ["Restore verification", "Not tested"],
+              ]}
+            />
+          </div>
+        )}
         <Planned title="Connect storage. Let Server Guy handle the rest.">
           The planned flow recommends Cloudflare R2 or AWS S3, asks for scoped
           access, configures a schedule and retention per kind of state, and
-          verifies an isolated restore. Backup execution is not implemented yet.
+          verifies an isolated restore. Scheduled backup execution is not
+          implemented yet.
         </Planned>
       </>
     );
+  }
   const status = protectionStatus(protection);
   const failed = status.tone === "bad";
   const last = protection.history.find(
@@ -378,6 +428,7 @@ export function BackupsView(props: ViewProps) {
           ))}
         </ol>
       </section>
+      {evidence && <BackupEvidencePanel facts={evidence} now={now} />}
       <p className="sg-section-note">
         Creation, off-host transfer and verification are recorded separately. A
         local dump with a failed upload never counts as protection.

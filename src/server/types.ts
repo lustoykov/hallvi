@@ -817,6 +817,12 @@ export interface OperatorView {
   contract: ApplicationContractView | null;
   /** Phase 3 only. */
   conformance: ConformanceView | null;
+  /**
+   * Facts the controller can read from its own durable records, carried on
+   * the view so the shell's existing poll refreshes them. A view that fetches
+   * its own facts on demand, like the firewall, merges them over these.
+   */
+  facts?: import("./application-facts").ApplicationFacts;
 }
 
 /** Retained name from the Phase 1 build; the view is now phase-aware. */

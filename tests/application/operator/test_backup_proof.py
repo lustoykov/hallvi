@@ -22,9 +22,99 @@ def load(name, file):
 
 capture = load("capture", "scripts/backup-proof/capture-sqlite-stack.py")
 proof = load("proof", "scripts/backup-proof/prove-sqlite-stack.py")
+functional = load("functional", "scripts/backup-proof/grafana-functional.py")
 
 
 class BackupProofTest(unittest.TestCase):
+    def test_functional_verification_rejects_missing_dashboard_data_and_open_auth(self):
+        dashboard = {"panels": [{"targets": [{"refId": "A"}]}] * 2}
+        fixture = {"uid": "fixture", "dashboard": dashboard, "image": "fixture-image"}
+        with tempfile.TemporaryDirectory() as directory:
+
+            def request(path, body=None, raw=False):
+                if path.startswith("/api/dashboards/"):
+                    return {"dashboard": dashboard}
+                if path == "/api/ds/query":
+                    return {
+                        "results": {
+                            "A": {"frames": [{"data": {"values": [[1], [42]]}}]}
+                        }
+                    }
+                return {
+                    "secureJsonFields": {"basicAuthPassword": True},
+                    "url": "http://fixture",
+                }
+
+            args = (
+                fixture,
+                "proof",
+                "project",
+                Path(directory),
+                request,
+                {"startedAt": 1000},
+            )
+            with self.assertRaisesRegex(RuntimeError, "reject invalid credentials"):
+                functional.verify(lambda *a: b"[200, 200]", *args)
+            with self.assertRaisesRegex(RuntimeError, "dashboard differs"):
+                functional.verify(
+                    lambda *a: b"[401, 401]",
+                    *args[:4],
+                    lambda *a, **k: {"dashboard": {}},
+                    args[-1],
+                )
+
+            def empty_query(path, body=None, raw=False):
+                if path == "/api/ds/query":
+                    return {
+                        "results": {"A": {"frames": [{"data": {"values": [[], []]}}]}}
+                    }
+                return request(path, body, raw)
+
+            with self.assertRaisesRegex(RuntimeError, "empty frames"):
+                functional.verify(
+                    lambda *a: b"[401, 401]", *args[:4], empty_query, args[-1]
+                )
+
+    def test_functional_verification_rejects_changed_plugin_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plugin = root / "state/data/plugins/test"
+            plugin.mkdir(parents=True)
+            (plugin / "plugin.json").write_text(
+                json.dumps({"id": "test", "name": "Test", "info": {"version": "1"}})
+            )
+            (plugin / "module.js").write_bytes(b"original module")
+            dashboard = {"panels": [{"targets": [{"refId": "A"}]}] * 2}
+
+            def request(path, body=None, raw=False):
+                if raw:
+                    return b"corrupted module"
+                if path.startswith("/api/plugins/"):
+                    return {"id": "test", "info": {"version": "1"}}
+                if path.startswith("/api/dashboards/"):
+                    return {"dashboard": dashboard}
+                if path == "/api/ds/query":
+                    return {
+                        "results": {
+                            "A": {"frames": [{"data": {"values": [[1], [42]]}}]}
+                        }
+                    }
+                return {
+                    "secureJsonFields": {"basicAuthPassword": True},
+                    "url": "http://fixture",
+                }
+
+            with self.assertRaisesRegex(RuntimeError, "frontend module differs"):
+                functional.verify(
+                    lambda *a: b"[401, 401]",
+                    {"uid": "fixture", "dashboard": dashboard, "image": "fixture"},
+                    "proof",
+                    "project",
+                    root,
+                    request,
+                    {"startedAt": 1000},
+                )
+
     def test_sqlite_backup_recovers_committed_wal_data(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
