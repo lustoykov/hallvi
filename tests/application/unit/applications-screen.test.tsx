@@ -88,6 +88,19 @@ describe("application navigation", () => {
     expect(html).not.toContain("Deployed");
   });
 
+  it("does not accept form edits before hydration can retain them", () => {
+    const html = renderToStaticMarkup(
+      <NewApplicationScreen githubLogin="qa-user" />,
+    );
+    expect(html.match(/<input[^>]*id="repository-url"[^>]*>/)?.[0]).toContain(
+      "disabled",
+    );
+    expect(html.match(/<input[^>]*id="application-name"[^>]*>/)?.[0]).toContain(
+      "disabled",
+    );
+    expect(html).toMatch(/<fieldset[^>]*disabled/);
+  });
+
   it("starts creation with an empty URL and an explicit permission choice", () => {
     const html = renderToStaticMarkup(<NewApplicationScreen />);
     expect(html).toContain('name="repositoryUrl"');

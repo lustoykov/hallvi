@@ -29,6 +29,7 @@ export function NewApplicationScreen({
   );
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("pi-decides");
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = useRef(false);
 
@@ -60,6 +61,9 @@ export function NewApplicationScreen({
     } catch {
       /* Storage can be unavailable; creating an application still works. */
     }
+    // The server-rendered form must not accept edits before React owns the
+    // inputs and the saved draft is restored; those early edits can be lost.
+    setReady(true);
     return () => {
       active.current = false;
     };
@@ -174,7 +178,7 @@ export function NewApplicationScreen({
             name="repositoryUrl"
             autoComplete="url"
             spellCheck={false}
-            disabled={busy}
+            disabled={!ready || busy}
             value={repositoryUrl}
             onChange={(event) => setRepositoryUrl(event.target.value)}
             placeholder="https://github.com/owner/repository"
@@ -193,7 +197,7 @@ export function NewApplicationScreen({
             name="name"
             value={name}
             maxLength={120}
-            disabled={busy}
+            disabled={!ready || busy}
             onChange={(event) => setName(event.target.value)}
             placeholder="Defaults to the repository name"
           />
@@ -201,7 +205,7 @@ export function NewApplicationScreen({
             The same repository can have several independently named
             applications.
           </p>
-          <fieldset disabled={busy} className={s.permissions}>
+          <fieldset disabled={!ready || busy} className={s.permissions}>
             <legend>Permission policy</legend>
             <div className={s.options}>
               {permissionOptions.map(([value, option]) => (
@@ -239,7 +243,7 @@ export function NewApplicationScreen({
             </Link>
             <button
               className={s.primary}
-              disabled={busy || !repositoryUrl.trim() || !githubLogin}
+              disabled={!ready || busy || !repositoryUrl.trim() || !githubLogin}
               type="submit"
             >
               {busy && <SpinnerGap className="spin" />}

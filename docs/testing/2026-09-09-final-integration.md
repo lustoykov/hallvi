@@ -34,6 +34,12 @@ The browser and application tests use synthetic provider/model fixtures. They do
 
 The [final Fable review](../reviews/2026-09-09-final-integration-review.md) found no merge blockers. Its additional approval/reference race was corrected after the main test pass; all 11 deployment-state tests passed, including unchanged recommendation approval during a cross-chat reference and rejection when the recommendation actually changes. Final GitHub checks must cover this follow-up revision. Unresolved purchase and verification outcomes remain conservative stops with no in-product resolution action; the review records these limits explicitly.
 
+## CI hydration correction
+
+GitHub run `34334341571` passed all **822 application tests**, lint, TypeScript and the production build. Two of four browser smoke cases failed at the new-application form: the trace showed repository/name text in the DOM, a connected GitHub login and a disabled submit button. The form accepted edits before React hydration could retain them.
+
+The form now keeps editable controls disabled until hydration and draft restoration complete. A server-render regression test failed before this fix and passes after it; the existing browser journeys exercise the hydrated form. The two longer shell journeys receive the same 120-second cold-development-compilation allowance as the pre-existing add-application smoke case; assertion deadlines and test coverage are unchanged. All four browser smoke cases passed locally after the correction (48.2 seconds); the five application-screen unit cases, targeted lint and TypeScript also passed. A subsequent CI run must verify this correction before merge.
+
 ## Product limits
 
 The implemented executor is a first-deployment slice: a local controller, a fresh Hetzner instance, one source-built HTTP application and optional private persistent PostgreSQL. BYOM, HTTPS/CDN, general image/Compose intake, SQLite and worker/broker orchestration, off-host backups/restoration, ongoing monitoring and routine release history remain delivery work. Neither polished placeholders nor this merge imply those capabilities are operational.

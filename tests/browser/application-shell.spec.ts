@@ -5,6 +5,9 @@ test(
   "application conversations preserve drafts and messages across navigation and reload",
   journey("application-shell"),
   async ({ page }) => {
+    // Cold CI compilation also consumes the journey budget. Keep assertion
+    // timeouts unchanged, matching the existing add-application smoke test.
+    test.setTimeout(120_000);
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -192,6 +195,7 @@ test(
   "deployment reviews exact checks, refreshes changed prices and recovers a rejection",
   journey("application-shell"),
   async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
     const { randomUUID } = await import("node:crypto");
     let record:
       import("../../src/server/deployment-types").DeploymentRecord | null =
