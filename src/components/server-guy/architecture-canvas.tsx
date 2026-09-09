@@ -103,7 +103,7 @@ export function ArchitectureCanvas({
         : check.state === "passing"
           ? "ok"
           : "unknown";
-    return live ? "ok" : "unknown";
+    return "unknown";
   };
   const postgres = deployment?.plan?.postgres;
   const sqlite = stack?.databases.find((item) => item.kind === "sqlite");
@@ -155,7 +155,7 @@ export function ArchitectureCanvas({
               ? "Persistent volume · private network"
               : "Planned service",
             symbol: "database",
-            tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+            tone: "unknown" as NodeTone,
             destination: "database" as ApplicationSection,
             description: live
               ? "Runs on the same instance as the application. Its data uses a persistent Docker volume. Off-host backups are not configured."
@@ -170,7 +170,7 @@ export function ArchitectureCanvas({
               name: "Embedded SQLite",
               detail: sqlite.location,
               symbol: "database",
-              tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+              tone: "unknown" as NodeTone,
               destination: "database" as ApplicationSection,
               description:
                 "Application-owned SQLite file in a persistent volume. Off-host backups are not configured; backing it up requires a consistent snapshot.",
@@ -185,7 +185,7 @@ export function ArchitectureCanvas({
             name: `${service.kind === "valkey" ? "Valkey" : "Redis"}${service.version ? ` ${service.version}` : ""}`,
             detail: live ? "Private network" : "Planned service",
             symbol: "cache",
-            tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+            tone: "unknown" as NodeTone,
             destination: "cache" as ApplicationSection,
             description: `${service.role === "broker" ? "Queue broker" : service.role === "cache" ? "Cache" : "Cache and queue broker"} on the same instance, reachable only inside the Compose network. ${service.persistence ?? "Persistence not recorded."}`,
           },
