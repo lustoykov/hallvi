@@ -645,7 +645,7 @@ describe("the explicit Phase 2 → Phase 3 transition", () => {
     });
     expect(retained.checks).toHaveLength(4);
     expect(view.messages.at(-1)?.body).toContain(
-      "Phase 3, Make launch-ready, starts here",
+      "I’ve recorded how this application runs",
     );
     expect(view.messages.at(-1)?.body).toContain(
       "1 required change (Health endpoint)",
@@ -653,9 +653,14 @@ describe("the explicit Phase 2 → Phase 3 transition", () => {
     expect(runs.claimNextPiRun()).toBeNull();
     expect(completeInspectApp(app.id).workspace?.id).toBe(view.workspace?.id);
     expect(store.listWorkspaces(app.id)).toHaveLength(3);
-    expect(() =>
-      runs.sendChatMessage(app.id, app.phaseTwoChatId, "late", randomUUID()),
-    ).toThrow(/Phase 2 is complete/);
+    const continued = runs.sendChatMessage(
+      app.id,
+      app.phaseTwoChatId,
+      "continue",
+      randomUUID(),
+    );
+    expect(continued.run.workspaceId).toBe(view.workspace!.id);
+    runs.cancelPiRun(app.id, continued.run.chatId, continued.run.id);
     expect(feed(view.workspaces[1].id)[0]).toBe("phase-completed");
     expect(feed(view.workspace!.id)).toEqual(["phase-started"]);
     expect(checks(app.id)).toEqual({

@@ -1,18 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { CaretDown, Check, GearSix, Plus, Trash } from "@phosphor-icons/react";
+import {
+  ArrowLeft,
+  CaretDown,
+  Check,
+  Plus,
+  Trash,
+} from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 
+import { applicationOperations } from "@/server/operation-record";
+import { stackOf } from "@/server/application-stack";
+
 import type { PiSetupStatus } from "@/server/pi-setup";
-import { APPROVAL_MODES } from "@/server/types";
 import type {
   ApplicationRecord,
   ChatRunSnapshot,
@@ -24,8 +33,28 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
-import { ChatList } from "./chat-list";
-import { ChatPane } from "./chat-pane";
+import { ApplicationSectionView } from "./application-section-view";
+import {
+  applicationSections,
+  hiddenStackSections,
+  sectionFromHash,
+  visibleSections,
+  type ApplicationSection,
+} from "./application-sections";
+import { ApplicationNavigation } from "./application-navigation";
+import { DeploymentPanel } from "./deployment-panel";
+import { DeploymentDecision } from "./deployment-decision";
+import type { DeploymentRecord } from "@/server/deployment-types";
+import "./application-shell.css";
+import { ChatPane, type MessageHighlight } from "./chat-pane";
+import {
+  conversationMarks,
+  featuredOperation,
+  labelOf,
+  navigationIndicators,
+  stepDetail,
+} from "./operation-model";
+import { StateChip } from "./operation-receipt";
 import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import type { ConformanceAction } from "./conformance-record";
@@ -35,7 +64,6 @@ import { DemoContext } from "./external-link";
 import { SetupDialog } from "./setup-dialog";
 import { RevisionDialog } from "./revision-dialog";
 import { Inspector } from "./inspector";
-import { PhaseRail } from "./phase-rail";
 import { recordReferences, type RecordSection } from "./record-references";
 
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
@@ -50,6 +78,30 @@ function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
     }),
     ...current.filter((message) => !received.has(message.id)),
   ];
+}
+
+/**
+ * When each destination was last looked at, per browser. A confirmed change
+ * newer than this shows a mark until the destination is opened. A first
+ * visit counts everything as seen, so old work does not glow.
+ */
+function readSeen(applicationId: string | undefined) {
+  const all = () =>
+    Object.fromEntries(
+      applicationSections.map((section) => [
+        section.id,
+        new Date().toISOString(),
+      ]),
+    ) as Partial<Record<ApplicationSection, string>>;
+  if (typeof window === "undefined" || !applicationId) return all();
+  try {
+    const stored = localStorage.getItem(`sg-seen:${applicationId}`);
+    return stored
+      ? (JSON.parse(stored) as Partial<Record<ApplicationSection, string>>)
+      : all();
+  } catch {
+    return all();
+  }
 }
 
 function readSubmission(chatId: string) {
@@ -83,9 +135,61 @@ export function OperatorShell({
   demo?: boolean;
 }) {
   const router = useRouter();
-  const [recordVisible, setRecordVisible] = useState(true);
+  const showDeployment = !demo;
+  const [deployment, setDeployment] = useState<DeploymentRecord | null>(null);
+  const [hetznerConnected, setHetznerConnected] = useState(false);
+  const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
+    null,
+  );
+  const recordVisible = activeSection !== null;
+  const [seen, setSeen] = useState(() => readSeen(initialView.application?.id));
+  const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const id = initialView.application?.id;
+    if (!id) return;
+    try {
+      localStorage.setItem(`sg-seen:${id}`, JSON.stringify(seen));
+    } catch {
+      /* a browser without storage simply forgets what was looked at */
+    }
+  }, [seen, initialView.application?.id]);
+  // Leaving a destination records that it was looked at; the marks derive
+  // from that timestamp and the operations, and clear on their own.
+  function selectSection(section: ApplicationSection | null) {
+    setActiveSection((current) => {
+      if (current && current !== section)
+        setSeen((seen) => ({ ...seen, [current]: new Date().toISOString() }));
+      return section;
+    });
+    const url = new URL(window.location.href);
+    const hash = section ? `#${section}` : "";
+    if (url.hash !== hash) {
+      url.hash = hash;
+      window.history.pushState(null, "", url);
+    }
+  }
+  // The preparation Record lives with Deployment.
+  function setRecordVisible(visible: boolean) {
+    selectSection(visible ? "deployment" : null);
+  }
+  useEffect(() => {
+    const restore = () =>
+      setActiveSection(sectionFromHash(window.location.hash));
+    const timer = window.setTimeout(restore, 0);
+    window.addEventListener("popstate", restore);
+    window.addEventListener("hashchange", restore);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("popstate", restore);
+      window.removeEventListener("hashchange", restore);
+    };
+  }, []);
   const [recordWide, setRecordWide] = useState(false);
-  const recordButton = useRef<HTMLButtonElement>(null);
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [revisionOpen, setRevisionOpen] = useState(false);
@@ -108,17 +212,55 @@ export function OperatorShell({
   const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
-  const checks = view.checks;
+  const checks = view.checks
+    .filter((check) => check.key !== "target-environment")
+    .map((check) =>
+      check.key === "application-identity"
+        ? { ...check, result: check.result.replace(" · Production", "") }
+        : check,
+    );
   const activeChat =
     view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
   const composer = activeChat ? (drafts[activeChat.id] ?? "") : "";
   const selectedCheck =
     checks.find((check) => check.key === selectedCheckKey) ?? null;
   const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
-  const policy = application ? APPROVAL_MODES[application.approvalMode] : null;
-  const { selection } = initialPiSetup;
   const applicationId = application?.id;
   const selectedChatId = view.selectedChatId;
+  const refreshDeployment = useCallback(async () => {
+    if (!applicationId || !selectedChatId || demo) return;
+    const response = await fetch(
+      `/api/applications/${applicationId}/deployment`,
+    );
+    if (!response.ok) return;
+    const value = await response.json();
+    setDeployment(value.deployment);
+    setHetznerConnected(value.connected);
+    if (value.deployment) {
+      const next = await api.view(applicationId, selectedChatId);
+      setView((current) =>
+        current.selectedChatId === next.selectedChatId
+          ? {
+              ...next,
+              messages: mergeMessages(current.messages, next.messages),
+            }
+          : current,
+      );
+    }
+  }, [applicationId, selectedChatId, demo]);
+  useEffect(() => {
+    const initial = window.setTimeout(() => {
+      void refreshDeployment().catch(() => undefined);
+    }, 0);
+    const timer = setInterval(
+      () => void refreshDeployment().catch(() => undefined),
+      2500,
+    );
+    return () => {
+      window.clearTimeout(initial);
+      clearInterval(timer);
+    };
+  }, [refreshDeployment]);
   // The current-step bar, the Record and the reply references all read the
   // same view, so a reload and a reply say the same thing.
   const step = describeCurrentStep(view, { demo });
@@ -146,6 +288,18 @@ export function OperatorShell({
       kind: "link",
     });
   const references = recordReferences(view);
+  const operations = useMemo(
+    () => applicationOperations(deployment),
+    [deployment],
+  );
+  const stack = useMemo(() => stackOf(deployment), [deployment]);
+  const [stackRevealed, setStackRevealed] = useState(false);
+  // The open destination is being looked at: it never shows "updated".
+  const indicators = navigationIndicators(operations, seen);
+  if (activeSection && indicators[activeSection]?.tone === "updated")
+    delete indicators[activeSection];
+  const chatMarks = conversationMarks(operations, view.chats);
+  const featured = featuredOperation(operations, activeSection, selectedChatId);
 
   function revealSection(section: RecordSection) {
     setRecordVisible(true);
@@ -336,6 +490,7 @@ export function OperatorShell({
   }
 
   function selectChat(chatId: string) {
+    setRecordVisible(false);
     if (!application || chatId === view.selectedChatId) return;
     void run("chat", () => api.view(application.id, chatId));
   }
@@ -401,8 +556,39 @@ export function OperatorShell({
   }
 
   function createChat() {
+    setRecordVisible(false);
     if (!application) return;
     void run("new-chat", () => api.createChat(application.id));
+  }
+
+  // A receipt link, an origin line or an Overview item opens the conversation
+  // at the reply that started the work; the transcript scrolls there.
+  function openConversation(chatId: string, messageId: string | null) {
+    const reveal = () => {
+      if (messageId)
+        setHighlight((current) => ({
+          messageId,
+          nonce: (current?.nonce ?? 0) + 1,
+        }));
+    };
+    setRecordVisible(false);
+    if (!application || chatId === view.selectedChatId) {
+      reveal();
+      return;
+    }
+    void run("chat", () => api.view(application.id, chatId)).then(reveal);
+  }
+
+  // Drafts a message in a conversation without sending it.
+  function askInConversation(chatId: string | null, draft: string) {
+    const target = chatId ?? view.selectedChatId;
+    if (!target) return;
+    setDrafts((current) => ({ ...current, [target]: draft }));
+    focusComposerAfterClose.current = true;
+    if (application && target !== view.selectedChatId)
+      void run("chat", () => api.view(application.id, target));
+    setRecordVisible(false);
+    setSelectedCheckKey(null);
   }
 
   // Every current-step action is one of the existing operations; nothing here
@@ -605,26 +791,16 @@ export function OperatorShell({
     } else {
       setComposer(question);
     }
+    setRecordVisible(false);
     focusComposerAfterClose.current = true;
     setSelectedCheckKey(null);
   }
 
   return (
     <DemoContext.Provider value={demo}>
-      <main className="sg-shell">
+      <main className="sg-shell sg-adaptive-shell">
         <header className="sg-topbar">
           <div className="sg-app-identity">
-            <Link
-              className="sg-brand"
-              href="/applications"
-              aria-label="Server Guy, all applications"
-            >
-              <span className="sg-app-mark">SG</span>
-            </Link>
-            {/* The application is the switcher, its repository beneath the
-              name. Environment and policy are saved Phase 1 facts, shown as
-              quiet context rather than status; the phase lives in the strip
-              below, so it is not repeated here. */}
             <button
               ref={applicationPicker}
               className="sg-application-picker"
@@ -641,16 +817,6 @@ export function OperatorShell({
               </span>
               <CaretDown aria-hidden="true" weight="bold" />
             </button>
-            {policy && (
-              <span
-                className="sg-topbar-context"
-                title={`Saved in Phase 1. ${policy.hint} The server itself is chosen in Phase 5.`}
-              >
-                <b>Production</b>
-                <i aria-hidden="true" />
-                <span>{policy.label}</span>
-              </span>
-            )}
             <nav
               id="application-picker"
               popover="auto"
@@ -714,55 +880,114 @@ export function OperatorShell({
               </button>
             </nav>
           </div>
-          <div className="sg-topbar-tools">
+          {activeSection && featured && (
             <button
               type="button"
-              className="sg-record-visibility"
-              ref={recordButton}
-              aria-controls="application-record"
-              aria-expanded={recordVisible}
-              onClick={() => setRecordVisible((visible) => !visible)}
-            >
-              Record
-            </button>
-            <Link
-              className="sg-settings-link"
-              href="/setup/pi"
-              title={
-                initialPiSetup.ready
-                  ? `ChatGPT connected · ${selection.model}, ${selection.reasoningEffort} reasoning`
-                  : "Connect ChatGPT to chat with Server Guy"
+              className="sg-workstrip"
+              onClick={() =>
+                featured.origin
+                  ? openConversation(
+                      featured.origin.chatId,
+                      featured.origin.messageId,
+                    )
+                  : selectSection(featured.destinations[0])
               }
+              aria-label={`Active work: ${featured.title}`}
             >
-              <GearSix aria-hidden="true" />
-              {initialPiSetup.ready
-                ? "Settings · ChatGPT connected"
-                : "Settings · Connect ChatGPT"}
-            </Link>
-          </div>
+              <StateChip state={featured.state} detail={stepDetail(featured)} />
+              <span>{featured.title}</span>
+            </button>
+          )}
         </header>
 
-        <PhaseRail
+        <ApplicationNavigation
+          chats={view.chats}
+          selectedChatId={view.selectedChatId}
+          section={activeSection}
           busy={busy !== null}
-          checks={checks}
-          onSelectPhase={selectPhase}
-          viewedPhaseKey={view.workspace?.phaseKey ?? null}
-          workspaces={view.workspaces}
+          onSection={selectSection}
+          onChat={selectChat}
+          onCreate={createChat}
+          indicators={indicators}
+          chatMarks={chatMarks}
+          sections={visibleSections(stack, activeSection)}
+          hidden={hiddenStackSections(stack, activeSection)}
+          revealed={stackRevealed}
+          onReveal={setStackRevealed}
         />
-
         <section
-          className={`sg-workspace${!recordVisible ? " sg-record-hidden" : recordWide ? " sg-record-wide" : ""}`}
+          className={`sg-workspace${recordVisible ? " sg-dashboard-open" : ""}`}
         >
-          <ChatList
-            busy={busy !== null}
-            chats={view.chats}
-            hasApplication={application !== null}
-            onCreate={createChat}
-            onSelect={selectChat}
-            selectedChatId={view.selectedChatId}
-            workspace={view.workspace}
-          />
-          <div className="sg-chat-column">
+          {activeSection && (
+            <ApplicationSectionView
+              key={`${applicationId}:${activeSection}`}
+              section={activeSection}
+              view={view}
+              deployment={deployment}
+              stack={stack}
+              operations={operations}
+              now={now}
+              onRefresh={refreshDeployment}
+              onOpenDestination={selectSection}
+              onOpenConversation={openConversation}
+              onAsk={askInConversation}
+              onRevealStack={() => setStackRevealed(true)}
+              bar={
+                <div className="sg-view-bar">
+                  <button
+                    type="button"
+                    className="sg-view-back"
+                    onClick={() => setRecordVisible(false)}
+                  >
+                    <ArrowLeft aria-hidden="true" />
+                    Back to {activeChat?.title ?? "the conversation"}
+                  </button>
+                  {featured &&
+                    !featured.destinations.includes(activeSection) && (
+                      <button
+                        type="button"
+                        className="sg-suggest"
+                        onClick={() => selectSection(featured.destinations[0])}
+                      >
+                        Server Guy is in {labelOf(featured.destinations[0])} ·
+                        show
+                      </button>
+                    )}
+                </div>
+              }
+            >
+              {activeSection === "deployment" &&
+                showDeployment &&
+                applicationId &&
+                selectedChatId && (
+                  <DeploymentPanel
+                    applicationId={applicationId}
+                    chatId={selectedChatId}
+                    record={deployment}
+                    connected={hetznerConnected}
+                    onRefresh={refreshDeployment}
+                  />
+                )}
+            </ApplicationSectionView>
+          )}
+          <div
+            className={`sg-chat-column${recordVisible ? " sg-chat-parked" : ""}`}
+            inert={recordVisible || undefined}
+          >
+            <details className="sg-legacy-preparation">
+              <summary>Repository preparation details</summary>
+              <CurrentStepBar
+                busy={busy}
+                demo={demo}
+                onAction={stepAction}
+                repository={
+                  application
+                    ? `${application.repositoryOwner}/${application.repositoryName}`
+                    : null
+                }
+                step={step}
+              />
+            </details>
             {preparationOpen && applicationId && (
               <ConfirmActionDialog
                 title="Work on a shared GitHub branch?"
@@ -799,17 +1024,6 @@ export function OperatorShell({
                 }
               />
             )}
-            <CurrentStepBar
-              busy={busy}
-              demo={demo}
-              onAction={stepAction}
-              repository={
-                application
-                  ? `${application.repositoryOwner}/${application.repositoryName}`
-                  : null
-              }
-              step={step}
-            />
             <ChatPane
               activeChat={activeChat}
               busy={busy}
@@ -827,25 +1041,49 @@ export function OperatorShell({
               onReveal={revealSection}
               references={references}
               view={view}
+              operations={operations}
+              now={now}
+              onOpenDestination={selectSection}
+              onOpenConversation={openConversation}
+              highlight={highlight}
+              decisionFor={(operation) =>
+                operation.source.type === "deployment" &&
+                deployment &&
+                applicationId &&
+                showDeployment ? (
+                  <DeploymentDecision
+                    applicationId={applicationId}
+                    record={deployment}
+                    connected={hetznerConnected}
+                    onRefresh={refreshDeployment}
+                    onOpen={selectSection}
+                  />
+                ) : null
+              }
             />
           </div>
-          <Inspector
-            key={view.workspace?.id ?? "record"}
-            hidden={!recordVisible}
-            wide={recordWide}
-            onToggleWidth={() => setRecordWide((wide) => !wide)}
-            onHide={() => {
-              setRecordVisible(false);
-              recordButton.current?.focus();
-            }}
-            busy={busy}
-            checks={checks}
-            offerGrant={step.actions.some((action) => action.key === "grant")}
-            onConformance={conformanceAction}
-            onSelectCheck={setSelectedCheckKey}
-            reveal={reveal}
-            view={view}
-          />
+          <div
+            className="sg-dashboard-record"
+            hidden={activeSection !== "deployment"}
+          >
+            <h2 className="sg-record-heading">Preparation record</h2>
+            <Inspector
+              key={view.workspace?.id ?? "record"}
+              hidden={activeSection !== "deployment"}
+              wide={recordWide}
+              onToggleWidth={() => setRecordWide((wide) => !wide)}
+              onHide={() => {
+                setRecordVisible(false);
+              }}
+              busy={busy}
+              checks={checks}
+              offerGrant={step.actions.some((action) => action.key === "grant")}
+              onConformance={conformanceAction}
+              onSelectCheck={setSelectedCheckKey}
+              reveal={reveal}
+              view={view}
+            />{" "}
+          </div>
         </section>
 
         {selectedCheck && (

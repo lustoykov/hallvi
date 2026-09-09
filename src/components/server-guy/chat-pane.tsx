@@ -9,6 +9,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
+import { useEffect, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -20,11 +21,20 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
+import type { ApplicationOperation } from "@/server/operation-record";
 import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 
+import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
+import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference, RecordSection } from "./record-references";
+
+/** The message a view or Overview asked to reveal; the nonce repeats it. */
+export interface MessageHighlight {
+  messageId: string;
+  nonce: number;
+}
 
 const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   completed: "Saved",
@@ -54,6 +64,12 @@ export function ChatPane({
   onNewChat,
   references,
   onReveal,
+  operations = [],
+  now = 0,
+  onOpenDestination,
+  onOpenConversation,
+  highlight,
+  decisionFor,
 }: {
   view: OperatorView;
   activeChat: Chat | null;
@@ -73,7 +89,74 @@ export function ChatPane({
   references?: Map<string, RecordReference[]>;
   /** Opens that record section beside the chat. */
   onReveal?: (section: RecordSection) => void;
+  /** The application's operations; receipts render in their origin chat. */
+  operations?: ApplicationOperation[];
+  now?: number;
+  onOpenDestination?: (destination: ApplicationSection) => void;
+  onOpenConversation?: (chatId: string, messageId: string | null) => void;
+  highlight?: MessageHighlight | null;
+  /** The real decision controls for an operation while it needs one. */
+  decisionFor?: (operation: ApplicationOperation) => ReactNode;
 }) {
+  const chatId = activeChat?.id ?? null;
+  // Receipts sit under the reply that started the work. One whose reply is
+  // not in this transcript (an older record, or a reply not saved yet) is
+  // still shown, at the end, so no operation is ever lost.
+  const own = operations.filter(
+    (operation) => operation.origin?.chatId === chatId,
+  );
+  const messageIds = new Set(view.messages.map((message) => message.id));
+  const anchored = new Map<string, ApplicationOperation[]>();
+  const unanchored: ApplicationOperation[] = [];
+  for (const operation of own) {
+    // A record made before origins were kept anchors to the first recorded
+    // reply after it started, which is the reply that announced it.
+    const messageId =
+      operation.origin?.messageId ??
+      view.messages.find(
+        (message) =>
+          message.role === "assistant" &&
+          message.source === "server-guy" &&
+          message.createdAt >= operation.startedAt,
+      )?.id;
+    if (messageId && messageIds.has(messageId))
+      anchored.set(messageId, [...(anchored.get(messageId) ?? []), operation]);
+    else unanchored.push(operation);
+  }
+  const mentioned = (messageId: string) =>
+    operations.filter((operation) =>
+      operation.mentions.some(
+        (mention) =>
+          mention.chatId === chatId && mention.messageId === messageId,
+      ),
+    );
+  const openDestination = onOpenDestination ?? (() => {});
+  const openConversation = onOpenConversation ?? (() => {});
+  const messageCount = view.messages.length;
+  useEffect(() => {
+    if (!highlight) return;
+    const element = document.getElementById(
+      `sg-message-${highlight.messageId}`,
+    );
+    if (!element) return;
+    element.scrollIntoView({ block: "center" });
+    element.classList.add("sg-message-highlight");
+    const timer = window.setTimeout(
+      () => element.classList.remove("sg-message-highlight"),
+      2600,
+    );
+    return () => window.clearTimeout(timer);
+  }, [highlight, messageCount]);
+  const receipts = (list: ApplicationOperation[] | undefined) =>
+    list?.map((operation) => (
+      <OperationReceipt
+        key={operation.id}
+        operation={operation}
+        now={now}
+        onOpen={openDestination}
+        decision={decisionFor?.(operation)}
+      />
+    ));
   const application = view.application;
   const workspace = view.workspace;
   const archived = Boolean(activeChat?.archivedAt);
@@ -100,8 +183,8 @@ export function ChatPane({
               : completed
                 ? `Phase ${workspace?.phaseNumber} is complete · read-only`
                 : activeChat?.isPrimary === false
-                  ? "Separate transcript · shares the phase's saved state"
-                  : "Main phase chat"}
+                  ? "A conversation about your application"
+                  : "Working with Server Guy"}
           </span>
         </div>
         {activeChat && !activeChat.isPrimary && !readOnly && (
@@ -157,6 +240,7 @@ export function ChatPane({
                       : ""
                 }
                 from={engineer ? "user" : "assistant"}
+                id={`sg-message-${message.id}`}
                 key={message.id}
               >
                 <div className="sg-message-heading">
@@ -264,9 +348,21 @@ export function ChatPane({
                     ))}
                   </div>
                 ) : null}
+                <OperationReferences
+                  operations={mentioned(message.id)}
+                  chats={view.chats}
+                  onOpenConversation={openConversation}
+                  onOpen={openDestination}
+                />
+                {receipts(anchored.get(message.id))}
               </Message>
             );
           })}
+          {unanchored.length > 0 && (
+            <div className="sg-message sg-message-assistant sg-message-receipts">
+              {receipts(unanchored)}
+            </div>
+          )}
 
           {pendingMessage !== null && (
             <>

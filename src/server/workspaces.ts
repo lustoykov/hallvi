@@ -51,14 +51,21 @@ export function loadChat(applicationId: string, chatId: string) {
   const { application, workspaces, current } = loadApplication(applicationId);
   const chat = getChat(chatId);
   const workspace = chat ? getWorkspaceById(chat.workspaceId) : null;
-  if (!chat || !workspace || workspace.applicationId !== application.id)
+  if (
+    !chat ||
+    chat.applicationId !== application.id ||
+    !workspace ||
+    workspace.applicationId !== application.id
+  )
     throw new NotFoundError("Chat not found.");
   return {
     application,
     workspaces,
-    workspace,
+    // The workspace retained on the chat is historical provenance. New work
+    // belongs to the application's current internal execution context.
+    workspace: current,
     chat,
-    current: workspace.id === current.id,
+    current: true,
   };
 }
 

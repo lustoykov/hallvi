@@ -164,11 +164,12 @@ export function getApplicationByRepository(repositoryUrl: string) {
 
 export function insertApplication(
   input: Omit<ApplicationRecord, "id" | "createdAt" | "updatedAt">,
+  id: string = randomUUID(),
 ) {
   const timestamp = now();
   const application: ApplicationRecord = {
     ...input,
-    id: randomUUID(),
+    id,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -279,8 +280,11 @@ export function insertChat(
   title: string,
   isPrimary = false,
 ) {
+  const workspace = getWorkspaceById(workspaceId);
+  if (!workspace) throw new Error("Workspace not found.");
   const chat: Chat = {
     id: randomUUID(),
+    applicationId: workspace.applicationId,
     workspaceId,
     title,
     isPrimary,
@@ -304,10 +308,31 @@ export function listChats(workspaceId: string) {
     .all();
 }
 
+export function listApplicationChats(applicationId: string) {
+  return db()
+    .select()
+    .from(chats)
+    .where(eq(chats.applicationId, applicationId))
+    .orderBy(asc(chats.createdAt), asc(rowId))
+    .all();
+}
+
 // The chat list shows when each chat was last active: its newest message, or
 // its creation when nothing has been sent yet.
 export function listChatSummaries(workspaceId: string) {
   return listChats(workspaceId).map((chat) => ({
+    ...chat,
+    lastActivityAt:
+      db()
+        .select({ at: sql<string | null>`max(${messages.createdAt})` })
+        .from(messages)
+        .where(eq(messages.chatId, chat.id))
+        .get()?.at ?? chat.createdAt,
+  }));
+}
+
+export function listApplicationChatSummaries(applicationId: string) {
+  return listApplicationChats(applicationId).map((chat) => ({
     ...chat,
     lastActivityAt:
       db()

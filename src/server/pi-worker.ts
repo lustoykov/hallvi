@@ -114,6 +114,10 @@ export async function executePiRun(
       controller.signal.throwIfAborted();
       diagnostics.signal({ type: "start", key: "context", kind: "context" });
       const { chat, workspace } = loadChat(run.applicationId, run.chatId);
+      if (workspace.id !== run.workspaceId)
+        throw new Error(
+          "Application execution context changed. Start a new request with the current state.",
+        );
       assertChatWritable(chat, workspace);
       // No application summary is injected: Pi reads current state through
       // get_application_status when an answer depends on it.

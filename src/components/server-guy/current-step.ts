@@ -145,14 +145,14 @@ function startStep(view: OperatorView, base: Base): CurrentStep {
   if (view.workspace?.status === "ready")
     return {
       ...base,
-      now: "All four checks pass. The Launch Brief is ready.",
+      now: "Repository access is verified. Ready to inspect the application.",
       waitingOn: "you",
       actions: [
         {
           key: "continue",
-          label: "Continue to Inspect app",
+          label: "Inspect application",
           explanation:
-            "Server Guy inspects the repository and proposes the Application Contract. Phase 1 chats become read-only.",
+            "Server Guy inspects the repository and records its deployment requirements in this conversation.",
           kind: "primary",
         },
       ],

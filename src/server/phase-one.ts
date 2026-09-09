@@ -1,7 +1,8 @@
+import { applicationDeployment } from "./deployment-store";
 import {
   archiveChat as archiveChatRecord,
   deleteApplication,
-  getApplicationByRepository,
+  getApplication,
   getWorkspace,
   insertActivity,
   insertApplication,
@@ -12,7 +13,7 @@ import {
   insertWorkspace,
   latestObservation,
   listApplications,
-  listChats,
+  listApplicationChats,
   listObservations,
   listApplicationPreviews,
   recordActivityOnce,
@@ -67,33 +68,41 @@ export async function createPhaseOneApplication(input: CreateApplicationInput) {
     throw new Error("Choose a valid permission policy.");
   }
   const repository = parseGithubRepository(input.repositoryUrl);
-  const existing = getApplicationByRepository(repository.canonicalUrl);
+  const name = input.name?.trim() || repository.name;
+  const existing = input.requestKey ? getApplication(input.requestKey) : null;
   if (existing) {
-    if (existing.approvalMode !== input.approvalMode) {
+    if (
+      existing.approvalMode !== input.approvalMode ||
+      existing.repositoryUrl !== repository.canonicalUrl ||
+      existing.name !== name
+    ) {
       throw new ExistingApplicationConflictError(
-        `An application already exists for this repository with ${APPROVAL_MODES[existing.approvalMode].label}. Open it instead of replacing its permission policy.`,
+        "This creation request was already used with different application settings. Open the existing application or start a new creation request.",
       );
     }
     return { view: getOperatorView(existing.id), created: false };
   }
 
   const application = withTransaction(() => {
-    const application = insertApplication({
-      name: repository.name,
-      repositoryUrl: repository.canonicalUrl,
-      repositoryOwner: repository.owner,
-      repositoryName: repository.name,
-      environment: "production",
-      approvalMode: input.approvalMode,
-      approvalScope: "Current application launch",
-    });
+    const application = insertApplication(
+      {
+        name,
+        repositoryUrl: repository.canonicalUrl,
+        repositoryOwner: repository.owner,
+        repositoryName: repository.name,
+        environment: "production",
+        approvalMode: input.approvalMode,
+        approvalScope: "Current application launch",
+      },
+      input.requestKey,
+    );
     const workspace = insertWorkspace(application.id);
-    const chat = insertChat(workspace.id, primaryChatTitle("start"), true);
+    const chat = insertChat(workspace.id, "Deploy application", true);
 
     insertMessage(
       chat.id,
       "assistant",
-      `I created the ${repository.name} application. I’m checking the exact GitHub repository identity now. No code, infrastructure, domain, or paid resource has been changed.`,
+      `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
       "server-guy",
     );
     insertActivity(
@@ -372,6 +381,10 @@ export function removeApplication(applicationId: string, repository: string) {
     throw new Error(
       "Stop the application preview before removing this application.",
     );
+  if (applicationDeployment(application.id))
+    throw new Error(
+      "This application owns a deployment record. Host retirement is not implemented yet; preserve this record to retain access and billing history.",
+    );
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
   // Contracts, every phase workspace and their native files go with it.
@@ -386,15 +399,15 @@ export function createChat(applicationId: string, title?: string) {
   const { application, current } = loadApplication(applicationId);
   if (current.completedAt)
     throw new Error("This phase is complete; its chats are read-only.");
-  const chatNumber = listChats(current.id).length + 1;
+  const chatNumber = listApplicationChats(application.id).length + 1;
   const chat = insertChat(
     current.id,
-    title?.trim() || `Launch question ${chatNumber}`,
+    title?.trim() || `Conversation ${chatNumber}`,
   );
   insertMessage(
     chat.id,
     "assistant",
-    `This is a separate Chat for the same ${primaryChatTitle(current.phaseKey)}. I can see the shared Operator View and checks, but this transcript starts fresh.`,
+    `We can continue working on ${application.name} here. The application keeps its configuration and history; this conversation starts fresh.`,
     "server-guy",
   );
   // Chat administration is visible in the chat list; it is not an application

@@ -1,5 +1,7 @@
 # Self-hosting demand and use-case fit for Server Guy
 
+> Dated research/reference, not an active requirement or implementation plan. Current scope is in [Product](../../PRODUCT.md) and delivery is in [Roadmap](../../ROADMAP.md). Recheck version-sensitive facts before use.
+
 **Research date:** 2026-08-31  
 **Scope:** Primary sources only: official analytics, first-party product reports and documentation, and GitHub repository metadata. “Direct evidence” below means a publisher-reported usage or activity count. GitHub stars are treated only as an interest proxy, not as users, installations, revenue, or willingness to pay.
 

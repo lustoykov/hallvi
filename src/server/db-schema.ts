@@ -42,7 +42,7 @@ import type {
 export const applications = sqliteTable("applications", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  repositoryUrl: text("repository_url").notNull().unique(),
+  repositoryUrl: text("repository_url").notNull(),
   repositoryOwner: text("repository_owner").notNull(),
   repositoryName: text("repository_name").notNull(),
   environment: text("environment")
@@ -75,6 +75,9 @@ export const phaseWorkspaces = sqliteTable(
 
 export const chats = sqliteTable("chats", {
   id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => phaseWorkspaces.id, { onDelete: "cascade" }),
@@ -495,4 +498,17 @@ export const preparationBranches = sqliteTable("preparation_branches", {
     .notNull()
     .references(() => applications.id, { onDelete: "cascade" }),
   record: text("record", { mode: "json" }).$type<PreparationBranch>().notNull(),
+});
+
+// Durable initial deployment intent, provider identity and execution evidence.
+export const deployments = sqliteTable("deployments", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id")
+    .notNull()
+    .unique()
+    .references(() => applications.id),
+  status: text("status").notNull(),
+  body: text("body", { mode: "json" })
+    .$type<import("./deployment-types").DeploymentRecord>()
+    .notNull(),
 });

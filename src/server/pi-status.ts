@@ -1,3 +1,4 @@
+import { applicationDeployment } from "./deployment-store";
 import { Type } from "typebox";
 
 import { getApplicationStatus } from "./operator-view";
@@ -27,7 +28,27 @@ export function readPiApplicationStatus(
   chatId: string,
 ): { status: ApplicationStatus; text: string } {
   const status = getApplicationStatus(applicationId, chatId);
-  const text = JSON.stringify(status);
+  const deployment = applicationDeployment(applicationId);
+  const text = JSON.stringify(
+    deployment
+      ? {
+          ...status,
+          deployment: {
+            status: deployment.status,
+            revision: deployment.revision,
+            plan: deployment.plan?.summary,
+            serverId: deployment.serverId,
+            address: deployment.address,
+            url: deployment.url,
+            verifiedAt: deployment.verifiedAt,
+            error: deployment.error,
+            latestAction: deployment.events.at(-1),
+            offer: deployment.offer,
+            backupsConfigured: false,
+          },
+        }
+      : status,
+  );
   if (text.length > MAX_APPLICATION_STATUS_CHARACTERS)
     throw new Error(
       "The current application status is larger than the supported tool result. Check the application's records in the Operator View.",

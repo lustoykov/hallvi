@@ -1,6 +1,8 @@
 # Workshop review input, 2026-08-30 (archived)
 
-Status: historical reviewer input, moved out of [PRODUCT-WORKSHOP-NOTES.md](../PRODUCT-WORKSHOP-NOTES.md) on 2026-09-05. It records what three read-only Fable reviews said and how the workshop responded at the time. It is not the current data model or a settled specification: it predates the 2026-09-03 Phase 1 simplification, so it still says Operator Session where the product now says Chat, and it discusses Temporal, which is not planned. Current terminology lives in [CONTEXT.md](../../CONTEXT.md); current direction lives in the workshop notes, the [user journeys](../user-journeys/README.md) and the [roadmap](../../ROADMAP.md).
+> Archived workshop input. Earlier instructions and proposals do not override [Product](../../PRODUCT.md) or [Roadmap](../../ROADMAP.md).
+
+Status: historical reviewer input, moved out of [PRODUCT-WORKSHOP-NOTES.md](previous-direction/docs/PRODUCT-WORKSHOP-NOTES.md) on 2026-09-05. It records what three read-only Fable reviews said and how the workshop responded at the time. It is not the current data model or a settled specification: it predates the 2026-09-03 Phase 1 simplification, so it still says Operator Session where the product now says Chat, and it discusses Temporal, which is not planned. Current terminology lives in [CONTEXT.md](../../CONTEXT.md); current direction lives in the workshop notes, the [user journeys](../user-journeys/README.md) and the [roadmap](../../ROADMAP.md).
 
 ## Independent review input
 

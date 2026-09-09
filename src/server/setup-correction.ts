@@ -1,6 +1,6 @@
+import { applicationDeployment } from "./deployment-store";
 import { z } from "zod";
 import {
-  getApplicationByRepository,
   getObservation,
   insertActivity,
   insertObservation,
@@ -20,9 +20,11 @@ import { INSPECTION_OBSERVATION } from "./phase-two";
 import { assertCorrectionIdle, correctionState } from "./revision-correction";
 import { createApplicationRequestSchema } from "./schemas";
 
-export const setupImpactRequest = createApplicationRequestSchema.extend({
-  name: z.string().trim().min(1).max(120),
-});
+export const setupImpactRequest = createApplicationRequestSchema
+  .omit({ requestKey: true })
+  .extend({
+    name: z.string().trim().min(1).max(120),
+  });
 export const setupApplyRequest = z.strictObject({ impactId: z.uuid() });
 export interface SetupImpact {
   id: string;
@@ -55,11 +57,6 @@ export async function previewSetupCorrection(
     throw new Error("Setup corrections are available before launch planning.");
   const repository = parseGithubRepository(after.repositoryUrl);
   after.repositoryUrl = repository.canonicalUrl;
-  const existing = getApplicationByRepository(after.repositoryUrl);
-  if (existing && existing.id !== applicationId)
-    throw new Error(
-      "That repository already has an application. Open it instead.",
-    );
   const repositoryChanged =
     after.repositoryUrl !== before.application.repositoryUrl;
   const policyChanged = after.approvalMode !== before.application.approvalMode;
@@ -144,6 +141,10 @@ export function applySetupCorrection(applicationId: string, input: unknown) {
       );
     assertCorrectionIdle(applicationId);
     const { after, repositoryChanged } = saved.view;
+    if (repositoryChanged && applicationDeployment(applicationId))
+      throw new Error(
+        "This application has a deployment record. Create a separate application for a different repository so its host and history stay correctly associated.",
+      );
     const policyChanged =
       before.application.approvalMode !== after.approvalMode;
     const repository = parseGithubRepository(after.repositoryUrl);

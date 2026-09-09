@@ -1,12 +1,14 @@
 # GitHub connection
 
-Server Guy reads repositories through an explicitly chosen, installation-wide connection. Application records and repository-check evidence remain application-scoped. Phases 1 and 2 are read-only. Phase 3 can publish a reviewable branch and pull request, but only after an explicit per-application [publishing grant](#publishing-in-phase-3) that Server Guy verifies against the connection; it never merges, changes workflows, or deploys.
+This is the existing GitHub connection/setup reference, including retained preparation/publication behavior. The [product boundary](../../PRODUCT.md#operating-boundary) governs new work: only narrow operability application-code proposals, with owner merge. [Roadmap](../../ROADMAP.md) tracks enforcement/migration and the separate deployment/release capability.
+
+Repository access uses an explicitly chosen installation-wide connection; application records and repository evidence remain scoped to the application. Read-only inspection does not grant publication. The legacy publication path needs an explicit per-application [publishing grant](#publishing-in-phase-3), rechecked against the connection; it does not merge for the owner.
 
 ## One GitHub App connection
 
 Connect GitHub through Server Guy's configured GitHub App device flow. Server Guy stores the resulting user access/refresh tokens, expiries and connection identity in its own protected settings file. It does not discover, adopt or borrow `gh`, `GH_TOKEN` or `GITHUB_TOKEN` credentials. An older saved CLI selection is rejected with instructions to reconnect; Server Guy does not sign the host CLI out or alter its account.
 
-The parallel UX follow-up removes the retired CLI controls. Until it is integrated, the setup response retains an empty `detected` field for the existing consumer; the server never populates or accepts that option.
+Legacy response fields are compatibility details, not a second supported login method. GitHub CLI credential adoption is retired.
 
 ## Register a local GitHub App once
 
@@ -77,6 +79,6 @@ Make launch-ready publishes Server Guy's staged change as one commit on the cont
 
 `tests/application/integration/github-setup.test.ts` exercises the real coordinator, connection files, route boundary and repository adapter against synthetic provider responses. `tests/application/unit/github-api.test.ts` tests request/error handling without real tokens or network requests. `tests/browser/github.spec.ts` covers consent, device cancellation/denial/success, disconnect/reconnect, exact saved evidence and permission recovery in a disposable desktop app.
 
-The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](../testing/phase-one-acceptance.md#latest-verification).
+The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](../archive/implementation/phase-one-acceptance.md#latest-verification).
 
 UI conventions for future changes live in the [shared settings design reference](../architecture/settings/DESIGN.md).

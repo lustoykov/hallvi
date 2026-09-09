@@ -1,3 +1,4 @@
+import { openDashboard } from "./workspace-helpers";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
@@ -97,6 +98,7 @@ test(
     ).toBe("not-yet");
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
+    await openDashboard(page);
     await page
       .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
@@ -158,6 +160,7 @@ test(
       (await (await page.request.get(`/api${path}`)).json()).observations,
     ).toEqual(refreshed.observations);
     await page.goto(path);
+    await openDashboard(page);
     await expect(
       page.getByRole("button", {
         name: /Check 2 GitHub repository access.*Passed/,
@@ -179,6 +182,7 @@ test(
       await page.request.post("/api/applications", {
         data: {
           repositoryUrl: "https://github.com/qa/device-reconnect",
+          requestKey: crypto.randomUUID(),
           approvalMode: "pi-decides",
         },
       })
@@ -355,11 +359,13 @@ test(
     const appUrl = page.url();
     const old = expireAccess();
     await page.reload();
+    await openDashboard(page);
     await expect(
       page.getByRole("button", {
         name: /Check 2 GitHub repository access.*Passed/,
       }),
     ).toBeVisible();
+    await openDashboard(page);
     await page
       .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();
@@ -393,6 +399,7 @@ test(
       JSON.stringify({ refresh: "revoked" }),
     );
     await page.goto(appUrl);
+    await openDashboard(page);
     await page
       .getByRole("button", { name: /Check 2 GitHub repository access/ })
       .click();

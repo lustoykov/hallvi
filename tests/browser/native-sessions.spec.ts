@@ -1,3 +1,4 @@
+import { openConversation, openDashboard } from "./workspace-helpers";
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
@@ -28,7 +29,9 @@ async function send(
   message: string,
   answer = `[QA fixture reply] ${message}`,
 ) {
+  await openConversation(page);
   await page.getByRole("textbox", { name: "Message Server Guy" }).fill(message);
+  await openConversation(page);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
 }
@@ -38,6 +41,7 @@ test(
   journey("native-history"),
   async ({ page, fixture }, testInfo) => {
     const first = await addApplication(page, "native-continuity");
+    await openDashboard(page);
     await expect(
       page.getByText("Saved requirements", { exact: true }),
     ).toHaveCount(0);
@@ -57,11 +61,13 @@ test(
       first.application.id,
       `${first.selectedChatId}.jsonl`,
     );
+    await openConversation(page);
     await send(page, "Remember the violet deployment window");
     const sessionId = JSON.parse(
       readFileSync(firstPath, "utf8").split("\n")[0],
     ).id;
     await page.reload();
+    await openConversation(page);
     await send(
       page,
       "recall: Remember the violet deployment window",
@@ -69,13 +75,19 @@ test(
     );
     // The synthetic provider's priority: prefix exercises the real storage
     // tool; live evals separately verify whether a model should call it.
+    await openConversation(page);
     await send(page, "priority: Customer data must stay in the EU");
+    await openDashboard(page);
     await expect(page.locator(".sg-decision-list")).not.toBeVisible();
+    await openDashboard(page);
     await page.getByText("Saved requirements (1)", { exact: true }).click();
+    await openDashboard(page);
     await expect(page.locator(".sg-decision-list")).toBeVisible();
+    await openDashboard(page);
     await expect(page.locator(".sg-decision-list")).toContainText(
       "Customer data must stay in the EU",
     );
+    await openDashboard(page);
     await expect(page.locator(".sg-decision-list")).not.toContainText(
       "launch priority",
     );
@@ -94,15 +106,18 @@ test(
     expect(nativeHistory).toContain('"toolName":"propose_decision"');
     expect(nativeHistory).toContain("pending, not saved");
 
-    await page.getByRole("button", { name: "Start a new phase chat" }).click();
+    await page.getByRole("button", { name: "New conversation" }).click();
+    await openConversation(page);
     await expect(
       page.getByRole("button", { name: "Archive chat", exact: true }),
     ).toBeEnabled();
+    await openConversation(page);
     await send(
       page,
       "recall: Remember the violet deployment window",
       "[QA native history] absent: Remember the violet deployment window",
     );
+    await openConversation(page);
     await send(
       page,
       "lookup-decisions",
@@ -130,6 +145,7 @@ test(
   journey("native-history"),
   async ({ page, fixture }, testInfo) => {
     const initial = await addApplication(page, "native-recovery");
+    await openConversation(page);
     await send(page, "priority: Preserve these saved records");
     const before = await snapshot(page);
     const nativePath = join(
@@ -139,9 +155,11 @@ test(
       initial.selectedChatId + ".jsonl",
     );
     renameSync(nativePath, nativePath + ".qa-preserved");
+    await openConversation(page);
     await page
       .getByRole("textbox", { name: "Message Server Guy" })
       .fill("Continue after history loss");
+    await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const startChat = page.getByRole("button", {
       name: "Start a new chat",
@@ -168,6 +186,7 @@ test(
       fullPage: true,
     });
     await startChat.click();
+    await openConversation(page);
     await expect(
       page.getByRole("button", { name: "Archive chat", exact: true }),
     ).toBeEnabled();
@@ -182,7 +201,9 @@ test(
     );
     expect(existsSync(nativePath)).toBe(false);
     expect(existsSync(nativePath + ".qa-preserved")).toBe(true);
+    await openConversation(page);
     await send(page, "Hello from a new chat");
+    await openConversation(page);
     await send(
       page,
       "lookup-decisions",

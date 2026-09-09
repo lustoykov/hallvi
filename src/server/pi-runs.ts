@@ -349,6 +349,10 @@ export function completePiRun(id: string, reply: PiTurnResult) {
       const run = getPiRun(id);
       if (run?.status !== "running") return false;
       const { chat, workspace } = loadChat(run.applicationId, run.chatId);
+      if (workspace.id !== run.workspaceId)
+        throw new Error(
+          "Application execution context changed before this reply could be saved.",
+        );
       // A phase completed or a Chat archived while the answer was being
       // produced cannot receive it; the attempt fails instead of crossing
       // the boundary.

@@ -1,4 +1,16 @@
-# Architecture explanations
+# Architecture references
+
+[Agent-directed operations](agent-directed-operations.md) is the current architecture. [Roadmap](../../ROADMAP.md) alone owns build order and status.
+
+## Decisions
+
+- [Single-instance operating boundary](../adr/0001-self-hosted-operating-boundary.md).
+- [Application-owned conversation and operations](../adr/0002-agent-directed-application-collaboration.md).
+- [Plugins deferred](../adr/0003-extensible-agent-composed-views.md): optional extension direction, not a core runtime requirement.
+
+[Archived implementation contracts](../archive/README.md#implementation-reference) preserve existing Pi, phase and evidence mechanics for regression/migration work. The [current design](../../src/components/server-guy/DESIGN.md) owns UI language; settings/testing design references describe their own surfaces.
+
+## PR explanations
 
 Medium and large Server Guy pull requests include a small architecture explanation generated with `diagram-design`. Small pull requests such as bug fixes and cleanup do not need one.
 
@@ -16,7 +28,7 @@ python3 -m http.server 8765
 
 Then open `http://127.0.0.1:8765/docs/architecture/` and select the PR artifact.
 
-Each explanation is a snapshot of the architecture when its PR merged, not a living diagram; later PRs changed what earlier diagrams show (for example, PR #13 added the local Pi worker). The [README architecture section](../../README.md#architecture) describes the current shape.
+Each explanation is a snapshot of the architecture when its PR merged, not a living diagram; later PRs changed what earlier diagrams show (for example, PR #13 added the local Pi worker). The [current architecture](agent-directed-operations.md) describes the current shape.
 
 Explanations by PR, oldest first:
 

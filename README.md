@@ -1,122 +1,89 @@
 # Server Guy
 
-Server Guy is being built to provide PaaS-like deployment and recovery for your own applications and supported self-hosted open-source tools, on infrastructure you own.
+**The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
-The [product direction](docs/PRODUCT-WORKSHOP-NOTES.md#self-hosted-oss-deployment) includes taking a project such as Langfuse from upstream deployment instructions to a verified installation with inspectable configuration and recovery evidence. This is a planned use case, not a shipped installer catalog. The current implementation covers Phases 1 to 3 of Journey 1: **Start**, the read-only **Inspect app**, which establishes the Application Contract, and **Make launch-ready**, which resolves the contract's required changes through a reviewable pull request and verifies the exact merged revision in disposable containers.
+The target is Docker Compose on one instance, with PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled commands and persistent files. Compute starts with Hetzner + BYOM; backups with R2 + S3. **Coolify is a reference, not a parity requirement.**
 
 ## Documentation
 
-| Question | Owner |
+Start with **Product → Roadmap → Architecture**.
+
+| Read | Answers |
 | --- | --- |
-| What do we build next, and what is implemented or still open? | [Development roadmap](ROADMAP.md) — ordered milestones/PRs and the implementation backlog. |
-| What should users experience? | [User journeys](docs/user-journeys/README.md) — product behavior, launch phases, deliverables and exit gates. |
-| What belongs in application Activity? | [Activity inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules) — event criteria, flow inventory, and exclusions. |
-| What does Inspect app establish, and how? | [Application Contract spec](docs/specs/application-contract.md) — the phase transition, inspection bounds, the supported profile, contract provenance, gates and Pi's scoped tools. |
-| What does Make launch-ready produce, and where does repository code run? | [Phase 3 spec](docs/specs/phase-three-conformance.md) — the brief, staged changes and isolated previews, publication under the Approval Mode, the exact merged candidate, the versioned check set, the Docker runner and its boundary. |
-| What engineering capabilities does this teach? | [Learning guide](docs/learning/stack-with-server-guy.md) — stack mapping and exercises, not another build plan. |
-| How do we prove the implemented behavior works? | [Phase 1 testing guide](docs/testing/phase-one-acceptance.md) — acceptance cases, test/eval procedures and verification evidence. |
-| Where are the test runners and saved results? | [Tests index](tests/README.md) — commands, folders and the local dashboard. |
+| [Product](PRODUCT.md) | Who it serves, what we support and where we stop. |
+| [Roadmap](ROADMAP.md) | What works, what remains and the only implementation sequence. |
+| [Architecture](docs/architecture/agent-directed-operations.md) | How conversation, records, the agent and execution fit together. |
 
-Launch phases are product steps; development milestones are implementation work and may span several PRs. Update each fact in its owning document and link to it from the others.
+### Supporting references
 
-## Architecture
+| Document | Responsibility |
+| --- | --- |
+| [Capability spec](docs/specs/self-hosting-capabilities.md) | Supported behavior and reusable interaction requirements. |
+| [Journeys](docs/user-journeys/README.md) | Concrete user goals, success and failure outcomes. |
+| [Compatibility tests](docs/testing/self-hosted-compatibility.md) | Representative software and the evidence required for support. |
+| [Testing](docs/testing/README.md) | Acceptance navigation and dated results; [runner instructions](tests/README.md) own commands. |
+| [Design](src/components/server-guy/DESIGN.md) | Fable's current visual language and interaction rules. |
+| [UI integration](docs/design/2026-09-09-conversation-first-integration.md) | What the conversation-first shell actually binds to. |
+| [Supported-stack brief](docs/design/2026-09-09-fable-supported-stack-brief.md) | Current handoff to Fable, leaving layout decisions to the designer. |
+| [Terminology](CONTEXT.md) | Domain glossary, not another specification. |
+| [Architecture decisions](docs/architecture/README.md) | Accepted boundaries and historical PR diagrams. |
+| [GitHub setup](docs/integrations/github.md) | Existing connection and credential setup. |
 
-Phases 1 to 3 are one codebase with a Next.js web process and one local Pi worker:
+### Historical and educational references
 
-```text
-Next.js
-├── Operator UI (phase strip, chats, Record with checks, the Application
-│   Contract and the Conformance Result; Settings → Execution)
-├── Route Handlers
-├── Phase 1–3 domain logic, phase transitions, publication through GitHub
-├── SQLite durable records: applications, phase workspaces, chats, Decisions,
-│   Observations, contracts, conformance proposals and runs, behavior checks,
-│   publishing grants
-└── GitHub adapter: identity check, bounded reads at one commit, archives,
-    Git Data API branch/pull request, merge observation
+[Archive](docs/archive/README.md) contains superseded plans, phase specifications, workshops and explorations. Preserve evidence and unresolved regression checks when replacing legacy code; do not implement their abandoned product/UI instructions.
 
-Local Node worker
-├── Same SQLite database: queued Pi Runs and conformance runs
-├── Pi SDK adapter with per-phase instructions and scoped tools
-├── One native Pi JSONL session per Chat, with Pi-owned compaction
-└── Disposable runner: Docker Engine on this machine, one container per
-    step, internal network, restricted proxy for installation and image builds
+[Research](docs/research/README.md) contains dated findings and proposals. Coolify comparisons do not impose parity; pricing/provider facts require a fresh check before use. The [learning guide](docs/learning/stack-with-server-guy.md) is educational material, not a product backlog. [Reviews](docs/reviews/2026-09-08-fable-merge-readiness.md) and dated test reports apply to the candidate they inspected.
 
-Docker Engine (controller host)          GitHub
-└── rootless builder, application image,  └── the reviewable pull request; the
-    source runner and PostgreSQL              engineer merges, never Server Guy
-```
+### Maintaining the docs
 
-There is no separate API service, distributed queue or workflow engine. Repository code runs only inside the disposable runner, never in the web or worker process. The current supported execution case is one Python/uv/FastAPI application with PostgreSQL. Pi interprets repository evidence; profile-specific execution checks define what Server Guy can currently verify. See the [combined verification record](docs/plans/phase23-verification.md) for real-provider and fixture evidence.
+- Put a decision in its owning document once; link to it elsewhere.
+- Replace superseded wording instead of appending another clarification.
+- Keep status and implementation order in Roadmap; link evidence with date and candidate.
+- Put abandoned explorations in the archive. Do not promote a research suggestion into scope without a product decision.
+- Preserve runbooks and regression evidence. A documentation cleanup never proves a feature, retires a table or waives a failing test.
 
-The permission scope is recorded as **Current application launch** in this slice. That is an explicit Phase 1 implementation boundary, not a decision about the eventual global policy model.
+## Implementation status
+
+A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/2026-09-08-real-deployment-acceptance.md), followed by [hardening](docs/testing/2026-09-08-deployment-hardening.md). Fable's [conversation-first integration](docs/design/2026-09-09-conversation-first-integration.md) uses the real deployment record and conversations.
+
+The executor is still narrower than the target: one source-built HTTP app plus optional PostgreSQL. Generic Compose/image intake, additional services, backups, ongoing monitoring and routine releases need implementation. Historical results do not prove the current branch is ready to merge or that the deployed host is still online.
 
 ## Run
 
-Requirements: Node.js and a supported ChatGPT subscription for Pi. The Pi SDK is installed with the app; a separate Pi CLI installation is not required. GitHub is connected explicitly in Settings through a configured GitHub App. Server Guy does not borrow GitHub CLI or environment credentials.
+Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](docs/integrations/github.md).
 
-```bash
+```sh
 npm install
 npm run db:push
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>.
+Open <http://127.0.0.1:3000>. In another terminal from the same checkout:
 
-In a second terminal, run `npm run worker`. Keep both processes running from this checkout with the same database/configuration. The worker reads `.env` and `.env.local`; `SERVER_GUY_DB_PATH` selects the database for both. A second worker for the same database is rejected.
+```sh
+npm run worker
+```
 
-Sending returns immediately after the message is saved. You can leave the page and return to its saved progress. Cancellation and Retry are beside the attempt. An interrupted/failed attempt saves no Decisions or contract; Retry uses the original user message. Without a worker, requests stay visibly queued. Stop the app and worker before applying schema changes. The current schema is version 10: `npm run db:push` upgrades a version-6, version-8 or version-9 database in place after writing a `.pre-v10-<id>.backup` copy beside it. Every other prototype version, including the abandoned version-7 branch, requires moving aside the disposable database and its `-wal`/`-shm` files before pushing a fresh database; no old-chat import is supported. Keep credential/configuration files and `tests/results/`. Missing native history offers **Start a new chat**, not reconstruction.
+Both processes must use the same database/configuration. The worker loads `.env` and `.env.local`. `SERVER_GUY_DB_PATH` overrides the default `.server-guy/server-guy.db`. Without the worker, accepted requests remain queued. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
 
-When the Launch Brief's four checks pass, **Continue to Inspect app** starts Phase 2. Server Guy pins the repository's default branch to one commit, records its tree, resolves the supported Application Profile (FastAPI + uv, PostgreSQL as the intended database) and starts one request of its own, shown as Server Guy's. In that request Pi reads the files it needs through read-only tools bound to that commit; each read is saved as an Observation before the model sees it. Pi proposes the Application Contract through a typed tool that checks every field's source before staging it and again when the reply is saved. The Record shows each field with its provenance, the conformance work Phase 3 owes, the values that need your decision, and the product policies that stay open until later gates. Phase 1 chats become read-only but stay readable; **Re-inspect repository** keeps the selected commit. **Change selected revision** shows the retained work, required reviews and reruns before explicitly adopting another commit. **Edit application setup** provides the same impact review for a repository or policy correction; earlier records remain available and affected later phases are paused. Nothing in Phase 2 builds, runs, tests, deploys or changes the repository. See the [Application Contract spec](docs/specs/application-contract.md).
+### Data and migrations
 
-When the contract's four checks pass, **Continue to Make launch-ready** starts Phase 3. The current-step bar offers the next action; the Record contains the brief, proposed changes, behavior checks and execution evidence. **Work on GitHub with Server Guy** asks for an explicit shared-work grant: Server Guy creates a preparation branch and opens a draft PR with the first meaningful source checkpoint. You can follow along and commit there. Checkpoints preserve unrelated collaborator changes; conflicting edits need reconciliation and raced pushes are rejected. Merging stays yours on GitHub. External work can instead use the exported brief and return a branch, PR or commit for independent checking.
+Stop the web process and worker before applying schema changes. Schema v12 upgrades known versions 6, 8, 9, 10 and 11 with a private backup before migration; unknown versions require investigation. Keep the database, WAL/recovery material and native sessions rather than resetting an unexpected schema. `src/server/db-schema.ts` owns the schema.
 
-**Refresh from GitHub** selects the observed merge result and keeps it pinned. **Verify candidate** builds the repository's reviewed application image in a restricted rootless build environment, then checks configuration, PostgreSQL/migrations, startup, health and accepted application behavior against that image. Repository tests use the isolated source runner. **Start application preview** retains a successfully verified instance on a loopback URL so you can try it and confirm the application works. It uses disposable data, expires after one hour, and can be stopped explicitly. Confirmation is tied to the tested candidate, image, contract and checks; it does not prove production health.
+Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>.jsonl`. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and recovery/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
 
-Docker Engine must be reachable on the machine running Server Guy. **Settings → Execution** explains installation, startup, access and image-preparation problems. Docker Desktop is one option, not a requirement; Phases 1 and 2 do not need Docker. The preview currently supports local browsing on that execution host. See the [Phase 3 spec](docs/specs/phase-three-conformance.md) and [combined implementation notes](docs/plans/phase23-core-progress.md).
+### Diagnostics
 
-
-Each Chat continues its private native Pi session across requests and worker restarts. Server Guy sends stable instructions, a small current-state note and the new user message; the model looks up current Decisions through a scoped read-only tool. Proposals remain pending until the final SQLite transaction. No filesystem, shell or external mutation tools are granted. See the [native session contract](docs/specs/native-pi-and-permissions.md).
-
-Native histories live beside the configured database at `pi-sessions/<application-id>/<chat-id>.jsonl`. Back up **both SQLite and pi-sessions** with the web app and worker stopped; restoring only SQLite can leave a missing-history error. Compaction reduces model context, not disk history. A damaged/missing established history offers **Start a new chat**; existing records remain and no old messages are imported or retried automatically. Cancel an active reply and wait for it to stop before removing its application; removal deletes that application's records and native files, not credentials or other applications.
-
-### Activity and diagnostics
-
-Two surfaces answer two questions. **Activity** in an application's Inspector answers *what happened to this application*: the workspace was created, a repository check passed or failed, a requirement was saved or changed (old → new), or a GitHub disconnect/replacement invalidated an earlier repository verification. Ordinary replies, lookups, failed attempts and chat creation/archive add nothing there, following the [inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules).
-
-Chat keeps answers, working/failed/cancelled states, unfinished drafts and retry. It has no Reply details panel. Product outcomes remain understandable through Chat, Record and Activity without a tracing service.
-
-Metadata-only diagnostics work locally by default. `diagnostics/replies.ndjson` contains event logs; `diagnostics/spans.ndjson` contains completed OpenTelemetry spans, one OTLP JSON envelope per line. Both live beside the database unless `SERVER_GUY_LOG_DIR` overrides the directory. Each file rotates at 1 MiB with three archives. **Settings → ChatGPT & model → Storage & privacy** shows both absolute paths with copy buttons and the optional export configuration. Read the files with a text editor, `jq`, or an agent. Unfinished spans can be lost on a crash; missing diagnostics never establish a product outcome.
-
-Optional remote export supports Langfuse or another OTLP/HTTP trace backend. Set `SERVER_GUY_TRACING=1` and either Langfuse project keys or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` in ignored `.env.local`, then restart the server and worker with the same environment. Export off still records local spans. Export uses in-memory batches; local files are not a replay queue and are not automatically resent. No Collector or account is needed for local use, and diagnostic failures cannot change reply or Activity outcomes. See [configuration and data boundaries](docs/specs/action-history-and-tracing.md#configuration-and-data-boundaries).
-
-Open **Settings → ChatGPT & model** to configure Pi, and **Settings → GitHub** before adding a repository. A detected login is never silently adopted. For a separate GitHub login, follow the [GitHub App registration guide](docs/integrations/github.md); only a public client ID and App slug go in local configuration, never an App private key or client secret.
-
-Durable application records are stored in `.server-guy/server-guy.db`; the Operator View and Gate Checks are derived from them. The TypeScript schema in `src/server/db-schema.ts` is the only schema definition, and `npm run db:push` applies it directly with Drizzle Kit. Delete the database only when you intentionally want a fresh local product state. Before the first release the schema can still change; Server Guy refuses to open a missing or older schema until `db:push` initializes it. Version 9 is current; versions 6 and 8 are upgraded in place with a backup. Recreate disposable development databases from other prototype versions; there is no compatibility layer for the abandoned version-7 branch.
+Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `SERVER_GUY_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Detailed configuration and privacy behavior are in the [implementation reference](docs/archive/implementation/action-history-and-tracing.md).
 
 ## Verify
 
-For a visual entry point, run `npm run test:dashboard` and open [Server Guy Testing](http://127.0.0.1:4317). It can run checks and review saved eval answers. Nothing starts automatically; real model work requires explicit confirmation. This is a separate local developer tool, not a production app page.
-
-```bash
+```sh
 npm test
 npm run lint
 npm run build
 npm run test:e2e:smoke
 ```
 
-Browser checks use synthetic providers and no model credits. See the [tests index](tests/README.md) for the full desktop suite, interactive runner UIs and opt-in live evals.
-
-To try Phase 2 without credentials, start the disposable fixture and add `https://github.com/qa/fastapi-app`, then press **Continue to Inspect app**:
-
-```bash
-node tests/browser/qa-fixture.mjs 3190 success ready
-```
-
-The fixture serves synthetic repositories at a synthetic commit (`fastapi-app`, `fastapi-nohealth`, `fastapi-localhost`, `fastapi-sqlite`, `django-site`) and a synthetic model that reads and proposes deterministically; see the [testing guide](docs/testing/phase-one-acceptance.md#phase-2-acceptance-inspect-app). From a ready contract, **Continue to Make launch-ready** shows the Phase 3 flow with a scripted runner in place of Docker: Continue with Server Guy stages and previews the change, Approve and Allow publishing then Publish create a synthetic pull request, writing `{"mergePull": 1, "mergeMethod": "squash"}` to the fixture's `state/github-scenario.json` merges it, Refresh records the candidate and Verify candidate runs the scripted checks. `state/conformance-scenario.json` with `{"docker": "missing"}`, `"stopped"`, `"denied"` or `"unverified"` shows the prerequisite states in Settings → Execution and the Record.
-
-To exercise the real runner against the executable fixture applications, opt in with a reachable Docker Engine (pulls `astral/uv:python3.12-bookworm-slim` and `postgres:16-alpine`, about seven minutes):
-
-```bash
-SERVER_GUY_DOCKER_TESTS=1 npm test -- tests/application/integration/conformance-executor.docker.test.ts
-```
+[tests/README.md](tests/README.md) describes full browser journeys, synthetic fixtures, Docker checks and opt-in real-model evals. `npm run test:dashboard` opens the local testing workbench at <http://127.0.0.1:4317>. Synthetic tests are not provider or deployment evidence. See the [testing index](docs/testing/README.md) for acceptance coverage and known limits.

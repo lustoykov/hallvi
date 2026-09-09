@@ -421,15 +421,32 @@ describe("Phase 1 application workspace", () => {
     expect(result.view.decisions).toEqual([]);
   });
 
-  it("is idempotent for the same policy and rejects a conflicting policy", async () => {
-    const first = await createApplication();
-    const repeated = await createApplication();
+  it("deduplicates a creation request without making repository identity unique", async () => {
+    const input = {
+      requestKey: "00000000-0000-4000-8000-000000000099",
+      repositoryUrl: "https://github.com/lustoykov/todo-fastapi",
+      environment: "production" as const,
+      approvalMode: "pi-decides" as const,
+    };
+    const first = await phaseOne.createPhaseOneApplication(input);
+    const repeated = await phaseOne.createPhaseOneApplication(input);
 
     expect(repeated.created).toBe(false);
     expect(repeated.view.application?.id).toBe(first.view.application?.id);
-    await expect(createApplication("always-ask")).rejects.toBeInstanceOf(
-      phaseOne.ExistingApplicationConflictError,
-    );
+    const separate = await phaseOne.createPhaseOneApplication({
+      ...input,
+      requestKey: "00000000-0000-4000-8000-000000000098",
+      name: "Staging",
+    });
+    expect(separate.view.application?.id).not.toBe(first.view.application?.id);
+    expect(separate.view.application?.name).toBe("Staging");
+    expect(separate.view.selectedChatId).not.toBe(first.view.selectedChatId);
+    await expect(
+      phaseOne.createPhaseOneApplication({
+        ...input,
+        approvalMode: "always-ask",
+      }),
+    ).rejects.toBeInstanceOf(phaseOne.ExistingApplicationConflictError);
   });
 
   it.each([

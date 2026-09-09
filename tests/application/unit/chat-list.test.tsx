@@ -5,6 +5,7 @@ import { ChatList } from "../../../src/components/server-guy/chat-list";
 
 const chat = {
   id: "chat-1",
+  applicationId: "application",
   workspaceId: "workspace",
   title: "Launch Brief",
   isPrimary: true,

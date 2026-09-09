@@ -1,3 +1,5 @@
+import { Type } from "typebox";
+import { requestDeployment } from "./deployment-store";
 import { readPreparationFile } from "./preparation";
 import { dirname } from "node:path";
 
@@ -116,6 +118,7 @@ export const PHASE_TWO_SYSTEM_PROMPT = [
 ].join("\n\n");
 
 const PHASE_THREE_PARAGRAPHS = [
+  `Server Guy prepares deployment surroundings, not application business logic. Application-code proposals are limited to small operability changes such as a health endpoint, an environment-driven port or a start entrypoint, always through a pull request the owner merges. Do not implement features, repair application exceptions, rewrite migration logic, or replace database/queue libraries to fit a profile. For those cases, explain the impact and provide a coding-agent handoff with the selected revision, evidence and the check that should pass after an owner-merged fix. A conformance brief or failed test does not expand this boundary.`,
   `You are collaborating on Phase 3, Make launch-ready. The deliverable is a Conformance Result: one exact eligible repository revision with Server Guy's independent evidence that every required profile check passes for it. The checks are:
 ${phaseThreeCheckListForPrompt()}`,
   `A status result reads local records at retrievedAt. Phase 3 works from the Application Contract retained when Inspect app completed and its conformance brief: the exact base commit, the required changes, the allowed scope, the acceptance bar and what is excluded. get_conformance_brief returns the brief, the saved proposal and what you have staged in this request. Nothing in this phase deploys, provisions, merges, or touches a production database; the engineer merges on GitHub and later phases deploy.`,
@@ -149,6 +152,7 @@ export function toolNamesForPhase(phaseKey: PhaseKey) {
     "propose_decision",
     "search_decisions",
     "get_application_status",
+    "prepare_deployment",
   ];
   const repository = [
     "get_repository_inspection",
@@ -486,6 +490,35 @@ export async function askPi(
       },
     });
 
+    const deploymentTool = defineTool({
+      name: "prepare_deployment",
+      label: "Prepare deployment",
+      description:
+        "Start a read-only repository inspection and priced deployment recommendation when the user asks to deploy. No server purchase or host change happens until the user accepts the inline recommendation.",
+      parameters: Type.Object({}, { additionalProperties: false }),
+      async execute() {
+        options.signal?.throwIfAborted();
+        const record = requestDeployment(
+          input.run.applicationId,
+          input.run.chatId,
+          "server-guy",
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                status: record.status,
+                error: record.error,
+                url: record.url,
+                next: "Follow the deployment card in this conversation. The user accepts the cost and supplies missing secrets there.",
+              }),
+            },
+          ],
+          details: {},
+        };
+      },
+    });
     const cwd = process.cwd();
     const agentDir = dirname(native.sessionManager.getSessionFile()!);
     const settingsManager = SettingsManager.inMemory();
@@ -493,7 +526,11 @@ export async function askPi(
       cwd,
       agentDir,
       settingsManager,
-      systemPromptOverride: () => systemPromptForPhase(phaseKey),
+      systemPromptOverride: () =>
+        systemPromptForPhase(phaseKey) +
+        `
+
+The application now has a separate real deployment goal flow. When the user asks to deploy, use prepare_deployment to queue source inspection and an inline Hetzner recommendation, instead of sending them through phase buttons. This tool records a local request only; it grants no spending authority. The user accepts the priced recommendation and supplies secrets through the inline deployment card. The deployment worker then performs the accepted operations and records verification. Internal phase readiness is not deployment status. get_application_status includes deployment evidence when present: use that evidence for deployment questions. Never claim the old phase prevents this deployment flow, and never invent its progress. To discuss the current deployment you may also call prepare_deployment if a request already exists; it returns that same request without restarting it.`,
       appendSystemPromptOverride: () => [],
       skillsOverride: () => ({ skills: [], diagnostics: [] }),
       agentsFilesOverride: () => ({ agentsFiles: [] }),
@@ -525,6 +562,7 @@ export async function askPi(
               readRepositoryFileTool,
               applicationContractTool,
               proposeContractTool,
+              deploymentTool,
             ]
           : phaseKey === "make-launch-ready"
             ? [
@@ -541,8 +579,14 @@ export async function askPi(
                 conformancePreviewTool,
                 repositoryCommandTool,
                 acceptanceChecksTool,
+                deploymentTool,
               ]
-            : [proposeDecisionTool, searchDecisionsTool, applicationStatusTool],
+            : [
+                proposeDecisionTool,
+                searchDecisionsTool,
+                applicationStatusTool,
+                deploymentTool,
+              ],
       resourceLoader: loader,
       sessionManager: native.sessionManager,
     }));

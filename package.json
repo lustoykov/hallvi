@@ -56,5 +56,9 @@
     "prettier": "3.9.6",
     "typescript": "5.9.2",
     "vitest": "4.1.11"
+  },
+  "allowScripts": {
+    "better-sqlite3": true,
+    "esbuild": true
   }
 }

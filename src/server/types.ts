@@ -98,6 +98,8 @@ export interface PhaseWorkspaceView extends PhaseWorkspaceRecord {
 
 export interface Chat {
   id: string;
+  applicationId: string;
+  /** Retained internal execution context; not conversation ownership. */
   workspaceId: string;
   title: string;
   isPrimary: boolean;
@@ -819,6 +821,9 @@ export interface OperatorView {
 export type PhaseOneOperatorView = OperatorView;
 
 export interface CreateApplicationInput {
+  /** Stable identity for one creation attempt, retained across HTTP retries. */
+  requestKey?: string;
+  name?: string;
   repositoryUrl: string;
   environment: "production";
   approvalMode: ApprovalMode;

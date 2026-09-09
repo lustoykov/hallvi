@@ -4,7 +4,7 @@ import {
   listActiveDecisions,
   listActivity,
   listApplications,
-  listChatSummaries,
+  listApplicationChatSummaries,
   listMessages,
   listObservations,
   listWorkspaces,
@@ -187,7 +187,7 @@ export function getOperatorView(
     if (!requested) throw new NotFoundError("Phase not found.");
     workspace = requested;
   }
-  const chats = listChatSummaries(workspace.id);
+  const chats = listApplicationChatSummaries(application.id);
   const selected =
     (chatId ? chats.find((chat) => chat.id === chatId) : null) ??
     chats.find((chat) => !chat.archivedAt && chat.isPrimary) ??

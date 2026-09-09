@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { databasePath, db } from "./db";
-import { applications, chats, phaseWorkspaces } from "./db-schema";
+import { applications, chats } from "./db-schema";
 
 // Keep native handles reachable until explicit settlement/release, including
 // when a poisoned worker abandons its pending SDK promise before process exit.
@@ -51,13 +51,7 @@ function ownedChat(applicationId: string, chatId: string) {
   const row = db()
     .select({ chat: chats })
     .from(chats)
-    .innerJoin(phaseWorkspaces, eq(chats.workspaceId, phaseWorkspaces.id))
-    .where(
-      and(
-        eq(chats.id, chatId),
-        eq(phaseWorkspaces.applicationId, applicationId),
-      ),
-    )
+    .where(and(eq(chats.id, chatId), eq(chats.applicationId, applicationId)))
     .get();
   if (!row)
     throw new NativeSessionError("not-found", "Conversation not found.");

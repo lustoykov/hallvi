@@ -1,227 +1,83 @@
-# Server Guy development roadmap
+# Implementation plan
 
-This is the single owner of development order, implementation status, and the remaining work. Keep detailed checklists here rather than maintaining a separate TODO file. See the [documentation map](README.md#documentation) for the other documents' roles.
+The only active delivery plan. [Product](PRODUCT.md) owns scope, [architecture](docs/architecture/agent-directed-operations.md) owns mechanisms and [journeys](docs/user-journeys/README.md) own user outcomes. Research, review snapshots and archived checklists do not create additional work commitments.
 
-**Launch phases** describe the [user's Application Launch journey](docs/user-journeys/01-application-launch.md#nine-phase-journey). **Development milestones and PRs** describe how we build it. One launch phase spans several PRs: Phase 1 includes boundaries, Drizzle, Pi setup, evals, GitHub connection, and durable requests. Milestone numbers below are not launch-phase numbers.
+## Current state — 9 September 2026
 
-## Development sequence
+| Area | Evidence and remaining limit |
+| --- | --- |
+| First real deployment | The [8 September acceptance](docs/testing/2026-09-08-real-deployment-acceptance.md) records the product deploying `lustoykov/todo-fastapi` to Hetzner, generating its missing Dockerfile, preparing the host, using private persistent PostgreSQL and verifying external create/read/delete behavior at the selected revision. This is dated evidence, not a current uptime claim. |
+| Hardening | The [follow-up report](docs/testing/2026-09-08-deployment-hardening.md) records bounded fixes and test results. The [9 September integration report](docs/testing/2026-09-09-final-integration.md) records final local checks and an additional cross-conversation persistence fix. |
+| Conversation-first UI | Fable's [integration report](docs/design/2026-09-09-conversation-first-integration.md) describes real deployment receipts, shared views, cross-conversation references and preserved drafts. The [final integration acceptance](docs/testing/2026-09-09-final-integration.md) records local browser coverage and the retained legacy preparation boundary. |
+| Persistence | Schema v12 retains existing domain tables, application-owned conversations and the initial deployment record. `ApplicationOperation` is currently a projection of that record, not a new generic operation table. |
+| Runtime limit | The planner/executor currently represents one source-built HTTP application plus optional PostgreSQL. The broader Compose, image, SQLite, broker, worker and storage targets below are not implemented by documenting them. |
+| Lifecycle gaps | BYOM adoption, public HTTPS/CDN, routine release history, verified backups/restoration and ongoing care still need end-to-end implementation. The controller currently enforces local access; shared/separate remote hosting requires authenticated bootstrap. |
 
-The sequence below carries the agreed order formerly kept in the learning guide, with the current Phase 1 eval work made explicit. It is not a replacement for the journey's product requirements or exit gates. Conditional technology adoption is not a mandatory step.
+## Next: finish and reconcile the integration
 
-| Order | Development milestone | Status / detail |
-| --- | --- | --- |
-| 1 | Harden Phase 1 HTTP and Pi boundaries with Zod, TypeBox, and adversarial tests. | Merged: [PR #7](https://github.com/lustoykov/server-guy/pull/7). |
-| 2 | Add Drizzle over the existing SQLite database. | Merged: [PR #8](https://github.com/lustoykov/server-guy/pull/8). [Checklist](#add-drizzle-over-the-existing-sqlite-database). |
-| 3 | Configure Pi explicitly, with supported model selection and account setup/recovery. | Merged: [PR #9](https://github.com/lustoykov/server-guy/pull/9). [Setup and remaining acceptance work](#configure-pi-explicitly). |
-| 4 | Establish repeatable Phase 1 tests and real-Pi evals. Extend relevant cases alongside later milestones. | Merged: [PR #10](https://github.com/lustoykov/server-guy/pull/10). Desktop automation, local dashboard and opt-in judge are implemented; human meaning review and broader journey coverage remain open below. |
-| 5 | Connect GitHub explicitly: authorization, scope, revocation, exact repository access. | Merged: [PR #12](https://github.com/lustoykov/server-guy/pull/12). [Checklist](#connect-github-explicitly), [setup and boundaries](docs/integrations/github.md). |
-| 6 | Make Pi requests durable: SQLite, one local Node worker, run IDs, revisioned messages, reconnectable SSE, bounded transcript and durable summary. | Merged: [PR #13](https://github.com/lustoykov/server-guy/pull/13). Synthetic process and desktop verification; real-Pi streaming remains opt-in. [Contract](docs/specs/durable-pi-requests.md), [checklist](#make-pi-requests-durable). |
-| 7 | Keep application Activity meaningful, with bounded local diagnostic logs and optional OpenTelemetry export. | Merged: [PR #16](https://github.com/lustoykov/server-guy/pull/16), including the September 6 correction that removes Reply details and detailed SQLite diagnostics. Extends alongside later Operations. [Checklist](#action-history-and-tracing), [small spec](docs/specs/action-history-and-tracing.md). |
-| 8 | Let Pi retrieve application status and recorded evidence through a scoped read-only tool instead of injecting the full summary before every reply. | Merged: [PR #17](https://github.com/lustoykov/server-guy/pull/17). [Spec](docs/specs/application-status-tool.md), [checklist](#application-status-lookup). |
-| 9 | Implement the Phase 2 Application Contract as a read-only vertical slice. | In progress on `codex/phase-two-application-contract`, PR open and unmerged. Started 2026-09-06 by the user's decision before Phase 1 human sign-off; the Phase 1 gaps below stay open. [Spec](docs/specs/application-contract.md), [checklist](#phase-2-application-contract), [product contract](docs/user-journeys/01-application-launch.md#phase-2--inspect-app), [learning exercises](docs/learning/stack-with-server-guy.md#the-first-learning-slice-phase-2-application-contract). |
-| 9b | Implement Phase 3, Make launch-ready: the conformance brief, Pi's staged changes with isolated previews, publication under the Approval Mode, the exact merged candidate and Server Guy's own conformance run in disposable containers. | In progress on `codex/phase-three-conformance`, stacked on the Phase 2 branch, PR open and unmerged. Docker Engine on the controller host is the accepted prerequisite for built-in execution (decided 2026-09-06). [Spec](docs/specs/phase-three-conformance.md), [checklist](#phase-3-conformance-result), [product contract](docs/user-journeys/01-application-launch.md#phase-3--make-launch-ready). |
-| 10 | Specify and test the durable Operation lifecycle without a provider mutation. | Planned; the Phase 3 publication effect (reconciled branch and pull request) is the first concrete external effect and informs it. |
-| 11 | Reconcile the first real Hetzner host effect through approval and verification. | Planned. |
-| 12 | Containerize and deploy the first exact application Release to a VPS. | Planned; satisfy the relevant launch-phase gates, not just container startup. |
-| 13 | Revisit Workflow DevKit only when its durability trigger is present. | Conditional: [trigger](#revisit-workflow-devkit-only-at-its-trigger); not a prerequisite for the next milestone. |
-| 14 | Break, recover, roll back, and externally re-verify a deployed application. | Planned. |
-| 15 | Add the EC2 Host Adapter, reusing the proven Linux-host lifecycle and Host Record. | Planned: [AWS direction](#aws-integration-direction). |
-| 16 | Complete the home-server, managed-platform, Python, and AWS ECS/Fargate transfer labs without expanding Server Guy's V1 boundary. | Later learning work: [home-server constraints](#home-server-controller-mode), [learning guide](docs/learning/stack-with-server-guy.md), [AWS direction](#aws-integration-direction). |
+While Fable owns the UI, backend work should start from the actual supported-stack gaps and acceptance fixtures. Do not build a second shell or another competing plan.
 
-Merge status above and checkbox status below are distinct: a checked item is implemented in this branch, not proof of complete phase acceptance. Test results and unresolved acceptance evidence live in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
+- [ ] Verify the final conversation-first implementation with real state and synthetic failure journeys: approvals, retries, multiple conversations, reload, lost responses, stale observations and drafts.
+- [ ] Remove remaining mandatory phase ceremony only after preserving prerequisite checks and evidence access. Enforce the narrow operability-PR boundary in all source-writing paths.
+- [x] Reconcile the [legacy acceptance](docs/archive/implementation/phase-one-acceptance.md), [retained checklist](docs/archive/previous-direction/docs/plans/implementation-history.md) and [merge review](docs/reviews/2026-09-08-fable-merge-readiness.md) against the current candidate. Record applicable fixes or deliberate retirement; do not treat archived work as silently waived. Dispositions are recorded in the [final integration report](docs/testing/2026-09-09-final-integration.md).
+- [ ] Run the relevant tests, build and browser journeys on the exact candidate and get the final review. Historical passing results and a working prototype are insufficient to call it ready for main.
 
-Merged follow-ups: [native Pi sessions and permission boundaries](docs/specs/native-pi-and-permissions.md) ([PR #15](https://github.com/lustoykov/server-guy/pull/15): native per-Chat history replaces custom replay/compaction, saved Decisions are retrieved through a scoped read-only tool, and invalid proposals return in-loop feedback), action history and tracing, and the [application status lookup](#application-status-lookup) that replaces the per-reply application summary. External authority and atomic Decision commits are unchanged; independently committed tools remain deferred. Phase 2 is in progress on its own branch; see the [checklist](#phase-2-application-contract).
+Retained checks needing explicit disposition: unreviewed live-model semantic cases, source/connection provenance, owner-merged candidate verification, durable request cancellation/retry, populated database migration and history preservation. Earlier AWS labs, workflow-engine research and UI presentation cleanups are not merge requirements unless a concrete current defect requires them. The deployment spending card already supplies an explicit authority boundary; do not recreate a generic phase gate merely to satisfy an old checklist.
 
-## Phase 1 implementation backlog
+## Delivery sequence
 
-**September 6 acceptance:** the merged implementation passed 29 live automated cases, a six-answer targeted follow-up after an approval-wording clarification, all 26 desktop tests, and 560 deterministic tests. Codex reviewed the saved answers separately from human verdicts. [Evidence and remaining coverage](docs/testing/phase-one-acceptance.md#september-6-acceptance-pass-after-prs-1517-merged). Human meaning sign-off and the explicitly listed end-to-end coverage gaps remain open; this is not a new infrastructure milestone.
+Each increment must connect conversation, durable state, execution and verification. These are engineering increments, never user-facing stages. Implement the smallest useful case within each; do not wait for every compatibility case to finish before exercising a working lifecycle.
 
-Finish the required [Phase 1 acceptance gates](docs/testing/phase-one-acceptance.md#what-done-means), including explicit GitHub connection and durable requests, before Phase 2 merges. **Decision 2026-09-06:** Phase 2 development started on `codex/phase-two-application-contract` before human sign-off, at the user's request; its PR stays unmerged until that sign-off or an explicit waiver, and the unchecked items below are neither closed nor rewritten by it. Optional cleanup and conditional architecture studies are not automatic blockers. Server Guy uses Pi as its only model and agent runtime; do not add AI SDK Core or `useChat` to the product.
+### 1. Complete the single-instance runtime
 
-### Add Drizzle over the existing SQLite database
+Reuse actual Dockerfiles/Compose and support upstream image intake, required services, configuration mounts, persistent files, private connections and explicit ports. Prepare repository and host without discarding existing workloads. Add BYOM through the same Linux-host lifecycle as Hetzner; record the observed prerequisites and unsupported cases.
 
-- [x] Define the existing SQLite tables, columns, constraints, and indexes with `drizzle-orm` while preserving current names and behavior.
-- [x] Replace handwritten CRUD queries and unchecked generic row casts with typed Drizzle queries.
-- [x] Keep `better-sqlite3`, foreign-key enforcement, WAL mode, transactions, and the prototype reset/nuke policy.
-- [x] Prove unchanged domain behavior with the existing tests plus a schema smoke test against a fresh database.
-- [x] Keep this PR mechanical: do not add Pi Run, worker, streaming, authentication, or Phase 2 tables yet.
+Introduce workers, PostgreSQL/SQLite and required Redis/Valkey through representative fixtures rather than an installer branch for every product. Preserve scheduler ownership and library-controlled queue behavior. Keep source/image/configuration identities pinned; interrupted external effects require reconciliation before retry.
 
-Decision: use `drizzle-kit push` during prototyping. The TypeScript Drizzle schema is the only schema definition; application startup validates the schema but does not create it. We deliberately do not keep handwritten `CREATE TABLE` statements or versioned migration files beside it. Run `npm run db:push` after installing dependencies or explicitly resetting a disposable local database. Version mismatches stop setup rather than migrate data, with two explicit exceptions: a version-6 or version-8 database is upgraded in place to version 9 after a backup copy is written beside it (the version-8 workspace columns and contracts table, then the version-9 conformance tables); the abandoned version-7 branch is refused. Before the first release with user-data retention promises, implement and test schema migrations and backup/restore; until then, development chats are disposable.
+**Acceptance:** a source app missing deployment setup and a host missing runtime prerequisites; then an image with persistent SQLite and a linked-service configuration. Recreate containers without data loss, inspect logs, reject unsupported dependencies honestly and retain safe recovery after controller interruption.
 
-### Configure Pi explicitly
+### 2. Public delivery and controller installation
 
-- [x] Add a Pi setup screen that shows installation/runtime readiness, authentication state, provider, model, and reasoning effort.
-- [x] Use `openai-codex`, `gpt-5.6-sol`, and `high` reasoning effort as the initial Server Guy default.
-- [x] Keep Codex CLI credentials separate, show Pi's exact credential source, and start an explicit ChatGPT device-code OAuth flow.
-- [x] Cover existing credentials, first-time login, cancellation, expiry/refresh failures, quota errors, missing runtime, and unavailable models with isolated automated tests; live account acceptance remains below.
-- [x] Detect existing Pi provider/model/effort and credential presence read-only; require **Use existing Pi setup** or **Use a new ChatGPT connection** before chat.
-- [x] Snapshot the adopted preferences in Server Guy’s own config; never import machine tools, extensions, instructions, or custom model/provider definitions.
-- [x] Keep authentication limited to ChatGPT subscription OAuth; reject API keys and other providers.
-- [x] Offer Pi catalog models and model-supported reasoning levels, validate on save and before each turn, and persist changes only in Server Guy preferences.
-- [x] Explain unencrypted JSON token storage and the actual shared/separate destination before reuse or login; keep runtime details collapsed.
-- [x] Promote prototype A to the real login screen; keep technical details in a separate help panel and preserve the current connection until replacement login succeeds. See the [current setup rules](docs/testing/phase-one-acceptance.md#current-entry-points-and-setup-rules).
-- [x] Automatically detect reusable Pi login on page load, including broken-login recovery; offer **Use existing login** / **Connect another account** without a manual scan button.
-- [x] Return from Pi setup to an [applications overview](docs/testing/phase-one-acceptance.md#current-entry-points-and-setup-rules), with explicit creation and switching; keep Pi configuration installation-wide and each application's chats, Decisions, and checks separate.
-- [x] Use **Settings** navigation and progressive storage disclosure; add explicit disconnect (forget Server Guy's selection, preserve credential files) and confirmed per-application removal for fresh testing.
-- [x] Document the [Phase 1 desktop acceptance contract](docs/testing/phase-one-acceptance.md), separating deterministic UI/domain tests from live Pi behavior, GitHub authorization and pending durable-worker gates.
-- [x] Add desktop-only Playwright Test with isolated app/database/config fixtures and failure traces, two CI smoke journeys and manual full-suite runs. Keep Vitest and opt-in live Pi cases separate; all code/config/results live under `tests/`.
-- [ ] Extend checked-in browser coverage to remaining branches of the twenty-case [acceptance contract](docs/testing/phase-one-acceptance.md#current-journey-contract); current automation covers selected branches, not complete Phase 1 acceptance.
-- [x] Add a separate localhost-only testing dashboard for fixed runner commands, recent runs, file locations and saved-answer human review; no production app page or test-control service.
-- [x] Add optional, explicitly confirmed LLM judging of one saved answer, with configurable model/effort, isolated tools and separate immutable review records. Unit/browser validation does not claim a successful real-provider judge run.
-- [x] Fix the September 4 audit's setup request-boundary defect: reject untrusted Origins across all 11 mutation handlers, with regression coverage including saved-setting preservation and a real-Next HTTP check. Browser exploitability of the original defect was not tested.
-- [x] Restore keyboard focus to **Disconnect** after its confirmation dialog closes via Cancel/Escape; both paths verified in the desktop browser. Full keyboard accessibility remains separate acceptance work.
-- [x] Add eight opt-in real-Pi eval cases with repeatable inputs, exact proposal/state checks, isolated SQLite state, model/source metadata and a human review sheet; reuse Vitest, not a new eval service.
-- [x] Extend the casebook with three GitHub evidence cases (eleven total), using synthetic connection/repository records with real Pi answers. Accept equivalent meaning without requiring unrelated disclaimers; keep false claims and unauthorized Decisions as failures.
-- [x] Group the live-eval picker by searchable categories and default to cases without a saved attempt, including archived history. Keep saved answers and earlier judgments intact when rubrics change.
-- [x] Finish dashboard automatic-judge recovery: judge saved answers after a failed eval runner when auto-judging was explicitly selected, without auto-retrying generation or resuming cancelled runs. Make unjudged, judging and judged-but-failed states clear. Done 2026-09-05: failed and timed-out runners hand saved answers to the judge, stopped runs do not, the run log says what was saved and why the runner failed, and Eval runs shows judge progress and a source-change notice.
-- [x] Run the merged Phase 1 live baseline and review answers as an assistant: 29 automated passes, one approval-wording correction, and six targeted follow-up passes on September 6. Keep original results and assistant reasoning separate from human verdicts.
-- [ ] Review the saved live Pi answers against their case rubrics and record human verdicts. Keep automated checks and semantic acceptance distinct; rerun relevant cases as each phase changes.
-- [x] Clarify the unresolved-conflict eval. Decided 2026-09-04: Pi may suggest a way to resolve the conflict as long as nothing is recorded and it does not claim the engineer chose; the rubric now says so. Earlier judgments used the stricter wording and stay as saved.
-- [ ] Retain a repeatable real-route production smoke check that login POST and attempt GET share the coordinator in one process. A fresh September 4 production start/poll/cancel probe passed; the old Fable singleton concern was not reproduced. Do not add cross-process machinery without a demonstrated need.
-- [ ] Review remaining unused Pi presentation fields/constants (`billing`, `usesDefaultModel`, `PI_PROVIDER_LABEL`, `PI_MODEL_LABEL`) for removal. Preserve credential validation, API-key rejection and no-API-fallback guarantees; this is cleanup, not an architecture blocker. Carried forward from the September 3 Fable review.
+Finish domain routing, automatic HTTPS/renewal and applicable Cloudflare DNS/CDN setup. Recommend Hetzner size/region from current requirements and cost; keep BYOM equally available. Reconcile provisioning uncertainty before another purchase. Establish reachability for private/home machines before claiming public delivery; a tunnel is a possible mechanism, not a mandatory product choice.
 
-Decision: the packaged Pi SDK is the runtime; users do not install Pi or Codex CLI. **Use saved login** snapshots the detected model/effort and shares Pi’s `auth.json`; token refresh may update that file after consent, but global model preferences stay untouched. **Connect ChatGPT** defaults to `openai-codex` / `gpt-5.6-sol` / `high`; model and effort can be edited before sign-in. Each attempt writes a separate `.server-guy/pi-auth-<login-id>.json`. Only successful OAuth activates that file and the selected preferences by atomically replacing `pi-settings.json`. Failure or cancellation leaves the previous connection intact. Older accepted credential files are retained for in-flight turns. Existing `pi-auth.json` configurations remain readable.
+Package authenticated Server Guy installation on the same host and on a separate controller. Preserve controller state and recovery access during application releases.
 
-Tokens are unencrypted JSON; new credential files are owner-only (0600), and Pi preserves existing file permissions. `SERVER_GUY_CONFIG_DIR` overrides the storage directory. Detection does not refresh tokens, execute key commands, contact providers, expose secrets, or read Codex CLI auth. Only built-in `openai-codex` models and stored ChatGPT OAuth credentials are reusable. Readiness means local configuration/credentials are present; provider access and limits are checked on send. Live OAuth completion and a real model response still require a user-approved account test.
+**Acceptance:** trusted public HTTPS reaches the intended application; failed access/issuance is actionable; configured CDN caching is tested without caching private responses; both controller placements work. These checks do not promise zero-downtime Compose deployments.
 
-### Connect GitHub explicitly
+### 3. Protect and restore data
 
-- [x] Add a user-visible GitHub authentication and connection flow.
-- [x] Detect and explain any reusable local credentials instead of silently assuming access.
-- [x] Verify access to the exact selected repository and record the credential source, repository identity, permissions, and observation time.
-- [x] Test successful authorization, cancelled or denied authorization, missing scope, revoked or expired credentials, and an inaccessible private repository with controlled provider responses.
-- [x] Verify real GitHub App installation, device sign-in and read access to the selected private repository without a client secret or private key.
+Connect R2 and S3. Discover PostgreSQL, SQLite and other required persistent state; choose consistent backup methods, schedule, retention and off-host transfer. Verify an isolated restore with meaningful application data. Protect controller records, native sessions, configuration and recovery material separately.
 
-Decision: offer explicit reuse of a detected GitHub CLI/environment credential or a separate GitHub App device login. The App asks only for Contents read access plus mandatory Metadata read access. Server Guy records exact repository membership in the installation as well as the user/repository identities. Disconnect preserves application history but invalidates old repository gates; reconnect requires re-verification. App user tokens renew on demand without a client secret or background worker. Detailed behavior and registration steps live in the [GitHub guide](docs/integrations/github.md). No webhook, repository-write or Phase 2 scope is included.
+**Acceptance:** each storage destination passes backup and restore; failed upload, expired access and stale recovery points remain visible across restart. Restore onto a replacement instance without replaying completed operations, preserving application identity and isolating the previous writer before cutover. A bucket, schedule or uploaded file alone is not proof of recoverability.
 
-- [x] Save and rotate GitHub device-flow refresh tokens so the eight-hour access-token expiry does not require routine sign-in. Preserve the connection ID on refresh; handle concurrent refresh in the local Node process, disconnect/replacement during refresh, refresh rejection/expiry, atomic storage and secret redaction. Existing logins need one new sign-in because their refresh token was not retained.
+### 4. Release updates and recover from failure
 
-### Make Pi requests durable
+Reuse existing GitHub Actions/checks or prepare a reviewed workflow when useful. Prebuilt images do not need a source build. A passing commit/image becomes a candidate; the user requests its release. Record distinct attempts and the actual serving revision rather than overwriting the initial-deployment record.
 
-The [implementation contract](docs/specs/durable-pi-requests.md) defines the first vertical slice and the changed failure semantics. Start with durable acceptance and worker completion, then add recovery/streaming and bounded context; complete the checklist before claiming this milestone done.
+Run existing migrations with outcome tracking; inspect uncertainty before repeating side effects. Roll back only where configuration/data compatibility permits. Hand application-code failures to a coding agent, then verify the owner-merged fix through the same release path.
 
-- [x] Replace unbounded transcript replay. PR #13 used a bounded window and durable summary; PR #15 replaced that path with native Pi history/compaction. Prototype chats are disposable; no legacy import.
-- [x] Make all active Decisions available regardless of age. PR #15 replaced the repeated injected list with scoped, paginated `search_decisions`; PR #17 added `get_application_status` for current checks. Run context carries identity and previous attempt outcomes.
-- [x] Replace the request-bound, in-memory Pi turn with SQLite-backed Pi Run and assistant-message state.
-- [x] Persist the accumulated assistant message with `body`, `status`, and a monotonically increasing `revision`; batch writes instead of storing one database row per token. Keep durable reply status and retry lineage in Runs, and diagnostic step metadata in local logs; the application feed follows the [Activity inclusion rules](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules).
-- [x] Add one local Node worker process that owns scheduling and execution. Many Chats may enqueue runs, but allow at most one active Pi Run per Phase Workspace.
-- [x] Validate the multiple-Chat experience with worker concurrency set to one, visible queue state, and cancellation. Add a small bounded concurrency pool inside the same process only if real waiting makes the interface materially unpleasant.
-- [x] Return a run ID immediately, load the authoritative message snapshot after reload, and continue updates through a reconnectable SSE endpoint. SSE frames are delivery notifications, not the system of record.
-- [x] On worker restart, mark an in-flight run `interrupted` and require an explicit safe retry or reconciliation instead of blindly repeating possible external effects.
-- [x] Persist cancellation, timeout, retry, terminal result, and error state in durable Pi run records.
-- [x] Test multiple Chats queueing work, duplicate delivery, client disconnect, timeout, cancellation, worker crash, process restart, and reconstruction after reconnect.
+**Acceptance:** later pushes cannot replace an approved candidate; required failed checks block it. Demonstrate a failed release, interrupted migration, compatible recovery and returned code fix, with fresh application behavior checks.
 
-Previously, Pi ran inside the HTTP request and replayed the full transcript. Those limits triggered the worker and bounded-context implementation. SQLite remains authoritative for saved effects, messages and Runs; native JSONL owns attempted model/tool history and compaction. Old summary rows are unused; no import or reconstruction runs. The live stream is only a delivery mechanism and losing it must not lose or redefine the run.
+### 5. Ongoing care and background work
 
-The first design deliberately has one worker process and no leases. A Chat ID identifies conversation scope; it does not coordinate independent queue consumers. SQLite remains appropriate for one local scheduler, including a bounded in-process concurrency pool. Treat independent worker processes as the separate [horizontal worker scaling study](#later-architecture-study--horizontal-workers-and-durable-queues), not as hidden scope in this follow-up.
+Implement bounded host-side logs, metric/health collection and observed job results independent of an open chat or model turn. Catch up after a sleeping controller; show freshness and retention gaps. Add bounded diagnostic archives to the selected off-host storage so previous evidence remains inspectable when the application host is unavailable.
 
-## Action history and tracing
+Configure existing scheduled commands with timezone, non-overlap, timeout, logs and pause/resume. Observe worker health and supported queue summaries without copying payloads into Server Guy or adding another retry system. Create durable in-app issues for meaningful failures, deduplicate noise and link to evidence/investigation. Routine successes belong in history, not unsolicited chat messages.
 
-Give users application history for meaningful domain events and ordinary Chat with safe recovery. Operators debug using bounded local event logs and completed spans, with optional trace export. The [action history and tracing spec](docs/specs/action-history-and-tracing.md#application-activity-inclusion-rules) owns inclusion rules and the flow inventory; build order and completion stay here. This adds no Phase 1 acceptance gate.
+**Acceptance:** controlled app/worker/job/backup failures, controller downtime, host unreachability and collection gaps produce honest state. Configured host work continues while the controller sleeps; reconnecting does not duplicate history or replay unknown side effects. In-app notifications do not promise out-of-app delivery.
 
-- [x] Retain authoritative Pi Runs, messages, Decisions and application Activity in SQLite; reuse Run IDs for diagnostics and retry lineage.
-- [x] Remove the ordinary Chat Reply details panel and detailed SQLite execution-history writes. Keep queued/working, failure, cancellation, unfinished drafts and retry states.
-- [x] Record bounded, metadata-only local diagnostic logs with rotation, safe failures and Run correlation, independently of tracing. Emit successful save diagnostics after outer commit; log/export failures cannot change product outcomes.
-- [x] Save completed OpenTelemetry spans locally in rotating `spans.ndjson`, alongside event logs in `replies.ndjson`. Settings exposes both paths and distinguishes local retention from optional export; local files are not a replay queue.
-- [x] Export optional OpenTelemetry spans to Langfuse or an explicit OTLP/HTTP trace backend without a required Collector or service.
-- [x] Keep Activity to meaningful application outcomes: creation, repository checks, one requirement-saved event per committed Decision and one old → new event per replacement. Replies, lookups and Chat administration add no events.
-- [x] Record repository-verification invalidation once per invalidated Observation on connection change/disconnect, without claiming access loss or repeating events on refresh or token renewal.
-- [x] Keep schema version 6 and filter historical diagnostic rows from application Activity. Special compatibility with unmerged version 7 prototypes was removed in PR #16; recreate incompatible disposable development databases explicitly. No real database was reset by that change. (Phase 2 later moved the schema to version 8, skipping 7.)
+## Compatibility gates
 
-Earlier PR revisions placed every reply in Activity, then moved details into Chat and a separate table. The final September 6 decision supersedes those implementations: no rich diagnostic database or in-app viewer is required for the current product.
+The [compatibility matrix](docs/testing/self-hosted-compatibility.md) supplies executable acceptance targets. Retain the source-app/PostgreSQL proof; start with Uptime Kuma and Grafana/Prometheus, then Forgejo/Vaultwarden, Paperless-ngx and finally Immich's heavier dependencies. This order is a working priority, not a promise of universal upstream support.
 
-- [ ] Extend the same correlation through policy, approvals, provider calls, receipts, and verification as those Operations are implemented; add Sentry for application errors before external-user releases.
+For each supported pinned version prove **deploy → meaningful work → recreate → update → restore → verify**, plus a controlled failure. Add its required machinery to the increments above. Installing all examples is not a gate for the current UI integration. WordPress and the earlier Coolify-as-a-workload experiment are not release requirements.
 
-## Application status lookup
+## Later and excluded
 
-After Activity/tracing and before Phase 2: replace the repeated per-reply application summary with `get_application_status`, a read-only tool bound to the current application. The [tool spec](docs/specs/application-status-tool.md) owns its behavior, evidence boundaries, and acceptance scenarios. Merged in [PR #17](https://github.com/lustoykov/server-guy/pull/17), after PR #16. Live model runs remain explicit opt-in; current acceptance evidence is recorded in the testing guide.
+External notification providers are an agreed expansion after in-app issues; choose providers when implementing delivery. Optional Plugins, additional compute/storage providers, automatic-on-push releases, previews, dedicated build servers, richer teams and API/MCP integration have no committed implementation order.
 
-- [x] Add the empty-input, application-scoped tool using the same current check evaluation as the Operator View; return saved configuration, workspace status, public check results, applicable evidence references/timestamps, and catalog requirements. Extra input fields, a mismatched or deleted scope, and a failed storage read are tool errors; missing repository evidence is a successful `not-yet` result.
-- [x] Remove automatic `currentApplication` summary injection; retain the small execution envelope (`createdAt`, Run/application/Chat identity) and previous-attempt outcome needed to distinguish committed effects from failed proposals.
-- [x] Update Pi instructions to look up current state when needed, distinguish retrieval time from observation time, and avoid inferring deployment status from Phase 1 readiness. Keep saved requirements in `search_decisions`.
-- [x] Keep status reads out of application Activity; record them only as metadata-only `get_application_status` diagnostic steps in local logs and optional spans (PR #16's final revision removed the Reply details panel), without adding provider calls or broader database access.
-- [x] Verify scope, stale/invalidated evidence, lookup failures, no domain effects, and removal of repeated summaries with deterministic tests, including the actual SDK tool loop with a synthetic provider.
-- [x] Extend the synthetic real-Pi casebook with seven `Application status` cases (acknowledgement and conceptual questions without a lookup; blockers, recorded access versus a live recheck, stale checks-passed history, a changed Approval Mode, and readiness versus deployment) and status-lookup expectations on the greeting and GitHub cases; run and review them on explicit opt-in, as recorded in the [testing guide](docs/testing/phase-one-acceptance.md#latest-verification).
-- [x] Update native-session documentation to reflect the tool and the reduced Run context.
+Multi-host application/database orchestration, clusters/replicas, automatic database failover and distributed job orchestration are outside the product direction. Manual recovery onto a replacement host maintains one active instance. Learning labs and competitor feature lists do not expand this boundary.
 
-## Phase 2 Application Contract
+## Updating this plan
 
-Read-only vertical slice on `codex/phase-two-application-contract`; the [spec](docs/specs/application-contract.md) owns the contract, the [journey](docs/user-journeys/01-application-launch.md#phase-2--inspect-app) the gates, the [testing guide](docs/testing/phase-one-acceptance.md#phase-2-acceptance-inspect-app) the cases and evidence. Confirmed direction: Phase 2 establishes the contract and records known conformance work for Phase 3; unknown required values still block; open policies stay visible until their later gates.
-
-- [x] Real Phase 1 → Phase 2 lifecycle: explicit Continue re-evaluates the Launch Brief, refuses while a Run is pending, completes Phase 1 with retained evidence, opens Inspect app, and makes completed chats read-only across HTTP, worker, retry and commit paths. Current versus viewed phase are distinct; no future workspace is pre-created.
-- [x] Schema version 8 (7 skipped): completed workspaces with retained evidence, versioned `application_contracts`; explicit additive upgrade from 6 with a backup.
-- [x] Deterministic inspection through the existing GitHub connection: identity re-verification, pinned default-branch commit, bounded tree, the profile's manifest; failure, unavailability and truncation recorded honestly; concurrent requests share one inspection.
-- [x] Application Profile `fastapi-uv` v1 with versioned criteria, rules and material fields; unmatched and ambiguous resolution reported with what was found. PostgreSQL is the profile's target, not an observed fact.
-- [x] Pi's adaptive inspection: scoped `get_repository_inspection`, `read_repository_file` (pinned, bounded, deny-listed, redacted, saved as an Observation before the model sees it, cancellation-aware), `get_application_contract` and `propose_application_contract`; per-phase stable prompt and tool set; phase-aware `get_application_status`.
-- [x] Typed contract with non-interchangeable provenance (verbatim declarations, exact profile rules, quoted engineer messages or active Decisions, labeled inference, unresolved with blocker or policy); validated at proposal time and again in the final transaction; revisions append and supersede; cancellation keeps observed facts and discards the staged contract.
-- [x] P2.G1–G4 as projections over the current inspection, connection, profile version, contract commit and provenance; invalidation on connection replacement, re-inspection at a new commit, profile change or superseded cited Decision, with Activity for inspections, contracts and invalidations.
-- [x] Desktop UI: phase strip with current/completed/viewed phases, Continue, Server Guy-attributed request, contract record grouped by responsibility with provenance badges and exact source links, blockers/conformance/policies, re-inspect from the check drawer, completed-phase read-only view.
-- [x] Deterministic coverage (profile, validator, checks, inspection bounds, transition, SDK tool loop, cancellation/retry/revision/stale commit, invalidation, isolation, removal, v6 upgrade), the `phase-two-contract` desktop journey and eight `Application Contract` live-eval cases added without running them.
-- [x] Review fixes (September 6): staged proposals keep their bound commit and profile and fail atomically when either changes; profile rules govern one field each, enforced at proposal and review; connection identity is separate from inspection outcome in the gate projection and the read tool; every proposal string is checked for credential shapes before any reason could echo it.
-- [ ] Run the eight `Application Contract` live-eval cases on explicit opt-in and review their meaning; rerun the affected Phase 1 cases.
-- [ ] Inspect the real private `todo-fastapi` repository through the saved GitHub connection as a separately authorized integration check; the synthetic fixtures do not establish its layout or compatibility.
-- [ ] Decide U3 (explicit contract confirmation before paid work) before Phase 4/5; the slice records no confirmation gate.
-- [x] Phase 3: conformance execution and verification against the recorded conformance items, with the Continue from Inspect app. Delivered on `codex/phase-three-conformance`; see the [Phase 3 checklist](#phase-3-conformance-result).
-
-## Phase 3 Conformance Result
-
-Vertical slice on `codex/phase-three-conformance`, stacked on the Phase 2 branch; the [spec](docs/specs/phase-three-conformance.md) owns the contract, the [journey](docs/user-journeys/01-application-launch.md#phase-3--make-launch-ready) the gates, the [testing guide](docs/testing/phase-one-acceptance.md#phase-3-acceptance-make-launch-ready) the cases and evidence. Confirmed direction: Docker Engine on the controller host is the prerequisite for built-in execution; static checks are previews; Server Guy publishes and the engineer merges; the candidate is the observed merged revision.
-
-- [x] Explicit Phase 2 → Phase 3 transition retaining the contract identity, version, profile, commit and check evidence; completed phases read-only; no automatic request.
-- [x] Schema version 9: `conformance_proposals`, `conformance_runs`, `acceptance_checks`, `publication_grants`; additive upgrade from 8 (and from 6 through 8) with a backup; 7 still refused.
-- [x] Deterministic conformance brief from the contract in force: base commit, required changes with what the repository does now, blockers never converted into changes, allowed and sensitive scope, the versioned acceptance bar with runner configuration and synthetic values, exclusions; exportable as text and recorded once.
-- [x] Pi's Phase 3 loop through scoped tools: brief lookup, staged complete file changes with a required-change mapping (validated for safe, non-sensitive paths, read-before-replace, credential shapes by JSON path), behavior-check proposals grounded in cited routes, isolated previews and exploratory commands recorded as worker evidence, "untested since last edit"; the final transaction saves the proposal and the checks with approval per policy and fails atomically on a contract that changed.
-- [x] Approval Mode semantics for publication: Always ask approves in the Record; Let Server Guy decide follows Pi's request; Full autonomy approves and publishes after the commit; merge stays the engineer's in every mode and the UI says so. Explicit verified publishing grant per application and connection.
-- [x] Git Data API publication: one commit from the staged files, one branch, one pull request; reconciliation before every retry adopts an interrupted attempt's branch and pull request and refuses a foreign branch; receipts and failures recorded on the proposal.
-- [x] Candidate resolution from GitHub after the merge (merge, squash, rebase), file-by-file comparison with the reviewed change, deterministic scope check on the reviewed diff; external returns by pull request, branch or commit against this repository only; the no-change path selects the contract commit; withdrawal and supersession.
-- [x] Versioned check set `fastapi-uv/conformance` v1 (locked install, enforced configuration, disposable PostgreSQL, alembic migrations, startup, sibling health probe, accepted application behavior, repository tests) with proves/limits, per-check outcomes and evidence-backed not-applicable; unrun required checks never pass.
-- [x] The Docker runner: exact tree in a fresh volume, non-root, all capabilities dropped, no new privileges, read-only root, bounded memory/CPU/pids/time/output, internal network, allowlisting proxy for installation only, trusted probe, redacted output, labeled resources removed on every ending, interrupted attempts recorded on restart; discovery of the configured engine with honest states and recovery guidance; Settings → Execution with Check again and visible preparation.
-- [x] P3.G1–G3 as projections bound to the candidate, contract version, profile, check-set and behavior-check versions and image digest; previews never satisfy them; a Phase 3 contract revision invalidates by projection and reintroduced blockers block with a correction path.
-- [x] Desktop UI in the existing shell: Continue, brief, working-environment choice, execution prerequisite card, proposal with diff and mapping, approval/publish/withdraw, grant, refresh, candidate, verify and per-check evidence; Changes tab for the proposal; Activity for meaningful outcomes only.
-- [x] Deterministic coverage (unit files for tar, trees, proposals, behavior checks, brief, gate projection, engine discovery, publication; the `phase-three.test.ts` integration suite over the real SDK loop, a fake runner and a synthetic GitHub with every merge method), the opt-in real-container suite `conformance-executor.docker.test.ts`, the `phase-three-conformance` desktop journey and six `Conformance Result` live-eval cases added without running them.
-- [x] Run the six `Conformance Result` live-eval cases on explicit opt-in and review their meaning (September 6: 6/6 automated passes on `gpt-5.6-sol`/high after three harness fixes; assistant review beside the results, human verdicts still pending).
-- [x] Take a real private repository through Phase 3 (September 6, authorized: `lustoykov/todo-fastapi` published as a real branch and pull request under a CLI grant with verified push permission, squash-merged by the engineer's delegate, candidate observed and verified on real Docker, all three checks passed). Two defects surfaced and were fixed with regression tests: a same-turn contract revision could never commit alongside a staged change, and the conformance check compared runs against the retained Phase 2 contract instead of the active revision. Later the same day the GitHub App path was proven the same way: a real installation with Contents and Pull requests write, the grant verified against it (which exposed a wrong installation lookup, fixed with tests), and pull request #4 published through the App user token, merged by the delegate, observed and verified.
-- [ ] A workflow-file proposal path as separately approved scope, if a repository ever needs one; remote Docker contexts if a user needs them; migration tools beyond alembic; Phase 4 and its Continue.
-
-## Revisit Workflow DevKit only at its trigger
-
-- [ ] Re-evaluate Workflow DevKit when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate.
-
-Do not add it merely because background work exists. If introduced, Server Guy's durable application records remain the product system of record; workflow history does not replace them.
-
-## Later architecture study — horizontal workers and durable queues
-
-This is a separate learning and design challenge, not a Phase 1 requirement and not yet a commitment to any queue or workflow product. Start it when a real Server Guy release or client design needs multiple independent worker processes, multi-host execution, worker failover, or more throughput than one bounded local process can provide.
-
-- [ ] Write the invariants before choosing infrastructure: which work must stay ordered, what may run concurrently, what "claimed" and "complete" mean, and which external effects must never be repeated blindly.
-- [ ] Build a small failure lab in which two worker processes compete for queued runs; kill a worker after claiming and after performing an external effect, then observe duplicate claims, lost work, recovery, and stale ownership.
-- [ ] Understand and compare atomic database claims, PostgreSQL `FOR UPDATE SKIP LOCKED`, queue acknowledgement plus visibility timeout, and durable workflow execution. Include at least one managed queue and one self-hosted option when the target deployment is known.
-- [ ] Compare each option on delivery semantics, ordering, leases and timeouts, retries, idempotency, cancellation, backpressure, crash recovery, observability, operational burden, local development, and multi-host support.
-- [ ] Separate queue guarantees from application guarantees: no infrastructure choice removes the need for idempotency keys, durable run state, and reconciliation around external effects.
-- [ ] Use the lab and a concrete deployment or client constraint to select a design. Record that choice in an ADR only then, including rejected alternatives and the trigger for revisiting it.
-
-Expected learning artifact: a concise architecture note plus runnable failure scenarios that explain why the selected claim and recovery model is safe enough. Until this study is triggered, keep the production design at one worker process and do not implement leases.
-
-Originating discussion: Codex side chat [`01a06676-6a82-7f03-91b9-95c61504a066`](codex://threads/01a06676-6a82-7f03-91b9-95c61504a066). Side chats are ephemeral, so retain this ID as a searchable provenance handle even if the link stops resolving.
-
-## AWS integration direction
-
-Build order and status stay here. The boundary between an EC2 host and an ECS/Fargate deployment target, capability details, and supporting references live in [docs/integrations/aws.md](docs/integrations/aws.md).
-
-- [ ] Finish and prove the provider-independent Linux-host lifecycle on the Hetzner reference path.
-- [ ] Add an EC2 Host Adapter that produces the same Host Record and reuses the Linux-host lifecycle.
-- [ ] Manually deploy the same application to ECS/Fargate as a separate enterprise AWS lab.
-- [ ] Consider automating ECS/Fargate only after concrete client demand justifies a second deployment target.
-
-## Home-server controller mode
-
-- [ ] Install Server Guy on an always-on home server and connect to it from the Mac over the same Wi-Fi/LAN.
-
-Initial scope:
-
-- The home server runs the authoritative Server Guy controller, monitoring, Pi runtime, and SQLite database.
-- The Mac accesses its UI and API over the local network; no Tailscale dependency is required initially.
-- Give the home server a stable LAN address or local hostname.
-- Require authentication even on the home network.
-- Do not share or synchronize the SQLite file with the Mac.
-- Consider Tailscale later only for access from outside the home network.
+Change status only with linked evidence and its date/candidate. Replace superseded decisions rather than appending another correction. Put a feature's implementation sequence here once; link from its journey/spec. Do not store live spending authorization, credentials or temporary machine availability as permanent product requirements.

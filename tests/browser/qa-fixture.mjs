@@ -4,6 +4,7 @@
 // checkout.
 import {
   cpSync,
+  readFileSync,
   mkdirSync,
   writeFileSync,
   symlinkSync,
@@ -66,6 +67,22 @@ for (const name of [
 ]) {
   cpSync(join(source, name), join(app, name), { recursive: true });
 }
+// Keep synthetic repository labels, but exercise deployment UI in this isolated
+// copy. Deployment browser tests intercept its endpoint; no provider credential
+// files are copied and the unconnected state performs no external operation.
+const shellPath = join(app, "src/components/server-guy/operator-shell.tsx");
+writeFileSync(
+  shellPath,
+  readFileSync(shellPath, "utf8")
+    .replace(
+      "!applicationId || !selectedChatId || demo",
+      "!applicationId || !selectedChatId",
+    )
+    .replaceAll(
+      "const showDeployment = !demo;",
+      "const showDeployment = true;",
+    ),
+);
 symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
 renameSync(
   join(app, "src/server/pi-configuration.ts"),

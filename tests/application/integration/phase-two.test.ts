@@ -567,12 +567,14 @@ describe("the explicit Phase 1 → Phase 2 transition", () => {
       inspection.files.map((f) => (f.raw as { path: string }).path),
     ).toEqual([]);
     expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 1);
-    expect(view.messages.map((m) => [m.role, m.source, m.status])).toEqual([
+    expect(
+      view.messages.slice(-3).map((m) => [m.role, m.source, m.status]),
+    ).toEqual([
       ["assistant", "server-guy", "completed"],
       ["user", "server-guy", "completed"],
       ["assistant", "pi", "queued"],
     ]);
-    expect(view.messages[1].body).toBe(INSPECTION_REQUEST);
+    expect(view.messages.at(-2)?.body).toBe(INSPECTION_REQUEST);
     expect(checks(app.id)).toEqual({
       "profile-resolved": "not-yet",
       "contract-complete": "not-yet",
@@ -583,42 +585,38 @@ describe("the explicit Phase 1 → Phase 2 transition", () => {
     const again = await completeLaunchBrief(app.id);
     expect(again.workspace?.id).toBe(view.workspace?.id);
     expect(store.listObservations(app.id)).toHaveLength(observationsBefore + 1);
-    expect(store.listMessages(view.selectedChatId!)).toHaveLength(3);
+    expect(store.listMessages(view.selectedChatId!)).toHaveLength(
+      view.messages.length,
+    );
     expect(store.listWorkspaces(app.id)).toHaveLength(2);
   });
 
-  it("makes Phase 1 chats read-only at every mutation boundary while keeping them readable", async () => {
+  it("keeps the conversation usable as execution advances and preserves historical evidence", async () => {
     const app = await inspected();
-    const readOnly = "Phase 1 is complete; its chats are read-only.";
-    expect(() =>
-      runs.sendChatMessage(app.id, app.startChatId, "Late", randomUUID()),
-    ).toThrow(readOnly);
-    expect(() => phaseOne.archiveChat(app.id, app.startChatId)).toThrow();
+    const accepted = runs.sendChatMessage(
+      app.id,
+      app.startChatId,
+      "Continue here",
+      randomUUID(),
+    );
+    expect(accepted.run.workspaceId).toBe(app.workspaceId);
+    expect(accepted.run.chatId).toBe(app.startChatId);
+    runs.cancelPiRun(app.id, accepted.run.chatId, accepted.run.id);
     const view = getOperatorView(app.id, app.startChatId);
     expect(view.workspace).toMatchObject({
-      phaseKey: "start",
-      status: "completed",
-      current: false,
+      phaseKey: "inspect-app",
+      current: true,
     });
-    expect(view.checks.map((c) => c.status)).toEqual([
-      "passed",
-      "passed",
-      "passed",
-      "passed",
-    ]);
-    expect(view.checks.every((c) => c.rerun === null)).toBe(true);
-    expect(view.messages).toHaveLength(1);
-    // A retry of an old Phase 1 attempt is refused too.
-    const status = getApplicationStatus(app.id, app.startChatId);
-    expect(status.workspace).toMatchObject({
-      phaseKey: "start",
-      status: "completed",
-    });
-    expect(status.contract).toBeUndefined();
-    // A new chat always opens in the current phase.
-    const chat = phaseOne.createChat(app.id, "Side question");
-    expect(chat.workspace?.phaseKey).toBe("inspect-app");
-    expect(chat.messages[0].body).toContain("same Application Contract");
+    expect(view.messages[0].body).toContain("I created");
+    const retained = getOperatorView(app.id, undefined, "start");
+    expect(retained.workspace?.status).toBe("completed");
+    expect(retained.checks.every((check) => check.status === "passed")).toBe(
+      true,
+    );
+    const other = phaseOne.createChat(app.id, "Side question");
+    expect(other.chats.map((chat) => chat.id)).toContain(app.startChatId);
+    expect(other.messages).toHaveLength(1);
+    expect(other.messages[0].body).toContain("conversation starts fresh");
   });
 
   it("fails a Run whose phase completed underneath it, saving nothing", async () => {
@@ -656,11 +654,11 @@ describe("inspection outcomes", () => {
     const view = await completeLaunchBrief(app.id);
     const inspection = repositoryEvidence(app.id).inspection!;
     expect(inspection.status).toBe("unavailable");
-    expect(view.messages.map((m) => m.source)).toEqual([
+    expect(view.messages.slice(-2).map((m) => m.source)).toEqual([
       "server-guy",
       "server-guy",
     ]);
-    expect(view.messages[1].body).toContain("Re-inspect repository");
+    expect(view.messages.at(-1)?.body).toContain("Re-inspect repository");
     expect(runs.claimNextPiRun()).toBeNull();
     expect(checks(app.id)["profile-resolved"]).toBe("not-yet");
     expect(feed(view.workspace!.id)).toEqual([
@@ -685,7 +683,7 @@ describe("inspection outcomes", () => {
     expect(firstRun).not.toBeNull();
     runs.cancelPiRun(app.id, firstRun.chatId, firstRun.id);
     expect(view.inspection?.profile.criteria).toEqual([]);
-    expect(view.messages[1].body).toBe(INSPECTION_REQUEST);
+    expect(view.messages.at(-2)?.body).toBe(INSPECTION_REQUEST);
     const ambiguous = await application("ambiguous-app");
     await completeLaunchBrief(ambiguous.id);
     expect(getOperatorView(ambiguous.id).checks[0].result).toContain(
@@ -722,7 +720,9 @@ describe("Pi's adaptive inspection through the real SDK tool loop", () => {
       version: 1,
       profileId: "fastapi-uv",
       commitSha: fixtureCommitSha("qa/fastapi-app"),
-      sourceMessageId: app.view.messages[1].id,
+      sourceMessageId: app.view.messages.find(
+        (message) => message.body === INSPECTION_REQUEST,
+      )!.id,
     });
     expect(contract.body.fields).toHaveLength(19);
     const reads = fileReads(app.id).map(
@@ -1117,7 +1117,7 @@ describe("invalidation, isolation and removal", () => {
     });
     expect(checks(app.id)["contract-complete"]).toBe("passed");
     saveGithubConnection(null);
-    const retained = getOperatorView(app.id, app.startChatId);
+    const retained = getOperatorView(app.id, undefined, "start");
     expect(retained.workspace?.status).toBe("completed");
     expect(retained.checks[1].status).toBe("passed");
     expect(checks(app.id)["profile-resolved"]).toBe("not-yet");
@@ -1164,9 +1164,14 @@ describe("explicit revision correction", () => {
         .listObservations(app.id)
         .some((o) => o.kind === "phase-completion-history"),
     ).toBe(true);
-    expect(() =>
-      runs.sendChatMessage(app.id, priorChat, "continue", randomUUID()),
-    ).toThrow("earlier phase");
+    const continued = runs.sendChatMessage(
+      app.id,
+      priorChat,
+      "continue",
+      randomUUID(),
+    );
+    expect(continued.run.workspaceId).toBe(app.workspaceId);
+    runs.cancelPiRun(app.id, priorChat, continued.run.id);
     expect(applyRevisionCorrection(app.id, { impactId: impact.id })).toEqual(
       adopted,
     );

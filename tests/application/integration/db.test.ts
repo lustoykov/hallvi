@@ -99,6 +99,7 @@ describe("Phase 1 schema", () => {
       "conformance_proposals",
       "conformance_runs",
       "decisions",
+      "deployments",
       "messages",
       "observations",
       "phase_workspaces",

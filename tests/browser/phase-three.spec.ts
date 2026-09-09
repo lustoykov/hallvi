@@ -1,3 +1,8 @@
+import {
+  openPreparation,
+  openConversation,
+  openDashboard,
+} from "./workspace-helpers";
 import type { Page } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,9 +28,11 @@ async function view(page: Page) {
 }
 async function throughPhaseTwo(page: Page, name: string) {
   await addApplication(page, name);
+  await openPreparation(page);
   await page
-    .getByRole("button", { name: "Continue to Inspect app", exact: true })
+    .getByRole("button", { name: "Inspect application", exact: true })
     .click();
+  await openConversation(page);
   await expect(
     page.getByText(/\[QA contract\] Proposed Application Contract v1/),
   ).toBeVisible({ timeout: 60_000 });
@@ -51,6 +58,7 @@ test(
       name: "Record",
       exact: true,
     });
+    await openDashboard(page);
     await expect(
       record.getByText("Conformance work for Phase 3"),
     ).toBeVisible();
@@ -58,26 +66,27 @@ test(
       name: "Continue to Make launch-ready",
       exact: true,
     });
+    await openPreparation(page);
     await expect(continueButton).toBeVisible();
+    await openPreparation(page);
     await continueButton.click();
     await expect(page).toHaveURL(/\?chat=[\da-f-]{36}$/, { timeout: 30_000 });
-    await expect(page.locator(".sg-phase.active")).toContainText(
-      "Make launch-ready",
-    );
-    await expect(
-      page.getByRole("button", { name: "View completed phase 2, Inspect app" }),
-    ).toBeVisible();
+
+    await openDashboard(page);
     await expect(
       record.getByText(/^Conformance brief · base [0-9a-f]{8}$/),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.locator('[data-required="health.path"]')).toContainText(
       "Health endpoint",
     );
+    await openDashboard(page);
     await expect(
       record.getByText("No accepted application-behavior check yet"),
     ).toBeVisible();
+    await openConversation(page);
     await expect(page.locator(".sg-messages")).toContainText(
-      "Phase 3, Make launch-ready, starts here",
+      "Next, I’ll prepare and check the exact revision",
     );
     await page.screenshot({
       path: testInfo.outputPath("phase-three-01-brief.png"),
@@ -85,20 +94,25 @@ test(
     });
 
     // Secondary evidence starts collapsed and opens when the person needs it.
+    await openDashboard(page);
     await expect(
       record.getByRole("button", { name: /^Environment/ }),
     ).toHaveAttribute("aria-expanded", "false");
+    await openDashboard(page);
     await record
       .getByRole("combobox", { name: "Find in Record" })
       .selectOption("environment");
+    await openDashboard(page);
     await record
       .getByRole("combobox", { name: "Find in Record" })
       .selectOption("runs");
     // The engine is reachable; the brief names the runner configuration.
+    await openDashboard(page);
     await expect(record.getByText("Engine reachable")).toBeVisible();
 
     // Continue with Server Guy: the request is Server Guy's, the change is
     // staged, previewed in the (scripted) runner and behavior checks proposed.
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Work on GitHub with Server Guy",
@@ -108,24 +122,31 @@ test(
     await page
       .getByRole("button", { name: "Start shared preparation", exact: true })
       .click();
+    await openConversation(page);
     await expect(
-      page.locator(".sg-messages").getByText("Started automatically"),
+      page.locator(".sg-messages").getByText("Started automatically").last(),
     ).toBeVisible();
+    await openConversation(page);
     await expect(
       page.getByText(
         /\[QA conformance\] 1 file\(s\) staged; preview passed; behavior checks proposed \(2 steps\)/,
       ),
     ).toBeVisible({ timeout: 90_000 });
+    await openDashboard(page);
     await expect(
       record.locator('[data-proposal-status="published"]'),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.locator('[data-preview="passed"]')).toContainText(
       "Preview passed over this exact change",
     );
+    await openDashboard(page);
     await expect(
       record.locator('[data-acceptance-status="proposed"]'),
     ).toBeVisible();
+    await openDashboard(page);
     await record.getByRole("button", { name: /Show complete diff/ }).click();
+    await openDashboard(page);
     await expect(record.locator(".sg-diff-hunk .added").first()).toContainText(
       '@app.get("/health")',
     );
@@ -144,20 +165,26 @@ test(
     expect(proposed.conformance.latestPreview.status).toBe("passed");
 
     // Accept the behavior checks, approve, allow publishing, publish.
+    await openPreparation(page);
     await page
       .getByRole("button", { name: /Accept behavior checks v1/ })
       .click();
+    await openDashboard(page);
     await expect(
       record.locator('[data-acceptance-status="accepted"]'),
     ).toBeVisible();
     // The explicit shared-work grant already authorized this checkpoint.
+    await openDashboard(page);
     await expect(record.locator('[data-grant="granted"]')).toBeVisible();
+    await openDashboard(page);
     await expect(
       record.locator('[data-proposal-status="published"]'),
     ).toBeVisible({ timeout: 30_000 });
+    await openDashboard(page);
     await expect(record.locator(".sg-conformance-pull")).toContainText(
       "pull request #1",
     );
+    await openDashboard(page);
     await expect(record.locator(".sg-conformance-pull")).toContainText(
       "merge it on GitHub",
     );
@@ -169,24 +196,29 @@ test(
     const events = page
       .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
+    await openDashboard(page);
     await expect(
       events.filter({ hasText: "checkpoint" }).first(),
     ).toBeVisible();
 
     // Unmerged: refresh keeps the candidate open; merge on GitHub (squash),
     // refresh records the observed default-branch head.
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Refresh from GitHub", exact: true })
       .click();
+    await openDashboard(page);
     await expect(
       page.getByRole("button", {
         name: /Check 1 Exact candidate revision identified/,
       }),
     ).toContainText("unmerged head gets preview results only");
     githubScenario(fixture.state, { mergePull: 1, mergeMethod: "squash" });
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Refresh from GitHub", exact: true })
       .click();
+    await openDashboard(page);
     await expect(record.locator(".sg-conformance-candidate")).toContainText(
       "merged (squash)",
       { timeout: 30_000 },
@@ -206,15 +238,19 @@ test(
     });
 
     // Verify the candidate: the worker runs the (scripted) check set.
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Verify candidate", exact: true })
       .click();
+    await openDashboard(page);
     await expect(
       record.locator('[data-run="candidate"]').first(),
     ).toContainText("Every required check passed", { timeout: 90_000 });
+    await openDashboard(page);
     await expect(
       record.locator('[data-run="candidate"] [data-check="behavior"]').first(),
     ).toContainText("Passed");
+    await openDashboard(page);
     await expect(
       record.getByText(
         "The Conformance Result checks pass for the exact candidate",
@@ -234,12 +270,14 @@ test(
 
     // A synthetic runner deliberately cannot supply a real interactive URL.
     // The application must show a failed preview and allow recovery.
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Start application preview", exact: true })
       .click();
     await expect
       .poll(async () => (await view(page)).preview?.status, { timeout: 30_000 })
       .toBe("failed");
+    await openPreparation(page);
     await expect(
       page.getByRole("button", {
         name: "Start a new application preview",
@@ -259,23 +297,15 @@ test(
 
     // Reload: everything comes back from records; Phase 2 is read-only history.
     await page.reload();
+    await openDashboard(page);
     await expect(record.locator(".sg-conformance-candidate")).toContainText(
       "merged (squash)",
     );
-    await expect(page.locator(".sg-phase.active")).toContainText(
-      "Make launch-ready",
-    );
-    await page
-      .getByRole("button", { name: "View completed phase 2, Inspect app" })
-      .click();
-    await expect(record.getByText("retained as recorded then")).toBeVisible();
+
+    await openConversation(page);
     await expect(
       page.getByRole("textbox", { name: "Message Server Guy" }),
-    ).toBeDisabled();
-    await page.screenshot({
-      path: testInfo.outputPath("phase-three-06-phase-two-history.png"),
-      fullPage: true,
-    });
+    ).toBeEnabled();
   },
 );
 
@@ -345,6 +375,7 @@ test(
     // Check again, and the staged work survives the recovery.
     scenario(fixture.state, { docker: "missing" });
     await throughPhaseTwo(page, "fastapi-p3-recovery-nohealth");
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Continue to Make launch-ready",
@@ -357,12 +388,15 @@ test(
     });
     // The Record checks the engine when it opens, never trusting another
     // process's earlier answer.
+    await openDashboard(page);
     await record
       .getByRole("combobox", { name: "Find in Record" })
       .selectOption("environment");
+    await openDashboard(page);
     await expect(record.getByText("No engine found")).toBeVisible({
       timeout: 30_000,
     });
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Work on GitHub with Server Guy",
@@ -372,11 +406,13 @@ test(
     await page
       .getByRole("button", { name: "Start shared preparation", exact: true })
       .click();
+    await openConversation(page);
     await expect(
       page.getByText(
         /\[QA conformance\] 1 file\(s\) staged; preview unavailable: The execution environment is not available/,
       ),
     ).toBeVisible({ timeout: 90_000 });
+    await openDashboard(page);
     await expect(record.locator('[data-preview="untested"]')).toContainText(
       "Untested since last edit",
     );
@@ -388,9 +424,11 @@ test(
     await record
       .getByRole("button", { name: "Check again", exact: true })
       .click();
+    await openDashboard(page);
     await record
       .getByRole("combobox", { name: "Find in Record" })
       .selectOption("environment");
+    await openDashboard(page);
     await expect(record.getByText("Engine reachable")).toBeVisible({
       timeout: 15_000,
     });
@@ -398,6 +436,7 @@ test(
       page.getByRole("button", { name: /^Environment.*Docker ready/ }),
     ).toBeVisible();
     // The staged proposal is still there; nothing was launched by the recovery.
+    await openDashboard(page);
     await expect(
       record.locator('[data-proposal-status="published"]'),
     ).toBeVisible();
@@ -412,6 +451,7 @@ test(
     test.setTimeout(240_000);
     scenario(fixture.state, { docker: "ready" });
     await throughPhaseTwo(page, "fastapi-p3-app");
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Continue to Make launch-ready",
@@ -422,34 +462,43 @@ test(
       name: "Record",
       exact: true,
     });
+    await openDashboard(page);
     await expect(
       record.getByText("The contract records no required changes").first(),
     ).toBeVisible({ timeout: 30_000 });
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Verify the current revision", exact: true })
       .click();
+    await openDashboard(page);
     await expect(
       record.locator('[data-proposal-origin="no-change"]'),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       page.getByRole("button", {
         name: /Check 3 Profile conformance checks pass/,
       }),
     ).toContainText("No application-behavior check");
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Continue with Server Guy", exact: true })
       .click();
+    await openConversation(page);
     await expect(
       page.getByText(
         /\[QA conformance\] no change needed; preview passed; behavior checks proposed/,
       ),
     ).toBeVisible({ timeout: 90_000 });
+    await openPreparation(page);
     await page
       .getByRole("button", { name: /Accept behavior checks v1/ })
       .click();
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Verify candidate", exact: true })
       .click();
+    await openDashboard(page);
     await expect(
       record.locator('[data-run="candidate"]').first(),
     ).toContainText("Every required check passed", { timeout: 90_000 });

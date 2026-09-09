@@ -2,6 +2,12 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "application-shell",
+    name: "Application workspace and deployment",
+    description: "Conversations, dashboard and reviewed deployment recovery.",
+    smoke: true,
+  },
+  {
     id: "activity-history",
     name: "Inspect application Activity and reply recovery",
     description:

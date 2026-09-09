@@ -100,6 +100,8 @@ export const api = {
     );
   },
   createApplication(input: {
+    requestKey: string;
+    name?: string;
     repositoryUrl: string;
     approvalMode: ApprovalMode;
   }) {

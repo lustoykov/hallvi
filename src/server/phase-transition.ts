@@ -5,7 +5,7 @@ import {
   insertChat,
   insertMessage,
   insertWorkspace,
-  listChats,
+  listApplicationChats,
   withTransaction,
 } from "./db";
 import { getOperatorView } from "./operator-view";
@@ -19,12 +19,8 @@ import {
   inspectRepository,
   repositoryEvidence,
 } from "./phase-two";
-import {
-  computePhaseTwoChecks,
-  PHASE_TWO,
-  phaseTwoCheckListForPrompt,
-} from "./phase-two-spec";
-import { PHASE_THREE, phaseThreeCheckListForPrompt } from "./phase-three-spec";
+import { computePhaseTwoChecks, PHASE_TWO } from "./phase-two-spec";
+import { PHASE_THREE } from "./phase-three-spec";
 import { contractGapReport } from "./application-contract";
 import { enqueueServerGuyRequest } from "./pi-runs";
 import type { InspectAppEvidence, LaunchBriefEvidence } from "./types";
@@ -92,19 +88,20 @@ export async function completeLaunchBrief(applicationId: string) {
     const workspace =
       existing ?? insertWorkspace(application.id, PHASE_TWO.key);
     const chat =
-      listChats(workspace.id).find((item) => item.isPrimary) ??
-      insertChat(workspace.id, primaryChatTitle(PHASE_TWO.key), true);
+      listApplicationChats(application.id).find(
+        (item) => item.isPrimary && !item.archivedAt,
+      ) ?? insertChat(workspace.id, primaryChatTitle(PHASE_TWO.key), true);
     insertMessage(
       chat.id,
       "assistant",
-      `Phase 2, Inspect app, starts here. The deliverable is the Application Contract. The checks are:\n${phaseTwoCheckListForPrompt()}\n\nI will inspect the repository at an exact commit and propose the contract from what it declares. Nothing in this phase changes code, infrastructure or the repository.`,
+      `The repository is connected. I’ll inspect its exact revision and work out how to build, configure and check the application.`,
       "server-guy",
     );
     insertActivity(
       current.id,
       "phase-completed",
       "Launch Brief completed",
-      `All ${checks.length} checks passed; evidence retained as recorded. Phase 1 chats are now read-only.`,
+      `All ${checks.length} checks passed; evidence retained as recorded. The conversation continues with the application.`,
     );
     insertActivity(
       workspace.id,
@@ -195,7 +192,7 @@ export function completeInspectApp(applicationId: string) {
     const workspace =
       existing ?? insertWorkspace(application.id, PHASE_THREE.key);
     const chat =
-      listChats(workspace.id).find(
+      listApplicationChats(application.id).find(
         (item) => item.isPrimary && !item.archivedAt,
       ) ?? insertChat(workspace.id, primaryChatTitle(PHASE_THREE.key), true);
     const gaps = contractGapReport(contract.body);
@@ -203,18 +200,14 @@ export function completeInspectApp(applicationId: string) {
     insertMessage(
       chat.id,
       "assistant",
-      `Phase 3, Make launch-ready, starts here. The deliverable is a Conformance Result: one exact repository revision with independent evidence that the required checks pass for it. The checks are:\n${phaseThreeCheckListForPrompt()}\n\nThe brief works from Application Contract v${contract.version} at ${contract.commitSha.slice(0, 8)}: ${
-        required
-          ? `${required} required change${required === 1 ? "" : "s"} (${gaps.conformance.map((item) => item.label).join(", ")}).`
-          : "no required changes; the current revision still needs conformance evidence."
-      } Choose how the work happens in the Record: Continue with Server Guy (recommended), or export the brief for Codex, Claude, another harness or manual work and return the change. Server Guy publishes a reviewable pull request; you merge it on GitHub; then Server Guy verifies the exact merged revision in an isolated runner.`,
+      `I’ve recorded how this application runs. ${required ? `${required} required change${required === 1 ? "" : "s"} (${gaps.conformance.map((item) => item.label).join(", ")}).` : "No required changes were found."} Next, I’ll prepare and check the exact revision. Any application-code change needs a pull request that you review and merge.`,
       "server-guy",
     );
     insertActivity(
       current.id,
       "phase-completed",
       "Inspect app completed",
-      `All ${checks.length} checks passed; Application Contract v${contract.version} at ${contract.commitSha.slice(0, 8)} retained as recorded. Phase 2 chats are now read-only.`,
+      `All ${checks.length} checks passed; Application Contract v${contract.version} at ${contract.commitSha.slice(0, 8)} retained as recorded. The conversation continues with the application.`,
     );
     insertActivity(
       workspace.id,

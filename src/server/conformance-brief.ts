@@ -196,7 +196,7 @@ export function buildConformanceBrief(
     })),
     scope: {
       allowed:
-        "Application source, configuration examples, migrations, tests and the selected Dockerfile within the repository, as needed to resolve the required changes.",
+        "Deployment configuration and the selected Dockerfile; only small application operability proposals (health endpoint, environment-driven port, start entrypoint) and their tests, through an owner-merged pull request. Business logic, application bug fixes, migration rewrites and database/queue library replacement require a coding-agent handoff, even when a conformance check fails.",
       forbidden: SENSITIVE_PATH_PATTERNS.map((entry) => entry.reason).filter(
         (reason, index, all) => all.indexOf(reason) === index,
       ),

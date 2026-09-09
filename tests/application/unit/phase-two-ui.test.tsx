@@ -219,13 +219,11 @@ describe("current step bar", () => {
         step={describeCurrentStep(v)}
       />,
     );
-  it("offers Continue only on a ready, current Launch Brief", () => {
-    expect(render(view({ workspace: start }))).toContain(
-      "Continue to Inspect app",
-    );
+  it("offers inspection only when repository access is ready in the current context", () => {
+    expect(render(view({ workspace: start }))).toContain("Inspect application");
     expect(
       render(view({ workspace: { ...start, status: "in-progress" } })),
-    ).not.toContain("Continue to Inspect app");
+    ).not.toContain("Inspect application");
     expect(
       render(
         view({
@@ -233,10 +231,10 @@ describe("current step bar", () => {
           workspaces: [completedStart, { ...inspect, current: true }],
         }),
       ),
-    ).not.toContain("Continue to Inspect app");
+    ).not.toContain("Inspect application");
     expect(
       render(view({ workspace: { ...inspect, status: "ready" } })),
-    ).not.toContain("Continue to Inspect app");
+    ).not.toContain("Inspect application");
   });
   it("names the phase's purpose and offers Continue to Phase 3 when the contract is ready", () => {
     const html = render(
@@ -427,6 +425,7 @@ describe("chat pane phase states", () => {
         view={view(overrides)}
         activeChat={{
           id: "chat",
+          applicationId: "app",
           workspaceId: "ws-2",
           title: "Application Contract",
           isPrimary: true,
@@ -480,7 +479,7 @@ describe("chat pane phase states", () => {
     expect(html).toMatch(/You<\/span><strong>You<\/strong>/);
     // The phase's state lives in the current-step bar; the chat header only
     // names the chat.
-    expect(html).toContain("Main phase chat");
+    expect(html).toContain("Working with Server Guy");
     expect(html).not.toContain("Working toward");
   });
   it("makes a completed phase read-only with an explicit reason", () => {

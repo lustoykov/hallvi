@@ -13,6 +13,7 @@ const historyError =
   "Conversation history unavailable. Start a new chat to continue.";
 const chat: Chat = {
   id: "chat-one",
+  applicationId: "app-one",
   workspaceId: "workspace-one",
   title: "Launch Brief",
   isPrimary: true,

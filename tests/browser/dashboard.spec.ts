@@ -125,7 +125,7 @@ test(
         .getByRole("row")
         .filter({ hasText: "Browser journeys" });
       await expect(browserRow.locator(".suite-schedule > span")).toHaveText(
-        `2 of ${browserJourneys.length} per PR`,
+        `3 of ${browserJourneys.length} per PR`,
       );
       await expect(browserRow.locator(".suite-schedule small")).toHaveText(
         `All ${browserJourneys.length} on demand`,
@@ -246,12 +246,13 @@ test(
       await expect(page.locator("#journey-options .ci-badge")).toHaveText([
         "CI · Every PR",
         "CI · Every PR",
+        "CI · Every PR",
       ]);
       await page
         .getByRole("button", { name: "Clear journeys", exact: true })
         .click();
       // Local selection never changes which journeys belong to automatic CI.
-      await expect(page.locator("#journey-options .ci-badge")).toHaveCount(2);
+      await expect(page.locator("#journey-options .ci-badge")).toHaveCount(3);
       await expect(
         page.getByRole("button", { name: "Run selected journeys" }),
       ).toBeDisabled();

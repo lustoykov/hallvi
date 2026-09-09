@@ -54,7 +54,7 @@ import {
   insertConformanceProposal,
   insertPublicationGrant,
   listAcceptanceChecks,
-  listChats,
+  listApplicationChats,
   listConformanceProposals,
   listConformanceRuns,
   listObservations,
@@ -266,11 +266,11 @@ function requireBrief(applicationId: string) {
 
 /** Continue with Server Guy: one request Server Guy starts in the main chat. */
 export function continueWithServerGuy(applicationId: string) {
-  const { application, workspace } = requireBrief(applicationId);
+  const { application } = requireBrief(applicationId);
   if (hasPendingRuns(application.id))
     throw new Error("Wait for the current reply to finish or cancel it first.");
   const chat =
-    listChats(workspace.id).find(
+    listApplicationChats(application.id).find(
       (item) => item.isPrimary && !item.archivedAt,
     ) ?? null;
   if (!chat) throw new Error("The Make launch-ready chat is missing.");

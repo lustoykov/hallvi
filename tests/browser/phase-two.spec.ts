@@ -1,3 +1,8 @@
+import {
+  openConversation,
+  openDashboard,
+  openPreparation,
+} from "./workspace-helpers";
 import type { Page } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -22,7 +27,9 @@ async function view(page: Page) {
   return (await page.request.get(`/api${url.pathname}${url.search}`)).json();
 }
 async function send(page: Page, message: string, answer: RegExp) {
+  await openConversation(page);
   await page.getByRole("textbox", { name: "Message Server Guy" }).fill(message);
+  await openConversation(page);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText(answer)).toBeVisible({ timeout: 45_000 });
 }
@@ -37,27 +44,29 @@ test(
       name: "Record",
       exact: true,
     });
+    await openDashboard(page);
     await expect(record.getByText("Launch Brief ready")).toBeVisible();
     // Phase 3 never appears as an option; Phase 2 is only reachable by
     // Continue, which the ready Launch Brief offers.
     const continueButton = page.getByRole("button", {
-      name: "Continue to Inspect app",
+      name: "Inspect application",
       exact: true,
     });
+    await openPreparation(page);
     await expect(continueButton).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("phase-two-01-launch-brief-ready.png"),
       fullPage: true,
     });
+    await openPreparation(page);
     await continueButton.click();
     await expect(page).toHaveURL(/\?chat=[\da-f-]{36}$/, { timeout: 30_000 });
+
+    await openConversation(page);
     await expect(
-      page.getByRole("button", { name: "View completed phase 1, Start" }),
+      page.locator(".sg-messages").getByText("Started automatically").last(),
     ).toBeVisible();
-    await expect(page.locator(".sg-phase.active")).toContainText("Inspect app");
-    await expect(
-      page.locator(".sg-messages").getByText("Started automatically"),
-    ).toBeVisible();
+    await openConversation(page);
     await expect(
       page
         .locator(".sg-messages")
@@ -67,31 +76,41 @@ test(
         ),
     ).toBeVisible();
     // No engineer message was invented: the request is Server Guy's.
+    await openConversation(page);
     await expect(page.locator(".sg-messages .sg-message-user")).toHaveCount(0);
+    await openConversation(page);
     await expect(
       page.getByText(/\[QA contract\] Proposed Application Contract v1/),
     ).toBeVisible({ timeout: 60_000 });
+    await openDashboard(page);
     await expect(
       record.getByText(/^Application Contract v1 · [0-9a-f]{8}$/),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.getByText("Ready for review")).toBeVisible();
+    await openDashboard(page);
     await record.locator(".sg-contract-group").evaluateAll((groups) =>
       groups.forEach((group) => {
         (group as HTMLDetailsElement).open = true;
       }),
     );
+    await openDashboard(page);
     await expect(
       record.locator(".sg-provenance.repository-declared").first(),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       record.locator(".sg-provenance.profile-rule").first(),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       record.locator(".sg-provenance.inferred").first(),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       record.getByText("Open product policies for later gates"),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.getByText("Needs your decision")).toHaveCount(0);
     const source = record.locator(".sg-contract-source").first();
     // Synthetic repository: the citation names the file and line, and the
@@ -113,45 +132,30 @@ test(
 
     // Reload keeps the phase, the contract and the transcript.
     await page.reload();
+    await openDashboard(page);
     await expect(
       record.getByText(/^Application Contract v1 · [0-9a-f]{8}$/),
     ).toBeVisible();
-    await expect(page.locator(".sg-phase.active")).toContainText("Inspect app");
 
-    // Phase 1 is completed history: readable, read-only, evidence retained.
-    await page
-      .getByRole("button", { name: "View completed phase 1, Start" })
-      .click();
-    await expect(page).toHaveURL(/\?chat=[\da-f-]{36}$/);
-    await expect(record.getByText("retained as recorded then")).toBeVisible();
+    // Earlier conversations stay available under application ownership.
+    await openConversation(page);
     await expect(
-      page.getByText("Phase 1 is complete and its chats are read-only"),
-    ).toBeVisible();
-    const composer = page.getByRole("textbox", { name: "Message Server Guy" });
-    await expect(composer).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: "Start a new phase chat" }),
-    ).toHaveCount(0);
-    await expect(page.locator(".sg-phase.viewed")).toContainText("Start");
-    await page.screenshot({
-      path: testInfo.outputPath("phase-two-03-phase-one-read-only.png"),
-      fullPage: true,
-    });
-    await page
-      .getByRole("button", { name: "View phase 2, Inspect app" })
-      .click();
-    await expect(composer).toBeEnabled();
+      page.getByRole("textbox", { name: "Message Server Guy" }),
+    ).toBeEnabled();
 
     // The engineer corrects one field: a revision with user-confirmed
     // provenance and one old → new Activity item.
+    await openConversation(page);
     await send(
       page,
       "contract: correct /healthz",
       /\[QA contract\] Proposed Application Contract v2/,
     );
+    await openDashboard(page);
     await expect(
       record.getByText(/^Application Contract v2 · [0-9a-f]{8}$/),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.locator('[data-field="health.path"]')).toContainText(
       "/healthz",
     );
@@ -160,11 +164,13 @@ test(
     );
     if (!(await healthGroup.evaluate((el) => (el as HTMLDetailsElement).open)))
       await healthGroup.locator("summary").click();
+    await openDashboard(page);
     await expect(
       record.locator(
         '[data-field="health.path"] .sg-provenance.user-confirmed',
       ),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.locator('[data-field="health.path"]')).toContainText(
       "You said: “/healthz”",
     );
@@ -172,15 +178,21 @@ test(
     const events = page
       .getByRole("region", { name: "History", exact: true })
       .locator(".sg-event");
+    await openDashboard(page);
     await expect(events.nth(0)).toContainText("Application Contract revised");
+    await openDashboard(page);
     await expect(events.nth(0)).toContainText(
       "Health endpoint: /health → /healthz",
     );
+    await openDashboard(page);
     await expect(events.nth(1)).toContainText(
       "Application Contract established",
     );
+    await openDashboard(page);
     await expect(events.nth(2)).toContainText("Repository inspected");
+    await openDashboard(page);
     await expect(events.nth(3)).toContainText("Inspect app started");
+    await openDashboard(page);
     await page.screenshot({
       path: testInfo.outputPath("phase-two-04-revised-activity.png"),
       fullPage: true,
@@ -188,11 +200,13 @@ test(
 
     // An invented source is rejected; the attempt still completes and the
     // saved contract is untouched.
+    await openConversation(page);
     await send(
       page,
       "contract: invented",
       /\[QA contract\] Proposal rejected; nothing was saved/,
     );
+    await openDashboard(page);
     await expect(
       record.getByText(/^Application Contract v2 · [0-9a-f]{8}$/),
     ).toBeVisible();
@@ -200,6 +214,7 @@ test(
 
     // Explicit re-inspection at the same commit keeps the contract current;
     // a new push makes it stale until revised.
+    await openDashboard(page);
     await page
       .getByRole("button", { name: /Check 1 Supported application profile/ })
       .click();
@@ -222,6 +237,7 @@ test(
       join(fixture.state, "github-scenario.json"),
       JSON.stringify({ revision: "2" }),
     );
+    await openPreparation(page);
     await page
       .getByRole("button", { name: "Change selected revision", exact: true })
       .click();
@@ -237,9 +253,11 @@ test(
         exact: true,
       })
       .click();
+    await openDashboard(page);
     await expect(
       record.getByText(/Check 2.*Application Contract complete/),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       page.getByRole("button", {
         name: /Check 2 Application Contract complete/,
@@ -249,6 +267,7 @@ test(
       path: testInfo.outputPath("phase-two-05-stale-after-new-commit.png"),
       fullPage: true,
     });
+    await openConversation(page);
     await send(
       page,
       "contract: correct /healthz",
@@ -266,9 +285,11 @@ test(
   async ({ page }, testInfo) => {
     test.setTimeout(180_000);
     await addApplication(page, "fastapi-nohealth");
+    await openPreparation(page);
     await page
-      .getByRole("button", { name: "Continue to Inspect app", exact: true })
+      .getByRole("button", { name: "Inspect application", exact: true })
       .click();
+    await openConversation(page);
     await expect(
       page.getByText(
         /\[QA contract\] Proposed Application Contract v1 with 19 fields, 0 blocker\(s\) and 1 conformance item\(s\)/,
@@ -278,13 +299,17 @@ test(
       name: "Record",
       exact: true,
     });
+    await openDashboard(page);
     await expect(
       record.getByText("Conformance work for Phase 3"),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(
       record.locator('[data-field="health.path"] .sg-provenance.conformance'),
     ).toBeVisible();
+    await openDashboard(page);
     await expect(record.getByText("Ready for review")).toBeVisible();
+    await openPreparation(page);
     await expect(
       page.getByRole("button", {
         name: "Continue to Make launch-ready",
@@ -296,16 +321,21 @@ test(
       fullPage: true,
     });
     await addApplication(page, "fastapi-sqlite");
+    await openPreparation(page);
     await page
-      .getByRole("button", { name: "Continue to Inspect app", exact: true })
+      .getByRole("button", { name: "Inspect application", exact: true })
       .click();
+    await openConversation(page);
     await expect(
       page.getByText(
         /\[QA contract\] Proposed Application Contract v1 with 19 fields, 1 blocker\(s\)/,
       ),
     ).toBeVisible({ timeout: 60_000 });
+    await openDashboard(page);
     await expect(record.getByText("Needs your decision")).toBeVisible();
+    await openDashboard(page);
     await expect(record.getByText(/3 of 4 checks complete/)).toBeVisible();
+    await openDashboard(page);
     await expect(
       page.getByRole("button", { name: /Check 4 No unresolved contract gaps/ }),
     ).toContainText("Database (contradiction");

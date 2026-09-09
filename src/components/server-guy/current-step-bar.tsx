@@ -116,7 +116,7 @@ export function CurrentStepBar({
       {step.stages.length > 0 && (
         <details className="sg-stage-disclosure">
           <summary>
-            Phase progress ·{" "}
+            Work details ·{" "}
             {
               step.stages.filter(
                 (stage) => stage.state === "done" || stage.state === "skipped",
@@ -124,7 +124,7 @@ export function CurrentStepBar({
             }{" "}
             of {step.stages.length} steps complete
           </summary>
-          <ol className="sg-stages" aria-label="Phase 3 stages">
+          <ol className="sg-stages" aria-label="Preparation work">
             {step.stages.map((stage, index) => (
               <li className={stage.state} key={stage.key}>
                 <span className="sg-stage-mark" aria-hidden="true">

@@ -1,3 +1,4 @@
+import { isControllerHost } from "./controller-origin";
 import { z } from "zod";
 
 import { isApprovalMode } from "./types";
@@ -8,6 +9,8 @@ const approvalModeSchema = z.custom<ApprovalMode>(isApprovalMode, {
 });
 
 export const createApplicationRequestSchema = z.strictObject({
+  requestKey: z.uuid({ error: "A unique creation request key is required." }),
+  name: z.string().trim().min(1).max(120).optional(),
   repositoryUrl: z
     .string({ error: "Enter a GitHub repository URL." })
     .trim()
@@ -54,6 +57,10 @@ export function assertSameOrigin(request: Request) {
   // identifies the browser's destination (e.g. 127.0.0.1:3000); don't trust
   // X-Forwarded-Host.
   const host = request.headers.get("host");
+  if (!isControllerHost(host ?? destination.host))
+    throw new RequestValidationError(
+      "This controller only accepts loopback hosts.",
+    );
   if (host) destination.host = host;
   if (origin && origin !== destination.origin) {
     throw new RequestValidationError("Cross-origin requests are not allowed.");

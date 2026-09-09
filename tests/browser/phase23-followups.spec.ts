@@ -1,3 +1,8 @@
+import {
+  openPreparation,
+  openConversation,
+  openDashboard,
+} from "./workspace-helpers";
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 
@@ -13,12 +18,15 @@ test(
     await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
+    await openPreparation(page);
     await page
-      .getByRole("button", { name: "Continue to Inspect app", exact: true })
+      .getByRole("button", { name: "Inspect application", exact: true })
       .click();
+    await openConversation(page);
     await expect(
       page.getByText(/\[QA contract\] Proposed Application Contract v1/),
     ).toBeVisible({ timeout: 60_000 });
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Continue to Make launch-ready",
@@ -62,45 +70,43 @@ test(
         name: /Switch application: Corrected application/,
       }),
     ).toBeVisible();
+    await openPreparation(page);
     await expect(
       page.getByRole("button", {
-        name: "Continue to Inspect app",
+        name: "Inspect application",
         exact: true,
       }),
     ).toBeVisible();
+    await openPreparation(page);
     await page
-      .getByRole("button", { name: /View phase 3, Make launch-ready/ })
+      .getByRole("button", { name: "Inspect application", exact: true })
       .click();
-    await expect(
-      page.getByRole("textbox", { name: "Message Server Guy" }),
-    ).toBeDisabled();
-    await expect(page.getByText(/paused/i).first()).toBeVisible();
-    await page.screenshot({
-      path: testInfo.outputPath("later-phase-paused.png"),
-      fullPage: true,
-    });
-    await page.getByRole("button", { name: /View phase 1, Start/ }).click();
-    await page
-      .getByRole("button", { name: "Continue to Inspect app", exact: true })
-      .click();
+    await openConversation(page);
     await expect(
       page.getByText(/\[QA contract\] Proposed Application Contract v2/),
     ).toBeVisible({ timeout: 60_000 });
+    await openDashboard(page);
     await page
       .getByRole("combobox", { name: "Find in Record" })
       .selectOption("contract");
     await page.getByRole("button", { name: /^Saved versions/ }).click();
-    await expect(page.getByText(/v1/).first()).toBeVisible();
+    await expect(
+      page
+        .getByRole("list", { name: "Saved contract versions" })
+        .getByText(/^v1/),
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("corrected-contract-history.png"),
       fullPage: true,
     });
+    await openPreparation(page);
     await page
       .getByRole("button", {
         name: "Continue to Make launch-ready",
         exact: true,
       })
       .click();
+    await openConversation(page);
     await expect(
       page.getByRole("textbox", { name: "Message Server Guy" }),
     ).toBeEnabled();

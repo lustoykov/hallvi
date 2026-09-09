@@ -1,16 +1,18 @@
 # Learn the Agent-Engineering Stack Through Server Guy
 
+> Educational reference, not the product roadmap. The labs below may deliberately explore excluded technology; they do not expand [Product](../../PRODUCT.md) or add delivery commitments to [Roadmap](../../ROADMAP.md).
+
 **Status:** Living learning guide
 
 **Last revised:** 2026-09-05
 
-**Canonical stack:** [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
+**Canonical stack:** `STACK.md` (`ai-agent-engineer-roadmap/STACK.md`, in the separate learning repository)
 
 ## Purpose
 
 Use Server Guy as the practical spine for learning the capabilities in `STACK.md`.
 
-This guide owns capability mapping and learning exercises. The [development roadmap](../../ROADMAP.md) owns build order and implementation status; [user journeys](../user-journeys/README.md) own product behavior; the [testing guide](../testing/phase-one-acceptance.md) owns executable acceptance and verification evidence. Learning exercises below are not an independent backlog or a replacement for product exit gates.
+This guide owns capability mapping and learning exercises. The [development roadmap](../../ROADMAP.md) owns build order and implementation status; [user journeys](../user-journeys/README.md) own product behavior; the [testing guide](../archive/implementation/phase-one-acceptance.md) owns executable acceptance and verification evidence. Learning exercises below are not an independent backlog or a replacement for product exit gates.
 
 Server Guy is not a container for every named technology. A tool belongs in the product only when a current product requirement justifies it. Capabilities that do not belong in Server Guy should be learned through applications Server Guy operates or through bounded comparison and deployment labs.
 
@@ -45,9 +47,9 @@ There are therefore two learning surfaces:
 1. **Server Guy itself** teaches operational system ownership: durable records, typed boundaries, authorization, approvals, idempotency, reconciliation, evidence, observability, deployment, and recovery.
 2. **Applications managed by Server Guy** teach the TypeScript and Python application verticals without forcing both runtimes into Server Guy.
 
-## Current baseline
+## Historical baseline for these exercises
 
-The implemented Phase 1 is a Next.js modular monolith plus one local Node worker. The [README architecture section](../../README.md#architecture) shows the current shape and the [roadmap](../../ROADMAP.md#development-sequence) owns what is merged, open or planned; this guide does not repeat that status.
+The early Phase 1 implementation used a Next.js modular monolith plus one local Node worker. The [current architecture](../architecture/agent-directed-operations.md) shows the current shape and the [roadmap](../../ROADMAP.md) owns current delivery status; the [implementation history](../archive/previous-direction/docs/plans/implementation-history.md#development-sequence) preserves earlier milestones; this guide does not repeat that status.
 
 It already provides direct practice with:
 
@@ -59,19 +61,19 @@ It already provides direct practice with:
 - schema-validated request and model boundaries, policy conflicts, provenance stability, and adversarial malformed-model-output tests;
 - desktop Playwright journeys over real Next.js, SQLite and worker processes with synthetic providers, plus opt-in real-Pi evals with exact state checks, human verdicts and an advisory LLM judge.
 
-Pi is Server Guy's only model and agent runtime. The [roadmap's Pi setup decision](../../ROADMAP.md#configure-pi-explicitly) records how login, model and effort are chosen and stored. Server Guy does not import machine tools, extensions or instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing.
+Pi is Server Guy's only model and agent runtime. The [recorded Pi setup decision](../archive/previous-direction/docs/plans/implementation-history.md#configure-pi-explicitly) records how login, model and effort are chosen and stored. Server Guy does not import machine tools, extensions or instructions, copy Codex CLI credentials, overwrite global Pi model settings, or automatically fall back to API billing.
 
-The [Phase 1 acceptance contract](../testing/phase-one-acceptance.md) turns the journey into observable pass/fail cases: Vitest for rules and atomic writes, checked-in desktop Playwright journeys for navigation and recovery, and separate opt-in real-Pi cases for model behavior. A passing synthetic test proves UI and state behavior, not live model quality.
+The [Phase 1 acceptance contract](../archive/implementation/phase-one-acceptance.md) turns the journey into observable pass/fail cases: Vitest for rules and atomic writes, checked-in desktop Playwright journeys for navigation and recovery, and separate opt-in real-Pi cases for model behavior. A passing synthetic test proves UI and state behavior, not live model quality.
 
-The [real-Pi casebook](../testing/phase-one-acceptance.md#real-pi-casebook-and-remaining-phase-1-gates) makes that distinction executable. Course exercise: show that a structurally valid, correctly persisted Decision can still misrepresent a question as a commitment; write an eval for that mistake, run the real model, review meaning, then measure a change against the same cases. Add evals alongside each phase instead of postponing them to a final testing chapter. The runner is Vitest with exact state checks; human verdicts and the optional advisory judge live in the local testing dashboard, not a new eval platform, and LLM advice never counts as human sign-off.
+The [real-Pi casebook](../archive/implementation/phase-one-acceptance.md#real-pi-casebook-and-remaining-phase-1-gates) makes that distinction executable. Course exercise: show that a structurally valid, correctly persisted Decision can still misrepresent a question as a commitment; write an eval for that mistake, run the real model, review meaning, then measure a change against the same cases. Add evals alongside each phase instead of postponing them to a final testing chapter. The runner is Vitest with exact state checks; human verdicts and the optional advisory judge live in the local testing dashboard, not a new eval platform, and LLM advice never counts as human sign-off.
 
 Server Guy does **not** yet provide direct practice with PostgreSQL, versioned migrations, Workflow DevKit, Promptfoo, Langfuse/OpenTelemetry, Sentry, Docker delivery, Supabase, `pgvector`, MCP, or ECS/Fargate. Its toolchain is npm and ESLint rather than the stack's pnpm and Biome. Conceptual overlap does not count as direct tool experience. AI SDK and `useChat` are intentionally not Server Guy dependencies: Pi owns model interaction, while application code owns durable state, validation, authorization, evidence, and reconnection.
 
-The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together, and do not add a separate general-purpose API service. Treat independent worker processes as the [horizontal worker scaling study](../../ROADMAP.md#later-architecture-study--horizontal-workers-and-durable-queues), not hidden scope.
+The current modular monolith is the right product architecture. Keep the UI, API, and domain logic together, and do not add a separate general-purpose API service. Treat independent worker processes as the [horizontal worker scaling study](../archive/previous-direction/docs/plans/implementation-history.md#later-architecture-study--horizontal-workers-and-durable-queues), not hidden scope.
 
 ## Map the Server Guy journey to the stack
 
-The phase names refer to the [product journey](../user-journeys/01-application-launch.md#nine-phase-journey). This table maps learning opportunities, not development order or completion status.
+The phase names refer to the [product journey](../archive/previous-direction/docs/user-journeys/01-application-launch-phase-reference.md#nine-phase-journey). This table maps learning opportunities, not development order or completion status.
 
 | Launch phase / journey | Primary learning | Learning proof |
 | --- | --- | --- |
@@ -88,11 +90,11 @@ The phase names refer to the [product journey](../user-journeys/01-application-l
 
 ## The first learning slice: Phase 2 Application Contract
 
-Use the Phase 2 read-only Application Contract slice for the exercises below. Its scheduling and prerequisites live in the [development sequence](../../ROADMAP.md#development-sequence).
+Use the Phase 2 read-only Application Contract slice for the exercises below. Its original prerequisites are preserved in the [implementation history](../archive/previous-direction/docs/plans/implementation-history.md#development-sequence); current build order lives in [ROADMAP.md](../../ROADMAP.md).
 
 ### Build
 
-- Define a typed, versioned schema for build, runtime, port, health, persistence, migrations, configuration, telemetry, and verification requirements (the implementation uses one TypeBox schema shared with the Pi tool boundary; see the [Application Contract spec](../specs/application-contract.md)).
+- Define a typed, versioned schema for build, runtime, port, health, persistence, migrations, configuration, telemetry, and verification requirements (the implementation uses one TypeBox schema shared with the Pi tool boundary; see the [Application Contract spec](../archive/implementation/application-contract.md)).
 - Collect repository facts deterministically with source identity and timestamps.
 - Let Pi interpret ambiguity and propose contract fields.
 - Accept model output only when deterministic validation and evidence support it.
@@ -115,7 +117,7 @@ Test at least these cases:
 
 Server Guy calls Pi directly. Pi returns normal conversational text and may call the typed `propose_decision` tool for a durable user choice. The Pi SDK validates Decision arguments with TypeBox; application code normalizes accepted values, validates the final message, checks Decision domain rules, and commits the completed assistant answer and Decisions together; the user message was already saved at acceptance. Pi never becomes the authorization, persistence, gate-evaluation, or evidence boundary.
 
-Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint; the [durable requests contract](../specs/durable-pi-requests.md) owns that behavior. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
+Do not add AI SDK Core or `useChat` as an additional model abstraction or streaming layer. Durable Pi runs use SQLite-backed Pi Run and accumulated assistant-message state, one local Node worker process, and a reconnectable SSE endpoint; the [durable requests contract](../archive/implementation/durable-pi-requests.md) owns that behavior. The message's persisted content, status, and revision are authoritative; SSE frames are delivery notifications rather than token-per-row records. Revisit Workflow DevKit only when timers, autonomous retries, monitoring, or multi-step crash recovery create a concrete need beyond that design.
 
 ## The central reliability exercise: one durable Operation
 
@@ -198,7 +200,7 @@ Deploy one bounded TypeScript application through Vercel and Supabase to learn p
 
 ### 6. Guided AWS lab
 
-Manually deploy the same application through GitHub Actions → ECR → ECS/Fargate with an Application Load Balancer, RDS, Secrets Manager, and CloudWatch; cause a failure, roll back, and verify recovery. Inside Server Guy, AWS enters first as an EC2 Host Adapter that emits the same Host Record as the Hetzner path. Keep the AWS ECS/Fargate Deployment Target outside Server Guy automation until concrete demand justifies it; see [AWS integration direction](../integrations/aws.md).
+Manually deploy the same application through GitHub Actions → ECR → ECS/Fargate with an Application Load Balancer, RDS, Secrets Manager, and CloudWatch; cause a failure, roll back, and verify recovery. Inside Server Guy, AWS enters first as an EC2 Host Adapter that emits the same Host Record as the Hetzner path. Keep the AWS ECS/Fargate Deployment Target outside Server Guy automation until concrete demand justifies it; see [AWS integration direction](../archive/previous-direction/docs/integrations/aws.md).
 
 ## Learn the two application verticals through managed applications
 
@@ -234,7 +236,7 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | --- | --- |
 | **Drizzle over SQLite** | Introduced as the typed schema/query layer before durable Pi state. SQLite, `better-sqlite3`, WAL, foreign keys, transactions, and the prototype reset policy remain; `drizzle-kit push` explicitly applies the TypeScript schema. |
 | **PostgreSQL** | Introduce for direct practice or when shared controller/worker state, concurrency, or operational scale makes SQLite insufficient. Preserve the same Drizzle domain schema and invariants where the database differences allow it, and rerun the same tests. |
-| **SQLite + Node worker** | Introduced with [durable Pi requests](../specs/durable-pi-requests.md) because a Pi turn outlives one request: Pi Run and assistant-message state persist, one local worker process schedules work, and disconnects or process restarts recover from saved state. No leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
+| **SQLite + Node worker** | Introduced with [durable Pi requests](../archive/implementation/durable-pi-requests.md) because a Pi turn outlives one request: Pi Run and assistant-message state persist, one local worker process schedules work, and disconnects or process restarts recover from saved state. No leases; treat independent workers as a separate architecture study rather than silently expanding this design. |
 | **Workflow DevKit** | Re-evaluate when monitoring, timers, autonomous retries, or multi-step crash recovery make the SQLite-and-Node-worker design difficult to operate. Durable application records remain authoritative. |
 | **Run-ID streaming** | Introduced with the durable Pi worker: the request returns a run ID, the UI reloads the current message revision and reconnects to SSE, and state is recovered from SQLite rather than from the stream. |
 | **Structured logs + OpenTelemetry** | Add before the first multi-component operation; propagate one trace ID through model, domain, provider, and verification boundaries. |
@@ -249,7 +251,7 @@ Add Pydantic AI only when a Python service has a genuine agent responsibility. D
 | **Temporal** | Add only when a client already runs it or cross-service orchestration with in-flight versioning needs a workflow platform beyond Workflow DevKit. |
 | **Inngest, Braintrust, OpenTofu, Vault, Kubernetes, PostHog, deeper AWS** | Keep on demand until a current product or client requirement justifies them, as `STACK.md` defines. |
 
-Horizontal worker scaling is deliberately deferred, not solved by the table above. When a release or client design genuinely needs independent workers, use the [horizontal worker scaling study](../../ROADMAP.md#later-architecture-study--horizontal-workers-and-durable-queues) to reproduce claim and crash failures, compare database queues, message queues, and durable workflows, and choose from measured requirements. The result should be an ADR and runnable failure scenarios, not an assumed default technology.
+Horizontal worker scaling is deliberately deferred, not solved by the table above. When a release or client design genuinely needs independent workers, use the [horizontal worker scaling study](../archive/previous-direction/docs/plans/implementation-history.md#later-architecture-study--horizontal-workers-and-durable-queues) to reproduce claim and crash failures, compare database queues, message queues, and durable workflows, and choose from measured requirements. The result should be an ADR and runnable failure scenarios, not an assumed default technology.
 
 ## Observability learning target
 
@@ -299,7 +301,7 @@ Record learning evidence in the PR:
 
 ## Recommended milestone order
 
-Moved to the [development roadmap](../../ROADMAP.md#development-sequence). Keep the sequence and its status there; use this guide for the learning exercises attached to each milestone.
+Current order lives in the [implementation plan](../../ROADMAP.md), with earlier milestones in the [implementation history](../archive/previous-direction/docs/plans/implementation-history.md#development-sequence); use this guide for the learning exercises attached to each milestone.
 
 ## Guardrails
 
@@ -315,9 +317,9 @@ Moved to the [development roadmap](../../ROADMAP.md#development-sequence). Keep 
 
 ## References
 
-- [`STACK.md`](../../../ai-agent-engineer-roadmap/STACK.md)
+- `STACK.md` (`ai-agent-engineer-roadmap/STACK.md`, in the separate learning repository)
 - [Server Guy development roadmap](../../ROADMAP.md)
-- [AI Agent Engineer course roadmap (separate project)](../../../ai-agent-engineer-roadmap/ROADMAP.md)
+- AI Agent Engineer course roadmap (separate project) (`ai-agent-engineer-roadmap/ROADMAP.md`, in the separate learning repository)
 - [Journey 1: Application Launch](../user-journeys/01-application-launch.md)
-- [AWS integration direction](../integrations/aws.md)
+- [AWS integration direction](../archive/previous-direction/docs/integrations/aws.md)
 - [Shared discussion: Connect Server Guy to `STACK.md`](https://chatgpt.com/s/cx_6a9714af692c819182087392e7a2105b)

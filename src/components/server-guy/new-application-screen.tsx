@@ -23,6 +23,10 @@ export function NewApplicationScreen({
 }) {
   const router = useRouter();
   const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [name, setName] = useState("");
+  const creationRequest = useRef<{ key: string; settings: string } | null>(
+    null,
+  );
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("pi-decides");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +47,16 @@ export function NewApplicationScreen({
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate an external, tab-local form draft once after mount.
         setRepositoryUrl(draft.repositoryUrl);
         setApprovalMode(draft.approvalMode);
+        setName(typeof draft.name === "string" ? draft.name : "");
+        if (
+          typeof draft.requestKey === "string" &&
+          typeof draft.settings === "string"
+        )
+          creationRequest.current = {
+            key: draft.requestKey,
+            settings: draft.settings,
+          };
       }
-      sessionStorage.removeItem(draftKey);
     } catch {
       /* Storage can be unavailable; creating an application still works. */
     }
@@ -57,7 +69,13 @@ export function NewApplicationScreen({
     try {
       sessionStorage.setItem(
         draftKey,
-        JSON.stringify({ repositoryUrl, approvalMode }),
+        JSON.stringify({
+          repositoryUrl,
+          approvalMode,
+          name,
+          requestKey: creationRequest.current?.key,
+          settings: creationRequest.current?.settings,
+        }),
       );
     } catch {
       /* Do not block connection setup when browser storage is unavailable. */
@@ -69,12 +87,30 @@ export function NewApplicationScreen({
     setBusy(true);
     setError(null);
     try {
-      const view = await api.createApplication({ repositoryUrl, approvalMode });
+      const settings = JSON.stringify({
+        repositoryUrl: repositoryUrl.trim(),
+        approvalMode,
+        name: name.trim(),
+      });
+      if (creationRequest.current?.settings !== settings)
+        creationRequest.current = { key: crypto.randomUUID(), settings };
+      keepDraft();
+      const view = await api.createApplication({
+        requestKey: creationRequest.current.key,
+        repositoryUrl,
+        approvalMode,
+        ...(name.trim() ? { name: name.trim() } : {}),
+      });
       // Leaving the form does not undo creation, but must stop its late
       // navigation.
       if (!active.current) return;
       if (!view.application)
         throw new Error("No application was returned. Try again.");
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* Storage is optional. */
+      }
       router.push(`/applications/${view.application.id}`);
       router.refresh();
     } catch (caught) {
@@ -149,6 +185,22 @@ export function NewApplicationScreen({
           <p className={s.helper} id="repository-help">
             HTTPS and SSH repository URLs are supported.
           </p>
+          <label className={s.field} htmlFor="application-name">
+            Application name
+          </label>
+          <input
+            id="application-name"
+            name="name"
+            value={name}
+            maxLength={120}
+            disabled={busy}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Defaults to the repository name"
+          />
+          <p className={s.helper}>
+            The same repository can have several independently named
+            applications.
+          </p>
           <fieldset disabled={busy} className={s.permissions}>
             <legend>Permission policy</legend>
             <div className={s.options}>
@@ -168,8 +220,8 @@ export function NewApplicationScreen({
             <p className={s.helper}>{APPROVAL_MODES[approvalMode].hint}</p>
           </fieldset>
           <p className={s.scope}>
-            Target: <strong>Production</strong>. Adding an application checks
-            repository access; it does not deploy or change your code.
+            Server Guy checks repository access first, then helps you prepare
+            and deploy the application.
           </p>
           {error && (
             <p role="alert" className={s.error}>
