@@ -143,7 +143,20 @@ export function OperatorShell({
     null,
   );
   const recordVisible = activeSection !== null;
-  const [seen, setSeen] = useState(() => readSeen(initialView.application?.id));
+  const [seen, setSeen] = useState<Partial<Record<ApplicationSection, string>>>(
+    {},
+  );
+  const [seenApplicationId, setSeenApplicationId] = useState<string | null>(
+    null,
+  );
+  const seenLoaded = seenApplicationId === initialView.application?.id;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSeen(readSeen(initialView.application?.id));
+      setSeenApplicationId(initialView.application?.id ?? null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialView.application?.id]);
   const [highlight, setHighlight] = useState<MessageHighlight | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -152,13 +165,13 @@ export function OperatorShell({
   }, []);
   useEffect(() => {
     const id = initialView.application?.id;
-    if (!id) return;
+    if (!id || !seenLoaded) return;
     try {
       localStorage.setItem(`sg-seen:${id}`, JSON.stringify(seen));
     } catch {
       /* a browser without storage simply forgets what was looked at */
     }
-  }, [seen, initialView.application?.id]);
+  }, [seen, seenLoaded, initialView.application?.id]);
   // Leaving a destination records that it was looked at; the marks derive
   // from that timestamp and the operations, and clear on their own.
   function selectSection(section: ApplicationSection | null) {
@@ -297,6 +310,12 @@ export function OperatorShell({
   const [stackRevealed, setStackRevealed] = useState(false);
   // The open destination is being looked at: it never shows "updated".
   const indicators = navigationIndicators(operations, seen);
+  // Browser read marks become available only after hydration. Keep the server
+  // and first client render identical, and do not flash old work as new.
+  if (!seenLoaded)
+    for (const section of applicationSections)
+      if (indicators[section.id]?.tone === "updated")
+        delete indicators[section.id];
   if (activeSection && indicators[activeSection]?.tone === "updated")
     delete indicators[activeSection];
   const chatMarks = conversationMarks(operations, view.chats);

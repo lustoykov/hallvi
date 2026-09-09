@@ -515,3 +515,18 @@ it("reuses official images and preserves data/config mounts without publishing p
   expect(compose.services.prometheus).not.toHaveProperty("ports");
   expect(compose.volumes).toEqual({ "grafana-data": {}, metrics: {} });
 });
+
+it("verifies JSON content independently of formatting without changing values", async () => {
+  const { responseContains } =
+    await import("../../../src/server/deployment-executor");
+  expect(responseContains('{\n  "database": "ok"\n}', '"database":"ok"')).toBe(
+    true,
+  );
+  expect(responseContains('{"database":"not ok"}', '"database":"ok"')).toBe(
+    false,
+  );
+  expect(responseContains('{"message":"not ok"}', '"message":"notok"')).toBe(
+    false,
+  );
+  expect(responseContains("<p>not ok</p>", "notok")).toBe(false);
+});

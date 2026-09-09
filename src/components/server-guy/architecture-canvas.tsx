@@ -78,7 +78,8 @@ export function ArchitectureCanvas({
   const postgres = deployment?.plan?.postgres;
   const sqlite = stack?.databases.find((item) => item.kind === "sqlite");
   const service = stack?.services[0];
-  const workers = stack?.processes.filter((item) => item.role === "worker");
+  const workers = stack?.processes.filter((item) => item.name !== "app");
+  const onlyWorkers = workers?.every((item) => item.role === "worker");
   const nodes = [
     {
       id: "source",
@@ -132,7 +133,7 @@ export function ArchitectureCanvas({
               detail: sqlite.location,
               symbol: "database",
               description:
-                "Application-owned SQLite file inside the application's persistent files. Protected together with those files, never as a live copy.",
+                "Application-owned SQLite file in a persistent volume. Off-host backups are not configured; backing it up requires a consistent snapshot.",
             },
           ]
         : []),
@@ -152,14 +153,14 @@ export function ArchitectureCanvas({
       ? [
           {
             id: "workers",
-            label: "Workers",
+            label: onlyWorkers ? "Workers" : "Private services",
             name:
               workers.length === 1
                 ? workers[0].name
-                : `${workers.length} worker processes`,
-            detail: live ? "Same image as the application" : "Planned",
+                : `${workers.length} private processes`,
+            detail: live ? "Same host · private network" : "Planned",
             symbol: "workers",
-            description: `${workers.map((worker) => worker.name).join(", ")}: background processes that consume queued work on this instance.`,
+            description: `${workers.map((worker) => worker.name).join(", ")}: ${onlyWorkers ? "background processes" : "additional services"} running on this instance. Their images, commands and health checks are recorded in Processes.`,
           },
         ]
       : []),
@@ -168,7 +169,9 @@ export function ArchitectureCanvas({
     {
       from: "source",
       to: "app",
-      label: "Build from revision",
+      label: deployment?.plan?.image
+        ? "Configuration revision"
+        : "Build from revision",
       vertical: false,
     },
     { from: "app", to: "host", label: "Docker Compose", vertical: false },
@@ -190,7 +193,11 @@ export function ArchitectureCanvas({
           {
             from: "app",
             to: "workers",
-            label: service ? "Queued work" : "Background work",
+            label: onlyWorkers
+              ? service
+                ? "Queued work"
+                : "Background work"
+              : "Private network",
             vertical: true,
           },
         ]

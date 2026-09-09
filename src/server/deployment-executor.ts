@@ -710,11 +710,13 @@ export async function executeDeployment(
   record.verifiedAt = new Date().toISOString();
   deploymentEvent(
     record,
-    "Public application behavior verified against the deployed revision",
+    record.plan.image
+      ? "Application behavior verified against the accepted image and configuration revision"
+      : "Public application behavior verified against the deployed revision",
   );
   deploymentMessage(
     record,
-    `Your application is running at ${record.url}.${record.httpSourceIp ? " HTTP access is restricted to this controller’s network; use an SSH tunnel for private admin setup until HTTPS is configured." : ""} I verified the serving revision and the application checks: ${record.plan.checks.map((c) => c.name).join(", ")}.${record.plan.postgres ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
+    `Your application is running at ${record.url}.${record.httpSourceIp ? " HTTP access is restricted to this controller’s network; use an SSH tunnel for private admin setup until HTTPS is configured." : ""} I verified ${record.plan.image ? "the accepted image and configuration revision" : "the serving revision"} and the application checks: ${record.plan.checks.map((c) => c.name).join(", ")}.${record.plan.postgres ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
   );
 }
 export async function collectDeploymentLogs(
@@ -887,7 +889,10 @@ export async function verifyDeployment(
       }
       if (
         response.status !== check.expectedStatus ||
-        !text.includes(check.contains.replaceAll("SG_VERIFY_TOKEN", marker))
+        !responseContains(
+          text,
+          check.contains.replaceAll("SG_VERIFY_TOKEN", marker),
+        )
       )
         throw new Error(
           `Application behavior check failed: ${check.name} (HTTP ${response.status}).`,
@@ -911,6 +916,16 @@ export async function verifyDeployment(
   }
 }
 
+/** Ignore JSON serialization whitespace, never whitespace inside values. */
+export function responseContains(body: string, expected: string) {
+  if (body.includes(expected)) return true;
+  try {
+    return JSON.stringify(JSON.parse(body)).includes(expected);
+  } catch {
+    return false;
+  }
+}
+
 /** Observe every image, not just the web container, before claiming a stack. */
 export async function verifyServiceImages(
   record: DeploymentRecord,
@@ -925,28 +940,34 @@ export async function verifyServiceImages(
     "ssh",
     [
       ...sshArgs(record),
-      `cd /opt/server-guy/${record.id} && docker inspect $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
+      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
     ],
     signal,
   );
-  const containers = JSON.parse(output) as {
-    Image: string;
-    Config: { Image: string; Labels: Record<string, string> };
-    State: { Running: boolean };
-  }[];
+  // Inspect only identities/state, never container environment secrets.
+  const containers = output
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const [Image, reference, service, running] = JSON.parse(line) as [
+        string,
+        string,
+        string,
+        boolean,
+      ];
+      return { Image, reference, service, running };
+    });
   const images: Record<string, string> = {};
   for (const name of expected) {
-    const matches = containers.filter(
-      (c) => c.Config.Labels["com.docker.compose.service"] === name,
-    );
-    if (matches.length !== 1 || !matches[0].State.Running)
+    const matches = containers.filter((c) => c.service === name);
+    if (matches.length !== 1 || !matches[0].running)
       throw new Error(`Compose service ${name} is not running exactly once.`);
     const container = matches[0];
     const pinned =
       name === "app"
         ? record.plan!.image
         : record.plan!.services?.find((s) => s.name === name)?.image;
-    if (pinned && container.Config.Image !== pinned)
+    if (pinned && container.reference !== pinned)
       throw new Error(`Service ${name} differs from its approved image.`);
     if (
       record.serviceImages?.[name] &&
@@ -1054,6 +1075,25 @@ export async function recreateDeployment(
       .split(/\s+/)
       .sort();
   const before = await ids();
+  const volumeNames = [
+    ...(record.plan.postgres ? ["database"] : []),
+    ...(record.plan.volumes ?? []).map((v) => v.name),
+    ...(record.plan.services ?? []).flatMap((s) =>
+      s.volumes.map((v) => v.name),
+    ),
+  ];
+  // Compose creates missing named volumes automatically. Refuse that during
+  // recreation: a deleted data volume must become an explicit recovery task.
+  if (volumeNames.length) {
+    await command(
+      "ssh",
+      [
+        ...sshArgs(record),
+        `docker volume inspect --format '{{.Name}}' ${volumeNames.map((name) => `sg-${record.id.slice(0, 8)}_${name}`).join(" ")}`,
+      ],
+      signal,
+    );
+  }
   const { recordOperationRemoteEffect } =
     await import("./application-operations");
   recordOperationRemoteEffect();

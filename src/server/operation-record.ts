@@ -218,8 +218,8 @@ export function deploymentOperation(
       return {
         ...base,
         state: "verified",
-        summary: `Revision ${revision(record)} is running at ${record.url ?? record.address ?? "the host"}.`,
-        evidence: `Verified ${record.verifiedAt ? new Date(record.verifiedAt).toISOString() : "at deployment"} · public HTTP checks passed${record.plan ? `: ${record.plan.checks.map((check) => check.name).join(", ")}` : ""}.`,
+        summary: `${record.plan?.image ? `Accepted image with configuration revision ${revision(record)}` : `Revision ${revision(record)}`} is running at ${record.url ?? record.address ?? "the host"}.`,
+        evidence: `Verified ${record.verifiedAt ? new Date(record.verifiedAt).toISOString() : "at deployment"} · ${record.httpSourceIp ? "controller-restricted" : "public"} HTTP checks passed${record.plan ? `: ${record.plan.checks.map((check) => check.name).join(", ")}` : ""}.`,
       };
     case "failed":
       return {
