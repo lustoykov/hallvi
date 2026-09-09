@@ -14,6 +14,13 @@ import {
 } from "./operation-model";
 import { OperationSteps, StateChip } from "./operation-receipt";
 
+/** Work no conversation and no view started: checks, schedules, hosts. */
+function automatic(operation: ApplicationOperation) {
+  return ["check", "backup", "job", "release", "issue"].includes(
+    operation.source.type,
+  );
+}
+
 /**
  * What is happening to a view right now, above its confirmed facts: every
  * unsettled operation that touches it, each with its origin. Once settled,
@@ -27,6 +34,7 @@ export function DestinationActivity({
   now,
   onOpenConversation,
   onAsk,
+  onInvestigate,
 }: {
   section: ApplicationSection;
   operations: ApplicationOperation[];
@@ -35,6 +43,11 @@ export function DestinationActivity({
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   /** Drafts a question about work no conversation started. */
   onAsk?: (draft: string) => void;
+  /**
+   * Starts the linked investigation of automatic work, when the product can
+   * record one; returns false when this operation has nothing to adopt.
+   */
+  onInvestigate?: (operation: ApplicationOperation) => boolean;
 }) {
   const list = operationsFor(section, operations);
   if (!list.length) return null;
@@ -66,13 +79,14 @@ export function DestinationActivity({
       <button
         type="button"
         className="sg-op-link"
-        onClick={() =>
+        onClick={() => {
+          if (onInvestigate?.(operation)) return;
           onAsk(
             `Investigate “${operation.title}” (${relativeTime(operation.updatedAt, now)}): what happened and what should I do next?`,
-          )
-        }
+          );
+        }}
       >
-        Investigate in the conversation <ArrowRight aria-hidden="true" />
+        Investigate <ArrowRight aria-hidden="true" />
       </button>
     ) : null;
   return (
@@ -135,6 +149,8 @@ export function DestinationActivity({
                 {conversationName(settled[0].origin.chatId)}
               </button>
             </>
+          ) : automatic(settled[0]) ? (
+            " · automatic"
           ) : (
             " · started from this view"
           )}{" "}

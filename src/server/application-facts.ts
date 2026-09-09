@@ -1,0 +1,267 @@
+// Facts a stable view shows once a capability records them. Each block is
+// optional: a view without its facts renders the honest unavailable state,
+// so the same components serve the product today and the fuller product
+// later. Nothing here is a prototype type; it is the integration contract
+// for what each capability must record.
+
+/** A value as observed; freshness is derived from the time, not stored. */
+export interface Observed<T> {
+  value: T;
+  observedAt: string;
+}
+
+export interface CoverageItem {
+  key: string;
+  /** "PostgreSQL 16", "Files · media", "SQLite · kuma.db". */
+  label: string;
+  /** "consistent database dump", "file archive", "consistent copy". */
+  method: string;
+  state: "protected" | "behind" | "failed" | "unprotected" | "not-covered";
+  lastSuccessfulAt?: string | null;
+  size?: string | null;
+  note?: string | null;
+}
+
+export interface ProtectionFacts {
+  destination: {
+    provider: "r2" | "s3";
+    bucket: string;
+    region: string;
+    connectedAt: string;
+    /** How the credential is scoped, in words. Never the credential. */
+    access: string;
+  } | null;
+  policy: {
+    schedule: string;
+    timezone: string;
+    retention: string;
+    /** The conversation and operation that set the policy. */
+    operationId?: string | null;
+  } | null;
+  coverage: CoverageItem[];
+  lastAttempt: {
+    at: string;
+    outcome: "succeeded" | "failed" | "partial";
+    reason?: string | null;
+    size?: string | null;
+  } | null;
+  restoreTest: {
+    at: string;
+    recoveryPointAt: string;
+    verified: string;
+    operationId?: string | null;
+  } | null;
+  history: {
+    id: string;
+    at: string;
+    kind: "backup" | "restore-test" | "policy" | "upload";
+    outcome: "succeeded" | "failed" | "partial";
+    detail: string;
+    operationId?: string | null;
+  }[];
+}
+
+export interface Issue {
+  id: string;
+  title: string;
+  /** What the user or their users experience. */
+  impact: string;
+  detectedAt: string;
+  state: "open" | "acknowledged" | "recovered";
+  recoveredAt?: string | null;
+  evidence: string;
+  next: string;
+  /** What raised it: a check, a job, a backup or a deployment. */
+  source: { kind: "check" | "job" | "backup" | "release" | "host"; id: string };
+  operationId?: string | null;
+  /** The conversation investigating it, once one exists. */
+  conversationId?: string | null;
+  unread: boolean;
+}
+
+export interface MonitoringFacts {
+  collector: {
+    state: "running" | "stale" | "not-running";
+    lastObservationAt?: string | null;
+    hostReachable: boolean | null;
+    detail: string;
+  };
+  checks: {
+    id: string;
+    name: string;
+    kind: "http" | "process" | "disk" | "job" | "backup" | "certificate";
+    target: string;
+    state: "passing" | "failing" | "unknown";
+    lastAt?: string | null;
+    detail: string;
+  }[];
+  resources: {
+    cpuPercent: number;
+    memoryUsedMb: number;
+    memoryTotalMb: number;
+    diskUsedGb: number;
+    diskTotalGb: number;
+    measuredAt: string;
+  } | null;
+  issues: Issue[];
+  /** External providers are an agreed later expansion; in-app is always on. */
+  providers: { kind: string; state: "connected" | "failed"; detail: string }[];
+}
+
+export interface DomainFacts {
+  address: string | null;
+  domain: {
+    name: string;
+    provider: "cloudflare" | "external";
+    state: "resolving" | "pending-dns" | "failed";
+    detail: string;
+    /** A step only the user can do, shown as words. */
+    userStep?: string | null;
+  } | null;
+  tls: {
+    state: "valid" | "pending" | "failed" | "not-configured";
+    issuer?: string | null;
+    expiresAt?: string | null;
+    renewal?: string | null;
+    detail?: string | null;
+  };
+  cdn: {
+    state: "active" | "not-configured" | "not-useful" | "partial";
+    provider?: string | null;
+    detail: string;
+  };
+  routes: { host: string; service: string; port: number; protocol: string }[];
+}
+
+export interface VariableFacts {
+  variables: {
+    name: string;
+    scope: "build" | "runtime" | "both";
+    source: "plan" | "user" | "generated" | "database" | "service";
+    secret: boolean;
+    updatedAt?: string | null;
+    /** A change that has not reached the running processes yet. */
+    pendingRestart?: boolean;
+    note?: string | null;
+  }[];
+  /** Values Server Guy still needs, provided in conversation. */
+  pending: { name: string; reason: string; operationId?: string | null }[];
+}
+
+export interface ReleaseFacts {
+  serving: {
+    revision: string;
+    message: string;
+    image: string;
+    deployedAt: string;
+    verifiedAt: string | null;
+  } | null;
+  candidate: {
+    revision: string;
+    message: string;
+    author: string;
+    pushedAt: string;
+    ci: { state: "passed" | "failed" | "running" | "none"; detail: string };
+    image?: string | null;
+  } | null;
+  history: {
+    id: string;
+    revision: string;
+    at: string;
+    outcome: "verified" | "failed" | "rolled-back";
+    note: string;
+    operationId?: string | null;
+  }[];
+  preparation: {
+    dockerfile: "reused" | "generated";
+    compose: "reused" | "generated";
+    checks: number;
+    revision: string;
+    detail: string;
+  } | null;
+}
+
+export interface LogFacts {
+  streams: {
+    service: string;
+    lines: number;
+    lastAt: string;
+    level?: "ok" | "errors";
+  }[];
+  retention: string;
+  snapshot: { at: string; service: string; lines: string[] } | null;
+}
+
+export interface DatabaseFacts {
+  measuredAt: string;
+  sizeGb: number;
+  connections: number;
+  growthMbPerWeek: number | null;
+  scratch: {
+    name: string;
+    rows: number;
+    from: string;
+    until: string;
+    operationId?: string | null;
+  } | null;
+}
+
+export interface StorageFacts {
+  volumes: { name: string; sizeGb: number; measuredAt: string }[];
+  hostDisk: { usedGb: number; totalGb: number; measuredAt: string } | null;
+}
+
+export interface JobRun {
+  id: string;
+  jobName: string;
+  startedAt: string;
+  finishedAt?: string | null;
+  outcome: "succeeded" | "failed" | "timed-out" | "missed" | "running";
+  trigger: "schedule" | "run-now";
+  revision: string;
+  durationSeconds?: number | null;
+  output?: string | null;
+  operationId?: string | null;
+}
+
+export interface JobFacts {
+  runs: JobRun[];
+  queues: {
+    library: string;
+    backlog: number | null;
+    oldestWaitingSeconds: number | null;
+    failedLastHour: number | null;
+    observedAt: string | null;
+  }[];
+}
+
+export interface ApplicationFacts {
+  protection?: ProtectionFacts;
+  monitoring?: MonitoringFacts;
+  domains?: DomainFacts;
+  variables?: VariableFacts;
+  releases?: ReleaseFacts;
+  logs?: LogFacts;
+  database?: DatabaseFacts;
+  storage?: StorageFacts;
+  jobs?: JobFacts;
+}
+
+/**
+ * Something a view lets the user start. The product wires each one to a
+ * real operation as the capability lands; a view without a handler shows
+ * the fact and no control.
+ */
+export type ViewAction =
+  | { type: "run-job"; job: string }
+  | { type: "pause-job"; job: string }
+  | { type: "resume-job"; job: string }
+  | { type: "acknowledge-issue"; issue: string }
+  | { type: "investigate-issue"; issue: string }
+  | { type: "deploy-candidate"; revision: string }
+  | { type: "roll-back"; revision: string }
+  | { type: "measure-database" }
+  | { type: "refresh-logs"; service?: string }
+  | { type: "run-backup" }
+  | { type: "test-restore" }
+  | { type: "verify-now" };

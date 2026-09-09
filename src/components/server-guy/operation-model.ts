@@ -43,8 +43,16 @@ export function isStale(
   return !iso || now - new Date(iso).getTime() > hours * 3_600_000;
 }
 
+/** Newest change first; on a tie, the operation recorded later wins. */
 function newestFirst(operations: ApplicationOperation[]) {
-  return [...operations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return operations
+    .map((operation, index) => ({ operation, index }))
+    .sort(
+      (a, b) =>
+        b.operation.updatedAt.localeCompare(a.operation.updatedAt) ||
+        b.index - a.index,
+    )
+    .map((item) => item.operation);
 }
 
 /** A failure counts until the operation that addressed it has been verified. */

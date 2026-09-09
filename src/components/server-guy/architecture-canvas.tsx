@@ -6,6 +6,8 @@ import type { ApplicationStack } from "@/server/application-stack";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationRecord } from "@/server/types";
 
+import { formatTimestamp } from "./format";
+
 type Point = { x: number; y: number };
 const initialPositions: Record<string, Point> = {
   source: { x: 48, y: 138 },
@@ -93,7 +95,7 @@ export function ArchitectureCanvas({
       detail: live ? "Last deployment verified" : "Deployment not verified",
       symbol: "app",
       description: deployment?.url
-        ? `Public address: ${deployment.url}. ${deployment?.verifiedAt ? `Last verified ${new Date(deployment.verifiedAt).toLocaleString()}.` : "Not externally verified yet."}`
+        ? `Public address: ${deployment.url}. ${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
         : "Your application's runtime will appear here once a deployment is recorded.",
     },
     {

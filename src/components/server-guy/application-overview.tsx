@@ -2,12 +2,13 @@
 
 import { ArrowRight } from "@phosphor-icons/react";
 
-import type { ApplicationOperation } from "@/server/operation-record";
+import type { ApplicationFacts, ViewAction } from "@/server/application-facts";
 import {
   persistentState,
   type ApplicationStack,
 } from "@/server/application-stack";
 import type { DeploymentRecord } from "@/server/deployment-types";
+import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
@@ -21,26 +22,31 @@ import {
   stepDetail,
 } from "./operation-model";
 import { DestinationLinks, StateChip } from "./operation-receipt";
+import { IssueCard } from "./views/monitoring-view";
 
 /**
  * Overview answers four questions in order: what is running, what needs you,
  * what changed, and how fresh the evidence is. Only recorded facts appear;
- * nothing here claims continuous monitoring.
+ * continuous monitoring counts only while its collector is running.
  */
 export function ApplicationOverview({
   view,
   deployment,
   stack,
+  facts = {},
   operations,
   now,
   onOpenDestination,
   onOpenConversation,
   onAsk,
   onRevealStack,
+  onAction,
+  busy,
 }: {
   view: OperatorView;
   deployment: DeploymentRecord | null;
   stack: ApplicationStack;
+  facts?: ApplicationFacts;
   operations: ApplicationOperation[];
   now: number;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -49,6 +55,8 @@ export function ApplicationOverview({
   onAsk: (chatId: string | null, draft: string) => void;
   /** Shows the hidden stack destinations in navigation. */
   onRevealStack?: () => void;
+  onAction?: (action: ViewAction) => void;
+  busy?: string | null;
 }) {
   const application = view.application;
   if (!application) return null;
@@ -56,19 +64,64 @@ export function ApplicationOverview({
     view.chats.find((chat) => chat.id === id)?.title ?? "another conversation";
   // A later failure never erases the last verified state: the record keeps
   // its verification, address and revision until a new one replaces them.
-  const live = deployment?.status === "live";
-  const verifiedAt = deployment?.verifiedAt ?? null;
-  const stale = isStale(verifiedAt, now);
-  const attention = attentionItems(operations);
+  const live =
+    deployment?.status === "live" || Boolean(facts.releases?.serving);
+  const verifiedAt =
+    facts.releases?.serving?.verifiedAt ?? deployment?.verifiedAt ?? null;
+  const monitoring = facts.monitoring;
+  const lastObservation = monitoring?.collector.lastObservationAt ?? null;
+  const watching = monitoring?.collector.state === "running";
+  const stale = isStale(watching ? lastObservation : verifiedAt, now);
+  const issues = (monitoring?.issues ?? []).filter(
+    (issue) => issue.state !== "recovered",
+  );
+  const failingChecks = (monitoring?.checks ?? []).filter(
+    (check) => check.state === "failing",
+  );
+  // An issue already carries Investigate for the operation it records.
+  const attention = attentionItems(operations).filter(
+    (operation) => !issues.some((issue) => issue.operationId === operation.id),
+  );
   const changes = recentOperations(operations).slice(0, 6);
   const postgres = stack.databases.find((item) => item.kind === "postgres");
   const protectable = persistentState(stack);
+  const protection = facts.protection;
+  const protectionState = !protection
+    ? null
+    : protection.lastAttempt?.outcome === "failed" ||
+        protection.coverage.some((item) => item.state === "failed")
+      ? "bad"
+      : protection.coverage.some(
+            (item) => item.state === "behind" || item.state === "unprotected",
+          )
+        ? "warn"
+        : "ok";
   const workers = stack.processes.filter((item) => item.role === "worker");
   const absent = [
     ...(stack.services.length || stack.queues.length ? [] : ["cache or queue"]),
     ...(workers.length ? [] : ["workers"]),
     ...(stack.jobs.length ? [] : ["scheduled jobs"]),
   ];
+  const condition = watching
+    ? issues.some((issue) => issue.state === "open")
+      ? `Running with ${issues.length} open issue${issues.length === 1 ? "" : "s"} · observed ${relativeTime(lastObservation!, now)}`
+      : failingChecks.length
+        ? `Running · ${failingChecks.length} check${failingChecks.length === 1 ? "" : "s"} failing · observed ${relativeTime(lastObservation!, now)}`
+        : `Running · all checks passing · observed ${relativeTime(lastObservation!, now)}`
+    : monitoring
+      ? `${monitoring.collector.detail}${lastObservation ? ` · last observed ${relativeTime(lastObservation, now)}` : ""}`
+      : verifiedAt
+        ? stale
+          ? `Last verified ${relativeTime(verifiedAt, now)} · not checked since`
+          : live
+            ? `Running · verified ${relativeTime(verifiedAt, now)} · HTTP`
+            : `Last verified ${relativeTime(verifiedAt, now)} · later work failed`
+        : "Deployment not verified";
+  const dotLive =
+    (watching &&
+      !issues.some((issue) => issue.state === "open") &&
+      !failingChecks.length) ||
+    (!monitoring && live && !stale);
   const freshness: {
     fact: string;
     at?: string | null;
@@ -81,46 +134,71 @@ export function ApplicationOverview({
       detail: "Public HTTP checks at deployment · not continuous",
       destination: "deployment",
     },
+    ...(monitoring
+      ? [
+          {
+            fact: "Host observation",
+            at: lastObservation,
+            detail: watching
+              ? "Collector running on the host"
+              : monitoring.collector.detail,
+            destination: "monitoring" as const,
+          },
+        ]
+      : []),
     {
       fact: "Host logs snapshot",
-      at: deployment?.logsCollectedAt,
-      detail: "Collected on request · no live stream",
+      at: facts.logs?.snapshot?.at ?? deployment?.logsCollectedAt,
+      detail: facts.logs
+        ? `Collected on request · ${facts.logs.retention} on the host`
+        : "Collected on request · no live stream",
       destination: "logs",
     },
     {
       fact: "Database storage",
-      detail: postgres ? "Not measured" : "No database recorded",
+      at: facts.database?.measuredAt,
+      detail: facts.database
+        ? `${facts.database.sizeGb.toFixed(1)} GB measured on the host`
+        : postgres || stack.databases.length
+          ? "Not measured"
+          : "No database recorded",
       destination: "database",
     },
     {
       fact: "Off-host backup",
-      detail: "No backup recorded",
+      at: protection?.coverage.find((item) => item.lastSuccessfulAt)
+        ?.lastSuccessfulAt,
+      detail: protection?.lastAttempt
+        ? protection.lastAttempt.outcome === "succeeded"
+          ? `${protection.lastAttempt.size ?? "Copy"} in ${protection.destination?.provider === "r2" ? "R2" : "S3"}`
+          : `Last attempt ${protection.lastAttempt.outcome}`
+        : "No backup recorded",
       destination: "backups",
     },
     {
       fact: "Restore test",
-      detail: "Not tested",
+      at: protection?.restoreTest?.at,
+      detail: protection?.restoreTest?.verified ?? "Not tested",
       destination: "backups",
     },
   ];
   return (
     <div className="sg-overview">
       <div className="sg-overview-condition">
-        <span className={`sg-status-dot${live && !stale ? " live" : ""}`} />
+        <span className={`sg-status-dot${dotLive ? " live" : ""}`} />
         <div>
           <h2>{application.name}</h2>
           <p>
-            {verifiedAt
-              ? stale
-                ? `Last verified ${relativeTime(verifiedAt, now)} · not checked since`
-                : live
-                  ? `Running · verified ${relativeTime(verifiedAt, now)} · HTTP`
-                  : `Last verified ${relativeTime(verifiedAt, now)} · later work failed`
-              : "Deployment not verified"}
-            <span className="sg-op-muted"> · no continuous monitoring yet</span>
+            {condition}
+            {!monitoring && (
+              <span className="sg-op-muted">
+                {" "}
+                · no continuous monitoring yet
+              </span>
+            )}
           </p>
         </div>
-        {verifiedAt && stale && (
+        {verifiedAt && stale && !monitoring && (
           <button
             type="button"
             className="sg-secondary-button sg-overview-ask"
@@ -138,6 +216,21 @@ export function ApplicationOverview({
       <div className="sg-overview-grid">
         <section className="sg-overview-block" aria-label="Needs you">
           <h3>Needs you</h3>
+          {issues.length > 0 && (
+            <div className="sg-issues sg-issues-overview">
+              {issues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  now={now}
+                  chats={view.chats}
+                  onOpenConversation={onOpenConversation}
+                  onAction={onAction}
+                  busy={busy}
+                />
+              ))}
+            </div>
+          )}
           {attention.length ? (
             <ul className="sg-attention">
               {attention.map((operation) => (
@@ -198,7 +291,7 @@ export function ApplicationOverview({
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : issues.length ? null : (
             <p className="sg-overview-empty">Nothing needs you right now.</p>
           )}
         </section>
@@ -208,7 +301,13 @@ export function ApplicationOverview({
             <div>
               <dt>Application</dt>
               <dd>
-                {verifiedAt && deployment?.revision ? (
+                {facts.releases?.serving ? (
+                  <>
+                    Revision{" "}
+                    <code>{facts.releases.serving.revision.slice(0, 12)}</code>{" "}
+                    · {facts.releases.serving.message}
+                  </>
+                ) : verifiedAt && deployment?.revision ? (
                   <>
                     Revision <code>{deployment.revision.slice(0, 12)}</code> ·
                     port 80 → {deployment.plan?.port}
@@ -231,6 +330,28 @@ export function ApplicationOverview({
                   : "No host recorded"}
               </dd>
             </div>
+            {facts.domains?.domain && (
+              <div>
+                <dt>Address</dt>
+                <dd>
+                  <button
+                    type="button"
+                    className="sg-op-text-link"
+                    onClick={() => onOpenDestination("domains")}
+                  >
+                    {facts.domains.tls.state === "valid"
+                      ? "https://"
+                      : "http://"}
+                    {facts.domains.domain.name}
+                  </button>
+                  {facts.domains.domain.state !== "resolving"
+                    ? " · not resolving here yet"
+                    : facts.domains.tls.state === "valid"
+                      ? " · certificate valid"
+                      : " · HTTPS pending"}
+                </dd>
+              </div>
+            )}
             {stack.recorded && (
               <div>
                 <dt>Processes</dt>
@@ -245,6 +366,9 @@ export function ApplicationOverview({
                       ? ` · ${workers.length} worker${workers.length === 1 ? "" : "s"}`
                       : ""}
                   </button>
+                  {failingChecks.some((check) => check.kind === "process")
+                    ? " · one is unhealthy"
+                    : ""}
                 </dd>
               </div>
             )}
@@ -253,8 +377,11 @@ export function ApplicationOverview({
                 <dt>Database</dt>
                 <dd>
                   {database.kind === "postgres"
-                    ? `PostgreSQL ${database.version} · ${verifiedAt ? "persistent volume" : "planned with the application"} · storage not measured`
+                    ? `PostgreSQL ${database.version} · ${verifiedAt ? "persistent volume" : "planned with the application"}`
                     : `Embedded SQLite · ${database.location}`}
+                  {facts.database
+                    ? ` · ${facts.database.sizeGb < 1 ? `${Math.round(facts.database.sizeGb * 1024)} MB` : `${facts.database.sizeGb.toFixed(1)} GB`}`
+                    : " · storage not measured"}
                 </dd>
               </div>
             ))}
@@ -290,8 +417,7 @@ export function ApplicationOverview({
                     {stack.jobs.length === 1 ? "" : "s"}
                   </button>
                   {stack.jobs.some(
-                    (job) =>
-                      job.lastRun?.outcome !== "succeeded" && job.lastRun,
+                    (job) => job.lastRun && job.lastRun.outcome !== "succeeded",
                   )
                     ? " · a recent run did not succeed"
                     : ""}
@@ -310,7 +436,10 @@ export function ApplicationOverview({
                     {stack.volumes.length} persistent volume
                     {stack.volumes.length === 1 ? "" : "s"}
                   </button>{" "}
-                  · not measured
+                  ·{" "}
+                  {facts.storage?.hostDisk
+                    ? `disk ${facts.storage.hostDisk.usedGb} of ${facts.storage.hostDisk.totalGb} GB used`
+                    : "not measured"}
                 </dd>
               </div>
             )}
@@ -318,14 +447,33 @@ export function ApplicationOverview({
               <dt>Protection</dt>
               <dd
                 className={
-                  protectable.length ? "sg-protection-warn" : undefined
+                  protectionState === "ok"
+                    ? "sg-protection-ok"
+                    : protectionState === "bad"
+                      ? "sg-protection-bad"
+                      : protectionState === "warn" || protectable.length
+                        ? "sg-protection-warn"
+                        : undefined
                 }
               >
-                {protectable.length
-                  ? `Not backed up · ${protectable.map((item) => item.label).join(", ")}`
-                  : stack.recorded
-                    ? "Nothing persistent recorded"
-                    : "No database recorded"}
+                {protection
+                  ? protectionState === "ok"
+                    ? `${protection.policy?.schedule ?? "Scheduled"} to ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
+                    : protectionState === "bad"
+                      ? `Last backup failed · ${protection.lastAttempt?.reason ?? "see Backups"}`
+                      : `Behind policy · ${protection.coverage
+                          .filter(
+                            (item) =>
+                              item.state === "behind" ||
+                              item.state === "unprotected",
+                          )
+                          .map((item) => item.label)
+                          .join(", ")}`
+                  : protectable.length
+                    ? `Not backed up · ${protectable.map((item) => item.label).join(", ")}`
+                    : stack.recorded
+                      ? "Nothing persistent recorded"
+                      : "No database recorded"}
               </dd>
             </div>
             {stack.recorded && absent.length > 0 && (
@@ -377,6 +525,10 @@ export function ApplicationOverview({
                           {chatTitle(operation.origin.chatId)}
                         </button>
                       </>
+                    ) : ["check", "backup", "job", "release", "issue"].includes(
+                        operation.source.type,
+                      ) ? (
+                      "automatic"
                     ) : (
                       `from the ${labelOf(operation.destinations[0])} view`
                     )}{" "}
@@ -456,9 +608,9 @@ export function ApplicationOverview({
         </table>
       </section>
       <p className="sg-section-note">
-        Setup checks and the preparation record live with Deployment. Database
-        measurements, backups and continuous monitoring are not implemented yet;
-        their rows stay honest until real evidence exists.
+        {monitoring
+          ? "Freshness is measured against the host collector; a stale collector is shown as stale, never as healthy."
+          : "Setup checks and the preparation record live with Deployment. Database measurements, backups and continuous monitoring are not implemented yet; their rows stay honest until real evidence exists."}
       </p>
     </div>
   );

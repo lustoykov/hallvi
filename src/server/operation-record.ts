@@ -20,10 +20,46 @@ export interface OperationStep {
   at?: string;
 }
 
+/**
+ * What the user is asked to do while an operation waits. An approval may
+ * need protected inputs; a failure offers recovery. Generic, so any
+ * capability's record can carry one; the deployment keeps its own form.
+ */
+export type OperationDecision =
+  | {
+      kind: "approval";
+      note: string;
+      /** A cost or scope line shown beside the action. */
+      cost?: string | null;
+      inputs: { name: string; hint?: string; secret?: boolean }[];
+      action: string;
+    }
+  | {
+      kind: "recovery";
+      note?: string | null;
+      retry?: string | null;
+      cancel?: string | null;
+      inputs?: { name: string; hint?: string; secret?: boolean }[];
+    };
+
 export interface ApplicationOperation {
   id: string;
   /** The durable record this operation is projected from. */
-  source: { type: "deployment" | "logs"; id: string };
+  source: {
+    type:
+      | "deployment"
+      | "logs"
+      | "backup"
+      | "restore"
+      | "job"
+      | "release"
+      | "domain"
+      | "variables"
+      | "check"
+      | "inspection"
+      | "issue";
+    id: string;
+  };
   kind: "inspection" | "change";
   title: string;
   state: OperationState;
@@ -42,6 +78,8 @@ export interface ApplicationOperation {
   steps?: OperationStep[];
   /** What the user is asked to decide while the operation is proposed. */
   approval?: { note: string; action: string };
+  /** Decision controls for the generic card; absent for the deployment. */
+  decision?: OperationDecision | null;
   evidence?: string;
   /** What has to happen next after a failure. */
   next?: string;
