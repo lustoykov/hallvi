@@ -26,6 +26,7 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
+import { useFirewallFacts } from "./use-firewall-facts";
 import {
   ApplicationIdentity,
   type IdentityVariant,
@@ -146,6 +147,7 @@ export function OperatorShell({
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
     null,
   );
+  const firewall = useFirewallFacts(deployment, activeSection === "security");
   const recordVisible = activeSection !== null;
   const [seen, setSeen] = useState<Partial<Record<ApplicationSection, string>>>(
     {},
@@ -873,8 +875,8 @@ export function OperatorShell({
           onCreate={createChat}
           indicators={indicators}
           chatMarks={chatMarks}
-          sections={visibleSections(stack, activeSection)}
-          hidden={hiddenSections(stack, activeSection)}
+          sections={visibleSections(stack, activeSection, firewall.facts)}
+          hidden={hiddenSections(stack, activeSection, firewall.facts)}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
         />
@@ -891,6 +893,13 @@ export function OperatorShell({
               operations={operations}
               now={now}
               loading={!recordLoaded}
+              facts={firewall.facts}
+              busy={firewall.loading ? "check-firewall" : null}
+              onAction={
+                activeSection === "security" && deployment?.serverId
+                  ? () => firewall.refresh()
+                  : undefined
+              }
               onRefresh={refreshDeployment}
               decisionFor={(operation) =>
                 (operation.source.type !== "deployment" ||
@@ -943,6 +952,17 @@ export function OperatorShell({
                     connected={hetznerConnected}
                     onRefresh={refreshDeployment}
                   />
+                )}
+              {activeSection === "security" &&
+                (firewall.loading || firewall.error) && (
+                  <p role="status" className="sg-section-note">
+                    {firewall.loading
+                      ? "Checking Hetzner firewall rules…"
+                      : firewall.error}
+                    {firewall.error &&
+                      firewall.facts.security &&
+                      " The last successful check is shown below."}
+                  </p>
                 )}
             </ApplicationSectionView>
           )}

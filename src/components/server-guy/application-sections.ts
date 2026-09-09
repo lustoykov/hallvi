@@ -111,7 +111,7 @@ export const applicationSections = [
     icon: ShieldCheck,
     group: "care",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "variables",
@@ -189,10 +189,12 @@ export function hiddenSections(
     )
     .map((section) => ({
       ...section,
-      note: !("available" in section && section.available)
-        ? "nothing recorded yet"
-        : stack.recorded
-          ? "not used"
-          : "after deployment",
+      note:
+        section.id === "security" ||
+        !("available" in section && section.available)
+          ? "nothing recorded yet"
+          : stack.recorded
+            ? "not used"
+            : "after deployment",
     }));
 }

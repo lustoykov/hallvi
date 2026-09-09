@@ -5,7 +5,6 @@ import {
   Facts,
   LinkButton,
   Pill,
-  Planned,
   SubHeading,
   When,
   type ViewProps,
@@ -40,9 +39,17 @@ export function SecurityView(props: ViewProps) {
     return (
       <>
         <Condition tone="muted" title="Exposure has not been read back">
-          Server Guy creates a host firewall during deployment and opens only
-          the ports the application needs. Nothing reads those rules back yet,
-          so this view will not tell you what is currently reachable.
+          {deployment?.serverId
+            ? "Check Hetzner to read the attached firewall rules. The deployment plan below does not establish what is currently allowed."
+            : "Firewall read-back is available after a Hetzner instance is deployed."}
+          {onAction && (
+            <LinkButton
+              disabled={busy === "check-firewall"}
+              onClick={() => onAction({ type: "check-firewall" })}
+            >
+              Check now
+            </LinkButton>
+          )}
         </Condition>
         <div className="sg-band">
           <SubHeading>What the deployment asked for</SubHeading>
@@ -69,20 +76,21 @@ export function SecurityView(props: ViewProps) {
             is what was asked for; it is not evidence of what is open now.
           </p>
         </div>
-        <Planned title="Read the firewall back from the host">
-          Firewall state, the exact inbound rules with their sources, who holds
-          an SSH key, and the time each was last checked will appear here. Until
-          then the deployment conversation is the only record of what was
-          configured.
-        </Planned>
       </>
     );
   const open = security.rules.filter((rule) => rule.reach === "internet");
   const restricted = security.rules.filter((rule) => rule.reach !== "internet");
   // A public web application needs port 80 open; administrative access
   // reachable from anywhere is the exposure worth naming.
-  const web = open.filter((rule) => rule.port !== "22");
-  const sshOpen = open.some((rule) => rule.port === "22");
+  const allowsSsh = (rule: (typeof security.rules)[number]) => {
+    if (rule.protocol !== "tcp") return false;
+    if (rule.port === "any" || rule.port === "all") return true;
+    const range = /^(\d+)(?:-(\d+))?$/.exec(rule.port);
+    return Boolean(
+      range && Number(range[1]) <= 22 && Number(range[2] ?? range[1]) >= 22,
+    );
+  };
+  const sshOpen = open.some(allowsSsh);
   const tone =
     security.firewall.state !== "active"
       ? "bad"
@@ -94,13 +102,17 @@ export function SecurityView(props: ViewProps) {
       <Condition
         tone={tone}
         title={
-          security.firewall.state !== "active"
-            ? "No firewall is protecting this instance"
-            : sshOpen
-              ? "Administrative access is reachable from any network"
-              : web.length
-                ? `Public on port ${web.map((rule) => rule.port).join(" and ")} · everything else restricted`
-                : `Reachable only from ${restricted.length} named source${restricted.length === 1 ? "" : "s"}`
+          security.firewall.state === "not-configured"
+            ? "No Hetzner firewall is attached"
+            : security.firewall.state === "unknown"
+              ? "Firewall rules are not confirmed as applied"
+              : sshOpen
+                ? "Firewall allows SSH from any network"
+                : open.length
+                  ? "Firewall allows public incoming traffic"
+                  : security.rules.length
+                    ? "Firewall rules restrict incoming traffic to listed sources"
+                    : "Firewall allows no incoming traffic"
         }
         aside={
           onAction && (
@@ -113,8 +125,8 @@ export function SecurityView(props: ViewProps) {
           )
         }
       >
-        {sshOpen
-          ? "Anyone who reaches port 22 can attempt to sign in; only a key will let them. Narrowing it to the networks you administer from is the usual next step. "
+        {sshOpen && security.firewall.state === "active"
+          ? `The firewall allows connections to port 22. ${security.ssh.state === "key-only" ? "SSH was recorded as key-only. " : "SSH authentication settings must be checked separately. "}`
           : ""}
         {security.firewall.detail}
         {security.firewall.lastCheckedAt && (
@@ -126,7 +138,7 @@ export function SecurityView(props: ViewProps) {
       </Condition>
       <section className="sg-band" aria-label="Inbound rules">
         <div className="sg-band-head">
-          <h2>What can reach it</h2>
+          <h2>Reported incoming rules</h2>
           <span className="sg-visual-caption">
             {security.firewall.provider}
             {security.firewall.name ? ` · ${security.firewall.name}` : ""}
@@ -147,12 +159,12 @@ export function SecurityView(props: ViewProps) {
           <div className="sg-rule-row sg-table-head">
             <span>Port</span>
             <span>Serves</span>
-            <span>Reachable from</span>
+            <span>Allowed sources</span>
             <span>Exposure</span>
           </div>
           {[...open, ...restricted].map((rule) => (
             <div
-              className={`sg-rule-row${rule.reach === "internet" && rule.port === "22" ? " sg-row-warn" : ""}`}
+              className={`sg-rule-row${rule.reach === "internet" && allowsSsh(rule) ? " sg-row-warn" : ""}`}
               key={rule.id}
             >
               <span>
@@ -161,7 +173,7 @@ export function SecurityView(props: ViewProps) {
                 </strong>
               </span>
               <span data-label="Serves">{rule.serves ?? "Not recorded"}</span>
-              <span data-label="Reachable from">
+              <span data-label="Allowed sources">
                 {rule.sources.map((source) => (
                   <code key={source}>{source}</code>
                 ))}
@@ -171,7 +183,7 @@ export function SecurityView(props: ViewProps) {
                   tone={
                     rule.reach !== "internet"
                       ? "ok"
-                      : rule.port === "22"
+                      : allowsSsh(rule)
                         ? "warn"
                         : "muted"
                   }
@@ -184,8 +196,11 @@ export function SecurityView(props: ViewProps) {
         </div>
         {!security.rules.length && (
           <p className="sg-section-note">
-            The provider reports no inbound rules. Nothing should be reachable
-            from outside the instance.
+            {security.firewall.state === "active"
+              ? "The attached firewalls report no incoming allow rules. They block incoming connections."
+              : security.firewall.state === "not-configured"
+                ? "No attached firewall restricts incoming traffic. Reachability depends on host networking and listening services."
+                : "No incoming rules were reported; their effective state is not confirmed."}
           </p>
         )}
       </section>
@@ -218,19 +233,21 @@ export function SecurityView(props: ViewProps) {
               : []),
             [
               "Private services",
-              security.privateServices.length
-                ? `${security.privateServices.join(", ")} · no published port`
-                : privateServices.length
-                  ? `${privateServices.join(", ")} · no published port`
-                  : "None recorded",
+              security.privateServicesDetail ??
+                (security.privateServices.length
+                  ? `${security.privateServices.join(", ")} · no published port`
+                  : privateServices.length
+                    ? `${privateServices.join(", ")} · no published port`
+                    : "None recorded"),
             ],
           ]}
         />
       </section>
       <p className="sg-section-note">
-        A rule open to any network is not automatically wrong; a public web
-        application needs one. It is marked so that the choice stays visible,
-        and so a port opened for a moment does not quietly stay open.
+        These are provider firewall rules for the instance, shared by its
+        applications. This check does not test reachability or inspect the host
+        firewall. An allowed port still needs a running service; an allowed IP
+        may be shared by several devices.
       </p>
     </>
   );

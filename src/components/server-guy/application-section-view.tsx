@@ -221,7 +221,12 @@ export function ApplicationSectionView({
       content = <CdnView {...viewProps} />;
       break;
     case "security":
-      content = <SecurityView {...viewProps} />;
+      content = (
+        <>
+          {children}
+          <SecurityView {...viewProps} />
+        </>
+      );
       break;
     case "variables":
       content = <VariablesView {...viewProps} />;

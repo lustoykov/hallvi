@@ -168,6 +168,8 @@ export interface SecurityFacts {
   };
   /** Services that are not reachable from outside at all. */
   privateServices: string[];
+  /** Provider checks do not necessarily inspect host networking. */
+  privateServicesDetail?: string;
 }
 
 export interface VariableFacts {
