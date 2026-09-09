@@ -227,8 +227,17 @@ export function pendingDeployments() {
     .filter((record) => ["queued", "deploy-queued"].includes(record.status));
 }
 export function interruptDeployments() {
+  // Called only after acquiring the exclusive deployment-worker lock. A
+  // crash can happen between claiming an operation and writing `deploying`.
   for (const { body } of db().select().from(deployments).all()) {
-    if (!["planning", "deploying"].includes(body.status)) continue;
+    const claimedBeforeExecution =
+      body.status === "deploy-queued" &&
+      operation(body.operationId ?? `deployment:${body.id}`)?.executorPid;
+    if (
+      !claimedBeforeExecution &&
+      !["planning", "deploying"].includes(body.status)
+    )
+      continue;
     remember(body);
     body.status = "failed";
     body.error =
