@@ -556,7 +556,7 @@ export async function askPi(
         name: "propose_change",
         label: "Propose an application change",
         description:
-          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Supported executors cover initial deployment, recreating the accepted containers without removing volumes, reading host logs and authorized source preparation/publication. collect-logs is read-only and starts immediately; recreation asks approval. Do not invent backups or other executors.",
+          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Executors cover initial deployment, container recreation, host logs, source preparation/publication, and scheduled backups for the supported PostgreSQL-only, Kuma and Grafana stacks. configure-backups uses already connected private R2/S3 access; specify backupPolicy. run-backup verifies an uploaded copy; test-restore checks an isolated database/file restoration, not application boot or cutover. Changes ask approval; collect-logs is read-only and starts immediately. Never claim protection from a schedule alone.",
         parameters: Type.Object(
           {
             action: Type.Union([
@@ -565,8 +565,23 @@ export async function askPi(
               Type.Literal("publish-proposal"),
               Type.Literal("recreate-deployment"),
               Type.Literal("collect-logs"),
+              Type.Literal("configure-backups"),
+              Type.Literal("run-backup"),
+              Type.Literal("test-restore"),
             ]),
             proposalId: Type.Optional(Type.String()),
+            backupPolicy: Type.Optional(
+              Type.Object(
+                {
+                  schedule: Type.Union([
+                    Type.Literal("daily"),
+                    Type.Literal("six-hourly"),
+                  ]),
+                  keep: Type.Integer({ minimum: 2, maximum: 90 }),
+                },
+                { additionalProperties: false },
+              ),
+            ),
           },
           { additionalProperties: false },
         ),
@@ -577,6 +592,7 @@ export async function askPi(
             input.run.chatId,
             params.action,
             params.proposalId,
+            params.backupPolicy,
           );
           return {
             content: [{ type: "text", text: JSON.stringify(result) }],

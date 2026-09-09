@@ -13,7 +13,7 @@ import {
 
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
-import type { ApplicationFacts } from "@/server/application-facts";
+import type { ApplicationFacts, ViewAction } from "@/server/application-facts";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
@@ -226,6 +226,11 @@ export function OperatorShell({
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backupRequest, setBackupRequest] = useState<{
+    applicationId: string;
+    busy: string | null;
+    error: string | null;
+  } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const focusComposerAfterClose = useRef(false);
@@ -269,6 +274,43 @@ export function OperatorShell({
       );
     }
   }, [applicationId, selectedChatId, demo]);
+  async function backupAction(action: ViewAction) {
+    if (
+      !applicationId ||
+      ![
+        "configure-backups",
+        "run-backup",
+        "test-restore",
+        "refresh-backups",
+      ].includes(action.type)
+    )
+      return;
+    setBackupRequest({ applicationId, busy: action.type, error: null });
+    try {
+      const response = await fetch(
+        `/api/applications/${applicationId}/backups`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: action.type }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error ?? "Could not start the backup action.");
+      await refreshDeployment();
+      setBackupRequest({ applicationId, busy: null, error: null });
+    } catch (failure) {
+      setBackupRequest({
+        applicationId,
+        busy: null,
+        error:
+          failure instanceof Error
+            ? failure.message
+            : "Could not complete the backup request.",
+      });
+    }
+  }
   useEffect(() => {
     const initial = window.setTimeout(() => {
       void refreshDeployment().catch(() => setRecordLoaded(true));
@@ -908,11 +950,22 @@ export function OperatorShell({
               now={now}
               loading={!recordLoaded}
               facts={facts}
-              busy={firewall.loading ? "check-firewall" : null}
+              busy={
+                activeSection === "backups" &&
+                backupRequest &&
+                backupRequest.applicationId === applicationId
+                  ? backupRequest.busy
+                  : firewall.loading
+                    ? "check-firewall"
+                    : null
+              }
               onAction={
                 activeSection === "security" && deployment?.serverId
                   ? () => firewall.refresh()
-                  : undefined
+                  : activeSection === "backups" &&
+                      (facts.protection || facts.backupSetup)
+                    ? backupAction
+                    : undefined
               }
               onRefresh={refreshDeployment}
               decisionFor={(operation) =>
@@ -976,6 +1029,14 @@ export function OperatorShell({
                     {firewall.error &&
                       firewall.facts.security &&
                       " The last successful check is shown below."}
+                  </p>
+                )}
+              {activeSection === "backups" &&
+                backupRequest &&
+                backupRequest.applicationId === applicationId &&
+                backupRequest.error && (
+                  <p role="alert" className="sg-section-note">
+                    {backupRequest.error}
                   </p>
                 )}
             </ApplicationSectionView>

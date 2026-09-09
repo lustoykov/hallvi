@@ -6,6 +6,8 @@ import type { ApplicationListItem } from "@/components/server-guy/applications-s
 import type { BackupEvidenceFacts } from "./application-facts";
 import { stackOf, type ApplicationStack } from "./application-stack";
 import { backupEvidenceFor } from "./backup-evidence";
+import { scheduledProtectionFor } from "./scheduled-backup-store";
+import type { ProtectionFacts } from "./application-facts";
 import { applicationOperations } from "./operation-record";
 import { applicationDeployment } from "./deployment-store";
 import { listApplications } from "./db";
@@ -20,6 +22,29 @@ function backupEvidenceSummary(facts: BackupEvidenceFacts) {
     : facts.proofs.length
       ? "Restore proof did not succeed"
       : "No restore proof";
+}
+
+function scheduledSummary(facts: ProtectionFacts) {
+  if (facts.observation?.running && facts.observation.reachable)
+    return "Backup work in progress";
+  if (facts.observation?.cleanupPending)
+    return "Backup cleanup needs attention";
+  if (facts.observation && !facts.observation.reachable)
+    return "Backup status unavailable";
+  if (facts.observation && !facts.observation.timerActive)
+    return "Backup schedule stopped";
+  if (facts.lastAttempt?.outcome === "failed") return "Backup failed";
+  if (facts.observation?.retentionFailed) return "Retention needs attention";
+  if (facts.coverage.some((item) => item.state === "behind"))
+    return "Backup overdue";
+  if (
+    !facts.coverage.length ||
+    facts.coverage.some((item) => !item.lastSuccessfulAt)
+  )
+    return "Scheduled · awaiting first backup";
+  return facts.restoreTest
+    ? "Backed up · restore tested"
+    : "Backed up · restore not tested";
 }
 
 export function stackSummary(stack: ApplicationStack) {
@@ -51,6 +76,7 @@ export function listItem(
   operations = applicationOperations(deployment),
   /** Manual restore proofs, when any were recorded for this deployment. */
   evidence: BackupEvidenceFacts | null = null,
+  protection: ProtectionFacts | null = null,
 ): ApplicationListItem {
   const stack = stackOf(deployment);
   const attention = operations.filter(
@@ -83,13 +109,15 @@ export function listItem(
     // A recorded proof means a copy was made and restored at least once, so
     // the list may not say nothing exists. It still says nothing is running
     // on its own: no proof ever becomes a schedule here.
-    protection: evidence
-      ? backupEvidenceSummary(evidence)
-      : stack.databases.length || stack.volumes.length
-        ? "Not backed up"
-        : stack.recorded
-          ? "Nothing persistent"
-          : "",
+    protection: protection
+      ? scheduledSummary(protection)
+      : evidence
+        ? backupEvidenceSummary(evidence)
+        : stack.databases.length || stack.volumes.length
+          ? "Not backed up"
+          : stack.recorded
+            ? "Nothing persistent"
+            : "",
   };
 }
 
@@ -102,6 +130,7 @@ export function listApplicationItems() {
       Date.now(),
       operationsFor(application.id),
       backupEvidenceFor(deployment),
+      scheduledProtectionFor(deployment),
     );
   });
 }

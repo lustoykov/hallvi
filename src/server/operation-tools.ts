@@ -9,6 +9,7 @@ import {
   settleOperation,
 } from "./operation-store";
 import type { OperationCommand } from "./operation-types";
+import { proposeBackupOperation } from "./scheduled-backup-operations";
 
 export function operationContext(applicationId: string) {
   return operationsFor(applicationId)
@@ -38,9 +39,19 @@ export function proposeAgentChange(
     | "start-preparation"
     | "publish-proposal"
     | "recreate-deployment"
-    | "collect-logs",
+    | "collect-logs"
+    | "configure-backups"
+    | "run-backup"
+    | "test-restore",
   proposalId?: string,
+  backupPolicy?: { schedule: "daily" | "six-hourly"; keep: number },
 ) {
+  if (
+    action === "configure-backups" ||
+    action === "run-backup" ||
+    action === "test-restore"
+  )
+    return proposeBackupOperation(applicationId, action, backupPolicy, chatId);
   if (action === "deployment") {
     requestDeployment(applicationId, chatId, "server-guy");
     return operationContext(applicationId);

@@ -79,7 +79,17 @@ export function ApplicationsHome({
       item.protection === "Not backed up" ||
       item.protection.includes("not scheduled") ||
       item.protection === "Restore proof did not succeed" ||
-      item.protection === "Restore cleanup needs attention",
+      item.protection === "Restore cleanup needs attention" ||
+      [
+        "Backup cleanup needs attention",
+        "Backup status unavailable",
+        "Backup schedule stopped",
+        "Backup failed",
+        "Retention needs attention",
+        "Backup overdue",
+        "Scheduled · awaiting first backup",
+        "Backed up · restore not tested",
+      ].includes(item.protection),
   );
   function greet(id: string) {
     setSelectedId(id);
@@ -325,8 +335,8 @@ export function ApplicationsHome({
               <strong>A little peace of mind, next.</strong>
               <p>
                 {unprotected.length} application
-                {unprotected.length === 1 ? " has" : "s have"} persistent data
-                without scheduled backups.
+                {unprotected.length === 1 ? " needs" : "s need"} a backup, a
+                restore test, or a current status check.
               </p>
             </div>
             <Link href={`${unprotected[0].href.split("#")[0]}#backups`}>

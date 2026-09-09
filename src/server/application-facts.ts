@@ -23,6 +23,16 @@ export interface CoverageItem {
 }
 
 export interface ProtectionFacts {
+  /** Host observation, separate from the age of a stored recovery point. */
+  observation?: {
+    at: string | null;
+    reachable: boolean;
+    timerActive: boolean;
+    nextAt: string | null;
+    running: boolean;
+    cleanupPending: boolean;
+    retentionFailed: boolean;
+  };
   destination: {
     provider: "r2" | "s3";
     bucket: string;
@@ -373,6 +383,7 @@ export interface JobFacts {
 
 export interface ApplicationFacts {
   protection?: ProtectionFacts;
+  backupSetup?: { connected: boolean };
   /** Manual restore proofs. Independent of `protection`, never a stand-in. */
   backupEvidence?: BackupEvidenceFacts;
   security?: SecurityFacts;
@@ -403,6 +414,8 @@ export type ViewAction =
   | { type: "refresh-logs"; service?: string }
   | { type: "check-firewall" }
   | { type: "clear-cdn-cache" }
+  | { type: "configure-backups" }
   | { type: "run-backup" }
+  | { type: "refresh-backups" }
   | { type: "test-restore" }
   | { type: "verify-now" };

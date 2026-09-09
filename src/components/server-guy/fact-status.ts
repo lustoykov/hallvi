@@ -43,6 +43,29 @@ export function monitoringStatus(facts: MonitoringFacts, now: number) {
 
 /** A configured policy alone does not prove a recoverable off-host copy. */
 export function protectionStatus(facts: ProtectionFacts) {
+  const observation = facts.observation;
+  if (observation?.running && observation.reachable)
+    return {
+      tone: "working",
+      title: "Backup work is running on the host",
+    } as const;
+  if (observation?.cleanupPending)
+    return { tone: "bad", title: "Backup cleanup needs attention" } as const;
+  if (observation && !observation.reachable)
+    return {
+      tone: "warn",
+      title: "Current backup status is unavailable",
+    } as const;
+  if (observation && !observation.timerActive)
+    return {
+      tone: "warn",
+      title: "The backup schedule is not running",
+    } as const;
+  if (observation?.retentionFailed)
+    return {
+      tone: "warn",
+      title: "Copy verified · retention needs attention",
+    } as const;
   if (
     facts.lastAttempt?.outcome === "failed" ||
     facts.coverage.some((item) => item.state === "failed")
@@ -73,6 +96,8 @@ export function protectionStatus(facts: ProtectionFacts) {
       tone: "muted",
       title: "Backup protection is not verified",
     } as const;
+  if (observation && !facts.restoreTest)
+    return { tone: "warn", title: "Backed up · restore not tested" } as const;
   return { tone: "ok", title: `Protected · ${facts.policy.schedule}` } as const;
 }
 

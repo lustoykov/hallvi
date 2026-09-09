@@ -1080,7 +1080,11 @@
   color: var(--blue-text);
   cursor: pointer;
 }
-.sg-op-link:hover {
+.sg-op-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sg-op-link:hover:not(:disabled) {
   border-color: #c7d6f5;
   background: var(--blue-soft);
 }

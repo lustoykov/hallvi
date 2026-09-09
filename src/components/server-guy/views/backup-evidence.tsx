@@ -192,9 +192,11 @@ function Attempt({ proof, now }: { proof: BackupProof; now: number }) {
 export function BackupEvidencePanel({
   facts,
   now,
+  ongoingProtection = false,
 }: {
   facts: BackupEvidenceFacts;
   now: number;
+  ongoingProtection?: boolean;
 }) {
   const verified = lastVerifiedProof(facts);
   const latest = latestProof(facts);
@@ -207,9 +209,9 @@ export function BackupEvidencePanel({
   // Absence stated once. The schedule and retention a proof cannot record
   // belong with the limits of the proof, not in a section of their own.
   const notCovered: Array<[string, ReactNode]> = [];
-  if (!facts.scheduleConfigured)
+  if (!facts.scheduleConfigured && !ongoingProtection)
     notCovered.push(["Nothing is scheduled", scheduleLimit]);
-  if (!facts.retentionConfigured)
+  if (!facts.retentionConfigured && !ongoingProtection)
     notCovered.push(["No retention policy", retentionLimit]);
   for (const gap of verified?.gaps ?? [])
     if (gap.key !== "schedule" && gap.key !== "retention")

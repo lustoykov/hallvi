@@ -1,5 +1,6 @@
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
+import { deploymentLock } from "./deployment-ssh";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -659,7 +660,13 @@ export async function executeDeployment(
     const root = `/opt/server-guy/${record.id}`;
     await command(
       "ssh",
-      [...sshArgs(record), `umask 077; mkdir -p ${root}; tar -xf - -C ${root}`],
+      [
+        ...sshArgs(record),
+        deploymentLock(
+          record.id,
+          `umask 077; mkdir -p ${root}; tar -xf - -C ${root}`,
+        ),
+      ],
       signal,
       archive,
     );
@@ -671,7 +678,10 @@ export async function executeDeployment(
       "ssh",
       [
         ...sshArgs(record),
-        `cd ${root} && docker compose -p sg-${record.id.slice(0, 8)} -f compose.json up -d --build --wait --wait-timeout 120`,
+        deploymentLock(
+          record.id,
+          `cd ${root} && docker compose -p sg-${record.id.slice(0, 8)} -f compose.json up -d --build --wait --wait-timeout 120`,
+        ),
       ],
       signal,
       undefined,
@@ -1105,7 +1115,10 @@ export async function recreateDeployment(
     "ssh",
     [
       ...sshArgs(record),
-      `cd ${root} && flock -n recreate.lock ${compose} up -d --force-recreate --no-build --pull never --wait --wait-timeout 120`,
+      deploymentLock(
+        record.id,
+        `cd ${root} && ${compose} up -d --force-recreate --no-build --pull never --wait --wait-timeout 120`,
+      ),
     ],
     signal,
     undefined,

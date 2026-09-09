@@ -5,6 +5,13 @@ export type OperationCommand =
   | { type: "deployment"; deploymentId: string }
   | { type: "recreate-deployment"; deploymentId: string }
   | { type: "collect-logs"; deploymentId: string }
+  | { type: "run-backup" | "test-restore"; deploymentId: string }
+  | {
+      type: "configure-backups";
+      deploymentId: string;
+      schedule: "daily" | "six-hourly";
+      keep: number;
+    }
   | { type: "start-preparation" }
   | { type: "publish-proposal"; proposalId: string }
   | { type: "publish-checkpoint"; proposalId: string }

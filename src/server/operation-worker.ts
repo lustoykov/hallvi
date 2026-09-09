@@ -12,6 +12,28 @@ async function dispatch(record: StoredOperation) {
   const phase = await import("./phase-three");
   const preparation = await import("./preparation");
   switch (command.type) {
+    case "configure-backups":
+    case "run-backup":
+    case "test-restore": {
+      const { applicationDeployment } = await import("./deployment-store");
+      if (applicationDeployment(id)?.id !== command.deploymentId)
+        throw new Error(
+          "The deployment changed. Review the backup operation before retrying.",
+        );
+      const { performBackupAction } =
+        await import("./scheduled-backup-actions");
+      return performBackupAction(
+        id,
+        command.type,
+        command.type === "configure-backups"
+          ? {
+              schedule: command.schedule,
+              keep: command.keep,
+              operationId: record.id,
+            }
+          : undefined,
+      );
+    }
     case "recreate-deployment":
     case "collect-logs": {
       const { getDeployment } = await import("./deployment-store");
