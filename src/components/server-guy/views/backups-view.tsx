@@ -82,23 +82,21 @@ export function BackupsView(props: ViewProps) {
           {proved ? (
             <>
               An operator restored this application’s data from an off-host copy
-              and checked it
+              and checked it.{" "}
               {proved.finishedAt ? (
                 <>
-                  {" "}
-                  on <LocalTime value={proved.finishedAt} variant="compact" />
+                  Proved <When at={proved.finishedAt} now={now} />.{" "}
                 </>
               ) : (
                 ""
               )}
-              .{" "}
+              Automatic backups are not configured.
               {proved.revisionCurrent
                 ? ""
-                : "That proof ran against an earlier revision than the one deployed now. "}
+                : " That proof ran against an earlier revision than the one deployed now."}
               {latest && latest.outcome !== "verified"
-                ? "A later attempt has no verified restore result. "
+                ? " A later attempt has no verified restore result."
                 : ""}
-              Scheduled backups are not configured.
             </>
           ) : latest ? (
             "No completed restore is recorded. See the attempts below for the available evidence."
@@ -110,27 +108,26 @@ export function BackupsView(props: ViewProps) {
         </Condition>
         {needed.length > 0 && (
           <div className="sg-band">
-            <SubHeading>What needs protection</SubHeading>
-            <div className="sg-coverage">
-              {needed.map((item) => (
-                <div className="sg-coverage-row sg-row-warn" key={item.key}>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <small>
-                      {item.detail} · would be copied as {item.method}
-                    </small>
-                  </div>
-                  <Pill tone="warn">
-                    {proved ? "Not scheduled" : "Not backed up"}
-                  </Pill>
-                  <span className="sg-op-muted">
-                    {proved
-                      ? "See the dated restore checks below"
-                      : "No verified restore recorded"}
-                  </span>
-                </div>
-              ))}
+            <div className="sg-band-head">
+              <h2>Data to protect</h2>
+              <span className="sg-visual-caption">
+                {proved
+                  ? "Manual restore verified · newer changes need backups"
+                  : "No verified restore recorded"}
+              </span>
             </div>
+            <Facts
+              wide
+              rows={needed.map((item) => [
+                item.label,
+                <>
+                  {item.detail}
+                  <small className="sg-fact-note">
+                    Would be copied as a {item.method}.
+                  </small>
+                </>,
+              ])}
+            />
           </div>
         )}
         {evidence ? (
@@ -151,8 +148,8 @@ export function BackupsView(props: ViewProps) {
         <Planned title="Connect storage. Let Server Guy handle the rest.">
           The planned flow recommends Cloudflare R2 or AWS S3, asks for scoped
           access, configures a schedule and retention per kind of state, and
-          verifies an isolated restore. Scheduled backup execution is not
-          implemented yet.
+          verifies an isolated restore. Today a proof is a manual operation
+          Server Guy does not start from this page.
         </Planned>
       </>
     );

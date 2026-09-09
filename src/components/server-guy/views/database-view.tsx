@@ -105,7 +105,7 @@ export function DatabaseView(props: ViewProps) {
               ? "It has an off-host copy."
               : "It has no current off-host copy."
             : proved
-              ? "An operator proved once that an off-host copy of this data restores. Scheduled backups are not configured."
+              ? "An operator verified that an off-host copy of this data restores. Nothing is scheduled to back up newer changes."
               : "Off-host protection is not configured."}
         </Condition>
       )}

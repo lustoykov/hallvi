@@ -341,7 +341,7 @@ export function ApplicationOverview({
       : cleanupPending
         ? "Temporary restore resources need cleanup. Review Backups."
         : proved
-          ? `${provedAt ? `${relativeTime(provedAt, now)} · ` : ""}${proved.revisionCurrent ? "started by hand" : "an earlier revision"} · nothing scheduled`
+          ? `${provedAt ? `${relativeTime(provedAt, now)} · ` : ""}${proved.revisionCurrent ? "by hand" : "an earlier revision"} · nothing scheduled`
           : evidence
             ? "The last attempt did not restore this data"
             : protectable.length
