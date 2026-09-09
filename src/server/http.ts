@@ -1,9 +1,11 @@
+import { OperationConflictError } from "./operation-store";
 import { NextResponse } from "next/server";
 
 import { ExistingApplicationConflictError, NotFoundError } from "./phase-one";
 import { PiUnavailableError } from "./pi";
 
 function statusFor(error: unknown) {
+  if (error instanceof OperationConflictError) return 409;
   if (error instanceof ExistingApplicationConflictError) return 409;
   if (error instanceof NotFoundError) return 404;
   if (error instanceof PiUnavailableError) return 503;

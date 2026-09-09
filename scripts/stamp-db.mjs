@@ -10,7 +10,7 @@ const { version } = JSON.parse(
 );
 // A fresh push starts at 0; prepare-db.mjs has already upgraded a known older
 // file in place. Any other version is refused before data could be misread.
-const STAMPABLE_VERSIONS = [0, 6, 8, 9, 10, 11, version];
+const STAMPABLE_VERSIONS = [0, 6, 8, 9, 10, 11, 12, version];
 const databasePath =
   process.env.SERVER_GUY_DB_PATH ??
   join(process.cwd(), ".server-guy", "server-guy.db");

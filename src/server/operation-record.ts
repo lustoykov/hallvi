@@ -7,12 +7,18 @@ import type { ApplicationSection } from "@/components/server-guy/application-sec
 import type { DeploymentRecord } from "./deployment-types";
 
 /**
- * An inspection goes working → inspected. A change goes proposed → working →
- * verified or failed. Views show confirmed facts; the operation carries the
- * rest.
+ * An inspection goes working → inspected. A change goes proposed → queued
+ * (when another change owns the slot) → working → verified or failed.
+ * Views show confirmed facts; the operation carries the rest.
  */
 export type OperationState =
-  "proposed" | "working" | "inspected" | "verified" | "failed";
+  | "proposed"
+  | "queued"
+  | "working"
+  | "inspected"
+  | "verified"
+  | "failed"
+  | "cancelled";
 
 export interface OperationStep {
   label: string;
@@ -57,7 +63,8 @@ export interface ApplicationOperation {
       | "variables"
       | "check"
       | "inspection"
-      | "issue";
+      | "issue"
+      | "preparation";
     id: string;
   };
   kind: "inspection" | "change";
@@ -85,6 +92,9 @@ export interface ApplicationOperation {
   next?: string;
   /** A later operation that addressed this failure. */
   resolvedById?: string;
+  waitingForId?: string | null;
+  waitingForTitle?: string | null;
+  preconditions?: Record<string, string | null>;
 }
 
 function revision(record: DeploymentRecord) {
@@ -128,9 +138,14 @@ export function deploymentOperation(
   )
     destinations.push("variables");
   const base = {
-    id: `deployment:${record.id}`,
+    id: record.operationId ?? `deployment:${record.id}`,
     source: { type: "deployment" as const, id: record.id },
-    kind: "change" as const,
+    kind: (["queued", "planning"].includes(record.status) ||
+    (record.status === "failed" &&
+      !record.authority &&
+      !record.serverCreateAttempted)
+      ? "inspection"
+      : "change") as ApplicationOperation["kind"],
     title: `Deploy ${record.repository}`,
     destinations,
     origin: {

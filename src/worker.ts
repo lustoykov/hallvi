@@ -1,3 +1,4 @@
+import { runOperationWorker } from "./server/operation-worker";
 import { PiWorkerDrainError, runPiWorker } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
 
@@ -8,6 +9,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => controller.abort());
 Promise.all([
   runPiWorker(controller.signal),
+  runOperationWorker(controller.signal),
   runDeploymentWorker(controller.signal),
 ])
   .catch((error) => {

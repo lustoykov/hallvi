@@ -1,3 +1,9 @@
+import {
+  operationsFor,
+  syncDeploymentOperation,
+  startChange,
+  retryOperation,
+} from "@/server/operation-store";
 import { randomUUID } from "node:crypto";
 import { db } from "@/server/db";
 import { checkDeploymentSource } from "@/server/deployment-source";
@@ -30,6 +36,7 @@ export function GET(_request: Request, context: Context) {
   return handle(async () => ({
     deployment: applicationDeployment((await context.params).applicationId),
     connected: Boolean(hetznerConnectionId()),
+    operations: operationsFor((await context.params).applicationId),
   }));
 }
 const schema = z.discriminatedUnion("action", [
@@ -105,6 +112,9 @@ export function POST(request: Request, context: Context) {
             connectionId,
             maxMonthly: input.maxMonthly,
           };
+          const tracked = syncDeploymentOperation(record);
+          const started = startChange(tracked.id, tracked.updatedAt);
+          if (started.state === "proposed") throw new Error(started.summary);
           record.status = "deploy-queued";
           saveDeployment(record);
           deploymentMessage(
@@ -139,9 +149,17 @@ export function POST(request: Request, context: Context) {
     } else if (input.action === "retry") {
       if (record.status !== "failed")
         throw new Error("Only a stopped deployment can be retried.");
-      record.status = record.authority ? "deploy-queued" : "queued";
-      record.error = null;
-      saveDeployment(record);
+      db().transaction(
+        () => {
+          const tracked = syncDeploymentOperation(record);
+          const retried = retryOperation(tracked.id, tracked.updatedAt);
+          record.operationId = retried.id;
+          record.status = record.authority ? "deploy-queued" : "queued";
+          record.error = null;
+          saveDeployment(record);
+        },
+        { behavior: "immediate" },
+      );
     } else {
       if (record.status !== "live")
         throw new Error(

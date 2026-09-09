@@ -54,6 +54,7 @@ export function DestinationActivity({
   const active = list.filter(
     (operation) =>
       operation.state === "working" ||
+      operation.state === "queued" ||
       operation.state === "proposed" ||
       unresolved(operation, operations),
   );
@@ -106,7 +107,9 @@ export function DestinationActivity({
                   ? operation.kind === "inspection"
                     ? "Server Guy is inspecting · read-only"
                     : "Server Guy is applying a change"
-                  : "This needs you"}
+                  : operation.state === "queued"
+                    ? "Queued · approved, waiting to run"
+                    : "This needs you"}
             </strong>
           </div>
           <p>

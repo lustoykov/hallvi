@@ -81,7 +81,7 @@ describe("deployment operation", () => {
     });
     expect(operation.mentions[0].chatId).toBe("chat-b");
     expect(operation.state).toBe("working");
-    expect(operation.kind).toBe("change");
+    expect(operation.kind).toBe("inspection");
     expect(operation.destinations[0]).toBe("deployment");
   });
 

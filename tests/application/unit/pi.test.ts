@@ -32,6 +32,11 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   },
   SettingsManager: { inMemory: () => ({ isolated: true }) },
 }));
+vi.mock("../../../src/server/operation-tools", () => ({
+  operationContext: () => [],
+  proposeAgentChange: vi.fn(),
+  recordLocalInspection: vi.fn(),
+}));
 vi.mock("../../../src/server/pi-configuration", () => ({
   configuredPiRuntime: mocks.configure,
 }));
@@ -573,6 +578,9 @@ describe("native Pi adapter", () => {
         "search_decisions",
         "get_application_status",
         "prepare_deployment",
+        "list_operations",
+        "propose_change",
+        "record_inspection",
       ],
       sessionManager: handles[0].sessionManager,
       settingsManager: { isolated: true },
@@ -582,6 +590,9 @@ describe("native Pi adapter", () => {
       "search_decisions",
       "get_application_status",
       "prepare_deployment",
+      "list_operations",
+      "propose_change",
+      "record_inspection",
     ]);
     expect(mocks.search).not.toHaveBeenCalled();
     // Nothing is read on the model's behalf before it asks.
@@ -614,7 +625,9 @@ describe("native Pi adapter", () => {
     expect(loader.systemPromptOverride()).not.toContain(current.runContext);
     expect(loader.systemPromptOverride()).not.toContain("CURRENT DECISIONS");
     expect(loader.agentsFilesOverride()).toEqual({ agentsFiles: [] });
-    expect(loader.appendSystemPromptOverride()).toEqual([]);
+    expect(loader.appendSystemPromptOverride().join("\n")).toContain(
+      "operation",
+    );
     expect(handles[0].release.mock.invocationCallOrder[0]).toBeGreaterThan(
       session.dispose.mock.invocationCallOrder[0],
     );

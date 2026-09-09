@@ -2,6 +2,7 @@ import {
   SquaresFour,
   Graph,
   RocketLaunch,
+  ClockCounterClockwise,
   Cpu,
   Database,
   Lightning,
@@ -38,6 +39,12 @@ export const applicationSections = [
     id: "deployment",
     label: "Deployment",
     icon: RocketLaunch,
+    group: "application",
+  },
+  {
+    id: "history",
+    label: "History",
+    icon: ClockCounterClockwise,
     group: "application",
   },
   // `available` says whether any backend can record the resource today.

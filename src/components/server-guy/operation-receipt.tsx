@@ -3,6 +3,7 @@
 import {
   ArrowRight,
   Check,
+  X,
   HourglassMedium,
   MagnifyingGlass,
   SpinnerGap,
@@ -26,6 +27,8 @@ import {
 
 const icons: Record<OperationState, ReactNode> = {
   proposed: <HourglassMedium weight="bold" aria-hidden="true" />,
+  queued: <HourglassMedium aria-hidden="true" />,
+  cancelled: <X aria-hidden="true" />,
   working: <SpinnerGap className="spin" aria-hidden="true" />,
   inspected: <MagnifyingGlass weight="bold" aria-hidden="true" />,
   verified: <Check weight="bold" aria-hidden="true" />,
@@ -114,7 +117,9 @@ export function OperationReceipt({
   now,
   onOpen,
   decision,
+  onOpenOperation,
 }: {
+  onOpenOperation?: (id: string) => void;
   operation: ApplicationOperation;
   now: number;
   onOpen: (destination: ApplicationSection) => void;
@@ -122,7 +127,9 @@ export function OperationReceipt({
   decision?: ReactNode;
 }) {
   const showSteps =
-    (operation.state === "working" || operation.state === "failed") &&
+    (operation.state === "working" ||
+      operation.state === "queued" ||
+      operation.state === "failed") &&
     operation.steps?.length;
   return (
     <div
@@ -132,13 +139,39 @@ export function OperationReceipt({
       aria-label={`${stateLabel[operation.state]}: ${operation.title}`}
     >
       <div className="sg-op-receipt-head">
-        <StateChip state={operation.state} detail={stepDetail(operation)} />
+        <StateChip
+          state={operation.state}
+          detail={operation.state === "queued" ? null : stepDetail(operation)}
+        />
         <strong>{operation.title}</strong>
         <span className="sg-op-rel">
           {relativeTime(operation.updatedAt, now)}
         </span>
       </div>
-      <p className="sg-op-summary">{operation.summary}</p>
+      {operation.state !== "queued" && (
+        <p className="sg-op-summary">{operation.summary}</p>
+      )}
+      {operation.state === "queued" && operation.waitingForId && (
+        <button
+          type="button"
+          className="sg-op-ref"
+          onClick={() => {
+            if (onOpenOperation && operation.waitingForId)
+              return onOpenOperation(operation.waitingForId);
+            onOpen("history");
+            window.setTimeout(
+              () =>
+                document
+                  .getElementById(`operation-${operation.waitingForId}`)
+                  ?.scrollIntoView({ block: "center", behavior: "smooth" }),
+              0,
+            );
+          }}
+        >
+          Waiting for {operation.waitingForTitle ?? "the current change"}{" "}
+          <ArrowRight />
+        </button>
+      )}
       {showSteps ? <OperationSteps steps={operation.steps} /> : null}
       {operation.evidence &&
         (operation.state === "verified" || operation.state === "inspected") && (

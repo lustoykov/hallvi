@@ -1,3 +1,8 @@
+import {
+  claimOperation,
+  operation,
+  syncDeploymentOperation,
+} from "./operation-store";
 import { realpathSync } from "node:fs";
 import Database from "better-sqlite3";
 import { setTimeout as delay } from "node:timers/promises";
@@ -28,10 +33,20 @@ export async function runDeploymentWorker(signal: AbortSignal) {
   try {
     interruptDeployments();
     while (!signal.aborted) {
-      const record = pendingDeployments()[0];
+      const record = pendingDeployments().find((candidate) => {
+        if (candidate.status === "queued") return true;
+        const tracked = syncDeploymentOperation(candidate);
+        return tracked.state === "working" && !tracked.executorPid;
+      });
       if (!record) {
         await delay(1000, undefined, { signal }).catch(() => undefined);
         continue;
+      }
+      if (record.status === "deploy-queued") {
+        const tracked = operation(
+          record.operationId ?? `deployment:${record.id}`,
+        );
+        if (!tracked || !claimOperation(tracked.id)) continue;
       }
       try {
         const bounded = AbortSignal.any([

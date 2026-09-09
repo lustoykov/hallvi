@@ -62,6 +62,7 @@ describe("stackOf", () => {
       "overview",
       "architecture",
       "deployment",
+      "history",
       "backups",
       "logs",
       "monitoring",

@@ -83,6 +83,16 @@ export function OperationDecisionCard({
           >
             {decision.action}
           </button>
+          <button
+            className="sg-secondary-button"
+            disabled={busy}
+            type="button"
+            onClick={() =>
+              onDecide(operation.id, { action: "cancel", inputs: {} })
+            }
+          >
+            Cancel
+          </button>
           <span>Nothing changes until you approve.</span>
         </div>
       </form>

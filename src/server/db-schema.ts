@@ -6,6 +6,7 @@ import {
   sqliteTable,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 import type {
@@ -484,13 +485,16 @@ export const applicationPreviews = sqliteTable("application_previews", {
 });
 
 // Provider work spans awaits in both the web process and the worker.
-export const applicationOperations = sqliteTable("application_operations", {
-  id: text("id").primaryKey(),
-  applicationId: text("application_id")
-    .notNull()
-    .references(() => applications.id, { onDelete: "cascade" }),
-  pid: integer("pid").notNull(),
-});
+export const applicationOperationProcesses = sqliteTable(
+  "application_operation_processes",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    pid: integer("pid").notNull(),
+  },
+);
 
 export const preparationBranches = sqliteTable("preparation_branches", {
   id: text("id").primaryKey(),
@@ -512,3 +516,25 @@ export const deployments = sqliteTable("deployments", {
     .$type<import("./deployment-types").DeploymentRecord>()
     .notNull(),
 });
+
+// One durable record drives execution, receipts, history and queue ownership.
+export const operationRecords = sqliteTable(
+  "application_operations",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    state: text("state").notNull(),
+    body: text("body", { mode: "json" })
+      .$type<import("./operation-types").StoredOperation>()
+      .notNull(),
+  },
+  (table) => [
+    index("operation_application").on(table.applicationId),
+    uniqueIndex("one_working_change_per_application")
+      .on(table.applicationId)
+      .where(sql`${table.kind} = 'change' AND ${table.state} = 'working'`),
+  ],
+);

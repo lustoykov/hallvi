@@ -15,7 +15,7 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
-const UPGRADABLE_VERSIONS = [6, 8, 9, 10, 11];
+const UPGRADABLE_VERSIONS = [6, 8, 9, 10, 11, 12];
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {
@@ -51,6 +51,15 @@ try {
           );
       })
       .immediate();
+    // Preserve old process guards; they are not operation history. Do not
+    // drop a live guard or reinterpret a PID row as a completed operation.
+    const operationColumns = database
+      .prepare("PRAGMA table_info(application_operations)")
+      .all();
+    if (operationColumns.some((column) => column.name === "pid"))
+      database.exec(
+        "ALTER TABLE application_operations RENAME TO application_operation_processes",
+      );
     migrateChatOwnership(database);
     // Drizzle v10 used a separate index, so removing source uniqueness needs
     // no application-table rebuild and cannot cascade into dependent records.

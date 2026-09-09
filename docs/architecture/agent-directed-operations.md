@@ -35,13 +35,21 @@ Pi interprets repository/upstream evidence, investigates ambiguity and revises t
 
 `deployment-store.ts` retains the initial deployment intent, source/connection identity, recommendation/approval, progress and results. Conditional writes prevent stale record replacement. Provider creation uncertainty is reconciled using the original identity before another purchase. Exact cost/offer and source identity are refreshed at the effect boundary.
 
-`operation-record.ts` derives UI operation records from the saved deployment. Chat receipts, view activity and navigation marks use this projection; they are not separate execution stores. This is one initial deployment per application, not a completed release-history model. Extend persistence only for the next concrete lifecycle requirement.
+`operation-store.ts` persists application operations. Existing deployment writes synchronize their receipt into this store; each log collection keeps a separate snapshot record. The existing deployment row still owns provider identity, source and spending authority. History, chat receipts, view activity, navigation marks and Overview consume the shared operation list. This adds operation history, not a completed multi-release executor.
+
+A partial unique index allows one `working` change per application. Approval, queue selection and completion run in immediate SQLite transactions. Approved changes blocked by another change are `queued`, with a reference to the blocker. Completion advances the oldest approved change. Repository, contract, revision, plan and input-name assumptions are checked both on advancement and executor claim; a changed assumption returns the operation to `proposed` without running it. Inspections do not take this change slot.
+
+Existing source preparation/publication commands and initial deployment are the current executors. Typed persisted commands let queued source work resume without its originating HTTP request. Source permissions, approved file digests, provenance and deployment pricing checks remain mandatory. The model cannot supply arbitrary shell commands or declare unsupported operations executable.
+
+The generic decision endpoint accepts approve/retry/cancel with an `updatedAt` comparison. Deployment approval and recovery retain their source/price/secret checks in the dedicated endpoint; a deployment still waiting behind another operation can be cancelled through the generic endpoint before any host effect. Cancelled records remain in History. Retrying creates a linked attempt and retains the failure.
+
+A dead local worker fails its claimed operation. If no external effect began, the queue continues. If a GitHub write or deployment effect may have occurred, the failed record holds the slot until its existing reconciliation/retry path establishes the result. Process death alone never authorizes another conflicting change. The operation record owns this hold; the agent never acquires or releases a lock.
 
 ## One application, multiple conversations
 
 Conversations belong directly to an Application. Each has its own transcript, draft and native Pi session; all refer to shared operational facts. An accepted run retains its application/conversation context when the user changes views. Request deduplication, cancellation, retry and atomic commits survive navigation and worker restarts.
 
-An operation records its origin and affected resources. The initiating reply renders the full receipt; other conversations can reference it. Stable views show the same pending work and independently verified current state. A proposal never masquerades as applied configuration. Conflicting changes need serialization or a precise conflict result; do not infer general concurrency support from the initial deployment's single-record guard.
+An operation records its origin and affected resources. The initiating reply renders the full receipt; other conversations can reference it. Stable views show the same pending work and independently verified current state. A proposal never masquerades as applied configuration. The server serializes changes regardless of which conversation or automatic task requested them. Duplicate unresolved intents reuse the same operation and record a mention in the requesting conversation. Every model turn receives compact live operation context, with `list_operations`, `propose_change` and `record_inspection` tools; other transcripts are excluded. The inspection tool records a read of saved application records and explicitly does not claim current remote health.
 
 Automatic jobs/checks record a schedule or system origin without inventing a user message. Failures become durable issues; investigation can link a conversation. Routine successes remain in history. Fable's [integration report](../design/2026-09-09-conversation-first-integration.md) owns the current presentation and browser-local seen-state limitation.
 
@@ -83,7 +91,7 @@ Manual recovery onto a replacement host preserves Application identity/history, 
 
 ## Implementation reality and migration
 
-Schema v12 retains Decisions, Observations, contracts, conformance/publication evidence, phase workspaces and native histories. The phase-oriented UI model is superseded; its evidence and authority checks remain until equivalent behavior replaces them. `application_operations` legacy guards must not be confused with the projected `ApplicationOperation` receipt model.
+Schema v13 retains Decisions, Observations, contracts, conformance/publication evidence, phase workspaces and native histories. The phase-oriented UI model is superseded; its evidence and authority checks remain until equivalent behavior replaces them. Migration renames the legacy PID guards to `application_operation_processes` without discarding them and creates durable `application_operations`. Stop both web and worker processes before migrating. Preserved live guards prevent new changes from bypassing older in-flight preparation.
 
 Use known-version, backed-up migrations with populated-state tests. Preserve application/chat/message IDs, native-session associations, pending work, source provenance and exact tested candidates. Do not drop tables because their old UI names disappeared.
 

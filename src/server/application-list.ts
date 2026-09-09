@@ -1,3 +1,4 @@
+import { operationsFor } from "./operation-store";
 // The applications list, derived from records: the deployment record and
 // its stack, never a phase or a check count.
 import type { ApplicationListItem } from "@/components/server-guy/applications-screen";
@@ -35,12 +36,13 @@ export function listItem(
   application: ApplicationRecord,
   deployment: DeploymentRecord | null,
   now = Date.now(),
+  operations = applicationOperations(deployment),
 ): ApplicationListItem {
   const stack = stackOf(deployment);
-  const operations = applicationOperations(deployment);
   const attention = operations.filter(
     (operation) =>
-      operation.state === "proposed" || operation.state === "failed",
+      operation.state === "proposed" ||
+      (operation.state === "failed" && !operation.resolvedById),
   ).length;
   const verifiedAt = deployment?.verifiedAt ?? null;
   const stale =
@@ -75,6 +77,11 @@ export function listItem(
 
 export function listApplicationItems() {
   return listApplications().map((application) =>
-    listItem(application, applicationDeployment(application.id)),
+    listItem(
+      application,
+      applicationDeployment(application.id),
+      Date.now(),
+      operationsFor(application.id),
+    ),
   );
 }

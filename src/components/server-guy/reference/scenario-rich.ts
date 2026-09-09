@@ -1754,3 +1754,110 @@ export const richScenario: Scenario = {
     },
   ],
 };
+
+// Coordination examples share the same records across chat and History.
+// Their executor is deliberately simulated, like the other reference scenes.
+richScenario.steps.push(
+  {
+    id: "queued-change",
+    title: "Two conversations, one change",
+    note: "A second approved change waits. Read-only inspection continues alongside it; History shows all three.",
+    clock: "2026-09-11T15:00:00.000Z",
+    apply: (state) => {
+      chat(state, "chat-coordinate-one", "Restart the worker");
+      chat(state, "chat-coordinate-two", "Change worker concurrency");
+      const first = message(
+        state,
+        "chat-coordinate-one",
+        "assistant",
+        "I’m restarting the worker and checking it comes back healthy.",
+      );
+      operation(state, {
+        id: "coord-restart",
+        source: "job",
+        kind: "change",
+        title: "Restart the worker",
+        state: "working",
+        destinations: ["processes", "jobs"],
+        origin: { chatId: first.chatId, messageId: first.id },
+        summary: "Waiting for the worker health check.",
+        steps: steps(["Restart the worker", "Verify its health"], 1),
+      });
+      const second = message(
+        state,
+        "chat-coordinate-two",
+        "assistant",
+        "Restart the worker is running from the other conversation. Your approved concurrency change will follow it; I’ll recheck the worker configuration first.",
+      );
+      operation(state, {
+        id: "coord-concurrency",
+        source: "variables",
+        kind: "change",
+        title: "Increase worker concurrency",
+        state: "queued",
+        destinations: ["processes", "variables"],
+        origin: { chatId: second.chatId, messageId: second.id },
+        summary: "Queued · after Restart the worker",
+        steps: [
+          { label: "Wait for Restart the worker to finish", state: "pending" },
+        ],
+      });
+      update(state, "coord-concurrency", {
+        waitingForId: "coord-restart",
+        waitingForTitle: "Restart the worker",
+      });
+      operation(state, {
+        id: "coord-inspect",
+        source: "inspection",
+        kind: "inspection",
+        title: "Inspect worker logs",
+        state: "inspected",
+        destinations: ["logs"],
+        origin: null,
+        summary: "Read-only inspection completed while the change was running.",
+        evidence:
+          "Worker is reconnecting; no fatal errors in the latest 100 lines.",
+      });
+    },
+  },
+  {
+    id: "queue-recheck",
+    title: "Facts changed while waiting",
+    note: "The first change finished. A changed worker definition needs fresh approval; the queued change has not run.",
+    clock: "2026-09-11T15:02:00.000Z",
+    apply: (state) => {
+      update(state, "coord-restart", {
+        state: "verified",
+        summary: "Worker restarted and healthy.",
+        steps: undefined,
+        evidence: "Worker connected and processed its health task.",
+      });
+      update(state, "coord-concurrency", {
+        state: "proposed",
+        waitingForId: null,
+        waitingForTitle: null,
+        steps: undefined,
+        summary:
+          "The worker definition changed while this was queued. Review the new configuration before applying concurrency.",
+        decision: {
+          kind: "approval",
+          note: "Worker now runs in the updated image. Set concurrency to 2 in that configuration and restart this process.",
+          action: "Approve updated change",
+          inputs: [],
+        },
+      });
+    },
+  },
+  {
+    id: "queue-cancelled",
+    title: "Cancelled, kept in History",
+    note: "Cancellation is a recorded outcome, not a deleted proposal.",
+    clock: "2026-09-11T15:03:00.000Z",
+    apply: (state) =>
+      update(state, "coord-concurrency", {
+        state: "cancelled",
+        decision: null,
+        summary: "Cancelled by the user. Worker configuration was not changed.",
+      }),
+  },
+);

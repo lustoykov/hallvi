@@ -1,3 +1,4 @@
+import { operationsFor } from "./operation-store";
 import { preparationView } from "./preparation";
 import { applicationPreviewView } from "./application-preview";
 import {
@@ -201,6 +202,7 @@ export function getOperatorView(
   });
   return {
     application,
+    operations: operationsFor(application.id),
     preview: applicationPreviewView(application.id),
     preparation: preparationView(application.id),
     workspace: views.find((item) => item.id === workspace.id) ?? null,

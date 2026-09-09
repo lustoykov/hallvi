@@ -207,7 +207,17 @@ export function ReferenceShell({
   }
   function decide(operationId: string, choice: DecisionChoice) {
     const later = stepAfterDecision(scenario, step, operationId);
-    if (later !== null && choice.action !== "cancel") {
+    const laterOperation =
+      later === null
+        ? null
+        : allOperations(stateAt(scenario, later)).find(
+            (item) => item.id === operationId,
+          );
+    if (
+      later !== null &&
+      choice.action !== "cancel" &&
+      laterOperation?.state !== "cancelled"
+    ) {
       goToStep(later);
       return;
     }
@@ -215,9 +225,20 @@ export function ReferenceShell({
       const next = structuredClone(current ?? base);
       const found = next.operations.find((item) => item.id === operationId);
       if (choice.action === "cancel") {
-        if (operationId.startsWith("deployment:")) next.deployment = null;
-        else if (found) {
-          found.state = "inspected";
+        if (operationId.startsWith("deployment:")) {
+          const cancelled = allOperations(next).find(
+            (item) => item.id === operationId,
+          );
+          if (cancelled)
+            next.operations.push({
+              ...cancelled,
+              state: "cancelled",
+              decision: null,
+              summary: "Cancelled before anything was applied.",
+            });
+          next.deployment = null;
+        } else if (found) {
+          found.state = "cancelled";
           found.summary = "Cancelled before anything was applied.";
           found.decision = null;
         }
@@ -448,6 +469,24 @@ export function ReferenceShell({
               operations={operations}
               now={now}
               onRefresh={async () => setOverlay(refreshLogs(state))}
+              decisionFor={(operation) =>
+                operation.state === "queued" ? (
+                  <button
+                    className="sg-op-link"
+                    type="button"
+                    onClick={() =>
+                      decide(operation.id, { action: "cancel", inputs: {} })
+                    }
+                  >
+                    Cancel queued change
+                  </button>
+                ) : (
+                  <OperationDecisionCard
+                    operation={operation}
+                    onDecide={decide}
+                  />
+                )
+              }
               onOpenDestination={selectSection}
               onOpenConversation={openConversation}
               onAsk={ask}
@@ -516,7 +555,17 @@ export function ReferenceShell({
                 onOpenConversation={openConversation}
                 highlight={highlight}
                 decisionFor={(operation) =>
-                  operation.decision ? (
+                  operation.state === "queued" ? (
+                    <button
+                      className="sg-op-link"
+                      type="button"
+                      onClick={() =>
+                        decide(operation.id, { action: "cancel", inputs: {} })
+                      }
+                    >
+                      Cancel queued change
+                    </button>
+                  ) : operation.decision ? (
                     <OperationDecisionCard
                       operation={operation}
                       onDecide={decide}

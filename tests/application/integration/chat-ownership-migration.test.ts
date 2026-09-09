@@ -149,7 +149,7 @@ it("refuses an orphaned conversation and leaves its original history recoverable
   }
 }, 20_000);
 
-it("upgrades a v11 conversation database to v12 without rewriting its history", () => {
+it("upgrades a v11 conversation database to the current schema without rewriting its history", () => {
   const { path } = legacyDatabase();
   pushTestDatabase(path);
   const v11 = new Database(path);
@@ -165,8 +165,42 @@ it("upgrades a v11 conversation database to v12 without rewriting its history", 
     expect(upgraded.prepare("SELECT * FROM chats").all()).toEqual(chats);
     expect(upgraded.prepare("SELECT * FROM deployments").all()).toEqual([]);
     expect(upgraded.pragma("foreign_key_check")).toEqual([]);
-    expect(upgraded.pragma("user_version", { simple: true })).toBe(12);
+    expect(upgraded.pragma("user_version", { simple: true })).toBe(
+      schemaVersion.version,
+    );
   } finally {
     upgraded.close();
   }
 }, 20_000);
+
+it("upgrades v12 process guards to durable operation storage without dropping guards or history", () => {
+  const { root, path } = legacyDatabase();
+  pushTestDatabase(path);
+  const before = new Database(path);
+  const history = snapshot(before);
+  before.exec(
+    "DROP TABLE application_operations; ALTER TABLE application_operation_processes RENAME TO application_operations; INSERT INTO application_operations VALUES ('guard', 'app', 12345); PRAGMA user_version = 12",
+  );
+  before.close();
+  pushTestDatabase(path);
+  const upgraded = new Database(path);
+  try {
+    expect(snapshot(upgraded)).toEqual(history);
+    expect(
+      upgraded.prepare("SELECT * FROM application_operation_processes").all(),
+    ).toEqual([{ id: "guard", application_id: "app", pid: 12345 }]);
+    expect(
+      upgraded.prepare("SELECT * FROM application_operations").all(),
+    ).toEqual([]);
+    expect(upgraded.pragma("user_version", { simple: true })).toBe(
+      schemaVersion.version,
+    );
+    expect(upgraded.pragma("foreign_key_check")).toEqual([]);
+    const backups = readdirSync(root).filter((name) =>
+      name.endsWith(".backup"),
+    );
+    expect(backups).toHaveLength(2);
+  } finally {
+    upgraded.close();
+  }
+}, 20000);
