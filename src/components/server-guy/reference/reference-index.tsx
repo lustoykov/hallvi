@@ -8,6 +8,12 @@ const scenarios = [simpleScenario, richScenario];
 
 const screens: { title: string; detail: string; href: string }[] = [
   {
+    title: "Where the application identity belongs",
+    detail:
+      "Three placements of the switcher, side by side and live: sidebar head, top bar, or a path with no menu.",
+    href: "/prototype/shell",
+  },
+  {
     title: "Applications",
     detail: "The list with condition, stack and what needs you.",
     href: "/prototype/applications",
@@ -119,6 +125,21 @@ const flows: { title: string; detail: string; href: string }[] = [
     title: "Simple stack · what else it could run",
     detail: "Status page · adaptive sidebar with Show more.",
     href: "/prototype/app?scenario=simple&step=4&section=processes",
+  },
+  {
+    title: "Delivery path · no domain",
+    detail: "Status page · the path from name to service with the gaps shown.",
+    href: "/prototype/app?scenario=simple&step=4&section=domains",
+  },
+  {
+    title: "Disk against its volumes",
+    detail: "Document archive · which volume is actually large.",
+    href: "/prototype/app?scenario=rich&step=13&section=storage",
+  },
+  {
+    title: "Recovery points over time",
+    detail: "Document archive · copies, gaps and the proven restore.",
+    href: "/prototype/app?scenario=rich&step=13&section=backups",
   },
 ];
 

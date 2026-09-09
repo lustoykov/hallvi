@@ -5,10 +5,12 @@ import type { ReactNode } from "react";
 import type { StackProcess } from "@/server/application-stack";
 
 import {
+  Condition,
   Facts,
   Pill,
   Planned,
   Possible,
+  TextLink,
   stateText,
   verifiedText,
   type ViewProps,
@@ -19,22 +21,30 @@ function brokerName(stack: ViewProps["stack"], backend: "postgres" | "redis") {
   return stack.services[0]?.kind === "valkey" ? "Valkey" : "Redis";
 }
 
+type Check = { state: "passing" | "failing" | "unknown"; detail: string };
+
 function Process({
   process,
   verified,
   stack,
   check,
+  onOpenDestination,
 }: {
   process: StackProcess;
   verified: ReactNode;
   stack: ViewProps["stack"];
-  check?: { state: "passing" | "failing" | "unknown"; detail: string } | null;
+  check?: Check | null;
+  onOpenDestination: ViewProps["onOpenDestination"];
 }) {
   const queue = stack.queues.find((item) =>
     item.workers.includes(process.name),
   );
+  const unhealthy = check?.state === "failing";
   return (
-    <section className="sg-stack-item" aria-label={`Process ${process.name}`}>
+    <section
+      className={`sg-stack-item${unhealthy ? " sg-stack-item-bad" : ""}`}
+      aria-label={`Process ${process.name}`}
+    >
       <h2>
         <code>{process.name}</code>
         <span className="sg-role">
@@ -58,18 +68,14 @@ function Process({
           </Pill>
         )}
       </h2>
+      {check && (
+        <p className={unhealthy ? "sg-op-next" : "sg-visual-caption"}>
+          {check.detail}
+        </p>
+      )}
       <Facts
         rows={[
-          [
-            "State",
-            check ? (
-              <>
-                {stateText(process.state, verified)} · {check.detail}
-              </>
-            ) : (
-              stateText(process.state, verified)
-            ),
-          ],
+          ["State", stateText(process.state, verified)],
           [
             "Command",
             process.command ? <code>{process.command}</code> : "Image default",
@@ -93,16 +99,24 @@ function Process({
                     "No health path recorded"
                   ),
                 ],
-              ] as Array<[string, React.ReactNode]>)
+              ] as Array<[string, ReactNode]>)
             : ([
                 [
                   "Consumes",
                   process.consumes ??
-                    (queue
-                      ? `${queue.library} queue on ${brokerName(stack, queue.backend)}`
-                      : "Not recorded"),
+                    (queue ? (
+                      <>
+                        {queue.library} queue on{" "}
+                        {brokerName(stack, queue.backend)} ·{" "}
+                        <TextLink onClick={() => onOpenDestination("cache")}>
+                          Cache &amp; queue
+                        </TextLink>
+                      </>
+                    ) : (
+                      "Not recorded"
+                    )),
                 ],
-              ] as Array<[string, React.ReactNode]>)),
+              ] as Array<[string, ReactNode]>)),
         ]}
       />
     </section>
@@ -114,25 +128,23 @@ export function ProcessesView(props: ViewProps) {
   const { stack, facts, deployment } = props;
   const verified = verifiedText(deployment);
   const workers = stack.processes.filter((item) => item.role === "worker");
+  const web = stack.processes.filter((item) => item.role === "web");
   const checks = facts.monitoring?.checks ?? [];
-  return (
-    <>
-      {stack.recorded ? (
-        stack.processes.map((process) => (
-          <Process
-            key={process.name}
-            process={process}
-            verified={verified}
-            stack={stack}
-            check={
-              checks.find(
-                (check) =>
-                  check.kind === "process" && check.target === process.name,
-              ) ?? null
-            }
-          />
-        ))
-      ) : (
+  const checkFor = (name: string) =>
+    checks.find((check) => check.kind === "process" && check.target === name) ??
+    null;
+  const unhealthy = stack.processes.filter(
+    (process) => checkFor(process.name)?.state === "failing",
+  );
+  // Something failing is read first, so it is ordered first.
+  const ordered = [...stack.processes].sort(
+    (a, b) =>
+      Number(checkFor(b.name)?.state === "failing") -
+      Number(checkFor(a.name)?.state === "failing"),
+  );
+  if (!stack.recorded)
+    return (
+      <>
         <Possible
           title="No processes recorded yet"
           available
@@ -143,8 +155,41 @@ export function ProcessesView(props: ViewProps) {
           worker process appears here with its command, image, ports, health
           check and verification state.
         </Possible>
+        <Planned title="Process health and restarts">
+          Restart counts, resource use per process and controlled restarts will
+          live here. Only the deployment verification is recorded today.
+        </Planned>
+      </>
+    );
+  return (
+    <>
+      {checks.length > 0 && (
+        <Condition
+          tone={unhealthy.length ? "bad" : "ok"}
+          title={
+            unhealthy.length
+              ? `${unhealthy.map((item) => item.name).join(", ")} ${unhealthy.length === 1 ? "is" : "are"} unhealthy`
+              : `${stack.processes.length} process${stack.processes.length === 1 ? "" : "es"} healthy`
+          }
+        >
+          {web.length} web process{web.length === 1 ? "" : "es"}
+          {workers.length
+            ? ` and ${workers.length} worker${workers.length === 1 ? "" : "s"}`
+            : " and no workers"}{" "}
+          on one instance, checked on the host.
+        </Condition>
       )}
-      {stack.recorded && !workers.length && (
+      {ordered.map((process) => (
+        <Process
+          key={process.name}
+          process={process}
+          verified={verified}
+          stack={stack}
+          check={checkFor(process.name)}
+          onOpenDestination={props.onOpenDestination}
+        />
+      ))}
+      {!workers.length && (
         <p className="sg-section-note">
           No worker processes are recorded for this application. Server Guy adds
           them when the application declares background work.

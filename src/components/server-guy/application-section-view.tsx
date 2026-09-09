@@ -29,6 +29,7 @@ import { ProcessesView } from "./views/processes-view";
 import { StorageView } from "./views/storage-view";
 import { VariablesView } from "./views/variables-view";
 import type { ViewProps } from "./views/bits";
+import { Loading } from "./views/visuals";
 
 const descriptions: Record<ApplicationSection, string> = {
   history:
@@ -75,6 +76,7 @@ export function ApplicationSectionView({
   onRevealStack,
   onAction,
   busy,
+  loading,
   bar,
   children,
   decisionFor,
@@ -96,6 +98,8 @@ export function ApplicationSectionView({
   /** Starts a view action when the product can; absent hides the control. */
   onAction?: (action: ViewAction) => void;
   busy?: string | null;
+  /** The record has not been read yet; the view shows its shape, not "none". */
+  loading?: boolean;
   /** The bar above the header: the way back to the conversation. */
   bar?: ReactNode;
   children?: ReactNode;
@@ -138,6 +142,23 @@ export function ApplicationSectionView({
     />
   );
   let content: ReactNode;
+  if (loading && !deployment)
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        {bar}
+        <header className="sg-section-header">
+          <div>
+            <h1>
+              {applicationSections.find((item) => item.id === section)?.label}
+            </h1>
+            <p>{descriptions[section]}</p>
+          </div>
+        </header>
+        <div className="sg-section-content">
+          <Loading rows={5} label="Reading the recorded facts" />
+        </div>
+      </div>
+    );
   switch (section) {
     case "overview":
       content = (
@@ -227,6 +248,8 @@ export function ApplicationSectionView({
             application={app}
             deployment={deployment}
             stack={stack}
+            facts={facts}
+            onOpenDestination={onOpenDestination}
           />
         </>
       ) : (

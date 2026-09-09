@@ -5,10 +5,14 @@ import { useState } from "react";
 
 import { Facts, When, type ViewProps } from "./bits";
 
+const severe = /\b(ERROR|CRITICAL|FATAL|Traceback)\b/;
+const warned = /\b(WARN|WARNING)\b/;
+
 /**
  * A collected snapshot of the application's output, per service, with the
  * stream facts when a collector records them. Refreshing is an inspection:
- * read-only, recorded with its time.
+ * read-only, recorded with its time. Severity tinting comes from the words
+ * in the line itself; it is a reading aid, never a health verdict.
  */
 export function LogsView(
   props: ViewProps & { applicationId: string; onRefresh: () => Promise<void> },
@@ -28,6 +32,7 @@ export function LogsView(
   const collectedAt =
     facts.logs?.snapshot?.at ?? deployment?.logsCollectedAt ?? null;
   const streams = facts.logs?.streams ?? [];
+  const peak = Math.max(1, ...streams.map((stream) => stream.lines));
   const shown = snapshot.filter(
     (line) =>
       line.toLowerCase().includes(query.toLowerCase()) &&
@@ -67,6 +72,7 @@ export function LogsView(
   const canRefresh = onAction
     ? busy !== "refresh-logs"
     : deployment?.status === "live" && !refreshing;
+  const collecting = refreshing || busy === "refresh-logs";
   return (
     <>
       {streams.length > 0 && (
@@ -92,6 +98,16 @@ export function LogsView(
                 <When at={stream.lastAt} now={now} />
                 {stream.level === "errors" ? " · errors" : ""}
               </small>
+              <span className="sg-stream-bar" aria-hidden="true">
+                <span
+                  className={
+                    stream.level === "errors"
+                      ? "sg-fill-bad"
+                      : "sg-fill-working"
+                  }
+                  style={{ width: `${(stream.lines / peak) * 100}%` }}
+                />
+              </span>
             </button>
           ))}
         </div>
@@ -108,9 +124,7 @@ export function LogsView(
         </label>
         <button disabled={!canRefresh} onClick={() => void refresh()}>
           <ArrowClockwise />
-          {refreshing || busy === "refresh-logs"
-            ? "Collecting…"
-            : "Refresh logs"}
+          {collecting ? "Collecting…" : "Refresh logs"}
         </button>
       </div>
       {error && (
@@ -122,6 +136,7 @@ export function LogsView(
         <span>
           Application host · collected snapshot · read-only
           {service ? ` · ${service}` : ""}
+          {query ? ` · ${shown.length} of ${snapshot.length} lines match` : ""}
         </span>
         <span>
           {collectedAt ? (
@@ -133,19 +148,45 @@ export function LogsView(
           )}
         </span>
       </div>
-      <pre
-        className="sg-logs-output"
-        tabIndex={0}
-        aria-label="Collected application logs"
-      >
-        {shown.length
-          ? shown.join("\n")
-          : snapshot.length
-            ? "No lines match your filter."
-            : "No logs collected yet. After a verified deployment, refresh to collect the latest host output."}
-      </pre>
+      {collecting ? (
+        <div className="sg-logs-output sg-logs-collecting" role="status">
+          Collecting the latest output from the host…
+        </div>
+      ) : (
+        <pre
+          className="sg-logs-output"
+          tabIndex={0}
+          aria-label="Collected application logs"
+        >
+          {shown.length ? (
+            shown.map((line, index) => (
+              <span
+                key={index}
+                className={
+                  severe.test(line)
+                    ? "sg-log-severe"
+                    : warned.test(line)
+                      ? "sg-log-warn"
+                      : undefined
+                }
+              >
+                {line}
+                {"\n"}
+              </span>
+            ))
+          ) : snapshot.length ? (
+            <span className="sg-log-empty">No lines match your filter.</span>
+          ) : (
+            <span className="sg-log-empty">
+              No logs collected yet. After a verified deployment, refresh to
+              collect the latest host output.
+            </span>
+          )}
+        </pre>
+      )}
       {facts.logs ? (
         <Facts
+          wide
           rows={[
             ["Retention on the host", facts.logs.retention],
             [

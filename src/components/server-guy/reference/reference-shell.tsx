@@ -1,21 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ArrowLeft,
-  CaretDown,
-  Check,
-  Plus,
-  Trash,
-} from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft } from "@phosphor-icons/react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ViewAction } from "@/server/application-facts";
 import { stackOf } from "@/server/application-stack";
 import type { OperatorView } from "@/server/types";
 
 import "../application-shell.css";
+import "../views.css";
 import "./reference.css";
+import {
+  ApplicationIdentity,
+  type IdentityVariant,
+} from "../application-identity";
 import { ApplicationNavigation } from "../application-navigation";
 import { ApplicationSectionView } from "../application-section-view";
 import {
@@ -82,12 +80,15 @@ export function ReferenceShell({
   initialStep,
   initialSection = null,
   initialChat = null,
+  identityVariant = "navigation",
 }: {
   scenarioId: Scenario["id"];
   initialStep: number;
   /** A section id from the URL; anything else opens the conversation. */
   initialSection?: string | null;
   initialChat?: string | null;
+  /** Which identity placement to show; the explorer compares them. */
+  identityVariant?: IdentityVariant;
 }) {
   const [scenarioKey, setScenarioKey] = useState<Scenario["id"]>(scenarioId);
   const scenario =
@@ -117,7 +118,6 @@ export function ReferenceShell({
   const [busy, setBusy] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [dialog, setDialog] = useState<"remove" | null>(null);
-  const picker = useRef<HTMLButtonElement>(null);
 
   const operations = useMemo(() => allOperations(state), [state]);
   const stack = useMemo(() => stackOf(state.deployment), [state.deployment]);
@@ -327,95 +327,39 @@ export function ReferenceShell({
   };
   const other = scenarios.find((item) => item.id !== scenario.id)!;
   const otherApplication = other.initial().application;
+  const identity = (
+    <ApplicationIdentity
+      variant={identityVariant}
+      application={state.application}
+      applications={[state.application, otherApplication]}
+      menuId="reference-picker"
+      listHref="/prototype/applications"
+      addHref="/prototype/new"
+      hrefFor={(item) =>
+        `/prototype/app?scenario=${item.id === state.application.id ? scenario.id : other.id}`
+      }
+      onSelect={(item, event) => {
+        if (item.id === state.application.id) return;
+        event.preventDefault();
+        chooseScenario(other.id);
+      }}
+      onRemove={() => setDialog("remove")}
+    />
+  );
+  const where = section
+    ? { title: labelOf(section), detail: null as string | null }
+    : {
+        title: chat?.title ?? "Conversation",
+        detail: chat?.archivedAt ? "Archived" : null,
+      };
   return (
     <>
       <main className="sg-shell sg-adaptive-shell sg-reference-shell">
         <header className="sg-topbar">
-          <div className="sg-app-identity">
-            <button
-              ref={picker}
-              className="sg-application-picker"
-              type="button"
-              popoverTarget="reference-picker"
-              aria-label={`Switch application: ${state.application.name}`}
-            >
-              <span>
-                <strong>{state.application.name}</strong>
-                <small>
-                  {state.application.repositoryOwner}/
-                  {state.application.repositoryName}
-                </small>
-              </span>
-              <CaretDown aria-hidden="true" weight="bold" />
-            </button>
-            <nav
-              id="reference-picker"
-              popover="auto"
-              className="sg-application-menu"
-              aria-label="Applications"
-              onBeforeToggle={(event) => {
-                if (event.newState !== "open") return;
-                const anchor = picker.current?.getBoundingClientRect();
-                if (!anchor) return;
-                event.currentTarget.style.top = `${anchor.bottom + 6}px`;
-                event.currentTarget.style.left = `${Math.max(12, anchor.left)}px`;
-                event.currentTarget.style.minWidth = `${anchor.width}px`;
-              }}
-            >
-              <span className="sg-eyebrow sg-application-menu-label">
-                Switch application
-              </span>
-              {[state.application, otherApplication].map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/prototype/app?scenario=${item.id === state.application.id ? scenario.id : other.id}`}
-                  aria-current={
-                    item.id === state.application.id ? "page" : undefined
-                  }
-                  onClick={(event) => {
-                    event.currentTarget
-                      .closest<HTMLElement>("[popover]")
-                      ?.hidePopover();
-                    if (item.id !== state.application.id) {
-                      event.preventDefault();
-                      chooseScenario(other.id);
-                    }
-                  }}
-                >
-                  <span aria-hidden="true" className="sg-application-menu-mark">
-                    {item.repositoryName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {item.repositoryOwner}/{item.repositoryName}
-                    </small>
-                  </div>
-                  {item.id === state.application.id && (
-                    <Check aria-label="Current application" weight="bold" />
-                  )}
-                </Link>
-              ))}
-              <Link
-                className="sg-application-menu-action"
-                href="/prototype/new"
-              >
-                <Plus /> Add application
-              </Link>
-              <hr />
-              <button
-                type="button"
-                className="sg-remove-application"
-                onClick={(event) => {
-                  event.currentTarget
-                    .closest<HTMLElement>("[popover]")
-                    ?.hidePopover();
-                  setDialog("remove");
-                }}
-              >
-                <Trash /> Remove application…
-              </button>
-            </nav>
+          {identityVariant !== "navigation" && identity}
+          <div className="sg-topbar-where">
+            <strong>{where.title}</strong>
+            {where.detail && <span>{where.detail}</span>}
           </div>
           {section && featured && (
             <button
@@ -437,6 +381,7 @@ export function ReferenceShell({
           )}
         </header>
         <ApplicationNavigation
+          head={identityVariant === "navigation" ? identity : undefined}
           chats={state.chats}
           selectedChatId={chat?.id ?? null}
           section={section}

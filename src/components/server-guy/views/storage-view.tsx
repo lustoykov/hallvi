@@ -1,10 +1,23 @@
 "use client";
 
-import { Planned, Possible, TextLink, When, type ViewProps } from "./bits";
+import {
+  Condition,
+  Planned,
+  Possible,
+  TextLink,
+  When,
+  type ViewProps,
+} from "./bits";
+import { Composition } from "./visuals";
+
+const size = (gb: number) =>
+  gb < 1 ? `${Math.round(gb * 1024)} MB` : `${gb.toFixed(1)} GB`;
 
 /**
- * Volumes and files that must survive container replacement, with their
- * measured size when a collector has one and their protection state.
+ * Volumes and files that must survive container replacement. Where the
+ * host disk has been measured, the volumes are drawn against it: which one
+ * is actually large, and how much headroom is left, are the two questions
+ * a list of five equal rows answers slowly.
  */
 export function StorageView(props: ViewProps) {
   const { stack, facts, now } = props;
@@ -20,76 +33,125 @@ export function StorageView(props: ViewProps) {
     </TextLink>
   );
   const disk = facts.storage?.hostDisk;
+  const protectionOf = (name: string, kind: string) =>
+    coverage.get(`volume:${name}`) ??
+    (kind === "database"
+      ? [...coverage.values()].find((item) => item.key.startsWith("database:"))
+      : undefined);
+  const measured = stack.volumes
+    .map((volume) => ({ volume, size: sizes.get(volume.name) }))
+    .filter((item) => item.size);
+  const unprotected = stack.volumes.filter(
+    (volume) => protectionOf(volume.name, volume.kind)?.state !== "protected",
+  );
+  const total = measured.reduce((sum, item) => sum + item.size!.sizeGb, 0);
   return (
     <>
+      {stack.volumes.length > 0 && (
+        <Condition
+          tone={unprotected.length ? "warn" : disk ? "ok" : "muted"}
+          title={
+            `${stack.volumes.length} persistent volume${stack.volumes.length === 1 ? "" : "s"}` +
+            (measured.length === stack.volumes.length
+              ? ` · ${size(total)} on the instance`
+              : "")
+          }
+        >
+          {unprotected.length
+            ? `${unprotected.length} of them ${unprotected.length === 1 ? "is" : "are"} not backed up off the host. A volume survives container replacement; it does not survive losing the instance.`
+            : "Every volume has an off-host copy. A volume survives container replacement; the off-host copy survives losing the instance."}
+        </Condition>
+      )}
+      {disk && measured.length > 0 && (
+        <div className="sg-band">
+          <h2>Instance disk</h2>
+          <Composition
+            segments={measured.map((item) => ({
+              label: item.volume.name,
+              value: item.size!.sizeGb,
+            }))}
+            total={disk.totalGb}
+            unit={size}
+            remainderLabel="Free and system"
+            caption={
+              <>
+                {disk.usedGb} of {disk.totalGb} GB used, measured{" "}
+                <When at={disk.measuredAt} now={now} />. The remainder covers
+                the operating system, images and free space.
+              </>
+            }
+          />
+        </div>
+      )}
       {stack.volumes.length ? (
-        <div className="sg-volume-list">
-          <div className="sg-volume-row sg-table-head">
-            <span>Volume</span>
-            <span>Holds</span>
-            <span>Size</span>
-            <span>Protection</span>
-          </div>
-          {stack.volumes.map((volume) => {
-            const size = sizes.get(volume.name);
-            const protection =
-              coverage.get(`volume:${volume.name}`) ??
-              (volume.kind === "database"
-                ? [...coverage.values()].find((item) =>
-                    item.key.startsWith("database:"),
-                  )
-                : undefined);
-            return (
-              <div className="sg-volume-row" key={volume.name}>
-                <span>
-                  <code>{volume.name}</code>
-                  <small>{volume.mount}</small>
-                </span>
-                <span data-label="Holds">
-                  {volume.kind === "database"
-                    ? `${volume.usedBy} data`
-                    : `Application files · ${volume.usedBy}`}
-                </span>
-                <span data-label="Size">
-                  {size ? (
-                    <>
-                      {size.sizeGb < 1
-                        ? `${Math.round(size.sizeGb * 1024)} MB`
-                        : `${size.sizeGb.toFixed(1)} GB`}
-                      <small>
-                        measured <When at={size.measuredAt} now={now} />
-                      </small>
-                    </>
-                  ) : (
-                    "Not measured"
-                  )}
-                </span>
-                <span
-                  data-label="Protection"
-                  className={
-                    protection?.state === "protected"
-                      ? "sg-outcome-ok"
-                      : "sg-outcome-warn"
-                  }
+        <div className="sg-band">
+          <h2>Volumes</h2>
+          <div className="sg-volume-list">
+            <div className="sg-volume-row sg-table-head">
+              <span>Volume</span>
+              <span>Holds</span>
+              <span>Size</span>
+              <span>Protection</span>
+            </div>
+            {stack.volumes.map((volume) => {
+              const measurement = sizes.get(volume.name);
+              const protection = protectionOf(volume.name, volume.kind);
+              const bad = protection?.state === "failed";
+              const warn = !bad && protection?.state !== "protected";
+              return (
+                <div
+                  className={`sg-volume-row${bad ? " sg-row-bad" : warn ? " sg-row-warn" : ""}`}
+                  key={volume.name}
                 >
-                  {protection?.state === "protected"
-                    ? "Backed up"
-                    : protection?.state === "behind"
-                      ? "Behind policy"
-                      : protection?.state === "failed"
-                        ? "Last backup failed"
-                        : "Not backed up"}{" "}
-                  · {backupsLink}
-                  {protection?.lastSuccessfulAt && (
-                    <small>
-                      last copy{" "}
-                      <When at={protection.lastSuccessfulAt} now={now} />
-                    </small>
-                  )}
-                </span>
-              </div>
-            );
-          })}
+                  <span>
+                    <code>{volume.name}</code>
+                    <small>{volume.mount}</small>
+                  </span>
+                  <span data-label="Holds">
+                    {volume.kind === "database"
+                      ? `${volume.usedBy} data`
+                      : `Application files · ${volume.usedBy}`}
+                  </span>
+                  <span data-label="Size">
+                    {measurement ? (
+                      <>
+                        {size(measurement.sizeGb)}
+                        <small>
+                          measured{" "}
+                          <When at={measurement.measuredAt} now={now} />
+                        </small>
+                      </>
+                    ) : (
+                      "Not measured"
+                    )}
+                  </span>
+                  <span
+                    data-label="Protection"
+                    className={
+                      protection?.state === "protected"
+                        ? "sg-outcome-ok"
+                        : "sg-outcome-warn"
+                    }
+                  >
+                    {protection?.state === "protected"
+                      ? "Backed up"
+                      : protection?.state === "behind"
+                        ? "Behind policy"
+                        : protection?.state === "failed"
+                          ? "Last backup failed"
+                          : "Not backed up"}{" "}
+                    · {backupsLink}
+                    {protection?.lastSuccessfulAt && (
+                      <small>
+                        last copy{" "}
+                        <When at={protection.lastSuccessfulAt} now={now} />
+                      </small>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <Possible
@@ -103,43 +165,6 @@ export function StorageView(props: ViewProps) {
           documents or configuration, each with its protection state.
         </Possible>
       )}
-      {disk && (
-        <div className="sg-resource sg-resource-single">
-          <div className="sg-resource-head">
-            <strong>Instance disk</strong>
-            <span
-              className={
-                disk.usedGb / disk.totalGb >= 0.9
-                  ? "sg-outcome-bad"
-                  : disk.usedGb / disk.totalGb >= 0.75
-                    ? "sg-outcome-warn"
-                    : undefined
-              }
-            >
-              {disk.usedGb} of {disk.totalGb} GB used ·{" "}
-              <When at={disk.measuredAt} now={now} />
-            </span>
-          </div>
-          <div className="sg-meter" aria-hidden="true">
-            <span
-              className={
-                disk.usedGb / disk.totalGb >= 0.9
-                  ? "bad"
-                  : disk.usedGb / disk.totalGb >= 0.75
-                    ? "warn"
-                    : ""
-              }
-              style={{
-                width: `${Math.round((disk.usedGb / disk.totalGb) * 100)}%`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-      <p className="sg-section-note">
-        A persistent volume survives container replacement on this instance. It
-        does not survive losing the host; off-host backups do that.
-      </p>
       {!facts.storage && (
         <Planned title="Disk usage and growth">
           Measured usage per volume, host disk pressure and targeted cleanup

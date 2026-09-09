@@ -160,10 +160,16 @@ export function navigationIndicators(
     const others = working.length
       ? ` · ${count(working.length, "operation")} working`
       : "";
+    // An operation names the destination it is mainly about first; only
+    // that one animates, so one change across five destinations does not
+    // set five marks pulsing.
+    const leads = (operation: ApplicationOperation) =>
+      operation.destinations[0] === section.id;
     if (failed) {
       result[section.id] = {
         tone: "failed",
         label: `Failed: ${failed.title}${others}`,
+        primary: leads(failed),
       };
       continue;
     }
@@ -171,6 +177,7 @@ export function navigationIndicators(
       result[section.id] = {
         tone: "needs-you",
         label: `Waiting for you: ${proposed.title}${others}`,
+        primary: leads(proposed),
       };
       continue;
     }
@@ -181,6 +188,7 @@ export function navigationIndicators(
           working.length > 1
             ? `${count(working.length, "operation")} working: ${working.map((operation) => operation.title).join(", ")}`
             : `Server Guy is working here: ${working[0].title}`,
+        primary: working.some(leads),
       };
       continue;
     }
@@ -205,6 +213,7 @@ export function conversationMarks(
   chats: ChatSummary[],
 ) {
   const marks: Record<string, NavigationIndicator> = {};
+  // A conversation owns the work it started, so its own mark leads.
   for (const chat of chats) {
     const own = newestFirst(
       operations.filter((operation) => operation.origin?.chatId === chat.id),
@@ -223,6 +232,7 @@ export function conversationMarks(
             ? "needs-you"
             : "working",
       label: `${stateLabel[live.state]}: ${live.title}`,
+      primary: true,
     };
   }
   return marks;

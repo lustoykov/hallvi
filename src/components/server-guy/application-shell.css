@@ -211,7 +211,7 @@
 @media (max-width: 640px) {
   .sg-adaptive-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 56px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
   }
   .sg-application-navigation {
     grid-column: 1;

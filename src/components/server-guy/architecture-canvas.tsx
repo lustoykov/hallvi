@@ -2,13 +2,23 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowCounterClockwise, Pause, Play } from "@phosphor-icons/react";
+import type { ApplicationFacts } from "@/server/application-facts";
 import type { ApplicationStack } from "@/server/application-stack";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationRecord } from "@/server/types";
 
+import type { ApplicationSection } from "./application-sections";
 import { formatTimestamp } from "./format";
 
 type Point = { x: number; y: number };
+type NodeTone = "ok" | "bad" | "unknown";
+const sectionLabel: Partial<Record<ApplicationSection, string>> = {
+  deployment: "Deployment",
+  processes: "Processes",
+  storage: "Storage",
+  database: "Database",
+  cache: "Cache & queue",
+};
 const initialPositions: Record<string, Point> = {
   source: { x: 48, y: 138 },
   app: { x: 365, y: 224 },
@@ -30,11 +40,16 @@ export function ArchitectureCanvas({
   application,
   deployment,
   stack,
+  facts,
+  onOpenDestination,
 }: {
   application: ApplicationRecord;
   deployment: DeploymentRecord | null;
   /** Recorded services beyond the web process appear as their own nodes. */
   stack?: ApplicationStack;
+  /** Observed checks colour each node; without them every node is neutral. */
+  facts?: ApplicationFacts;
+  onOpenDestination?: (destination: ApplicationSection) => void;
 }) {
   const storageKey = `sg:architecture:v1:${application.id}`;
   const [positions, setPositions] = useState(initialPositions);
@@ -75,6 +90,21 @@ export function ArchitectureCanvas({
     );
   }
   const live = deployment?.status === "live";
+  const checks = facts?.monitoring?.checks ?? [];
+  // A node is red only when a check on it failed; otherwise it is verified
+  // or simply unknown. Nothing is inferred from silence.
+  const toneOf = (kind: string, target?: string): NodeTone => {
+    const check = checks.find(
+      (item) => item.kind === kind && (!target || item.target === target),
+    );
+    if (check)
+      return check.state === "failing"
+        ? "bad"
+        : check.state === "passing"
+          ? "ok"
+          : "unknown";
+    return live ? "ok" : "unknown";
+  };
   const postgres = deployment?.plan?.postgres;
   const sqlite = stack?.databases.find((item) => item.kind === "sqlite");
   const service = stack?.services[0];
@@ -87,6 +117,8 @@ export function ArchitectureCanvas({
       name: application.repositoryName,
       detail: deployment?.revision?.slice(0, 12) ?? "Revision not selected",
       symbol: "source",
+      tone: "unknown" as NodeTone,
+      destination: "deployment" as ApplicationSection,
       description: `${application.repositoryOwner}/${application.repositoryName}. ${deployment?.revision ? `Selected revision: ${deployment.revision}.` : "A revision will be selected during deployment."}`,
     },
     {
@@ -95,6 +127,8 @@ export function ArchitectureCanvas({
       name: application.name,
       detail: live ? "Last deployment verified" : "Deployment not verified",
       symbol: "app",
+      tone: toneOf("http"),
+      destination: "processes" as ApplicationSection,
       description: deployment?.url
         ? `Public address: ${deployment.url}. ${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
         : "Your application's runtime will appear here once a deployment is recorded.",
@@ -105,6 +139,8 @@ export function ArchitectureCanvas({
       name: deployment?.offer?.serverType.toUpperCase() ?? "Host not selected",
       detail: deployment?.address ?? "No instance recorded",
       symbol: "host",
+      tone: toneOf("disk"),
+      destination: "storage" as ApplicationSection,
       description: deployment?.serverId
         ? `Server ${deployment.serverId}, ${deployment.address}. ${deployment.offer?.cores} vCPU, ${deployment.offer?.memory} GB RAM. Docker Compose runs the application services on this host.`
         : "No server has been recorded. Host selection and purchase remain part of deployment approval.",
@@ -119,6 +155,8 @@ export function ArchitectureCanvas({
               ? "Persistent volume · private network"
               : "Planned service",
             symbol: "database",
+            tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+            destination: "database" as ApplicationSection,
             description: live
               ? "Runs on the same instance as the application. Its data uses a persistent Docker volume. Off-host backups are not configured."
               : "Planned to run on the same instance as the application with a persistent Docker volume. Off-host backups are not configured.",
@@ -132,6 +170,8 @@ export function ArchitectureCanvas({
               name: "Embedded SQLite",
               detail: sqlite.location,
               symbol: "database",
+              tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+              destination: "database" as ApplicationSection,
               description:
                 "Application-owned SQLite file in a persistent volume. Off-host backups are not configured; backing it up requires a consistent snapshot.",
             },
@@ -145,6 +185,8 @@ export function ArchitectureCanvas({
             name: `${service.kind === "valkey" ? "Valkey" : "Redis"}${service.version ? ` ${service.version}` : ""}`,
             detail: live ? "Private network" : "Planned service",
             symbol: "cache",
+            tone: live ? ("ok" as NodeTone) : ("unknown" as NodeTone),
+            destination: "cache" as ApplicationSection,
             description: `${service.role === "broker" ? "Queue broker" : service.role === "cache" ? "Cache" : "Cache and queue broker"} on the same instance, reachable only inside the Compose network. ${service.persistence ?? "Persistence not recorded."}`,
           },
         ]
@@ -160,6 +202,8 @@ export function ArchitectureCanvas({
                 : `${workers.length} private processes`,
             detail: live ? "Same host · private network" : "Planned",
             symbol: "workers",
+            tone: toneOf("process", workers[0]?.name),
+            destination: "processes" as ApplicationSection,
             description: `${workers.map((worker) => worker.name).join(", ")}: ${onlyWorkers ? "background processes" : "additional services"} running on this instance. Their images, commands and health checks are recorded in Processes.`,
           },
         ]
@@ -371,7 +415,13 @@ export function ArchitectureCanvas({
                   cx="202"
                   cy="25"
                   r="4"
-                  fill={live ? "#267c58" : "#8b95a5"}
+                  fill={
+                    node.tone === "bad"
+                      ? "#c1524a"
+                      : node.tone === "ok"
+                        ? "#267c58"
+                        : "#8b95a5"
+                  }
                 />
               </g>
             );
@@ -379,13 +429,37 @@ export function ArchitectureCanvas({
         </svg>
       </div>
       <div className="sg-canvas-detail" aria-live="polite">
-        <strong>{active.label}</strong>
-        <p>{active.description}</p>
+        <div>
+          <strong>{active.label}</strong>
+          <p>{active.description}</p>
+        </div>
+        {onOpenDestination && active.destination && (
+          <button
+            type="button"
+            className="sg-op-link"
+            onClick={() => onOpenDestination(active.destination)}
+          >
+            Open {sectionLabel[active.destination] ?? active.destination}
+          </button>
+        )}
       </div>
-      <p className="sg-canvas-caption">
-        Connections illustrate the recorded topology, not measured traffic.
-        Arranging nodes only changes this browser’s layout.
-      </p>
+      <div className="sg-canvas-caption">
+        <ul className="sg-canvas-legend">
+          <li>
+            <i className="sg-fill-ok" /> verified by a check
+          </li>
+          <li>
+            <i className="sg-fill-bad" /> a check on it is failing
+          </li>
+          <li>
+            <i className="sg-fill-muted" /> nothing observed
+          </li>
+        </ul>
+        <p>
+          Connections illustrate the recorded topology, not measured traffic.
+          Arranging nodes only changes this browser’s layout.
+        </p>
+      </div>
     </div>
   );
 }

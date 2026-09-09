@@ -8,6 +8,7 @@ import {
   Plus,
 } from "@phosphor-icons/react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   applicationSections,
   type ApplicationSection,
@@ -22,6 +23,12 @@ import type { ChatSummary } from "@/server/types";
 export interface NavigationIndicator {
   tone: "working" | "needs-you" | "failed" | "updated";
   label: string;
+  /**
+   * The destination this operation is mainly about. One change often
+   * touches five destinations; only the primary one animates, so a busy
+   * application does not flash five marks at once.
+   */
+  primary?: boolean;
 }
 
 /**
@@ -39,7 +46,7 @@ function Mark({
   return (
     <>
       <i
-        className={`sg-nav-indicator ${indicator.tone}`}
+        className={`sg-nav-indicator ${indicator.tone}${indicator.primary ? " primary" : ""}`}
         title={indicator.label}
         aria-hidden="true"
       />
@@ -117,7 +124,10 @@ export function ApplicationNavigation({
   hidden = [],
   revealed = false,
   onReveal,
+  head,
 }: {
+  /** The application identity, when it sits here rather than in the top bar. */
+  head?: ReactNode;
   /** The destinations to list; defaults to every one. */
   sections?: readonly ApplicationSectionDefinition[];
   /**
@@ -142,9 +152,18 @@ export function ApplicationNavigation({
       className="sg-application-navigation"
       aria-label="Application navigation"
     >
-      <Link href="/applications" className="sg-navigation-brand">
-        <span>sg</span>Server Guy
-      </Link>
+      {head ? (
+        <div className="sg-navigation-head">
+          <Link href="/applications" className="sg-navigation-home">
+            Server Guy
+          </Link>
+          {head}
+        </div>
+      ) : (
+        <Link href="/applications" className="sg-navigation-brand">
+          <span>sg</span>Server Guy
+        </Link>
+      )}
       <nav aria-label="Application workspace">
         <div className="sg-destinations">
           {sections.map((item, index) => {

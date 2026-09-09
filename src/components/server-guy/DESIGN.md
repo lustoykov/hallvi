@@ -205,6 +205,40 @@ Fable A is the selected experience: conversation first, inline operation receipt
 
 **Built into the shell on 9 September.** `operator-shell.tsx` now renders this design against the real deployment record: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `deployment-decision.tsx` (the real approval and recovery inside the receipt), `destination-activity.tsx` (activity cards and origin lines above a view's facts), `application-overview.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. The development-only `/explore` route remains a simulated interaction reference. See the [integration report](../../../docs/design/2026-09-09-conversation-first-integration.md) and [adoption details](../../../docs/design/2026-09-09-conversation-first-adoption.md).
 
+## The visual vocabulary (later on 9 September)
+
+Views were reworked so each one leads with its state, groups its facts, and
+draws a picture only where a picture is faster to read than a sentence. The
+elements live in `views/visuals.tsx` and each renders nothing when its data
+would not support it, so a simple application stays a simple page.
+
+| Element | Says | Renders when |
+| --- | --- | --- |
+| `Condition` | The state of this destination in one line | Always, at the top of a view that has one |
+| `Tally` | How a set of states divides: 1 failing, 5 passing | Three or more items in two or more states |
+| `Composition` | How a measured whole divides, with the headroom | A measured total exists and the parts fit inside it |
+| `Meter` | One level against its capacity, marked at 75% and 90% | A measurement and a capacity are both recorded |
+| `Flow` | A path whose stages each carry their own state | Delivery (Domains & CDN) and release (Deployment) |
+| `Timeline` | Recorded moments on a real time axis, and the gaps | Two or more recorded points |
+| `OutcomeStrip` | The rhythm of the last few outcomes | Three or more recorded runs |
+| `Bars` | Comparable magnitudes with no whole | Observed values, never an assumed zero |
+| `Loading` | The shape of the answer before the record is read | The first record fetch has not returned |
+
+Rules that keep this restrained: a visual must answer a question the reader
+already has; it never invents a value a capability has not recorded; and a
+view that has one honest sentence to say says it in one sentence. Facts run
+in two columns on a wide screen so a label and its value stay together, and
+a row list tints only when something is wrong.
+
+## Where identity sits
+
+The application name, its repository and the switcher sit in the sidebar
+head, above the destinations they scope, with a small “Server Guy” link back
+to all applications. The top bar then carries where you are — the open
+destination, or the current conversation — and the active work strip. There
+is one place to switch application. `application-identity.tsx` also carries
+`topbar` and `breadcrumb` placements, compared live in `/prototype/shell`.
+
 ## Colors
 
 Blue accents sit on white work surfaces, a cool gray navigation surface, and a slightly tinted context pane. `ink`, `muted`, and `line` are the application shell's local overrides of global variables. Reuse those scoped values for secondary text and separators; global legacy palette comments do not describe this shell.
@@ -217,7 +251,7 @@ Geist is the inherited interface family; Geist Mono serves code and logs. The co
 
 ## Layout
 
-The desktop shell fills the viewport with a 240px navigation column and 56px header. The conversation fills the rest; there is no context pane. Selecting an application destination shows it full width above a bar that leads back to the conversation, while the conversation stays mounted and parked so its scroll position and draft survive. The legacy repository-preparation step bar is a collapsed disclosure above the transcript, and the preparation Record sits under Deployment. Architecture has a draggable SVG canvas for source, application, host and PostgreSQL when recorded, with node details below.
+The desktop shell fills the viewport with a 240px navigation column and 56px header; the navigation head carries the application identity and the header carries the current destination. The conversation fills the rest; there is no context pane. Selecting an application destination shows it full width above a bar that leads back to the conversation, while the conversation stays mounted and parked so its scroll position and draft survive. The legacy repository-preparation step bar is a collapsed disclosure above the transcript, and the preparation Record sits under Deployment. Architecture has a draggable SVG canvas for source, application, host and PostgreSQL when recorded, with node details below.
 
 At 1100px and below, navigation narrows to 224px and the context pane flows below conversation. At 640px and below, application destinations become a horizontally scrolling row above conversations. The architecture canvas scrolls within its own region without widening the page.
 
@@ -231,7 +265,7 @@ Controls and navigation have compact curved corners; architecture cards and the 
 
 ## Components
 
-- **Navigation:** three groups above the conversations. Application (Overview, Architecture, Deployment) is always present. Stack (Processes, Database, Cache & queue, Jobs, Storage) lists only what the recorded deployment has, so a simple application carries no empty infrastructure rows; a quiet “Show more” row at the bottom of the destinations, above Conversations, reveals the rest as muted rows, each with the reason it is hidden (“not used”, “not available yet”, “after deployment”), and each revealed view says what Server Guy would do there with one “Ask in the conversation” link. Care (Backups, Logs, Monitoring, Domains, Environment Variables) is always present. Quiet separators divide the groups. Section selection is addressable through the URL hash and survives reload/back navigation. Selection has a pale blue fill and blue text plus `aria-current`; conversation names truncate. New-conversation controls have accessible names. Marks sit at the right edge with their reason as the row's accessible description.
+- **Navigation:** three groups above the conversations. Application (Overview, Architecture, Deployment) is always present. Stack (Processes, Database, Cache & queue, Jobs, Storage) lists only what the recorded deployment has, so a simple application carries no empty infrastructure rows; a quiet “Show more” row at the bottom of the destinations, above Conversations, reveals the rest as muted rows, each with the reason it is hidden (“not used”, “not available yet”, “after deployment”), and each revealed view says what Server Guy would do there with one “Ask in the conversation” link. Care (Backups, Logs, Monitoring, Domains, Environment Variables) is always present. Quiet separators divide the groups. Section selection is addressable through the URL hash and survives reload/back navigation. Selection has a pale blue fill and blue text plus `aria-current`; conversation names truncate. New-conversation controls have accessible names. Marks sit at the right edge with their reason as the row's accessible description. One change often touches five destinations; only the destination the operation names first animates, and the rest are smaller, dimmer and static, so a busy application never flashes five marks at once.
 - **Buttons and fields:** Blue primary actions, white secondary actions, visible labels, and password inputs for credentials. Disabled primary buttons reduce opacity. The deployment panel overrides inherited button padding and radius with the control values above. Focus outlines remain visible.
 - **Architecture:** Recorded facts render as a main canvas or compact conversation context rows. Nodes move with pointer dragging or arrow keys; layout is saved per application in this browser and can be reset. Flowing connectors illustrate topology, never claim measured traffic. Motion can be paused and respects reduced-motion preferences. Revision, host address, PostgreSQL persistence, verification time and HTTP transport stay explicit. The built PostgreSQL state says “Backups not configured”; approval configuration and the recorded conversation disclose that HTTPS is not configured.
 - **Deployment:** The Deployment view keeps the Hetzner connection, the request to deploy, the recorded event history and logs. The priced recommendation, its required inputs, approval, retry and cancel live in the operation receipt inside the conversation that started the deployment; the view's activity card links there. Approval refers to the displayed recommendation; a changed price refreshes the receipt without clearing entered inputs. The configuration disclosure includes exact source identity and executable checks. Cancel setup is offered only before a recorded or uncertain server creation.
