@@ -246,14 +246,19 @@ export function ApplicationSectionView({
           <p>{descriptions[section]}</p>
         </div>
         {(live || facts.releases?.serving) && address && (
-          <a
-            className="sg-section-open-app"
-            href={address}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open application <ArrowSquareOut />
-          </a>
+          <div className="sg-open-application">
+            <a
+              className="sg-section-open-app"
+              href={address}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open application <ArrowSquareOut aria-hidden="true" />
+            </a>
+            {deployment?.plan?.httpAccess === "controller" && (
+              <small>Restricted to the controller’s network</small>
+            )}
+          </div>
         )}
       </header>
       {section === "architecture" ? (

@@ -66,18 +66,16 @@ export function VariablesView(props: ViewProps) {
               These come from the deployment plan at the recorded revision.
               Values are held on the host and never shown here.
             </Condition>
-            <div className="sg-variable-list">
-              <div className="sg-variable-row sg-table-head">
-                <span>Name</span>
-                <span>Value</span>
-              </div>
+            <ul
+              className="sg-variable-names"
+              aria-label="Recorded variable names"
+            >
               {fallback.map((name) => (
-                <div className="sg-variable-row" key={name}>
+                <li key={name}>
                   <code>{name}</code>
-                  <span>Hidden</span>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </>
         ) : (
           <div className="sg-section-empty">

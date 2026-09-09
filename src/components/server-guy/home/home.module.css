@@ -339,6 +339,7 @@
   background: color-mix(in srgb, var(--caretaker-color) 57%, white);
   transition: background-color 0.2s var(--ease);
 }
+.caretaker:hover .illustration,
 .selected .illustration {
   background: color-mix(in srgb, var(--caretaker-color) 72%, white);
 }

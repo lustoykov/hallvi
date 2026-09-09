@@ -945,7 +945,7 @@
   border-radius: 10px;
   padding: 12px 14px;
   background: #fff;
-  font-size: 12.5px;
+  font-size: 14px;
   display: grid;
   gap: 8px;
   color: var(--ink);
@@ -980,7 +980,7 @@
 .sg-op-rel {
   color: var(--muted);
   margin-left: auto;
-  font-size: 11px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 .sg-op-summary,

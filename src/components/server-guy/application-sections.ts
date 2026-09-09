@@ -131,6 +131,7 @@ export function sectionRecorded(
   section: ApplicationSection,
   stack: ApplicationStack,
   facts: ApplicationFacts = {},
+  hasHost = false,
 ) {
   switch (section) {
     case "processes":
@@ -149,9 +150,9 @@ export function sectionRecorded(
         facts.domains?.cdn.state === "active" ||
         facts.domains?.cdn.state === "partial"
       );
-    // Exposure is only a destination once the host firewall was read back.
+    // A provisioned host can be inspected even before its first firewall read.
     case "security":
-      return Boolean(facts.security);
+      return hasHost || Boolean(facts.security);
     default:
       return true;
   }
@@ -162,10 +163,12 @@ export function visibleSections(
   stack: ApplicationStack,
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
+  hasHost = false,
 ) {
   return applicationSections.filter(
     (section) =>
-      section.id === active || sectionRecorded(section.id, stack, facts),
+      section.id === active ||
+      sectionRecorded(section.id, stack, facts, hasHost),
   );
 }
 
@@ -178,6 +181,7 @@ export function hiddenSections(
   stack: ApplicationStack,
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
+  hasHost = false,
 ) {
   return applicationSections
     .filter(
@@ -185,16 +189,17 @@ export function hiddenSections(
         "hideable" in section &&
         section.hideable &&
         section.id !== active &&
-        !sectionRecorded(section.id, stack, facts),
+        !sectionRecorded(section.id, stack, facts, hasHost),
     )
     .map((section) => ({
       ...section,
       note:
-        section.id === "security" ||
-        !("available" in section && section.available)
-          ? "nothing recorded yet"
-          : stack.recorded
-            ? "not used"
-            : "after deployment",
+        section.id === "security"
+          ? "check firewall rules"
+          : !("available" in section && section.available)
+            ? "nothing recorded yet"
+            : stack.recorded
+              ? "not used"
+              : "after deployment",
     }));
 }

@@ -1,16 +1,16 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import type { ApplicationOperation } from "@/server/operation-record";
-import { StateChip } from "../operation-receipt";
+import { OperationSteps, StateChip } from "../operation-receipt";
 import { LocalTime } from "../local-time";
-import { relativeTime, attentionItems } from "../operation-model";
+import { relativeTime, attentionItems, labelOf } from "../operation-model";
 import type { ViewProps } from "./bits";
 
 const filters = [
   "All",
   "Changes",
   "Inspections",
-  "Automatic",
+  "Outside chat",
   "Needs you",
 ] as const;
 
@@ -35,7 +35,7 @@ export function HistoryView({
     value === "All" ||
     (value === "Changes" && item.kind === "change") ||
     (value === "Inspections" && item.kind === "inspection") ||
-    (value === "Automatic" && !item.origin) ||
+    (value === "Outside chat" && !item.origin) ||
     (value === "Needs you" && needs.has(item.id));
   const rank = (item: ApplicationOperation) =>
     item.state === "working"
@@ -60,61 +60,106 @@ export function HistoryView({
     if (last && last.day === day) last.items.push(item);
     else days.push({ day, items: [item] });
   }
-  const row = (item: ApplicationOperation) => (
-    <li key={item.id} id={`operation-${item.id}`}>
-      <button
-        type="button"
-        className="sg-history-open"
-        onClick={() =>
-          item.origin
-            ? onOpenConversation(item.origin.chatId, item.origin.messageId)
-            : onOpenDestination(
-                item.destinations[0] === "history"
-                  ? "overview"
-                  : item.destinations[0],
-              )
-        }
-      >
-        <StateChip state={item.state} />
-        <span>
-          <strong>{item.title}</strong>
-          <small>
-            {item.origin
-              ? `from ${chats.find((chat) => chat.id === item.origin!.chatId)?.title ?? "its conversation"}`
-              : "automatic"}{" "}
-            · {item.destinations.join(" · ")}
-          </small>
-        </span>
-        <span className="sg-op-rel">
-          {relativeTime(item.updatedAt, now)} ·{" "}
-          <LocalTime value={item.updatedAt} variant="compact" />
-        </span>
-      </button>
-      {item.state === "queued" && (
-        <p className="sg-op-muted">
-          Queued · after{" "}
-          <button
-            type="button"
-            className="sg-op-text-link"
-            onClick={() =>
-              document
-                .getElementById(`operation-${item.waitingForId}`)
-                ?.scrollIntoView({ block: "center" })
-            }
-          >
-            {item.waitingForTitle ?? "the current change"}
-          </button>
-        </p>
-      )}
-      {item.state === "proposed" && (
-        <p className="sg-op-muted">{item.summary}</p>
-      )}
-      {item.state === "failed" && item.next && (
-        <p className="sg-op-next">{item.next}</p>
-      )}
-      {decisionFor?.(item)}
-    </li>
-  );
+  const row = (item: ApplicationOperation) => {
+    const resolver = item.resolvedById
+      ? operations.find(
+          (candidate) =>
+            candidate.id === item.resolvedById &&
+            candidate.state === "verified",
+        )
+      : undefined;
+    return (
+      <li key={item.id} id={`operation-${item.id}`}>
+        <button
+          type="button"
+          className="sg-history-open"
+          onClick={() =>
+            item.origin
+              ? onOpenConversation(item.origin.chatId, item.origin.messageId)
+              : onOpenDestination(
+                  item.destinations[0] === "history"
+                    ? "overview"
+                    : item.destinations[0],
+                )
+          }
+        >
+          <StateChip state={item.state} />
+          <span>
+            <strong>{item.title}</strong>
+            <small>
+              {item.origin
+                ? `from ${chats.find((chat) => chat.id === item.origin!.chatId)?.title ?? "its conversation"}`
+                : item.source.type === "logs"
+                  ? "Log collection"
+                  : item.source.type === "deployment"
+                    ? "Deployment record"
+                    : "automatic"}{" "}
+              · {labelOf(item.destinations[0])}
+            </small>
+          </span>
+          <span className="sg-op-rel">
+            {relativeTime(item.updatedAt, now)} ·{" "}
+            <LocalTime value={item.updatedAt} variant="compact" />
+          </span>
+        </button>
+        {item.state === "queued" && (
+          <p className="sg-op-muted">
+            Queued · after{" "}
+            <button
+              type="button"
+              className="sg-op-text-link"
+              onClick={() =>
+                document
+                  .getElementById(`operation-${item.waitingForId}`)
+                  ?.scrollIntoView({ block: "center" })
+              }
+            >
+              {item.waitingForTitle ?? "the current change"}
+            </button>
+          </p>
+        )}
+        {item.state === "proposed" && (
+          <p className="sg-op-muted">{item.summary}</p>
+        )}
+        {item.state === "failed" && item.next && (
+          <p className={resolver ? "sg-history-reason" : "sg-op-next"}>
+            {item.next}
+          </p>
+        )}
+        {resolver && (
+          <p className="sg-history-resolved">
+            Resolved by
+            <button
+              type="button"
+              className="sg-op-text-link"
+              onClick={() => {
+                setFilter("All");
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById(`operation-${resolver.id}`)
+                    ?.scrollIntoView({ block: "center" }),
+                );
+              }}
+            >
+              {resolver.title}
+            </button>
+            · verified {relativeTime(resolver.updatedAt, now)}
+          </p>
+        )}
+        {(item.evidence || item.steps?.length || resolver) && (
+          <details className="sg-history-details">
+            <summary>View recorded evidence</summary>
+            <p>{item.evidence ?? item.summary}</p>
+            <OperationSteps steps={item.steps} />
+            <span className="sg-op-muted">
+              {item.destinations.map(labelOf).join(" · ")}
+            </span>
+          </details>
+        )}
+        {decisionFor?.(item)}
+      </li>
+    );
+  };
   return (
     <>
       <div

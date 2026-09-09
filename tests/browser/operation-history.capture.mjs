@@ -31,7 +31,7 @@ try {
   await page.getByRole("button", { name: "Inspections", exact: true }).click();
   await expect(history).toContainText("Inspect worker logs");
   await expect(queued).toHaveCount(0);
-  await page.getByRole("button", { name: "Automatic", exact: true }).click();
+  await page.getByRole("button", { name: "Outside chat", exact: true }).click();
   await expect(history).toContainText("Inspect worker logs");
   await page.getByRole("button", { name: "All", exact: true }).click();
   await queued

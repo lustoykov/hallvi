@@ -115,20 +115,23 @@ test(
       }),
     ).toBeVisible();
     // Delivery is three destinations: Domains is always listed, while CDN and
-    // Security wait until a CDN caches or the host firewall is read back.
+    // Security wait until a CDN caches or a host is available to inspect.
     await expect(
       nav.getByRole("button", { name: "Domains", exact: true }),
     ).toHaveCount(1);
     for (const hidden of ["CDN", "Security"])
       await expect(
         nav.getByRole("button", {
-          name: `${hidden} nothing recorded yet`,
+          name:
+            hidden === "Security"
+              ? "Security check firewall rules"
+              : "CDN nothing recorded yet",
           exact: true,
         }),
       ).toBeVisible();
     await nav
       .getByRole("button", {
-        name: "Security nothing recorded yet",
+        name: "Security check firewall rules",
         exact: true,
       })
       .click();

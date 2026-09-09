@@ -65,10 +65,9 @@ test(
       timeout: 30_000,
     });
     const nav = page.getByRole("navigation", { name: "Application workspace" });
-    await nav.getByRole("button", { name: "Show more", exact: true }).click();
     await nav
       .getByRole("button", {
-        name: "Security nothing recorded yet",
+        name: "Security",
         exact: true,
       })
       .click();

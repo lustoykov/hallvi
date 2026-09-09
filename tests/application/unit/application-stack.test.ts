@@ -153,7 +153,7 @@ describe("stackOf", () => {
     expect(ids).toContain("jobs");
   });
 
-  it("hides CDN and Security until a capability records them", () => {
+  it("keeps Security available for a provisioned host before the first read", () => {
     const stack = stackOf(base);
     const ids = visibleSections(stack, null).map((section) => section.id);
     expect(ids).toContain("domains");
@@ -163,7 +163,12 @@ describe("stackOf", () => {
       hiddenSections(stack, null).map((section) => [section.id, section.note]),
     );
     expect(notes.cdn).toBe("nothing recorded yet");
-    expect(notes.security).toBe("nothing recorded yet");
+    expect(notes.security).toBe("check firewall rules");
+    expect(
+      visibleSections(stack, null, {}, true).some(
+        (item) => item.id === "security",
+      ),
+    ).toBe(true);
   });
 
   it("lists CDN once one caches and Security once the firewall is read back", () => {

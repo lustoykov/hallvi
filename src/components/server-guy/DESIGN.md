@@ -36,7 +36,7 @@ colors:
 typography:
   title:
     fontFamily: "Geist, system-ui, sans-serif"
-    fontSize: "23px"
+    fontSize: "24px"
     fontWeight: 600
     letterSpacing: "-0.025em"
   conversation-title:
@@ -45,11 +45,11 @@ typography:
     fontWeight: 600
   body:
     fontFamily: "Geist, system-ui, sans-serif"
-    fontSize: "13px"
+    fontSize: "14px"
     lineHeight: 1.8
   label:
     fontFamily: "Geist, system-ui, sans-serif"
-    fontSize: "11.5px"
+    fontSize: "13px"
     fontWeight: 600
     letterSpacing: "0.04em"
   mono:
@@ -57,7 +57,7 @@ typography:
     fontSize: "12px"
   receipt:
     fontFamily: "Geist, system-ui, sans-serif"
-    fontSize: "12.5px"
+    fontSize: "14px"
     lineHeight: 1.6
   chip:
     fontFamily: "Geist, system-ui, sans-serif"
@@ -468,3 +468,31 @@ Inherited: blue primary with a 7px radius, white secondary, password inputs with
 - **Don't** invent a sixth state or a new tint. Inspected, Waiting for you, Working, Verified and Failed cover the record.
 - **Don't** generate UI. The agent emits a record (title, state, steps, inputs, destinations, evidence); the components are fixed.
 - **Don't** lift a card with a shadow to signal state.
+
+
+## Application journey polish (9 September)
+
+Review used the saved Todo, Uptime Kuma, and Grafana/Prometheus deployments,
+recreation receipts, verification checks, logs and Grafana's failed/retried
+attempt. Claude Opus 5 at maximum effort reviewed source and six screenshots.
+
+- Shared destinations use 24px titles, 14px reading text, and 13px metadata.
+  Qualifying evidence is readable text, including on touch screens.
+- Completed receipts show identical result text once. The first three
+  destination links remain visible; additional destinations expand in place.
+- History keeps failure reasons visible, names the verified resolver, and
+  expands detailed evidence/steps. “Outside chat” describes origin accurately
+  without assuming that every log collection is automatic or user-triggered.
+- Overview summarizes the primary destination; History holds the full list.
+- Verified Deployment shows its revision, runtime type, server and HTTP access.
+  The preparation record starts collapsed after success; explicit record
+  references still reveal it. Event logs retain all original evidence.
+- Controller-restricted HTTP is labeled beside the application link and in
+  Architecture and Overview. A timestamp is a recorded check, not monitoring.
+- Security stays in navigation while a provisioned host is available; opening
+  it reads the provider. No locally cached observation is promoted to a fact.
+- Pointer hover highlights home illustrations without selecting a different
+  application for the chat action. Explicit click and keyboard focus select it.
+- Mobile omits the redundant back-to-chat bar while keeping the conversation
+  controls. The destination strip fades at its scroll edge. Variable names use
+  the existing mono font; the explanatory condition states that values are hidden.

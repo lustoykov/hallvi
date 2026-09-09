@@ -130,7 +130,7 @@ export function ArchitectureCanvas({
       tone: toneOf("http"),
       destination: "processes" as ApplicationSection,
       description: deployment?.url
-        ? `Public address: ${deployment.url}. ${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
+        ? `Address: ${deployment.url}. ${deployment.plan?.httpAccess === "controller" ? "HTTP is restricted to the controller’s network. " : "Public HTTP. "}${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
         : "Your application's runtime will appear here once a deployment is recorded.",
     },
     {

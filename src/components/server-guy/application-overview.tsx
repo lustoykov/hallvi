@@ -167,7 +167,7 @@ export function ApplicationOverview({
         .filter(Boolean)
         .join(" · ")
     : verifiedAt
-      ? `Verified ${relativeTime(verifiedAt, now)} by public HTTP checks · no continuous monitoring yet`
+      ? `Verified ${relativeTime(verifiedAt, now)} ${deployment?.plan?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
       : "Nothing has been verified on a host yet.";
   const conditionTone = monitoringSummary
     ? monitoringSummary.tone
@@ -360,7 +360,10 @@ export function ApplicationOverview({
     {
       fact: "Application responds and behaves",
       at: verifiedAt,
-      detail: "Public HTTP checks at deployment · not continuous",
+      detail:
+        deployment?.plan?.httpAccess === "controller"
+          ? "HTTP checks from the controller’s network · not continuous"
+          : "Public HTTP checks at deployment · not continuous",
       destination: "deployment",
     },
     ...(monitoring
@@ -585,11 +588,13 @@ export function ApplicationOverview({
                         operation.source.type,
                       ) ? (
                       "automatic"
+                    ) : operation.source.type === "logs" ? (
+                      "Log collection"
                     ) : (
                       `from the ${labelOf(operation.destinations[0])} view`
                     )}{" "}
                     · {relativeTime(operation.updatedAt, now)} ·{" "}
-                    {operation.destinations.map(labelOf).join(" · ")}
+                    {labelOf(operation.destinations[0])}
                   </span>
                 </div>
               </li>
@@ -634,7 +639,6 @@ export function ApplicationOverview({
                 <button
                   type="button"
                   className="sg-op-text-link"
-                  title={row.detail}
                   onClick={() => onOpenDestination(row.destination)}
                 >
                   {row.fact}
@@ -649,9 +653,10 @@ export function ApplicationOverview({
                       </span>
                     </>
                   ) : (
-                    "No evidence"
+                    "Not recorded"
                   )}
                 </span>
+                <small className="sg-evidence-detail">{row.detail}</small>
               </li>
             );
           })}

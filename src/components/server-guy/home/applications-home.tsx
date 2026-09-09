@@ -179,9 +179,6 @@ export function ApplicationsHome({
                           "--caretaker-color": mascotColors[color],
                         } as CSSProperties
                       }
-                      onMouseEnter={() => {
-                        if (!active) greet(item.id);
-                      }}
                       onFocus={() => {
                         if (!active) greet(item.id);
                       }}

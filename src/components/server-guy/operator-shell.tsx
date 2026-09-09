@@ -875,8 +875,18 @@ export function OperatorShell({
           onCreate={createChat}
           indicators={indicators}
           chatMarks={chatMarks}
-          sections={visibleSections(stack, activeSection, firewall.facts)}
-          hidden={hiddenSections(stack, activeSection, firewall.facts)}
+          sections={visibleSections(
+            stack,
+            activeSection,
+            firewall.facts,
+            Boolean(deployment?.serverId),
+          )}
+          hidden={hiddenSections(
+            stack,
+            activeSection,
+            firewall.facts,
+            Boolean(deployment?.serverId),
+          )}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
         />
@@ -1070,11 +1080,14 @@ export function OperatorShell({
               }
             />
           </div>
-          <div
+          <details
             className="sg-dashboard-record"
             hidden={activeSection !== "deployment"}
+            open={deployment?.status !== "live" || Boolean(reveal)}
           >
-            <h2 className="sg-record-heading">Preparation record</h2>
+            <summary className="sg-preparation-toggle">
+              Preparation record
+            </summary>
             <Inspector
               key={view.workspace?.id ?? "record"}
               hidden={activeSection !== "deployment"}
@@ -1090,8 +1103,8 @@ export function OperatorShell({
               onSelectCheck={setSelectedCheckKey}
               reveal={reveal}
               view={view}
-            />{" "}
-          </div>
+            />
+          </details>
         </section>
 
         {selectedCheck && (
