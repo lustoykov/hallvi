@@ -9,7 +9,7 @@ Three commits:
 
 - `284633d` — Give every application view a lead, a grouping and a picture worth drawing
 - `ce3b4bc` — Record the view refinement handoff
-- the delivery split into Domains, CDN and Security
+- `2409648` — Split delivery into Domains, CDN and Security
 
 ## What the work was
 
@@ -170,7 +170,9 @@ labelled by the prototype bar, as before.
 - `npx tsc --noEmit`, `eslint .`, `prettier --check .` — all clean.
 - `vitest`: 850 passed, 15 skipped, 0 failed.
 - Playwright `application-shell`, `workspace-navigation`, `activity-history`:
-  5 passed, 3 failed. Those same 3 fail identically on an untouched checkout
+  5 passed, 3 failed. `application-shell.spec.ts` was updated for the renamed
+  Domains row and now also covers the hidden CDN and Security rows and the
+  Security honest state. Those same 3 fail identically on an untouched checkout
   of the base commit `05eea88`, so they are pre-existing, not caused here:
   - `activity-history.spec.ts:69`
   - `activity-history.spec.ts:184`
