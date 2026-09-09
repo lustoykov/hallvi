@@ -146,19 +146,24 @@ export function scheduledProtection(
       key: item.key,
       label: item.label,
       method: item.method,
-      state:
-        latest?.outcome === "failed"
+      state: stale
+        ? "unknown"
+        : latest?.outcome === "failed"
           ? "failed"
           : !good
             ? "unprotected"
-            : behind || stale || !snapshot?.timerActive
+            : behind || !snapshot?.timerActive
               ? "behind"
               : "protected",
       lastSuccessfulAt: good?.capturedAt ?? null,
       size,
       note: good
-        ? "Downloaded from off-host storage and matched by size and SHA-256. Restore tests are recorded separately."
-        : "No verified off-host copy for the deployed revision.",
+        ? stale && behind
+          ? "The last recorded copy is older than the agreed policy. Refresh status to check for newer verified copies."
+          : "Downloaded from off-host storage and matched by size and SHA-256. Restore tests are recorded separately."
+        : stale
+          ? "No verified off-host copy is recorded for the deployed revision. Current coverage is unknown."
+          : "No verified off-host copy for the deployed revision.",
     })),
     lastAttempt: latest
       ? {

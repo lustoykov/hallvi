@@ -16,7 +16,13 @@ export interface CoverageItem {
   label: string;
   /** "consistent database dump", "file archive", "consistent copy". */
   method: string;
-  state: "protected" | "behind" | "failed" | "unprotected" | "not-covered";
+  state:
+    | "protected"
+    | "behind"
+    | "failed"
+    | "unprotected"
+    | "not-covered"
+    | "unknown";
   lastSuccessfulAt?: string | null;
   size?: string | null;
   note?: string | null;

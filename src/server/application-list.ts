@@ -29,7 +29,10 @@ function scheduledSummary(facts: ProtectionFacts) {
     return "Backup work in progress";
   if (facts.observation?.cleanupPending)
     return "Backup cleanup needs attention";
-  if (facts.observation && !facts.observation.reachable)
+  if (
+    (facts.observation && !facts.observation.reachable) ||
+    facts.coverage.some((item) => item.state === "unknown")
+  )
     return "Backup status unavailable";
   if (facts.observation && !facts.observation.timerActive)
     return "Backup schedule stopped";
