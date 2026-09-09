@@ -259,7 +259,7 @@ The September 9 direction favors predictable built-in views over generated UI. A
 
 ## Conversation-first design language from Fable
 
-Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exact source remains in [explore/DESIGN.md](../../../docs/archive/previous-direction/explore-DESIGN.md). The adopted demo adds only working conversations, multiple-operation visibility and historical facts. Its reference chips now lead to one approval at the originating message.
+Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the [reference prototype](../../../docs/design/2026-09-09-final-ui-screens-reference.md) under `/prototype` (development only) is the living source: every view, state and dialog built from the product’s own components with invented data, replayable step by step. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](../../../docs/archive/previous-direction/explore-DESIGN.md).
 
 ## Colors
 
@@ -393,9 +393,17 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 - **Recent changes:** rows of chip, title with origin and time, and destination links beneath the title.
 - **Evidence freshness:** a three-column table; the fact is a text link to its destination, the last-checked cell shows local time and relative time, the freshness cell is Fresh (green), Stale · over 24 h (amber, 600) or No evidence (muted).
 
-### Simulated banner and tag
+### Prototype bar
 
-- **Banner:** `simulated-bg` on `simulated-line`, 8px radius, 9px by 12px padding, meta size in waiting amber, first thing in a view’s content. **Tag:** the same colours as a 10.5px pill inside approval cards. Exploration only.
+- The reference prototype marks itself once: a bar fixed to the bottom of the viewport with the tag “Prototype · invented data” in waiting amber, the application and step selectors, previous, next, play and reset, the scenario clock in UTC and a link to the index. Nothing inside a view or a receipt says “simulated”; the bar is the label, and product screenshots never include it. Product routes render the same components with real facts or with their honest placeholder states.
+
+### Views from facts
+
+- A view renders its finished design when the facts contract (`src/server/application-facts.ts`) has facts for it, and its placeholder (what would appear, whether Server Guy can record it today, “Ask in the conversation”) otherwise. A view without an action handler shows the fact and no control.
+- **Investigate** means one thing: open a linked conversation that adopts the automatic operation, starting from the recorded event. Only when nothing can be adopted does it draft a question in the current conversation.
+- An issue carries its operation: Overview shows the issue card (Investigate, Acknowledge) and never a second card for the failed operation it records. Recovered issues have no Investigate; they link to their conversation when one exists.
+- Automatic work says “automatic” in origin lines and Recent changes; work a person started names its conversation.
+- Times render in the reader’s zone through `LocalTime`; a schedule states its own timezone next to the time.
 
 ### Buttons and fields
 
