@@ -12,6 +12,7 @@ import {
   verifiedText,
   type ViewProps,
 } from "./bits";
+import { lastVerifiedProof } from "../fact-status";
 import { LocalTime } from "../local-time";
 import { Meter } from "./visuals";
 
@@ -33,6 +34,11 @@ export function DatabaseView(props: ViewProps) {
   const coverage = facts.protection?.coverage.find((item) =>
     item.key.startsWith("database:"),
   );
+  // A verified operator proof restored this data at least once, so this view
+  // may not say no copy exists. It stays amber: nothing runs on a schedule.
+  const proved = facts.backupEvidence
+    ? lastVerifiedProof(facts.backupEvidence)
+    : null;
   const protectionText = coverage ? (
     coverage.state === "protected" ? (
       coverage.lastSuccessfulAt ? (
@@ -50,6 +56,19 @@ export function DatabaseView(props: ViewProps) {
     ) : (
       "Not backed up"
     )
+  ) : proved ? (
+    <>
+      Restore proved
+      {proved.finishedAt ? (
+        <>
+          {" "}
+          <LocalTime value={proved.finishedAt} variant="compact" />
+        </>
+      ) : (
+        ""
+      )}{" "}
+      · not scheduled
+    </>
   ) : (
     "Not configured"
   );
@@ -85,7 +104,9 @@ export function DatabaseView(props: ViewProps) {
             ? coverage.state === "protected"
               ? "It has an off-host copy."
               : "It has no current off-host copy."
-            : "Off-host protection is not configured."}
+            : proved
+              ? "An operator proved once that an off-host copy of this data restores. Scheduled backups are not configured."
+              : "Off-host protection is not configured."}
         </Condition>
       )}
       {measured && disk && (
@@ -213,7 +234,7 @@ export function DatabaseView(props: ViewProps) {
                       [
                         "Protection",
                         <>
-                          {coverage
+                          {coverage || proved
                             ? protectionText
                             : "Not backed up. SQLite requires a consistent snapshot; a live file copy is not a verified backup."}{" "}
                           · {backupsLink}
@@ -251,7 +272,7 @@ export function DatabaseView(props: ViewProps) {
         <Planned title="Database operations">
           Connection management, database-specific logs, storage measurements
           and restore controls will live here. This view currently shows
-          deployment facts only.
+          deployment and restore facts.
         </Planned>
       )}
     </>

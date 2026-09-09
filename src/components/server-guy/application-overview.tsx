@@ -13,7 +13,12 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
-import { monitoringStatus, protectionStatus } from "./fact-status";
+import {
+  backupEvidenceStatus,
+  lastVerifiedProof,
+  monitoringStatus,
+  protectionStatus,
+} from "./fact-status";
 import { LocalTime } from "./local-time";
 import {
   attentionItems,
@@ -136,6 +141,14 @@ export function ApplicationOverview({
   const protection = facts.protection;
   const protectionSummary = protection ? protectionStatus(protection) : null;
   const protectionState = protectionSummary?.tone;
+  // Manual restore proofs. They keep this row off "Not backed up" without
+  // ever becoming a schedule: a proof is a date, not ongoing protection.
+  const evidence = facts.backupEvidence;
+  const proved = evidence ? lastVerifiedProof(evidence) : null;
+  const provedAt = proved?.finishedAt ?? proved?.startedAt ?? null;
+  const cleanupPending = evidence?.proofs.some(
+    (proof) => proof.cleanupNotes.length > 0,
+  );
   const workers = stack.processes.filter((item) => item.role === "worker");
   const absent = [
     ...(stack.services.length || stack.queues.length ? [] : ["cache or queue"]),
@@ -314,26 +327,40 @@ export function ApplicationOverview({
       ? protectionState === "ok"
         ? (protection.policy?.schedule ?? "Scheduled")
         : protectionSummary!.title
-      : protectable.length
-        ? "Not backed up"
-        : "Nothing to protect",
+      : proved
+        ? "Restore proved"
+        : evidence
+          ? "No verified proof"
+          : protectable.length
+            ? "Not backed up"
+            : "Nothing to protect",
     note: protection
       ? protectionState === "ok"
         ? `To ${protection.destination?.provider === "r2" ? "R2" : "S3"} · restore ${protection.restoreTest ? `tested ${relativeTime(protection.restoreTest.at, now)}` : "not tested"}`
         : (protection.lastAttempt?.reason ?? "Off-host copies are incomplete")
-      : protectable.length
-        ? protectable.map((item) => item.label).join(", ")
-        : stack.recorded
-          ? "No database or file volume recorded"
-          : "Known after the first deployment",
+      : cleanupPending
+        ? "Temporary restore resources need cleanup. Review Backups."
+        : proved
+          ? `${provedAt ? `${relativeTime(provedAt, now)} · ` : ""}${proved.revisionCurrent ? "started by hand" : "an earlier revision"} · nothing scheduled`
+          : evidence
+            ? "The last attempt did not restore this data"
+            : protectable.length
+              ? protectable.map((item) => item.label).join(", ")
+              : stack.recorded
+                ? "No database or file volume recorded"
+                : "Known after the first deployment",
     tone:
       protectionState === "bad"
         ? "bad"
         : protectionState === "ok"
           ? undefined
-          : protectable.length || protection
-            ? "warn"
-            : undefined,
+          : evidence && !protection
+            ? backupEvidenceStatus(evidence).tone === "bad"
+              ? "bad"
+              : "warn"
+            : protectable.length || protection
+              ? "warn"
+              : undefined,
     destination: "backups",
   });
   runs.push({
@@ -398,19 +425,28 @@ export function ApplicationOverview({
     },
     {
       fact: "Off-host backup",
-      at: protection?.coverage.find((item) => item.lastSuccessfulAt)
-        ?.lastSuccessfulAt,
+      at:
+        protection?.coverage.find((item) => item.lastSuccessfulAt)
+          ?.lastSuccessfulAt ??
+        proved?.capturedAt ??
+        proved?.uploadedAt,
       detail: protection?.lastAttempt
         ? protection.lastAttempt.outcome === "succeeded"
           ? `${protection.lastAttempt.size ?? "Copy"} in ${protection.destination?.provider === "r2" ? "R2" : "S3"}`
           : `Last attempt ${protection.lastAttempt.outcome}`
-        : "No backup recorded",
+        : proved
+          ? "Copied to R2 during a proof · nothing scheduled since"
+          : "No backup recorded",
       destination: "backups",
     },
     {
       fact: "Restore test",
-      at: protection?.restoreTest?.at,
-      detail: protection?.restoreTest?.verified ?? "Not tested",
+      at: protection?.restoreTest?.at ?? provedAt,
+      detail:
+        protection?.restoreTest?.verified ??
+        (proved
+          ? `Restored in isolation and checked${proved.revisionCurrent ? "" : ", for an earlier revision"}`
+          : "Not tested"),
       destination: "backups",
     },
   ];
@@ -665,7 +701,9 @@ export function ApplicationOverview({
       <p className="sg-section-note">
         {monitoring
           ? "Freshness is measured against the host collector; a stale collector is shown as stale, never as healthy."
-          : "Setup checks and the preparation record live with Deployment. Database measurements, backups and continuous monitoring are not implemented yet; their rows stay honest until real evidence exists."}
+          : evidence
+            ? "Setup checks and the preparation record live with Deployment. The backup rows come from restore proofs an operator ran by hand; scheduled backups, database measurements and continuous monitoring are not implemented yet."
+            : "Setup checks and the preparation record live with Deployment. Database measurements, backups and continuous monitoring are not implemented yet; their rows stay honest until real evidence exists."}
       </p>
     </div>
   );

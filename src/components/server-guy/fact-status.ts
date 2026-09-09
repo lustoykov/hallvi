@@ -1,4 +1,6 @@
 import type {
+  BackupEvidenceFacts,
+  BackupProof,
   MonitoringFacts,
   ProtectionFacts,
 } from "@/server/application-facts";
@@ -72,4 +74,52 @@ export function protectionStatus(facts: ProtectionFacts) {
       title: "Backup protection is not verified",
     } as const;
   return { tone: "ok", title: `Protected · ${facts.policy.schedule}` } as const;
+}
+
+/** The most recent proof of any outcome, including one still unfinished. */
+export function latestProof(facts: BackupEvidenceFacts): BackupProof | null {
+  return facts.proofs[0] ?? null;
+}
+
+/** The most recent proof that restored. It may be an older revision. */
+export function lastVerifiedProof(
+  facts: BackupEvidenceFacts,
+): BackupProof | null {
+  return facts.proofs.find((proof) => proof.outcome === "verified") ?? null;
+}
+
+/**
+ * A proof is never protection. A verified restore earns the proof itself a
+ * verified mark, but the destination is still amber while nothing is
+ * scheduled, and a newer attempt that failed always leads: it never hides
+ * behind an older success, and an older success is never erased by it.
+ */
+export function backupEvidenceStatus(facts: BackupEvidenceFacts) {
+  const latest = latestProof(facts);
+  if (facts.proofs.some((proof) => proof.cleanupNotes.length > 0))
+    return {
+      tone: "bad",
+      title: "Temporary restore resources need cleanup",
+    } as const;
+  if (!latest)
+    return {
+      tone: "muted",
+      title: "No restore proof for what is running now",
+    } as const;
+  if (latest.outcome === "failed")
+    return { tone: "bad", title: "The last restore proof failed" } as const;
+  if (latest.outcome === "incomplete")
+    return {
+      tone: "muted",
+      title: "The last restore proof did not finish",
+    } as const;
+  if (!latest.revisionCurrent)
+    return {
+      tone: "warn",
+      title: "Restore proved for an earlier revision",
+    } as const;
+  return {
+    tone: "warn",
+    title: "Restore proved · nothing scheduled",
+  } as const;
 }

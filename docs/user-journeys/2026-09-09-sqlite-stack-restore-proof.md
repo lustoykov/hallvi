@@ -4,6 +4,11 @@ The tested applications now have real R2 round-trip and isolated-restore
 evidence. These are operator proofs, not scheduled protection or replacement-VPS
 cutovers. The Backups UI does not yet consume these receipts.
 
+**Follow-up:** [Functional Grafana recovery and application evidence](2026-09-09-grafana-functional-restore.md)
+extends this initial result with saved dashboard, encrypted credential and plugin
+tests, and connects the receipts to the application UI. The results and gaps below
+describe the original proof runs.
+
 ## Results on 9 September 2026
 
 | Application | Proof | Restored and checked |

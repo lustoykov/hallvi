@@ -3,12 +3,24 @@ import { operationsFor } from "./operation-store";
 // its stack, never a phase or a check count.
 import type { ApplicationListItem } from "@/components/server-guy/applications-screen";
 
+import type { BackupEvidenceFacts } from "./application-facts";
 import { stackOf, type ApplicationStack } from "./application-stack";
+import { backupEvidenceFor } from "./backup-evidence";
 import { applicationOperations } from "./operation-record";
 import { applicationDeployment } from "./deployment-store";
 import { listApplications } from "./db";
 import type { ApplicationRecord } from "./types";
 import type { DeploymentRecord } from "./deployment-types";
+
+function backupEvidenceSummary(facts: BackupEvidenceFacts) {
+  if (facts.proofs.some((proof) => proof.cleanupNotes.length > 0))
+    return "Restore cleanup needs attention";
+  return facts.proofs.some((proof) => proof.outcome === "verified")
+    ? "Restore proved · not scheduled"
+    : facts.proofs.length
+      ? "Restore proof did not succeed"
+      : "No restore proof";
+}
 
 export function stackSummary(stack: ApplicationStack) {
   if (!stack.recorded) return "Not deployed yet";
@@ -37,6 +49,8 @@ export function listItem(
   deployment: DeploymentRecord | null,
   now = Date.now(),
   operations = applicationOperations(deployment),
+  /** Manual restore proofs, when any were recorded for this deployment. */
+  evidence: BackupEvidenceFacts | null = null,
 ): ApplicationListItem {
   const stack = stackOf(deployment);
   const attention = operations.filter(
@@ -66,8 +80,12 @@ export function listItem(
     condition,
     stack: stackSummary(stack),
     attention,
-    protection:
-      stack.databases.length || stack.volumes.length
+    // A recorded proof means a copy was made and restored at least once, so
+    // the list may not say nothing exists. It still says nothing is running
+    // on its own: no proof ever becomes a schedule here.
+    protection: evidence
+      ? backupEvidenceSummary(evidence)
+      : stack.databases.length || stack.volumes.length
         ? "Not backed up"
         : stack.recorded
           ? "Nothing persistent"
@@ -76,12 +94,14 @@ export function listItem(
 }
 
 export function listApplicationItems() {
-  return listApplications().map((application) =>
-    listItem(
+  return listApplications().map((application) => {
+    const deployment = applicationDeployment(application.id);
+    return listItem(
       application,
-      applicationDeployment(application.id),
+      deployment,
       Date.now(),
       operationsFor(application.id),
-    ),
-  );
+      backupEvidenceFor(deployment),
+    );
+  });
 }

@@ -514,7 +514,6 @@ async function main() {
         receipt.canaryRemoved = true;
       } catch {
         receipt.canaryRemoved = false;
-        receipt.status = "failed";
       }
     }
     if (containerAttempted) {
@@ -523,7 +522,6 @@ async function main() {
         receipt.restoreTargetRemoved = true;
       } catch {
         receipt.restoreTargetRemoved = false;
-        receipt.status = "failed";
         receipt.cleanupError = `Inspect and remove only ${container}.`;
       }
     }
@@ -536,7 +534,7 @@ async function main() {
     unlinkSync(lockPath);
     console.log(`Proof receipt: ${join(directory, "receipt.json")}`);
   }
-  if (!["verified", "verified-local-only"].includes(String(receipt.status)))
+  if (receipt.canaryRemoved === false || receipt.restoreTargetRemoved === false)
     throw new Error("Restore cleanup requires attention.");
   console.log(
     localOnly

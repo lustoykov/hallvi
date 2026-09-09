@@ -1,6 +1,8 @@
 import { operationsFor } from "./operation-store";
 import { preparationView } from "./preparation";
 import { applicationPreviewView } from "./application-preview";
+import { backupEvidenceFor } from "./backup-evidence";
+import { applicationDeployment } from "./deployment-store";
 import {
   listActiveDecisions,
   listActivity,
@@ -200,7 +202,13 @@ export function getOperatorView(
     workspace,
     checks: evaluation.checks,
   });
+  // Read back from the receipts the proof runs retained. Absent evidence
+  // leaves `facts` empty, so every view keeps its unprotected state.
+  const backupEvidence = backupEvidenceFor(
+    applicationDeployment(application.id),
+  );
   return {
+    facts: backupEvidence ? { backupEvidence } : undefined,
     application,
     operations: operationsFor(application.id),
     preview: applicationPreviewView(application.id),
