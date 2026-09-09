@@ -11,3 +11,6 @@ tests/results/
 .impeccable/
 *.tsbuildinfo
 .env.local
+
+# Python operator proof helpers
+__pycache__/

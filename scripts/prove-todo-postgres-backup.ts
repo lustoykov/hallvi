@@ -5,7 +5,14 @@
  */
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+  unlinkSync,
+  existsSync,
+} from "node:fs";
 import { join } from "node:path";
 import { isIP } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
@@ -16,7 +23,13 @@ import {
   backupSha256,
   verifyPostgresArchive,
   verifyRestoredRows,
+  verifyCanaryBinding,
 } from "../src/server/backup-proof-verification";
+
+const interruption = new AbortController();
+let cleaningUp = false;
+for (const signal of ["SIGINT", "SIGTERM"] as const)
+  process.once(signal, () => interruption.abort());
 
 function run(file: string, args: string[], input?: Buffer | string) {
   return new Promise<Buffer>((resolve, reject) => {
@@ -28,12 +41,17 @@ function run(file: string, args: string[], input?: Buffer | string) {
         maxBuffer: 64 * 1024 * 1024,
         timeout: 180_000,
         killSignal: "SIGKILL",
+        signal: cleaningUp ? undefined : interruption.signal,
       },
       (error, stdout) => {
         // Never echo command output: database values and provider tokens can
         // appear in error streams. Record the failed phase instead.
         if (error)
-          reject(new Error(`${file} failed or exceeded the proof limit.`));
+          reject(
+            new Error(
+              `${file} failed: code=${String(error.code ?? "none")}, signal=${error.signal ?? "none"}, killed=${Boolean(error.killed)}.`,
+            ),
+          );
         else resolve(stdout);
       },
     );
@@ -67,6 +85,16 @@ async function main() {
   );
   let row: unknown;
   try {
+    if (
+      database
+        .prepare(
+          "SELECT id FROM application_operations WHERE application_id = ? AND state = 'working'",
+        )
+        .get(applicationId)
+    )
+      throw new Error(
+        "Wait for the active application operation before a backup proof.",
+      );
     row = database
       .prepare("SELECT body FROM deployments WHERE application_id = ?")
       .get(applicationId);
@@ -119,6 +147,10 @@ async function main() {
     phase: "preflight",
     scheduleConfigured: false,
     coverage: "Todo PostgreSQL database only",
+    restoreContainer: `sg-restore-proof-${proofId}`,
+    artifactPaths: [archivePath, ...(localOnly ? [] : [downloadPath])],
+    remoteObjectRetained: false,
+    retentionPolicyConfigured: false,
     restoreDestination:
       "Fresh local PostgreSQL container; no network or published ports",
   };
@@ -153,9 +185,11 @@ async function main() {
   const source = (args: string[]) =>
     run("ssh", [
       ...sshArgs,
-      `${compose} exec -T postgres ${args.map(quote).join(" ")}`,
+      `${compose} exec -T postgres timeout --signal=TERM --kill-after=5s 150s ${args.map(quote).join(" ")}`,
     ]);
   const sqlArgs = (sql: string) => [
+    "env",
+    "PGOPTIONS=-c timezone=UTC -c datestyle=ISO,YMD",
     "psql",
     "-X",
     "-v",
@@ -172,8 +206,52 @@ async function main() {
   const container = `sg-restore-proof-${proofId}`;
   let containerAttempted = false;
   let canaryId: string | undefined;
+  const token = `SG_BACKUP_PROOF_${proofId}`;
+  let canaryAttempted = false;
   save();
+  const lockPath = join(runtimeDir, `backup-proof-${applicationId}.lock`);
+  writeFileSync(lockPath, JSON.stringify({ proofId, pid: process.pid }), {
+    flag: "wx",
+    mode: 0o600,
+  });
   try {
+    if (!localOnly)
+      receipt.privateBucketCheck = JSON.parse(
+        (
+          await run("node", [
+            join(process.cwd(), "scripts/backup-proof/check-r2-private.mjs"),
+            account,
+            bucket,
+          ])
+        ).toString(),
+      );
+    const containerId = (
+      await run("ssh", [...sshArgs, `${compose} ps -q postgres`])
+    )
+      .toString()
+      .trim();
+    if (!/^[a-f0-9]{64}$/.test(containerId))
+      throw new Error("Source database container identity is ambiguous.");
+    receipt.sourceContainer = JSON.parse(
+      (
+        await run("ssh", [
+          ...sshArgs,
+          `docker inspect --format '${'{"id":{{json .Id}},"image":{{json .Image}}}'}' ${containerId}`,
+        ])
+      ).toString(),
+    );
+    receipt.sourceHostKey = (
+      await run("ssh-keygen", ["-lf", join(identity, "known_hosts")])
+    )
+      .toString()
+      .trim();
+    const actualVersion = Number(
+      (await source(sqlArgs("SHOW server_version_num"))).toString().trim(),
+    );
+    if (Math.floor(actualVersion / 10000) !== Number(version))
+      throw new Error(
+        "Source PostgreSQL major version differs from the deployment.",
+      );
     // Do not generalize this application's row assertion to other databases.
     const tables = await source(
       sqlArgs(
@@ -184,32 +262,42 @@ async function main() {
       throw new Error(
         "This bounded proof only supports the Todo reference schema.",
       );
-    const token = `SG_BACKUP_PROOF_${proofId}`;
-    receipt.canary = { token, status: "creating" };
-    save();
-    const response = await fetch(`http://${deployment.address}/api/todos`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: token,
-        notes: "Temporary backup restore proof",
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (response.status !== 201)
-      throw new Error("Could not create the proof todo.");
-    const created = z
-      .object({
-        todo: z.object({
-          id: z.uuid(),
-          title: z.literal(token),
+    const initialRows = await source(sqlArgs(rowsSql));
+    receipt.sourceRowsBeforeCanary = initialRows.toString().trim()
+      ? initialRows.toString().trim().split("\n").length
+      : 0;
+    if (!initialRows.toString().trim()) {
+      canaryAttempted = true;
+      receipt.canary = { token, status: "creating" };
+      save();
+      const response = await fetch(`http://${deployment.address}/api/todos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: token,
+          notes: "Temporary backup restore proof",
         }),
-      })
-      .parse(await response.json());
-    canaryId = created.todo.id;
-    receipt.canary = { token, id: canaryId, status: "created" };
-    save();
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (response.status !== 201)
+        throw new Error("Could not create the proof todo.");
+      const created = z
+        .object({
+          todo: z.object({
+            id: z.uuid(),
+            title: z.literal(token),
+          }),
+        })
+        .parse(await response.json());
+      canaryId = created.todo.id;
+      receipt.canary = { token, id: canaryId, status: "created" };
+      save();
+    }
+    const schemaSql =
+      "SELECT table_name,column_name,data_type,is_nullable,column_default FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,ordinal_position; SELECT indexname,indexdef FROM pg_indexes WHERE schemaname='public' ORDER BY indexname; SELECT conname,pg_get_constraintdef(oid) FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY conname";
+    const sourceSchema = await source(sqlArgs(schemaSql));
     const before = await source(sqlArgs(rowsSql));
+    if (canaryId) verifyCanaryBinding(before, canaryId, token);
     if (!before.toString().trim())
       throw new Error("Todo has no rows to prove recovery.");
     await run("docker", ["info", "--format", "{{.ServerVersion}}"]);
@@ -237,6 +325,7 @@ async function main() {
     };
     let downloaded = archive;
     if (!localOnly) {
+      receipt.uploadAttempted = true;
       phase("upload");
       await run("npx", [
         "--yes",
@@ -250,6 +339,7 @@ async function main() {
         "--remote",
       ]);
       receipt.uploadedAt = new Date().toISOString();
+      receipt.remoteObjectRetained = true;
       phase("download-and-verify");
       await run("npx", [
         "--yes",
@@ -296,6 +386,12 @@ async function main() {
       container,
       "--network",
       "none",
+      "--label",
+      `sg-backup-proof=${proofId}`,
+      "--memory",
+      "512m",
+      "--cpus",
+      "1",
       "--env",
       "POSTGRES_HOST_AUTH_METHOD=trust",
       "--env",
@@ -303,7 +399,7 @@ async function main() {
       "--env",
       "POSTGRES_DB=application",
       "--tmpfs",
-      `/var/lib/postgresql${version === "18" ? "" : "/data"}`,
+      `/var/lib/postgresql${version === "18" ? "" : "/data"}:size=256m`,
       image,
     ]);
     let ready = false;
@@ -349,6 +445,22 @@ async function main() {
       ...sqlArgs(rowsSql),
     ]);
     receipt.rowVerification = verifyRestoredRows(before, after, restored);
+    const restoredSchema = await run("docker", [
+      "exec",
+      container,
+      ...sqlArgs(schemaSql),
+    ]);
+    if (!sourceSchema.equals(restoredSchema))
+      throw new Error("Restored schema, constraints, or indexes differ.");
+    await run("docker", [
+      "exec",
+      container,
+      ...sqlArgs(
+        "BEGIN; INSERT INTO public.todos SELECT (jsonb_populate_record(NULL::public.todos, to_jsonb(t) || jsonb_build_object('id', gen_random_uuid(), 'title', 'SG_RESTORE_WRITE_PROOF'))).* FROM public.todos t LIMIT 1; ROLLBACK;",
+      ),
+    ]);
+    receipt.schemaVerified = true;
+    receipt.isolatedWriteVerified = true;
     receipt.restoreVerifiedAt = new Date().toISOString();
     receipt.status = localOnly ? "verified-local-only" : "verified";
     phase("complete");
@@ -357,16 +469,48 @@ async function main() {
     receipt.error = error instanceof Error ? error.message : "Proof failed.";
     throw error;
   } finally {
-    if (canaryId !== undefined) {
+    cleaningUp = true;
+    if (canaryAttempted) {
       try {
-        const response = await fetch(
-          `http://${deployment.address}/api/todos/${canaryId}`,
-          {
-            method: "DELETE",
-            signal: AbortSignal.timeout(15_000),
-          },
-        );
-        if (response.status !== 204) throw new Error("Canary cleanup failed.");
+        const remaining = (
+          await source(
+            sqlArgs(
+              `SELECT id FROM public.todos WHERE title = '${token}' AND notes = 'Temporary backup restore proof'`,
+            ),
+          )
+        )
+          .toString()
+          .trim()
+          .split("\n")
+          .filter(Boolean);
+        if (remaining.length > 1)
+          throw new Error("Canary identity is ambiguous.");
+        canaryId = remaining.length ? z.uuid().parse(remaining[0]) : undefined;
+        if (canaryId)
+          receipt.canary = { token, id: canaryId, status: "cleanup" };
+        save();
+        if (canaryId !== undefined) {
+          const response = await fetch(
+            `http://${deployment.address}/api/todos/${canaryId}`,
+            {
+              method: "DELETE",
+              signal: AbortSignal.timeout(15_000),
+            },
+          );
+          if (response.status !== 204)
+            throw new Error("Canary cleanup failed.");
+        }
+        const remainingCount = (
+          await source(
+            sqlArgs(
+              `SELECT count(*) FROM public.todos WHERE title = '${token}' AND notes = 'Temporary backup restore proof'`,
+            ),
+          )
+        )
+          .toString()
+          .trim();
+        if (remainingCount !== "0")
+          throw new Error("Canary still exists in the source database.");
         receipt.canaryRemoved = true;
       } catch {
         receipt.canaryRemoved = false;
@@ -383,8 +527,13 @@ async function main() {
         receipt.cleanupError = `Inspect and remove only ${container}.`;
       }
     }
+    receipt.localArtifactsRetained = [archivePath, downloadPath].filter(
+      existsSync,
+    );
+    receipt.remoteObjectMayExist = Boolean(receipt.uploadAttempted);
     receipt.finishedAt = new Date().toISOString();
     save();
+    unlinkSync(lockPath);
     console.log(`Proof receipt: ${join(directory, "receipt.json")}`);
   }
   if (!["verified", "verified-local-only"].includes(String(receipt.status)))

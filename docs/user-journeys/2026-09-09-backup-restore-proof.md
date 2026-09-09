@@ -58,6 +58,13 @@ installed matching PostgreSQL major version, pins its image ID, and force-stops
 commands that exceed their deadline. The successful proof used the downloaded
 R2 object, not the original local dump.
 
+## Follow-up verification
+
+The [SQLite and multi-service proof](2026-09-09-sqlite-stack-restore-proof.md)
+adds real Kuma, Grafana and Prometheus restore evidence and records the
+corrections from Opus review. The updated Todo runner was reverified with canary
+binding/removal checks, schema comparison, and an isolated rolled-back write.
+
 ## What follows
 
 1. Add the product's R2/S3 connection using credentials scoped to its bucket.
@@ -66,8 +73,9 @@ R2 object, not the original local dump.
 2. Implement scheduled PostgreSQL backups independently of the controller, with
    retention, durable operation records, failed-upload handling, and stale-backup
    issues. Show recovery point and restore-test evidence in the Backups view.
-3. Cover Uptime Kuma and Grafana with consistent SQLite backups, plus their
-   configuration and required files. Treat Prometheus data separately.
+3. Turn the verified Kuma/Grafana/Prometheus operator proofs into scheduled
+   protection, and extend fixtures with a saved Grafana dashboard and a nonempty
+   datasource credential.
 4. Exercise replacement-host application recovery and cutover. This proof tested
    a fresh database instance, not an entire replacement VPS or production cutover.
 

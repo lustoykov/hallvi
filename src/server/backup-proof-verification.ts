@@ -32,3 +32,15 @@ export function verifyRestoredRows(
     rowsSha256: backupSha256(before),
   };
 }
+
+export function verifyCanaryBinding(rows: Buffer, id: string, token: string) {
+  const matches = rows
+    .toString()
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { id?: string; title?: string })
+    .filter((row) => row.id === id && row.title === token);
+  if (matches.length !== 1)
+    throw new Error("The API canary was not found in the source database.");
+}
