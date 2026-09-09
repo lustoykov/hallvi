@@ -27,9 +27,23 @@ test(
       page.getByRole("button", { name: "Overview", exact: true }),
     ).toHaveCount(1);
     await composer.fill("First conversation draft");
-    await nav
-      .getByRole("button", { name: "New conversation", exact: true })
-      .click();
+    const chatsUrl = new URL(
+      `/api${new URL(page.url()).pathname}/chats`,
+      page.url(),
+    ).href;
+    // The cold Next dev fixture compiles this handler on first use. Wait for
+    // HTTP creation before starting the unchanged UI-state assertion budget.
+    const [created] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url() === chatsUrl && response.request().method() === "POST",
+        { timeout: 30_000 },
+      ),
+      nav
+        .getByRole("button", { name: "New conversation", exact: true })
+        .click(),
+    ]);
+    expect(created.status()).toBe(201);
     await expect(composer).toHaveValue("");
     await composer.fill("Second conversation draft");
     await nav

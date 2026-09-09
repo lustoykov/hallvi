@@ -2,7 +2,7 @@
 
 > Archived reference, 9 September 2026. Preserved for evidence and migration; instructions and unchecked lists below are historical, not the current product plan. See [Product](../../../PRODUCT.md) and [Roadmap](../../../ROADMAP.md).
 
-Implementation reference: this document describes the existing backend. The [accepted architecture](../../architecture/agent-directed-operations.md) changes the target collaboration/UI model and application-code scope; those migrations remain pending in [ROADMAP.md](../../../ROADMAP.md#next-finish-and-reconcile-the-integration). Existing phase, tool and preview behavior below must not be mistaken for the new product boundary.
+Implementation reference: this document describes the existing backend. The [accepted architecture](../../architecture/agent-directed-operations.md) changes the target collaboration/UI model and application-code scope; those migrations remain pending in [ROADMAP.md](../../../ROADMAP.md#integration-acceptance-and-remaining-reconciliation). Existing phase, tool and preview behavior below must not be mistaken for the new product boundary.
 
 Status: slice 1 merged in [PR #15](https://github.com/lustoykov/server-guy/pull/15). This is the current native-session contract; external mutation/approval enforcement remains a later slice. Baseline: [PR #13](https://github.com/lustoykov/server-guy/pull/13), merged September 5, 2026. Build order belongs in [ROADMAP.md](../../../ROADMAP.md).
 

@@ -87,7 +87,7 @@ Schema v12 retains Decisions, Observations, contracts, conformance/publication e
 
 Use known-version, backed-up migrations with populated-state tests. Preserve application/chat/message IDs, native-session associations, pending work, source provenance and exact tested candidates. Do not drop tables because their old UI names disappeared.
 
-The [legacy implementation references](../archive/README.md#implementation-reference) describe those existing mechanisms and tests. The [roadmap](../../ROADMAP.md#next-finish-and-reconcile-the-integration) owns their explicit acceptance disposition.
+The [legacy implementation references](../archive/README.md#implementation-reference) describe those existing mechanisms and tests. The [roadmap](../../ROADMAP.md#integration-acceptance-and-remaining-reconciliation) owns their explicit acceptance disposition.
 
 ## Plugins
 
