@@ -4,19 +4,20 @@ import {
   Condition,
   Facts,
   Pill,
-  LinkButton,
   Possible,
   SubHeading,
+  TextLink,
   When,
   type ViewProps,
 } from "./bits";
 import { Flow, type FlowStage } from "./visuals";
 
 /**
- * Delivery is a path, and every stage of it can be in a different state:
- * the name resolves but the certificate is pending, the certificate is
- * valid but no CDN caches anything. The path is drawn once at the top so
- * the gap is obvious; the facts below say exactly what each stage recorded.
+ * The name this application answers on, and the certificate behind it.
+ * Delivery is a path whose stages each carry their own state: the name can
+ * resolve while the certificate is still pending. The path is drawn once at
+ * the top so the gap is obvious; caching is its own destination, because a
+ * stale cached copy is a different failure from a name that will not resolve.
  */
 export function DomainsView(props: ViewProps) {
   const { stack, facts, deployment, now } = props;
@@ -69,6 +70,16 @@ export function DomainsView(props: ViewProps) {
         : cdn?.state === "not-useful"
           ? "skipped"
           : "absent",
+      note: (
+        <>
+          Caching, delivery and clearing the cache live in{" "}
+          <TextLink onClick={() => props.onOpenDestination("cdn")}>
+            CDN
+          </TextLink>
+          .
+        </>
+      ),
+      noteLabel: "CDN",
     },
     {
       key: "tls",
@@ -119,7 +130,7 @@ export function DomainsView(props: ViewProps) {
           Server Guy connects your existing DNS, routes the hostname to the
           right service, issues and renews the certificate, and recommends a CDN
           only when it helps. You do the one step only you can: pointing the
-          domain. Domain setup is not available yet.
+          domain. Domain setup is not implemented yet.
         </Possible>
         <div className="sg-band">
           <SubHeading>Domain &amp; HTTPS</SubHeading>
@@ -137,7 +148,6 @@ export function DomainsView(props: ViewProps) {
             ]}
           />
         </div>
-        <CdnSection {...props} />
       </>
     );
   const tone =
@@ -264,71 +274,6 @@ export function DomainsView(props: ViewProps) {
           are reachable from outside.
         </p>
       </div>
-      <CdnSection {...props} />
     </>
-  );
-}
-
-function CdnSection({ facts, onAsk }: ViewProps) {
-  const cdn = facts.domains?.cdn;
-  const configured = cdn?.state === "active" || cdn?.state === "partial";
-  return (
-    <section className="sg-band" aria-label="CDN">
-      <SubHeading>CDN</SubHeading>
-      <p className="sg-section-note">
-        An optional layer that serves cached copies of eligible files closer to
-        visitors. Your domain and HTTPS work independently of it.
-      </p>
-      <Facts
-        wide
-        rows={[
-          [
-            "Status",
-            <Pill
-              key="state"
-              tone={
-                cdn?.state === "active"
-                  ? "ok"
-                  : cdn?.state === "partial"
-                    ? "warn"
-                    : "muted"
-              }
-            >
-              {cdn?.state === "active"
-                ? "Active"
-                : cdn?.state === "partial"
-                  ? "Partially configured"
-                  : "Not enabled"}
-            </Pill>,
-          ],
-          ...(configured
-            ? [["Provider", cdn.provider ?? "Not recorded"] as [string, string]]
-            : []),
-          [
-            configured ? "Caching" : "Recommendation",
-            cdn?.state === "not-configured" || !cdn
-              ? "No CDN configured. Server Guy can help assess whether this application would benefit."
-              : cdn.detail,
-          ],
-        ]}
-      />
-      <LinkButton
-        onClick={() =>
-          onAsk(
-            null,
-            configured
-              ? "I want to clear the CDN cache for this application. Show me the scope and impact before doing anything."
-              : "Would a CDN help this application? Explain what should be cached and recommend a setup if it makes sense.",
-          )
-        }
-      >
-        {configured ? "Ask to clear cache" : "Discuss CDN setup"}
-      </LinkButton>
-      {!facts.domains && (
-        <p className="sg-section-note">
-          CDN setup and cache clearing are not implemented yet.
-        </p>
-      )}
-    </section>
   );
 }

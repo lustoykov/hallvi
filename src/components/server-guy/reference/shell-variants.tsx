@@ -34,7 +34,7 @@ const variants = [
 
 const screens = [
   { id: "overview", label: "Overview" },
-  { id: "domains", label: "Domains & CDN" },
+  { id: "domains", label: "Domains" },
   { id: "backups", label: "Backups" },
   { id: "", label: "Conversation" },
 ] as const;

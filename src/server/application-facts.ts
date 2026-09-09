@@ -133,6 +133,43 @@ export interface DomainFacts {
   routes: { host: string; service: string; port: number; protocol: string }[];
 }
 
+/**
+ * What can reach this application, as the host provider records it. The
+ * executor already creates a firewall with the ports it opens; this is the
+ * shape that firewall must be read back into, so the view states exposure
+ * from observation rather than from the plan that asked for it.
+ */
+export interface SecurityFacts {
+  firewall: {
+    state: "active" | "not-configured" | "unknown";
+    provider: string;
+    /** The provider's own name for it, so it is findable outside the app. */
+    name?: string | null;
+    lastCheckedAt?: string | null;
+    detail: string;
+  };
+  /** One entry per inbound rule the provider reports. */
+  rules: {
+    id: string;
+    port: string;
+    protocol: string;
+    /** The exact sources, as the provider states them. */
+    sources: string[];
+    /** Those sources in words: "any network", "your network". */
+    reach: "internet" | "restricted";
+    /** What listens behind it, when the recorded stack says. */
+    serves?: string | null;
+  }[];
+  ssh: {
+    state: "key-only" | "password" | "closed" | "unknown";
+    detail: string;
+    /** Who holds a key, in words. Never a key. */
+    holders?: string | null;
+  };
+  /** Services that are not reachable from outside at all. */
+  privateServices: string[];
+}
+
 export interface VariableFacts {
   variables: {
     name: string;
@@ -237,6 +274,7 @@ export interface JobFacts {
 
 export interface ApplicationFacts {
   protection?: ProtectionFacts;
+  security?: SecurityFacts;
   monitoring?: MonitoringFacts;
   domains?: DomainFacts;
   variables?: VariableFacts;
@@ -262,6 +300,8 @@ export type ViewAction =
   | { type: "roll-back"; revision: string }
   | { type: "measure-database" }
   | { type: "refresh-logs"; service?: string }
+  | { type: "check-firewall" }
+  | { type: "clear-cdn-cache" }
   | { type: "run-backup" }
   | { type: "test-restore" }
   | { type: "verify-now" };

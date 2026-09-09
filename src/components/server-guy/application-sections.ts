@@ -12,8 +12,11 @@ import {
   TerminalWindow,
   Pulse,
   Globe,
+  ShieldCheck,
+  StackSimple,
   SlidersHorizontal,
 } from "@phosphor-icons/react";
+import type { ApplicationFacts } from "@/server/application-facts";
 import type { ApplicationStack } from "@/server/application-stack";
 
 /**
@@ -21,6 +24,9 @@ import type { ApplicationStack } from "@/server/application-stack";
  * stack group shows only the resources this application's deployment
  * records, so a simple application never carries empty infrastructure
  * controls; the care group covers protection, evidence and delivery.
+ *
+ * `hideable` says a destination drops under "Show more" until something
+ * records it. `available` says whether any backend can record it today.
  */
 export const applicationSections = [
   {
@@ -47,12 +53,12 @@ export const applicationSections = [
     icon: ClockCounterClockwise,
     group: "application",
   },
-  // `available` says whether any backend can record the resource today.
   {
     id: "processes",
     label: "Processes",
     icon: Cpu,
     group: "stack",
+    hideable: true,
     available: true,
   },
   {
@@ -60,6 +66,7 @@ export const applicationSections = [
     label: "Database",
     icon: Database,
     group: "stack",
+    hideable: true,
     available: true,
   },
   {
@@ -67,6 +74,7 @@ export const applicationSections = [
     label: "Cache & queue",
     icon: Lightning,
     group: "stack",
+    hideable: true,
     available: false,
   },
   {
@@ -74,6 +82,7 @@ export const applicationSections = [
     label: "Jobs",
     icon: CalendarCheck,
     group: "stack",
+    hideable: true,
     available: false,
   },
   {
@@ -81,12 +90,29 @@ export const applicationSections = [
     label: "Storage",
     icon: HardDrive,
     group: "stack",
+    hideable: true,
     available: true,
   },
   { id: "backups", label: "Backups", icon: Archive, group: "care" },
   { id: "logs", label: "Logs", icon: TerminalWindow, group: "care" },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
-  { id: "domains", label: "Domains & CDN", icon: Globe, group: "care" },
+  { id: "domains", label: "Domains", icon: Globe, group: "care" },
+  {
+    id: "cdn",
+    label: "CDN",
+    icon: StackSimple,
+    group: "care",
+    hideable: true,
+    available: false,
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: ShieldCheck,
+    group: "care",
+    hideable: true,
+    available: false,
+  },
   {
     id: "variables",
     label: "Environment Variables",
@@ -100,10 +126,11 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
   return applicationSections.find((s) => `#${s.id}` === hash)?.id ?? null;
 }
 
-/** Whether the stack group's destination has anything recorded to show. */
+/** Whether a hideable destination has anything recorded to show. */
 export function sectionRecorded(
   section: ApplicationSection,
   stack: ApplicationStack,
+  facts: ApplicationFacts = {},
 ) {
   switch (section) {
     case "processes":
@@ -116,6 +143,15 @@ export function sectionRecorded(
       return stack.jobs.length > 0;
     case "storage":
       return stack.volumes.length > 0;
+    // Delivery through a CDN is only a destination once one is caching.
+    case "cdn":
+      return (
+        facts.domains?.cdn.state === "active" ||
+        facts.domains?.cdn.state === "partial"
+      );
+    // Exposure is only a destination once the host firewall was read back.
+    case "security":
+      return Boolean(facts.security);
     default:
       return true;
   }
@@ -125,32 +161,36 @@ export function sectionRecorded(
 export function visibleSections(
   stack: ApplicationStack,
   active: ApplicationSection | null,
+  facts: ApplicationFacts = {},
 ) {
   return applicationSections.filter(
-    (section) => section.id === active || sectionRecorded(section.id, stack),
+    (section) =>
+      section.id === active || sectionRecorded(section.id, stack, facts),
   );
 }
 
 /**
- * The stack destinations this application does not show, with the reason
- * each row carries once revealed: the application does not use it, nothing
- * can record it yet, or it is known only after the first deployment.
+ * The destinations this application does not show, with the reason each row
+ * carries once revealed: the application does not use it, nothing can record
+ * it yet, or it is known only after the first deployment.
  */
-export function hiddenStackSections(
+export function hiddenSections(
   stack: ApplicationStack,
   active: ApplicationSection | null,
+  facts: ApplicationFacts = {},
 ) {
   return applicationSections
     .filter(
       (section) =>
-        section.group === "stack" &&
+        "hideable" in section &&
+        section.hideable &&
         section.id !== active &&
-        !sectionRecorded(section.id, stack),
+        !sectionRecorded(section.id, stack, facts),
     )
     .map((section) => ({
       ...section,
       note: !("available" in section && section.available)
-        ? "not available yet"
+        ? "nothing recorded yet"
         : stack.recorded
           ? "not used"
           : "after deployment",

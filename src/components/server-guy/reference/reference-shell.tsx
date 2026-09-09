@@ -18,7 +18,7 @@ import { ApplicationNavigation } from "../application-navigation";
 import { ApplicationSectionView } from "../application-section-view";
 import {
   applicationSections,
-  hiddenStackSections,
+  hiddenSections,
   sectionFromHash,
   visibleSections,
   type ApplicationSection,
@@ -395,8 +395,8 @@ export function ReferenceShell({
           }}
           indicators={indicators}
           chatMarks={chatMarks}
-          sections={visibleSections(stack, section)}
-          hidden={hiddenStackSections(stack, section)}
+          sections={visibleSections(stack, section, state.facts)}
+          hidden={hiddenSections(stack, section, state.facts)}
           revealed={revealed}
           onReveal={setRevealed}
         />

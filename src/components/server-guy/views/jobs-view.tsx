@@ -185,7 +185,7 @@ export function JobsView(props: ViewProps) {
           host-side schedule, reusing a schedule the application already owns
           rather than adding a second trigger. Each job would show its schedule,
           next run, last result and the conversation that set it up. Scheduled
-          execution is not available yet.
+          execution is not implemented yet.
         </Possible>
       )}
       {(queues.length > 0 || stack.queues.length > 0 || workers.length > 0) && (

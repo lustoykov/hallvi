@@ -483,6 +483,40 @@ function initial(): ReferenceState {
       ],
       pending: [],
     },
+    security: {
+      firewall: {
+        state: "active",
+        provider: "Hetzner Cloud",
+        name: "sg-5c2e9b1d",
+        lastCheckedAt: "2026-09-08T21:31:00.000Z",
+        detail: "One firewall attached to this instance",
+      },
+      rules: [
+        {
+          id: "rule-http",
+          port: "80",
+          protocol: "tcp",
+          sources: ["0.0.0.0/0", "::/0"],
+          reach: "internet",
+          serves: "app · the document archive",
+        },
+        {
+          id: "rule-ssh",
+          port: "22",
+          protocol: "tcp",
+          sources: ["0.0.0.0/0", "::/0"],
+          reach: "internet",
+          serves: "SSH · administrative access",
+        },
+      ],
+      ssh: {
+        state: "key-only",
+        detail:
+          "Password authentication is disabled in the instance’s cloud-init",
+        holders: "One key held by this controller",
+      },
+      privateServices: ["PostgreSQL 16", "Valkey 8 broker"],
+    },
     domains: {
       address: "http://203.0.113.24",
       domain: null,

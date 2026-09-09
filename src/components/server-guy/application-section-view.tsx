@@ -18,6 +18,7 @@ import { ArchitectureCanvas } from "./architecture-canvas";
 import { DestinationActivity } from "./destination-activity";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
+import { CdnView } from "./views/cdn-view";
 import { DatabaseView } from "./views/database-view";
 import { DeploymentView } from "./views/deployment-view";
 import { DomainsView } from "./views/domains-view";
@@ -26,6 +27,7 @@ import { JobsView } from "./views/jobs-view";
 import { LogsView } from "./views/logs-view";
 import { MonitoringView } from "./views/monitoring-view";
 import { ProcessesView } from "./views/processes-view";
+import { SecurityView } from "./views/security-view";
 import { StorageView } from "./views/storage-view";
 import { VariablesView } from "./views/variables-view";
 import type { ViewProps } from "./views/bits";
@@ -51,7 +53,9 @@ const descriptions: Record<ApplicationSection, string> = {
   logs: "Inspect the latest collected output from your application host.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
-  domains: "Your application’s domain, HTTPS and optional CDN caching.",
+  domains: "The name your application answers on, and the HTTPS behind it.",
+  cdn: "Cached copies of eligible files, served closer to your visitors.",
+  security: "What can reach this application, and over which ports.",
   variables: "Configuration your application needs to build and run.",
 };
 
@@ -212,6 +216,12 @@ export function ApplicationSectionView({
       break;
     case "domains":
       content = <DomainsView {...viewProps} />;
+      break;
+    case "cdn":
+      content = <CdnView {...viewProps} />;
+      break;
+    case "security":
+      content = <SecurityView {...viewProps} />;
       break;
     case "variables":
       content = <VariablesView {...viewProps} />;

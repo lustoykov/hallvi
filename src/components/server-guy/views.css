@@ -173,9 +173,11 @@
   background: var(--working-bg);
   border-color: #c7d6f5;
 }
-.sg-condition-aside {
+/* The aside is a div, and `.sg-condition > div` claims flex: 1; this has to
+   out-specify it or the action grows to half the band. */
+.sg-condition > .sg-condition-aside {
   margin-left: auto;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 .sg-condition-aside .sg-op-links {
   margin: 0;
@@ -1226,9 +1228,9 @@
     flex-wrap: wrap;
     padding: 13px 14px;
   }
-  .sg-condition-aside {
-    margin-left: 21px;
-    width: 100%;
+  .sg-condition > .sg-condition-aside {
+    margin: 4px 0 0 21px;
+    flex: 0 0 100%;
   }
   .sg-stack-item {
     padding: 14px;
@@ -1526,4 +1528,53 @@
 }
 .sg-pending-inputs ul {
   margin: 0;
+}
+
+/* Inbound rules: the port, what it serves, and who can reach it. */
+.sg-rules {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hairline);
+}
+.sg-rule-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1.2fr) minmax(0, 1.4fr) 120px;
+  gap: 20px;
+  align-items: baseline;
+  padding: 11px 10px 11px 12px;
+  margin-left: -12px;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 2px solid transparent;
+  font-size: 12.5px;
+}
+.sg-rule-row.sg-table-head {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #99a2b0;
+  font-weight: 600;
+  border-top: 0;
+}
+.sg-rule-row code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+.sg-rule-row code + code {
+  margin-left: 6px;
+}
+.sg-rule-row .sg-pill {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .sg-rule-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .sg-rule-row.sg-table-head {
+    display: none;
+  }
+  .sg-rule-row span[data-label]::before {
+    content: attr(data-label) ": ";
+    color: #99a2b0;
+  }
 }

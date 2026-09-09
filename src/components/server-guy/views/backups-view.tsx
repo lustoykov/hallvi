@@ -103,7 +103,7 @@ export function BackupsView(props: ViewProps) {
         <Planned title="Connect storage. Let Server Guy handle the rest.">
           The planned flow recommends Cloudflare R2 or AWS S3, asks for scoped
           access, configures a schedule and retention per kind of state, and
-          verifies an isolated restore. Backup execution is not available yet.
+          verifies an isolated restore. Backup execution is not implemented yet.
         </Planned>
       </>
     );

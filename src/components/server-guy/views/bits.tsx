@@ -150,7 +150,7 @@ export function Possible({
           Ask in the conversation <ArrowRight aria-hidden="true" />
         </LinkButton>
         {!available && (
-          <span className="sg-availability">Not available yet</span>
+          <span className="sg-availability">Not implemented yet</span>
         )}
       </div>
     </div>

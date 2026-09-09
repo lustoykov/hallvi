@@ -33,7 +33,7 @@ import {
 import { ApplicationSectionView } from "./application-section-view";
 import {
   applicationSections,
-  hiddenStackSections,
+  hiddenSections,
   sectionFromHash,
   visibleSections,
   type ApplicationSection,
@@ -874,7 +874,7 @@ export function OperatorShell({
           indicators={indicators}
           chatMarks={chatMarks}
           sections={visibleSections(stack, activeSection)}
-          hidden={hiddenStackSections(stack, activeSection)}
+          hidden={hiddenSections(stack, activeSection)}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
         />

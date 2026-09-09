@@ -324,6 +324,40 @@ export const simpleScenario: Scenario = {
             ],
             pending: [],
           },
+          security: {
+            firewall: {
+              state: "active",
+              provider: "Hetzner Cloud",
+              name: "sg-e3b0c442",
+              lastCheckedAt: state.clock,
+              detail: "One firewall attached to this instance",
+            },
+            rules: [
+              {
+                id: "rule-http",
+                port: "80",
+                protocol: "tcp",
+                sources: ["0.0.0.0/0", "::/0"],
+                reach: "internet",
+                serves: "app · the status page",
+              },
+              {
+                id: "rule-ssh",
+                port: "22",
+                protocol: "tcp",
+                sources: ["0.0.0.0/0", "::/0"],
+                reach: "internet",
+                serves: "SSH · administrative access",
+              },
+            ],
+            ssh: {
+              state: "key-only",
+              detail:
+                "Password authentication is disabled in the instance’s cloud-init",
+              holders: "One key held by this controller",
+            },
+            privateServices: [],
+          },
           domains: {
             address: "http://203.0.113.41",
             domain: null,
@@ -913,6 +947,70 @@ export const simpleScenario: Scenario = {
         )!;
         found.state = "recovered";
         found.recoveredAt = state.clock;
+      },
+    },
+    {
+      id: "narrowed",
+      title: "SSH narrowed, CDN in front",
+      note: "Exposure and caching as their own destinations.",
+      clock: "2026-09-10T15:04:00.000Z",
+      apply: (state) => {
+        const security = state.facts.security!;
+        security.firewall.lastCheckedAt = state.clock;
+        security.firewall.detail =
+          "One firewall attached to this instance · SSH narrowed to the controller";
+        security.rules = [
+          {
+            id: "rule-https",
+            port: "443",
+            protocol: "tcp",
+            sources: ["0.0.0.0/0", "::/0"],
+            reach: "internet",
+            serves: "app · the status page, over HTTPS",
+          },
+          {
+            id: "rule-http",
+            port: "80",
+            protocol: "tcp",
+            sources: ["0.0.0.0/0", "::/0"],
+            reach: "internet",
+            serves: "app · redirects to HTTPS",
+          },
+          {
+            id: "rule-ssh",
+            port: "22",
+            protocol: "tcp",
+            sources: ["198.51.100.24/32"],
+            reach: "restricted",
+            serves: "SSH · administrative access",
+          },
+        ];
+        state.facts.domains!.cdn = {
+          state: "active",
+          provider: "Cloudflare",
+          detail:
+            "Static assets cached at the edge for 12 minutes · the status HTML always comes from the instance",
+        };
+        operation(state, {
+          id: "op-narrow",
+          source: "deployment",
+          kind: "change",
+          state: "verified",
+          title: "Narrow SSH and put a CDN in front",
+          summary:
+            "SSH is now reachable only from this controller, and Cloudflare caches the status page’s static assets.",
+          destinations: ["security", "cdn", "domains"],
+          origin: { chatId: "chat-deploy", messageId: null },
+          evidence:
+            "Hetzner firewall sg-e3b0c442: port 22 source 198.51.100.24/32 · Cloudflare zone status.example.dev caching static assets only.",
+        });
+        message(
+          state,
+          "chat-deploy",
+          "assistant",
+          "SSH now accepts connections only from this controller’s address; ports 80 and 443 stay open because the status page is public. Cloudflare caches the page’s static assets for 12 minutes and always fetches the status itself from the instance, so a stale cache cannot show a stale status.",
+          { source: "server-guy" },
+        );
       },
     },
   ],

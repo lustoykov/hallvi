@@ -127,6 +127,16 @@ const flows: { title: string; detail: string; href: string }[] = [
     href: "/prototype/app?scenario=simple&step=4&section=processes",
   },
   {
+    title: "Exposure · SSH open to any network",
+    detail: "Document archive · the firewall rules read back from the host.",
+    href: "/prototype/app?scenario=rich&step=13&section=security",
+  },
+  {
+    title: "Exposure narrowed, CDN in front",
+    detail: "Status page · SSH restricted, Cloudflare caching static assets.",
+    href: "/prototype/app?scenario=simple&step=16&section=security",
+  },
+  {
     title: "Delivery path · no domain",
     detail: "Status page · the path from name to service with the gaps shown.",
     href: "/prototype/app?scenario=simple&step=4&section=domains",
