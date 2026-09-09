@@ -12,7 +12,8 @@ The only active delivery plan. [Product](PRODUCT.md) owns scope, [architecture](
 | Final screen reference | Fable’s finished views and replayable `/prototype` scenarios are integrated. Real application routes use recorded state and unavailable placeholders; simulation does not implement backups, monitoring, releases or other missing executors. See [combined acceptance](docs/testing/2026-09-09-final-ui-integration.md). |
 | Persistence | Schema v13 adds durable application operations, serialized changes, a queue with precondition rechecks and retained cancellation. Existing domain/deployment evidence and native conversations remain. History and the agent read the same operations; current executors remain source preparation/publication and first deployment. See [coordination acceptance](docs/testing/2026-09-09-operation-coordination.md). |
 | Runtime limit | The runtime now represents a source-built web service or pinned Docker Hub image, optional PostgreSQL, private image services, read-only configuration mounts and persistent volumes including SQLite. See the [dated runtime evidence](docs/testing/2026-09-09-single-instance-runtime.md); arbitrary Compose, BYOM, worker lifecycle and backups are not implied. |
-| Lifecycle gaps | BYOM adoption, public HTTPS/CDN, routine release history, verified backups/restoration and ongoing care still need end-to-end implementation. The controller currently enforces local access; shared/separate remote hosting requires authenticated bootstrap. |
+| Scheduled data protection | R2-backed host timers, retention and isolated database/file restores now run on the PostgreSQL, Kuma and Grafana/Prometheus test stacks. Failure, interruption and sleeping-worker evidence is recorded in the [scheduled-backup acceptance](docs/testing/2026-09-09-scheduled-backups.md). AWS S3, controller backup and replacement-host cutover remain open. |
+| Lifecycle gaps | BYOM adoption, routine release history, controller recovery, replacement-host restoration and ongoing care still need end-to-end implementation. The controller currently enforces local access; shared/separate remote hosting requires authenticated bootstrap. |
 
 ## Integration acceptance and remaining reconciliation
 
@@ -48,6 +49,8 @@ Package authenticated Server Guy installation on the same host and on a separate
 **Acceptance:** trusted public HTTPS reaches the intended application; failed access/issuance is actionable; configured CDN caching is tested without caching private responses; both controller placements work. These checks do not promise zero-downtime Compose deployments.
 
 ### 3. Protect and restore data
+
+**Delivered slice:** scheduled R2 backups and retention with isolated restore proofs for the three test stacks. See [dated evidence](docs/testing/2026-09-09-scheduled-backups.md). The broader acceptance below remains open.
 
 Connect R2 and S3. Discover PostgreSQL, SQLite and other required persistent state; choose consistent backup methods, schedule, retention and off-host transfer. Verify an isolated restore with meaningful application data. Protect controller records, native sessions, configuration and recovery material separately.
 

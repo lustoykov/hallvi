@@ -1,7 +1,9 @@
 import { operationsFor } from "./operation-store";
 import { preparationView } from "./preparation";
 import { applicationPreviewView } from "./application-preview";
+import { backupSetupFor } from "./scheduled-backup-install";
 import { backupEvidenceFor } from "./backup-evidence";
+import { scheduledProtectionFor } from "./scheduled-backup-store";
 import { applicationDeployment } from "./deployment-store";
 import {
   listActiveDecisions,
@@ -207,8 +209,19 @@ export function getOperatorView(
   const backupEvidence = backupEvidenceFor(
     applicationDeployment(application.id),
   );
+  const protection = scheduledProtectionFor(
+    applicationDeployment(application.id),
+  );
+  const backupSetup = backupSetupFor(applicationDeployment(application.id));
   return {
-    facts: backupEvidence ? { backupEvidence } : undefined,
+    facts:
+      backupEvidence || protection || backupSetup
+        ? {
+            ...(backupEvidence ? { backupEvidence } : {}),
+            ...(protection ? { protection } : {}),
+            ...(backupSetup ? { backupSetup } : {}),
+          }
+        : undefined,
     application,
     operations: operationsFor(application.id),
     preview: applicationPreviewView(application.id),

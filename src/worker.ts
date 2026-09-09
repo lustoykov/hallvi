@@ -1,4 +1,5 @@
 import { runOperationWorker } from "./server/operation-worker";
+import { runBackupObservationWorker } from "./server/scheduled-backup-host";
 import { PiWorkerDrainError, runPiWorker } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
 
@@ -11,6 +12,7 @@ Promise.all([
   runPiWorker(controller.signal),
   runOperationWorker(controller.signal),
   runDeploymentWorker(controller.signal),
+  runBackupObservationWorker(controller.signal),
 ])
   .catch((error) => {
     controller.abort();
