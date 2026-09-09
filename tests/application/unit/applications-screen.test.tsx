@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import Home from "../../../src/app/page";
 import { ApplicationsScreen } from "../../../src/components/server-guy/applications-screen";
 import { NewApplicationScreen } from "../../../src/components/server-guy/new-application-screen";
+import { listItem } from "../../../src/server/application-list";
 import type { ApplicationRecord } from "../../../src/server/types";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
@@ -11,20 +12,10 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-
-const workspace = {
-  id: "workspace-one",
-  applicationId: "app-one",
-  phaseKey: "start" as const,
-  createdAt: "2026-09-04T00:00:00Z",
-  completedAt: null,
-  deliverableEvidence: null,
-  phaseNumber: 1,
-  name: "Start",
-  deliverable: "Launch Brief",
-  status: "ready" as const,
-  current: true,
-};
+vi.mock("../../../src/server/deployment-store", () => ({
+  applicationDeployment: () => null,
+}));
+vi.mock("../../../src/server/db", () => ({ listApplications: () => [] }));
 
 const application: ApplicationRecord = {
   id: "app-one",
@@ -55,26 +46,19 @@ describe("application navigation", () => {
     expect(html).not.toContain("todo-fastapi");
   });
 
-  it("distinguishes repositories with the same name and links to the exact app", () => {
+  it("lists the condition and stack of each application from its records", () => {
     const html = renderToStaticMarkup(
       <ApplicationsScreen
         piReady
         applications={[
-          { application, workspace, passedChecks: 4, totalChecks: 4 },
+          listItem(application, null),
           {
-            application: {
-              ...application,
-              id: "app-two",
-              repositoryOwner: "two",
-            },
-            workspace: {
-              ...workspace,
-              id: "workspace-two",
-              applicationId: "app-two",
-              status: "in-progress",
-            },
-            passedChecks: 2,
-            totalChecks: 4,
+            ...listItem(
+              { ...application, id: "app-two", repositoryOwner: "two" },
+              null,
+            ),
+            condition: { tone: "warn", text: "Recommendation waiting for you" },
+            attention: 1,
           },
         ]}
       />,
@@ -83,9 +67,11 @@ describe("application navigation", () => {
     expect(html).toContain('href="/applications/app-two"');
     expect(html).toContain("one/todo");
     expect(html).toContain("two/todo");
-    expect(html).toContain("Launch Brief ready");
-    expect(html).toContain("Needs attention");
-    expect(html).not.toContain("Deployed");
+    expect(html).toContain("Not deployed");
+    expect(html).toContain("Recommendation waiting for you");
+    expect(html).toContain("1 needs you");
+    expect(html).toContain("Nothing needs you");
+    expect(html).not.toContain("Launch Brief");
   });
 
   it("does not accept form edits before hydration can retain them", () => {

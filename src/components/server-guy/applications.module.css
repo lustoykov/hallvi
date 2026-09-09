@@ -282,3 +282,29 @@
   line-height: 1.6;
   margin: 0 0 18px;
 }
+
+/* Condition in words, with the dot as a quiet confirmation. */
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8b95a5;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.tone_live .dot {
+  background: #267c58;
+}
+.tone_warn .dot {
+  background: #b25a16;
+}
+.tone_bad .dot {
+  background: #a6312b;
+}
+.tone_warn {
+  color: #8b4b15;
+}
+.tone_bad {
+  color: #a6292f;
+}

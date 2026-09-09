@@ -3,11 +3,22 @@ import s from "./pi-setup-screen.module.css";
 
 export function SettingsNav({
   current,
+  prototype = false,
 }: {
-  current: "pi" | "github" | "execution";
+  current: "pi" | "github" | "execution" | "connections";
+  /** The reference prototype adds the designed Connections home. */
+  prototype?: boolean;
 }) {
   return (
     <nav className={s.settingsNav} aria-label="Settings">
+      {prototype && (
+        <Link
+          href="/prototype/settings/connections"
+          aria-current={current === "connections" ? "page" : undefined}
+        >
+          Connections
+        </Link>
+      )}
       <Link
         href="/setup/pi"
         aria-current={current === "pi" ? "page" : undefined}

@@ -1,15 +1,32 @@
 import Link from "next/link";
 
-import type { listApplicationSummaries } from "@/server/phase-one";
-
 import s from "./applications.module.css";
+
+/**
+ * One application as the list shows it: its condition in words, the stack
+ * it records, and whether anything needs the user. Derived from records;
+ * never a phase or a check count.
+ */
+export interface ApplicationListItem {
+  id: string;
+  name: string;
+  source: string;
+  condition: { tone: "live" | "warn" | "bad" | "muted"; text: string };
+  /** "Web · PostgreSQL 16 · 3 jobs" or "Not deployed yet". */
+  stack: string;
+  attention: number;
+  protection: string;
+}
 
 export function ApplicationsScreen({
   applications,
   piReady,
+  hrefFor = (id) => `/applications/${id}`,
 }: {
-  applications: ReturnType<typeof listApplicationSummaries>;
+  applications: ApplicationListItem[];
   piReady: boolean;
+  /** The prototype links its own routes; the product links the workspace. */
+  hrefFor?: (id: string) => string;
 }) {
   return (
     <main className={s.page}>
@@ -25,7 +42,7 @@ export function ApplicationsScreen({
         <div className={s.heading}>
           <div>
             <h1 id="applications-heading">Applications</h1>
-            <p>Choose a workspace or connect another repository.</p>
+            <p>Each application has its own conversations, records and host.</p>
           </div>
           {applications.length > 0 && (
             <Link className={s.primary} href="/applications/new">
@@ -37,54 +54,41 @@ export function ApplicationsScreen({
           <div className={s.empty}>
             <h2>Add your first application</h2>
             <p>
-              Start with a GitHub repository. Server Guy will create its Launch
-              Brief and check repository access.
+              Start with a GitHub repository or an upstream image. Server Guy
+              inspects it, recommends a server and deploys when you approve.
             </p>
             <Link className={s.primary} href="/applications/new">
               Add application
             </Link>
-            <small>No code changes or infrastructure will be created.</small>
+            <small>Nothing is bought or changed until you approve it.</small>
           </div>
         ) : (
           <ul className={s.list} aria-label="Applications">
-            {applications.map(
-              ({ application, workspace, passedChecks, totalChecks }) => (
-                <li key={application.id}>
-                  <Link
-                    className={s.application}
-                    href={`/applications/${application.id}`}
-                  >
-                    <div className={s.repository}>
-                      <h2>{application.name}</h2>
-                      <span>
-                        {application.repositoryOwner}/
-                        {application.repositoryName}
-                      </span>
-                    </div>
-                    <div className={s.phase}>
-                      <strong>
-                        Phase {workspace.phaseNumber} · {workspace.deliverable}
-                      </strong>
-                      <span>Production</span>
-                    </div>
-                    <div className={s.checks}>
-                      <strong
-                        className={
-                          passedChecks === totalChecks ? s.ready : s.attention
-                        }
-                      >
-                        {passedChecks === totalChecks
-                          ? `${workspace.deliverable} ready`
-                          : "Needs attention"}
-                      </strong>
-                      <span>
-                        {passedChecks} of {totalChecks} checks pass
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ),
-            )}
+            {applications.map((item) => (
+              <li key={item.id}>
+                <Link className={s.application} href={hrefFor(item.id)}>
+                  <div className={s.repository}>
+                    <h2>{item.name}</h2>
+                    <span>{item.source}</span>
+                  </div>
+                  <div className={s.phase}>
+                    <strong className={s[`tone_${item.condition.tone}`]}>
+                      <i className={s.dot} aria-hidden="true" />
+                      {item.condition.text}
+                    </strong>
+                    <span>{item.stack}</span>
+                  </div>
+                  <div className={s.checks}>
+                    <strong className={item.attention ? s.attention : s.ready}>
+                      {item.attention
+                        ? `${item.attention} need${item.attention === 1 ? "s" : ""} you`
+                        : "Nothing needs you"}
+                    </strong>
+                    <span>{item.protection}</span>
+                  </div>
+                </Link>
+              </li>
+            ))}
           </ul>
         )}
       </section>

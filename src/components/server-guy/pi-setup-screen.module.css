@@ -411,3 +411,27 @@
     font-size: 16px;
   }
 }
+
+/* Connections: state in words beside the provider name. */
+.root :global(.sg-connection-state) {
+  margin-left: 10px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: #647089;
+  vertical-align: middle;
+}
+.root :global(.sg-connection-state.sg-connection-connected) {
+  background: #eaf8f1;
+  color: #0f7a4e;
+}
+.root :global(.sg-connection-state.sg-connection-expired),
+.root :global(.sg-connection-state.sg-connection-failed) {
+  background: #fff4e9;
+  color: #9a4b10;
+}
