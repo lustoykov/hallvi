@@ -5,9 +5,9 @@ test(
   "application conversations preserve drafts and messages across navigation and reload",
   journey("application-shell"),
   async ({ page }) => {
-    // Cold CI compilation also consumes the journey budget. Keep assertion
-    // timeouts unchanged, matching the existing add-application smoke test.
-    test.setTimeout(120_000);
+    // This journey first compiles creation, chat selection and message routes.
+    // Bound each HTTP acceptance separately; keep UI assertions at 10 seconds.
+    test.setTimeout(180_000);
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -44,22 +44,49 @@ test(
         .click(),
     ]);
     expect(created.status()).toBe(201);
+    const createdView: import("../../src/server/types").OperatorView =
+      await created.json();
+    const secondChatId = createdView.selectedChatId!;
+    const firstChatId = createdView.chats.find(
+      (chat) => chat.id !== secondChatId,
+    )!.id;
+    async function selectConversation(title: string, chatId: string) {
+      const url = new URL(`/api${new URL(page.url()).pathname}`, page.url());
+      url.searchParams.set("chat", chatId);
+      const [selected] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url() === url.href &&
+            response.request().method() === "GET",
+          { timeout: 30_000 },
+        ),
+        nav.getByRole("button", { name: title, exact: true }).click(),
+      ]);
+      expect(selected.status()).toBe(200);
+      expect((await selected.json()).selectedChatId).toBe(chatId);
+    }
     await expect(composer).toHaveValue("");
     await composer.fill("Second conversation draft");
-    await nav
-      .getByRole("button", { name: "Deploy application", exact: true })
-      .click();
+    await selectConversation("Deploy application", firstChatId);
     await expect(composer).toHaveValue("First conversation draft");
-    await nav
-      .getByRole("button", { name: "Conversation 2", exact: true })
-      .click();
+    await selectConversation("Conversation 2", secondChatId);
     await expect(composer).toHaveValue("Second conversation draft");
-    await page.getByRole("button", { name: "Send", exact: true }).click();
+    const messagesUrl = `${chatsUrl}/${secondChatId}/messages`;
+    const [accepted] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url() === messagesUrl &&
+          response.request().method() === "POST",
+        { timeout: 30_000 },
+      ),
+      page.getByRole("button", { name: "Send", exact: true }).click(),
+    ]);
+    expect(accepted.status()).toBe(202);
     await expect(
       page.getByText("[QA fixture reply] Second conversation draft", {
         exact: true,
       }),
-    ).toBeVisible({ timeout: 30000 });
+    ).toBeVisible();
     await page.reload();
     await expect(
       page.getByText("[QA fixture reply] Second conversation draft", {
