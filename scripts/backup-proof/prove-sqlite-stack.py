@@ -7,6 +7,7 @@ Briefly pauses the source; restores into new local volumes on an internal networ
 import base64
 import hashlib
 import importlib.util
+import ipaddress
 import json
 import os
 import re
@@ -87,8 +88,7 @@ def main():
     if deployment["status"] != "live" or not deployment["plan"]["image"]:
         raise RuntimeError("Expected a live image-based deployment")
     deployment_id = str(uuid.UUID(deployment["id"]))
-    if not re.fullmatch(r"[0-9.]+", deployment["address"]):
-        raise RuntimeError("Invalid source address")
+    ipaddress.IPv4Address(deployment["address"])
     proof = str(uuid.uuid4())
     directory = runtime / "backup-proofs" / proof
     directory.mkdir(mode=0o700, parents=True)
@@ -105,6 +105,7 @@ def main():
         "localArtifactsRetained": str(directory),
         "remoteObjectsRetained": False,
         "retentionPolicyConfigured": False,
+        "containsLiveCredentials": True,
         "startedAt": time.time(),
         "destination": {"account": account, "bucket": bucket},
     }
@@ -167,8 +168,22 @@ def main():
         images = [deployment["plan"]["image"]] + [
             s["image"] for s in deployment["plan"].get("services", [])
         ]
-        for image in [*images, "alpine:3.20"]:
-            run("docker", "image", "inspect", image)
+        for image in images:
+            platform = (
+                run(
+                    "docker",
+                    "image",
+                    "inspect",
+                    "--format",
+                    "{{.Os}}/{{.Architecture}}",
+                    image,
+                )
+                .decode()
+                .strip()
+            )
+            if platform != "linux/amd64":
+                raise RuntimeError("Restore requires the source linux/amd64 image")
+        run("docker", "image", "inspect", "alpine:3.20")
         source_compose = f"docker compose -p sg-{deployment_id[:8]} -f /opt/server-guy/{deployment_id}/compose.json"
         ids = run(*ssh, source_compose + " ps -q").decode().split()
         if not ids or not all(re.fullmatch(r"[a-f0-9]{64}", value) for value in ids):
@@ -258,6 +273,17 @@ def main():
         for name, expected in manifest["sqlite"].items():
             if capture_module.sqlite_evidence(restored / "state" / name) != expected:
                 raise RuntimeError("Restored SQLite schema or rows differ")
+        app_volume = next(
+            name
+            for name, value in manifest["volumes"].items()
+            if value["service"] == "app"
+        )
+        original_app_db = (
+            restored
+            / "state"
+            / app_volume
+            / ("grafana.db" if manifest["kind"] == "grafana" else "kuma.db")
+        )
         receipt["sqlite"] = {
             name: {
                 "tableCount": len(value["tables"]),
@@ -277,11 +303,6 @@ def main():
             service["labels"] = {"sg-backup-proof": proof}
             service["networks"] = ["proof"]
             service.pop("container_name", None)
-            port = (
-                9090
-                if name == "prometheus"
-                else (3000 if manifest["kind"] == "grafana" else 3001)
-            )
             service["ports"] = []
             mounts = []
             for volume, meta in manifest["volumes"].items():
@@ -323,7 +344,9 @@ def main():
                 "alpine:3.20",
                 "sh",
                 "-ec",
-                f"mkdir /stage; tar -xzf /source/archive -C /stage state/{volume}; cp -a /stage/state/{volume}/. /target/",
+                'mkdir /stage; tar -xzf /source/archive -C /stage "state/$1"; cp -a "/stage/state/$1/." /target/',
+                "sh",
+                volume,
             )
         run(*compose, "start")
         endpoints = {}
@@ -420,7 +443,7 @@ def main():
                     )
                 )
 
-            source_db = sqlite3.connect(restored / "state/grafana-data/grafana.db")
+            source_db = sqlite3.connect(f"file:{original_app_db}?mode=ro", uri=True)
             try:
                 expected_sources = source_db.execute(
                     "SELECT uid,name,type,url FROM data_source ORDER BY uid"
@@ -452,7 +475,31 @@ def main():
         db_name = "grafana.db" if manifest["kind"] == "grafana" else "kuma.db"
         mounted_db = directory / "booted.db"
         # Quiesce the disposable app for this final inspection only.
-        run(*compose, "stop", "app")
+        run(*compose, "stop", "--timeout", "30", "app")
+        stopped = json.loads(run("docker", "inspect", app_id))[0]["State"]
+        if stopped["Running"] or stopped["ExitCode"] != 0:
+            raise RuntimeError(
+                "Restored application did not stop cleanly for inspection"
+            )
+        # Refuse a main-file-only inspection when committed WAL data remains.
+        run(
+            "docker",
+            "run",
+            "--rm",
+            "--label",
+            "sg-backup-proof=" + proof,
+            "--network",
+            "none",
+            "-v",
+            project + "_" + app_volume + ":/state:ro",
+            "alpine:3.20",
+            "sh",
+            "-ec",
+            'test ! -s "/state/$1-wal"',
+            "sh",
+            db_name,
+        )
+        receipt["postBootInspection"] = "Clean exit; no nonempty WAL sidecar"
         run(
             "docker",
             "cp",
@@ -468,7 +515,7 @@ def main():
         )
         for table in business_tables:
             if manifest["kind"] == "grafana" and table == "user":
-                original_db = restored / "state/grafana-data/grafana.db"
+                original_db = original_app_db
                 matches = capture_module.table_hash(
                     original_db, table, {"last_seen_at"}
                 ) == capture_module.table_hash(mounted_db, table, {"last_seen_at"})

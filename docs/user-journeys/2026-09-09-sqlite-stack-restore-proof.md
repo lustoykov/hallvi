@@ -9,8 +9,8 @@ cutovers. The Backups UI does not yet consume these receipts.
 | Application | Proof | Restored and checked |
 | --- | --- | --- |
 | Todo / PostgreSQL | `15c5e5a7-4c24-41fd-94e9-949fde4f9305` | One temporary row; complete schema, indexes and constraints; a successful write rolled back in the isolated database. The source was empty before the canary. |
-| Uptime Kuma / SQLite | `716cc5b3-af38-4f8f-9c23-5de0a65bab83` | 29 tables, 921 rows, five files; actual user, monitor, settings and heartbeat history; pinned application boot and business records checked after boot. |
-| Grafana + Prometheus | `102db930-0e49-47cb-8bfe-f4cdcf25839f` | 92 SQLite tables, 1,786 rows, 690 files including plugins and provisioning; Grafana and Prometheus boot; authenticated Grafana datasource configuration and successful datasource health; 21 identical historical Prometheus samples. |
+| Uptime Kuma / SQLite | `79310e32-14d8-416e-ba9b-cd297210877e` | 29 tables, 969 rows, five files; actual user, monitor, settings and heartbeat history; pinned application boot and business records checked after boot. |
+| Grafana + Prometheus | `c5e9741a-7b2f-4253-996b-18f4906ca006` | 92 SQLite tables, 1,786 rows, 692 files including plugins and provisioning; Grafana and Prometheus boot; authenticated Grafana datasource configuration and successful datasource health; 21 identical historical Prometheus samples. |
 
 The private archives were uploaded to `server-guy-backups`, downloaded again,
 and compared by size and SHA-256. All restores consumed the downloaded bytes.
@@ -21,15 +21,17 @@ were retained when loading fresh Docker volumes.
 | Application | Archive bytes | SHA-256 |
 | --- | ---: | --- |
 | Todo | 2,340 | `40807d7c6e16b238f445d083f817f805640a448b37ec87129e381ffb7cb4a559` |
-| Uptime Kuma | 45,639 | `4bf28ea20759a82c3fc0777c0379af6fcb6092108994d6374a11ad10935066a5` |
-| Grafana + Prometheus | 70,402,501 | `4ee0073121c0f687ea898130c1b4e6382acd88c075370f308fd39db90d049d16` |
+| Uptime Kuma | 46,744 | `b062af9b3eabf98189e756c44cb84244746baa48db01b4c7cebf89b9f33bd681` |
+| Grafana + Prometheus | 70,498,408 | `3c14efb9eca3f016348f480a6ec6c1de0c7ca02d7abe1b6db4151e19689938c8` |
 
 Receipts live in `.server-guy/backup-proofs/<proof-id>/receipt.json`. Stack
 archives and their receipts are retained privately under
 `applications/<application-id>/<proof-id>/` in R2. The earlier failed attempts
 remain identified as failures; they are not protection evidence. Local dumps,
 extracted state, and inspection copies are retained in the private proof folder.
-No automatic retention policy is configured.
+No automatic retention policy is configured. These archives contain live
+credentials, including Grafana's admin password in its Compose configuration;
+they must remain private.
 
 ## Consistency, isolation, and source recovery
 
@@ -41,7 +43,7 @@ were included. Grafana's
 [backup guidance](https://grafana.com/docs/grafana/latest/administration/back-up-grafana/)
 also calls out configuration, plugins, and stopping its SQLite-backed service.
 
-The final source pauses were 4.74 seconds for Kuma and 2.98 seconds for Grafana
+The final source pauses were 4.74 seconds for Kuma and 2.83 seconds for Grafana
 and Prometheus. Sources restarted before compression and upload. Prometheus's
 complete stopped data directory included its WAL and head data; a fixed historical
 query was compared after restoration. This avoids treating a live directory copy
@@ -100,6 +102,15 @@ access the repository or execute tests. Its useful findings led to:
 - Comparing PostgreSQL schema, indexes and constraints, plus a rolled-back write.
 - Testing equal-length corruption, mismatched canary identity, SQLite WAL content,
   damaged databases, unsafe archives, and source restart after a failed copy.
+
+A second source-packet review by Opus 5 at max effort recommended merging. Its
+remaining substantive finding was fixed before merge: post-boot SQLite inspection
+now requires a clean application exit and no nonempty WAL sidecar, preventing a
+stale main-file copy from masquerading as post-boot evidence. The real Kuma and
+Grafana proofs were rerun with that check. Its smaller suggestions were also
+applied: derive the Grafana database path from the manifest, quote volume paths,
+check the cached image platform before pausing the source, and disclose retained
+live credentials. Connection-handle cleanup and IPv4 validation were tightened.
 
 One speculative finding was rejected after checking the schema:
 `deployments.application_id` is unique, so selecting its one deployment record
