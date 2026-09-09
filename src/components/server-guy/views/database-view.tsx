@@ -49,6 +49,8 @@ export function DatabaseView(props: ViewProps) {
       ) : (
         "Backed up"
       )
+    ) : coverage.state === "unknown" ? (
+      "Current backup status unknown"
     ) : coverage.state === "behind" ? (
       "Behind policy"
     ) : coverage.state === "failed" ? (
@@ -85,11 +87,13 @@ export function DatabaseView(props: ViewProps) {
       {primary && (
         <Condition
           tone={
-            coverage?.state === "failed"
-              ? "bad"
-              : coverage?.state === "protected"
-                ? "ok"
-                : "warn"
+            coverage?.state === "unknown"
+              ? "muted"
+              : coverage?.state === "failed"
+                ? "bad"
+                : coverage?.state === "protected"
+                  ? "ok"
+                  : "warn"
           }
           title={
             primary.kind === "postgres"
@@ -103,7 +107,9 @@ export function DatabaseView(props: ViewProps) {
           {coverage
             ? coverage.state === "protected"
               ? "It has an off-host copy."
-              : "It has no current off-host copy."
+              : coverage.state === "unknown"
+                ? "Current off-host protection is unknown. Check Backups for the last recorded copy."
+                : "It has no current off-host copy."
             : proved
               ? "An operator verified that an off-host copy of this data restores. Nothing is scheduled to back up newer changes."
               : "Off-host protection is not configured."}

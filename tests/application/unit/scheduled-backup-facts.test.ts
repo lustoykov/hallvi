@@ -123,10 +123,74 @@ describe("scheduled backup evidence", () => {
       now + 121000,
     );
     expect(facts.observation?.reachable).toBe(false);
+    expect(facts.coverage[0].state).toBe("unknown");
     expect(facts.coverage[0].lastSuccessfulAt).toBe(at);
     expect(protectionStatus(facts).title).toBe(
       "Current backup status is unavailable",
     );
+  });
+  it.each([
+    [null, now],
+    [{ ...snapshot, reachable: false }, now],
+    [snapshot, now + 121000],
+  ])(
+    "keeps absent, unreachable or stale observations unknown",
+    (observation, checkedAt) => {
+      const facts = scheduledProtection(
+        deployment,
+        policy,
+        observation,
+        checkedAt,
+      );
+      expect(facts.coverage.every((item) => item.state === "unknown")).toBe(
+        true,
+      );
+      expect(protectionStatus(facts).title).toBe(
+        "Current backup status is unavailable",
+      );
+      if (!observation)
+        expect(facts.coverage[0].note).toContain(
+          "No verified off-host copy is recorded",
+        );
+    },
+  );
+  it("flags an old recorded copy without inferring whether newer host copies exist", () => {
+    const facts = scheduledProtection(
+      deployment,
+      policy,
+      snapshot,
+      now + 5 * 24 * 3600000,
+    );
+    expect(facts.coverage[0].state).toBe("unknown");
+    expect(facts.coverage[0].lastSuccessfulAt).toBe(at);
+    expect(facts.coverage[0].note).toContain(
+      "last recorded copy is older than the agreed policy",
+    );
+    expect(protectionStatus(facts).tone).toBe("warn");
+  });
+  it("retains a failed attempt as history while current coverage is unknown", () => {
+    const facts = scheduledProtection(
+      deployment,
+      policy,
+      {
+        ...snapshot,
+        reachable: false,
+        runs: [{ ...run, outcome: "failed", phase: "upload" }],
+      },
+      now,
+    );
+    expect(facts.coverage[0].state).toBe("unknown");
+    expect(facts.lastAttempt?.outcome).toBe("failed");
+    expect(facts.history[0].outcome).toBe("failed");
+  });
+  it("keeps a freshly observed stopped schedule behind policy", () => {
+    const facts = scheduledProtection(
+      deployment,
+      policy,
+      { ...snapshot, timerActive: false },
+      now,
+    );
+    expect(facts.coverage[0].state).toBe("behind");
   });
   it("marks a recovery point overdue even after a fresh host observation", () => {
     const late = now + 27 * 3600000;

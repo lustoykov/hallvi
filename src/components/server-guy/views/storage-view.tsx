@@ -41,15 +41,27 @@ export function StorageView(props: ViewProps) {
   const measured = stack.volumes
     .map((volume) => ({ volume, size: sizes.get(volume.name) }))
     .filter((item) => item.size);
-  const unprotected = stack.volumes.filter(
-    (volume) => protectionOf(volume.name, volume.kind)?.state !== "protected",
+  const unknown = stack.volumes.filter(
+    (volume) => protectionOf(volume.name, volume.kind)?.state === "unknown",
   );
+  const unprotected = stack.volumes.filter((volume) => {
+    const state = protectionOf(volume.name, volume.kind)?.state;
+    return state !== "protected" && state !== "unknown";
+  });
   const total = measured.reduce((sum, item) => sum + item.size!.sizeGb, 0);
   return (
     <>
       {stack.volumes.length > 0 && (
         <Condition
-          tone={unprotected.length ? "warn" : disk ? "ok" : "muted"}
+          tone={
+            unprotected.length
+              ? "warn"
+              : unknown.length
+                ? "muted"
+                : disk
+                  ? "ok"
+                  : "muted"
+          }
           title={
             `${stack.volumes.length} persistent volume${stack.volumes.length === 1 ? "" : "s"}` +
             (measured.length === stack.volumes.length
@@ -57,9 +69,18 @@ export function StorageView(props: ViewProps) {
               : "")
           }
         >
+          {unknown.length > 0 && (
+            <>
+              Current off-host protection is unknown for {unknown.length} volume
+              {unknown.length === 1 ? "" : "s"}. Check {backupsLink} for the
+              last recorded copies.{" "}
+            </>
+          )}
           {unprotected.length
             ? `${unprotected.length} of them ${unprotected.length === 1 ? "is" : "are"} not backed up off the host. A volume survives container replacement; it does not survive losing the instance.`
-            : "Every volume has an off-host copy. A volume survives container replacement; the off-host copy survives losing the instance."}
+            : unknown.length
+              ? "A volume survives container replacement; it does not survive losing the instance."
+              : "Every volume has an off-host copy. A volume survives container replacement; the off-host copy survives losing the instance."}
         </Condition>
       )}
       {disk && measured.length > 0 && (
@@ -97,7 +118,10 @@ export function StorageView(props: ViewProps) {
               const measurement = sizes.get(volume.name);
               const protection = protectionOf(volume.name, volume.kind);
               const bad = protection?.state === "failed";
-              const warn = !bad && protection?.state !== "protected";
+              const warn =
+                !bad &&
+                protection?.state !== "protected" &&
+                protection?.state !== "unknown";
               return (
                 <div
                   className={`sg-volume-row${bad ? " sg-row-bad" : warn ? " sg-row-warn" : ""}`}
@@ -128,18 +152,22 @@ export function StorageView(props: ViewProps) {
                   <span
                     data-label="Protection"
                     className={
-                      protection?.state === "protected"
-                        ? "sg-outcome-ok"
-                        : "sg-outcome-warn"
+                      protection?.state === "unknown"
+                        ? undefined
+                        : protection?.state === "protected"
+                          ? "sg-outcome-ok"
+                          : "sg-outcome-warn"
                     }
                   >
                     {protection?.state === "protected"
                       ? "Backed up"
-                      : protection?.state === "behind"
-                        ? "Behind policy"
-                        : protection?.state === "failed"
-                          ? "Last backup failed"
-                          : "Not backed up"}{" "}
+                      : protection?.state === "unknown"
+                        ? "Unknown"
+                        : protection?.state === "behind"
+                          ? "Behind policy"
+                          : protection?.state === "failed"
+                            ? "Last backup failed"
+                            : "Not backed up"}{" "}
                     · {backupsLink}
                     {protection?.lastSuccessfulAt && (
                       <small>

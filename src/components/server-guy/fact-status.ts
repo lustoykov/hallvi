@@ -51,7 +51,10 @@ export function protectionStatus(facts: ProtectionFacts) {
     } as const;
   if (observation?.cleanupPending)
     return { tone: "bad", title: "Backup cleanup needs attention" } as const;
-  if (observation && !observation.reachable)
+  if (
+    (observation && !observation.reachable) ||
+    facts.coverage.some((item) => item.state === "unknown")
+  )
     return {
       tone: "warn",
       title: "Current backup status is unavailable",

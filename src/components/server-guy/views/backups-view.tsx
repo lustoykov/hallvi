@@ -28,6 +28,7 @@ import {
 import { Tally, Timeline, type Tone } from "./visuals";
 
 const coverageTone = {
+  unknown: "muted",
   protected: "ok",
   behind: "warn",
   failed: "bad",
@@ -35,6 +36,7 @@ const coverageTone = {
   "not-covered": "muted",
 } as const;
 const coverageWord = {
+  unknown: "Unknown",
   protected: "Protected",
   behind: "Behind policy",
   failed: "Last attempt failed",
@@ -267,6 +269,8 @@ export function BackupsView(props: ViewProps) {
   const oldest = recoveryPoints.at(-1);
   const recent = protection.history.slice(0, 8);
   const counted = {
+    unknown: protection.coverage.filter((item) => item.state === "unknown")
+      .length,
     protected: protection.coverage.filter((item) => item.state === "protected")
       .length,
     behind: protection.coverage.filter(
@@ -508,6 +512,7 @@ export function BackupsView(props: ViewProps) {
             { label: "failed", count: counted.failed, tone: "bad" },
             { label: "not protected", count: counted.behind, tone: "warn" },
             { label: "not covered", count: counted.uncovered, tone: "muted" },
+            { label: "unknown", count: counted.unknown, tone: "muted" },
             { label: "protected", count: counted.protected, tone: "ok" },
           ]}
         />

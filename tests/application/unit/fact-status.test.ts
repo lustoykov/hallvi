@@ -118,12 +118,12 @@ describe("truthful view summaries", () => {
         coverage: [{ ...protectedData.coverage[0], lastSuccessfulAt: null }],
       },
       { ...protectedData, lastAttempt: { at, outcome: "partial" } },
-      ...(["not-covered", "unprotected", "behind", "failed"] as const).map(
-        (state) => ({
-          ...protectedData,
-          coverage: [{ ...protectedData.coverage[0], state }],
-        }),
-      ),
+      ...(
+        ["not-covered", "unprotected", "behind", "failed", "unknown"] as const
+      ).map((state) => ({
+        ...protectedData,
+        coverage: [{ ...protectedData.coverage[0], state }],
+      })),
     ];
     for (const facts of incomplete)
       expect(protectionStatus(facts).tone).not.toBe("ok");
