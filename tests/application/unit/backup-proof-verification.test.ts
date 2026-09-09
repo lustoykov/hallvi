@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   verifyPostgresArchive,
   verifyRestoredRows,
+  verifyCanaryBinding,
 } from "../../../src/server/backup-proof-verification";
 
 describe("backup proof evidence", () => {
@@ -10,6 +11,11 @@ describe("backup proof evidence", () => {
     expect(() =>
       verifyPostgresArchive(archive, Buffer.from("PGDMP-invalid-archive")),
     ).toThrow("does not match");
+    const corrupted = Buffer.from(archive);
+    corrupted[corrupted.length - 1] ^= 1;
+    expect(() => verifyPostgresArchive(archive, corrupted)).toThrow(
+      "does not match",
+    );
     expect(() =>
       verifyPostgresArchive(archive, archive.subarray(0, -1)),
     ).toThrow("does not match");
@@ -35,4 +41,17 @@ describe("backup proof evidence", () => {
       verifyPostgresArchive(archive, Buffer.from(archive)),
     ).not.toThrow();
   });
+});
+
+it("binds the API canary to the database that is being backed up", () => {
+  const rows = Buffer.from('{"id":"expected-id","title":"expected-token"}\n');
+  expect(() =>
+    verifyCanaryBinding(rows, "different-id", "expected-token"),
+  ).toThrow("not found");
+  expect(() =>
+    verifyCanaryBinding(rows, "expected-id", "different-token"),
+  ).toThrow("not found");
+  expect(() =>
+    verifyCanaryBinding(rows, "expected-id", "expected-token"),
+  ).not.toThrow();
 });
