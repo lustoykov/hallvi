@@ -88,6 +88,16 @@ export interface LiveRecord {
   operations: ApplicationOperation[];
 }
 
+/** One line of the agent's recorded work, oldest first. */
+export interface LogLine {
+  id: string;
+  at: string;
+  tone: "pass" | "fail" | "work" | "info";
+  text: string;
+  /** From a prototype scenario or the simulated re-check. */
+  invented?: boolean;
+}
+
 export interface Gap {
   id: string;
   title: string;
@@ -113,6 +123,8 @@ export interface ArchitectureModel {
   monitored: boolean;
   /** When a restore of an off-site copy was last tested, if ever. */
   restoreAt: string | null;
+  /** The agent's most recent recorded work: deployment events and backups. */
+  log: LogLine[];
 }
 
 const MINUTE = 60_000;
@@ -1047,6 +1059,57 @@ export function buildModel({
       destination: "monitoring",
     });
 
+  // ---- The agent's recorded work, as a log.
+  const log: LogLine[] = [];
+  if (live && deployment) {
+    deployment.events.forEach((event, i) => {
+      const message = event.message;
+      const tone: LogLine["tone"] = /timed out|failed|Stopped/i.test(message)
+        ? "fail"
+        : /^Passed:|^Verified|verified|reverified/.test(message)
+          ? "pass"
+          : /^(Recreating|Building|Checking|Creating|Uploading|Waiting|Preparing|Inspecting|Reading|Reconciled)/.test(
+                message,
+              )
+            ? "work"
+            : "info";
+      log.push({ id: `event:${i}`, at: event.at, tone, text: message });
+    });
+    for (const entry of facts.protection?.history ?? [])
+      log.push({
+        id: `protection:${entry.id}`,
+        at: entry.at,
+        tone: entry.outcome === "succeeded" ? "pass" : "fail",
+        text:
+          entry.kind === "backup"
+            ? `Nightly copy: ${entry.detail}`
+            : entry.kind === "restore-test"
+              ? `Restore test: ${entry.detail}`
+              : entry.detail,
+      });
+  }
+  if (scenario === "failing") {
+    const service = plan?.services?.[0];
+    const name = productName(service?.image, service?.name ?? "worker");
+    log.push(
+      {
+        id: "invented:collector",
+        at: new Date(clockNow - 4 * MINUTE - 20_000).toISOString(),
+        tone: "info",
+        text: "Collector reached the host",
+        invented: true,
+      },
+      {
+        id: "invented:failure",
+        at: new Date(clockNow - 4 * MINUTE).toISOString(),
+        tone: "fail",
+        text: `${name} readiness: /-/ready timed out after 5 s, three times in a row`,
+        invented: true,
+      },
+    );
+  }
+  log.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
   return {
     scenario,
     invented,
@@ -1063,6 +1126,7 @@ export function buildModel({
     restricted,
     monitored: Boolean(monitoring),
     restoreAt: facts.protection?.restoreTest?.at ?? null,
+    log: log.slice(-10),
   };
 }
 

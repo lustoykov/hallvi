@@ -16,12 +16,11 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { ApplicationRecord } from "@/server/types";
 
 import type { ApplicationSection } from "../application-sections";
-import { JourneyDirection } from "./journey";
+import { JourneyDirection } from "./journey-v2";
 import { useLiveRecord } from "./live-record";
 import { buildModel, type ArchitectureModel, type ScenarioId } from "./model";
 import { setMotionPreview } from "./motion";
 import { PrototypeBar, scenarios, type VariantEntry } from "./prototype-bar";
-import { SentenceDirection } from "./plain-sentence";
 import { useRecheck, type Recheck } from "./use-recheck";
 import "./prototype.css";
 
@@ -42,7 +41,6 @@ export interface DirectionProps {
 
 const variants: VariantEntry[] = [
   { key: "A", id: "journey", name: "Journeys" },
-  { key: "B", id: "sentence", name: "Plain sentence" },
   { key: "C", id: "anatomy", name: "Exploded server" },
   { key: "0", id: "current", name: "Current canvas" },
 ];
@@ -161,8 +159,6 @@ export function ArchitecturePrototype({
         current
       ) : variant.id === "journey" ? (
         <JourneyDirection {...props} />
-      ) : variant.id === "sentence" ? (
-        <SentenceDirection {...props} />
       ) : (
         <AnatomyDirection {...props} />
       )}
