@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
 import {
@@ -9,7 +10,11 @@ import {
   sourceBuilds,
   sharedVolumes,
 } from "../../../src/server/deployment-layout";
-import { releaseBundle } from "../../../src/server/release-executor";
+import {
+  releaseBundle,
+  releaseCommand,
+} from "../../../src/server/release-executor";
+import { releaseOf } from "../../../src/server/deployment-release";
 import { stackOf } from "../../../src/server/application-stack";
 import { backupKind } from "../../../src/server/scheduled-backup-install";
 function plan() {
@@ -99,6 +104,77 @@ it("includes companion source even when the primary service uses a published ima
       {},
     ).map((f) => f.path),
   ).toContain("source/backend/Dockerfile");
+});
+it("a rollback runs only the recorded local images: no source, build, pull or volume removal", () => {
+  const p = deploymentPlanSchema.parse(plan());
+  p.image = `example/web@sha256:${"a".repeat(64)}`;
+  const release = releaseOf({
+    repository: "qa/example",
+    revision: "b".repeat(40),
+    plan: p,
+  })!;
+  const id = randomUUID(),
+    attempt = randomUUID();
+  const images: Record<string, string> = {
+    app: `sha256:${"1".repeat(64)}`,
+    api: `sha256:${"2".repeat(64)}`,
+    worker: `sha256:${"2".repeat(64)}`,
+  };
+  const files = [
+    {
+      path: "backend/Dockerfile",
+      mode: 0o644,
+      content: Buffer.from("FROM scratch"),
+    },
+  ];
+  const bundle = releaseBundle(
+    p,
+    release.revision,
+    id,
+    files,
+    "unused",
+    {},
+    images,
+  );
+  expect(bundle.some((f) => f.path.startsWith("source/"))).toBe(false);
+  const compose = JSON.parse(
+    bundle.find((f) => f.path === "compose.json")!.content.toString(),
+  );
+  expect(Object.keys(compose.services).sort()).toEqual(
+    Object.keys(images).sort(),
+  );
+  for (const [name, service] of Object.entries(compose.services)) {
+    expect(service).toMatchObject({ image: images[name] });
+    expect(service).not.toHaveProperty("build");
+  }
+  const incomplete = { ...images };
+  delete incomplete.worker;
+  expect(() =>
+    releaseBundle(p, release.revision, id, files, "unused", {}, incomplete),
+  ).toThrow();
+  const update = releaseCommand(release, id, attempt, ["documents"]);
+  const rollback = releaseCommand(
+    release,
+    id,
+    attempt,
+    ["documents"],
+    false,
+    images,
+  );
+  expect(update).toContain("compose.json build");
+  expect(update).toContain("compose.json pull");
+  expect(rollback).not.toContain("compose.json build");
+  expect(rollback).not.toContain("compose.json pull");
+  // A missing local image stops the host command before activation.
+  const checked = rollback.slice(
+    rollback.indexOf("phase=build"),
+    rollback.indexOf("phase=activate"),
+  );
+  expect(checked).toContain("docker image inspect");
+  for (const image of Object.values(images)) expect(checked).toContain(image);
+  expect(rollback).toContain(`sg-${id.slice(0, 8)}_documents`);
+  expect(rollback).toContain("--pull never");
+  expect(rollback).not.toMatch(/\bdown\b|volume rm|prune/);
 });
 it("rejects missing/cyclic image references and inconsistent shared-state declarations", () => {
   const p = plan();
