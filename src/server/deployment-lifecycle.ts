@@ -91,7 +91,7 @@ export function syncDeploymentHost(record: DeploymentRecord) {
 
 export function beginDeploymentAttempt(
   record: DeploymentRecord,
-  kind: "deploy" | "recreate" | "release",
+  kind: "deploy" | "recreate" | "release" | "reconcile",
   operationId: string,
   selectedRelease?: DeploymentRelease,
 ): DeploymentAttempt {

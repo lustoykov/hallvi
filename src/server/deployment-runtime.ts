@@ -6,8 +6,9 @@ export interface DeploymentAttempt {
   operationId: string;
   releaseId: string;
   hostId: string;
-  kind: "deploy" | "recreate" | "release" | "legacy";
+  kind: "deploy" | "recreate" | "release" | "reconcile" | "legacy";
   authorizationId?: string;
+  reconcilesAttemptId?: string;
   remoteResult?: { phase: string; exitCode: number; at: string };
   startedAt: string;
   finishedAt: string | null;
@@ -27,6 +28,14 @@ export interface DeploymentLifecycle {
   };
   releases: DeploymentRelease[];
   attempts: DeploymentAttempt[];
+  reconciliations?: {
+    id: string;
+    attemptId: string;
+    releaseId: string;
+    phase: string;
+    exitCode: number;
+    observedAt: string;
+  }[];
   runtime: {
     /** Verification is timestamped evidence, never continuous health. */
     state: "not-observed" | "verified" | "unknown";
