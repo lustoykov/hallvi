@@ -4,10 +4,10 @@
 // Direction A, third pass: Journeys. A visit, your data and a release travel
 // through one server, drawn as crafted cards on a quiet canvas; stops light
 // up as the light passes and open their details beside themselves. The header
-// keeps the way back and Open; under it, Server Guy's verdict sits on its
-// evidence: Little Server reports the status, and the console below keeps
-// the work behind it, folded to its latest line. What is not set up is drawn
-// on the map, where it would go.
+// keeps the way back and Open, then comes the map, with what is not set up
+// drawn where it would go. Under the map, Server Guy's report: Little Server
+// and the verdict, on the console that keeps the work behind it, folded to
+// its latest line.
 
 import {
   ArrowRight,
@@ -102,8 +102,8 @@ const BOX: Record<string, Rect> = {
   svcVol: { x: 612, y: 434, w: 196, h: 60 },
   offsite: { x: 924, y: 428, w: 176, h: 72 },
   watch: { x: 924, y: 96, w: 176, h: 72 },
-  http: { x: 211, y: 286, w: 102, h: 28 },
-  ssh: { x: 211, y: 368, w: 102, h: 28 },
+  http: { x: 204, y: 284, w: 116, h: 32 },
+  ssh: { x: 204, y: 366, w: 116, h: 32 },
 };
 
 interface Layout {
@@ -128,7 +128,7 @@ function layoutFor(model: ArchitectureModel): Layout {
     offsite: BOX.offsite,
     "gate:http": BOX.http,
     "gate:ssh": BOX.ssh,
-    tls: { x: 226, y: 322, w: 72, h: 22 },
+    tls: { x: 222, y: 315, w: 80, h: 17 },
   };
   if (service) rects[service.id] = BOX.svc;
   if (appVolume) rects[appVolume.id] = BOX.appVol;
@@ -401,14 +401,19 @@ function Port({
       title={part.role}
     >
       {iconFor(part, model.restricted)}
-      <span>{part.name.replace("Port ", "")}</span>
-      <em>
-        {part.id === "gate:ssh"
-          ? "Server Guy"
-          : model.restricted
-            ? "you only"
-            : "anyone"}
-      </em>
+      <span className="axj2-port-text">
+        <b>
+          {part.name.replace("Port ", "")}
+          <small> · {part.id === "gate:ssh" ? "SSH" : "HTTP"}</small>
+        </b>
+        <em>
+          {part.id === "gate:ssh"
+            ? "Server Guy"
+            : model.restricted
+              ? "your network"
+              : "anyone"}
+        </em>
+      </span>
     </button>
   );
 }
@@ -847,33 +852,12 @@ export function JourneyDirection({
     return () => local.forEach((timer) => window.clearTimeout(timer));
   }, [recheck.phase, recheck.active]);
 
-  // Little Server stands at the start of the console, beside the verdict it
-  // reports, and hops once for each new line of work.
   const lines = useMemo(
     () => [...model.log, ...liveLines].slice(-8),
     [model.log, liveLines],
   );
   const latest = lines[lines.length - 1];
-  const reposition = useCallback(() => {
-    const host = section.current;
-    const element = mascot.current;
-    const term = terminal.current;
-    if (!host || !element || !term) return;
-    const origin = host.getBoundingClientRect();
-    const box = term.getBoundingClientRect();
-    const size = element.offsetWidth;
-    element.style.transform = `translate(${box.left - origin.left + 12}px, ${box.top - origin.top - size * 0.84}px)`;
-  }, []);
-  useLayoutEffect(() => {
-    reposition();
-  }, [reposition]);
-  useEffect(() => {
-    const host = section.current;
-    if (!host) return;
-    const observer = new ResizeObserver(() => reposition());
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [reposition]);
+  // Little Server hops once for each new line of simulated work.
   const newestId = latest?.id;
   useEffect(() => {
     const element = mascot.current;
@@ -977,143 +961,6 @@ export function JourneyDirection({
         </div>
       </header>
 
-      {/* Server Guy's verdict, and the work behind it. */}
-      <div className="axj3-report">
-        <div className="axj2-condition axj3-verdict">
-          <CertaintyTag certainty={model.condition.certainty}>
-            {conditionWord[model.condition.certainty]}
-          </CertaintyTag>
-          <p key={model.condition.text}>{model.condition.text}</p>
-        </div>
-        <div
-          ref={terminal}
-          className={`axj2-term${open ? " is-open" : ""}${simulating ? " is-live" : ""}`}
-        >
-          <div className="axj2-term-bar">
-            <button
-              type="button"
-              className="axj2-term-toggle"
-              aria-expanded={open}
-              aria-controls="axj2-term-body"
-              onClick={() => setOpen((value) => !value)}
-            >
-              {open && !running ? (
-                <span className="axj2-term-title">
-                  server-guy · {model.headline.toLowerCase()} ·{" "}
-                  {host?.name.toLowerCase() ?? "server"}
-                </span>
-              ) : (
-                <span className="axj2-term-ticker" data-tone={latest?.tone ?? "info"}>
-                  <b aria-hidden="true">{latest ? glyph[latest.tone] : "·"}</b>
-                  <span data-tag={tagOf(latest)}>
-                    {latest?.text ??
-                      (planned
-                        ? "Nothing has run yet. The plan waits for your approval."
-                        : "No work recorded yet.")}
-                  </span>
-                </span>
-              )}
-              <em className={simulating ? "is-simulated" : undefined}>
-                {simulating
-                  ? running
-                    ? "Simulated re-check · nothing is contacted"
-                    : "Simulated re-check · nothing was contacted"
-                  : latest
-                    ? open
-                      ? `Recorded work · last ${ago(latest.at, model.now)}`
-                      : ago(latest.at, model.now)
-                    : ""}
-              </em>
-              <CaretDown weight="bold" className="axj2-term-caret" aria-hidden="true" />
-              <span className="ax-visually-hidden">
-                {open ? "Hide Server Guy's work" : "Show Server Guy's work"}
-              </span>
-            </button>
-            {!planned && (
-              <button
-                type="button"
-                className="axj2-term-action"
-                disabled={running}
-                onClick={() => {
-                  setSelected(null);
-                  recheck.run(order, 1100);
-                }}
-              >
-                {running ? (
-                  <SpinnerGap weight="bold" className="ax-spin" />
-                ) : (
-                  <ArrowsClockwise weight="bold" />
-                )}
-                {running ? "Checking…" : "Re-check"}
-                <span className="ax-invented">simulated</span>
-              </button>
-            )}
-          </div>
-          <div className="axj2-term-body" id="axj2-term-body">
-            <div>
-              {page?.last && (
-                <p className="axj2-term-origin">
-                  # Last change: {page.last.title}
-                  {page.last.conversation && page.last.open && (
-                    <>
-                      {" "}· from{" "}
-                      <button type="button" onClick={page.last.open}>
-                        {page.last.conversation}
-                      </button>
-                    </>
-                  )}{" "}
-                  · {ago(page.last.at, model.now)}
-                  {page.earlier > 0 && (
-                    <>
-                      {" "}·{" "}
-                      <button type="button" onClick={() => onOpenDestination("history")}>
-                        {page.earlier} earlier
-                      </button>
-                    </>
-                  )}
-                </p>
-              )}
-              <div className="axj2-term-lines" role="log" aria-live="polite">
-                {lines.length === 0 && (
-                  <div className="axj2-term-line" data-tone="info">
-                    <time>--:--:--</time>
-                    <b>·</b>
-                    <span>
-                      {planned
-                        ? "Nothing has run yet. The plan waits for your approval."
-                        : "No work recorded yet."}
-                    </span>
-                  </div>
-                )}
-                {lines.map((line, i) => {
-                  const previous = lines[i - 1];
-                  const isNewest = i === lines.length - 1;
-                  return (
-                    <Fragment key={line.id}>
-                      {(!previous || day(previous.at) !== day(line.at)) && (
-                        <div className="axj2-term-day">{day(line.at)}</div>
-                      )}
-                      <div
-                        className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
-                        data-tone={line.tone}
-                      >
-                        <time>{clock(line.at)}</time>
-                        <b aria-hidden="true">{glyph[line.tone]}</b>
-                        <span data-tag={tagOf(line)}>
-                          {line.text}
-                          {isNewest && running && (
-                            <i className="axj2-caret" aria-hidden="true" />
-                          )}
-                        </span>
-                      </div>
-                    </Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
       {page?.busy && page.chrome.activity}
 
       <div className="axj2-controls">
@@ -1227,6 +1074,7 @@ export function JourneyDirection({
               className={`axj2-wire j-${wire.journey}${wire.journey === journey ? " is-on" : ""}`}
             />
           ))}
+          <path className="axj2-wire-ssh" d="M110 336V368Q110 382 124 382H204" />
           {ghostPart && <path d="M878 132H924" className="axj2-wire-ghost" />}
           {!planned &&
             layout.legs[journey].flat().map((d) => (
@@ -1267,26 +1115,10 @@ export function JourneyDirection({
         </svg>
 
         {/* The ways in. */}
-        {/* The firewall's legend, on its outer face. */}
-        <button
-          type="button"
-          className={`axj2-wall-note axj2-wall-name${selected === "gate:http" ? " is-selected" : ""}`}
-          style={point(250, 198)}
-          onClick={(event) => {
-            event.stopPropagation();
-            setSelected((currentId) =>
-              currentId === "gate:http" ? null : "gate:http",
-            );
-          }}
-        >
-          <ShieldCheck weight="bold" /> Firewall
-        </button>
-        {model.restricted && (
-          <span className="axj2-wall-note axj2-wall-refused" style={point(250, 236)}>
-            Everyone else is turned away
-            <Prohibit weight="bold" />
-          </span>
-        )}
+        {/* The firewall is named where the wall begins, like the other regions. */}
+        <span className="axj2-wall-label" style={point(276, 151)}>
+          Firewall · {model.restricted ? "only these two doors open" : "two doors open"}
+        </span>
         {(["gate:http", "gate:ssh"] as const).map((id) =>
           model.byId[id] ? (
             <Port
@@ -1370,27 +1202,186 @@ export function JourneyDirection({
         )}
       </div>
 
-      {/* Little Server, at the start of the console, reporting. */}
-      <div
-        ref={mascot}
-        className={`axj2-mascot${running ? " is-working" : ""}`}
-        onClick={greet}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            greet();
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-label="Little Server. Say hello."
-      >
-        <LittleServer color={3} mood={mascotMood} gesture={gesture} paused={reduced} />
-        {bubble && (
-          <div className="axj2-bubble" key={bubble}>
-            {bubble}
+      {/* Server Guy's report: the verdict, and the work behind it. */}
+      <div className={`axj3-report${simulating ? " is-live" : ""}`}>
+        <div className="axj3-report-head">
+          <div
+            ref={mascot}
+            className={`axj2-mascot${running ? " is-working" : ""}`}
+            onClick={greet}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                greet();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Little Server. Say hello."
+          >
+            <LittleServer
+              color={3}
+              mood={mascotMood}
+              gesture={gesture}
+              paused={reduced}
+            />
+            {bubble && (
+              <div className="axj2-bubble" key={bubble}>
+                {bubble}
+              </div>
+            )}
           </div>
-        )}
+          <div className="axj2-condition axj3-verdict">
+            <CertaintyTag certainty={model.condition.certainty}>
+              {conditionWord[model.condition.certainty]}
+            </CertaintyTag>
+            <p key={model.condition.text}>{model.condition.text}</p>
+          </div>
+          {!planned && (
+            <button
+              type="button"
+              className="ax-button axj3-recheck"
+              disabled={running}
+              onClick={() => {
+                setSelected(null);
+                recheck.run(order, 1100);
+              }}
+            >
+              {running ? (
+                <SpinnerGap weight="bold" className="ax-spin" />
+              ) : (
+                <ArrowsClockwise weight="bold" />
+              )}
+              {running ? "Checking…" : "Re-check"}
+              <span className="ax-invented">simulated</span>
+            </button>
+          )}
+        </div>
+        <div
+          ref={terminal}
+          className={`axj2-term${open ? " is-open" : ""}${simulating ? " is-live" : ""}`}
+        >
+          <div className="axj2-term-bar">
+            <button
+              type="button"
+              className="axj2-term-toggle"
+              aria-expanded={open}
+              aria-controls="axj2-term-body"
+              onClick={() => {
+                const next = !open;
+                setOpen(next);
+                // Opened by hand: bring the work into view once it unfolds.
+                if (next)
+                  later(
+                    () =>
+                      terminal.current?.scrollIntoView({
+                        block: "nearest",
+                        behavior: reducedMotion() ? "auto" : "smooth",
+                      }),
+                    440,
+                  );
+              }}
+            >
+              {open && !running ? (
+                <span className="axj2-term-title">
+                  server-guy · {model.headline.toLowerCase()} ·{" "}
+                  {host?.name.toLowerCase() ?? "server"}
+                </span>
+              ) : (
+                <span className="axj2-term-ticker" data-tone={latest?.tone ?? "info"}>
+                  <b aria-hidden="true">{latest ? glyph[latest.tone] : "·"}</b>
+                  <span data-tag={tagOf(latest)}>
+                    {latest?.text ??
+                      (planned
+                        ? "Nothing has run yet. The plan waits for your approval."
+                        : "No work recorded yet.")}
+                  </span>
+                </span>
+              )}
+              <em className={simulating ? "is-simulated" : undefined}>
+                {simulating
+                  ? running
+                    ? "Simulated re-check · nothing is contacted"
+                    : "Simulated re-check · nothing was contacted"
+                  : latest
+                    ? open
+                      ? `Recorded work · last ${ago(latest.at, model.now)}`
+                      : ago(latest.at, model.now)
+                    : ""}
+              </em>
+              <CaretDown weight="bold" className="axj2-term-caret" aria-hidden="true" />
+              <span className="ax-visually-hidden">
+                {open ? "Hide Server Guy's work" : "Show Server Guy's work"}
+              </span>
+            </button>
+          </div>
+          <div className="axj2-term-body" id="axj2-term-body">
+            <div>
+              {page?.last && (
+                <p className="axj2-term-origin">
+                  # Last change: {page.last.title}
+                  {page.last.conversation && page.last.open && (
+                    <>
+                      {" "}· from{" "}
+                      <button type="button" onClick={page.last.open}>
+                        {page.last.conversation}
+                      </button>
+                    </>
+                  )}{" "}
+                  · {ago(page.last.at, model.now)}
+                  {page.earlier > 0 && (
+                    <>
+                      {" "}·{" "}
+                      <button
+                        type="button"
+                        onClick={() => onOpenDestination("history")}
+                      >
+                        {page.earlier} earlier
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+              <div className="axj2-term-lines" role="log" aria-live="polite">
+                {lines.length === 0 && (
+                  <div className="axj2-term-line" data-tone="info">
+                    <time>--:--:--</time>
+                    <b>·</b>
+                    <span>
+                      {planned
+                        ? "Nothing has run yet. The plan waits for your approval."
+                        : "No work recorded yet."}
+                    </span>
+                  </div>
+                )}
+                {lines.map((line, i) => {
+                  const previous = lines[i - 1];
+                  const isNewest = i === lines.length - 1;
+                  return (
+                    <Fragment key={line.id}>
+                      {(!previous || day(previous.at) !== day(line.at)) && (
+                        <div className="axj2-term-day">{day(line.at)}</div>
+                      )}
+                      <div
+                        className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
+                        data-tone={line.tone}
+                      >
+                        <time>{clock(line.at)}</time>
+                        <b aria-hidden="true">{glyph[line.tone]}</b>
+                        <span data-tag={tagOf(line)}>
+                          {line.text}
+                          {isNewest && running && (
+                            <i className="axj2-caret" aria-hidden="true" />
+                          )}
+                        </span>
+                      </div>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

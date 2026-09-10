@@ -38,3 +38,20 @@ direction gets rewritten properly when it is folded in.
 
 `model.ts` owns every fact and every certainty; the directions only render it.
 Verified green requires evidence under a day old, as on Overview.
+
+## What the owner validated (10 Sep 2026)
+
+Journeys (A) is the reference for every page designed from now on:
+
+- **Bird's-eye first, depth on demand.** The whole picture is visible at once;
+  clicking a box opens plain words, evidence, facts, a link to its destination
+  and "Ask in the conversation".
+- **Alive, with purpose.** Light travels the flows and stops light up as it
+  passes; a re-check streams step by step; Little Server reacts. Reduced
+  motion is honoured.
+- **Honest and crafted.** Crafted cards on a quiet canvas, one certainty per
+  part (verified, out of date, failed, planned, not set up), and what is
+  missing drawn as a ghost where it would go.
+
+Open: whether Server Guy's report (Little Server, the verdict and the console)
+belongs on Architecture or on Overview.

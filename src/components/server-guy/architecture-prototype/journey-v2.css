@@ -611,11 +611,11 @@
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px 0 9px;
   border: 1px solid #d9e0ea;
-  border-radius: 999px;
+  border-radius: 11px;
   background: #ffffff;
   color: var(--ax-ink);
   font: inherit;
@@ -633,6 +633,7 @@
     transform 320ms var(--ax-spring);
 }
 .axj2-port svg {
+  flex: none;
   width: 14px;
   height: 14px;
   color: #3e4a60;
@@ -1140,9 +1141,9 @@
   height: 14px;
 }
 .axj3-verdict p {
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.5;
-  max-width: 74ch;
+  max-width: 72ch;
   color: var(--ax-ink);
 }
 .ax-visually-hidden {
@@ -1345,19 +1346,56 @@
 /* ---------- The report: Server Guy's verdict over its evidence ---------- */
 
 .axj3-report {
+  margin-top: 8px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 24px 48px -36px rgb(23 34 56 / 32%);
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axj3-report.is-live {
+  border-color: var(--ax-working-line);
+  box-shadow:
+    0 0 0 4px rgb(40 90 216 / 7%),
+    0 24px 48px -36px rgb(23 34 56 / 32%);
+}
+.axj3-report-head {
   display: grid;
-  gap: 10px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--ax-line);
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: 16px;
+  padding: 6px 18px 0 16px;
+}
+.axj3-report .axj2-mascot {
+  position: relative;
+  left: auto;
+  top: auto;
+  z-index: 2;
+  width: 92px;
+  height: 92px;
+  margin-bottom: -14px;
 }
 .axj3-verdict {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  align-content: end;
   column-gap: 10px;
-  min-height: 84px;
-  padding-left: 116px;
+  padding: 18px 0 20px;
+}
+.axj3-recheck {
+  align-self: center;
+  margin-bottom: 6px;
+}
+.axj3-report .axj2-term,
+.axj3-report .axj2-term.is-live {
+  margin: 0;
+  border: 0;
+  border-radius: 0 0 17px 17px;
+  box-shadow: none;
 }
 .axj2-card.is-ghost {
   border-style: dashed;
@@ -1391,7 +1429,7 @@
 }
 .axj2-jamb {
   fill: none;
-  stroke: #8b95a5;
+  stroke: #aab4c5;
   stroke-width: 2;
   stroke-linecap: round;
 }
@@ -1401,24 +1439,20 @@
 .axj2-stage.is-planned .axj2-jamb {
   stroke: #c3ccda;
 }
-.axj2-wall-note {
+.axj2-wall-legend {
   position: absolute;
   z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.3;
+  display: grid;
+  justify-items: end;
+  gap: 1px;
   text-align: right;
   transform: translate(-100%, -50%);
 }
-.axj2-wall-note svg {
-  flex: none;
-  width: 13px;
-  height: 13px;
-}
 .axj2-wall-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: -6px;
   padding: 3px 6px;
   border: 0;
   border-radius: 7px;
@@ -1437,10 +1471,23 @@
   background: #ffffff;
   box-shadow: 0 0 0 1px var(--ax-line-2);
 }
+.axj2-wall-name svg {
+  width: 13px;
+  height: 13px;
+}
 .axj2-wall-refused {
-  max-width: 104px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: nowrap;
   color: #a0706b;
   transition: opacity 480ms;
+}
+.axj2-wire-ssh {
+  fill: none;
+  stroke: #aab4c5;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .axj2-stage:not([data-journey="visit"]) .axj2-wall-refused {
   opacity: 0.4;
@@ -1470,4 +1517,45 @@
 }
 :root[data-ax-motion="reduced"] .axj2-wall-refused {
   animation: none !important;
+}
+
+/* Doors: two lines, the port and what it carries, then who may use it. */
+.axj2-port-text {
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  line-height: 1.15;
+}
+.axj2-port-text b {
+  font-size: 12.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.axj2-port-text small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+.axj2-port-text em {
+  font-size: 11px;
+}
+
+/* "no HTTPS" hangs from door 80 as a tab, under the door. */
+.axj2-ghost.axj2-ghost-tls {
+  z-index: 2;
+  gap: 4px;
+  padding: 1px 8px 0;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  font-size: 10.5px;
+}
+.axj2-wall-label {
+  position: absolute;
+  z-index: 2;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: #56627a;
 }
