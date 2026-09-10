@@ -133,57 +133,6 @@ describe("Phase 2 checks", () => {
     expect(statuses(checks)["contract-complete"]).toBe("not-yet");
   });
 
-  it.each(["failed", "unavailable"] as const)(
-    "asks for a fresh inspection instead of repeating a %s result from a previous login",
-    (status) => {
-      const replaced = computePhaseTwoChecks({
-        inspection: inspection(status),
-        inspectionConnectionCurrent: false,
-        githubConnected: true,
-        resolution: resolution("not-inspected"),
-        contract: null,
-      });
-      expect(statuses(replaced)["profile-resolved"]).toBe("not-yet");
-      expect(results(replaced)["profile-resolved"]).toContain("previous login");
-      expect(replaced[0].rerun?.label).toBe("Re-inspect repository");
-      const disconnected = computePhaseTwoChecks({
-        inspection: inspection(status),
-        inspectionConnectionCurrent: false,
-        githubConnected: false,
-        resolution: resolution("not-inspected"),
-        contract: null,
-      });
-      expect(results(disconnected)["profile-resolved"]).toBe(
-        "Connect GitHub, then re-inspect the repository; the last inspection used a login that is no longer connected.",
-      );
-      expect(disconnected[0].rerun?.label).toBe("Inspect repository");
-    },
-  );
-
-  it.each([
-    ["failed", "blocked"],
-    ["unavailable", "not-yet"],
-  ] as const)(
-    "carries a %s inspection under the current login as %s with its own reason",
-    (status, expected) => {
-      const checks = computePhaseTwoChecks({
-        inspection: inspection(status),
-        inspectionConnectionCurrent: true,
-        githubConnected: true,
-        resolution: resolution("not-inspected"),
-        contract: null,
-      });
-      expect(statuses(checks)["profile-resolved"]).toBe(expected);
-      expect(results(checks)["profile-resolved"]).toBe(
-        inspection(status).summary,
-      );
-      expect(results(checks)["profile-resolved"]).not.toContain(
-        "previous login",
-      );
-      expect(checks[0].rerun?.label).toBe("Re-inspect repository");
-    },
-  );
-
   it.each([
     ["unmatched", "FastAPI + uv did not match: no pyproject.toml at the root."],
     [

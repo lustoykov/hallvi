@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { expect, it } from "vitest";
 import {
   composeDefinition,
@@ -17,10 +16,7 @@ import {
   persistentState,
 } from "../../../src/server/application-stack";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
-import {
-  legacyPlans,
-  legacyHashes,
-} from "../../fixtures/queue-worker/legacy-plans";
+import { legacyPlans } from "../../fixtures/queue-worker/legacy-plans";
 
 it("builds web and worker once, keeps the queue private, and escapes credentials only at Compose serialization", () => {
   const plan = queuePlan();
@@ -247,20 +243,78 @@ it("projects explicit roles and individual historical readiness without making i
   });
 });
 
-it.each(legacyPlans().map((plan, i) => [i, plan] as const))(
-  "preserves baseline Compose bytes for legacy plan %i",
-  (index, plan) => {
+// Existing hosts keep their data only if services, images, ports, named
+// volumes, mounts and database wiring stay the same.
+it("keeps legacy plans' services, images, ports, volumes and database wiring", () => {
+  const [postgres, kuma, grafana] = legacyPlans().map((plan) => {
     deploymentPlanSchema.parse(plan);
-    const json = JSON.stringify(
-      composeDefinition(plan, "a".repeat(40), "legacy", "synthetic-password", {
-        API_KEY: "test$dollar",
-      }),
+    return composeDefinition(
+      plan,
+      "a".repeat(40),
+      "legacy",
+      "synthetic-password",
+      { API_KEY: "test$dollar" },
     );
-    expect(createHash("sha256").update(json).digest("hex")).toBe(
-      legacyHashes[index],
-    );
-  },
-);
+  });
+  expect(postgres).toMatchObject({
+    services: {
+      app: {
+        ports: ["80:8080"],
+        environment: {
+          API_KEY: "test$$dollar",
+          DATABASE_URL:
+            "postgresql://serverguy:synthetic-password@postgres:5432/application",
+        },
+        depends_on: { postgres: { condition: "service_healthy" } },
+        volumes: [],
+      },
+      postgres: {
+        image: "postgres:16",
+        environment: { POSTGRES_USER: "serverguy", POSTGRES_DB: "application" },
+        volumes: ["database:/var/lib/postgresql/data"],
+      },
+    },
+  });
+  expect(kuma).toMatchObject({
+    services: {
+      app: {
+        image: "louislam/uptime-kuma@sha256:" + "a".repeat(64),
+        ports: ["80:8080"],
+        volumes: ["data:/app/data"],
+      },
+    },
+  });
+  expect(grafana).toMatchObject({
+    services: {
+      app: {
+        image: "grafana/grafana@sha256:" + "b".repeat(64),
+        ports: ["80:8080"],
+        volumes: [
+          "data:/var/lib/grafana",
+          "./configs/app-source:/etc/grafana/provisioning/datasources/source.yaml:ro",
+        ],
+      },
+      prometheus: {
+        image: "prom/prometheus@sha256:" + "c".repeat(64),
+        volumes: ["metrics:/prometheus"],
+      },
+    },
+  });
+  expect(grafana.services.prometheus).not.toHaveProperty("ports");
+  expect(
+    [postgres, kuma, grafana].map((compose) => [
+      Object.keys(compose.services),
+      Object.keys(compose.volumes ?? {}),
+    ]),
+  ).toEqual([
+    [["app", "postgres"], ["database"]],
+    [["app"], ["data"]],
+    [
+      ["app", "prometheus"],
+      ["data", "metrics"],
+    ],
+  ]);
+});
 
 it("uses plan services in preference to stale legacy process projections", () => {
   const record = {

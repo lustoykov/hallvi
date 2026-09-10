@@ -6,7 +6,6 @@ import { ContractRecord } from "../../../src/components/server-guy/contract-reco
 import { describeCurrentStep } from "../../../src/components/server-guy/current-step";
 import { CurrentStepBar } from "../../../src/components/server-guy/current-step-bar";
 import { Inspector } from "../../../src/components/server-guy/inspector";
-import { PhaseRail } from "../../../src/components/server-guy/phase-rail";
 import type {
   ApplicationContractView,
   ApplicationRecord,
@@ -187,27 +186,6 @@ function view(overrides: Partial<OperatorView>): OperatorView {
   };
 }
 
-describe("phase strip", () => {
-  it("marks the current, completed and viewed phases and leaves future phases inert", () => {
-    const html = renderToStaticMarkup(
-      <PhaseRail
-        busy={false}
-        checks={[]}
-        onSelectPhase={() => {}}
-        viewedPhaseKey="start"
-        workspaces={[completedStart, { ...inspect, current: true }]}
-      />,
-    );
-    expect(html).toContain('class="sg-phase completed viewed"');
-    expect(html).toContain('class="sg-phase active"');
-    expect(html).toContain('aria-label="View completed phase 1, Start"');
-    expect(html).toContain('aria-label="View phase 2, Inspect app"');
-    expect(html).toContain("Completed");
-    expect(html).not.toContain('aria-label="View phase 3');
-    expect(html).toContain('title="Deliverable: Conformance Result"');
-  });
-});
-
 describe("current step bar", () => {
   const render = (v: OperatorView) =>
     renderToStaticMarkup(
@@ -219,23 +197,6 @@ describe("current step bar", () => {
         step={describeCurrentStep(v)}
       />,
     );
-  it("offers inspection only when repository access is ready in the current context", () => {
-    expect(render(view({ workspace: start }))).toContain("Inspect application");
-    expect(
-      render(view({ workspace: { ...start, status: "in-progress" } })),
-    ).not.toContain("Inspect application");
-    expect(
-      render(
-        view({
-          workspace: completedStart,
-          workspaces: [completedStart, { ...inspect, current: true }],
-        }),
-      ),
-    ).not.toContain("Inspect application");
-    expect(
-      render(view({ workspace: { ...inspect, status: "ready" } })),
-    ).not.toContain("Inspect application");
-  });
   it("names the phase's purpose and offers Continue to Phase 3 when the contract is ready", () => {
     const html = render(
       view({
@@ -273,16 +234,6 @@ describe("current step bar", () => {
     expect(html).toContain("Continue to Make launch-ready");
     expect(html).toContain("Waiting for you");
     expect(html).toContain("1 required change remains for Phase 3");
-  });
-  it("sends a completed phase to the current one instead of offering its Continue", () => {
-    const html = render(
-      view({
-        workspace: completedStart,
-        workspaces: [completedStart, { ...inspect, current: true }],
-      }),
-    );
-    expect(html).toContain("Go to Phase 2 · Inspect app");
-    expect(html).toContain("retained as recorded then");
   });
 });
 

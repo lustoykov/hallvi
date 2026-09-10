@@ -4,10 +4,24 @@ import {
   invalidateDeploymentRuntime,
 } from "../../../src/server/deployment-lifecycle";
 import { runDeploymentAttempt } from "../../../src/server/deployment-store";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  copyFileSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { pushTestDatabase } from "../../test-database";
 const external = vi.hoisted(() => ({
@@ -57,14 +71,24 @@ import {
   deploymentDirectory,
   deploymentPath,
 } from "../../../src/server/deployment-files";
+let template: string;
 let root: string;
 let app: string;
 let chat: string;
+// One schema push per file; each test starts from its own copy.
+beforeAll(() => {
+  template = join(
+    mkdtempSync(join(tmpdir(), "sg-deployment-schema-")),
+    "db.sqlite",
+  );
+  pushTestDatabase(template);
+});
+afterAll(() => rmSync(dirname(template), { recursive: true, force: true }));
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sg-deployment-state-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "db.sqlite"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "private"));
-  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+  copyFileSync(template, process.env.SERVER_GUY_DB_PATH!);
   app = insertApplication({
     name: "Test",
     repositoryUrl: "https://github.com/qa/todo",

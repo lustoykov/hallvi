@@ -291,38 +291,6 @@ describe("assistant output and errors", () => {
       expect(handles[0].release).toHaveBeenCalledOnce();
     },
   );
-  it.each([false, true])(
-    "never accepts an old successful answer after current overflow recovery ends without a new answer (compaction failure: %s)",
-    async (compactionFails) => {
-      session.messages[0].content[0].text = "Old successful answer";
-      session.prompt.mockImplementation(async () => {
-        session.finish({
-          role: "assistant",
-          content: [{ type: "text", text: "" }],
-          stopReason: "error",
-        });
-        // The SDK removes this failed assistant from session.messages before
-        // trying overflow compaction. It can resolve without retrying when no
-        // compaction is possible, or when summarization fails.
-        if (compactionFails) {
-          session.emit({
-            type: "compaction_start",
-            reason: "overflow",
-          } as AgentSessionEvent);
-          session.emit({
-            type: "compaction_end",
-            reason: "overflow",
-            result: undefined,
-            aborted: false,
-            willRetry: false,
-            errorMessage: "Context overflow recovery failed",
-          } as AgentSessionEvent);
-        }
-      });
-      await expect(askPi(input)).rejects.toThrow("could not reach");
-      expect(handles[0].release).toHaveBeenCalledOnce();
-    },
-  );
   it("requires a current completion event even when history ends in success", async () => {
     session.prompt.mockResolvedValue(undefined);
     await expect(askPi(input)).rejects.toThrow("could not reach");

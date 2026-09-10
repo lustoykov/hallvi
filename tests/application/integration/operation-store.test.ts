@@ -5,9 +5,18 @@ import {
 } from "../../../src/server/deployment-lifecycle";
 import { getDeployment } from "../../../src/server/deployment-store";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { eq } from "drizzle-orm";
@@ -41,11 +50,24 @@ import {
   saveDeployment,
 } from "../../../src/server/deployment-store";
 import { operationContext } from "../../../src/server/operation-tools";
-let root: string, app: string, firstChat: string, secondChat: string;
+let template: string,
+  root: string,
+  app: string,
+  firstChat: string,
+  secondChat: string;
+// One schema push per file; each test starts from its own copy.
+beforeAll(() => {
+  template = join(
+    mkdtempSync(join(tmpdir(), "sg-operations-schema-")),
+    "db.sqlite",
+  );
+  pushTestDatabase(template);
+});
+afterAll(() => rmSync(dirname(template), { recursive: true, force: true }));
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sg-operations-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "db.sqlite"));
-  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+  copyFileSync(template, process.env.SERVER_GUY_DB_PATH!);
   app = insertApplication({
     name: "Example",
     repositoryUrl: "https://github.com/qa/ops",

@@ -50,13 +50,13 @@ export const suiteGuides = {
   smoke: {
     ...browserGuide,
     purpose:
-      "The small automatic subset: add an application and save a priority; then check settings, privacy help and saved effort.",
+      "The small automatic subset: the application workspace and deployment recovery, adding an application with a priority, and settings with privacy help and saved effort.",
     execution:
-      "Playwright drives Chromium against a disposable Next.js app and Pi worker. Only the two journeys tagged @smoke run.",
+      "Playwright drives Chromium against a disposable Next.js app and Pi worker. Only the journeys tagged @smoke run.",
     mocked:
       "Pi replies, GitHub and login responses are synthetic. No model or provider calls.",
     limits:
-      "Passing covers those two journeys only, not the full browser suite or real provider/model behavior.",
+      "Passing covers those journeys only, not the full browser suite or real provider/model behavior.",
   },
   e2e: {
     ...browserGuide,

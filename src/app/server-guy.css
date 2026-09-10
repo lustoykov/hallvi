@@ -289,136 +289,6 @@
   color: var(--muted);
 }
 
-/* ---------- Launch phases: one strip under the top bar ---------- */
-
-/* Each group is a white track on the panel, labelled above and joined to the
-   next by a short connector, so membership and order read at a glance. */
-.sg-phase-rail {
-  display: flex;
-  align-items: flex-end;
-  gap: 28px;
-  padding: 12px 20px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-  overflow: hidden;
-}
-.sg-phase-group {
-  position: relative;
-  flex: 0 1 auto;
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-}
-.sg-phase-group + .sg-phase-group::before {
-  content: "";
-  position: absolute;
-  left: -28px;
-  bottom: 23px;
-  width: 28px;
-  height: 1px;
-  background: #c9d3e2;
-}
-.sg-phase-group-label {
-  margin-left: 14px;
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.sg-phase-track {
-  margin: 0;
-  padding: 5px;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: #fff;
-  box-shadow: var(--shadow-s);
-}
-.sg-phase {
-  flex: 0 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 12px 0 9px;
-  border-radius: 8px;
-  color: var(--muted);
-}
-.sg-phase-number {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #c6d0e0;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-/* Short names never truncate; long ones absorb any shortfall. */
-.sg-phase-name {
-  min-width: 4.2em;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sg-phase.active {
-  flex-shrink: 0;
-  background: var(--blue-soft);
-  color: var(--ink);
-}
-.sg-phase.active .sg-phase-number {
-  background: var(--navy);
-  border-color: var(--navy);
-  color: #fff;
-}
-.sg-phase.active .sg-phase-name {
-  font-size: 13px;
-  font-weight: 600;
-}
-.sg-phase-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: 4px;
-  padding-left: 10px;
-  border-left: 1px solid rgb(40 90 216 / 18%);
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.sg-phase-dots {
-  display: inline-flex;
-  gap: 3px;
-}
-.sg-phase-dots i {
-  width: 7px;
-  height: 7px;
-  border: 1.5px solid #c3cddd;
-  border-radius: 50%;
-}
-.sg-phase-dots i.passed {
-  border-color: var(--green);
-  background: var(--green);
-}
-.sg-phase-dots i.blocked {
-  border-color: var(--amber);
-  background: var(--amber);
-}
-
 /* ---------- Workspace columns ---------- */
 
 .sg-workspace {
@@ -1703,31 +1573,6 @@
     padding-inline: 20px;
   }
 }
-/* Below a 1394px desktop the roomy strip no longer fits nine names. */
-@media (max-width: 1380px) {
-  .sg-phase-rail {
-    gap: 20px;
-    padding-inline: 14px;
-  }
-  .sg-phase-group + .sg-phase-group::before {
-    left: -20px;
-    width: 20px;
-  }
-  .sg-phase-track {
-    padding: 4px;
-    gap: 4px;
-  }
-  .sg-phase {
-    gap: 6px;
-    padding: 0 8px 0 6px;
-  }
-}
-/* The deliverable name is a nicety; the chat header always carries it. */
-@media (max-width: 1500px) {
-  .sg-phase-deliverable {
-    display: none;
-  }
-}
 
 /* ---------- Settings and list pages share the top bar ---------- */
 
@@ -1819,51 +1664,8 @@
   box-shadow: 0 0 0 3px var(--amber-soft);
 }
 
-/* ---------- Phase 2: phase navigation, transition and the contract ---------- */
+/* ---------- Phase 2: transition and the contract ---------- */
 
-.sg-phase-button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  border-radius: 8px;
-}
-.sg-phase-button:disabled {
-  cursor: default;
-}
-.sg-phase:has(.sg-phase-button):hover {
-  background: #f1f4f9;
-}
-.sg-phase.active:has(.sg-phase-button):hover {
-  background: var(--blue-soft);
-}
-.sg-phase.completed .sg-phase-number {
-  border-color: var(--green);
-  background: var(--green);
-  color: #fff;
-}
-.sg-phase.completed .sg-phase-number svg {
-  width: 11px;
-}
-.sg-phase.completed .sg-phase-name {
-  color: var(--ink-2);
-}
-.sg-phase.viewed {
-  box-shadow: inset 0 0 0 1.5px var(--blue);
-}
-.sg-phase.viewed:not(.active) {
-  background: #fff;
-  color: var(--ink);
-}
-.sg-phase.completed .sg-phase-meta {
-  border-left-color: rgb(20 148 95 / 25%);
-}
 .sg-record-notice {
   margin: 0 0 14px;
   padding: 10px 12px;
@@ -2095,10 +1897,6 @@
 }
 .sg-contract-source {
   white-space: nowrap;
-}
-/* A completed phase keeps its label; only future phases may shrink. */
-.sg-phase.completed {
-  flex-shrink: 0;
 }
 
 /* ---------- Phase 3: execution prerequisite, conformance brief, proposals and runs ---------- */
