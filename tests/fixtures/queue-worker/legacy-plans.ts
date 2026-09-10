@@ -85,9 +85,3 @@ export function legacyPlans(): DeploymentPlan[] {
     },
   ];
 }
-// Captured from composeDefinition at main 10880c7; includes property order.
-export const legacyHashes = [
-  "74c92f082bcc02f550c36f13bdda6f48755623deca8f7433e5eeff3c129393e3",
-  "8a98c96aec9942ad88e1334f0182b0e05d5de131326938cee65c1b98bcae9b64",
-  "56e62075dcfda37f25ddc3e4e39281be81aa277d1c74af14ff86b0c2e4450aba",
-];

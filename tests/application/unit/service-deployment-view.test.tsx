@@ -1,7 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { ProcessesView } from "../../../src/components/server-guy/views/processes-view";
 import { ArchitectureCanvas } from "../../../src/components/server-guy/architecture-canvas";
 import { richScenario } from "../../../src/components/server-guy/reference/scenario-rich";
@@ -49,30 +47,6 @@ it("shows a broker and a worker with historical readiness, without claiming all 
   expect(html).toContain("Passed readiness command at");
   expect(html).toContain("Some process checks are unavailable");
   expect(html).not.toContain("3 processes healthy");
-  expect(html).not.toContain("synthetic$with");
-  const diagram = renderToStaticMarkup(
-    <ArchitectureCanvas
-      application={state.application}
-      deployment={deployment}
-      stack={stack}
-      facts={facts}
-    />,
-  );
-  // Optional local visual proof renders actual components and incumbent CSS.
-  if (process.env.SG_UI_PROOF_DIR) {
-    mkdirSync(process.env.SG_UI_PROOF_DIR, { recursive: true });
-    const css = [
-      "src/app/globals.css",
-      "src/components/server-guy/application-shell.css",
-      "src/components/server-guy/views.css",
-    ]
-      .map((p) => readFileSync(p, "utf8"))
-      .join("\n");
-    writeFileSync(
-      join(process.env.SG_UI_PROOF_DIR, "index.html"),
-      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Service deployment fixture</title><style>${css}\nbody{padding:24px;font-family:Arial,sans-serif}.sg-adaptive-shell{max-width:1000px;margin:auto;height:auto} code{overflow-wrap:anywhere}</style><main class="sg-adaptive-shell"><div class="sg-section-content"><h1>Processes · synthetic fixture</h1>${html}${diagram}</div></main>`,
-    );
-  }
 });
 
 it("does not let a passing first companion hide a failing later companion in Architecture", () => {

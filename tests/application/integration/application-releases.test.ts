@@ -1,7 +1,21 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  copyFileSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pushTestDatabase } from "../../test-database";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
 const model = vi.hoisted(() => ({
@@ -52,7 +66,16 @@ import {
 } from "../../../src/server/application-operations";
 import { invalidateDeploymentRuntime } from "../../../src/server/deployment-lifecycle";
 import { ReleaseExecutionError } from "../../../src/server/release-executor";
-let root: string, app: string, chat: string;
+let template: string, root: string, app: string, chat: string;
+// One schema push per file; each test starts from its own copy.
+beforeAll(() => {
+  template = join(
+    mkdtempSync(join(tmpdir(), "sg-release-schema-")),
+    "db.sqlite",
+  );
+  pushTestDatabase(template);
+});
+afterAll(() => rmSync(dirname(template), { recursive: true, force: true }));
 function plan() {
   const p = queuePlan();
   p.services = [];
@@ -73,7 +96,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sg-release-state-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "db.sqlite"));
   vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "private"));
-  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+  copyFileSync(template, process.env.SERVER_GUY_DB_PATH!);
   app = insertApplication({
     name: "Example",
     repositoryUrl: "https://github.com/qa/example",
@@ -334,7 +357,9 @@ it("reconciles a lost successful result and verifies without a second replacemen
   expect(() => saveDeployment(changed)).toThrow("cannot be rewritten");
 });
 
-it.each(["busy", "missing", "mismatch"])(
+// A busy lock and a missing result both surface as an SSH error here; the
+// real lock is exercised only by the opt-in Docker proof.
+it.each(["unreadable", "mismatch"])(
   "keeps %s remote evidence blocked",
   async (failure) => {
     const proposed = await proposeApplicationRelease(app, chat);

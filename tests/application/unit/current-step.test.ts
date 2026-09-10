@@ -345,7 +345,12 @@ describe("Phase 1", () => {
       view({ workspace: workspace("start", "ready"), checks: [] }),
     );
     expect(step.waitingOn).toBe("you");
-    expect(step.actions.map((action) => action.key)).toEqual(["continue"]);
+    expect(step.actions).toEqual([
+      expect.objectContaining({
+        key: "continue",
+        label: "Inspect application",
+      }),
+    ]);
     expect(step.purpose).toMatch(/^Save what Server Guy needs/);
   });
 
@@ -419,7 +424,12 @@ describe("Phase 2", () => {
     expect(one.now).toBe(
       "Inspection complete. 1 required change remains for Phase 3.",
     );
-    expect(one.actions.map((action) => action.key)).toEqual(["continue"]);
+    expect(one.actions).toEqual([
+      expect.objectContaining({
+        key: "continue",
+        label: "Continue to Make launch-ready",
+      }),
+    ]);
     const none = describeCurrentStep(
       view({
         ...base,
@@ -459,7 +469,11 @@ describe("Phase 2", () => {
     expect(step.waitingOn).toBe("none");
     expect(step.now).toMatch(/^Completed\./);
     expect(step.actions).toEqual([
-      expect.objectContaining({ key: "phase:make-launch-ready", kind: "link" }),
+      expect.objectContaining({
+        key: "phase:make-launch-ready",
+        label: "Go to Phase 3 · Make launch-ready",
+        kind: "link",
+      }),
     ]);
     expect(step.remaining).toMatch(/1 required change remains/);
   });
