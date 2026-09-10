@@ -28,6 +28,13 @@ export interface DeploymentLifecycle {
   };
   releases: DeploymentRelease[];
   attempts: DeploymentAttempt[];
+  verifiedImages?: {
+    attemptId: string;
+    releaseId: string;
+    hostId: string;
+    checkedAt: string;
+    images: Record<string, string>;
+  }[];
   reconciliations?: {
     id: string;
     attemptId: string;

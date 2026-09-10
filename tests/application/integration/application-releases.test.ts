@@ -73,18 +73,38 @@ import {
   requestDeployment,
   getDeployment,
   saveDeployment,
+  applicationDeployment,
+  runDeploymentAttempt,
 } from "../../../src/server/deployment-store";
 import {
   proposeApplicationRelease,
   runApplicationRelease,
 } from "../../../src/server/application-releases";
-import { operation, startChange } from "../../../src/server/operation-store";
+import {
+  operation,
+  operationsFor,
+  retryOperation,
+  startChange,
+} from "../../../src/server/operation-store";
 import {
   executeOperation,
   recordOperationRemoteEffect,
 } from "../../../src/server/application-operations";
 import { invalidateDeploymentRuntime } from "../../../src/server/deployment-lifecycle";
 import { ReleaseExecutionError } from "../../../src/server/release-executor";
+import {
+  releaseOf,
+  type DeploymentRelease,
+} from "../../../src/server/deployment-release";
+import {
+  ReleaseScopeError,
+  type ReleaseScope,
+} from "../../../src/server/release-scope";
+import type {
+  DeploymentPlan,
+  DeploymentRecord,
+} from "../../../src/server/deployment-types";
+import type { StoredOperation } from "../../../src/server/operation-types";
 let template: string, root: string, app: string, chat: string;
 // One schema push per file; each test starts from its own copy.
 beforeAll(() => {
@@ -507,4 +527,402 @@ it("an explicitly retried operation reconciles a known failure before another ex
   expect(model.execute).toHaveBeenCalledTimes(2);
   expect(operation(retried.id)!.state).toBe("verified");
   expect(operation(retried.id)!.blocksQueue).toBe(false);
+});
+
+const digest = (c: string) => `sha256:${c.repeat(64)}`;
+const V1 = digest("1"),
+  V2 = digest("2"),
+  EVIDENCE =
+    "v2 only added a nullable column that v1 never reads; v1 writes rows v2 accepts.";
+const pg = {
+  version: "16",
+  variable: "DATABASE_URL",
+  scheme: "postgresql",
+} as const;
+const observed = (
+  p: DeploymentPlan,
+  app: string,
+  postgres = digest("d"),
+): Record<string, string> => (p.postgres ? { app, postgres } : { app });
+const run = (tracked: StoredOperation) =>
+  executeOperation(tracked, () =>
+    runApplicationRelease(tracked, new AbortController().signal),
+  );
+const rollBack = (releaseId: string, compatibilityEvidence = EVIDENCE) =>
+  proposeApplicationRelease(app, chat, "HEAD", "Go back to the last version", {
+    releaseId,
+    compatibilityEvidence,
+  });
+function v2Plan() {
+  const p = plan();
+  p.command = ["python", "app.py", "v2"];
+  return p;
+}
+/** v1 is live and verified with the image digests the host reported. */
+function verifiedV1(
+  change: (p: DeploymentPlan) => void = () => {},
+  postgres?: string,
+) {
+  const r = applicationDeployment(app)!;
+  change(r.plan!);
+  r.serviceImages = observed(r.plan!, V1, postgres);
+  r.imageId = V1;
+  saveDeployment(r);
+}
+/** Stands in for the host: records what it replaced, as executeRelease does. */
+function replaced(image = V2) {
+  return async (
+    r: DeploymentRecord,
+    release: DeploymentRelease,
+    _files: unknown,
+    _signal: AbortSignal,
+    rollback?: Record<string, string>,
+  ) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    const images =
+      rollback ?? observed(release.plan, image, r.serviceImages?.postgres);
+    Object.assign(r, {
+      plan: release.plan,
+      revision: release.revision,
+      releaseId: release.id,
+      serviceImages: structuredClone(images),
+      imageId: images.app,
+      verifiedAt: new Date().toISOString(),
+    });
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    return { evidence: `Verified ${release.revision.slice(0, 12)}` };
+  };
+}
+/** v2 arrives through the ordinary agent-planned release operation. */
+async function releasedV2() {
+  verifiedV1();
+  const proposed = await proposeApplicationRelease(app, chat);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementationOnce(replaced());
+  model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
+    expect(await options.apply(v2Plan())).toMatchObject({ ok: true });
+    return v2Plan();
+  });
+  await run(started);
+  vi.clearAllMocks();
+  return applicationDeployment(app)!;
+}
+/** v2 arrives through a separately authorized change, outside release scope. */
+async function changedV2(
+  change: (p: DeploymentPlan) => void,
+  postgres?: string,
+) {
+  const r = applicationDeployment(app)!;
+  const next = structuredClone(r.plan!);
+  change(next);
+  const release = releaseOf({
+    repository: r.repository,
+    revision: "b".repeat(40),
+    plan: next,
+  })!;
+  await runDeploymentAttempt(
+    r,
+    "recreate",
+    "separate-change",
+    async () => {
+      Object.assign(r, {
+        plan: next,
+        revision: release.revision,
+        releaseId: release.id,
+        serviceImages: observed(next, V2, postgres),
+        imageId: V2,
+        verifiedAt: new Date().toISOString(),
+      });
+    },
+    release,
+  );
+  return applicationDeployment(app)!;
+}
+
+it("rolls back to the exact earlier release and recorded images on the same host, keeping data scope and history", async () => {
+  const current = await releasedV2();
+  const history = structuredClone(current.lifecycle!);
+  const [v1, v2] = history.releases;
+  expect(
+    history.verifiedImages!.map((a) => [a.releaseId, a.hostId, a.images]),
+  ).toEqual([
+    [v1.id, history.host.id, { app: V1 }],
+    [v2.id, history.host.id, { app: V2 }],
+  ]);
+  const proposed = await rollBack(
+    v1.id,
+    `${EVIDENCE} It still signs in with synthetic-private-password.`,
+  );
+  // The approval and stored scope show the agent's compatibility assessment,
+  // with the application's known private values redacted.
+  const assessment = `${EVIDENCE} It still signs in with [REDACTED].`;
+  expect(proposed.summary).toContain(assessment);
+  expect(proposed.summary).not.toContain("synthetic-private-password");
+  const scope = (operation(proposed.id)!.command as { scope: ReleaseScope })
+    .scope;
+  expect(scope).toMatchObject({
+    revision: v1.revision,
+    baselineReleaseId: v2.id,
+    hostId: history.host.id,
+    serverId: 7,
+    rollback: {
+      releaseId: v1.id,
+      attemptId: history.verifiedImages![0].attemptId,
+      images: { app: V1 },
+      compatibilityEvidence: assessment,
+    },
+  });
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementationOnce(replaced());
+  await run(started);
+  expect(operation(started.id)!.state).toBe("verified");
+  // No planning session, source archive or build input: the exact recorded
+  // release and its verified local images.
+  expect(model.plan).not.toHaveBeenCalled();
+  expect(model.archive).not.toHaveBeenCalled();
+  expect(model.execute).toHaveBeenCalledOnce();
+  const [, release, files, , images] = model.execute.mock.calls[0];
+  expect(release).toEqual(v1);
+  expect(files).toEqual([]);
+  expect(images).toEqual({ app: V1 });
+  const saved = applicationDeployment(app)!;
+  expect(saved).toMatchObject({
+    serverId: 7,
+    address: "203.0.113.7",
+    revision: v1.revision,
+  });
+  expect(saved.plan!.volumes).toEqual(v2.plan.volumes);
+  expect(saved.lifecycle!.runtime).toMatchObject({
+    state: "verified",
+    lastVerified: {
+      releaseId: v1.id,
+      hostId: history.host.id,
+      images: { app: V1 },
+    },
+  });
+  // Earlier releases, attempts and image observations are appended to, never
+  // rewritten; the rollback is its own verified attempt of the v1 release.
+  expect(saved.lifecycle!.releases).toEqual(history.releases);
+  expect(saved.lifecycle!.attempts.slice(0, history.attempts.length)).toEqual(
+    history.attempts,
+  );
+  const attempt = saved.lifecycle!.attempts.at(-1)!;
+  expect(attempt).toMatchObject({
+    kind: "release",
+    outcome: "verified",
+    releaseId: v1.id,
+    authorizationId: scope.id,
+  });
+  expect(saved.lifecycle!.verifiedImages!.slice(0, 2)).toEqual(
+    history.verifiedImages,
+  );
+  expect(saved.lifecycle!.verifiedImages!.at(-1)).toMatchObject({
+    attemptId: attempt.id,
+    releaseId: v1.id,
+    images: { app: V1 },
+  });
+  saved.lifecycle!.verifiedImages![0].images.app = V2;
+  expect(() => saveDeployment(saved)).toThrow("cannot be rewritten");
+});
+
+it("keeps the current managed database image while returning to earlier application images", async () => {
+  verifiedV1((p) => (p.postgres = pg), digest("3"));
+  // A separately authorized same-version database patch changed its image.
+  const current = await changedV2(
+    (p) => (p.command = ["python", "app.py", "v2"]),
+    digest("4"),
+  );
+  const v1 = current.lifecycle!.releases[0];
+  expect(current.lifecycle!.verifiedImages![0].images).toEqual({
+    app: V1,
+    postgres: digest("3"),
+  });
+  const proposed = await rollBack(v1.id);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementationOnce(replaced());
+  await run(started);
+  expect(model.execute.mock.calls[0][4]).toEqual({
+    app: V1,
+    postgres: digest("4"),
+  });
+  expect(
+    applicationDeployment(app)!.lifecycle!.runtime.lastVerified,
+  ).toMatchObject({
+    releaseId: v1.id,
+    images: { app: V1, postgres: digest("4") },
+  });
+});
+
+type Change = (p: DeploymentPlan) => void;
+it.each<{ limit: string; v1: Change; v2: Change; reason: string }>([
+  {
+    limit: "a data mount",
+    v1: () => {},
+    v2: (p) => {
+      p.volumes!.push({
+        name: "uploads",
+        target: "/uploads",
+        kind: "files",
+        sqlite: null,
+      });
+    },
+    reason: "volume uploads",
+  },
+  {
+    limit: "the database version",
+    v1: (p) => {
+      p.postgres = pg;
+    },
+    v2: (p) => {
+      p.postgres = { ...pg, version: "17" };
+    },
+    reason: "database",
+  },
+  {
+    limit: "network exposure",
+    v1: (p) => {
+      p.httpAccess = "controller";
+    },
+    v2: (p) => {
+      p.httpAccess = "public";
+    },
+    reason: "exposure",
+  },
+])(
+  "refuses a rollback that would change $limit",
+  async ({ v1, v2, reason }) => {
+    verifiedV1(v1);
+    const current = await changedV2(v2);
+    const operations = operationsFor(app).length;
+    const error = await rollBack(current.lifecycle!.releases[0].id).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ReleaseScopeError);
+    expect((error as Error).message).toContain(reason);
+    expect(operationsFor(app)).toHaveLength(operations);
+    expect(applicationDeployment(app)).toEqual(current);
+  },
+);
+
+it("refuses rollback to a never-verified or current release, or without a compatibility assessment", async () => {
+  verifiedV1();
+  const proposed = await proposeApplicationRelease(app, chat);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute
+    .mockImplementationOnce(async (r, release) => {
+      recordOperationRemoteEffect();
+      invalidateDeploymentRuntime(r);
+      Object.assign(r, {
+        plan: release.plan,
+        revision: release.revision,
+        releaseId: release.id,
+      });
+      r.lifecycle.attempts.at(-1).remoteResult = {
+        phase: "replace",
+        exitCode: 1,
+        at: new Date().toISOString(),
+      };
+      saveDeployment(r);
+      throw new ReleaseExecutionError("Unknown entry point", true, "replace");
+    })
+    .mockImplementationOnce(replaced());
+  model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
+    const wrong = v2Plan();
+    wrong.command = ["python", "wrong.py"];
+    expect(await options.apply(wrong)).toMatchObject({ ok: false });
+    expect(await options.apply(v2Plan())).toMatchObject({ ok: true });
+    return v2Plan();
+  });
+  await run(started);
+  const current = applicationDeployment(app)!;
+  const [v1, unverified, v2] = current.lifecycle!.releases;
+  expect(current.lifecycle!.verifiedImages!.map((a) => a.releaseId)).toEqual([
+    v1.id,
+    v2.id,
+  ]);
+  const operations = operationsFor(app).length;
+  for (const [releaseId, evidence, reason] of [
+    [unverified.id, EVIDENCE, "verified images"],
+    [v2.id, EVIDENCE, "already"],
+    [v1.id, " \n ", "Explain"],
+  ])
+    await expect(rollBack(releaseId, evidence)).rejects.toThrow(reason);
+  expect(operationsFor(app)).toHaveLength(operations);
+  expect(applicationDeployment(app)).toEqual(current);
+  expect(model.execute).toHaveBeenCalledTimes(2);
+  // The same v1 target is accepted once it is explained.
+  expect(operation((await rollBack(v1.id)).id)!.state).toBe("proposed");
+});
+
+it("reconciles a lost rollback reply before any repeat and never replaces again", async () => {
+  const current = await releasedV2();
+  const v1 = current.lifecycle!.releases[0];
+  const proposed = await rollBack(v1.id);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementationOnce(
+    async (r, release, _files, _signal, images) => {
+      recordOperationRemoteEffect();
+      invalidateDeploymentRuntime(r);
+      Object.assign(r, {
+        plan: release.plan,
+        revision: release.revision,
+        releaseId: release.id,
+        serviceImages: structuredClone(images),
+      });
+      saveDeployment(r);
+      throw new ReleaseExecutionError("Lost result", false, "transport");
+    },
+  );
+  await expect(run(started)).rejects.toThrow("Lost result");
+  const lost = structuredClone(
+    applicationDeployment(app)!.lifecycle!.attempts.at(-1)!,
+  );
+  expect(lost).toMatchObject({ kind: "release", releaseId: v1.id });
+  // A busy lock or missing host result authorizes neither success nor repeat.
+  model.ssh.mockRejectedValueOnce(new Error("lock busy"));
+  let failed = operation(started.id)!;
+  const blocked = retryOperation(failed.id, failed.updatedAt);
+  await expect(run(blocked)).rejects.toThrow(ReleaseScopeError);
+  expect(model.execute).toHaveBeenCalledOnce();
+  expect(operation(blocked.id)!.blocksQueue).toBe(true);
+  failed = operation(blocked.id)!;
+  const recovered = retryOperation(failed.id, failed.updatedAt);
+  model.ssh.mockResolvedValueOnce(
+    JSON.stringify({
+      attemptId: lost.id,
+      releaseId: v1.id,
+      revision: v1.revision,
+      phase: "replace",
+      exitCode: 0,
+    }),
+  );
+  model.verify.mockImplementationOnce(async (r) => {
+    r.imageId = r.serviceImages.app;
+    r.verifiedAt = new Date().toISOString();
+    return { evidence: "Verified the recovered rollback" };
+  });
+  await run(recovered);
+  expect(model.execute).toHaveBeenCalledOnce();
+  expect(model.verify).toHaveBeenCalledOnce();
+  const saved = applicationDeployment(app)!;
+  expect(saved.lifecycle!.attempts.find((a) => a.id === lost.id)).toEqual(lost);
+  expect(saved.lifecycle!.attempts.at(-1)).toMatchObject({
+    kind: "reconcile",
+    outcome: "verified",
+    reconcilesAttemptId: lost.id,
+  });
+  expect(saved.lifecycle!.runtime.lastVerified).toMatchObject({
+    releaseId: v1.id,
+    images: { app: V1 },
+  });
+  expect(operation(recovered.id)).toMatchObject({
+    state: "verified",
+    blocksQueue: false,
+  });
 });

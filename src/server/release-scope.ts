@@ -13,6 +13,12 @@ export interface ReleaseScope {
   revision: string;
   baselineReleaseId: string;
   maxAttempts: 3;
+  rollback?: {
+    releaseId: string;
+    attemptId: string;
+    images: Record<string, string>;
+    compatibilityEvidence: string;
+  };
 }
 export class ReleaseScopeError extends Error {}
 

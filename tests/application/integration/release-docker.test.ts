@@ -152,6 +152,7 @@ import {
   finishDeploymentAttempt,
 } from "../../../src/server/deployment-lifecycle";
 import { releaseOf } from "../../../src/server/deployment-release";
+import { rollbackSelection } from "../../../src/server/rollback";
 
 it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
   "releases after failures and retains state (independent builds/shared volumes: %s)",
@@ -524,6 +525,48 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
           `${project}_data`,
         ]),
       ).toBe(`${project}_data`);
+      // Compatible rollback: v1's recorded local images return on the same
+      // volumes without a build or pull. A missing image stops before
+      // activation and leaves v2 running.
+      const v1 = record.lifecycle!.releases[0];
+      const selection = rollbackSelection(
+        record,
+        v1.id,
+        "v2 reads and writes the same settings table as v1.",
+      );
+      expect(selection.images.app).toBe(originalImage);
+      const v2Container = currentContainer();
+      const missing = beginDeploymentAttempt(
+        record,
+        "release",
+        "fixture-rollback",
+        v1,
+      );
+      await expect(
+        executeRelease(record, v1, [], signal, {
+          ...selection.images,
+          app: `sha256:${"0".repeat(64)}`,
+        }),
+      ).rejects.toMatchObject({ phase: "build", retryable: true });
+      finishDeploymentAttempt(record, missing.id, "failed", "Image missing");
+      expect(currentContainer()).toBe(v2Container);
+      const rollback = beginDeploymentAttempt(
+        record,
+        "release",
+        "fixture-rollback",
+        v1,
+      );
+      await executeRelease(record, v1, [], signal, selection.images);
+      finishDeploymentAttempt(record, rollback.id, "verified");
+      expect(transport.executions).toBe(5);
+      expect(record.imageId).toBe(originalImage);
+      expect(record.lifecycle!.runtime.lastVerified!.releaseId).toBe(v1.id);
+      expect(
+        await (await fetch(`http://${transport.endpoint}/version`)).text(),
+      ).toContain("v1");
+      expect(
+        await (await fetch(`http://${transport.endpoint}/value`)).json(),
+      ).toEqual({ value: "retained-user-data" });
     } finally {
       try {
         docker([

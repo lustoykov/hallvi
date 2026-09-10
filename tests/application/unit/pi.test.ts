@@ -8,6 +8,7 @@ import type {
   AgentSession,
   AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
+import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PiDecision, PiRun } from "../../../src/server/types";
@@ -20,6 +21,20 @@ const mocks = vi.hoisted(() => ({
   collect: vi.fn(),
   search: vi.fn(),
   status: vi.fn(),
+  propose: vi.fn(),
+  deployment: vi.fn(),
+  read: vi.fn(),
+}));
+vi.mock("../../../src/server/application-releases", () => ({
+  proposeApplicationRelease: mocks.propose,
+}));
+vi.mock("../../../src/server/deployment-store", async (original) => ({
+  ...(await original<typeof import("../../../src/server/deployment-store")>()),
+  applicationDeployment: mocks.deployment,
+}));
+vi.mock("../../../src/server/rollback", async (original) => ({
+  ...(await original<typeof import("../../../src/server/rollback")>()),
+  readReleaseFile: mocks.read,
 }));
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: mocks.create,
@@ -541,29 +556,26 @@ describe("native Pi adapter", () => {
     const options = mocks.create.mock.calls[0][0] as Options;
     expect(options).toMatchObject({
       noTools: "all",
-      tools: [
-        "propose_decision",
-        "search_decisions",
-        "get_application_status",
-        "prepare_deployment",
-        "prepare_release",
-        "list_operations",
-        "propose_change",
-        "record_inspection",
-      ],
       sessionManager: handles[0].sessionManager,
       settingsManager: { isolated: true },
     });
-    expect(options.customTools.map((tool) => tool.name)).toEqual([
+    const names = options.customTools.map((tool) => tool.name);
+    expect(names).toEqual([
       "propose_decision",
       "search_decisions",
       "get_application_status",
       "prepare_deployment",
+      "read_release_file",
+      "list_releases",
+      "prepare_rollback",
       "prepare_release",
       "list_operations",
       "propose_change",
       "record_inspection",
     ]);
+    // With noTools "all", a registered tool missing from the allowlist is
+    // never offered to the model.
+    expect([...options.tools].sort()).toEqual([...names].sort());
     expect(mocks.search).not.toHaveBeenCalled();
     // Nothing is read on the model's behalf before it asks.
     expect(mocks.status).not.toHaveBeenCalled();
@@ -716,6 +728,75 @@ describe("native Pi adapter", () => {
         chatId: run.chatId,
       },
     });
+  });
+  it("prepare_rollback proposes only a selected release and assessment for the Run's application", async () => {
+    mocks.propose.mockResolvedValue({ id: "rollback-operation" });
+    const params = {
+      releaseId: "a".repeat(64),
+      compatibilityEvidence: "v1 reads the current schema unchanged.",
+    };
+    let tool: Tool | undefined;
+    session.prompt.mockImplementation(async () => {
+      tool = (mocks.create.mock.calls[0][0] as Options).customTools.find(
+        (t) => t.name === "prepare_rollback",
+      );
+      await tool!.execute("rollback", params);
+      session.finish();
+    });
+    await askPi(input);
+    for (const invalid of [
+      { ...params, compatibilityEvidence: "" },
+      { ...params, releaseId: "v1" },
+      { ...params, applicationId: "other-app" },
+      { releaseId: params.releaseId },
+    ])
+      expect(Value.Check(tool!.parameters as TSchema, invalid)).toBe(false);
+    expect(mocks.propose).toHaveBeenCalledOnce();
+    expect(mocks.propose).toHaveBeenCalledWith(
+      run.applicationId,
+      run.chatId,
+      "HEAD",
+      input.userMessage,
+      params,
+    );
+  });
+  it("read_release_file reads the Run application's recorded releases within a per-request budget", async () => {
+    const record = { id: "deployment-a" };
+    const evidence = { path: "migrations/0002.sql", text: "ALTER TABLE a;" };
+    mocks.deployment.mockReturnValue(record);
+    mocks.read.mockResolvedValue(evidence);
+    const params = { releaseId: "a".repeat(64), path: evidence.path };
+    let tool: Tool | undefined;
+    let result: unknown;
+    session.prompt.mockImplementation(async () => {
+      tool = (mocks.create.mock.calls[0][0] as Options).customTools.find(
+        (t) => t.name === "read_release_file",
+      );
+      result = await tool!.execute("read-1", params);
+      for (let i = 2; i <= 25; i++) await tool!.execute(`read-${i}`, params);
+      await expect(tool!.execute("read-26", params)).rejects.toThrow("budget");
+      session.finish();
+    });
+    await askPi(input);
+    expect(mocks.deployment).toHaveBeenCalledWith(run.applicationId);
+    expect(mocks.read).toHaveBeenCalledTimes(25);
+    expect(mocks.read).toHaveBeenCalledWith(
+      record,
+      params.releaseId,
+      params.path,
+      expect.any(AbortSignal),
+    );
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: JSON.stringify(evidence) }],
+    });
+    // The model names a recorded release, never a repository or revision.
+    for (const invalid of [
+      { ...params, releaseId: "v1" },
+      { ...params, path: "" },
+      { ...params, revision: "b".repeat(40) },
+      { releaseId: params.releaseId },
+    ])
+      expect(Value.Check(tool!.parameters as TSchema, invalid)).toBe(false);
   });
   it("returns a failed status lookup to the tool loop as an error, never as an empty result", async () => {
     mocks.status.mockImplementationOnce(() => {

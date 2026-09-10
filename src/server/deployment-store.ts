@@ -72,7 +72,12 @@ export function saveDeployment(record: DeploymentRecord) {
       if (mentions.size) record.mentions = [...mentions.values()];
       // Completed outcomes and selected releases are retained, not rewritten
       // by a retry or an unrelated save of the legacy executor workspace.
-      for (const key of ["releases", "attempts", "reconciliations"] as const) {
+      for (const key of [
+        "releases",
+        "attempts",
+        "reconciliations",
+        "verifiedImages",
+      ] as const) {
         for (const [index, entry] of (
           latest.lifecycle?.[key] ?? []
         ).entries()) {
