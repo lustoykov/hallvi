@@ -36,8 +36,8 @@ Get the general architecture right first; fine-tune, harden and polish afterward
 
 - [x] Step 1 reviewed and merged: PR #43, merge 4479f9833a593c6e7ba966cb570db88b4ecc3807. Real Pi proof and Codex focused verification passed.
 - [x] Step 2 unified native initial/update path reviewed and merged: PR #44, af4941984b7c4963ee5aa9fa319af026cfcb7cfe. Real configured Pi installed and updated the PostgreSQL notes app, correcting host build failures and preserving state/private inputs.
-- [ ] Step 3 real Pi proofs completed and necessary corrections merged.
-- [ ] Final concise handoff: what changed, proof results, limitations and next useful product step.
+- [x] Step 3 real Pi proofs completed and independently reviewed. The second topology required no production corrections; this proof PR completes the delivery.
+- [x] Final handoff recorded below; report completion and pause monitoring after the proof PR merges.
 
 ## Continuation and monitoring
 
@@ -58,3 +58,9 @@ Branch: `codex/native-compose-intake`, based on PR #43 merge `4479f98`. Opus 5 H
 Worktree: /Users/aiwithlyubomir/biz/code/server-guy/.worktrees/native-compose-proof
 
 Branch `codex/native-compose-proof`, baseline PR #44 merge af49419. Opus 5 High session `3f831892-be76-48e0-a46d-0da6672ea39f`. Current task/log/report are in tests/results/native-compose-proof/ there. Step 2 and its report are complete; do not resume that old implementer. The notes app proof already supplies the first application; prove a structurally different shared-files/SQLite/independent-build stack through the actual Pi initial/update loop.
+
+## Final delivery handoff
+
+PR43 and PR44 established native Compose release execution and a shared initial/update loop. The final proof uses unchanged PR44 production code on independently built web/worker services, shared files and SQLite. Actual configured Pi installed and updated both this stack and the earlier PostgreSQL/private-input notes app. State survived; the notes proof demonstrated host-failure recovery, and the second proof demonstrated anticipatory correction plus intake feedback. Codex independently reviewed the evidence, type-checked and passed the first-deployment Docker regression after the proof addition.
+
+Limits remain: these are disposable local Docker proofs with provider/SSH stand-ins, not new live-host trials. Product behavior verification remains HTTP-oriented; useful worker processing was checked by the harness. Backups still carry legacy service-name assumptions, and capture/rollback were not tested on this second topology. The next useful capability is a small managed private-check execution tool for Pi, with recorded results, so background-only applications can be verified without introducing another application-description language.

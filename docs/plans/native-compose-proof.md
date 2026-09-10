@@ -63,3 +63,9 @@ Production changes only for a concrete failure of this path. Detailed evidence: 
   - The proof ran once.
   - Backup capture, rollback and recreation of this stack were not exercised.
   - Stand-ins: local SSH, a fake provider, fixture trees and a loopback port.
+
+## Codex verification
+
+Reviewed candidate `80d3e8b`, the actual model evidence and assertions. Both phases completed with verified attempts and no harness error. The three retained volumes, distinct rebuilt images and worker output across the update match the report. Confirmed the proof's containers and volumes were removed. Corrected a test comment: the UID problem can be anticipated from retained files, as Pi actually did.
+
+Independent checks passed: TypeScript and the scripted first-deployment Docker regression (27.61 s), exercising the shared harness after the additive test. Opus's default run passed 1,006 tests with 26 opt-in skips. The expensive model run was not repeated because no production or executable test logic changed after its successful run. Ready for the authorized merge.

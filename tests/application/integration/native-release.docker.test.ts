@@ -2183,8 +2183,8 @@ it.skipIf(!piProof)(
       file("worker/version.txt", version),
     ];
     // v2's worker runs as its own UID. A fresh install tolerates that, but
-    // the results volume v1 created stays owned by the old UID: a failure
-    // only the host reveals, and only with retained data.
+    // the results volume v1 created stays owned by the old UID. Pi may
+    // anticipate this from retained release files or correct host feedback.
     host.trees = {
       [A]: tree("v1"),
       [B]: tree("v2").map((item) =>
