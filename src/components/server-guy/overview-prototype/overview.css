@@ -1,6 +1,7 @@
 /* PROTOTYPE · claude/architecture-directions · throwaway.
-   Overview in the Journeys language. Prefix: axo-. The header and Server
-   Guy's report come from the Journeys styles. */
+   The Overview page around its top section: what needs you, the map in
+   miniature, recent work and ideas. Prefix: axo-. Each direction's top
+   section has its own file. */
 
 .axo {
   position: relative;
@@ -10,20 +11,6 @@
 }
 .axo .axj3-head {
   margin-bottom: 2px;
-}
-
-/* ---------- The report leads, a little larger here ---------- */
-
-.axo .axj3-report {
-  margin-top: 0;
-}
-.axo .axj3-report-head {
-  grid-template-columns: 112px minmax(0, 1fr) auto;
-}
-.axo .axj3-report .axj2-mascot {
-  width: 112px;
-  height: 112px;
-  margin-bottom: -17px;
 }
 
 /* ---------- What needs you: only what is real, and unmistakable ---------- */
@@ -98,9 +85,8 @@
   }
 }
 
-/* ---------- Ideas, three ways ---------- */
+/* ---------- Ideas: one quiet line, at the foot of the page ---------- */
 
-/* Quiet: one line, at the foot of the page. */
 .axo-quiet-wrap {
   display: grid;
   gap: 10px;
@@ -182,264 +168,6 @@
 .axo-idea .ax-textlink {
   justify-self: start;
   margin-top: 2px;
-}
-
-/* Little Server suggests: one idea at a time, in its own words. */
-.axo-suggest {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  margin: -4px 18px 18px 144px;
-  padding: 12px 12px 12px 16px;
-  border: 1px solid #d7e2f7;
-  border-radius: 14px;
-  background: #f5f8ff;
-  animation: axo-pop 560ms var(--ax-spring) both;
-  transform-origin: left center;
-}
-.axo-suggest::before {
-  content: "";
-  position: absolute;
-  left: -7px;
-  top: 18px;
-  width: 12px;
-  height: 12px;
-  background: #f5f8ff;
-  border-left: 1px solid #d7e2f7;
-  border-bottom: 1px solid #d7e2f7;
-  transform: rotate(45deg);
-}
-.axo-suggest small {
-  display: block;
-  font-size: 12px;
-  color: var(--ax-muted);
-}
-.axo-suggest b {
-  display: block;
-  margin-top: 1px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ax-ink);
-}
-.axo-suggest p {
-  margin: 2px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--ax-ink-2);
-}
-.axo-suggest-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.axo-later {
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--ax-muted);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.axo-later:hover {
-  color: var(--ax-ink-2);
-  background: #e9eef8;
-}
-.axo-suggest.is-leaving {
-  animation: axo-leave 320ms var(--ax-ease-out) forwards;
-}
-.axo-snoozed {
-  margin: -8px 18px 16px 144px;
-  font-size: 12.5px;
-  color: var(--ax-muted);
-  animation: axo-rise 380ms var(--ax-ease-out) both;
-}
-@keyframes axo-pop {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.97);
-  }
-}
-@keyframes axo-leave {
-  to {
-    opacity: 0;
-    transform: translateX(14px);
-  }
-}
-
-/* Two lanes: what needs you, and what could be better. */
-.axo-lanes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: start;
-  gap: 12px;
-}
-.axo-lane {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid var(--ax-line);
-  border-radius: 18px;
-  background: #ffffff;
-}
-.axo-lane.is-calm {
-  border-style: dashed;
-  background: #fbfcfe;
-}
-.axo-lane h2 {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ax-ink);
-}
-.axo-lane h2 small {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ax-muted);
-}
-.axo-lane .axo-needs {
-  margin: 0;
-}
-.axo-lane .axo-idea {
-  border-style: solid;
-  border-color: var(--ax-line);
-  background: #ffffff;
-}
-.axo-lane-empty {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 12px;
-  background: var(--ax-verified-bg);
-  color: var(--ax-verified-text);
-  font-size: 13.5px;
-  font-weight: 560;
-}
-.axo-lane-empty svg {
-  width: 17px;
-  height: 17px;
-}
-
-/* ---------- Vital signs: what people check, each opening its details ---------- */
-
-.axo-vitals {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-.axo-vital-wrap {
-  position: relative;
-}
-.axo-vital {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  width: 100%;
-  min-height: 136px;
-  padding: 15px 16px 14px;
-  border: 1px solid var(--ax-line);
-  border-radius: 16px;
-  background: #ffffff;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
-  animation: axo-rise 480ms var(--ax-ease-out) both;
-  animation-delay: calc(var(--i, 0) * 60ms);
-  transition:
-    transform 320ms var(--ax-spring),
-    box-shadow var(--ax-base),
-    border-color var(--ax-base);
-}
-.axo-vital:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 1px 2px rgb(23 34 56 / 5%),
-    0 18px 36px -26px rgb(23 34 56 / 38%);
-}
-.axo-vital.is-open {
-  border-color: var(--ax-blue);
-}
-.axo-vital-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ax-muted);
-}
-.axo-vital-label svg {
-  width: 16px;
-  height: 16px;
-}
-.axo-vital-value {
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--ax-ink);
-  font-variant-numeric: tabular-nums;
-}
-.axo-vital-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 560;
-  color: var(--ax-muted);
-}
-.axo-vital-status i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.axo-vital-status[data-c="verified"] {
-  color: var(--ax-verified-text);
-}
-.axo-vital-status[data-c="stale"] {
-  color: var(--ax-waiting-text);
-}
-.axo-vital-status[data-c="failed"] {
-  color: var(--ax-failed);
-}
-.axo-vital-lines {
-  display: grid;
-  gap: 2px;
-  margin-top: 2px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--ax-ink-2);
-}
-.axo-vital-lines b {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.axo-pop {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 0;
-  z-index: 12;
-  width: 340px;
-}
-.axo-pop.is-end {
-  left: auto;
-  right: 0;
-}
-.axo-pop .axj2-pop {
-  position: relative;
-  left: auto;
-  top: auto;
-  transform: none;
 }
 
 /* ---------- The map in miniature, and recent work ---------- */
@@ -659,9 +387,6 @@
   .axo-need,
   .axo-need-icon,
   .axo-idea,
-  .axo-suggest,
-  .axo-snoozed,
-  .axo-vital,
   .axo-map-card.is-checking rect {
     animation: none !important;
   }
@@ -669,9 +394,6 @@
 :root[data-ax-motion="reduced"] .axo-need,
 :root[data-ax-motion="reduced"] .axo-need-icon,
 :root[data-ax-motion="reduced"] .axo-idea,
-:root[data-ax-motion="reduced"] .axo-suggest,
-:root[data-ax-motion="reduced"] .axo-snoozed,
-:root[data-ax-motion="reduced"] .axo-vital,
 :root[data-ax-motion="reduced"] .axo-map-card.is-checking rect {
   animation: none !important;
 }
@@ -733,4 +455,15 @@
     animation: none;
     opacity: 0.35;
   }
+}
+
+/* Little Server, placed by each direction rather than pinned to a corner. */
+.axo-mascot.axj2-mascot {
+  position: relative;
+  left: auto;
+  top: auto;
+}
+.axo-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }

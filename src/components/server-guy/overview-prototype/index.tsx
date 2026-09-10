@@ -3,8 +3,9 @@
 // PROTOTYPE · claude/architecture-directions · throwaway.
 // Overview in the Journeys language, on the real route and inside the real
 // shell, switchable with ?variant= and the prototype bar (← → keys). The
-// same live record and scenarios as Architecture. The variants differ only
-// in how ideas are offered, so you never feel there is always work to do.
+// same live record and scenarios as Architecture. The variants are three
+// ways to say how it is doing at the top of the page: in time, in Little
+// Server's words, or as its console. The page around them stays the same.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -29,9 +30,9 @@ import { OverviewDirection, type OverviewVariant } from "./overview";
 import "../architecture-prototype/prototype.css";
 
 const variants: VariantEntry[] = [
-  { key: "A", id: "quiet", name: "Quiet" },
-  { key: "B", id: "suggests", name: "Little Server suggests" },
-  { key: "C", id: "lanes", name: "Two lanes" },
+  { key: "A", id: "timeline", name: "Timeline" },
+  { key: "B", id: "note", name: "Little Server's note" },
+  { key: "C", id: "console", name: "Console" },
   { key: "0", id: "current", name: "Current overview" },
 ];
 
@@ -71,7 +72,7 @@ export function OverviewPrototype({
   current: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
-  const [variantId, setVariantId] = useState("quiet");
+  const [variantId, setVariantId] = useState("timeline");
   const [scenario, setScenario] = useState<ScenarioId>("live");
   const [reduced, setReduced] = useState(false);
   const [now, setNow] = useState(0);

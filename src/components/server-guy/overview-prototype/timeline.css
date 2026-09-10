@@ -1,0 +1,552 @@
+/* PROTOTYPE · claude/architecture-directions · throwaway.
+   Direction A, Timeline. Prefix: axt-. */
+
+.axt {
+  position: relative;
+  padding: 26px 28px 18px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axt.is-live {
+  border-color: var(--ax-working-line);
+  box-shadow:
+    0 0 0 4px rgb(40 90 216 / 6%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+
+/* ---------- What it says ---------- */
+
+.axt-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+}
+.axt-say {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+  animation: axj2-fade 520ms var(--ax-ease-out);
+}
+.axt-sub {
+  margin: 8px 0 0;
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.axt-check {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  padding-top: 2px;
+}
+.axt-check small {
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--ax-waiting-text);
+}
+.axt-needs {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ---------- Time ---------- */
+
+.axt-time {
+  --head: 214px;
+  position: relative;
+  margin-top: 8px;
+  padding-top: 88px;
+}
+.axt-field {
+  position: absolute;
+  left: var(--head);
+  right: 0;
+  top: 0;
+  bottom: 30px;
+  pointer-events: none;
+}
+.axt-grid {
+  position: absolute;
+  top: 60px;
+  bottom: 0;
+  width: 1px;
+  background: #f1f3f7;
+}
+.axt-grid.is-midnight {
+  top: 26px;
+  background: #e3e8ef;
+}
+.axt-day {
+  position: absolute;
+  top: 28px;
+  padding-left: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ax-ink-2);
+  white-space: nowrap;
+}
+.axt-future {
+  position: absolute;
+  left: var(--now);
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(90deg, rgb(40 90 216 / 5%), rgb(40 90 216 / 1.5%));
+}
+.axt-now {
+  position: absolute;
+  left: var(--now);
+  top: 84px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--ax-blue), rgb(40 90 216 / 30%));
+}
+.axt-over {
+  position: absolute;
+  left: var(--head);
+  right: 0;
+  top: 0;
+  height: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.axt-stand {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+/* The lane whose details are open sits above the others. */
+.axt-lane:has(.axt-pop) {
+  z-index: 30;
+}
+.axt-mascot.axo-mascot {
+  width: 84px;
+  height: 84px;
+}
+.axt-mascot .axj2-bubble {
+  left: auto;
+  right: 88%;
+  top: 6px;
+  max-width: 300px;
+  border-radius: 12px 12px 4px 12px;
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+}
+
+/* ---------- Lanes ---------- */
+
+.axt-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--head) minmax(0, 1fr);
+  align-items: center;
+  height: 56px;
+  border-radius: 14px;
+  transition: background-color var(--ax-base);
+}
+.axt-lane.is-pointed {
+  background: linear-gradient(90deg, rgb(166 49 43 / 5%), transparent 80%);
+}
+.axt-lane-head {
+  position: relative;
+  z-index: 5;
+}
+.axt-lane-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ax-base);
+}
+.axt-lane-name:hover,
+.axt-lane-name[aria-expanded="true"] {
+  background: #f4f6fa;
+}
+.axt-lane-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #f4f6fa, #e8ecf3);
+  color: var(--ax-ink-2);
+  box-shadow: inset 0 0 0 1px rgb(23 34 56 / 7%);
+}
+.axt-lane-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.axt-lane-text {
+  display: grid;
+  min-width: 0;
+}
+.axt-lane-text b {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.axt-lane-text small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ax-muted);
+}
+.axt-lane-text small i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aab4c4;
+}
+.axt-lane[data-c="verified"] small {
+  color: var(--ax-verified-text);
+}
+.axt-lane[data-c="verified"] small i {
+  background: var(--ax-verified);
+}
+.axt-lane[data-c="stale"] small {
+  color: var(--ax-waiting-text);
+}
+.axt-lane[data-c="stale"] small i {
+  background: var(--ax-amber);
+}
+.axt-lane[data-c="failed"] small {
+  color: var(--ax-failed);
+}
+.axt-lane[data-c="failed"] small i {
+  background: var(--ax-failed);
+}
+.axt-lane:is([data-c="planned"], [data-c="unknown"], [data-c="absent"]) small i {
+  background: transparent;
+  border: 1.5px dashed #9aa6ba;
+}
+
+.axt-track {
+  position: relative;
+  height: 100%;
+}
+.axt-track::before,
+.axt-track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  height: 0;
+  border-top: 1.5px solid #dfe5ee;
+}
+.axt-track::before {
+  left: 0;
+  width: var(--now);
+}
+.axt-track::after {
+  left: var(--now);
+  right: 0;
+  border-top-style: dashed;
+  border-top-color: #cfd8e6;
+}
+.axt.is-planned .axt-track::before {
+  border-top-style: dashed;
+}
+
+/* The stretch since anything looked: honest about the wait. */
+.axt-gap {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 5px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(178 90 22 / 22%) 0 4px,
+    rgb(178 90 22 / 6%) 4px 8px
+  );
+  transform-origin: left center;
+  animation: axt-grow 900ms var(--ax-ease-out) 300ms both;
+}
+.axt-gap[data-c="unknown"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(104 113 131 / 18%) 0 4px,
+    rgb(104 113 131 / 5%) 4px 8px
+  );
+}
+.axt-gap span {
+  padding: 1px 9px;
+  border: 1px solid var(--ax-waiting-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.5;
+  color: var(--ax-waiting-text);
+  white-space: nowrap;
+}
+.axt-gap[data-c="unknown"] span {
+  border-color: var(--ax-line-2);
+  color: var(--ax-muted);
+}
+@keyframes axt-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+.axt-empty {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--now) + 14px);
+  transform: translateY(-50%);
+  padding: 0 8px;
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--ax-faint);
+}
+
+/* Moments: one dot each, a number when several came together. */
+.axt-ev {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #8b95a5;
+  box-shadow: 0 0 0 3px #ffffff;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  animation: axt-ev-in 520ms var(--ax-spring) both;
+  transition:
+    transform 260ms var(--ax-spring),
+    box-shadow 260ms;
+}
+.axt-ev b {
+  position: absolute;
+  left: 13px;
+  top: -11px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--ax-line-2);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 15px;
+  color: var(--ax-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.axt-ev:hover,
+.axt-ev.is-open {
+  transform: translate(-50%, -50%) scale(1.25);
+}
+.axt-ev.is-open {
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 6px rgb(40 90 216 / 22%);
+}
+.axt-ev[data-tone="pass"] {
+  background: var(--ax-verified);
+}
+.axt-ev[data-tone="fail"] {
+  background: var(--ax-failed);
+}
+.axt-ev[data-tone="fail"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid var(--ax-failed);
+  animation: axt-ping 1.8s ease-out infinite;
+}
+.axt-ev[data-tone="planned"] {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px #ffffff,
+    inset 0 0 0 2px #9aa6ba;
+}
+.axt-ev[data-tone="checking"] {
+  background: var(--ax-blue);
+  animation: axj2-breathe 900ms ease-in-out infinite;
+}
+@keyframes axt-ev-in {
+  from {
+    transform: translate(-50%, -50%) scale(0);
+  }
+}
+@keyframes axt-ping {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+.axt-next {
+  position: absolute;
+  top: calc(50% + 12px);
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  font-weight: 560;
+  color: var(--ax-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- The hour line ---------- */
+
+.axt-axis {
+  display: grid;
+  grid-template-columns: var(--head) minmax(0, 1fr);
+  height: 30px;
+}
+.axt-ticks {
+  grid-column: 2;
+  position: relative;
+}
+.axt-ticks span {
+  position: absolute;
+  top: 9px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--ax-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.axt-ticks .axt-now-label {
+  font-weight: 650;
+  color: var(--ax-blue);
+}
+
+/* ---------- Details ---------- */
+
+.axt-pop {
+  position: absolute;
+  top: calc(50% + 16px);
+  z-index: 20;
+  width: 380px;
+  transform: translateX(-50%);
+}
+.axt-pop[data-align="end"] {
+  transform: translateX(calc(-100% + 30px));
+}
+.axt-pop[data-align="start"] {
+  transform: translateX(-30px);
+}
+.axt-pop.is-lane {
+  top: calc(100% + 2px);
+  left: 0;
+  width: 340px;
+  transform: none;
+}
+.axt-pop .axj2-pop {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+.axt-console {
+  display: grid;
+  gap: 1px;
+  margin-top: 12px;
+  padding: 8px 6px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+  color: #d9e1f2;
+}
+.axt-console-line {
+  display: grid;
+  grid-template-columns: 42px 14px minmax(0, 1fr);
+  gap: 0 4px;
+  align-items: baseline;
+  padding: 2px 6px;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.axt-console-line time {
+  color: #56627a;
+  font-variant-numeric: tabular-nums;
+}
+.axt-console-line b {
+  text-align: center;
+  color: #7d8aa5;
+}
+.axt-console-line[data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axt-console-line[data-tone="pass"] span {
+  color: #b9e8d0;
+}
+.axt-console-line[data-tone="fail"] b,
+.axt-console-line[data-tone="fail"] span {
+  color: #ef8d86;
+}
+.axt-console-line[data-tone="work"] b,
+.axt-console-line[data-tone="work"] span {
+  color: #9fb4f5;
+}
+.axt-console-line span {
+  overflow-wrap: anywhere;
+}
+.axt-console-line em {
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-style: normal;
+  color: #f4c98f;
+  background: rgb(244 201 143 / 12%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axt-gap,
+  .axt-ev,
+  .axt-ev::after {
+    animation: none !important;
+  }
+}
+:root[data-ax-motion="reduced"] .axt-gap,
+:root[data-ax-motion="reduced"] .axt-ev,
+:root[data-ax-motion="reduced"] .axt-ev::after {
+  animation: none !important;
+}

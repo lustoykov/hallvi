@@ -53,5 +53,30 @@ Journeys (A) is the reference for every page designed from now on:
   part (verified, out of date, failed, planned, not set up), and what is
   missing drawn as a ghost where it would go.
 
-Open: whether Server Guy's report (Little Server, the verdict and the console)
-belongs on Architecture or on Overview.
+Settled: Server Guy's report (Little Server, the verdict and the console)
+belongs on Overview; Architecture keeps the map.
+
+## Overview (`overview-prototype/`)
+
+Open `/applications/<id>?variant=A#overview`; the same bar, keys and record
+scenarios as Architecture.
+
+This round asks what the top of Overview should be: how it is doing, and
+whether anything needs you. The owner found the first version "scrambled
+together" (a report, a console strip and four cards repeating each other).
+Each direction below replaces all three with one composition; the header, the
+map in miniature, recent work and one quiet line of ideas stay the same.
+
+| Key | Name | Structure | Signature interaction |
+| --- | --- | --- | --- |
+| A | Timeline | The last day and a half and the next half day as four lanes (checks, backups, server, access); the stretch since anything looked is drawn and named | Little Server stands at now; a re-check lands on the lanes as it happens and closes the gap; each moment opens its recorded lines |
+| B | Little Server's note | A short note in Little Server's words; every fact is a highlighted phrase in the certainty's colour | Phrases open their evidence in place; the countdown ticks inside the sentence; the console folds under the signature |
+| C | Console | Server Guy's console as the centrepiece; the vital signs are its status lines, the recorded work runs underneath | Rows open in place; a re-check streams into the log while the rows turn from checking to verified |
+
+What needs you is only ever real, and each direction shows it first. The map
+in miniature pings a failing part, lights the part you point at anywhere on
+the page, and opens Architecture with that part's details already open.
+
+Earlier round, parked at commit a64b165: how ideas are offered (Quiet, Little
+Server suggests, Two lanes). The owner wants ideas optional and calm, so every
+direction keeps the quiet line.

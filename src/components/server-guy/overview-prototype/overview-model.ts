@@ -100,7 +100,7 @@ function money(value: number, currency: string) {
 }
 
 /** The next scheduled copy: the host's own answer, or the policy's time. */
-function nextCopy(record: LiveRecord, now: number) {
+export function nextCopy(record: LiveRecord, now: number) {
   const protection = record.facts.protection;
   const recorded = protection?.observation?.nextAt;
   if (recorded && Date.parse(recorded) > now) return recorded;

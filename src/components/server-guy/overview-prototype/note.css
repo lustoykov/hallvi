@@ -1,0 +1,281 @@
+/* PROTOTYPE · claude/architecture-directions · throwaway.
+   Direction B, Little Server's note. Prefix: axn-. */
+
+.axn {
+  position: relative;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: 30px;
+  padding: 34px 40px 26px 26px;
+  border: 1px solid var(--ax-line);
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 90% at 0% 0%, #f3f6fc 0%, rgb(243 246 252 / 0%) 55%),
+    #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axn.is-live {
+  border-color: var(--ax-working-line);
+}
+
+/* Little Server, large enough to be the one writing. */
+.axn-author {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+}
+.axn-mascot.axo-mascot {
+  width: 184px;
+  height: 184px;
+  margin-top: -14px;
+}
+.axn-mascot .axj2-bubble {
+  left: 72%;
+  top: -6px;
+}
+
+/* ---------- The note ---------- */
+
+.axn-words {
+  position: relative;
+  min-width: 0;
+}
+.axn-say {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+  animation: axn-write 620ms var(--ax-ease-out) both;
+}
+.axn-needs {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+.axn-body p {
+  margin: 14px 0 0;
+  max-width: 60ch;
+  font-size: 19px;
+  line-height: 1.62;
+  letter-spacing: -0.008em;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+  animation: axn-write 720ms var(--ax-ease-out) both;
+  animation-delay: calc(140ms + var(--i, 0) * 120ms);
+}
+@keyframes axn-write {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateY(4px);
+  }
+}
+
+/* Phrases that open their evidence, marked like a highlighter would.
+   Spans, not buttons, so a phrase wraps like the words around it. */
+.axn-tok {
+  --hl: rgb(104 113 131 / 14%);
+  display: inline;
+  margin: 0 -2px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: linear-gradient(transparent 58%, var(--hl) 58%);
+  color: var(--ax-ink);
+  font: inherit;
+  font-weight: 560;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition:
+    background-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axn-tok[data-c="verified"] {
+  --hl: rgb(20 148 95 / 17%);
+}
+.axn-tok[data-c="stale"] {
+  --hl: rgb(178 90 22 / 19%);
+}
+.axn-tok[data-c="failed"] {
+  --hl: rgb(166 49 43 / 17%);
+}
+.axn-tok:hover,
+.axn-tok[aria-expanded="true"] {
+  background-color: var(--hl);
+}
+.axn-tok[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--hl);
+}
+.axn-count {
+  font-weight: 600;
+  color: var(--ax-ink);
+  font-variant-numeric: tabular-nums;
+}
+.axn-pop {
+  position: absolute;
+  z-index: 20;
+  width: 340px;
+}
+.axn-pop .axj2-pop {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+
+/* ---------- What you can do ---------- */
+
+.axn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 24px;
+}
+.axn-sim {
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--ax-waiting-text);
+}
+.axn-ask {
+  margin-left: auto;
+}
+
+/* ---------- The signature, and the console under it ---------- */
+
+.axn-sign {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px dashed #dbe1ea;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axn-sign > span {
+  font-style: italic;
+}
+.axn-log-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-right: -8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ax-ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axn-log-toggle:hover {
+  background: #f1f4f8;
+}
+.axn-log-toggle svg {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axn-log-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.axn-log {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 420ms var(--ax-ease-out);
+}
+.axn-log.is-open {
+  grid-template-rows: 1fr;
+}
+.axn-log > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.axn-log-lines {
+  display: grid;
+  margin-top: 10px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+  color: #d9e1f2;
+}
+.axn-log-line {
+  display: grid;
+  grid-template-columns: 48px 16px minmax(0, 1fr);
+  gap: 0 6px;
+  align-items: baseline;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  animation: axj2-line-in 420ms var(--ax-ease-out);
+}
+.axn-log-line.is-newest {
+  background: #222c42;
+}
+.axn-log-line time {
+  color: #56627a;
+  font-variant-numeric: tabular-nums;
+}
+.axn-log-line b {
+  text-align: center;
+  color: #7d8aa5;
+}
+.axn-log-line span {
+  overflow-wrap: anywhere;
+}
+.axn-log-line[data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axn-log-line[data-tone="pass"] span {
+  color: #b9e8d0;
+}
+.axn-log-line[data-tone="fail"] b,
+.axn-log-line[data-tone="fail"] span {
+  color: #ef8d86;
+}
+.axn-log-line[data-tone="work"] b,
+.axn-log-line[data-tone="work"] span {
+  color: #9fb4f5;
+}
+.axn-log-line em {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-style: normal;
+  color: #f4c98f;
+  background: rgb(244 201 143 / 12%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axn-say,
+  .axn-body p,
+  .axn-log,
+  .axn-log-line {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+:root[data-ax-motion="reduced"] .axn-say,
+:root[data-ax-motion="reduced"] .axn-body p,
+:root[data-ax-motion="reduced"] .axn-log,
+:root[data-ax-motion="reduced"] .axn-log-line {
+  animation: none !important;
+  transition: none !important;
+}
