@@ -58,25 +58,42 @@ belongs on Overview; Architecture keeps the map.
 
 ## Overview (`overview-prototype/`)
 
-Open `/applications/<id>?variant=A#overview`; the same bar, keys and record
-scenarios as Architecture.
+Open `/applications/<id>?variant=A#overview`; the bar (or the ← → keys)
+switches A and 0 (the shipped Overview), with the same record scenarios as
+Architecture.
 
-This round asks what the top of Overview should be: how it is doing, and
-whether anything needs you. The owner found the first version "scrambled
-together" (a report, a console strip and four cards repeating each other).
-Each direction below replaces all three with one composition; the header, the
-map in miniature, recent work and one quiet line of ideas stay the same.
+The top of Overview says how it is doing, and whether anything needs you.
+The owner found the first version "scrambled together" (a report, a console
+strip and four cards repeating each other), so a round compared three
+compositions that each replace all of it: a Timeline, Little Server's note and
+a Console.
+
+**Decided (10 Sep 2026): the Timeline.** In the owner's words, "let's use the
+A Timeline now". The note's log had already moved under the timeline at the
+owner's request, so the best of the note stays. Little Server's note and the
+Console are retired; they are in git history at 943c37a, where the three
+directions arrived, and b82106b, where the Timeline took the note's log. The
+header, the map in miniature, recent work and one quiet line of ideas stay as
+they were.
 
 | Key | Name | Structure | Signature interaction |
 | --- | --- | --- | --- |
-| A | Timeline | The last day and a half and the next half day as four lanes (checks, backups, server, access); the stretch since anything looked is drawn and named; Little Server's log folds underneath (B's terminal, at the owner's request) | Little Server stands at now; a re-check lands on the lanes and streams into the log; point at a log line and its moment lights up, point at a moment and its lines do |
-| B | Little Server's note | A short note in Little Server's words; every fact is a highlighted phrase in the certainty's colour | Phrases open their evidence in place; the countdown ticks inside the sentence; the console folds under the signature |
-| C | Console | Server Guy's console as the centrepiece; the vital signs are its status lines, the recorded work runs underneath | Rows open in place; a re-check streams into the log while the rows turn from checking to verified |
+| A | Timeline | The last day and a half and the next half day as four lanes (checks, backups, server, access); the stretch since anything looked is drawn and named; Little Server's log sits underneath, open from the start | Little Server stands at now; a re-check lands on the lanes and streams into the log; point at a log line and its moment lights up, point at a moment and its lines do |
 
-What needs you is only ever real, and each direction shows it first. The map
-in miniature pings a failing part, lights the part you point at anywhere on
-the page, and opens Architecture with that part's details already open.
+The log's label, "What I did last", reads like an agent at work (the owner
+asked for Claude Code's spinner and the ultracode shimmer). At rest it is a
+quiet slate star. While a check runs, the star steps through its rays, a
+cool light crosses the words and the seconds count. After a pass, or with
+news since your last visit, it answers once. Little Server points at it
+rarely: once to introduce the log, then at most weekly and only for news;
+never during a check or when something needs you, and with reduced motion he
+only says it. To review it, `&looked=never` replays the introduction and
+`&looked=20h` pretends you were away for 20 hours.
+
+What needs you is only ever real, and the Timeline shows it first. The map in
+miniature pings a failing part, lights the part you point at anywhere on the
+page, and opens Architecture with that part's details already open.
 
 Earlier round, parked at commit a64b165: how ideas are offered (Quiet, Little
-Server suggests, Two lanes). The owner wants ideas optional and calm, so every
-direction keeps the quiet line.
+Server suggests, Two lanes). The owner wants ideas optional and calm, so the
+page keeps the quiet line.

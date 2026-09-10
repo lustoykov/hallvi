@@ -3,9 +3,10 @@
 // PROTOTYPE · claude/architecture-directions · throwaway.
 // Overview in the Journeys language, on the real route and inside the real
 // shell, switchable with ?variant= and the prototype bar (← → keys). The
-// same live record and scenarios as Architecture. The variants are three
-// ways to say how it is doing at the top of the page: in time, in Little
-// Server's words, or as its console. The page around them stays the same.
+// same live record and scenarios as Architecture. The owner chose the
+// Timeline for the top of the page on 10 Sep 2026; the other directions
+// (Little Server's note, Console) live in git history at commit b82106b.
+// Variant 0 keeps the shipped Overview for comparison.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -19,20 +20,18 @@ import { recentOperations, unresolved } from "../operation-model";
 import type { PageChrome, PageContext } from "../architecture-prototype";
 import { useLiveRecord } from "../architecture-prototype/live-record";
 import { buildModel, type ScenarioId } from "../architecture-prototype/model";
-import { setMotionPreview } from "../architecture-prototype/motion";
+import { setMotionPreview, useReducedMotion } from "../architecture-prototype/motion";
 import {
   PrototypeBar,
   scenarios,
   type VariantEntry,
 } from "../architecture-prototype/prototype-bar";
 import { useRecheck } from "../architecture-prototype/use-recheck";
-import { OverviewDirection, type OverviewVariant } from "./overview";
+import { OverviewDirection } from "./overview";
 import "../architecture-prototype/prototype.css";
 
 const variants: VariantEntry[] = [
   { key: "A", id: "timeline", name: "Timeline" },
-  { key: "B", id: "note", name: "Little Server's note" },
-  { key: "C", id: "console", name: "Console" },
   { key: "0", id: "current", name: "Current overview" },
 ];
 
@@ -74,7 +73,9 @@ export function OverviewPrototype({
   const [ready, setReady] = useState(false);
   const [variantId, setVariantId] = useState("timeline");
   const [scenario, setScenario] = useState<ScenarioId>("live");
+  // The bar's preview button; the page follows it and the OS setting both.
   const [reduced, setReduced] = useState(false);
+  const motionReduced = useReducedMotion();
   const [now, setNow] = useState(0);
 
   useEffect(() => {
@@ -195,14 +196,13 @@ export function OverviewPrototype({
           current
         ) : (
           <OverviewDirection
-            variant={variant.id as OverviewVariant}
             model={model}
             record={live.record}
             recheck={recheck}
             page={page}
             operations={operations}
             chats={chats}
-            reduced={reduced}
+            reduced={motionReduced}
             onOpenConversation={onOpenConversation}
             onOpenDestination={onOpenDestination}
             onAsk={onAsk}

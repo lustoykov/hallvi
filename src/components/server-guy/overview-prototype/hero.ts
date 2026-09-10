@@ -1,6 +1,6 @@
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// What each Overview direction's top section receives. The page around it
-// (header, the map in miniature, recent work, ideas) stays the same.
+// What the top of Overview, the Timeline, receives from the page around it
+// (header, the map in miniature, recent work, ideas).
 
 import type { ApplicationSection } from "../application-sections";
 import type { PageContext } from "../architecture-prototype";

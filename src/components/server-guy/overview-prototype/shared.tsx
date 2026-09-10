@@ -1,9 +1,9 @@
 "use client";
 
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// Pieces the three Overview directions share: the countdown to the next
-// copy, what needs you, an idea, a recent-work chip, a vital sign's details,
-// and plain words for when something happened.
+// Pieces the Overview page shares: the countdown to the next copy, what
+// needs you, an idea, a recent-work chip, a vital sign's details, and plain
+// words for when something happened.
 
 import {
   ArrowRight,

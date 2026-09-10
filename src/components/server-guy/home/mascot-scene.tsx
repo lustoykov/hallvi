@@ -11,6 +11,7 @@ export type MascotMood =
   | "dancing"
   | "celebrating"
   | "waving"
+  | "pointing"
   | "resting";
 export type MascotDance =
   "shuffle" | "robot" | "floss" | "backflip" | "cartwheel";
@@ -249,6 +250,9 @@ export function MascotScene({
       wrist.add(palm, thumb);
       return { shoulder, elbow, wrist };
     });
+    // A finger stub turns a held-out mitten into a point.
+    const finger = mesh(0.085, 0.2, 0.085, 0.04, 0xedf3ff, 0, -0.2, 0.02);
+    arms[1].wrist.add(finger);
     const clipboard = new THREE.Group();
     arms[0].wrist.add(clipboard);
     clipboard.position.set(-0.06, 0.17, 0.16);
@@ -339,7 +343,8 @@ export function MascotScene({
       previousGesture = state.current.gesture,
       moodStart = performance.now(),
       previousDanceRequest = 0,
-      danceStart = -Infinity;
+      danceStart = -Infinity,
+      reach = 0;
     const render = (t: number) => {
       frame = requestAnimationFrame(render);
       if (document.hidden || !visible) return;
@@ -402,13 +407,26 @@ export function MascotScene({
         current === "celebrating" || current === "waving" || dancing;
       const celebrate = current === "celebrating";
       const waving = current === "waving";
+      const pointing = current === "pointing";
+      // One eased value carries the whole pose in and out, so the caller's
+      // timer decides the hold.
+      reach = still
+        ? pointing
+          ? 1
+          : 0
+        : THREE.MathUtils.lerp(reach, pointing ? 1 : 0, 0.14);
+      // Out first, then one tap down toward what he means; held after it lands.
+      const tap =
+        pointing && !still ? THREE.MathUtils.smoothstep(elapsed, 560, 820) : 1;
       const animatedGreeting = !still && elapsed < 2600;
       const blink = !still && t % 5700 > 5500;
+      // A point turns him toward what he means, below and to his right.
       body.rotation.y = still
         ? 0
         : THREE.MathUtils.lerp(
             body.rotation.y,
-            pointerX * 0.16 +
+            pointerX * 0.16 * (1 - reach) +
+              reach * 0.28 +
               (checking ? -0.08 : Math.sin(t * 0.00055) * 0.025),
             0.06,
           );
@@ -428,6 +446,11 @@ export function MascotScene({
           : checking
             ? 0.06
             : pointerY * 0.06;
+      // He looks down and leans in toward what he points at.
+      if (!still) {
+        body.rotation.x += reach * 0.09;
+        body.rotation.z -= reach * 0.05;
+      }
       body.position.y =
         celebrate && animatedGreeting
           ? Math.abs(Math.sin(elapsed * 0.007)) * 0.16 * (1 - elapsed / 2600)
@@ -488,23 +511,26 @@ export function MascotScene({
               : checking && i === 0
                 ? 0.7
                 : 1;
-        eye.position.x = (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0);
+        // When he points he glances down toward it, brows raised and level.
+        eye.position.x =
+          (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0) + reach * 0.06;
+        eye.position.y = faceY - reach * 0.04;
         eye.rotation.z = attention ? (i === 0 ? -0.12 : 0.12) : 0;
         (eye.material as THREE.MeshStandardMaterial).color.set(
           attention ? 0xf0c37b : 0xedf3ff,
         );
         happyEyes[i].visible = happy;
-        brows[i].visible = checking || attention;
+        brows[i].visible = checking || attention || reach > 0.3;
+        brows[i].position.y = faceY + 0.19 + reach * 0.035;
         brows[i].rotation.z = attention
           ? i === 0
             ? -0.22
             : 0.22
-          : i === 0
-            ? 0.15
-            : -0.08;
+          : (i === 0 ? 0.15 : -0.08) * (1 - reach);
       });
       clipboard.visible = checking;
       wrench.visible = working;
+      finger.visible = reach > 0.05;
       antennas.forEach((antenna, i) => {
         const side = i === 0 ? -1 : 1;
         let outward = resting ? 0.62 : attention ? 0.02 : 0.12;
@@ -519,7 +545,9 @@ export function MascotScene({
             outward += Math.sin(t * 0.0021 + i * 1.7) * 0.035;
           if (working) lean += Math.sin(t * 0.007) * 0.06;
         }
-        const tilt = -side * outward;
+        // When he points, both lean forward and toward what he means.
+        lean += reach * 0.15;
+        const tilt = -side * outward - reach * 0.22;
         antenna.rotation.z = still
           ? tilt
           : THREE.MathUtils.lerp(antenna.rotation.z, tilt, 0.15);
@@ -584,9 +612,24 @@ export function MascotScene({
           }
         }
         if (attention && i === 0) angle = -0.7;
-        arm.shoulder.rotation.z = still
-          ? angle
-          : THREE.MathUtils.lerp(arm.shoulder.rotation.z, angle, 0.12);
+        // The right arm reaches out, then taps down toward the log below
+        // him, set directly so the tap lands at 820 ms, with the label.
+        const reaching = i === 1 && reach > 0.001;
+        if (reaching) {
+          angle = THREE.MathUtils.lerp(
+            angle,
+            THREE.MathUtils.lerp(1.15, 0.7, tap),
+            reach,
+          );
+          elbow = THREE.MathUtils.lerp(elbow, 0, reach);
+          arm.shoulder.rotation.x =
+            THREE.MathUtils.lerp(-0.4, -0.85, tap) * reach;
+          arm.wrist.rotation.z = THREE.MathUtils.lerp(0.1, 0.2, tap) * reach;
+        }
+        arm.shoulder.rotation.z =
+          still || reaching
+            ? angle
+            : THREE.MathUtils.lerp(arm.shoulder.rotation.z, angle, 0.12);
         arm.elbow.rotation.x = checking && i === 0 ? -0.25 : elbow;
       });
       // Rotate around the character's center, with a clean takeoff and landing.

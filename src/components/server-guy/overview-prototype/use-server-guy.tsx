@@ -1,9 +1,8 @@
 "use client";
 
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// Little Server's behaviour on Overview, shared by the three directions: what
-// it says, how it feels, and the simulated re-check it streams. Each
-// direction stages it its own way.
+// Little Server's behaviour on Overview: what he says, how he feels, when he
+// points, and the simulated re-check he streams. The Timeline stages him.
 
 import dynamic from "next/dynamic";
 import {
@@ -57,6 +56,8 @@ export interface ServerGuy {
   gesture: number;
   bubble: string | null;
   greet: () => void;
+  /** Points at something beside him, with a line to say why. */
+  point: (text?: string) => void;
   /** Recorded work, then the lines of a simulated re-check. */
   lines: LogLine[];
   live: LogLine[];
@@ -95,6 +96,29 @@ export function useServerGuy(
     },
     [later],
   );
+
+  // A rare invitation: the arm is the arrow, the bubble says why, and both
+  // stay up for three seconds, long enough to read. With reduced motion he
+  // only says it. A check starting in the meantime takes the stage.
+  const pointRun = useRef(0);
+  const point = useCallback(
+    (text?: string) => {
+      const run = ++pointRun.current;
+      if (text)
+        later(() => {
+          if (pointRun.current === run) say(text, 2700);
+        }, 300);
+      if (reducedMotion()) return;
+      setMood("pointing");
+      setGesture((value) => value + 1);
+      later(() => setMood((current) => (current === "pointing" ? null : current)), 3000);
+    },
+    [later, say],
+  );
+  const lowerPoint = useCallback(() => {
+    pointRun.current += 1;
+    setMood((current) => (current === "pointing" ? null : current));
+  }, []);
 
   // A change of record, said once.
   const lastCondition = useRef(model.condition.certainty);
@@ -232,12 +256,17 @@ export function useServerGuy(
       );
       later(() => setMood(null), 2600);
     },
+    point,
     lines,
     live,
     running,
     simulating: recheck.phase !== "idle",
     reduced,
-    run: () => recheck.run(order, 1100),
+    run: () => {
+      // A check starting lowers a point still in the air.
+      lowerPoint();
+      recheck.run(order, 1100);
+    },
   };
   return [guy, mascot];
 }

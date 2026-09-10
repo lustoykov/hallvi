@@ -1,10 +1,9 @@
 "use client";
 
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// Overview in the Journeys language. This round's question is the top of
-// the page, how it is doing: three directions (Timeline, Little Server's
-// note, Console) under the same header, above the same map in miniature,
-// recent work, and one quiet line of ideas.
+// Overview in the Journeys language. The top of the page, how it is doing,
+// is the Timeline the owner chose on 10 Sep 2026; under it sit the map in
+// miniature, recent work, and one quiet line of ideas.
 
 import {
   ArrowRight,
@@ -26,26 +25,15 @@ import type {
   LiveRecord,
 } from "../architecture-prototype/model";
 import type { Recheck } from "../architecture-prototype/use-recheck";
-import { ConsoleHero } from "./console";
-import type { HeroProps } from "./hero";
 import { MiniMap } from "./mini-map";
-import { NoteHero } from "./note";
 import { buildOverview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";
 import { TimelineHero } from "./timeline";
 import "./overview.css";
 
-export type OverviewVariant = "timeline" | "note" | "console";
-
-const heroes = {
-  timeline: TimelineHero,
-  note: NoteHero,
-  console: ConsoleHero,
-} as const;
 const counts = ["No", "One", "Two", "Three", "Four"];
 
 export function OverviewDirection({
-  variant,
   model,
   record,
   recheck,
@@ -57,7 +45,6 @@ export function OverviewDirection({
   onOpenDestination,
   onAsk,
 }: {
-  variant: OverviewVariant;
   model: ArchitectureModel;
   record: LiveRecord;
   recheck: Recheck;
@@ -76,6 +63,8 @@ export function OverviewDirection({
   const [pointed, setPointed] = useState<string | null>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const planned = model.status !== "live";
+  // The "3 days later" scenario runs three days ahead of the clock.
+  const offset = model.scenario === "later" ? 3 * 86_400_000 : 0;
 
   // Architecture opens with a part's details open when there is one in mind.
   const openArchitecture = useCallback(
@@ -89,24 +78,8 @@ export function OverviewDirection({
     [onOpenDestination],
   );
 
-  const Hero = heroes[variant];
-  const hero: HeroProps = {
-    model,
-    record,
-    overview,
-    recheck,
-    page,
-    // The "3 days later" scenario runs three days ahead of the clock.
-    offset: model.scenario === "later" ? 3 * 86_400_000 : 0,
-    pointed,
-    onPoint: setPointed,
-    onShow: openArchitecture,
-    onAsk,
-    onOpenDestination,
-  };
-
   return (
-    <section className="axo" data-hero={variant} aria-label="Overview">
+    <section className="axo" aria-label="Overview">
       <header className="axj3-head">
         {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">
@@ -127,7 +100,19 @@ export function OverviewDirection({
         </div>
       </header>
 
-      <Hero {...hero} />
+      <TimelineHero
+        model={model}
+        record={record}
+        overview={overview}
+        recheck={recheck}
+        page={page}
+        offset={offset}
+        pointed={pointed}
+        onPoint={setPointed}
+        onShow={openArchitecture}
+        onAsk={onAsk}
+        onOpenDestination={onOpenDestination}
+      />
 
       <div className="axo-lower">
         <MiniMap model={model} reduced={reduced} highlight={pointed} onOpen={openArchitecture} />

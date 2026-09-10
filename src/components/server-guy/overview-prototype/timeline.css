@@ -141,6 +141,12 @@
 .axt-mascot.axo-mascot {
   width: 84px;
   height: 84px;
+  transform-origin: 50% 88%;
+  transition: transform 520ms var(--ax-spring);
+}
+/* He leans in to point, so the moment reads at this size. */
+.axt-mascot.axo-mascot.is-pointing {
+  transform: scale(1.12);
 }
 .axt-mascot .axj2-bubble {
   left: auto;
@@ -150,6 +156,16 @@
   border-radius: 12px 12px 4px 12px;
   font-family: var(--ax-mono);
   font-size: 11.5px;
+}
+/* While he points, his words sit on the way to the log, below and to his
+   right, in his own voice rather than the log's. */
+.axt-mascot.is-pointing .axj2-bubble {
+  left: 64%;
+  right: auto;
+  top: 78%;
+  border-radius: 4px 12px 12px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
 }
 
 /* ---------- Lanes ---------- */
@@ -551,13 +567,13 @@
   font-size: 12.5px;
   color: var(--ax-muted);
 }
-.axt-sign > span {
+.axt-sign-by {
   font-style: italic;
 }
 .axt-log-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   margin-right: -8px;
   padding: 4px 8px;
   border: 0;
@@ -572,13 +588,222 @@
 .axt-log-toggle:hover {
   background: #f1f4f8;
 }
-.axt-log-toggle svg {
+.axt-log-caret {
   width: 12px;
   height: 12px;
   transition: transform var(--ax-base) var(--ax-ease-out);
 }
-.axt-log-toggle[aria-expanded="true"] svg {
+.axt-log-toggle[aria-expanded="true"] .axt-log-caret {
   transform: rotate(180deg);
+}
+
+/* The label talks like an agent at work. Its star is the burst's sparkle:
+   four points at rest, stepping through its rays while a check runs, a red
+   dot when the newest thing failed, a dashed ring before anything ran. */
+.axt-spark {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  overflow: visible;
+  color: var(--ax-blue);
+  transition: color 400ms var(--ax-ease-out);
+}
+/* At rest the star is quiet slate; it turns blue for work, news, a hover,
+   and while the label answers. */
+.axt-sign[data-state="rest"] .axt-spark {
+  color: var(--ax-faint);
+}
+.axt-sign[data-state="rest"] .axt-log-toggle:is(:hover, :focus-visible, :has(.axt-shine[data-shine])) .axt-spark {
+  color: var(--ax-blue);
+}
+.axt-spark :is(path, circle) {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 240ms var(--ax-ease-out);
+}
+.axt-spark-a {
+  fill: currentColor;
+  transform: scale(0.8);
+}
+.axt-spark-b {
+  fill: #7d9cf2;
+  transform: rotate(45deg) scale(0);
+}
+.axt-spark-dot {
+  fill: var(--ax-failed);
+  transform: scale(0);
+}
+.axt-spark-ring {
+  display: none;
+  fill: none;
+  stroke: #9aa6ba;
+  stroke-width: 1.1;
+  stroke-dasharray: 1.9 1.5;
+}
+.axt-spark.is-fail .axt-spark-a {
+  transform: scale(0);
+}
+.axt-spark.is-fail .axt-spark-dot {
+  transform: scale(1);
+}
+.axt-spark.is-ghost :is(.axt-spark-a, .axt-spark-b, .axt-spark-dot) {
+  display: none;
+}
+.axt-spark.is-ghost .axt-spark-ring {
+  display: inline;
+}
+.axt-log-toggle:is(:hover, :focus-visible) .axt-spark.is-star .axt-spark-b {
+  transform: rotate(45deg) scale(0.45);
+  transition-duration: 200ms;
+}
+/* Held still, the working star is drawn whole. */
+.axt-sign[data-state="running"] .axt-spark-a {
+  transform: scale(0.9);
+}
+.axt-sign[data-state="running"] .axt-spark-b {
+  transform: rotate(45deg) scale(0.8);
+}
+.axt-shine {
+  --axt-shine-base: var(--ax-ink-2);
+  --axt-shine-1: #0b7fa6;
+  --axt-shine-2: var(--ax-blue);
+  --axt-shine-3: #6a4fd8;
+  color: var(--axt-shine-base);
+}
+/* While a check runs the light is the full cool spectrum over working blue. */
+.axt-sign[data-state="running"] .axt-shine {
+  --axt-shine-base: var(--ax-working-text);
+}
+.axt-log-meta {
+  /* Pulled in, so the dot sits centred between the words and the fact. */
+  margin-left: -3px;
+  color: var(--ax-muted);
+  font-weight: 500;
+}
+.axt-sign[data-state="running"] .axt-log-meta {
+  /* Monospace spaces are wide enough on their own. */
+  margin-left: 0;
+  font: 500 11.5px var(--ax-mono);
+  font-variant-numeric: tabular-nums;
+}
+.axt-sign[data-state="new"] .axt-log-meta {
+  color: var(--ax-working-text);
+  font-weight: 620;
+}
+.axt-sign[data-state="passed"] .axt-log-meta {
+  color: var(--ax-verified-text);
+}
+.axt-sign[data-state="failed"] .axt-log-meta {
+  color: var(--ax-failed);
+}
+.axt-tag {
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ax-waiting-text);
+  background: var(--ax-waiting-bg);
+  box-shadow: inset 0 0 0 1px var(--ax-waiting-line);
+}
+.axt-log-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ax-muted);
+}
+/* Light only where motion is welcome; clipped text would vanish in forced colours. */
+@media (prefers-reduced-motion: no-preference) and (forced-colors: none) {
+  :root:not([data-ax-motion="reduced"]) .axt-sign[data-state="running"] .axt-shine,
+  :root:not([data-ax-motion="reduced"]) .axt-shine[data-shine] {
+    background: linear-gradient(
+        100deg,
+        var(--axt-shine-base) 0 40%,
+        var(--axt-shine-1) 45%,
+        var(--axt-shine-2) 50%,
+        var(--axt-shine-3) 55%,
+        var(--axt-shine-base) 60% 100%
+      )
+      100% 0 / 260% 100% no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  :root:not([data-ax-motion="reduced"]) .axt-sign[data-state="running"] .axt-shine {
+    animation: axt-shine 1600ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  :root:not([data-ax-motion="reduced"]) .axt-sign[data-state="running"] .axt-spark-a {
+    animation: axt-step-a 1600ms steps(1, end) infinite;
+  }
+  :root:not([data-ax-motion="reduced"]) .axt-sign[data-state="running"] .axt-spark-b {
+    animation: axt-step-b 1600ms steps(1, end) infinite;
+  }
+}
+/* The light crosses the words in the first 1120 ms, then waits off-text. */
+@keyframes axt-shine {
+  0% {
+    background-position: 100% 0;
+  }
+  70%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+/* Eight 200 ms frames: a dot, a small four-point star, a hint of
+   diagonals, six rays, all eight, and back. Claude Code's spinner, drawn
+   with the burst's own star. */
+@keyframes axt-step-a {
+  0% {
+    transform: scale(0.35);
+  }
+  12.5% {
+    transform: scale(0.7);
+  }
+  25% {
+    transform: scale(0.9);
+  }
+  37.5%,
+  62.5% {
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(0.9);
+  }
+  87.5% {
+    transform: scale(0.7);
+  }
+  100% {
+    transform: scale(0.35);
+  }
+}
+@keyframes axt-step-b {
+  0%,
+  12.5% {
+    transform: rotate(45deg) scale(0);
+  }
+  25% {
+    transform: rotate(45deg) scale(0.35);
+  }
+  37.5% {
+    transform: rotate(45deg) scale(0.65);
+  }
+  50% {
+    transform: rotate(45deg) scale(0.9);
+  }
+  62.5% {
+    transform: rotate(45deg) scale(0.65);
+  }
+  75% {
+    transform: rotate(45deg) scale(0.35);
+  }
+  87.5%,
+  100% {
+    transform: rotate(45deg) scale(0);
+  }
 }
 .axt-log {
   display: grid;
@@ -607,6 +832,23 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #56627a;
+}
+/* Where your last look ends: everything under it landed while you were away. */
+.axt-log-new {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 3px 78px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9fb4f5;
+}
+.axt-log-new i {
+  height: 1px;
+  background: linear-gradient(90deg, rgb(159 180 245 / 60%), transparent 70%);
+  transform-origin: left center;
 }
 .axt-log-line {
   display: grid;
@@ -671,7 +913,8 @@
   margin-left: 6px;
   vertical-align: -2px;
   background: #9fb4f5;
-  animation: axj2-caret 1s steps(1) infinite;
+  /* Steady: the label above carries the rhythm while a check runs. */
+  animation: none;
 }
 /* A line pointed at in the log lights its moment on the lanes. */
 .axt-ev.is-lit {
@@ -684,7 +927,6 @@
 @media (prefers-reduced-motion: reduce) {
   .axt-log,
   .axt-log-line,
-  .axt-caret,
   .axt-gap,
   .axt-ev,
   .axt-ev::after {
@@ -693,7 +935,6 @@
 }
 :root[data-ax-motion="reduced"] .axt-log,
 :root[data-ax-motion="reduced"] .axt-log-line,
-:root[data-ax-motion="reduced"] .axt-caret,
 :root[data-ax-motion="reduced"] .axt-gap,
 :root[data-ax-motion="reduced"] .axt-ev,
 :root[data-ax-motion="reduced"] .axt-ev::after {
