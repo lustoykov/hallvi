@@ -1,4 +1,14 @@
 import type { DeploymentPlan } from "../../../src/server/deployment-types";
+import { sourceBuilds } from "../../../src/server/deployment-layout";
+
+/** How the retired initial executor started a legacy stack on its host. */
+export function legacyStartCommand(plan: DeploymentPlan, compose: string) {
+  const builds = sourceBuilds(plan).map((build) => build.name);
+  return builds.length
+    ? `${compose} build ${builds.join(" ")} && ${compose} up -d --no-build --wait --wait-timeout 120`
+    : `${compose} up -d --wait --wait-timeout 120`;
+}
+
 export function legacyPlans(): DeploymentPlan[] {
   const base: DeploymentPlan = {
     summary: "A legacy HTTP deployment plan",

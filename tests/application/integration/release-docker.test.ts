@@ -135,12 +135,9 @@ vi.mock("node:child_process", async (original) => {
     },
   };
 });
-import {
-  composeDefinition,
-  composeStartCommand,
-} from "../../../src/server/deployment-compose";
+import { composeDefinition } from "../../../src/server/deployment-compose";
+import { legacyStartCommand } from "../../fixtures/queue-worker/legacy-plans";
 import { reconcileRelease } from "../../../src/server/release-reconciliation";
-import type { StoredOperation } from "../../../src/server/operation-types";
 import { inspectRelease } from "../../../src/server/release-diagnostics";
 import { executeRelease } from "../../../src/server/release-executor";
 import {
@@ -334,7 +331,7 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
         "sh",
         [
           "-c",
-          composeStartCommand(
+          legacyStartCommand(
             plan,
             `docker compose -p ${project} -f compose.json`,
           ),
@@ -475,13 +472,7 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
       expect(record.lifecycle!.runtime.state).toBe("unknown");
       const reconciled = await reconcileRelease(
         record,
-        {
-          id: "fixture-release",
-          command: {
-            type: "release-deployment",
-            scope: { id: "fixture-scope" },
-          },
-        } as StoredOperation,
+        { id: "fixture-scope", operationId: "fixture-release" },
         signal,
       );
       expect(reconciled).toMatchObject({ ok: true, completed: true });

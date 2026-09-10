@@ -14,6 +14,11 @@ export interface ReleaseScope {
   repositoryId: number;
   revision: string;
   baselineReleaseId: string;
+  /**
+   * An approved first deployment: its baseline is the approved release, not
+   * yet established on the new host.
+   */
+  initial?: true;
   maxAttempts: 3;
   rollback?: {
     releaseId: string;
@@ -98,9 +103,11 @@ export function assertReleaseScope(
     throw new ReleaseScopeError(
       "The application, source or host changed. Review a new release scope.",
     );
-  // Retries under this authorization may replace their own observed runtime.
+  // Retries under this authorization may replace their own observed runtime;
+  // a first deployment starts from none.
   const established = establishedRuntime(record.lifecycle.runtime);
   if (
+    !(scope.initial && !established) &&
     established?.releaseId !== scope.baselineReleaseId &&
     !record.lifecycle.attempts.some(
       (attempt) =>

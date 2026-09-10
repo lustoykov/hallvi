@@ -156,6 +156,8 @@ export function POST(request: Request, context: Context) {
             acceptedAt: new Date().toISOString(),
             connectionId,
             maxMonthly: input.maxMonthly,
+            // The approval binds this exact release, price and inputs.
+            releaseId: record.releaseId,
           };
           const tracked = syncDeploymentOperation(record);
           const started = startChange(tracked.id, tracked.updatedAt);

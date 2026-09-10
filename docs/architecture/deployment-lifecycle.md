@@ -35,7 +35,7 @@ Deployment-worker recovery interrupts its unfinished attempt. Generic operation-
 
 ## Scope and next work
 
-The original lifecycle slice records attempts for initial deployment/retries and recreation on an existing Hetzner host. The follow-up [scoped release executor](agent-releases.md) adds subsequent revisions and Pi-directed configuration correction on that host. Rollback, BYOM adoption, host sharing, rolling/zero-downtime replacement, migration orchestration, secret-value versioning and a plugin runtime remain unimplemented. Release identity still does not guarantee reproducible source builds.
+The original lifecycle slice records attempts for initial deployment/retries and recreation on an existing Hetzner host. The follow-up [scoped release executor](agent-releases.md) adds subsequent revisions and Pi-directed configuration correction on that host. First deployments now run through the same executor: each host execution is its own attempt under the approved recommendation. Rollback, BYOM adoption, host sharing, rolling/zero-downtime replacement, migration orchestration, secret-value versioning and a plugin runtime remain unimplemented. Release identity still does not guarantee reproducible source builds.
 
 The subsequent-release executor targets another release without replacing earlier release/attempt evidence. Authorization binds the host, selected revision and permitted effects; corrected configurations receive distinct release snapshots under that scope. If a change fails after remote effects, it must reconcile what runs; it cannot label the old release as serving solely because that release passed yesterday.
 

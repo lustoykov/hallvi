@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
-import type { StoredOperation } from "./operation-types";
 import { deploymentLock, deploymentSsh } from "./deployment-ssh";
 import {
   saveDeployment,
@@ -22,18 +21,20 @@ const receiptSchema = z.strictObject({
   exitCode: z.number().int().min(0).max(255),
 });
 
-/** Append reconciliation evidence without rewriting completed attempts. */
+/**
+ * Append reconciliation evidence without rewriting completed attempts. The
+ * authorization is a release scope or an approved first deployment.
+ */
 export async function reconcileRelease(
   record: DeploymentRecord,
-  operation: StoredOperation,
+  authorization: { id: string; operationId: string },
   signal: AbortSignal,
 ) {
-  if (operation.command?.type !== "release-deployment")
-    throw new Error("Expected a release scope.");
-  const scope = operation.command.scope;
   const prior = record
     .lifecycle!.attempts.filter(
-      (a) => a.kind === "release" && a.authorizationId === scope.id,
+      (a) =>
+        (a.kind === "release" || a.kind === "deploy") &&
+        a.authorizationId === authorization.id,
     )
     .at(-1);
   if (!prior?.remoteStartedAt)
@@ -109,10 +110,10 @@ export async function reconcileRelease(
     const result = await runDeploymentAttempt(
       record,
       "reconcile",
-      operation.id,
+      authorization.operationId,
       async () => {
         const active = record.lifecycle!.attempts.at(-1)!;
-        active.authorizationId = scope.id;
+        active.authorizationId = authorization.id;
         active.reconcilesAttemptId = prior.id;
         recordOperationRemoteEffect();
         invalidateDeploymentRuntime(record);

@@ -1,4 +1,3 @@
-import { serviceImage } from "./deployment-layout";
 import { z } from "zod";
 import {
   imageReferenceSchema,
@@ -71,219 +70,55 @@ export function checkIssues(healthPath: string, checks: PrimaryCheck[]) {
   }
   return issues;
 }
-export const deploymentPlanSchema = z
-  .strictObject({
-    image: imageReferenceSchema.optional(),
-    volumes: z.array(volumeMountSchema).max(8).optional(),
-    configs: z.array(configMountSchema).max(8).optional(),
-    services: z.array(composeServiceSchema).max(5).optional(),
-    dependencies: z.array(dependencySchema).max(30).optional(),
-    inputBindings: z.array(inputBindingSchema).max(60).optional(),
-    healthCommand: z
-      .array(z.string().min(1).max(500))
-      .min(1)
-      .max(20)
-      .optional(),
-    httpAccess: z.enum(["public", "controller"]).optional(),
-    summary: z.string().min(20).max(1500),
-    dockerfile: path,
-    // Only deployment packaging may be generated; never patch application code.
-    generatedDockerfile: z.string().max(12000).nullable(),
-    context: path,
-    port: z.number().int().min(1024).max(65535),
-    command: z.array(z.string().min(1).max(500)).max(20).nullable(),
-    environment: z
-      .array(
-        z.strictObject({
-          name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-          value: z.string().max(1000),
-        }),
-      )
-      .max(30),
-    postgres: z
-      .strictObject({
-        version: z.enum(["16", "17", "18"]),
-        variable: z
-          .string()
-          .regex(/^[A-Z_][A-Z0-9_]*$/)
-          .nullable(),
-        scheme: z.enum(["postgresql", "postgresql+psycopg", "postgres"]),
-      })
-      .nullable(),
-    missingInputs: z
-      .array(
-        z.strictObject({
-          name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-          reason: z.string().min(1).max(400),
-        }),
-      )
-      .max(20),
-    healthPath: httpPathSchema,
-    checks: z.array(primaryCheckSchema).min(1).max(8),
-  })
-  .superRefine((plan, ctx) => {
-    const fail = (message: string) => ctx.addIssue({ code: "custom", message });
-    for (const issue of checkIssues(plan.healthPath, plan.checks)) fail(issue);
-    if (plan.image && plan.generatedDockerfile)
-      fail("Choose an image or a Dockerfile build, not both.");
-    const names = new Set([
-      "app",
-      ...(plan.postgres ? ["postgres"] : []),
-      ...(plan.services ?? []).map((s) => s.name),
-    ]);
-    const healthNames = new Set([
-      ...(plan.postgres ? ["postgres"] : []),
-      ...(plan.healthCommand ? ["app"] : []),
-      ...(plan.services ?? [])
-        .filter((s) => s.healthCommand)
-        .map((s) => s.name),
-    ]);
-    for (const service of plan.services ?? []) {
-      if (
-        [service.image, service.imageFrom, service.build].filter(Boolean)
-          .length !== 1
-      )
-        fail(
-          "Each service needs exactly one image, imageFrom reference or source build.",
-        );
-      try {
-        serviceImage(plan, "revision", "deployment", service.name);
-      } catch (error) {
-        fail((error as Error).message);
-      }
-      if (service.imageFrom && !service.command?.length)
-        fail("A service sharing the app image needs its own command.");
-      if (service.checks.length && !(service.port && service.healthPath))
-        fail("Private HTTP checks need a port and health path.");
-      if (
-        (service.role === "worker" || service.role === "broker") &&
-        !service.healthCommand &&
-        !(service.port && service.healthPath)
-      )
-        fail("Workers and brokers need an explicit readiness check.");
-    }
-    const edges = [
-      ...(plan.dependencies ?? []),
-      ...(plan.postgres
-        ? [{ service: "app", needs: "postgres", condition: "healthy" }]
-        : []),
-    ];
-    const uniqueEdges = new Set<string>();
-    for (const edge of plan.dependencies ?? []) {
-      if (!names.has(edge.service) || !names.has(edge.needs))
-        fail("Dependency refers to an unknown service.");
-      if (edge.service === "postgres")
-        fail("The managed database cannot depend on an application service.");
-      const key = `${edge.service}:${edge.needs}`;
-      if (uniqueEdges.has(key) || (plan.postgres && key === "app:postgres"))
-        fail("Dependency is already declared.");
-      uniqueEdges.add(key);
-      if (edge.condition === "healthy" && !healthNames.has(edge.needs))
-        fail("Healthy dependencies require a container readiness command.");
-    }
-    const visiting = new Set<string>(),
-      visited = new Set<string>();
-    const visit = (name: string): boolean => {
-      if (visiting.has(name)) return false;
-      if (visited.has(name)) return true;
-      visiting.add(name);
-      if (edges.filter((e) => e.service === name).some((e) => !visit(e.needs)))
-        return false;
-      visiting.delete(name);
-      visited.add(name);
-      return true;
-    };
-    if ([...names].some((name) => !visit(name)))
-      fail("Service dependencies must not contain a cycle.");
-    if (plan.inputBindings) {
-      const inputs = new Set(plan.missingInputs.map((i) => i.name));
-      const bound = new Set<string>();
-      for (const binding of plan.inputBindings) {
-        if (!names.has(binding.service) || binding.service === "postgres")
-          fail("Input binding refers to an unsupported service.");
-        if (Boolean(binding.input) === Boolean(binding.connection))
-          fail("Bind either a private input or a managed connection.");
-        if (binding.input && !inputs.has(binding.input))
-          fail("Input binding refers to an undeclared private input.");
-        if (binding.field && !binding.connection)
-          fail("A connection field requires a managed connection binding.");
-        if (binding.connection && !plan.postgres)
-          fail("The managed PostgreSQL connection is not configured.");
-        const key = `${binding.service}:${binding.variable}`;
-        if (bound.has(key))
-          fail("Each service variable may be bound only once.");
-        bound.add(key);
-        const environment =
-          binding.service === "app"
-            ? plan.environment
-            : plan.services?.find((s) => s.name === binding.service)
-                ?.environment;
-        if (
-          environment?.some((e) => e.name === binding.variable) ||
-          (binding.service === "app" &&
-            binding.variable === plan.postgres?.variable)
-        )
-          fail("Input binding conflicts with an existing variable.");
-      }
-      if (
-        [...inputs].some(
-          (input) => !plan.inputBindings!.some((b) => b.input === input),
-        )
-      )
-        fail("Every private input needs a service binding.");
-    }
-    const services = [
-      { name: "app", volumes: plan.volumes ?? [], configs: plan.configs ?? [] },
-      ...(plan.services ?? []),
-    ];
-    if (new Set(services.map((s) => s.name)).size !== services.length)
-      fail("Service names must be unique.");
-    const volumes = new Map<
-      string,
-      { kind: string; sqlite: string | null; capture?: string }
-    >();
-    for (const service of services) {
-      const targets = [...service.volumes, ...service.configs].map(
-        (m) => m.target,
-      );
-      if (new Set(targets).size !== targets.length)
-        fail("Mount targets must be unique per service.");
-      if (
-        new Set(service.configs.map((c) => c.name)).size !==
-        service.configs.length
-      )
-        fail("Configuration names must be unique per service.");
-      for (const volume of service.volumes) {
-        if (plan.postgres && volume.name === "database")
-          fail(
-            "The managed database volume cannot be mounted by another service.",
-          );
-        const relativeSqlite =
-          volume.sqlite?.slice(volume.target.replace(/\/$/, "").length) ?? null;
-        const prior = volumes.get(volume.name);
-        if (
-          prior &&
-          (prior.kind !== volume.kind ||
-            prior.sqlite !== relativeSqlite ||
-            prior.capture !== volume.capture)
-        )
-          fail(
-            "Shared volume mounts must describe the same data kind, capture method and relative SQLite path.",
-          );
-        volumes.set(volume.name, {
-          kind: volume.kind,
-          sqlite: relativeSqlite,
-          capture: volume.capture,
-        });
-        if (
-          volume.sqlite &&
-          (!volume.sqlite.startsWith(volume.target.replace(/\/$/, "") + "/") ||
-            volume.sqlite.includes(".."))
-        )
-          fail("SQLite must be inside its persistent volume.");
-      }
-    }
-  });
+/**
+ * Legacy plans, read for historical releases and rollback. New deployments
+ * are native Compose; plans were validated when they were authored.
+ */
+export const deploymentPlanSchema = z.strictObject({
+  image: imageReferenceSchema.optional(),
+  volumes: z.array(volumeMountSchema).max(8).optional(),
+  configs: z.array(configMountSchema).max(8).optional(),
+  services: z.array(composeServiceSchema).max(5).optional(),
+  dependencies: z.array(dependencySchema).max(30).optional(),
+  inputBindings: z.array(inputBindingSchema).max(60).optional(),
+  healthCommand: z.array(z.string().min(1).max(500)).min(1).max(20).optional(),
+  httpAccess: z.enum(["public", "controller"]).optional(),
+  summary: z.string().min(20).max(1500),
+  dockerfile: path,
+  // Only deployment packaging may be generated; never patch application code.
+  generatedDockerfile: z.string().max(12000).nullable(),
+  context: path,
+  port: z.number().int().min(1024).max(65535),
+  command: z.array(z.string().min(1).max(500)).max(20).nullable(),
+  environment: z
+    .array(
+      z.strictObject({
+        name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+        value: z.string().max(1000),
+      }),
+    )
+    .max(30),
+  postgres: z
+    .strictObject({
+      version: z.enum(["16", "17", "18"]),
+      variable: z
+        .string()
+        .regex(/^[A-Z_][A-Z0-9_]*$/)
+        .nullable(),
+      scheme: z.enum(["postgresql", "postgresql+psycopg", "postgres"]),
+    })
+    .nullable(),
+  missingInputs: z
+    .array(
+      z.strictObject({
+        name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+        reason: z.string().min(1).max(400),
+      }),
+    )
+    .max(20),
+  healthPath: httpPathSchema,
+  checks: z.array(primaryCheckSchema).min(1).max(8),
+});
 export type DeploymentPlan = z.infer<typeof deploymentPlanSchema>;
 export interface HostOffer {
   serverType: string;
@@ -334,6 +169,8 @@ export interface DeploymentRecord {
     acceptedAt: string;
     connectionId: string;
     maxMonthly: number;
+    /** The approved release; corrections under it keep its effects. */
+    releaseId?: string;
   } | null;
   serverId: number | null;
   serverCreateAttempted: boolean;

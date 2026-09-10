@@ -48,7 +48,7 @@ Start with **Product → Roadmap → Architecture**.
 
 A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/2026-09-08-real-deployment-acceptance.md), followed by [hardening](docs/testing/2026-09-08-deployment-hardening.md). Fable's [conversation-first integration](docs/design/2026-09-09-conversation-first-integration.md) uses the real deployment record and conversations.
 
-The executor is still narrower than the target: one source-built HTTP app plus optional PostgreSQL. Generic Compose/image intake, additional services, backups, ongoing monitoring and routine releases need implementation. Historical results do not prove the current branch is ready to merge or that the deployed host is still online.
+The executor is still narrower than the target: first deployments and releases run Pi-authored native Compose on one Hetzner host, HTTP only, verified by a behavior criterion over public HTTP. Applications without a public endpoint, BYOM, ongoing monitoring and broad compatibility evidence need implementation. Historical results do not prove the current branch is ready to merge or that the deployed host is still online.
 
 ## Run
 

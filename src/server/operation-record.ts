@@ -206,8 +206,8 @@ export function deploymentOperation(
       return {
         ...base,
         state: "verified",
-        summary: `${record.plan?.image ? `Accepted image with configuration revision ${revision(record)}` : `Revision ${revision(record)}`} was verified at ${record.url ?? record.address ?? "the host"}.`,
-        evidence: `Verified ${record.verifiedAt ? new Date(record.verifiedAt).toISOString() : "at deployment"} · ${record.httpSourceIp ? "controller-restricted" : "public"} HTTP checks passed${record.plan ? `: ${record.plan.checks.map((check) => check.name).join(", ")}` : ""}.`,
+        summary: `${facts && !facts.services.some((service) => service.build) ? `Accepted images with configuration revision ${revision(record)}` : `Revision ${revision(record)}`} was verified at ${record.url ?? record.address ?? "the host"}.`,
+        evidence: `Verified ${record.verifiedAt ? new Date(record.verifiedAt).toISOString() : "at deployment"} · ${record.httpSourceIp ? "controller-restricted" : "public"} HTTP checks passed${facts?.criterion ? `: ${facts.criterion.checks.map((check) => check.name).join(", ")}` : ""}.`,
       };
     case "failed":
       return {

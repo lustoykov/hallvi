@@ -207,7 +207,7 @@ Use a compact matrix, not a combinatorial test suite:
 
 Reuse existing Docker/operation tests and add only coverage for these new boundaries. Handle tests locally; delegate to Opus only when the owner explicitly requests it. Local Docker remains useful but cannot substitute for the final remote/Pi proof. No implementation or test changes are part of this design-only task.
 
-**Implementation status (10 September 2026):** releases now execute Pi-selected native Compose through the managed path, with observed-versus-verified baselines; initial intake remains the legacy plan and the private check path is not built. Evidence and limits: [execution plan](../plans/native-compose-execution.md).
+**Implementation status (10 September 2026):** releases execute Pi-selected native Compose through the managed path, with observed-versus-verified baselines. First deployments use the same native selection and execution loop after the priced approval ([intake plan](../plans/native-compose-intake.md)). The private check path is not built. Evidence and limits: [execution plan](../plans/native-compose-execution.md).
 
 ## Review questions (addressed in Fable review 3; retain for the proof)
 

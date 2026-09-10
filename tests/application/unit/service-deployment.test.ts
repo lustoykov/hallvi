@@ -1,8 +1,5 @@
 import { expect, it } from "vitest";
-import {
-  composeDefinition,
-  composeStartCommand,
-} from "../../../src/server/deployment-compose";
+import { composeDefinition } from "../../../src/server/deployment-compose";
 import {
   deploymentPlanSchema,
   type DeploymentRecord,
@@ -36,9 +33,6 @@ it("builds web and worker once, keeps the queue private, and escapes credentials
   expect(compose.services.queue).toHaveProperty("volumes", [
     "queue-data:/data",
   ]);
-  expect(composeStartCommand(plan, "compose")).toBe(
-    "compose build app && compose up -d --no-build --wait --wait-timeout 120",
-  );
 });
 
 it("only delivers an input to its named consumers and rejects missing input values", () => {
@@ -129,71 +123,6 @@ it("supplies each consumer only the managed PostgreSQL field it binds", () => {
     "random-password",
   );
   expect(JSON.stringify(plan)).not.toContain("random-password");
-});
-
-it.each([
-  [
-    "cycle",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      p.dependencies!.push({
-        service: "queue",
-        needs: "worker",
-        condition: "started",
-      }),
-  ],
-  [
-    "unknown dependency",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.dependencies![0].needs = "missing"),
-  ],
-  [
-    "no readiness",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      delete p.services![1].healthCommand,
-  ],
-  [
-    "ambiguous image",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.services![0].image = "example/worker:1"),
-  ],
-  [
-    "missing image",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      delete p.services![0].imageFrom,
-  ],
-  [
-    "unknown secret",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.inputBindings![0].input = "MISSING"),
-  ],
-  [
-    "connection field on a private input",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.inputBindings![0].field = "password"),
-  ],
-  [
-    "shadowed variable",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.inputBindings![0].variable = "QUEUE_HOST"),
-  ],
-  [
-    "duplicate binding",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      p.inputBindings!.push(p.inputBindings![0]),
-  ],
-  [
-    "unbound input",
-    (p: ReturnType<typeof queuePlan>): unknown => (p.inputBindings = []),
-  ],
-  [
-    "mutating retry",
-    (p: ReturnType<typeof queuePlan>): unknown =>
-      (p.checks[1].waitSeconds = 10),
-  ],
-] as const)("rejects %s before execution", (_name, change) => {
-  const plan = queuePlan();
-  change(plan);
-  expect(deploymentPlanSchema.safeParse(plan).success).toBe(false);
 });
 
 it("separates release identity from the host and attempt outcome, while detecting changed configuration", () => {

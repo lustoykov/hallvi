@@ -168,6 +168,7 @@ export function nativeBundle(
   source: TreeFile[],
   values: Record<string, string>,
   retainedVolumes: string[],
+  newManagedDatabase: boolean,
   rollbackImages?: Record<string, string>,
 ) {
   const native = release.native!;
@@ -175,6 +176,11 @@ export function nativeBundle(
   const builds = rollbackImages
     ? []
     : facts.services.filter((s) => s.build).map((s) => s.name);
+  // An existing managed database keeps its image; a new one is pulled once.
+  const pulls = facts.services.filter(
+    (s) =>
+      s.pinned || (newManagedDatabase && s.name === facts.database?.service),
+  );
   const artifacts = native.files.map((file) => ({
     path: file.path,
     mode: file.mode,
@@ -189,9 +195,7 @@ export function nativeBundle(
   const execution: ReleaseExecution = {
     projectDirectory: "bundle",
     builds,
-    pulls: rollbackImages
-      ? []
-      : facts.services.filter((s) => s.pinned).map((s) => s.name),
+    pulls: rollbackImages ? [] : pulls.map((s) => s.name),
     activate: runtimeArtifacts(native).map((path) => ({
       from: `bundle/${path}`,
       to: path,
@@ -279,18 +283,23 @@ export async function executeRelease(
   rollbackImages?: Record<string, string>,
 ) {
   const attempt = record.lifecycle?.attempts.at(-1);
-  if (attempt?.kind !== "release" || attempt.outcome !== "working")
+  if (
+    (attempt?.kind !== "release" && attempt?.kind !== "deploy") ||
+    attempt.outcome !== "working"
+  )
     throw new Error("A recorded release attempt is required.");
   const secrets = releaseSecrets(record);
-  // The data and database of the runtime this release replaces.
+  // The data and database of the runtime this release replaces. A first
+  // deployment replaces none: nothing is retained and its database is new.
   const lifecycle = record.lifecycle!;
   const priorRelease = lifecycle.releases.find(
     (r) => r.id === establishedRuntime(lifecycle.runtime)?.releaseId,
   );
-  const prior = priorRelease
-    ? releaseFacts(priorRelease, record.id)
-    : currentFacts(record);
+  const prior = priorRelease ? releaseFacts(priorRelease, record.id) : null;
   const retainedVolumes = prior?.volumes.map((v) => v.dockerName) ?? [];
+  const newManagedDatabase = Boolean(
+    releaseFacts(release, record.id).database && !prior?.database,
+  );
   const { files: bundle, execution } = release.native
     ? nativeBundle(
         release,
@@ -298,6 +307,7 @@ export async function executeRelease(
         files,
         secrets.values,
         retainedVolumes,
+        newManagedDatabase,
         rollbackImages,
       )
     : {
@@ -313,7 +323,7 @@ export async function executeRelease(
         execution: legacyExecution(
           release.plan,
           retainedVolumes,
-          Boolean(release.plan.postgres && !prior?.database),
+          newManagedDatabase,
           rollbackImages,
         ),
       };
