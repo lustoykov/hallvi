@@ -4,23 +4,42 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pushTestDatabase } from "../../test-database";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
-const model = vi.hoisted(() => ({
-  plan: vi.fn(),
-  execute: vi.fn(),
-  verify: vi.fn(),
-  ssh: vi.fn(),
-}));
+const model = vi.hoisted(() => {
+  const source = [
+    { path: "Dockerfile", mode: 0o644, content: Buffer.from("FROM python\n") },
+  ];
+  return {
+    plan: vi.fn(),
+    execute: vi.fn(),
+    verify: vi.fn(),
+    ssh: vi.fn(),
+    source,
+    archive: vi.fn(async () => source),
+  };
+});
 vi.mock("../../../src/server/deployment-planner", () => ({
   planDeployment: model.plan,
 }));
 vi.mock("../../../src/server/deployment-source", () => ({
   checkDeploymentSource: async () => ({ token: "synthetic" }),
 }));
-vi.mock("../../../src/server/github-api", () => ({
-  githubJson: async () => ({ data: { sha: "b".repeat(40) } }),
+vi.mock("../../../src/server/github-api", async (original) => ({
+  ...(await original<object>()),
+  githubJson: async (path: string) => ({
+    data: path.includes("/git/trees/")
+      ? {
+          sha: "b".repeat(40),
+          tree: [{ path: "Dockerfile", type: "blob", size: 12 }],
+        }
+      : { sha: "b".repeat(40) },
+  }),
 }));
 vi.mock("../../../src/server/execution-tree", () => ({
-  fetchBaseTree: async () => [],
+  fetchBaseTree: model.archive,
+}));
+vi.mock("../../../src/server/container-images", () => ({
+  pinContainerImage: async (reference: string) =>
+    `${reference.split(":")[0]}@sha256:${"c".repeat(64)}`,
 }));
 vi.mock("../../../src/server/release-executor", async (original) => ({
   ...(await original<object>()),
@@ -111,7 +130,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
-it("one scope authorizes a failed configuration and a corrected release, retaining the old runtime evidence", async () => {
+it("one scope authorizes a failed image configuration and a corrected source build, retaining the old runtime evidence", async () => {
   const proposed = await proposeApplicationRelease(app, chat);
   const tracked = operation(proposed.id)!;
   expect(tracked.state).toBe("proposed");
@@ -149,6 +168,7 @@ it("one scope authorizes a failed configuration and a corrected release, retaini
   });
   model.plan.mockImplementation(async (_files, r, _signal, options) => {
     const wrong = plan();
+    wrong.image = "ghcr.io/qa/example:1";
     wrong.command = ["python", "wrong.py"];
     const feedback = await options.apply(wrong);
     expect(feedback).toMatchObject({
@@ -157,6 +177,8 @@ it("one scope authorizes a failed configuration and a corrected release, retaini
       kind: "replace",
     });
     expect(feedback.message).toContain("wrong.py");
+    // Planning and a published image need no executable source archive.
+    expect(model.archive).not.toHaveBeenCalled();
     expect(getDeployment(r.id)!.lifecycle!.runtime.lastVerified!.revision).toBe(
       "a".repeat(40),
     );
@@ -179,6 +201,19 @@ it("one scope authorizes a failed configuration and a corrected release, retaini
   expect(saved.serverId).toBe(7);
   expect(operation(initialReceipt.id)).toEqual(initialReceipt);
   expect(operation(started.id)!.state).toBe("verified");
+  const [image, build] = model.execute.mock.calls;
+  expect(image[1].plan.image).toBe(
+    `ghcr.io/qa/example@sha256:${"c".repeat(64)}`,
+  );
+  expect(image[2]).toEqual([]);
+  expect(model.archive).toHaveBeenCalledTimes(1);
+  expect(model.archive).toHaveBeenCalledWith(
+    "qa/example",
+    "b".repeat(40),
+    "synthetic",
+    expect.any(AbortSignal),
+  );
+  expect(build[2]).toBe(model.source);
 });
 it("returns an unknown remote outcome to Pi but refuses another execution", async () => {
   const proposed = await proposeApplicationRelease(app, chat);

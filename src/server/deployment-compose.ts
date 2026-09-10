@@ -12,9 +12,16 @@ export function composeDefinition(
     plan.environment.map((item) => [item.name, item.value]),
   );
   if (!plan.inputBindings) Object.assign(environment, supplied);
-  if (plan.postgres)
-    environment[plan.postgres.variable] =
-      `${plan.postgres.scheme}://serverguy:${password}@postgres:5432/application`;
+  const connection = {
+    url: `${plan.postgres?.scheme ?? "postgresql"}://serverguy:${password}@postgres:5432/application`,
+    host: "postgres",
+    port: "5432",
+    database: "application",
+    username: "serverguy",
+    password,
+  };
+  if (plan.postgres?.variable)
+    environment[plan.postgres.variable] = connection.url;
   // Compose interprets dollars in values, including user secrets. Escape once
   // at serialization; never let a remote shell expand these strings.
   const literal = (value: string) => value.replaceAll("$", () => "$$");
@@ -139,10 +146,14 @@ export function composeDefinition(
   for (const binding of plan.inputBindings ?? []) {
     const value =
       binding.connection && plan.postgres
-        ? `${plan.postgres.scheme}://serverguy:${password}@postgres:5432/application`
+        ? connection[binding.field ?? "url"]
         : supplied[binding.input!];
     if (!value?.trim())
-      throw new Error(`Provide ${binding.input} before deploying.`);
+      throw new Error(
+        binding.connection
+          ? `Managed PostgreSQL ${binding.field ?? "url"} is unavailable.`
+          : `Provide ${binding.input} before deploying.`,
+      );
     const target = services[binding.service] as {
       environment: Record<string, string>;
     };

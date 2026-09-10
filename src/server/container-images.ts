@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { imageReferenceSchema } from "./compose-plan";
 
-/** Resolve public Docker Hub images before approval, never at execution. */
+/** Resolve public registry tags to the host's immutable Linux amd64 image. */
 export async function pinContainerImage(
   reference: string,
   signal: AbortSignal,
@@ -10,9 +10,17 @@ export async function pinContainerImage(
   const [repository, version] = reference.includes("@")
     ? reference.split("@")
     : reference.split(":");
-  const name = repository.includes("/") ? repository : `library/${repository}`;
+  const github = repository.startsWith("ghcr.io/");
+  const registry = github ? "ghcr.io" : "registry-1.docker.io";
+  const source = repository.replace(/^(?:docker\.io|ghcr\.io)\//, "");
+  const name = github || source.includes("/") ? source : `library/${source}`;
+  // These public registries have fixed token endpoints. Repository evidence
+  // cannot direct the controller or its anonymous pull token to another host.
+  const tokenEndpoint = github
+    ? "https://ghcr.io/token?service=ghcr.io"
+    : "https://auth.docker.io/token?service=registry.docker.io";
   const auth = await fetch(
-    `https://auth.docker.io/token?service=registry.docker.io&scope=${encodeURIComponent(`repository:${name}:pull`)}`,
+    `${tokenEndpoint}&scope=${encodeURIComponent(`repository:${name}:pull`)}`,
     { signal, redirect: "error" },
   );
   if (!auth.ok) throw new Error("Container registry authentication failed.");
@@ -26,7 +34,7 @@ export async function pinContainerImage(
   };
   const manifest = async (ref: string) => {
     const response = await fetch(
-      `https://registry-1.docker.io/v2/${name}/manifests/${ref}`,
+      `https://${registry}/v2/${name}/manifests/${ref}`,
       { headers, signal, redirect: "error" },
     );
     if (!response.ok)

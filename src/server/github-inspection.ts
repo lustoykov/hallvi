@@ -67,6 +67,7 @@ export async function fetchRepositoryTree(
   commitSha: string,
   token: string,
   signal?: AbortSignal,
+  entryLimit: number = INSPECTION_LIMITS.treeEntries,
 ): Promise<RepositoryTree> {
   const { data } = await githubJson(
     `/repos/${fullName}/git/trees/${commitSha}?recursive=1`,
@@ -87,10 +88,8 @@ export async function fetchRepositoryTree(
         : {}),
     }));
   return {
-    entries: entries.slice(0, INSPECTION_LIMITS.treeEntries),
-    truncated:
-      Boolean(parsed.data.truncated) ||
-      entries.length > INSPECTION_LIMITS.treeEntries,
+    entries: entries.slice(0, entryLimit),
+    truncated: Boolean(parsed.data.truncated) || entries.length > entryLimit,
   };
 }
 

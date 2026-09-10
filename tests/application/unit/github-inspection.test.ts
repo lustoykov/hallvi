@@ -13,6 +13,7 @@ import {
   normalizeRepositoryPath,
   RepositoryPathError,
 } from "../../../src/server/github-inspection";
+import { deploymentSourceFiles } from "../../../src/server/deployment-source-files";
 import {
   deniedPathReason,
   looksLikeSecret,
@@ -108,12 +109,13 @@ describe("bounded tree and file reads", () => {
     });
   });
 
-  it("truncates oversized trees and honors GitHub's own truncation flag", async () => {
+  it("truncates oversized inspection trees, lists them whole for deployment planning and honors GitHub's own truncation flag", async () => {
+    const signal = new AbortController().signal;
     const big = {
       sha: SHA,
       truncated: false,
       tree: Array.from(
-        { length: INSPECTION_LIMITS.treeEntries + 5 },
+        { length: INSPECTION_LIMITS.treeEntries + 1 },
         (_, i) => ({
           path: `f${i}.txt`,
           type: "blob",
@@ -122,17 +124,22 @@ describe("bounded tree and file reads", () => {
         }),
       ),
     };
-    mocks.githubJson.mockResolvedValueOnce({ data: big, scopes: [] });
+    mocks.githubJson.mockResolvedValue({ data: big, scopes: [] });
     const tree = await fetchRepositoryTree("qa/big", SHA, "token");
     expect(tree.entries).toHaveLength(INSPECTION_LIMITS.treeEntries);
     expect(tree.truncated).toBe(true);
-    mocks.githubJson.mockResolvedValueOnce({
+    const source = await deploymentSourceFiles("qa/big", SHA, "token", signal);
+    expect(source.paths).toHaveLength(INSPECTION_LIMITS.treeEntries + 1);
+    mocks.githubJson.mockResolvedValue({
       data: { sha: SHA, truncated: true, tree: [] },
       scopes: [],
     });
     expect((await fetchRepositoryTree("qa/big", SHA, "token")).truncated).toBe(
       true,
     );
+    await expect(
+      deploymentSourceFiles("qa/big", SHA, "token", signal),
+    ).rejects.toThrow("incomplete");
   });
 
   it("decodes, bounds and redacts a file pinned to the commit", async () => {
@@ -227,5 +234,36 @@ describe("bounded tree and file reads", () => {
         signal: controller.signal,
       }),
     ).rejects.toThrow("GitHub is unavailable");
+  });
+
+  it("lists only files for deployment planning and reads listed files at the revision", async () => {
+    const signal = new AbortController().signal;
+    mocks.githubJson.mockResolvedValueOnce({
+      data: {
+        sha: SHA,
+        tree: [
+          { path: "Dockerfile", type: "blob", size: 16 },
+          { path: "media/scan.pdf", type: "blob", size: 5_000_000 },
+          { path: "src", type: "tree" },
+        ],
+      },
+      scopes: [],
+    });
+    const source = await deploymentSourceFiles("qa/x", SHA, "token", signal);
+    expect(source.paths).toEqual(["Dockerfile", "media/scan.pdf"]);
+    mocks.githubJson.mockResolvedValueOnce({
+      data: file("FROM python:3.12"),
+      scopes: [],
+    });
+    await expect(source.read("Dockerfile")).resolves.toBe("FROM python:3.12");
+    expect(mocks.githubJson).toHaveBeenLastCalledWith(
+      `/repos/qa/x/contents/Dockerfile?ref=${SHA}`,
+      "token",
+      { signal },
+    );
+    // Oversized and unlisted files are refused without another request.
+    await expect(source.read("media/scan.pdf")).rejects.toThrow("not read");
+    await expect(source.read("src/missing.py")).rejects.toThrow("absent");
+    expect(mocks.githubJson).toHaveBeenCalledTimes(2);
   });
 });
