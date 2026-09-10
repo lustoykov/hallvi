@@ -9,6 +9,8 @@ import {
 } from "./scheduled-backup-types";
 
 export function backupFailure(run: ScheduledRun) {
+  if (run.errorCode === "source-stop-failed")
+    return "A service failed to stop cleanly or exceeded the two-minute grace period. Check its exit status and shutdown handling before retrying; source restart is recorded separately.";
   if (run.errorCode === "credentials-rejected")
     return "Backup storage rejected the credential. Reconnect storage access, then retry.";
   if (run.errorCode === "interrupted")
@@ -87,11 +89,19 @@ export function scheduledProtection(
       run.restore.recoveryPointAt &&
       run.restore.checks.includes("archive-hash") &&
       run.restore.checks.includes("backup-identity") &&
-      (policy.kind === "postgres"
-        ? run.restore.checks.includes("database-restored")
-        : run.restore.checks.includes("database-integrity") &&
-          run.restore.checks.includes("database-rows") &&
-          run.restore.checks.includes("file-inventory")) &&
+      (policy.kind === "stack"
+        ? Boolean(policy.data) &&
+          run.restore.checks.includes("file-inventory") &&
+          (!policy.data!.postgres ||
+            run.restore.checks.includes("database-restored")) &&
+          (!policy.data!.sqlite ||
+            (run.restore.checks.includes("database-integrity") &&
+              run.restore.checks.includes("database-rows")))
+        : policy.kind === "postgres"
+          ? run.restore.checks.includes("database-restored")
+          : run.restore.checks.includes("database-integrity") &&
+            run.restore.checks.includes("database-rows") &&
+            run.restore.checks.includes("file-inventory")) &&
       run.revision === deployment.revision,
   );
   const measurements = restored?.restore?.measurements;
@@ -190,9 +200,11 @@ export function scheduledProtection(
           at: restored.restore.at,
           recoveryPointAt: restored.restore.recoveryPointAt!,
           verified:
-            policy.kind === "postgres"
-              ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
-              : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,
+            policy.kind === "stack"
+              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""} Application boot was not tested.`
+              : policy.kind === "postgres"
+                ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
+                : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,
         }
       : null,
     history: runs

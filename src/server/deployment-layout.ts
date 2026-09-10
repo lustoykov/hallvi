@@ -45,6 +45,7 @@ export function sharedVolumes(plan: DeploymentPlan) {
     {
       name: string;
       kind: "files" | "database";
+      capture?: "quiesced-files";
       mounts: {
         service: string;
         target: string;
@@ -61,6 +62,7 @@ export function sharedVolumes(plan: DeploymentPlan) {
       const volume = result.get(v.name) ?? {
         name: v.name,
         kind: v.kind,
+        ...(v.capture ? { capture: v.capture } : {}),
         mounts: [],
       };
       volume.mounts.push({

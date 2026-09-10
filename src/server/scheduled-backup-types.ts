@@ -6,7 +6,14 @@ export const backupPolicySchema = z.object({
   applicationId: z.uuid(),
   deploymentId: z.uuid(),
   revision: z.string().regex(/^[a-f0-9]{40,64}$/),
-  kind: z.enum(["sqlite-stack", "postgres"]),
+  kind: z.enum(["sqlite-stack", "postgres", "stack"]),
+  data: z
+    .object({
+      postgres: z.boolean(),
+      sqlite: z.boolean(),
+      fileDatabases: z.boolean().optional(),
+    })
+    .optional(),
   provider: z.enum(["r2", "s3"]),
   bucket: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/),
   region: z.string().regex(/^[a-z0-9-]{1,40}$/),

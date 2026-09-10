@@ -70,6 +70,10 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Backup**: A consistent recoverable copy of specified application or controller state. Creation, off-host transfer and restore verification are separate outcomes.
 
+**Backup capture plan**: The application data to protect, the services that can change it, and the consistency procedure used to capture it together. It describes data and writers rather than supported application names.
+
+**Compatible rollback**: Returning to a previously verified release whose configuration and application code can still use the current data. It does not reverse database migrations or restore an earlier copy of the data.
+
 **Recovery point**: The state/time represented by a particular usable backup. It is not the last time the backup schedule was edited.
 
 **Diagnostic archive**: Retained logs, samples and check results copied off-host. It preserves evidence, not application recovery data or guaranteed live monitoring.

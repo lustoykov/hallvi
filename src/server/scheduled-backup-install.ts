@@ -1,4 +1,4 @@
-import { sharedVolumes, sourceBuilds } from "./deployment-layout";
+import { backupCapturePlan } from "./backup-capture-plan";
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { join } from "node:path";
@@ -67,30 +67,8 @@ export function backupKind(record: DeploymentRecord): BackupPolicy["kind"] {
     throw new Error(
       "A live deployment with recorded configuration is required.",
     );
-  if (
-    sharedVolumes(record.plan).some((v) => v.mounts.length > 1) ||
-    sourceBuilds(record.plan).some((b) => b.name !== "app")
-  )
-    throw new Error(
-      "Scheduled capture does not yet verify all writers and state in this shared-storage or multiple-build layout.",
-    );
-  if (
-    record.plan.postgres &&
-    !record.plan.volumes?.length &&
-    !record.plan.services?.length
-  )
-    return "postgres";
-  if (
-    record.plan.image &&
-    /^(grafana\/grafana|louislam\/uptime-kuma)@sha256:/.test(
-      record.plan.image,
-    ) &&
-    !record.plan.postgres
-  )
-    return "sqlite-stack";
-  throw new Error(
-    "Scheduled capture currently supports the verified PostgreSQL-only, Uptime Kuma and Grafana/Prometheus stacks.",
-  );
+  backupCapturePlan(record.plan);
+  return "stack";
 }
 /** Public capability facts contain no endpoint or credential material. */
 export function backupSetupFor(record: DeploymentRecord | null) {
@@ -131,6 +109,7 @@ export async function installScheduledBackups(
   },
 ) {
   const kind = backupKind(record);
+  const capture = backupCapturePlan(record.plan!);
   let destination: z.infer<typeof destinationSchema>;
   let credentials: z.infer<typeof credentialSchema>;
   try {
@@ -152,6 +131,14 @@ export async function installScheduledBackups(
     deploymentId: record.id,
     revision: record.revision,
     kind,
+    data: {
+      postgres: Boolean(record.plan!.postgres),
+      fileDatabases: capture.volumes.some(
+        (v) =>
+          v.kind === "database" && v.capture === "quiesced-files" && !v.sqlite,
+      ),
+      sqlite: capture.volumes.some((v) => v.sqlite !== null),
+    },
     provider: destination.provider,
     bucket: destination.bucket,
     region: destination.region,
@@ -181,6 +168,8 @@ export async function installScheduledBackups(
     deploymentId: policy.deploymentId,
     revision: policy.revision,
     kind,
+    capture,
+    composeSha256: composeHash,
     endpoint: destination.endpoint,
     region: destination.region,
     bucket: destination.bucket,
