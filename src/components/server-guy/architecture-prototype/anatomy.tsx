@@ -14,6 +14,7 @@ import {
   SpinnerGap,
   X,
 } from "@phosphor-icons/react";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -25,9 +26,10 @@ import {
 } from "react";
 
 import { applicationSections } from "../application-sections";
+import type { MascotMood } from "../home/mascot-scene";
+import type { Kit } from "./anatomy-kit";
 import { AnatomyScene, type Lens, type ScenePart } from "./anatomy-scene";
 import { CertaintyTag, FactList } from "./bits";
-import { Caretaker, type CaretakerPose } from "./caretaker";
 import type { DirectionProps } from "./index";
 import { ago, type ArchitectureModel, type Gap, type Part } from "./model";
 import {
@@ -35,10 +37,25 @@ import {
   reducedMotion,
   sparklePalettes,
   stepSpring,
+  useReducedMotion,
   type Spring,
 } from "./motion";
 import { TactileSlider } from "./tactile-slider";
 import "./anatomy.css";
+
+const LittleServer = dynamic(
+  () => import("../home/mascot-scene").then((module) => module.MascotScene),
+  { ssr: false },
+);
+
+/** Model styles for the same scene; each is a kit in ./kits. */
+type ModelId = "clay" | "chassis" | "glass" | "sketch";
+const models: { id: ModelId; label: string; hint: string }[] = [
+  { id: "clay", label: "Clay", hint: "Little Server's world, a toy diorama" },
+  { id: "chassis", label: "Chassis", hint: "A premium machine in aluminium" },
+  { id: "glass", label: "Glass", hint: "Frosted glass you can see into" },
+  { id: "sketch", label: "Sketch", hint: "The plain reference model" },
+];
 
 const lenses: { id: Lens; label: string; hint: string }[] = [
   {
@@ -70,7 +87,7 @@ const lensNote: Record<Lens, string> = {
     "Blue is the way in: port 80, and only for your network. Prometheus has no door at all.",
   data: "What must survive lives on the disk; every night a copy leaves the server.",
   certainty:
-    "Green while the evidence is under a day old, amber when older, hatched if never observed.",
+    "Green while the evidence is under a day old, amber when older, grey if never observed.",
 };
 
 function gapPart(gap: Gap): Part {
@@ -240,7 +257,11 @@ export function AnatomyDirection({
   const [selected, setSelected] = useState<string | null>(null);
   const [glFailed, setGlFailed] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
-  const [woken, setWoken] = useState(false);
+  const [mood, setMood] = useState<MascotMood | null>(null);
+  const [gesture, setGesture] = useState(0);
+  const [modelId, setModelId] = useState<ModelId>("clay");
+  const reduced = useReducedMotion();
+  const modelPicker = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const canvasHost = useRef<HTMLDivElement>(null);
   const scene = useRef<AnatomyScene | null>(null);
@@ -266,6 +287,7 @@ export function AnatomyDirection({
       parts.map((part) => ({
         id: part.id,
         kind: part.id.startsWith("gap:") ? "gap" : part.kind,
+        label: part.name,
         certainty: part.evidence.certainty,
         checking: Boolean(part.checking),
         owner: part.owner,
@@ -349,7 +371,7 @@ export function AnatomyDirection({
     }
     const roof = instance.roof();
     if (caretaker.current)
-      caretaker.current.style.transform = `translate(${roof.x}px, ${roof.y}px) translate(-50%, -92%)`;
+      caretaker.current.style.transform = `translate(${roof.x}px, ${roof.y}px) translate(-50%, -84%)`;
   }, []);
 
   // The scene is created once and lives as long as the direction does.
@@ -368,6 +390,8 @@ export function AnatomyDirection({
       return () => window.clearTimeout(timer);
     }
     scene.current = instance;
+    // Debug handle for headless captures of the prototype.
+    (window as unknown as { __axcScene?: AnatomyScene }).__axcScene = instance;
     return () => {
       instance.dispose();
       scene.current = null;
@@ -383,6 +407,26 @@ export function AnatomyDirection({
   useEffect(() => {
     scene.current?.setHighlight(hovered, selected);
   }, [hovered, selected]);
+
+  // The model style: ?model=clay|chassis|glass|sketch, then the picker.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("model");
+    const found = models.find((item) => item.id === wanted);
+    if (!found) return;
+    const timer = window.setTimeout(() => setModelId(found.id), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    import(`./kits/${modelId}`)
+      .then((module: { default: Kit }) => {
+        if (!cancelled) scene.current?.setKit(module.default);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [modelId]);
 
   // The trays follow the control on a soft spring, so a quick pull overshoots.
   const drive = useCallback(() => {
@@ -440,6 +484,7 @@ export function AnatomyDirection({
       const timers = [
         window.setTimeout(() => {
           setCelebrating(true);
+          setGesture((value) => value + 1);
           burstAt(caretaker.current, {
             count: 20,
             spread: 58,
@@ -473,16 +518,17 @@ export function AnatomyDirection({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const pose: CaretakerPose =
-    recheck.phase === "running"
-      ? "check"
+  const mascotMood: MascotMood =
+    mood ??
+    (recheck.phase === "running"
+      ? "checking"
       : celebrating
-        ? "cheer"
+        ? "celebrating"
         : recheck.phase === "failed" || model.condition.certainty === "failed"
-          ? "worry"
-          : model.condition.certainty === "stale" && !woken
-            ? "sleep"
-            : "idle";
+          ? "attention"
+          : model.condition.certainty === "stale"
+            ? "resting"
+            : "ready");
   const part = selected ? byId[selected] : null;
   const planned = model.status !== "live";
   const missing = parts.filter(
@@ -593,18 +639,41 @@ export function AnatomyDirection({
             </button>
           );
         })}
-        <div ref={caretaker} className="axc-ct">
-          <Caretaker
-            pose={pose}
-            size={36}
-            onPoke={() => {
-              burstAt(caretaker.current, { count: 8, spread: 26 });
-              if (pose === "sleep") {
-                setWoken(true);
-                window.setTimeout(() => setWoken(false), 2800);
-              }
+        <div
+          ref={caretaker}
+          className="axc-ct"
+          role="button"
+          tabIndex={0}
+          aria-label="Little Server. Say hello."
+          onClick={() => {
+            setMood("waving");
+            setGesture((value) => value + 1);
+            burstAt(caretaker.current, { count: 8, spread: 26 });
+            window.setTimeout(() => setMood(null), 2600);
+          }}
+        >
+          <LittleServer
+            color={3}
+            mood={mascotMood}
+            gesture={gesture}
+            paused={reduced}
+          />
+        </div>
+        <div ref={modelPicker} className="axc-models">
+          <span className="axc-label">Model</span>
+          <TactileSlider
+            label="Model style"
+            options={models}
+            value={modelId}
+            onChange={(value) => {
+              setModelId(value);
+              const url = new URL(window.location.href);
+              url.searchParams.set("model", value);
+              window.history.replaceState(window.history.state, "", url);
+              burstAt(modelPicker.current, { count: 12, spread: 40 });
             }}
           />
+          <span className="ax-invented">prototype only</span>
         </div>
         <button
           type="button"
