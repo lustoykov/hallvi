@@ -1,9 +1,11 @@
 "use client";
 
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// The Architecture map in miniature, for Overview: the same shape and the
-// same honest states, with light flowing along the way a visit takes. The
-// whole map opens Architecture.
+// The Architecture map as a thumbnail, for Overview: the same shape and the
+// same honest states, with light flowing along the way a visit takes. Quiet
+// while all is well. When something is wrong its part pings, and whatever
+// you point at under "needs you" lights up here. Clicking a part opens
+// Architecture with that part's details already open.
 
 import { ArrowRight } from "@phosphor-icons/react";
 import { useMemo } from "react";
@@ -29,14 +31,24 @@ const tint: Record<Certainty, string> = {
   absent: "#b9c2d0",
 };
 
+/** Short enough to read at thumbnail size. */
+function thumbName(id: string, name: string) {
+  if (id === "offsite") return "Off-site";
+  return name.split("/").pop() ?? name;
+}
+
 export function MiniMap({
   model,
   reduced,
+  highlight,
   onOpen,
 }: {
   model: ArchitectureModel;
   reduced: boolean;
-  onOpen: () => void;
+  /** A part to light up, from what you point at elsewhere on the page. */
+  highlight?: string | null;
+  /** Opens Architecture, with a part's details open when one was clicked. */
+  onOpen: (partId?: string) => void;
 }) {
   const layout = useMemo(() => layoutFor(model), [model]);
   const planned = model.status !== "live";
@@ -57,7 +69,13 @@ export function MiniMap({
     <button
       type="button"
       className={`axo-map${planned ? " is-planned" : ""}`}
-      onClick={onOpen}
+      data-host={host?.evidence.certainty}
+      onClick={(event) => {
+        const part = (event.target as Element)
+          .closest("[data-part]")
+          ?.getAttribute("data-part");
+        onOpen(part ?? undefined);
+      }}
     >
       <svg viewBox={`0 ${MAP_TOP} ${MAP_W} ${MAP_H}`} aria-hidden="true">
         <rect
@@ -75,15 +93,24 @@ export function MiniMap({
           y1={header}
           y2={header}
         />
-        <circle
-          cx={BOX.server.x + 30}
-          cy={BOX.header.y + 27}
-          r="7"
-          fill={tint[host?.evidence.certainty ?? "unknown"]}
-        />
-        <text className="axo-map-title" x={BOX.server.x + 48} y={BOX.header.y + 35}>
-          {host?.name ?? "Your server"}
-        </text>
+        <g data-part="host" className="axo-map-head">
+          <rect
+            x={BOX.header.x}
+            y={BOX.header.y}
+            width={BOX.header.w}
+            height={BOX.header.h}
+            fill="transparent"
+          />
+          <circle
+            cx={BOX.server.x + 30}
+            cy={BOX.header.y + 27}
+            r="8"
+            fill={tint[host?.evidence.certainty ?? "unknown"]}
+          />
+          <text className="axo-map-title" x={BOX.server.x + 50} y={BOX.header.y + 36}>
+            {host?.name ?? "Your server"}
+          </text>
+        </g>
         {service && (
           <rect
             className="axo-map-private"
@@ -126,9 +153,9 @@ export function MiniMap({
           const r = layout.rects[id];
           if (!r || !model.byId[id]) return null;
           return (
-            <g key={id} className="axo-map-door">
+            <g key={id} data-part={id} className="axo-map-door">
               <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="10" />
-              <text x={r.x + r.w / 2} y={r.y + r.h / 2 + 7} textAnchor="middle">
+              <text x={r.x + r.w / 2} y={r.y + r.h / 2 + 8} textAnchor="middle">
                 {id === "gate:http" ? "80" : "22"}
               </text>
             </g>
@@ -138,29 +165,41 @@ export function MiniMap({
           const part = model.byId[id];
           const r = layout.rects[id];
           if (!part || !r) return null;
+          const failed = part.evidence.certainty === "failed";
           return (
             <g
               key={id}
-              className={`axo-map-card${part.checking ? " is-checking" : ""}`}
+              data-part={id}
               data-c={part.evidence.certainty}
+              className={`axo-map-card${part.checking ? " is-checking" : ""}${highlight === id ? " is-highlight" : ""}`}
             >
+              {failed && (
+                <rect
+                  className={`axo-map-halo${reduced ? " is-still" : ""}`}
+                  x={r.x}
+                  y={r.y}
+                  width={r.w}
+                  height={r.h}
+                  rx="14"
+                />
+              )}
               <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="14" />
               <circle
                 cx={r.x + 24}
                 cy={r.y + r.h / 2}
-                r="7"
+                r="8"
                 fill={part.quiet ? "#3e4a60" : tint[part.evidence.certainty]}
               />
-              <text x={r.x + 42} y={r.y + r.h / 2 + 7}>
-                {part.name.split("/").pop()}
+              <text x={r.x + 42} y={r.y + r.h / 2 + 8}>
+                {thumbName(id, part.name)}
               </text>
             </g>
           );
         })}
         {model.gaps.some((gap) => gap.id === "monitoring") && (
-          <g className="axo-map-ghost">
+          <g data-part="gap:monitoring" className="axo-map-ghost">
             <rect x={924} y={96} width={176} height={72} rx="14" />
-            <text x={946} y={139}>
+            <text x={946} y={140}>
               Monitoring
             </text>
           </g>

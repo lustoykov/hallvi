@@ -36,6 +36,7 @@ import type {
   ArchitectureModel,
   LiveRecord,
 } from "../architecture-prototype/model";
+import { ARCHITECTURE_FOCUS } from "../architecture-prototype/journey-v2";
 import { ServerGuyReport } from "../architecture-prototype/report";
 import type { Recheck } from "../architecture-prototype/use-recheck";
 import { MiniMap } from "./mini-map";
@@ -79,13 +80,26 @@ function NeedCard({
   need,
   onAsk,
   onOpenDestination,
+  onHover,
+  onShow,
 }: {
   need: NeedItem;
   onAsk: (draft: string) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
+  /** Lights the part it is about on the map. */
+  onHover: (partId: string | null) => void;
+  /** Opens Architecture with that part's details open. */
+  onShow: (partId: string) => void;
 }) {
   return (
-    <div className="axo-need" data-tone={need.tone}>
+    <div
+      className="axo-need"
+      data-tone={need.tone}
+      onPointerEnter={() => need.partId && onHover(need.partId)}
+      onPointerLeave={() => onHover(null)}
+      onFocus={() => need.partId && onHover(need.partId)}
+      onBlur={() => onHover(null)}
+    >
       <span className="axo-need-icon" aria-hidden="true">
         {need.tone === "failed" ? (
           <Warning weight="bold" />
@@ -101,15 +115,26 @@ function NeedCard({
         </p>
       </div>
       <div className="axo-need-actions">
-        {need.secondary && (
+        {need.partId ? (
           <button
             type="button"
             className="ax-textlink"
-            onClick={() => onOpenDestination(need.secondary!.destination)}
+            onClick={() => onShow(need.partId!)}
           >
-            {need.secondary.label}
+            Show on the map
             <ArrowRight weight="bold" />
           </button>
+        ) : (
+          need.secondary && (
+            <button
+              type="button"
+              className="ax-textlink"
+              onClick={() => onOpenDestination(need.secondary!.destination)}
+            >
+              {need.secondary.label}
+              <ArrowRight weight="bold" />
+            </button>
+          )
         )}
         <button
           type="button"
@@ -320,6 +345,7 @@ export function OverviewDirection({
     [model, record, operations, chats, onOpenConversation],
   );
   const [openVital, setOpenVital] = useState<string | null>(null);
+  const [pointed, setPointed] = useState<string | null>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   // "Not now" quiets suggestions for the rest of the visit.
   const [snoozed, setSnoozed] = useState(false);
@@ -352,6 +378,14 @@ export function OverviewDirection({
     !snoozed &&
     overview.needs.length === 0 &&
     Boolean(suggestion);
+  // Architecture opens with a part's details open when there is one in mind.
+  const openArchitecture = (partId?: string) => {
+    if (partId)
+      try {
+        window.sessionStorage.setItem(ARCHITECTURE_FOCUS, partId);
+      } catch {}
+    onOpenDestination("architecture");
+  };
   const needsBlock = overview.needs.length > 0 && (
     <div className="axo-needs">
       {overview.needs.map((need) => (
@@ -360,6 +394,8 @@ export function OverviewDirection({
           need={need}
           onAsk={onAsk}
           onOpenDestination={onOpenDestination}
+          onHover={setPointed}
+          onShow={openArchitecture}
         />
       ))}
     </div>
@@ -497,7 +533,8 @@ export function OverviewDirection({
         <MiniMap
           model={model}
           reduced={reduced}
-          onOpen={() => onOpenDestination("architecture")}
+          highlight={pointed}
+          onOpen={openArchitecture}
         />
         <div className="axo-recent">
           <h2>Recent work</h2>

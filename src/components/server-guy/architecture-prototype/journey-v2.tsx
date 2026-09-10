@@ -52,6 +52,9 @@ import { reducedMotion, useReducedMotion } from "./motion";
 import { TactileSlider } from "./tactile-slider";
 import "./journey-v2.css";
 
+/** Session key: a part another page asked Architecture to open. */
+export const ARCHITECTURE_FOCUS = "sg-prototype:architecture-focus";
+
 const W = 1120;
 /** The map is drawn from y = 0; the view starts at TOP, just above the server. */
 const TOP = 60;
@@ -519,6 +522,23 @@ export function JourneyDirection({
 
   useEffect(() => {
     const timer = window.setTimeout(() => setEntering(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  // Arrived from Overview to see where something is: open that part.
+  useEffect(() => {
+    let wanted: string | null = null;
+    try {
+      wanted = window.sessionStorage.getItem(ARCHITECTURE_FOCUS);
+    } catch {}
+    if (!wanted) return;
+    const part = wanted;
+    const timer = window.setTimeout(() => {
+      try {
+        window.sessionStorage.removeItem(ARCHITECTURE_FOCUS);
+      } catch {}
+      setSelected(part);
+    }, 500);
     return () => window.clearTimeout(timer);
   }, []);
 

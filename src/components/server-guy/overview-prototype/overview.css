@@ -446,7 +446,7 @@
 
 .axo-lower {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
@@ -505,7 +505,7 @@
   stroke-width: 2;
 }
 .axo-map-title {
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 600;
   fill: var(--ax-ink);
 }
@@ -555,7 +555,7 @@
   stroke-width: 2;
 }
 .axo-map-door text {
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 650;
   fill: var(--ax-ink-2);
 }
@@ -565,7 +565,7 @@
   stroke-width: 2;
 }
 .axo-map-card text {
-  font-size: 19px;
+  font-size: 23px;
   font-weight: 600;
   fill: var(--ax-ink);
 }
@@ -593,7 +593,7 @@
   stroke-dasharray: 8 6;
 }
 .axo-map-ghost text {
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 600;
   fill: var(--ax-faint);
 }
@@ -680,4 +680,57 @@
   align-items: center;
   gap: 14px;
   margin-top: 2px;
+}
+
+/* Pointing at what needs you lights its part; what is wrong pings. */
+.axo-map-card rect,
+.axo-map-door rect {
+  transition:
+    stroke 260ms,
+    stroke-width 260ms,
+    fill 260ms;
+}
+.axo-map-card:hover > rect:not(.axo-map-halo),
+.axo-map-door:hover rect {
+  stroke: #9fb4f5;
+  stroke-width: 3;
+}
+.axo-map-card.is-highlight > rect:not(.axo-map-halo) {
+  stroke: var(--ax-blue);
+  stroke-width: 5;
+}
+.axo-map-card.is-highlight[data-c="failed"] > rect:not(.axo-map-halo) {
+  stroke: var(--ax-failed);
+  fill: #fdeceb;
+}
+.axo-map-card[data-c] .axo-map-halo {
+  fill: none;
+  stroke: #a6312b;
+  stroke-width: 4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: axo-map-ping 1.8s ease-out infinite;
+}
+.axo-map-card[data-c] .axo-map-halo.is-still {
+  animation: none;
+  opacity: 0.35;
+}
+@keyframes axo-map-ping {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+.axo-map[data-host="failed"] .axo-map-server {
+  stroke: #e2aaa5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .axo-map-card[data-c] .axo-map-halo {
+    animation: none;
+    opacity: 0.35;
+  }
 }

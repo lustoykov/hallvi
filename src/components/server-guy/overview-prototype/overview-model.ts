@@ -28,6 +28,8 @@ const DAY = 86_400_000;
 
 export interface NeedItem {
   id: string;
+  /** The part it is about, to show where it is. */
+  partId?: string;
   tone: "failed" | "waiting";
   title: string;
   detail: string;
@@ -139,6 +141,7 @@ export function buildOverview({
     if (part.evidence.certainty !== "failed") continue;
     needs.push({
       id: `part:${part.id}`,
+      partId: part.id,
       tone: "failed",
       title: `${part.name} isn't answering`,
       detail: part.evidence.detail,
