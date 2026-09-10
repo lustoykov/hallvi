@@ -1,11 +1,10 @@
-import { sourceBuilds } from "./deployment-layout";
 import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
 import { assertApprovedRelease } from "./deployment-release";
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
 import { deploymentLock, shellQuote } from "./deployment-ssh";
 import { currentFacts, primaryHttp } from "./release-facts";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -29,19 +28,14 @@ import {
   deploymentMessage,
   saveDeployment,
 } from "./deployment-store";
-import {
-  deploymentPlanSchema,
-  type DeploymentRecord,
-} from "./deployment-types";
-import { fetchBaseTree } from "./execution-tree";
-import { writeTar } from "./tar";
-import { deniedPathReason, redactSecrets } from "./secrets";
+import type { DeploymentRecord } from "./deployment-types";
+import { redactSecrets } from "./secrets";
 
 export function saveDeploymentInputs(
   record: DeploymentRecord,
   input: Record<string, string>,
 ) {
-  const allowed = new Set(record.plan?.missingInputs.map((i) => i.name));
+  const allowed = new Set(currentFacts(record)?.inputs);
   for (const key of Object.keys(input))
     if (!allowed.has(key)) throw new Error("Unexpected deployment input.");
   for (const key of allowed)
@@ -59,7 +53,7 @@ function inputs(record: DeploymentRecord): Record<string, string> {
       readFileSync(join(deploymentDirectory(record), "inputs.json"), "utf8"),
     );
   } catch {
-    if (record.plan?.missingInputs.length)
+    if (currentFacts(record)?.inputs.length)
       throw new Error(
         "The saved deployment inputs are unavailable. Restore them before retrying.",
       );
@@ -80,7 +74,6 @@ function databasePassword(record: DeploymentRecord) {
   return readFileSync(path, "utf8");
 }
 export { composeDefinition } from "./deployment-compose";
-import { composeDefinition, composeStartCommand } from "./deployment-compose";
 
 async function command(
   file: string,
@@ -223,7 +216,7 @@ export async function provision(record: DeploymentRecord, signal: AbortSignal) {
         await provider<{ firewall: { id: number } }>("/firewalls", {
           name,
           labels: { "sg-deployment": record.id },
-          rules: (record.plan?.httpAccess === "controller"
+          rules: (currentFacts(record)?.httpAccess === "controller"
             ? [22]
             : [22, 80]
           ).map((port) => ({
@@ -349,11 +342,17 @@ function logOutput(record: DeploymentRecord, text: string) {
   record.logs = (record.logs + redactSecrets(safe).text).slice(-50000);
   saveDeployment(record);
 }
+/**
+ * A first deployment: provision the approved host, restrict HTTP and cloud
+ * metadata, then run the approved release through the shared release loop,
+ * where Pi corrects execution failures within the approval.
+ */
 export async function executeDeployment(
   record: DeploymentRecord,
   signal: AbortSignal,
 ) {
-  if (!record.plan || !record.revision || !record.authority)
+  const facts = currentFacts(record);
+  if (!facts || !record.revision || !record.authority)
     throw new Error("A reviewed deployment recommendation is required.");
   const application = getApplication(record.applicationId);
   if (
@@ -364,22 +363,11 @@ export async function executeDeployment(
     throw new Error(
       "The application source changed. This deployment cannot be applied to another repository.",
     );
-  deploymentPlanSchema.parse(record.plan);
   assertApprovedRelease(record);
-  for (const image of [
-    record.plan.image,
-    ...(record.plan.services ?? []).map((s) => s.image),
-  ].filter(Boolean))
-    if (!/@sha256:[0-9a-f]{64}$/.test(image!))
-      throw new Error(
-        "Resolve container images to immutable digests before approval.",
-      );
   await checkDeploymentSource(record);
   databasePassword(record);
   record.status = "deploying";
   record.error = null;
-  saveDeployment(record);
-  invalidateDeploymentRuntime(record);
   saveDeployment(record);
   await provision(record, signal);
   deploymentEvent(
@@ -411,7 +399,7 @@ export async function executeDeployment(
     throw new Error(
       "SSH or host preparation is not ready. The existing server is retained for investigation.",
     );
-  if (record.plan.httpAccess === "controller") {
+  if (facts.httpAccess === "controller") {
     const peer = (
       await command(
         "ssh",
@@ -480,155 +468,18 @@ export async function executeDeployment(
     record,
     "Metadata access restricted before running application code",
   );
-  if (record.imageId) {
-    const current = await command(
-      "ssh",
-      [
-        ...sshArgs(record),
-        `cd /opt/server-guy/${record.id} && docker inspect --format '{{.Image}} {{index .Config.Labels "server-guy.revision"}} {{.State.Running}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q app)`,
-      ],
-      signal,
-    );
-    if (current.trim() !== `${record.imageId} ${record.revision} true`)
-      throw new Error(
-        "The previously built container changed or stopped. Investigate it before retrying verification.",
-      );
-    deploymentEvent(
-      record,
-      "Reconciled the existing container; resuming verification without rebuilding",
-    );
-  } else {
-    deploymentEvent(
-      record,
-      "Host prepared; uploading the exact source revision and deployment configuration",
-    );
-    const { token } = await checkDeploymentSource(record);
-    const files = !sourceBuilds(record.plan).length
-      ? []
-      : await fetchBaseTree(record.repository, record.revision, token, signal);
-    const safe = files.filter((file) => !deniedPathReason(file.path));
-    if (safe.length !== files.length)
-      throw new Error(
-        "The repository contains credential-bearing paths. Review them before transferring source to the host.",
-      );
-    for (const build of sourceBuilds(record.plan))
-      if (
-        build.generatedDockerfile &&
-        !safe.some((f) => f.path === build.dockerfile)
-      )
-        safe.push({
-          path: build.dockerfile,
-          content: Buffer.from(build.generatedDockerfile),
-          mode: 0o644,
-        });
-    const compose = composeDefinition(
-      record.plan,
-      record.revision,
-      record.id,
-      databasePassword(record),
-      inputs(record),
-    );
-    const bundle = [
-      ...safe.map((file) => ({ ...file, path: `source/${file.path}` })),
-      ...[
-        { name: "app", configs: record.plan.configs ?? [] },
-        ...(record.plan.services ?? []),
-      ].flatMap((service) =>
-        service.configs.map((config) => ({
-          path: `configs/${service.name}-${config.name}`,
-          content: Buffer.from(config.content),
-          mode: 0o644,
-        })),
-      ),
-      {
-        path: "compose.json",
-        content: Buffer.from(JSON.stringify(compose)),
-        mode: 0o600,
-      },
-    ];
-    record.bundleHashes = Object.fromEntries(
-      bundle
-        .filter((f) => !f.path.startsWith("source/"))
-        .map((f) => [
-          f.path,
-          createHash("sha256").update(f.content).digest("hex"),
-        ]),
-    );
-    saveDeployment(record);
-    const archive = writeTar(bundle, {
-      mtime: Math.floor(Date.now() / 1000),
-    });
-    const root = `/opt/server-guy/${record.id}`;
-    await command(
-      "ssh",
-      [
-        ...sshArgs(record),
-        deploymentLock(
-          record.id,
-          `umask 077; mkdir -p ${root}; tar -xpf - -C ${root}`,
-        ),
-      ],
-      signal,
-      archive,
-    );
-    deploymentEvent(
-      record,
-      "Building the application and starting its Compose services",
-    );
-    await command(
-      "ssh",
-      [
-        ...sshArgs(record),
-        deploymentLock(
-          record.id,
-          `cd ${root} && ${composeStartCommand(record.plan, `docker compose -p sg-${record.id.slice(0, 8)} -f compose.json`)}`,
-        ),
-      ],
-      signal,
-      undefined,
-      (text) => logOutput(record, text),
-    );
-    const serving = await command(
-      "ssh",
-      [
-        ...sshArgs(record),
-        `cd ${root} && docker inspect --format '{{.Image}} {{index .Config.Labels "server-guy.revision"}} {{.State.Running}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q app)`,
-      ],
-      signal,
-    );
-    const parts = serving.trim().split(/\s+/);
-    if (
-      !/^sha256:[0-9a-f]{64}$/.test(parts[0]) ||
-      parts[1] !== record.revision ||
-      parts[2] !== "true"
-    )
-      throw new Error(
-        "The serving container does not match the selected revision.",
-      );
-    record.imageId = parts[0];
-    saveDeployment(record);
-  }
-  deploymentEvent(
-    record,
-    "Checking public HTTP and application behavior from outside the host",
-  );
-  await verifyServiceImages(record, signal);
-  await verifyDeployment(record, signal);
-  await verifyPrivateServices(record, signal);
-  await collectDeploymentLogs(record, signal);
-  // The attempt wrapper publishes success together with its runtime evidence.
-  if (!record.lifecycle) record.status = "live";
+  const { runInitialRelease } = await import("./application-releases");
+  await runInitialRelease(record, signal);
+  const verified = currentFacts(record)!;
+  record.status = "live";
   record.url = `http://${record.address}`;
-  record.verifiedAt = new Date().toISOString();
   deploymentEvent(
     record,
-    record.plan.image
-      ? "Application behavior verified against the accepted image and configuration revision"
-      : "Public application behavior verified against the deployed revision",
+    "Application behavior verified against the deployed configuration",
   );
   deploymentMessage(
     record,
-    `Your application is running at ${record.url}.${record.httpSourceIp ? " HTTP access is restricted to this controller’s network; use an SSH tunnel for private admin setup until HTTPS is configured." : ""} I verified ${record.plan.image ? "the accepted image and configuration revision" : "the serving revision"} and the application checks: ${record.plan.checks.map((c) => c.name).join(", ")}.${record.plan.postgres ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
+    `Your application is running at ${record.url}.${record.httpSourceIp ? " HTTP access is restricted to this controller’s network; use an SSH tunnel for private admin setup until HTTPS is configured." : ""} I verified the running images and the application checks: ${verified.criterion?.checks.map((check) => check.name).join(", ")}.${verified.database ? " PostgreSQL is private to the Compose network and uses a persistent volume. Backups are not configured yet." : ""} This first deployment uses HTTP; a domain and HTTPS have not been configured.`,
   );
 }
 export async function collectDeploymentLogs(

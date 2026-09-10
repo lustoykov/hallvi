@@ -173,11 +173,3 @@ export function composeDefinition(
   }
   return { services, volumes };
 }
-
-/** Build shared source once before Compose can try to pull a worker's image. */
-export function composeStartCommand(plan: DeploymentPlan, compose: string) {
-  const builds = sourceBuilds(plan);
-  return builds.length
-    ? `${compose} build ${builds.map((b) => b.name).join(" ")} && ${compose} up -d --no-build --wait --wait-timeout 120`
-    : `${compose} up -d --wait --wait-timeout 120`;
-}

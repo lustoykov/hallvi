@@ -4,10 +4,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
-import {
-  composeDefinition,
-  composeStartCommand,
-} from "../../../src/server/deployment-compose";
+import { composeDefinition } from "../../../src/server/deployment-compose";
+import { legacyStartCommand } from "../../fixtures/queue-worker/legacy-plans";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
 
@@ -123,7 +121,7 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
         "sh",
         [
           "-c",
-          composeStartCommand(
+          legacyStartCommand(
             plan,
             `docker compose -p ${project} -f compose.json`,
           ),

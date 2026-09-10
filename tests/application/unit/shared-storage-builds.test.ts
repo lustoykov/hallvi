@@ -188,16 +188,6 @@ it("a rollback runs only the recorded local images: no source, build, pull or vo
   expect(rollback).toContain("--pull never");
   expect(rollback).not.toMatch(/\bdown\b|volume rm|prune/);
 });
-it("rejects missing/cyclic image references and inconsistent shared-state declarations", () => {
-  const p = plan();
-  p.services![1].imageFrom = "missing";
-  expect(() => deploymentPlanSchema.parse(p)).toThrow("unknown service");
-  p.services![1].imageFrom = "worker";
-  expect(() => deploymentPlanSchema.parse(p)).toThrow("cycle");
-  p.services![1].imageFrom = "api";
-  p.services![1].volumes[0].kind = "database";
-  expect(() => deploymentPlanSchema.parse(p)).toThrow("same data kind");
-});
 const live = (p: DeploymentPlan) =>
   ({
     id: randomUUID(),

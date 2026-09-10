@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import type { NativeConfiguration } from "../../../src/server/deployment-release";
 const mock = vi.hoisted(() => ({
   create: vi.fn(),
   workspace: vi.fn(),
@@ -53,6 +53,7 @@ import {
   planRelease,
 } from "../../../src/server/deployment-planner";
 import { PI_BUILTIN_TOOLS } from "../../../src/server/pi-workspace";
+import { NativeConfigurationError } from "../../../src/server/native-compose";
 import { callNativeToolsThroughSdk } from "../fixtures/native-tools";
 
 const selection = {
@@ -181,7 +182,7 @@ it("accepts a completed reconciliation without another deploy tool call", async 
   expect(reconcile).toHaveBeenCalledTimes(1);
 });
 
-it("gives the planner Pi's native tools only through a workspace seeded with the planned tree", async () => {
+it("prepares a first deployment natively: Pi's exported files resolve into the recommendation, with feedback until they do", async () => {
   const files = [
     {
       path: "Dockerfile",
@@ -196,20 +197,38 @@ it("gives the planner Pi's native tools only through a workspace seeded with the
   mock.workspace.mockClear();
   mock.dispose.mockClear();
   mock.execute.mockReset().mockResolvedValue(answer);
-  let native: Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
-  mock.create.mockImplementation(async (options) => ({
-    session: {
-      prompt: async () => {
-        native = await callNativeToolsThroughSdk(options);
-        await options.customTools
-          .find((t: { name: string }) => t.name === "submit_plan")
-          .execute("plan", { json: JSON.stringify(queuePlan()) });
-      },
-      waitForIdle: async () => {},
-      dispose: vi.fn(),
-      abort: vi.fn(),
-    },
-  }));
+  const exported = [
+    { path: "compose.yaml", mode: 0o644, content: Buffer.from("services: {}") },
+  ];
+  mock.exportFiles.mockReset().mockResolvedValue(exported);
+  const native = { summary: "Resolved native release" } as NativeConfiguration;
+  const recommend = vi
+    .fn()
+    .mockRejectedValueOnce(
+      new NativeConfigurationError(
+        "Include criterion: checks that prove useful behavior.",
+      ),
+    )
+    .mockResolvedValueOnce(native);
+  const selection = {
+    compose: ["./compose.yaml"],
+    criterion: "{}",
+    httpAccess: "public",
+    summary: "A web service with its managed database",
+  };
+  let nativeTools:
+    Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
+  const replies: string[] = [];
+  mock.create.mockImplementation(async (options) =>
+    session(async () => {
+      nativeTools = await callNativeToolsThroughSdk(options);
+      const recommendation = tool(options, "recommend_deployment");
+      for (let attempt = 0; attempt < 3; attempt++)
+        replies.push(
+          (await recommendation.execute("call", selection)).content[0].text,
+        );
+    }),
+  );
   const revision = "a".repeat(40);
   const record = {
     id: "deployment-a",
@@ -218,14 +237,38 @@ it("gives the planner Pi's native tools only through a workspace seeded with the
     repository: "qa/example",
     revision,
   } as DeploymentRecord;
-  await planDeployment(files, record, new AbortController().signal);
+  await expect(
+    planDeployment(files, record, new AbortController().signal, {
+      recommend,
+    }),
+  ).resolves.toBe(native);
   expect(mock.execute.mock.calls.map(([name]) => name)).toEqual([
     ...PI_BUILTIN_TOOLS,
   ]);
-  expect(Object.values(native!.results)).toEqual(
+  expect(Object.values(nativeTools!.results)).toEqual(
     PI_BUILTIN_TOOLS.map(() => answer),
   );
-  expect(native!.controllerFiles).toEqual([]);
+  expect(nativeTools!.controllerFiles).toEqual([]);
+  // Resolution errors return to Pi; one success completes the session.
+  expect(JSON.parse(replies[0])).toMatchObject({
+    ok: false,
+    kind: "configuration",
+    retryable: true,
+  });
+  expect(JSON.parse(replies[0]).message).toContain("Include criterion");
+  expect(JSON.parse(replies[1])).toMatchObject({ ok: true });
+  expect(replies[2]).toContain("Already completed");
+  expect(recommend).toHaveBeenCalledTimes(2);
+  // The exact exported bytes and the normalized Compose paths are resolved.
+  expect(recommend.mock.calls[0][0]).toMatchObject({
+    compose: ["compose.yaml"],
+    httpAccess: "public",
+  });
+  expect(recommend.mock.calls[0][1]).toBe(exported);
+  expect(mock.exportFiles).toHaveBeenCalledWith(
+    ["compose.yaml"],
+    expect.any(Number),
+  );
   const [workspace] = mock.workspace.mock.calls[0];
   expect(workspace).toMatchObject({
     applicationId: "app-a",

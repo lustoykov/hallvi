@@ -1,7 +1,9 @@
-// Opt-in (SG_RUN_DOCKER_PROOF=1): native Compose releases through the real
-// operation boundary, pinned resolver and locked executor, against local
-// Docker. Only the SSH transport and Pi are stand-ins: the transport runs the
-// host script locally, and a scripted Pi submits files a model would author.
+// Opt-in (SG_RUN_DOCKER_PROOF=1): native Compose first deployments and
+// releases through the real worker, approval route, operation boundary,
+// pinned resolver and locked executor, against local Docker. Stand-ins: the
+// SSH transport runs the host script locally, the provider API is a fake that
+// "creates" this machine, and a scripted Pi submits files a model would
+// author. SG_RUN_PI_PROOF runs the configured model instead.
 import { execFileSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import {
@@ -31,7 +33,15 @@ const host = vi.hoisted(() => ({
     { path: string; mode: number; content: Buffer }[]
   >,
   pi: null as null | ((options: never) => Promise<void>),
+  /** A scripted Pi session for planners that run through the SDK. */
+  session: null as null | ((tools: unknown[]) => Promise<void>),
+  /** What the fake provider API created. */
+  cloud: {
+    servers: [] as Record<string, unknown>[],
+    firewall: null as null | Record<string, unknown>,
+  },
   prepared: [] as {
+    stage?: string;
     compose: string[];
     files: string[];
     criterion: boolean;
@@ -42,28 +52,51 @@ const host = vi.hoisted(() => ({
 const platform = { ...process.env, DOCKER_DEFAULT_PLATFORM: "linux/amd64" };
 vi.mock("node:child_process", async (original) => {
   const real = await original<typeof import("node:child_process")>();
-  const local = (command: string) =>
-    command
+  const local = (command: string) => {
+    // A new host's preparation: the fixture has no cloud-init, the metadata
+    // guard changes host firewall rules and never runs on this machine, and
+    // the controller reaches the "host" over loopback.
+    if (command.includes("cloud-init status --wait"))
+      return "docker compose version";
+    if (command.includes("server-guy-metadata-guard")) return "true";
+    if (command.includes("$SSH_CONNECTION"))
+      return "printf '%s' '127.0.0.1 50000 127.0.0.1 22'";
+    return command
       .replace(/^flock -n \S+ /, "")
       .replaceAll(`/opt/server-guy/${host.id}`, host.root);
+  };
+  /** The loopback port of the stack's published web listener, if any. */
   const endpoint = () => {
     try {
-      host.endpoint = real
-        .execFileSync(
-          "docker",
-          [
-            "compose",
-            "-p",
-            `sg-${host.id.slice(0, 8)}`,
-            "-f",
-            join(host.root, "compose.json"),
-            "port",
-            "app",
-            "8080",
-          ],
-          { encoding: "utf8" },
-        )
-        .trim();
+      const compose = JSON.parse(
+        readFileSync(join(host.root, "compose.json"), "utf8"),
+      ) as {
+        services: Record<string, { ports?: (string | { target: number })[] }>;
+      };
+      for (const [name, service] of Object.entries(compose.services))
+        for (const port of service.ports ?? []) {
+          host.endpoint = real
+            .execFileSync(
+              "docker",
+              [
+                "compose",
+                "-p",
+                `sg-${host.id.slice(0, 8)}`,
+                "-f",
+                join(host.root, "compose.json"),
+                "port",
+                name,
+                String(
+                  typeof port === "string"
+                    ? port.split(":").at(-1)
+                    : port.target,
+                ),
+              ],
+              { encoding: "utf8" },
+            )
+            .trim();
+          return;
+        }
     } catch {
       /* worker-only arrangements publish nothing */
     }
@@ -115,6 +148,102 @@ vi.mock("node:child_process", async (original) => {
     },
   };
 });
+// A fake Hetzner API: provisioning runs for real against it, and the server
+// it "creates" is this machine, reached through the local SSH stand-in.
+vi.mock("../../../src/server/hetzner", async (original) => ({
+  ...(await original<object>()),
+  hetznerConnectionId: () => "local-fixture",
+  smallestHostOffer: async () => ({
+    serverType: "cx23",
+    location: "fsn1",
+    cores: 2,
+    memory: 4,
+    monthly: 4.99,
+    hourly: 0.008,
+    currency: "EUR",
+  }),
+  hetzner: async (path: string, body?: Record<string, unknown>) => {
+    const { pathname } = new URL(path, "https://provider.invalid");
+    const cloud = host.cloud;
+    if (pathname === "/servers" && body) {
+      cloud.servers.push({
+        id: 3,
+        name: body.name,
+        labels: body.labels,
+        status: "running",
+        public_net: { ipv4: { ip: "127.0.0.1" } },
+      });
+      return { server: cloud.servers[0] };
+    }
+    if (pathname === "/servers") return { servers: cloud.servers };
+    if (pathname === "/servers/3") return { server: cloud.servers[0] };
+    if (pathname === "/ssh_keys")
+      return body ? { ssh_key: { id: 1 } } : { ssh_keys: [] };
+    if (pathname === "/firewalls" && body) {
+      cloud.firewall = body;
+      return { firewall: { id: 2 } };
+    }
+    if (pathname === "/firewalls")
+      return { firewalls: cloud.firewall ? [{ id: 2 }] : [] };
+    if (pathname === "/firewalls/2/actions/set_rules") {
+      cloud.firewall = { ...cloud.firewall, ...body };
+      return { actions: [{ id: 9 }] };
+    }
+    if (pathname === "/actions/9") return { action: { status: "success" } };
+    throw new Error(`Unexpected provider request ${path}`);
+  },
+}));
+// Scripted sessions stand in for the model unless a test runs the model.
+vi.mock("@earendil-works/pi-coding-agent", async (original) => {
+  const real =
+    await original<typeof import("@earendil-works/pi-coding-agent")>();
+  return {
+    ...real,
+    createAgentSession: (options: { customTools: unknown[] }) =>
+      host.session
+        ? {
+            session: {
+              prompt: () => host.session!(options.customTools),
+              waitForIdle: async () => {},
+              getLastAssistantText: () => "",
+              dispose: () => {},
+              abort: async () => {},
+            },
+          }
+        : real.createAgentSession(
+            options as Parameters<typeof real.createAgentSession>[0],
+          ),
+  };
+});
+vi.mock("../../../src/server/pi-configuration", async (original) => {
+  const real =
+    await original<typeof import("../../../src/server/pi-configuration")>();
+  return {
+    ...real,
+    configuredPiRuntime: (
+      sdk: Parameters<typeof real.configuredPiRuntime>[0],
+    ) =>
+      host.session
+        ? {
+            configuration: { reasoningEffort: "low" },
+            model: {},
+            modelRuntime: {},
+          }
+        : real.configuredPiRuntime(sdk),
+  };
+});
+vi.mock("../../../src/server/http", () => ({
+  handle: async (work: () => unknown) => {
+    try {
+      return Response.json(await work());
+    } catch (error) {
+      return Response.json(
+        { error: (error as Error).message },
+        { status: 400 },
+      );
+    }
+  },
+}));
 vi.mock("../../../src/server/deployment-compose", async (original) => {
   const real =
     await original<typeof import("../../../src/server/deployment-compose")>();
@@ -176,22 +305,30 @@ vi.mock("../../../src/server/deployment-planner", async (original) => {
       host.pi ? host.pi(args[3] as never) : real.planRelease(...args),
   };
 });
-// Record every selection's outcome: the evidence of Pi's feedback loop.
+// Record every selection's outcome, at intake and execution: the evidence of
+// Pi's feedback loop.
 vi.mock("../../../src/server/native-compose", async (original) => {
   const real =
     await original<typeof import("../../../src/server/native-compose")>();
-  return {
-    ...real,
-    prepareNativeRelease: async (
-      input: Parameters<typeof real.prepareNativeRelease>[0],
-    ) => {
+  const recorded =
+    <
+      I extends {
+        selection: import("../../../src/server/native-compose").NativeSelection;
+      },
+      R,
+    >(
+      stage: string,
+      prepare: (input: I) => Promise<R>,
+    ) =>
+    async (input: I) => {
       const entry = {
+        stage,
         compose: input.selection.compose,
         files: input.selection.files ?? [],
         criterion: input.selection.criterion !== undefined,
       };
       try {
-        const native = await real.prepareNativeRelease(input);
+        const native = await prepare(input);
         host.prepared.push({ ...entry, accepted: true });
         return native;
       } catch (error) {
@@ -202,6 +339,25 @@ vi.mock("../../../src/server/native-compose", async (original) => {
         });
         throw error;
       }
+    };
+  return {
+    ...real,
+    prepareNativeRelease: recorded("execution", real.prepareNativeRelease),
+    prepareInitialRelease: recorded("intake", real.prepareInitialRelease),
+    // Only transport differs: the host's port 80 becomes a loopback port on
+    // this machine. Retained snapshots and facts keep port 80.
+    executableCompose: (...args: Parameters<typeof real.executableCompose>) => {
+      const compose = JSON.parse(real.executableCompose(...args)) as {
+        services: Record<
+          string,
+          { ports?: { published?: string; host_ip?: string }[] }
+        >;
+      };
+      for (const service of Object.values(compose.services))
+        for (const port of service.ports ?? [])
+          if (port.published === "80")
+            Object.assign(port, { published: "", host_ip: "127.0.0.1" });
+      return JSON.stringify(compose);
     },
   };
 });
@@ -222,16 +378,16 @@ import {
 } from "../../../src/server/application-releases";
 import { operation, startChange } from "../../../src/server/operation-store";
 import { executeOperation } from "../../../src/server/application-operations";
-import {
-  composeDefinition,
-  composeStartCommand,
-} from "../../../src/server/deployment-compose";
+import { composeDefinition } from "../../../src/server/deployment-compose";
+import { legacyStartCommand } from "../../fixtures/queue-worker/legacy-plans";
 import {
   recreateDeployment,
   verifyDeployment,
   verifyServiceImages,
 } from "../../../src/server/deployment-executor";
 import { executeRelease } from "../../../src/server/release-executor";
+import { runDeploymentWorker } from "../../../src/server/deployment-worker";
+import { POST as deploymentRoute } from "../../../src/app/api/applications/[applicationId]/deployment/route";
 import {
   prepareNativeRelease,
   type NativeSelection,
@@ -243,7 +399,10 @@ import {
   type ReleaseFacts,
 } from "../../../src/server/release-facts";
 import { scopeDifferences } from "../../../src/server/release-scope";
-import type { DeploymentPlan } from "../../../src/server/deployment-types";
+import type {
+  DeploymentPlan,
+  DeploymentRecord,
+} from "../../../src/server/deployment-types";
 import type { TreeFile } from "../../../src/server/execution-tree";
 
 const proof = process.env.SG_RUN_DOCKER_PROOF === "1";
@@ -262,6 +421,8 @@ const file = (
 ): TreeFile => ({ path, mode, content: Buffer.from(content) });
 type Pi = {
   workspaceFiles: TreeFile[];
+  context: string;
+  initial?: boolean;
   apply: (
     selection: NativeSelection,
     files: TreeFile[],
@@ -296,6 +457,8 @@ beforeEach(() => {
   host.executions = 0;
   host.loseResult = false;
   host.pi = null;
+  host.session = null;
+  host.cloud = { servers: [], firewall: null };
   host.prepared = [];
 });
 /** Verification reaches the loopback web port; other requests pass through. */
@@ -314,8 +477,8 @@ function stubLocalFetch() {
     },
   );
 }
-/** A live application record on the "host" with its private inputs. */
-function application(repositoryName: string) {
+/** An application with a conversation and no deployment yet. */
+function newApplication(repositoryName: string) {
   const app = insertApplication({
     name: repositoryName,
     repositoryUrl: `https://github.com/qa/${repositoryName}`,
@@ -326,6 +489,11 @@ function application(repositoryName: string) {
     approvalScope: "Test",
   }).id;
   const chat = insertChat(insertWorkspace(app).id, "Release", true).id;
+  return { app, chat };
+}
+/** A live application record on the "host" with its private inputs. */
+function application(repositoryName: string) {
+  const { app, chat } = newApplication(repositoryName);
   const record = requestDeployment(app, chat);
   host.id = record.id;
   mkdirSync(join(root, "private", "deployments", record.id), {
@@ -460,7 +628,7 @@ it.skipIf(!proof)(
         "sh",
         [
           "-c",
-          composeStartCommand(
+          legacyStartCommand(
             plan,
             `docker compose -p ${project} -f compose.json`,
           ),
@@ -1183,7 +1351,7 @@ it.skipIf(!piProof)(
         "sh",
         [
           "-c",
-          composeStartCommand(
+          legacyStartCommand(
             plan,
             `docker compose -p ${project} -f compose.json`,
           ),
@@ -1318,4 +1486,671 @@ it.skipIf(!piProof)(
     }
   },
   60 * 60_000,
+);
+
+/** The owner's approval, posted as the deployment card posts it. */
+function approve(
+  app: string,
+  record: DeploymentRecord,
+  inputs: Record<string, string>,
+) {
+  return deploymentRoute(
+    new Request("http://localhost:3000/api/deployment", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+        host: "localhost:3000",
+      },
+      body: JSON.stringify({
+        action: "approve",
+        deploymentId: record.id,
+        recommendationId: record.recommendationId,
+        maxMonthly: record.offer!.monthly,
+        inputs,
+      }),
+    }),
+    { params: Promise.resolve({ applicationId: app }) },
+  );
+}
+/**
+ * A first deployment through the product's worker: Pi's read-only intake,
+ * the owner's approval with private values, provisioning against the fake
+ * provider, then the shared release loop on this machine.
+ */
+async function install(
+  app: string,
+  chat: string,
+  request: string,
+  inputs: (record: DeploymentRecord) => Record<string, string>,
+  timeout: number,
+) {
+  const controller = new AbortController();
+  const worker = runDeploymentWorker(controller.signal);
+  const settled = async (states: string[]) => {
+    await expect
+      .poll(() => applicationDeployment(app)?.status, {
+        timeout,
+        interval: 1000,
+      })
+      .toSatisfy((status) => states.includes(status as string));
+    return applicationDeployment(app)!;
+  };
+  try {
+    host.id = requestDeployment(app, chat, "user", request).id;
+    const recommended = await settled(["awaiting-approval", "failed"]);
+    if (recommended.status === "failed") return recommended;
+    expect((await approve(app, recommended, inputs(recommended))).status).toBe(
+      200,
+    );
+    // Done when the worker has finished the deployment: live with its URL,
+    // which it records after Pi's session ends, or failed.
+    await expect
+      .poll(
+        () => {
+          const current = applicationDeployment(app)!;
+          return (
+            current.status === "failed" ||
+            (current.status === "live" && current.url !== null)
+          );
+        },
+        { timeout, interval: 1000 },
+      )
+      .toBe(true);
+  } finally {
+    controller.abort();
+    await worker;
+  }
+  return applicationDeployment(app)!;
+}
+/** What one Pi-driven phase did: selections, feedback, attempts and tools. */
+async function observe(app: string, work: () => Promise<unknown>) {
+  const workspaces = join(root, "pi-workspaces");
+  const listed = () => (existsSync(workspaces) ? readdirSync(workspaces) : []);
+  const known = new Set(listed());
+  const before = applicationDeployment(app);
+  host.prepared = [];
+  const began = Date.now();
+  const outcome = await work().then(
+    () => "completed",
+    (error: unknown) =>
+      error instanceof Error ? error.message : String(error),
+  );
+  const current = applicationDeployment(app)!;
+  const sessions = listed()
+    .filter((id) => !known.has(id))
+    .map((id) =>
+      readFileSync(join(workspaces, id, "events.jsonl"), "utf8")
+        .trim()
+        .split("\n")
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              at: string;
+              type: string;
+              name?: string;
+              args?: unknown;
+            },
+        ),
+    )
+    .sort((a, b) => a[0].at.localeCompare(b[0].at));
+  const summary = (release: DeploymentRecord["native"]) =>
+    release && {
+      resolver: release.resolver,
+      compose: release.compose,
+      files: release.files.map((item) => item.path),
+      inputs: release.inputs,
+      inputReasons: release.inputReasons,
+      services: Object.keys(release.resolved.services),
+      database: release.database,
+      httpAccess: release.httpAccess,
+      data: release.data,
+      criterion: release.criterion,
+      authored: release.files
+        .filter((item) => !item.path.startsWith(".server-guy/"))
+        .map((item) => ({
+          path: item.path,
+          content: Buffer.from(item.content, "base64").toString("utf8"),
+        })),
+    };
+  const approved = current.lifecycle?.releases.find(
+    (release) => release.id === current.authority?.releaseId,
+  );
+  return {
+    minutes: Math.round((Date.now() - began) / 600) / 100,
+    outcome,
+    status: current.status,
+    error: current.error,
+    selections: host.prepared.map((entry) => ({
+      ...entry,
+      message: entry.message?.slice(-1500),
+    })),
+    attempts: (current.lifecycle?.attempts ?? [])
+      .slice(before?.lifecycle?.attempts.length ?? 0)
+      .map(({ kind, outcome, error, remoteResult }) => ({
+        kind,
+        outcome,
+        error: error?.slice(-1500) ?? null,
+        remoteResult,
+      })),
+    feedback: current.events
+      .slice(before?.events.length ?? 0)
+      .filter((event) => event.message.startsWith("Release feedback:"))
+      // The actionable error ends the output: keep the tail.
+      .map((event) => event.message.slice(-1500)),
+    sessions: sessions.map((events) =>
+      events
+        .filter((event) => event.type === "tool-start")
+        .map(
+          (event) =>
+            `${event.name} ${JSON.stringify(event.args).slice(0, 200)}`,
+        ),
+    ),
+    journal: sessions,
+    approved: before ? undefined : approved && summary(approved.native),
+    release: { id: current.releaseId, ...summary(current.native) },
+  };
+}
+
+const notes = (path: string) =>
+  file(path, readFileSync(join("tests/fixtures/notes-app", path)));
+const notesSource = () =>
+  [
+    "Dockerfile",
+    "requirements.txt",
+    "app.py",
+    "README.md",
+    "docker-compose.yml",
+  ].map(notes);
+const getCheck = (name: string, path: string, contains: string) => ({
+  name,
+  method: "GET" as const,
+  path,
+  body: null,
+  expectedStatus: 200,
+  contains,
+  captureId: null,
+});
+const notesCriterion = (version: string) =>
+  JSON.stringify({
+    healthPath: "/health",
+    checks: [
+      getCheck("Version", "/version", version),
+      getCheck("Notes", "/notes", '"notes"'),
+    ],
+  });
+/** Notes on managed PostgreSQL with a private key, as Pi might author it. */
+function notesCompose(
+  options: { command?: string[]; worker?: boolean; image?: string } = {},
+) {
+  const image = options.image ?? "notes:v1";
+  const database =
+    "postgresql://serverguy:${SERVER_GUY_DATABASE_PASSWORD}@postgres:5432/application";
+  const worker = `  worker:
+    image: ${image}
+    command: ["python", "worker.py"]
+    environment:
+      DATABASE_URL: ${database}
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck: { test: ["CMD", "python", "-c", "import os; assert os.path.exists('/tmp/worker-ready')"], interval: 2s, timeout: 5s, retries: 30 }
+`;
+  return `services:
+  app:
+    build: .
+    image: ${image}
+    ports: ["80:8080"]${options.command ? `\n    command: ${JSON.stringify(options.command)}` : ""}
+    environment:
+      APP_SECRET: \${APP_SECRET}
+      DATABASE_URL: ${database}
+    depends_on:
+      postgres: { condition: service_healthy }
+${options.worker ? worker : ""}  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: serverguy
+      POSTGRES_DB: application
+      POSTGRES_PASSWORD: \${SERVER_GUY_DATABASE_PASSWORD}
+    volumes: ["database:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U serverguy -d application"], interval: 2s, timeout: 5s, retries: 30 }
+volumes:
+  database: {}
+`;
+}
+const retainedNote = "retained note from v1";
+
+it.skipIf(!proof)(
+  "installs a first deployment from Pi-authored native Compose through the worker and shared loop, corrects a host failure within the approval, then updates it keeping its data",
+  async () => {
+    host.trees = {
+      [A]: [...notesSource(), file("version.txt", "v1")],
+      [B]: [...notesSource(), notes("worker.py"), file("version.txt", "v2")],
+    };
+    host.head = A;
+    const { app, chat } = newApplication("notes");
+    const secret = "synthetic-notes-signing-value";
+    const intake = {
+      compose: ["deploy.compose.yml"],
+      summary:
+        "Notes web service on managed PostgreSQL with a private signing key",
+      data: [{ volume: "database", kind: "database" }],
+      criterion: notesCriterion("v1"),
+      httpAccess: "public",
+      database: { service: "postgres", version: "16" },
+    };
+    // Intake runs the real planner, workspace, export and resolver; only the
+    // model's tool calls are scripted. Its entry point is wrong, which only
+    // the host reveals after approval.
+    host.session = async (tools) => {
+      const call = async (name: string, args: object) =>
+        (
+          await (
+            tools as {
+              name: string;
+              execute: (
+                id: string,
+                args: object,
+              ) => Promise<{ content: { text: string }[] }>;
+            }[]
+          )
+            .find((tool) => tool.name === name)!
+            .execute(`call-${name}`, args)
+        ).content[0].text;
+      await call("write", {
+        path: "deploy.compose.yml",
+        content: notesCompose({ command: ["python", "server.py"] }),
+      });
+      // An undeclared private value is feedback, not an approval request.
+      const undeclared = JSON.parse(await call("recommend_deployment", intake));
+      expect(undeclared).toMatchObject({ ok: false, retryable: true });
+      expect(undeclared.message).toContain("APP_SECRET");
+      expect(
+        JSON.parse(
+          await call("recommend_deployment", {
+            ...intake,
+            inputs: [
+              {
+                name: "APP_SECRET",
+                reason: "Signs the digest returned with notes",
+              },
+            ],
+          }),
+        ),
+      ).toMatchObject({ ok: true });
+    };
+    // The approved release fails on the host; Pi corrects it in scope.
+    host.pi = (async (pi: Pi) => {
+      expect(pi.initial).toBe(true);
+      expect(pi.context).toContain(
+        "The previous execution under this authorization failed",
+      );
+      const exposed = await pi.apply(
+        {
+          compose: ["deploy.compose.yml"],
+          summary: "Also publish the application directly on port 8080",
+        },
+        [
+          file(
+            "deploy.compose.yml",
+            notesCompose().replace(
+              'ports: ["80:8080"]',
+              'ports: ["80:8080", "8080:8080"]',
+            ),
+          ),
+        ],
+      );
+      expect(exposed).toMatchObject({ ok: false, kind: "authorization" });
+      expect(
+        await pi.apply(
+          {
+            compose: ["deploy.compose.yml"],
+            summary: "Run the image's documented entry point",
+          },
+          [file("deploy.compose.yml", notesCompose())],
+        ),
+      ).toMatchObject({ ok: true });
+    }) as never;
+    stubLocalFetch();
+    try {
+      const live = await install(
+        app,
+        chat,
+        "Deploy the notes service.",
+        () => ({ APP_SECRET: secret }),
+        15 * 60_000,
+      );
+      expect(live.error).toBeNull();
+      expect(live).toMatchObject({
+        status: "live",
+        url: "http://127.0.0.1",
+        plan: null,
+      });
+      const approvedId = live.authority!.releaseId!;
+      expect(live.lifecycle!.releases[0].id).toBe(approvedId);
+      expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+        ["deploy", "failed"],
+        ["deploy", "verified"],
+      ]);
+      expect(live.lifecycle!.attempts[0].remoteResult).toMatchObject({
+        phase: "replace",
+      });
+      expect(live.releaseId).not.toBe(approvedId);
+      expect(live.lifecycle!.runtime).toMatchObject({
+        state: "verified",
+        lastVerified: { releaseId: live.releaseId, revision: A },
+      });
+      expect(
+        host.prepared.map((entry) => [entry.stage, entry.accepted]),
+      ).toEqual([
+        ["intake", false],
+        ["intake", true],
+        ["execution", true],
+        ["execution", true],
+      ]);
+      // One server, with the firewall the approval implies, and no private
+      // value in the record.
+      expect(host.cloud.servers).toHaveLength(1);
+      expect(host.cloud.firewall).toMatchObject({
+        rules: [{ port: "22" }, { port: "80" }],
+      });
+      // The recommendation's records stay with the approved release.
+      expect(live.lifecycle!.releases[0].native!.inputReasons).toEqual({
+        APP_SECRET: "Signs the digest returned with notes",
+      });
+      expect(JSON.stringify(live)).not.toContain(secret);
+      const project = `sg-${live.id.slice(0, 8)}`;
+      const compose = (...args: string[]) =>
+        docker([
+          "compose",
+          "-p",
+          project,
+          "-f",
+          join(host.root, "compose.json"),
+          ...args,
+        ]);
+      expect(
+        (
+          await fetch(`http://${host.endpoint}/notes`, {
+            method: "POST",
+            body: JSON.stringify({ body: retainedNote }),
+          })
+        ).status,
+      ).toBe(201);
+      const database = () =>
+        docker([
+          "volume",
+          "inspect",
+          "--format",
+          "{{.CreatedAt}}",
+          `${project}_database`,
+        ]);
+      const [v1Database, v1Postgres] = [
+        database(),
+        compose("ps", "-q", "postgres"),
+      ];
+
+      // The update runs through the same loop, from the verified runtime.
+      host.head = B;
+      const updated = await change(app, chat, async (pi) => {
+        expect(pi.initial).toBeFalsy();
+        expect(
+          await pi.apply(
+            {
+              compose: ["deploy.compose.yml"],
+              summary:
+                "v2 with the README's word-count worker on the app image",
+              criterion: notesCriterion("v2"),
+            },
+            [
+              file(
+                "deploy.compose.yml",
+                notesCompose({ worker: true, image: "notes:v2" }),
+              ),
+            ],
+          ),
+        ).toMatchObject({ ok: true });
+      });
+      expect(updated.state).toBe("verified");
+      await expect
+        .poll(
+          async () =>
+            (
+              await (await fetch(`http://${host.endpoint}/notes`)).json()
+            ).notes.find((item: { body: string }) => item.body === retainedNote)
+              ?.words,
+          { timeout: 60000 },
+        )
+        .toBe(4);
+      const listed = await (
+        await fetch(`http://${host.endpoint}/notes`)
+      ).json();
+      expect(listed.digest).toBe(
+        createHmac("sha256", secret)
+          .update(JSON.stringify(listed.notes))
+          .digest("hex"),
+      );
+      expect(database()).toBe(v1Database);
+      expect(compose("ps", "-q", "postgres")).toBe(v1Postgres);
+      expect(applicationDeployment(app)!.lifecycle!.runtime).toMatchObject({
+        state: "verified",
+        lastVerified: { revision: B },
+      });
+    } finally {
+      cleanup(host.id, ["notes:v1", "notes:v2"]);
+    }
+  },
+  30 * 60_000,
+);
+
+const intakeEvidence = join(
+  process.cwd(),
+  "tests/results/native-compose-intake/pi-proof",
+);
+it.skipIf(!piProof)(
+  "the configured Pi model prepares a first deployment, corrects its execution from host feedback within the approval, then updates it",
+  async () => {
+    // The product's saved Pi choice. Only the settings file is copied; the
+    // credential it names stays in place and is read by Pi's runtime alone.
+    const settings = process.env.SG_PI_SETTINGS;
+    if (!settings || !existsSync(settings))
+      throw new Error("Set SG_PI_SETTINGS to a saved pi-settings.json.");
+    mkdirSync(join(root, "private"), { recursive: true });
+    copyFileSync(settings, join(root, "private", "pi-settings.json"));
+    // The repository pins its base image to a digest no registry serves: a
+    // failure only the host build reveals, after the owner's approval.
+    const missing = createHash("sha256")
+      .update("unpublished base")
+      .digest("hex");
+    const pinned = (item: TreeFile) =>
+      item.path === "Dockerfile"
+        ? file(
+            "Dockerfile",
+            item.content
+              .toString()
+              .replace(
+                "FROM python:3.12-alpine",
+                `FROM python:3.12-alpine@sha256:${missing}`,
+              ),
+          )
+        : item.path === "README.md"
+          ? file(
+              "README.md",
+              `${item.content}\nThe Dockerfile pins its base image by digest for reproducible builds.\n`,
+            )
+          : item;
+    host.trees = {
+      [A]: [...notesSource().map(pinned), file("version.txt", "v1")],
+      [B]: [
+        ...notesSource().map(pinned),
+        notes("worker.py"),
+        file("version.txt", "v2"),
+      ],
+    };
+    host.head = A;
+    const { app, chat } = newApplication("notes");
+    const secret = "synthetic-notes-signing-value";
+    stubLocalFetch();
+    try {
+      const installed = await observe(app, () =>
+        install(
+          app,
+          chat,
+          "Deploy this notes service. Its notes live in PostgreSQL and its signing key is private.",
+          (record) =>
+            Object.fromEntries(
+              currentFacts(record)!.inputs.map((name) => [
+                name,
+                name === "APP_SECRET"
+                  ? secret
+                  : `synthetic-${name.toLowerCase()}`,
+              ]),
+            ),
+          40 * 60_000,
+        ),
+      );
+      // Harness steps between phases must not lose the model evidence: a
+      // failure is recorded, the evidence written, and then it is reported.
+      let problem: unknown = null;
+      let noteStatus: number | null = null;
+      let beforeUpdate: string | null = null;
+      let updated: Awaited<ReturnType<typeof observe>> | null = null;
+      let listed: { notes: unknown[] } | null = null;
+      // The managed database's volume, whatever name Pi gave it.
+      const database = () => {
+        const facts = currentFacts(applicationDeployment(app))!;
+        const volume = facts.volumes.find(
+          (item) => item.name === facts.database?.volume,
+        );
+        if (!volume) throw new Error("No managed database volume is recorded.");
+        return docker([
+          "volume",
+          "inspect",
+          "--format",
+          "{{.CreatedAt}}",
+          volume.dockerName,
+        ]);
+      };
+      try {
+        if (installed.status === "live") {
+          noteStatus = (
+            await fetch(`http://${host.endpoint}/notes`, {
+              method: "POST",
+              body: JSON.stringify({ body: retainedNote }),
+            })
+          ).status;
+          beforeUpdate = database();
+          updated = await observe(app, async () => {
+            host.head = B;
+            const proposed = await proposeApplicationRelease(
+              app,
+              chat,
+              "HEAD",
+              "Update to the latest revision. It adds a background worker that counts the words in each note; run it as the repository README describes and keep the existing notes.",
+            );
+            const started = startChange(proposed.id, proposed.updatedAt);
+            await executeOperation(started, () =>
+              runApplicationRelease(started, AbortSignal.timeout(45 * 60_000)),
+            );
+          });
+          if (updated.outcome === "completed")
+            listed = await (
+              await fetch(`http://${host.endpoint}/notes`)
+            ).json();
+        }
+      } catch (error) {
+        problem = error;
+      }
+      const current = applicationDeployment(app)!;
+      const chosen = JSON.parse(readFileSync(settings, "utf8"));
+      const phases = [installed, updated].map(
+        (phase) => phase && { ...phase, journal: undefined },
+      );
+      const text = JSON.stringify(
+        {
+          model: {
+            providerId: chosen.providerId,
+            modelId: chosen.modelId,
+            reasoningEffort: chosen.reasoningEffort,
+          },
+          transport:
+            "Worker, approval route, provisioning code, planners, workspace, resolver, executor and verification are real. Stand-ins: SSH runs the host script locally; the provider API is a fake that returns this machine; GitHub listings come from fixture trees; the host's port 80 is mapped to a loopback port at execution.",
+          provider: {
+            servers: host.cloud.servers.length,
+            firewall: host.cloud.firewall,
+          },
+          phases,
+          runtime: current.lifecycle?.runtime,
+          harnessError: problem ? String(problem) : null,
+        },
+        null,
+        2,
+      );
+      mkdirSync(intakeEvidence, { recursive: true });
+      writeFileSync(join(intakeEvidence, "evidence.json"), text);
+      const journals = JSON.stringify([installed.journal, updated?.journal]);
+      // No private value reached the evidence, the record or Pi's workspace.
+      for (const value of [
+        secret,
+        readFileSync(
+          join(root, "private", "deployments", host.id, "database-password"),
+          "utf8",
+        ),
+      ]) {
+        expect(text).not.toContain(value);
+        expect(JSON.stringify(current)).not.toContain(value);
+        expect(journals).not.toContain(value);
+      }
+      writeFileSync(join(intakeEvidence, "journal.json"), journals);
+      if (problem) throw problem;
+      expect(installed).toMatchObject({ outcome: "completed", status: "live" });
+      expect(
+        installed.selections.some(
+          (entry) => entry.stage === "intake" && entry.accepted,
+        ),
+      ).toBe(true);
+      expect(noteStatus).toBe(201);
+      expect(updated).toMatchObject({ outcome: "completed" });
+      expect(current.lifecycle!.runtime).toMatchObject({
+        state: "verified",
+        lastVerified: { revision: B },
+      });
+      await expect
+        .poll(
+          async () =>
+            (
+              await (await fetch(`http://${host.endpoint}/notes`)).json()
+            ).notes.find((item: { body: string }) => item.body === retainedNote)
+              ?.words,
+          { timeout: 60000 },
+        )
+        .toBe(4);
+      const final = await (await fetch(`http://${host.endpoint}/notes`)).json();
+      expect(final.digest).toBe(
+        createHmac("sha256", secret)
+          .update(JSON.stringify(final.notes))
+          .digest("hex"),
+      );
+      expect(database()).toBe(beforeUpdate);
+      writeFileSync(
+        join(intakeEvidence, "checks.json"),
+        JSON.stringify(
+          {
+            noteRetained: true,
+            words: 4,
+            digestMatchesPrivateInput: true,
+            databaseVolumeKept: true,
+            version: await (
+              await fetch(`http://${host.endpoint}/version`)
+            ).json(),
+            listedAfterUpdate: listed?.notes,
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      cleanup(host.id, []);
+    }
+  },
+  90 * 60_000,
 );

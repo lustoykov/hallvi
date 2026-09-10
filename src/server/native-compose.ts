@@ -56,7 +56,8 @@ export interface NativeSelection {
   summary: string;
 }
 
-const criterionSchema = z
+/** A behavior criterion in the existing check dialects. */
+export const criterionSchema = z
   .strictObject({
     healthPath: httpPathSchema,
     checks: z.array(primaryCheckSchema).min(1).max(8),
@@ -749,6 +750,102 @@ export async function prepareNativeRelease(input: {
   return native;
 }
 
+/** A first deployment's selection: native files plus declared records. */
+export interface IntakeSelection extends NativeSelection {
+  /** Private inputs the owner supplies at approval. */
+  inputs?: { name: string; reason: string }[];
+  httpAccess: "public" | "controller";
+  /** The managed PostgreSQL service; the controller generates its password. */
+  database?: { service: string; version: "16" | "17" | "18" } | null;
+}
+
+/**
+ * Resolve a first deployment's selection into the release its recommendation
+ * shows. The declared records stand in for a running baseline. The provider
+ * firewall opens only HTTP, so that is the only listener it can publish.
+ */
+export async function prepareInitialRelease(input: {
+  deploymentId: string;
+  revision: string;
+  selection: IntakeSelection;
+  artifacts: TreeFile[];
+  repositoryFile: (path: string) => Promise<Buffer | null>;
+  signal: AbortSignal;
+}): Promise<NativeConfiguration> {
+  const { selection } = input;
+  const declared = selection.inputs ?? [];
+  const names = declared.map((item) => item.name);
+  const problems: string[] = [];
+  if (new Set(names).size !== names.length)
+    problems.push("Declare each private input once.");
+  for (const { name, reason } of declared)
+    if (
+      !/^[A-Z_][A-Z0-9_]*$/.test(name) ||
+      /^(COMPOSE|DOCKER)_/.test(name) ||
+      name === DATABASE_PASSWORD
+    )
+      problems.push(
+        `${name}: use an upper-case environment name; ${DATABASE_PASSWORD} is generated for the managed database.`,
+      );
+    else if (
+      !reason.trim() ||
+      reason.length > 400 ||
+      redactSecrets(reason).count
+    )
+      problems.push(`${name}: give a short reason without credentials.`);
+  if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
+  const database = selection.database ?? null;
+  const native = await prepareNativeRelease({
+    ...input,
+    inputs: names,
+    baseline: {
+      services: [],
+      volumes: [],
+      exposure: [],
+      httpAccess: selection.httpAccess,
+      database: database && { ...database, image: null, volume: null },
+      inputs: [],
+      variables: [],
+      criterion: null,
+      summary: "",
+    },
+  });
+  if (!native.criterion)
+    problems.push(
+      "Include criterion: checks that prove useful behavior through the primary HTTP listener. Readiness is not behavior.",
+    );
+  for (const name of names)
+    if (!native.inputs.includes(name))
+      problems.push(
+        `${name} is declared, but no service references \${${name}}.`,
+      );
+  if (
+    database &&
+    !new RegExp(`^postgres:${database.version}(?:[.-][A-Za-z0-9_.-]*)?$`).test(
+      native.resolved.services[database.service]?.image ?? "",
+    )
+  )
+    problems.push(
+      `database names service ${database.service}, which must run the official postgres:${database.version} image.`,
+    );
+  const unsupported = nativeFacts(native).exposure.filter(
+    (item) => item.published !== "80" || item.protocol !== "tcp",
+  );
+  if (unsupported.length)
+    problems.push(
+      `Publish only the primary HTTP listener, on host port 80/tcp; the host firewall opens nothing else (${unsupported.map((item) => `${item.service} ${item.published || "(any)"}/${item.protocol}`).join(", ")}).`,
+    );
+  if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
+  return declared.length
+    ? {
+        ...native,
+        inputReasons: Object.fromEntries(
+          declared.map((item) => [item.name, item.reason.trim()]),
+        ),
+      }
+    : native;
+}
+
 /**
  * The running release as Pi's starting point: its configuration with private
  * values as ${NAME}, the files it mounted or built, and the records Compose
@@ -812,6 +909,19 @@ export function currentConfigurationFiles(
           content: Buffer.from(build.generatedDockerfile),
         });
   }
+  // The database identity the configuration sets; the official image
+  // defaults the database name to its user.
+  const environment = facts.database
+    ? ((
+        compose as {
+          services: Record<
+            string,
+            { environment?: Record<string, string | null> }
+          >;
+        }
+      ).services[facts.database.service]?.environment ?? {})
+    : {};
+  const databaseUser = environment.POSTGRES_USER ?? "postgres";
   const records = {
     release: release.id,
     revision: release.revision,
@@ -833,8 +943,8 @@ export function currentConfigurationFiles(
     })),
     managedDatabase: facts.database && {
       ...facts.database,
-      user: "serverguy",
-      database: "application",
+      user: databaseUser,
+      database: environment.POSTGRES_DB ?? databaseUser,
       passwordVariable: DATABASE_PASSWORD,
     },
     privateInputs: facts.inputs,

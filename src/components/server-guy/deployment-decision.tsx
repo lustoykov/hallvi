@@ -3,8 +3,38 @@
 import { useState } from "react";
 
 import type { DeploymentRecord } from "@/server/deployment-types";
+import { currentFacts } from "@/server/release-facts";
 
 import type { ApplicationSection } from "./application-sections";
+
+const decode = (base64: string) =>
+  new TextDecoder().decode(
+    Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)),
+  );
+
+/** The packaging the owner approves: Pi's files, or a legacy plan's. */
+function packaging(record: DeploymentRecord) {
+  if (record.native)
+    return record.native.files
+      .filter((file) => !file.path.startsWith(".server-guy/"))
+      .map((file) => ({ path: file.path, content: decode(file.content) }));
+  const plan = record.plan;
+  if (!plan) return [];
+  return [
+    ...(plan.generatedDockerfile
+      ? [{ path: plan.dockerfile, content: plan.generatedDockerfile }]
+      : []),
+    ...[
+      { name: "app", configs: plan.configs ?? [] },
+      ...(plan.services ?? []),
+    ].flatMap((service) =>
+      service.configs.map((config) => ({
+        path: `${service.name} ${config.target}`,
+        content: config.content,
+      })),
+    ),
+  ];
+}
 
 /**
  * The one place a deployment is decided: the priced recommendation with its
@@ -67,7 +97,16 @@ export function DeploymentDecision({
       setBusy(false);
     }
   }
-  if (record.status === "awaiting-approval" && record.plan && record.offer)
+  const facts = currentFacts(record);
+  if (record.status === "awaiting-approval" && facts && record.offer) {
+    const reasons: Record<string, string> =
+      record.native?.inputReasons ??
+      Object.fromEntries(
+        (record.plan?.missingInputs ?? []).map((input) => [
+          input.name,
+          input.reason,
+        ]),
+      );
     return (
       <form
         className="sg-op-approval"
@@ -84,7 +123,7 @@ export function DeploymentDecision({
         }}
       >
         <strong>Your approval is needed</strong>
-        <p>{record.plan.summary}</p>
+        <p>{facts.summary}</p>
         <div className="sg-host-recommendation">
           <strong>{record.offer.serverType.toUpperCase()} · Hetzner</strong>
           <span>
@@ -96,18 +135,18 @@ export function DeploymentDecision({
           </strong>
           <small>Hourly billing · IPv4 included · no backup add-on</small>
         </div>
-        {record.plan.missingInputs.map((input) => (
-          <label key={input.name}>
-            {input.name}
-            <small>{input.reason}</small>
+        {facts.inputs.map((name) => (
+          <label key={name}>
+            {name}
+            {reasons[name] && <small>{reasons[name]}</small>}
             <input
               type="password"
               autoComplete="off"
-              value={inputs[input.name] ?? ""}
+              value={inputs[name] ?? ""}
               onChange={(event) =>
                 setInputs((current) => ({
                   ...current,
-                  [input.name]: event.target.value,
+                  [name]: event.target.value,
                 }))
               }
               required
@@ -117,34 +156,33 @@ export function DeploymentDecision({
         <details>
           <summary>Review deployment configuration</summary>
           <p>
-            Revision {record.revision?.slice(0, 12)} · HTTP port{" "}
-            {record.plan.port}
-            {record.plan.postgres
-              ? ` · PostgreSQL ${record.plan.postgres.version}`
-              : ""}
+            Revision {record.revision?.slice(0, 12)}
+            {facts.exposure.map(
+              (item) =>
+                ` · ${item.service} serves HTTP on port ${item.published || item.target}`,
+            )}
+            {facts.database ? ` · PostgreSQL ${facts.database.version}` : ""}
           </p>
           <pre>
-            {record.plan.image
-              ? `Use pinned image ${record.plan.image}`
-              : (record.plan.generatedDockerfile ??
-                `Reuse ${record.plan.dockerfile}`)}
-            {record.plan.services
-              ?.map((s) => `\nPrivate service ${s.name}: ${s.image}`)
-              .join("")}
-            {record.plan.volumes
-              ?.map((v) => `\nPersist ${v.target} in ${v.name}`)
-              .join("")}
-            {record.plan.configs
-              ?.map((c) => `\nRead-only ${c.target}:\n${c.content}`)
-              .join("")}
-            {record.plan.services
-              ?.flatMap((s) =>
-                s.configs.map(
-                  (c) => `\n${s.name} read-only ${c.target}:\n${c.content}`,
-                ),
+            {facts.services
+              .map(
+                (service) =>
+                  `${service.name}: ${service.pinned ? `pinned image ${service.pinned}` : service.build ? "built from this revision" : service.sharesImageWith ? `runs the ${service.sharesImageWith} image` : "managed database image"}${service.command ? ` · ${service.command}` : ""}`,
+              )
+              .join("\n")}
+            {facts.volumes
+              .map(
+                (volume) =>
+                  `\nPersist ${volume.name} (${volume.kind}): ${volume.mounts.map((mount) => `${mount.service} ${mount.target}${mount.readOnly ? " read-only" : ""}`).join(", ")}`,
               )
               .join("")}
           </pre>
+          {packaging(record).map((file) => (
+            <details key={file.path}>
+              <summary>{file.path}</summary>
+              <pre>{file.content}</pre>
+            </details>
+          ))}
           {record.inspectedRevision &&
             record.inspectedRevision !== record.revision && (
               <p>
@@ -158,7 +196,7 @@ export function DeploymentDecision({
           </p>
           <p>
             Public checks:{" "}
-            {record.plan.checks
+            {facts.criterion?.checks
               .map(
                 (check) =>
                   `${check.name}: ${check.method} ${check.path} → HTTP ${check.expectedStatus}${check.contains ? `, contains “${check.contains}”` : ""}`,
@@ -166,7 +204,7 @@ export function DeploymentDecision({
               .join("; ")}
           </p>
           <p>
-            {record.plan.httpAccess === "controller"
+            {facts.httpAccess === "controller"
               ? "HTTP will be restricted to this controller’s network for protected setup. "
               : ""}
             Application code stays unchanged. This first release uses HTTP;
@@ -203,6 +241,7 @@ export function DeploymentDecision({
         </div>
       </form>
     );
+  }
   if (record.status === "failed")
     return (
       <div

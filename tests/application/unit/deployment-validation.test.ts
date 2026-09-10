@@ -1,61 +1,40 @@
 import { expect, it, vi } from "vitest";
-import { deploymentPlanSchema } from "../../../src/server/deployment-types";
+import { criterionSchema } from "../../../src/server/native-compose";
 import { HetznerError, hetzner } from "../../../src/server/hetzner";
 import { isControllerHost } from "../../../src/server/controller-origin";
-const base = {
-  summary: "A simple static application",
-  dockerfile: "Dockerfile",
-  generatedDockerfile: null,
-  context: ".",
-  port: 8080,
-  command: null,
-  environment: [],
-  postgres: null,
-  missingInputs: [],
-  healthPath: "/health",
+const check = {
+  name: "Check",
+  method: "GET",
+  path: "/health",
+  body: null,
+  expectedStatus: 200,
+  contains: "",
+  captureId: null,
 };
 it("requires application content evidence rather than only successful health", () => {
-  const check = {
-    name: "Check",
-    method: "GET",
-    path: "/health",
-    body: null,
-    expectedStatus: 200,
-    contains: "",
-    captureId: null,
-  };
   expect(
-    deploymentPlanSchema.safeParse({ ...base, checks: [check] }).success,
+    criterionSchema.safeParse({ healthPath: "/health", checks: [check] })
+      .success,
   ).toBe(false);
   expect(
-    deploymentPlanSchema.safeParse({
-      ...base,
+    criterionSchema.safeParse({
+      healthPath: "/health",
       checks: [{ ...check, path: "/", contains: "My application" }],
     }).success,
   ).toBe(true);
 });
 it("rejects arbitrary destructive verification even when there is a content check", () => {
   expect(
-    deploymentPlanSchema.safeParse({
-      ...base,
+    criterionSchema.safeParse({
+      healthPath: "/health",
       checks: [
+        { ...check, name: "Read", path: "/", contains: "App" },
         {
-          name: "Read",
-          method: "GET",
-          path: "/",
-          body: null,
-          expectedStatus: 200,
-          contains: "App",
-          captureId: null,
-        },
-        {
+          ...check,
           name: "Delete",
           method: "DELETE",
           path: "/todos/1",
-          body: null,
           expectedStatus: 204,
-          contains: "",
-          captureId: null,
         },
       ],
     }).success,
@@ -113,51 +92,4 @@ it("the request proxy rejects a rebound host on reads, before a route can return
     headers: { host: "127.0.0.1:3260" },
   });
   expect(proxy(local).status).toBe(200);
-});
-
-it("accepts pinned images and persistent SQLite while rejecting unsafe Compose fields", () => {
-  const image = {
-    ...base,
-    image: "louislam/uptime-kuma@sha256:" + "a".repeat(64),
-    volumes: [
-      {
-        name: "data",
-        target: "/app/data",
-        kind: "database",
-        sqlite: "/app/data/kuma.db",
-      },
-    ],
-    configs: [],
-    services: [],
-    httpAccess: "controller",
-    checks: [
-      {
-        name: "Content",
-        method: "GET",
-        path: "/",
-        body: null,
-        expectedStatus: 200,
-        contains: "Uptime Kuma",
-        captureId: null,
-      },
-    ],
-  };
-  expect(deploymentPlanSchema.safeParse(image).success).toBe(true);
-  for (const bad of [
-    { ...image, privileged: true },
-    { ...image, image: "https://untrusted.example/image:2" },
-    {
-      ...image,
-      volumes: [{ ...image.volumes[0], name: "/var/run/docker.sock" }],
-    },
-    {
-      ...image,
-      volumes: [{ ...image.volumes[0], sqlite: "/tmp/ephemeral.db" }],
-    },
-    {
-      ...image,
-      configs: [{ name: "config", target: "/app/../etc/file", content: "x" }],
-    },
-  ])
-    expect(deploymentPlanSchema.safeParse(bad).success).toBe(false);
 });

@@ -60,6 +60,8 @@ export interface NativeConfiguration {
   files: { path: string; mode: number; sha256: string; content: string }[];
   resolved: ResolvedCompose;
   inputs: string[];
+  /** Why each private input declared at intake is needed, for the owner. */
+  inputReasons?: Record<string, string>;
   data: {
     volume: string;
     kind: "database" | "files";

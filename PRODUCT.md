@@ -42,7 +42,7 @@ Use [representative compatibility cases](docs/testing/self-hosted-compatibility.
 
 Model intelligence determines what to inspect, recommend and do next. Tools enforce access, spending limits and effect-specific authority. Recommendations and successful commands are not proof of a working or protected application.
 
-Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture/agent-releases.md) implements this loop for updates on an existing host; initial deployment still uses its priced recommendation approval.
+Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture/agent-releases.md) implements this loop for updates on an existing host; a first deployment runs through the same loop once the owner approves its priced recommendation.
 
 ## Experience
 
