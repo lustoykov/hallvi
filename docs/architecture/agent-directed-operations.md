@@ -27,11 +27,13 @@ Application conversations ↔ stable application views
 
 The diagram shows the target responsibilities, not shipped support for every service. Keep the Next.js modular monolith and existing Node worker. Use straightforward modules and persistent records; a distributed queue, workflow engine or general plugin runtime is not a prerequisite.
 
+The [generalization and extensibility brief](extensible-capabilities.md) records the 10 September direction: general capabilities remain in the core, while versioned Plugins can add specialised operations, checks and UI contributions. The interface and execution trust model are pending review; plugin drafting does not authorize activation or access.
+
 Pi interprets repository/upstream evidence, investigates ambiguity and revises the next work. Deterministic code validates requests, enforces authority, executes bounded effects and records observations. Untrusted repository text and command output are evidence, never permission or instructions to the controller.
 
 ## Current implementation
 
-`deployment-planner.ts` inspects a pinned repository and submits a validated plan. `deployment-executor.ts` currently emits one HTTP service with optional private PostgreSQL, prepares a fresh Hetzner host and checks the resulting application. It cannot faithfully represent arbitrary Compose stacks yet; required unsupported services must block planning rather than disappear.
+`deployment-planner.ts` inspects a pinned repository and submits a validated plan. `deployment-executor.ts` emits one primary HTTP service, built from source or a pinned public Docker Hub image, with optional private PostgreSQL, up to five additional private image services, named volumes and read-only configuration mounts. It prepares a fresh Hetzner host and checks the resulting application. It cannot faithfully represent arbitrary Compose stacks yet; required unsupported services must block planning rather than disappear. This remains narrower than the product's target of several web/API services and existing-machine adoption.
 
 `deployment-store.ts` retains the initial deployment intent, source/connection identity, recommendation/approval, progress and results. Conditional writes prevent stale record replacement. Provider creation uncertainty is reconciled using the original identity before another purchase. Exact cost/offer and source identity are refreshed at the effect boundary.
 

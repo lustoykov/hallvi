@@ -4,6 +4,8 @@ import {
   volumeMountSchema,
   configMountSchema,
   composeServiceSchema,
+  dependencySchema,
+  inputBindingSchema,
 } from "./compose-plan";
 
 const path = z.string().regex(/^(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/);
@@ -13,6 +15,13 @@ export const deploymentPlanSchema = z
     volumes: z.array(volumeMountSchema).max(8).optional(),
     configs: z.array(configMountSchema).max(8).optional(),
     services: z.array(composeServiceSchema).max(5).optional(),
+    dependencies: z.array(dependencySchema).max(30).optional(),
+    inputBindings: z.array(inputBindingSchema).max(60).optional(),
+    healthCommand: z
+      .array(z.string().min(1).max(500))
+      .min(1)
+      .max(20)
+      .optional(),
     httpAccess: z.enum(["public", "controller"]).optional(),
     summary: z.string().min(20).max(1500),
     dockerfile: path,
@@ -53,6 +62,7 @@ export const deploymentPlanSchema = z
         z.strictObject({
           name: z.string().min(1).max(120),
           method: z.enum(["GET", "POST", "DELETE"]),
+          waitSeconds: z.number().int().min(1).max(30).optional(),
           path: z
             .string()
             .regex(/^\/(?!\/)[^\s]*$/)
@@ -84,6 +94,100 @@ export const deploymentPlanSchema = z
       );
     if (plan.image && plan.generatedDockerfile)
       fail("Choose an image or a Dockerfile build, not both.");
+    const names = new Set([
+      "app",
+      ...(plan.postgres ? ["postgres"] : []),
+      ...(plan.services ?? []).map((s) => s.name),
+    ]);
+    const healthNames = new Set([
+      ...(plan.postgres ? ["postgres"] : []),
+      ...(plan.healthCommand ? ["app"] : []),
+      ...(plan.services ?? [])
+        .filter((s) => s.healthCommand)
+        .map((s) => s.name),
+    ]);
+    for (const service of plan.services ?? []) {
+      if (Boolean(service.image) === Boolean(service.imageFrom))
+        fail("Each service needs exactly one image or imageFrom reference.");
+      if (service.imageFrom && !service.command?.length)
+        fail("A service sharing the app image needs its own command.");
+      if (service.checks.length && !(service.port && service.healthPath))
+        fail("Private HTTP checks need a port and health path.");
+      if (
+        (service.role === "worker" || service.role === "broker") &&
+        !service.healthCommand &&
+        !(service.port && service.healthPath)
+      )
+        fail("Workers and brokers need an explicit readiness check.");
+    }
+    const edges = [
+      ...(plan.dependencies ?? []),
+      ...(plan.postgres
+        ? [{ service: "app", needs: "postgres", condition: "healthy" }]
+        : []),
+    ];
+    const uniqueEdges = new Set<string>();
+    for (const edge of plan.dependencies ?? []) {
+      if (!names.has(edge.service) || !names.has(edge.needs))
+        fail("Dependency refers to an unknown service.");
+      if (edge.service === "postgres")
+        fail("The managed database cannot depend on an application service.");
+      const key = `${edge.service}:${edge.needs}`;
+      if (uniqueEdges.has(key) || (plan.postgres && key === "app:postgres"))
+        fail("Dependency is already declared.");
+      uniqueEdges.add(key);
+      if (edge.condition === "healthy" && !healthNames.has(edge.needs))
+        fail("Healthy dependencies require a container readiness command.");
+    }
+    const visiting = new Set<string>(),
+      visited = new Set<string>();
+    const visit = (name: string): boolean => {
+      if (visiting.has(name)) return false;
+      if (visited.has(name)) return true;
+      visiting.add(name);
+      if (edges.filter((e) => e.service === name).some((e) => !visit(e.needs)))
+        return false;
+      visiting.delete(name);
+      visited.add(name);
+      return true;
+    };
+    if ([...names].some((name) => !visit(name)))
+      fail("Service dependencies must not contain a cycle.");
+    if (plan.inputBindings) {
+      const inputs = new Set(plan.missingInputs.map((i) => i.name));
+      const bound = new Set<string>();
+      for (const binding of plan.inputBindings) {
+        if (!names.has(binding.service) || binding.service === "postgres")
+          fail("Input binding refers to an unsupported service.");
+        if (Boolean(binding.input) === Boolean(binding.connection))
+          fail("Bind either a private input or a managed connection.");
+        if (binding.input && !inputs.has(binding.input))
+          fail("Input binding refers to an undeclared private input.");
+        if (binding.connection && !plan.postgres)
+          fail("The managed PostgreSQL connection is not configured.");
+        const key = `${binding.service}:${binding.variable}`;
+        if (bound.has(key))
+          fail("Each service variable may be bound only once.");
+        bound.add(key);
+        const environment =
+          binding.service === "app"
+            ? plan.environment
+            : plan.services?.find((s) => s.name === binding.service)
+                ?.environment;
+        if (
+          environment?.some((e) => e.name === binding.variable) ||
+          (binding.service === "app" &&
+            binding.variable === plan.postgres?.variable)
+        )
+          fail("Input binding conflicts with an existing variable.");
+      }
+      if (
+        [...inputs].some(
+          (input) => !plan.inputBindings!.some((b) => b.input === input),
+        )
+      )
+        fail("Every private input needs a service binding.");
+    }
     const services = [
       { name: "app", volumes: plan.volumes ?? [], configs: plan.configs ?? [] },
       ...(plan.services ?? []),
@@ -114,6 +218,8 @@ export const deploymentPlanSchema = z
           fail("SQLite must be inside its persistent volume.");
       }
     }
+    if (plan.checks.some((c) => c.waitSeconds && c.method !== "GET"))
+      fail("Only read checks may wait for an asynchronous result.");
     const mutations = plan.checks.filter((c) => c.method !== "GET");
     if (mutations.length) {
       const create = mutations[0];
@@ -190,6 +296,13 @@ export interface DeploymentRecord {
   imageId: string | null;
   /** Every service image observed on the host, keyed by service name. */
   serviceImages?: Record<string, string>;
+  /** Historical readiness evidence, not continuous monitoring. */
+  serviceReadiness?: Record<
+    string,
+    { checkedAt: string; kind: "command" | "http"; imageId: string | null }
+  >;
+  /** Immutable recommendation identity; old records are projected on read. */
+  releaseId?: string;
   bundleHashes?: Record<string, string>;
   /** Public HTTP is limited to this controller address when requested. */
   httpSourceIp?: string;
@@ -211,10 +324,9 @@ export interface DeploymentRecord {
   logsCollectedAt?: string | null;
   /**
    * Stack facts beyond the web process and PostgreSQL that the executor
-   * runs from the plan. Nothing records these yet; the executor deploys one
-   * web process plus optional PostgreSQL. The views read them once a
-   * deployment records worker processes, Redis or Valkey, queues, scheduled
-   * commands or file volumes.
+   * runs from the plan. Services in the plan are authoritative; this optional
+   * legacy projection also carries schedules and queue-library metadata.
+   * Recording such metadata does not install a schedule or verify a job.
    */
   stack?: RecordedStack;
 }

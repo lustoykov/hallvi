@@ -1,5 +1,6 @@
 "use client";
 
+import { LocalTime } from "../local-time";
 import type { ReactNode } from "react";
 
 import type { StackProcess } from "@/server/application-stack";
@@ -48,7 +49,14 @@ function Process({
       <h2>
         <code>{process.name}</code>
         <span className="sg-role">
-          {process.role === "web" ? "Web process" : "Worker"}
+          {
+            {
+              web: "Web process",
+              worker: "Worker",
+              broker: "Broker",
+              service: "Private service",
+            }[process.role]
+          }
         </span>
         {check && (
           <Pill
@@ -90,7 +98,12 @@ function Process({
           ],
           ...(process.role === "web"
             ? ([
-                ["Listens", `Port 80 → ${process.port ?? "?"} · HTTP`],
+                [
+                  "Listens",
+                  process.private
+                    ? `Port ${process.port ?? "?"} · private HTTP`
+                    : `Port 80 → ${process.port ?? "?"} · HTTP`,
+                ],
                 [
                   "Health",
                   process.healthPath ? (
@@ -100,23 +113,52 @@ function Process({
                   ),
                 ],
               ] as Array<[string, ReactNode]>)
-            : ([
+            : process.role === "worker"
+              ? ([
+                  [
+                    "Consumes",
+                    process.consumes ??
+                      (queue ? (
+                        <>
+                          {queue.library} queue on{" "}
+                          {brokerName(stack, queue.backend)} ·{" "}
+                          <TextLink onClick={() => onOpenDestination("cache")}>
+                            Cache &amp; queue
+                          </TextLink>
+                        </>
+                      ) : (
+                        "Not recorded"
+                      )),
+                  ],
+                ] as Array<[string, ReactNode]>)
+              : []),
+          ...(process.dependsOn?.length
+            ? [["Needs", process.dependsOn.join(", ")] as [string, ReactNode]]
+            : []),
+          ...(process.healthCommand
+            ? [
                 [
-                  "Consumes",
-                  process.consumes ??
-                    (queue ? (
-                      <>
-                        {queue.library} queue on{" "}
-                        {brokerName(stack, queue.backend)} ·{" "}
-                        <TextLink onClick={() => onOpenDestination("cache")}>
-                          Cache &amp; queue
-                        </TextLink>
-                      </>
-                    ) : (
-                      "Not recorded"
-                    )),
-                ],
-              ] as Array<[string, ReactNode]>)),
+                  "Readiness command",
+                  <code key="readiness">
+                    {process.healthCommand.join(" ")}
+                  </code>,
+                ] as [string, ReactNode],
+              ]
+            : []),
+          [
+            "Deployment check",
+            process.readiness ? (
+              <>
+                Passed{" "}
+                {process.readiness.kind === "command"
+                  ? "readiness command"
+                  : "HTTP checks"}{" "}
+                at <LocalTime value={process.readiness.checkedAt} />
+              </>
+            ) : (
+              "No individual readiness result recorded"
+            ),
+          ],
         ]}
       />
     </section>
@@ -133,6 +175,9 @@ export function ProcessesView(props: ViewProps) {
   const checkFor = (name: string) =>
     checks.find((check) => check.kind === "process" && check.target === name) ??
     null;
+  const allPassing =
+    stack.processes.length > 0 &&
+    stack.processes.every((p) => checkFor(p.name)?.state === "passing");
   const unhealthy = stack.processes.filter(
     (process) => checkFor(process.name)?.state === "failing",
   );
@@ -165,18 +210,20 @@ export function ProcessesView(props: ViewProps) {
     <>
       {checks.length > 0 && (
         <Condition
-          tone={unhealthy.length ? "bad" : "ok"}
+          tone={unhealthy.length ? "bad" : allPassing ? "ok" : "muted"}
           title={
             unhealthy.length
               ? `${unhealthy.map((item) => item.name).join(", ")} ${unhealthy.length === 1 ? "is" : "are"} unhealthy`
-              : `${stack.processes.length} process${stack.processes.length === 1 ? "" : "es"} healthy`
+              : allPassing
+                ? `${stack.processes.length} process${stack.processes.length === 1 ? "" : "es"} healthy`
+                : "Some process checks are unavailable"
           }
         >
           {web.length} web process{web.length === 1 ? "" : "es"}
           {workers.length
             ? ` and ${workers.length} worker${workers.length === 1 ? "" : "s"}`
             : " and no workers"}{" "}
-          on one instance, checked on the host.
+          on one instance. Each observed result is shown below.
         </Condition>
       )}
       {ordered.map((process) => (

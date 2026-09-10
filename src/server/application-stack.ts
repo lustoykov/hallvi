@@ -9,13 +9,17 @@ export type StackState = "running" | "planned";
 
 export interface StackProcess {
   name: string;
-  role: "web" | "worker";
+  role: "web" | "worker" | "broker" | "service";
   command: string | null;
   image: string | null;
   /** Host port → container port for the web process. */
   port: number | null;
   healthPath: string | null;
   consumes: string | null;
+  private?: boolean;
+  healthCommand?: string[];
+  readiness?: NonNullable<DeploymentRecord["serviceReadiness"]>[string];
+  dependsOn?: string[];
   state: StackState;
 }
 export interface StackDatabase {
@@ -97,28 +101,54 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
       port: plan.port,
       healthPath: plan.healthPath,
       consumes: null,
+      dependsOn: [
+        ...(plan.postgres ? ["postgres"] : []),
+        ...(plan.dependencies ?? [])
+          .filter((d) => d.service === "app")
+          .map((d) => d.needs),
+      ],
+      ...(plan.healthCommand ? { healthCommand: plan.healthCommand } : {}),
+      ...(record.serviceReadiness?.app
+        ? { readiness: record.serviceReadiness.app }
+        : {}),
       state,
     },
     ...imageServices.map((service) => ({
       name: service.name,
-      role: "web" as const,
+      role:
+        service.role ??
+        (service.port ? ("web" as const) : ("service" as const)),
       command: service.command?.join(" ") ?? null,
-      image: service.image,
-      port: null,
+      image: service.imageFrom
+        ? (record.serviceImages?.[service.name] ?? plan.image ?? record.imageId)
+        : (service.image ?? null),
+      port: service.port,
+      private: true,
       healthPath: service.healthPath,
+      healthCommand: service.healthCommand,
+      readiness: record.serviceReadiness?.[service.name],
+      dependsOn: plan.dependencies
+        ?.filter((d) => d.service === service.name)
+        .map((d) => d.needs),
       consumes: null,
       state,
     })),
-    ...(extra.processes ?? []).map((process) => ({
-      name: process.name,
-      role: process.role,
-      command: process.command,
-      image: process.image ?? null,
-      port: null,
-      healthPath: null,
-      consumes: process.consumes ?? null,
-      state,
-    })),
+    ...(extra.processes ?? [])
+      .filter(
+        (process) =>
+          process.name !== "app" &&
+          !imageServices.some((service) => service.name === process.name),
+      )
+      .map((process) => ({
+        name: process.name,
+        role: process.role,
+        command: process.command,
+        image: process.image ?? null,
+        port: null,
+        healthPath: null,
+        consumes: process.consumes ?? null,
+        state,
+      })),
   ];
   const databases: StackDatabase[] = [
     ...(plan.postgres
@@ -204,12 +234,29 @@ export function persistentState(stack: ApplicationStack) {
           : "consistent copy of the database file",
     })),
     ...stack.volumes
-      .filter((volume) => volume.kind === "files")
+      .filter(
+        (volume) =>
+          volume.kind === "files" ||
+          !stack.databases.some(
+            (database) =>
+              (database.kind === "postgres" &&
+                volume.name === "database" &&
+                volume.usedBy === "postgres") ||
+              (database.kind === "sqlite" &&
+                database.name === volume.usedBy &&
+                database.location.startsWith(
+                  volume.mount.replace(/\/$/, "") + "/",
+                )),
+          ),
+      )
       .map((volume) => ({
         key: `volume:${volume.name}`,
-        label: `Files · ${volume.name}`,
+        label: `${volume.kind === "files" ? "Files" : "Data"} · ${volume.name}`,
         detail: `${volume.mount} · used by ${volume.usedBy}`,
-        method: "file archive",
+        method:
+          volume.kind === "files"
+            ? "file archive"
+            : "consistency procedure not yet supported",
       })),
   ];
 }

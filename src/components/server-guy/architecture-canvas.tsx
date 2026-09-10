@@ -202,7 +202,11 @@ export function ArchitectureCanvas({
                 : `${workers.length} private processes`,
             detail: live ? "Same host · private network" : "Planned",
             symbol: "workers",
-            tone: toneOf("process", workers[0]?.name),
+            tone: workers.some((w) => toneOf("process", w.name) === "bad")
+              ? "bad"
+              : workers.every((w) => toneOf("process", w.name) === "ok")
+                ? "ok"
+                : "unknown",
             destination: "processes" as ApplicationSection,
             description: `${workers.map((worker) => worker.name).join(", ")}: ${onlyWorkers ? "background processes" : "additional services"} running on this instance. Their images, commands and health checks are recorded in Processes.`,
           },

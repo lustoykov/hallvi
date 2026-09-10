@@ -1,3 +1,4 @@
+import { queuePlan } from "../../fixtures/queue-worker/plan";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -529,4 +530,47 @@ it("verifies JSON content independently of formatting without changing values", 
     false,
   );
   expect(responseContains("<p>not ok</p>", "notok")).toBe(false);
+});
+
+it("polls the declared result read while creating and deleting a marked job exactly once", async () => {
+  const value = record();
+  value.address = "203.0.113.10";
+  value.plan = queuePlan();
+  let marker = "",
+    reads = 0;
+  const fetcher = vi.fn(async (url: URL, init: RequestInit) => {
+    if (url.pathname === "/health") return Response.json({ ok: true });
+    if (url.pathname === "/") return new Response("Background job fixture");
+    if (init.method === "POST") {
+      marker = JSON.parse(String(init.body)).message;
+      return Response.json(
+        { id: "owned-job", message: marker },
+        { status: 201 },
+      );
+    }
+    expect(url.pathname).toBe("/jobs/owned-job");
+    if (init.method === "DELETE") return Response.json({ deleted: true });
+    return ++reads === 1
+      ? Response.json({ pending: true }, { status: 202 })
+      : Response.json({ result: `processed:${marker}` });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  await verifyDeployment(value, new AbortController().signal);
+  expect(reads).toBe(2);
+  expect(
+    fetcher.mock.calls.filter(([, init]) => init.method === "POST"),
+  ).toHaveLength(1);
+  expect(
+    fetcher.mock.calls.filter(([, init]) => init.method === "DELETE"),
+  ).toHaveLength(1);
+  expect(value.cleanup).toBeNull();
+});
+
+it("rejects changed release configuration before provisioning", async () => {
+  const value = record();
+  value.releaseId = "an-old-release-hash";
+  await expect(
+    executeDeployment(value, new AbortController().signal),
+  ).rejects.toThrow("release changed");
+  expect(api).not.toHaveBeenCalled();
 });

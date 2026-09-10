@@ -31,6 +31,17 @@ Retained checks and their [recorded disposition](docs/testing/2026-09-09-final-i
 
 Each increment must connect conversation, durable state, execution and verification. These are engineering increments, never user-facing stages. Implement the smallest useful case within each; do not wait for every compatibility case to finish before exercising a working lifecycle.
 
+### Current priority: service-based deployment
+
+Direction agreed on 10 September 2026: follow the [core and Plugin boundary](docs/architecture/extensible-capabilities.md). The first implementation slice is [service-based deployment](docs/architecture/service-deployment.md): shared source images, explicit roles, dependencies, scoped private-input/managed-connection bindings, and readiness plus asynchronous behavior verification. A synthetic web + worker + Valkey stack exercises this without application-name branches. It does not complete the lifecycle or plugin runtime.
+
+- Reconcile the supported application requirements with the plan schema, executor, backup capture path and dashboard model. Separate configuration differences, missing core capabilities and justified specialised behavior.
+- Use that review to generalize recorded services, storage ownership, writers and consistency requirements. Preserve existing deployments, recovery points and evidence; replace application-name guards only when the replacement method has equivalent checks and meaningful restore proof.
+- Use Grafana's specialised verification as the first candidate bundled Plugin after separating generic capture from functional checks. Exercise a second, different integration before stabilizing the interface. Select one additional application to reveal remaining core gaps without expanding the product's one-instance boundary.
+- Define enforceable access, version identity, result contracts and activation behavior before loading generated code. Include inspection, export, recovery and optional contribution through a PR. Prefer existing views for plugin results; a marketplace and arbitrary custom UI are not initial gates.
+
+Acceptance for the first generalization slice: an additional in-scope application works through configuration and supported methods without new application-name branches in core execution; existing test stacks retain their verified behavior. Record any genuinely specialised requirement explicitly. The Docker proof covers initial startup, same-image recreation, a stopped worker, safe test-object cleanup and recovered job processing. It is a local Linux container proof, not a new Hetzner/BYOM or backup certification. Next separate host adoption and subsequent release attempts from the initial-deployment path.
+
 ### 1. Complete the single-instance runtime
 
 Close the [reviewed recovery gaps](docs/reviews/2026-09-09-final-integration-review.md) before expanding the executor: provide evidence-backed resolution for an uncertain purchase with no recovered host and for an unknown verification object; clean private material for definitively abandoned setup. Do not clear uncertainty merely because the user retries. The [runtime acceptance report](docs/testing/2026-09-09-single-instance-runtime.md#recovery-gap-dispositions) records the implemented paths and the explicit limits of owner-attested purchase reconciliation.
@@ -81,7 +92,7 @@ For each supported pinned version prove **deploy → meaningful work → recreat
 
 ## Later and excluded
 
-External notification providers are an agreed expansion after in-app issues; choose providers when implementing delivery. Optional Plugins, additional compute/storage providers, automatic-on-push releases, previews, dedicated build servers, richer teams and API/MCP integration have no committed implementation order.
+External notification providers are an agreed expansion after in-app issues; choose providers when implementing delivery. Plugin boundary review and the first candidate extraction are covered above; a general marketplace and broad plugin/UI runtime remain unscheduled. Additional compute/storage providers, automatic-on-push releases, previews, dedicated build servers, richer teams and API/MCP integration have no committed implementation order.
 
 Multi-host application/database orchestration, clusters/replicas, automatic database failover and distributed job orchestration are outside the product direction. Manual recovery onto a replacement host maintains one active instance. Learning labs and competitor feature lists do not expand this boundary.
 
