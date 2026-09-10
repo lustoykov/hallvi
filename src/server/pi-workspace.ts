@@ -16,6 +16,7 @@ import {
   resolveDockerEndpoint,
 } from "./docker";
 import { treeArchive, type TreeFile } from "./execution-tree";
+import { readTar, writeTar } from "./tar";
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { pinContainerImage } from "./container-images";
 
@@ -435,6 +436,53 @@ export class PiWorkspace {
     return run;
   }
 
+  /**
+   * The exact bytes of files Pi selected, read through the archive API rather
+   * than a model tool. Regular files only; links and directories are refused.
+   */
+  async exportFiles(paths: string[], maxBytes: number): Promise<TreeFile[]> {
+    const run = this.tail.then(async () => {
+      if (this.closed || !this.started)
+        throw new Error(
+          "Write the selected files in /workspace before deploying them.",
+        );
+      const container = await this.started;
+      const files: TreeFile[] = [];
+      let total = 0;
+      for (const path of paths) {
+        const response = await this.docker!.request(
+          `/containers/${container}/archive?path=${encodeURIComponent(`${workspacePath}/${path}`)}`,
+          { maxBytes: maxBytes + 64 * 1024, timeoutMs: 15_000 },
+        );
+        if (response.status === 404)
+          throw new Error(`${path} does not exist in /workspace.`);
+        if (response.status >= 400 || response.truncated)
+          throw new Error(
+            `${path} is unreadable or exceeds the selection limit.`,
+          );
+        let entries: ReturnType<typeof readTar>;
+        try {
+          entries = readTar(response.body);
+        } catch {
+          throw new Error(`${path} must be a regular file, not a link.`);
+        }
+        if (entries.length !== 1 || entries[0].type !== "file")
+          throw new Error(`${path} must be a regular file.`);
+        total += entries[0].content.length;
+        if (total > maxBytes)
+          throw new Error(`Selected files exceed ${maxBytes} bytes.`);
+        files.push({
+          path,
+          mode: entries[0].mode & 0o111 ? 0o755 : 0o644,
+          content: entries[0].content,
+        });
+      }
+      return files;
+    });
+    this.tail = run.catch(() => undefined);
+    return run;
+  }
+
   async dispose(interrupted = false) {
     this.closed = true;
     if (!this.docker) return;
@@ -523,6 +571,83 @@ export function piWorkspaceTools(sdk: PiSdk, workspace: PiWorkspace) {
       );
     },
   }));
+}
+
+/**
+ * The workspace image's pinned Docker Compose, run on exact files in a fresh
+ * networkless container. Interpolation sees only the supplied values; no
+ * controller environment, credential or Docker socket reaches it.
+ */
+export async function runComposeResolver(
+  files: TreeFile[],
+  args: string[],
+  interpolation: Record<string, string>,
+  signal: AbortSignal,
+) {
+  const docker = client();
+  const image = await ensureImage(docker);
+  signal.throwIfAborted();
+  const id = randomUUID();
+  const { Id } = await docker.createContainer(`sg-resolve-${id}`, {
+    Image: image,
+    User: "1000:1000",
+    WorkingDir: "/tmp/bundle",
+    Entrypoint: [
+      "/bin/sh",
+      "-c",
+      'docker-compose version --short && exec env -i HOME=/tmp PATH=/usr/local/bin:/usr/bin:/bin docker-compose --env-file /tmp/interpolation.env "$@"',
+      "resolve",
+    ],
+    Cmd: args,
+    Labels: {
+      [ownerLabel]: ownerId(),
+      "server-guy.compose-resolver": id,
+      "server-guy.pi-workspace-process": String(process.pid),
+    },
+    HostConfig: {
+      NetworkMode: "none",
+      CapDrop: ["ALL"],
+      SecurityOpt: ["no-new-privileges"],
+      Memory: 256 * 1024 * 1024,
+      PidsLimit: 64,
+      NanoCpus: 1_000_000_000,
+    },
+  });
+  try {
+    await docker.putArchive(
+      Id,
+      "/tmp",
+      writeTar([
+        ...files.map((file) => ({
+          path: `bundle/${file.path}`,
+          content: file.content,
+          mode: 0o644,
+        })),
+        {
+          path: "interpolation.env",
+          content: Buffer.from(
+            Object.entries(interpolation)
+              .map(([name, value]) => `${name}=${value}\n`)
+              .join(""),
+          ),
+          mode: 0o644,
+        },
+      ]),
+    );
+    await docker.startContainer(Id);
+    const { exitCode, timedOut } = await docker.waitContainer(Id, {
+      timeoutMs: 60_000,
+      signal,
+    });
+    if (timedOut)
+      throw new Error("Compose configuration resolution timed out.");
+    const logs = await docker.containerLogs(Id, 2 * 1024 * 1024);
+    if (logs.truncated)
+      throw new Error("The resolved configuration exceeds the supported size.");
+    return { exitCode, stdout: logs.stdout, stderr: logs.stderr };
+  } finally {
+    await docker.removeContainer(Id);
+  }
 }
 
 export async function cleanupPiWorkspaces() {

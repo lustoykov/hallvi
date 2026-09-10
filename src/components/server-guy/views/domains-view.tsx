@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts, primaryHttp } from "@/server/release-facts";
 import {
   Condition,
   Facts,
@@ -28,10 +29,11 @@ export function DomainsView(props: ViewProps) {
   const tls = domains?.tls;
   const cdn = domains?.cdn;
   const configured = cdn?.state === "active" || cdn?.state === "partial";
+  const primary = primaryHttp(currentFacts(deployment ?? null));
   const serviceStage = domains?.routes[0]
     ? `${domains.routes[0].service} · port ${domains.routes[0].port}`
-    : deployment?.plan?.port
-      ? `app · port ${deployment.plan.port}`
+    : primary
+      ? `${primary.service} · port ${primary.target}`
       : "the application";
 
   const stages: FlowStage[] = [

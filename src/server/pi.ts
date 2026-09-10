@@ -594,29 +594,39 @@ export async function askPi(
         parameters: Type.Object({}, { additionalProperties: false }),
         async execute() {
           const { applicationDeployment } = await import("./deployment-store");
+          const { releaseFacts } = await import("./release-facts");
+          const { establishedRuntime } = await import("./deployment-runtime");
           const record = applicationDeployment(input.run.applicationId);
-          const result = (record?.lifecycle?.releases ?? []).map((release) => ({
-            releaseId: release.id,
-            revision: release.revision,
-            summary: release.plan.summary,
-            current:
-              record!.lifecycle!.runtime.lastVerified?.releaseId === release.id,
-            verifiedImagesRecorded: Boolean(
-              record!.lifecycle!.verifiedImages?.some(
-                (a) =>
-                  a.releaseId === release.id &&
-                  a.hostId === record!.lifecycle!.host.id,
+          const result = (record?.lifecycle?.releases ?? []).map((release) => {
+            const facts = releaseFacts(release, record!.id);
+            return {
+              releaseId: release.id,
+              revision: release.revision,
+              format: release.native ? "native Compose" : "legacy plan",
+              summary: facts.summary,
+              current:
+                establishedRuntime(record!.lifecycle!.runtime)?.releaseId ===
+                release.id,
+              verifiedImagesRecorded: Boolean(
+                record!.lifecycle!.verifiedImages?.some(
+                  (a) =>
+                    a.releaseId === release.id &&
+                    a.hostId === record!.lifecycle!.host.id,
+                ),
               ),
-            ),
-            postgresVersion: release.plan.postgres?.version ?? null,
-            volumes: [
-              { service: "app", volumes: release.plan.volumes ?? [] },
-              ...(release.plan.services ?? []).map((s) => ({
-                service: s.name,
-                volumes: s.volumes,
+              postgresVersion: facts.database?.version ?? null,
+              volumes: facts.volumes.map(({ name, kind, sqlite, mounts }) => ({
+                name,
+                kind,
+                sqlite,
+                mounts: mounts.map(({ service, target, readOnly }) => ({
+                  service,
+                  target,
+                  readOnly,
+                })),
               })),
-            ],
-          }));
+            };
+          });
           return {
             content: [{ type: "text", text: JSON.stringify(result) }],
             details: {},

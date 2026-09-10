@@ -484,7 +484,7 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
         } as StoredOperation,
         signal,
       );
-      expect(reconciled).toMatchObject({ ok: true, verified: true });
+      expect(reconciled).toMatchObject({ ok: true, completed: true });
       expect(currentContainer()).toBe(running);
       expect(second).toEqual(original);
       expect(transport.executions).toBe(3);

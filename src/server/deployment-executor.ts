@@ -3,7 +3,8 @@ import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
 import { assertApprovedRelease } from "./deployment-release";
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
-import { deploymentLock } from "./deployment-ssh";
+import { deploymentLock, shellQuote } from "./deployment-ssh";
+import { currentFacts, primaryHttp } from "./release-facts";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -554,7 +555,9 @@ export async function executeDeployment(
         ]),
     );
     saveDeployment(record);
-    const archive = await writeTar(bundle);
+    const archive = writeTar(bundle, {
+      mtime: Math.floor(Date.now() / 1000),
+    });
     const root = `/opt/server-guy/${record.id}`;
     await command(
       "ssh",
@@ -650,6 +653,11 @@ export async function verifyDeployment(
   record: DeploymentRecord,
   signal: AbortSignal,
 ) {
+  const facts = currentFacts(record);
+  const criterion = facts?.criterion;
+  // Without a recorded behavior criterion there is no behavior to claim.
+  if (!criterion) return;
+  const primary = primaryHttp(facts)?.service ?? "app";
   const origin = `http://${record.address}`;
   const request = async (path: string, init: RequestInit = {}) => {
     const url = new URL(path, origin);
@@ -671,7 +679,7 @@ export async function verifyDeployment(
   for (let attempt = 0; attempt < 30; attempt++) {
     signal.throwIfAborted();
     try {
-      const health = await request(record.plan!.healthPath);
+      const health = await request(criterion.healthPath);
       if (health.ok) {
         ready = true;
         break;
@@ -695,10 +703,10 @@ export async function verifyDeployment(
       "The public application did not become ready within the verification window. The existing host is retained.",
     );
   record.serviceReadiness ??= {};
-  record.serviceReadiness.app ??= {
+  record.serviceReadiness[primary] ??= {
     checkedAt: new Date().toISOString(),
     kind: "http",
-    imageId: record.serviceImages?.app ?? record.imageId ?? null,
+    imageId: record.serviceImages?.[primary] ?? record.imageId ?? null,
   };
   saveDeployment(record);
   const cleanup = async () => {
@@ -721,13 +729,13 @@ export async function verifyDeployment(
     !record.cleanup &&
     record.verificationRecoveryId
   ) {
-    const read = record.plan!.checks.find(
+    const read = criterion.checks.find(
       (c) =>
         c.method === "GET" &&
         c.path.includes("{id}") &&
         c.contains.includes("SG_VERIFY_TOKEN"),
     );
-    const removal = record.plan!.checks.find(
+    const removal = criterion.checks.find(
       (c) => c.method === "DELETE" && c.path.includes("{id}"),
     );
     if (!read || !removal)
@@ -764,7 +772,7 @@ export async function verifyDeployment(
   let captured = "";
   const marker = `sg-check-${randomBytes(6).toString("hex")}`;
   try {
-    for (const check of record.plan!.checks) {
+    for (const check of criterion.checks) {
       const path = check.path.replaceAll("{id}", encodeURIComponent(captured));
       if (check.path.includes("{id}") && !captured)
         throw new Error("A verification step requires a captured object ID.");
@@ -814,7 +822,7 @@ export async function verifyDeployment(
           throw new Error(
             "The create response did not prove ownership of the test object. Resolve its marker before retrying.",
           );
-        const removal = record.plan!.checks.find(
+        const removal = criterion.checks.find(
           (c) => c.method === "DELETE" && c.path.includes("{id}"),
         );
         if (removal) {
@@ -872,16 +880,13 @@ export async function verifyServiceImages(
 ) {
   record.serviceReadiness = {};
   saveDeployment(record);
-  const expected = [
-    "app",
-    ...(record.plan?.postgres ? ["postgres"] : []),
-    ...(record.plan?.services ?? []).map((s) => s.name),
-  ];
+  const facts = currentFacts(record);
+  if (!facts) throw new Error("No recorded configuration to verify.");
   const output = await command(
     "ssh",
     [
       ...sshArgs(record),
-      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
+      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}},{{json (index .Config.Labels "server-guy.revision")}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
     ],
     signal,
   );
@@ -890,43 +895,46 @@ export async function verifyServiceImages(
     .trim()
     .split("\n")
     .map((line) => {
-      const [Image, reference, service, running] = JSON.parse(line) as [
-        string,
-        string,
-        string,
-        boolean,
-      ];
-      return { Image, reference, service, running };
+      const [Image, reference, service, running, revision] = JSON.parse(
+        line,
+      ) as [string, string, string, boolean, string | undefined];
+      return { Image, reference, service, running, revision };
     });
   const images: Record<string, string> = {};
-  for (const name of expected) {
-    const matches = containers.filter((c) => c.service === name);
+  for (const service of facts.services) {
+    const matches = containers.filter((c) => c.service === service.name);
     if (matches.length !== 1 || !matches[0].running)
-      throw new Error(`Compose service ${name} is not running exactly once.`);
-    const container = matches[0];
-    const pinned =
-      name === "app"
-        ? record.plan!.image
-        : record.plan!.services?.find((s) => s.name === name)?.image;
-    if (
-      pinned &&
-      container.reference !== pinned &&
-      container.reference !== record.serviceImages?.[name]
-    )
-      throw new Error(`Service ${name} differs from its approved image.`);
-    if (
-      record.serviceImages?.[name] &&
-      record.serviceImages[name] !== container.Image
-    )
-      throw new Error(`Service ${name} changed since it was recorded.`);
-    images[name] = container.Image;
-  }
-  for (const service of record.plan?.services ?? []) {
-    if (service.imageFrom && images[service.name] !== images[service.imageFrom])
       throw new Error(
-        `Service ${service.name} does not use the same image as ${service.imageFrom}.`,
+        `Compose service ${service.name} is not running exactly once.`,
       );
+    const container = matches[0];
+    if (
+      service.pinned &&
+      container.reference !== service.pinned &&
+      container.reference !== record.serviceImages?.[service.name]
+    )
+      throw new Error(
+        `Service ${service.name} differs from its approved image.`,
+      );
+    if (
+      record.serviceImages?.[service.name] &&
+      record.serviceImages[service.name] !== container.Image
+    )
+      throw new Error(`Service ${service.name} changed since it was recorded.`);
+    if (service.labeled && container.revision !== record.revision)
+      throw new Error(
+        `Service ${service.name} does not run the selected revision.`,
+      );
+    images[service.name] = container.Image;
   }
+  for (const service of facts.services)
+    if (
+      service.sharesImageWith &&
+      images[service.name] !== images[service.sharesImageWith]
+    )
+      throw new Error(
+        `Service ${service.name} does not use the same image as ${service.sharesImageWith}.`,
+      );
   record.serviceImages = images;
   saveDeployment(record);
 }
@@ -939,16 +947,16 @@ export async function verifyPrivateServices(
   // leave an earlier passing check attached to a replaced container.
   record.serviceReadiness = {};
   saveDeployment(record);
-  for (const service of [
-    { name: "app", healthCommand: record.plan!.healthCommand },
-    ...(record.plan!.services ?? []),
-  ]) {
-    if (!service.healthCommand) continue;
+  const facts = currentFacts(record)!;
+  for (const service of facts.services) {
+    // The managed database's health already gates its dependents.
+    if (!service.healthcheck || service.name === facts.database?.service)
+      continue;
     const output = await command(
       "ssh",
       [
         ...sshArgs(record),
-        `cd /opt/server-guy/${record.id} && docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${service.name})`,
+        `cd /opt/server-guy/${record.id} && docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${shellQuote(service.name)})`,
       ],
       signal,
     );
@@ -964,13 +972,12 @@ export async function verifyPrivateServices(
     saveDeployment(record);
     deploymentEvent(record, `Verified readiness command: ${service.name}`);
   }
-  for (const service of record.plan!.services ?? []) {
-    if (!service.port || !service.healthPath) continue;
+  for (const service of facts.criterion?.services ?? []) {
     const output = await command(
       "ssh",
       [
         ...sshArgs(record),
-        `cd /opt/server-guy/${record.id} && docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${service.name})`,
+        `cd /opt/server-guy/${record.id} && docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${shellQuote(service.name)})`,
       ],
       signal,
     );
@@ -1014,11 +1021,12 @@ export async function recreateDeployment(
   record: DeploymentRecord,
   signal: AbortSignal,
 ) {
+  const facts = currentFacts(record);
   if (
     record.status !== "live" ||
-    !record.plan ||
-    !record.imageId ||
-    !record.serverId
+    !facts ||
+    !record.serverId ||
+    !(record.imageId || Object.keys(record.serviceImages ?? {}).length)
   )
     throw new Error(
       "A verified deployment is required before recreating its containers.",
@@ -1028,13 +1036,19 @@ export async function recreateDeployment(
       "This older deployment has no recorded configuration fingerprints. Reconcile its configuration before recreation.",
     );
   const files = Object.keys(record.bundleHashes);
-  if (files.some((path) => !/^(compose\.json|configs\/[a-z0-9-]+)$/.test(path)))
+  if (
+    files.some(
+      (path) =>
+        !/^[A-Za-z0-9_@+=,.-][A-Za-z0-9_@+=,./-]*$/.test(path) ||
+        path.split("/").some((part) => !part || part === "." || part === ".."),
+    )
+  )
     throw new Error("Invalid recorded configuration path.");
   const hashes = await command(
     "ssh",
     [
       ...sshArgs(record),
-      `cd /opt/server-guy/${record.id} && sha256sum -- ${files.join(" ")}`,
+      `cd /opt/server-guy/${record.id} && sha256sum -- ${files.map(shellQuote).join(" ")}`,
     ],
     signal,
   );
@@ -1061,13 +1075,7 @@ export async function recreateDeployment(
       .split(/\s+/)
       .sort();
   const before = await ids();
-  const volumeNames = [
-    ...(record.plan.postgres ? ["database"] : []),
-    ...(record.plan.volumes ?? []).map((v) => v.name),
-    ...(record.plan.services ?? []).flatMap((s) =>
-      s.volumes.map((v) => v.name),
-    ),
-  ];
+  const volumeNames = facts.volumes.map((volume) => volume.dockerName);
   // Compose creates missing named volumes automatically. Refuse that during
   // recreation: a deleted data volume must become an explicit recovery task.
   if (volumeNames.length) {
@@ -1075,7 +1083,7 @@ export async function recreateDeployment(
       "ssh",
       [
         ...sshArgs(record),
-        `docker volume inspect --format '{{.Name}}' ${volumeNames.map((name) => `sg-${record.id.slice(0, 8)}_${name}`).join(" ")}`,
+        `docker volume inspect --format '{{.Name}}' ${volumeNames.map(shellQuote).join(" ")}`,
       ],
       signal,
     );
@@ -1107,22 +1115,43 @@ export async function recreateDeployment(
     throw new Error(
       "Container replacement did not complete for the entire accepted stack.",
     );
-  await verifyServiceImages(record, signal);
-  await verifyDeployment(record, signal);
-  await verifyPrivateServices(record, signal);
-  await collectDeploymentLogs(record, signal);
-  record.verifiedAt = new Date().toISOString();
+  const behavior = await verifyRuntime(record, signal);
+  if (behavior === "passed") record.verifiedAt = new Date().toISOString();
   deploymentEvent(
     record,
-    "Recreated containers and reverified the accepted image identities and application checks; persistent volumes were retained",
+    behavior === "passed"
+      ? "Recreated containers and reverified the accepted image identities and application checks; persistent volumes were retained"
+      : "Recreated containers from the recorded images; readiness passed and persistent volumes were retained. No behavior criterion is recorded, so behavior is unverified",
   );
   deploymentMessage(
     record,
-    "The containers were recreated from the same images and passed verification. Named data volumes were retained. This is not a backup or a restore test.",
+    behavior === "passed"
+      ? "The containers were recreated from the same images and passed verification. Named data volumes were retained. This is not a backup or a restore test."
+      : "The containers were recreated from the same images and passed readiness. Named data volumes were retained. Behavior is unverified because no behavior criterion is recorded. This is not a backup or a restore test.",
   );
   return {
-    evidence: `Replaced ${after.length} containers, retained their named volumes, and verified the accepted image identities and application checks.`,
+    evidence:
+      behavior === "passed"
+        ? `Replaced ${after.length} containers, retained their named volumes, and verified the accepted image identities and application checks.`
+        : `Replaced ${after.length} containers, retained their named volumes, and observed the accepted image identities and readiness. Behavior is unverified.`,
     before,
     after,
+    behavior,
   };
+}
+
+/** Identity, readiness and the recorded behavior criterion, in that order. */
+export async function verifyRuntime(
+  record: DeploymentRecord,
+  signal: AbortSignal,
+  established?: () => void,
+) {
+  await verifyServiceImages(record, signal);
+  established?.();
+  await verifyDeployment(record, signal);
+  await verifyPrivateServices(record, signal);
+  await collectDeploymentLogs(record, signal);
+  return currentFacts(record)?.criterion
+    ? ("passed" as const)
+    : ("unverified" as const);
 }

@@ -71,6 +71,38 @@ it("keeps old verification historical after a different release fails remotely",
   });
   expect(r.lifecycle!.runtime.lastVerified!.images.app).toBe("sha256:one");
 });
+it("records an observed runtime without promoting verification", () => {
+  const r = fixture();
+  const old = structuredClone(ensureDeploymentLifecycle(r).runtime);
+  r.revision = "b".repeat(40);
+  const unverified = beginDeploymentAttempt(r, "release", "release-1");
+  invalidateDeploymentRuntime(r);
+  r.serviceImages = { app: "sha256:observed" };
+  finishDeploymentAttempt(r, unverified.id, "observed");
+  expect(r.lifecycle!.runtime).toMatchObject({
+    state: "observed",
+    lastVerified: old.lastVerified,
+    observed: {
+      attemptId: unverified.id,
+      behavior: "unverified",
+      images: { app: "sha256:observed" },
+    },
+  });
+  // A behavior failure after identity was established keeps that runtime.
+  const failed = beginDeploymentAttempt(r, "release", "release-2");
+  invalidateDeploymentRuntime(r);
+  finishDeploymentAttempt(r, failed.id, "failed", "Behavior failed", true);
+  expect(r.lifecycle!.runtime).toMatchObject({
+    state: "observed",
+    lastVerified: old.lastVerified,
+    observed: { attemptId: failed.id, behavior: "failed" },
+  });
+  // A lost reply establishes nothing.
+  const lost = beginDeploymentAttempt(r, "release", "release-3");
+  invalidateDeploymentRuntime(r);
+  finishDeploymentAttempt(r, lost.id, "failed", "Lost reply");
+  expect(r.lifecycle!.runtime.state).toBe("unknown");
+});
 it("preflight failure keeps prior verification, while interrupted remote work does not", () => {
   const r = fixture();
   const old = structuredClone(ensureDeploymentLifecycle(r).runtime);

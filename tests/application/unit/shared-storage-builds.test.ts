@@ -13,9 +13,11 @@ import {
   sharedVolumes,
 } from "../../../src/server/deployment-layout";
 import {
+  legacyExecution,
   releaseBundle,
   releaseCommand,
 } from "../../../src/server/release-executor";
+import { planFacts } from "../../../src/server/release-facts";
 import { releaseOf } from "../../../src/server/deployment-release";
 import { stackOf } from "../../../src/server/application-stack";
 import {
@@ -158,14 +160,18 @@ it("a rollback runs only the recorded local images: no source, build, pull or vo
   expect(() =>
     releaseBundle(p, release.revision, id, files, "unused", {}, incomplete),
   ).toThrow();
-  const update = releaseCommand(release, id, attempt, ["documents"]);
+  const retained = [`sg-${id.slice(0, 8)}_documents`];
+  const update = releaseCommand(
+    release,
+    id,
+    attempt,
+    legacyExecution(p, retained, false),
+  );
   const rollback = releaseCommand(
     release,
     id,
     attempt,
-    ["documents"],
-    false,
-    images,
+    legacyExecution(p, retained, false, images),
   );
   expect(update).toContain("compose.json build");
   expect(update).toContain("compose.json pull");
@@ -193,7 +199,14 @@ it("rejects missing/cyclic image references and inconsistent shared-state declar
   expect(() => deploymentPlanSchema.parse(p)).toThrow("same data kind");
 });
 const live = (p: DeploymentPlan) =>
-  ({ status: "live", revision: "revision", plan: p }) as DeploymentRecord;
+  ({
+    id: randomUUID(),
+    status: "live",
+    revision: "revision",
+    plan: p,
+  }) as DeploymentRecord;
+const capture = (p: DeploymentPlan) =>
+  backupCapturePlan(planFacts(p, randomUUID(), "revision"));
 it("captures a shared volume once and pauses every reader, writer and data client", () => {
   const built = plan();
   const published = plan();
@@ -201,7 +214,7 @@ it("captures a shared volume once and pauses every reader, writer and data clien
   // Support follows recorded data and consumers, not image names or builds.
   for (const p of [built, published]) {
     expect(backupKind(live(p))).toBe("stack");
-    expect(backupCapturePlan(p)).toMatchObject({
+    expect(capture(p)).toMatchObject({
       // Nothing records a dependency here, so only membership is meaningful.
       pauseServices: expect.arrayContaining(["app", "api", "worker"]),
       postgres: null,
@@ -238,23 +251,23 @@ it("records a generic SQLite path relative to its volume and keeps PostgreSQL ru
       readOnly: true,
     },
   ];
-  const capture = backupCapturePlan(deploymentPlanSchema.parse(p));
-  expect(capture.postgres).toBe("postgres");
-  expect(capture.pauseServices).not.toContain("postgres");
-  expect(capture.volumes).toHaveLength(1);
-  expect(capture.volumes[0]).toMatchObject({
+  const captured = capture(deploymentPlanSchema.parse(p));
+  expect(captured.postgres).toBe("postgres");
+  expect(captured.pauseServices).not.toContain("postgres");
+  expect(captured.volumes).toHaveLength(1);
+  expect(captured.volumes[0]).toMatchObject({
     kind: "database",
     sqlite: "db/app.sqlite",
   });
 });
 it("keeps previously supported layouts protected under the generic plan", () => {
   const [postgresOnly, kuma, grafana] = legacyPlans();
-  expect(backupCapturePlan(postgresOnly)).toMatchObject({
+  expect(capture(postgresOnly)).toMatchObject({
     postgres: "postgres",
     volumes: [],
   });
-  expect(backupCapturePlan(kuma).volumes[0].sqlite).toBe("kuma.db");
-  expect(backupCapturePlan(grafana)).toMatchObject({
+  expect(capture(kuma).volumes[0].sqlite).toBe("kuma.db");
+  expect(capture(grafana)).toMatchObject({
     pauseServices: expect.arrayContaining(["app", "prometheus"]),
     volumes: [
       { name: "data", sqlite: "grafana.db" },
@@ -274,13 +287,11 @@ it("refuses data it has no consistent capture method for", () => {
   expect(backupKind(live(queue))).toBe("stack");
   // Even declared before the worker, the broker stops after both its clients.
   queue.services!.reverse();
-  const order = backupCapturePlan(queue).pauseServices;
+  const order = capture(queue).pauseServices;
   expect(order.slice(0, 2).sort()).toEqual(["app", "worker"]);
   expect(order.slice(2)).toEqual(["queue"]);
   const stateless = plan();
   stateless.volumes = [];
   stateless.services![1].volumes = [];
-  expect(() => backupCapturePlan(stateless)).toThrow(
-    "No persistent application data",
-  );
+  expect(() => capture(stateless)).toThrow("No persistent application data");
 });

@@ -1,3 +1,4 @@
+import { currentFacts } from "./release-facts";
 import { finishDeploymentAttempt } from "./deployment-lifecycle";
 import { deploymentRuntime } from "./deployment-runtime";
 import { redactSecrets } from "./secrets";
@@ -86,21 +87,25 @@ export function currentOperationFacts(
     .where(eq(applicationContracts.applicationId, applicationId))
     .orderBy(desc(applicationContracts.version))
     .get();
+  const runtime = deploymentRuntime(deployment ?? null);
+  const configuration = currentFacts(deployment ?? null);
   return {
     repository: app.repositoryUrl,
     permissionPolicy: app.approvalMode,
     contract: contract?.id ?? null,
     sourceRevision: contract?.commitSha ?? deployment?.revision ?? null,
     servingRevision:
-      deploymentRuntime(deployment ?? null).state === "verified"
-        ? (deployment?.lifecycle?.runtime.lastVerified?.revision ??
-          deployment?.revision ??
-          null)
+      runtime.state === "verified"
+        ? (runtime.lastVerified?.revision ?? deployment?.revision ?? null)
+        : runtime.state === "observed"
+          ? (runtime.observed?.revision ?? null)
+          : null,
+    stack: deployment?.native
+      ? hash(deployment.native)
+      : deployment?.plan
+        ? hash(deployment.plan)
         : null,
-    stack: deployment?.plan ? hash(deployment.plan) : null,
-    inputNames: deployment?.plan
-      ? hash(deployment.plan.missingInputs.map((input) => input.name).sort())
-      : null,
+    inputNames: configuration ? hash([...configuration.inputs].sort()) : null,
   };
 }
 function changedFacts(record: StoredOperation) {

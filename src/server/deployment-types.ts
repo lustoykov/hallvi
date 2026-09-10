@@ -10,6 +10,67 @@ import {
 } from "./compose-plan";
 
 const path = z.string().regex(/^(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/);
+export const httpPathSchema = z
+  .string()
+  .regex(/^\/(?!\/)[^\s]*$/)
+  .max(200);
+export const primaryCheckSchema = z.strictObject({
+  name: z.string().min(1).max(120),
+  method: z.enum(["GET", "POST", "DELETE"]),
+  waitSeconds: z.number().int().min(1).max(30).optional(),
+  path: httpPathSchema,
+  body: z.record(z.string(), z.unknown()).nullable(),
+  expectedStatus: z.number().int().min(200).max(299),
+  contains: z.string().max(300),
+  captureId: z
+    .string()
+    .regex(/^[a-zA-Z0-9_.]+$/)
+    .nullable(),
+});
+type PrimaryCheck = z.infer<typeof primaryCheckSchema>;
+/** A health route proves readiness, not behavior; created objects are owned. */
+export function checkIssues(healthPath: string, checks: PrimaryCheck[]) {
+  const issues: string[] = [];
+  if (
+    !checks.some(
+      (c) =>
+        c.method === "GET" &&
+        c.path !== healthPath &&
+        c.contains.trim().length > 0,
+    )
+  )
+    issues.push(
+      "Include a content assertion on an application route beyond the health endpoint.",
+    );
+  if (checks.some((c) => c.waitSeconds && c.method !== "GET"))
+    issues.push("Only read checks may wait for an asynchronous result.");
+  const mutations = checks.filter((c) => c.method !== "GET");
+  if (mutations.length) {
+    const create = mutations[0];
+    const cleanup = mutations[1];
+    if (
+      mutations.length !== 2 ||
+      create.method !== "POST" ||
+      !create.captureId ||
+      !JSON.stringify(create.body).includes("SG_VERIFY_TOKEN") ||
+      !create.contains.includes("SG_VERIFY_TOKEN") ||
+      cleanup?.method !== "DELETE" ||
+      !cleanup.path.includes("{id}") ||
+      checks.at(-1) !== cleanup ||
+      checks.indexOf(create) >=
+        checks.findIndex(
+          (c) =>
+            c.method === "GET" &&
+            c.path.includes("{id}") &&
+            c.contains.includes("SG_VERIFY_TOKEN"),
+        )
+    )
+      issues.push(
+        "Mutating verification must create one marked object, capture its ID, read that marked object, and finally delete only that ID.",
+      );
+  }
+  return issues;
+}
 export const deploymentPlanSchema = z
   .strictObject({
     image: imageReferenceSchema.optional(),
@@ -57,45 +118,12 @@ export const deploymentPlanSchema = z
         }),
       )
       .max(20),
-    healthPath: z
-      .string()
-      .regex(/^\/(?!\/)[^\s]*$/)
-      .max(200),
-    checks: z
-      .array(
-        z.strictObject({
-          name: z.string().min(1).max(120),
-          method: z.enum(["GET", "POST", "DELETE"]),
-          waitSeconds: z.number().int().min(1).max(30).optional(),
-          path: z
-            .string()
-            .regex(/^\/(?!\/)[^\s]*$/)
-            .max(200),
-          body: z.record(z.string(), z.unknown()).nullable(),
-          expectedStatus: z.number().int().min(200).max(299),
-          contains: z.string().max(300),
-          captureId: z
-            .string()
-            .regex(/^[a-zA-Z0-9_.]+$/)
-            .nullable(),
-        }),
-      )
-      .min(1)
-      .max(8),
+    healthPath: httpPathSchema,
+    checks: z.array(primaryCheckSchema).min(1).max(8),
   })
   .superRefine((plan, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
-    if (
-      !plan.checks.some(
-        (c) =>
-          c.method === "GET" &&
-          c.path !== plan.healthPath &&
-          c.contains.trim().length > 0,
-      )
-    )
-      fail(
-        "Include a content assertion on an application route beyond the health endpoint.",
-      );
+    for (const issue of checkIssues(plan.healthPath, plan.checks)) fail(issue);
     if (plan.image && plan.generatedDockerfile)
       fail("Choose an image or a Dockerfile build, not both.");
     const names = new Set([
@@ -255,33 +283,6 @@ export const deploymentPlanSchema = z
           fail("SQLite must be inside its persistent volume.");
       }
     }
-    if (plan.checks.some((c) => c.waitSeconds && c.method !== "GET"))
-      fail("Only read checks may wait for an asynchronous result.");
-    const mutations = plan.checks.filter((c) => c.method !== "GET");
-    if (mutations.length) {
-      const create = mutations[0];
-      const cleanup = mutations[1];
-      if (
-        mutations.length !== 2 ||
-        create.method !== "POST" ||
-        !create.captureId ||
-        !JSON.stringify(create.body).includes("SG_VERIFY_TOKEN") ||
-        !create.contains.includes("SG_VERIFY_TOKEN") ||
-        cleanup?.method !== "DELETE" ||
-        !cleanup.path.includes("{id}") ||
-        plan.checks.at(-1) !== cleanup ||
-        plan.checks.indexOf(create) >=
-          plan.checks.findIndex(
-            (c) =>
-              c.method === "GET" &&
-              c.path.includes("{id}") &&
-              c.contains.includes("SG_VERIFY_TOKEN"),
-          )
-      )
-        fail(
-          "Mutating verification must create one marked object, capture its ID, read that marked object, and finally delete only that ID.",
-        );
-    }
   });
 export type DeploymentPlan = z.infer<typeof deploymentPlanSchema>;
 export interface HostOffer {
@@ -324,7 +325,10 @@ export interface DeploymentRecord {
   inspectedRevision?: string | null;
   cleanup?: { path: string; expectedStatus: number; marker: string } | null;
   revision: string | null;
+  /** Legacy custom plan; null once a native release is selected. */
   plan: DeploymentPlan | null;
+  /** The selected native release configuration, when not a legacy plan. */
+  native?: import("./deployment-release").NativeConfiguration | null;
   offer: HostOffer | null;
   authority: {
     acceptedAt: string;

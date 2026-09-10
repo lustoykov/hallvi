@@ -1,7 +1,7 @@
 import { sourceBuilds } from "./deployment-layout";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { z } from "zod";
 import { deploymentSsh, deploymentLock, shellQuote } from "./deployment-ssh";
 import { deploymentPath } from "./deployment-files";
@@ -12,20 +12,24 @@ import type { DeploymentRecord, DeploymentPlan } from "./deployment-types";
 import type { DeploymentRelease } from "./deployment-release";
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
+import { establishedRuntime } from "./deployment-runtime";
 import { deploymentEvent, saveDeployment } from "./deployment-store";
 import { recordOperationRemoteEffect } from "./application-operations";
+import { verifyRuntime } from "./deployment-executor";
+import { composeProject, currentFacts, releaseFacts } from "./release-facts";
 import {
-  verifyServiceImages,
-  verifyDeployment,
-  verifyPrivateServices,
-  collectDeploymentLogs,
-} from "./deployment-executor";
+  DATABASE_PASSWORD,
+  executableCompose,
+  runtimeArtifacts,
+} from "./native-compose";
 
 export class ReleaseExecutionError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean,
     readonly phase: string,
+    /** The exact runtime was observed before this failure. */
+    readonly established = false,
   ) {
     super(message);
   }
@@ -39,7 +43,7 @@ export function releaseSecrets(record: DeploymentRecord) {
   try {
     supplied = JSON.parse(readFileSync(join(directory, "inputs.json"), "utf8"));
   } catch {
-    if (record.plan?.missingInputs.length)
+    if (currentFacts(record)?.inputs.length)
       throw new Error("Restore the saved private inputs before releasing.");
   }
   const redact = (text: string) =>
@@ -48,7 +52,13 @@ export function releaseSecrets(record: DeploymentRecord) {
         .filter(Boolean)
         .reduce((s, secret) => s.replaceAll(secret, "[REDACTED]"), text),
     ).text;
-  return { password, supplied, redact };
+  return {
+    password,
+    supplied,
+    redact,
+    /** Values for a native release's ${NAME} references. */
+    values: { ...supplied, [DATABASE_PASSWORD]: password },
+  };
 }
 export function releaseBundle(
   plan: DeploymentPlan,
@@ -111,16 +121,108 @@ export function releaseBundle(
   ];
 }
 
+/** What the locked host script validates, builds, pulls and activates. */
+export interface ReleaseExecution {
+  /** Build-time project directory inside the stage; runtime uses the root. */
+  projectDirectory: string | null;
+  builds: string[];
+  pulls: string[];
+  /** Stage files the running containers mount, and their root paths. */
+  activate: { from: string; to: string }[];
+  retainedVolumes: string[];
+  rollbackImages?: Record<string, string>;
+}
+export function legacyExecution(
+  plan: DeploymentPlan,
+  retainedVolumes: string[],
+  newManagedDatabase: boolean,
+  rollbackImages?: Record<string, string>,
+): ReleaseExecution {
+  return {
+    projectDirectory: null,
+    builds: rollbackImages ? [] : sourceBuilds(plan).map((b) => b.name),
+    pulls: rollbackImages
+      ? []
+      : [
+          ...(newManagedDatabase ? ["postgres"] : []),
+          ...(plan.image ? ["app"] : []),
+          ...(plan.services ?? []).filter((s) => s.image).map((s) => s.name),
+        ],
+    activate: [
+      { name: "app", configs: plan.configs ?? [] },
+      ...(plan.services ?? []),
+    ].flatMap((s) =>
+      s.configs.map((c) => ({
+        from: `configs/${s.name}-${c.name}`,
+        to: `configs/${s.name}-${c.name}`,
+      })),
+    ),
+    retainedVolumes,
+    rollbackImages,
+  };
+}
+/** The retained snapshot, its selected files and, to build, the source. */
+export function nativeBundle(
+  release: DeploymentRelease,
+  id: string,
+  source: TreeFile[],
+  values: Record<string, string>,
+  retainedVolumes: string[],
+  rollbackImages?: Record<string, string>,
+) {
+  const native = release.native!;
+  const facts = releaseFacts(release, id);
+  const builds = rollbackImages
+    ? []
+    : facts.services.filter((s) => s.build).map((s) => s.name);
+  const artifacts = native.files.map((file) => ({
+    path: file.path,
+    mode: file.mode,
+    content: Buffer.from(file.content, "base64"),
+  }));
+  const selected = new Set(artifacts.map((file) => file.path));
+  const tree = builds.length
+    ? source.filter(
+        (file) => !deniedPathReason(file.path) && !selected.has(file.path),
+      )
+    : [];
+  const execution: ReleaseExecution = {
+    projectDirectory: "bundle",
+    builds,
+    pulls: rollbackImages
+      ? []
+      : facts.services.filter((s) => s.pinned).map((s) => s.name),
+    activate: runtimeArtifacts(native).map((path) => ({
+      from: `bundle/${path}`,
+      to: path,
+    })),
+    retainedVolumes,
+    rollbackImages,
+  };
+  return {
+    files: [
+      ...[...tree, ...artifacts].map((file) => ({
+        ...file,
+        path: `bundle/${file.path}`,
+      })),
+      {
+        path: "compose.json",
+        content: Buffer.from(executableCompose(native, values, rollbackImages)),
+        mode: 0o600,
+      },
+    ],
+    execution,
+  };
+}
+
 /** Compose owns config/build errors; one lock covers upload and replacement. */
 export function releaseCommand(
   release: DeploymentRelease,
   id: string,
   attemptId: string,
-  retainedVolumes: string[],
-  newManagedDatabase = false,
-  rollbackImages?: Record<string, string>,
+  execution: ReleaseExecution,
 ) {
-  const plan = release.plan;
+  const rollbackImages = execution.rollbackImages;
   for (const image of Object.values(rollbackImages ?? {}))
     z.string()
       .regex(/^sha256:[0-9a-f]{64}$/)
@@ -135,16 +237,11 @@ export function releaseCommand(
   z.uuid().parse(attemptId);
   const root = `/opt/server-guy/${id}`;
   const stage = `${root}/releases/${attemptId}`;
-  const compose = `docker compose -p sg-${id.slice(0, 8)} -f compose.json`;
-  const pull = [
-    ...(newManagedDatabase ? ["postgres"] : []),
-    ...(plan.image ? ["app"] : []),
-    ...(plan.services ?? []).filter((s) => s.image).map((s) => s.name),
-  ];
-  const configs = [
-    { name: "app", configs: plan.configs ?? [] },
-    ...(plan.services ?? []),
-  ].flatMap((s) => s.configs.map((c) => `${s.name}-${c.name}`));
+  const compose = `docker compose -p ${composeProject(id)} -f compose.json`;
+  const staged = execution.projectDirectory
+    ? `docker compose -p ${composeProject(id)} --project-directory ${shellQuote(execution.projectDirectory)} -f compose.json`
+    : compose;
+  const names = (values: string[]) => values.map(shellQuote).join(" ");
   const body = `umask 077
 phase=upload
 run_release() {
@@ -152,22 +249,15 @@ run_release() {
   tar -xpf - -C ${stage} || return $?
   cd ${stage} || return $?
   phase=configuration
-  ${compose} config --quiet || return $?
-  ${retainedVolumes.length ? `docker volume inspect ${retainedVolumes.map((name) => shellQuote(`sg-${id.slice(0, 8)}_${name}`)).join(" ")} >/dev/null || return $?` : ":"}
+  ${staged} config --quiet || return $?
+  ${execution.retainedVolumes.length ? `docker volume inspect ${names(execution.retainedVolumes)} >/dev/null || return $?` : ":"}
   phase=build
-  ${
-    !rollbackImages && sourceBuilds(plan).length
-      ? `${compose} build ${sourceBuilds(plan)
-          .map((b) => b.name)
-          .join(" ")} || return $?`
-      : ":"
-  }
-  ${!rollbackImages && pull.length ? `${compose} pull ${pull.map(shellQuote).join(" ")} || return $?` : ":"}
-  ${rollbackImages ? `docker image inspect ${Object.values(rollbackImages).map(shellQuote).join(" ")} >/dev/null || return $?` : ":"}
+  ${execution.builds.length ? `${staged} build ${names(execution.builds)} || return $?` : ":"}
+  ${execution.pulls.length ? `${staged} pull ${names(execution.pulls)} || return $?` : ":"}
+  ${rollbackImages ? `docker image inspect ${names(Object.values(rollbackImages))} >/dev/null || return $?` : ":"}
   phase=activate
   cp compose.json ${root}/compose.json || return $?
-  mkdir -p ${root}/configs || return $?
-  ${configs.map((name) => `cp ${shellQuote(`configs/${name}`)} ${shellQuote(`${root}/configs/${name}`)} || return $?`).join("\n  ") || ":"}
+  ${execution.activate.map(({ from, to }) => `mkdir -p ${shellQuote(`${root}/${posix.dirname(to)}`)} && cp -p ${shellQuote(from)} ${shellQuote(`${root}/${to}`)} || return $?`).join("\n  ") || ":"}
   cd ${root} || return $?
   phase=replace
   ${compose} up -d --no-build --pull never --remove-orphans --wait --wait-timeout 120 || return $?
@@ -192,43 +282,71 @@ export async function executeRelease(
   if (attempt?.kind !== "release" || attempt.outcome !== "working")
     throw new Error("A recorded release attempt is required.");
   const secrets = releaseSecrets(record);
-  const bundle = releaseBundle(
-    release.plan,
-    release.revision,
-    record.id,
-    files,
-    secrets.password,
-    secrets.supplied,
-    rollbackImages,
+  // The data and database of the runtime this release replaces.
+  const lifecycle = record.lifecycle!;
+  const priorRelease = lifecycle.releases.find(
+    (r) => r.id === establishedRuntime(lifecycle.runtime)?.releaseId,
   );
-  const priorPlan =
-    record.lifecycle!.releases.find(
-      (r) => r.id === record.lifecycle!.runtime.lastVerified?.releaseId,
-    )?.plan ?? record.plan!;
-  const volumes = [
-    ...(priorPlan.postgres ? ["database"] : []),
-    ...(priorPlan.volumes ?? []).map((v) => v.name),
-    ...(priorPlan.services ?? []).flatMap((s) => s.volumes.map((v) => v.name)),
-  ];
-  const archive = await writeTar(bundle);
+  const prior = priorRelease
+    ? releaseFacts(priorRelease, record.id)
+    : currentFacts(record);
+  const retainedVolumes = prior?.volumes.map((v) => v.dockerName) ?? [];
+  const { files: bundle, execution } = release.native
+    ? nativeBundle(
+        release,
+        record.id,
+        files,
+        secrets.values,
+        retainedVolumes,
+        rollbackImages,
+      )
+    : {
+        files: releaseBundle(
+          release.plan,
+          release.revision,
+          record.id,
+          files,
+          secrets.password,
+          secrets.supplied,
+          rollbackImages,
+        ),
+        execution: legacyExecution(
+          release.plan,
+          retainedVolumes,
+          Boolean(release.plan.postgres && !prior?.database),
+          rollbackImages,
+        ),
+      };
+  const archive = writeTar(bundle, { mtime: Math.floor(Date.now() / 1000) });
   recordOperationRemoteEffect();
   invalidateDeploymentRuntime(record);
-  record.plan = release.plan;
+  if (release.native) {
+    record.native = release.native;
+    record.plan = null;
+  } else {
+    record.plan = release.plan;
+    delete record.native;
+  }
   record.revision = release.revision;
   record.releaseId = release.id;
   record.imageId = null;
   // Reuse the managed database image without an incidental pull or upgrade.
+  const database = prior?.database?.service;
   record.serviceImages = rollbackImages
     ? structuredClone(rollbackImages)
-    : priorPlan.postgres && record.serviceImages?.postgres
-      ? { postgres: record.serviceImages.postgres }
+    : database && record.serviceImages?.[database]
+      ? { [database]: record.serviceImages[database] }
       : {};
   record.serviceReadiness = {};
+  const hosted = new Map([
+    ["compose.json", "compose.json"],
+    ...execution.activate.map(({ from, to }) => [from, to] as const),
+  ]);
   record.bundleHashes = Object.fromEntries(
     bundle
-      .filter((f) => !f.path.startsWith("source/"))
+      .filter((f) => hosted.has(f.path))
       .map((f) => [
-        f.path,
+        hosted.get(f.path)!,
         createHash("sha256").update(f.content).digest("hex"),
       ]),
   );
@@ -240,14 +358,7 @@ export async function executeRelease(
   try {
     output = await deploymentSsh(
       record,
-      releaseCommand(
-        release,
-        record.id,
-        attempt.id,
-        volumes,
-        Boolean(release.plan.postgres && !priorPlan.postgres),
-        rollbackImages,
-      ),
+      releaseCommand(release, record.id, attempt.id, execution),
       { input: archive, signal, timeout: 20 * 60000 },
     );
   } catch {
@@ -289,18 +400,12 @@ export async function verifyRelease(
   signal: AbortSignal,
 ) {
   const secrets = releaseSecrets(record);
+  let established = false;
+  let behavior: "passed" | "unverified";
   try {
-    await verifyServiceImages(record, signal);
-    const revision = await deploymentSsh(
-      record,
-      `cd /opt/server-guy/${record.id} && docker inspect --format '{{index .Config.Labels "server-guy.revision"}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q app)`,
-      { signal },
-    );
-    if (revision.trim() !== release.revision)
-      throw new Error("The running app does not match the selected revision.");
-    await verifyDeployment(record, signal);
-    await verifyPrivateServices(record, signal);
-    await collectDeploymentLogs(record, signal);
+    behavior = await verifyRuntime(record, signal, () => {
+      established = true;
+    });
   } catch (error) {
     const detail = secrets.redact(
       error instanceof Error ? error.message : "Release verification failed.",
@@ -309,16 +414,29 @@ export async function verifyRelease(
       detail,
       !record.verificationPending && !record.cleanup,
       "verification",
+      established,
     );
   }
-  record.imageId = record.serviceImages!.app;
-  record.verifiedAt = new Date().toISOString();
+  const revision = release.revision.slice(0, 12);
+  record.imageId = record.serviceImages?.app ?? null;
   record.error = null;
+  if (behavior === "unverified") {
+    deploymentEvent(
+      record,
+      `Revision ${revision} runs the recorded images and passed readiness; no behavior criterion is recorded, so its behavior is unverified`,
+    );
+    return {
+      behavior,
+      evidence: `Released revision ${revision} on the existing host and observed its exact images and readiness; named data volumes were retained. Behavior is unverified: no behavior criterion is recorded.`,
+    };
+  }
+  record.verifiedAt = new Date().toISOString();
   deploymentEvent(
     record,
-    `Revision ${release.revision.slice(0, 12)} passed image, readiness and application checks`,
+    `Revision ${revision} passed image, readiness and application checks`,
   );
   return {
-    evidence: `Verified revision ${release.revision.slice(0, 12)} on the existing host; named data volumes were retained.`,
+    behavior,
+    evidence: `Verified revision ${revision} on the existing host; named data volumes were retained.`,
   };
 }

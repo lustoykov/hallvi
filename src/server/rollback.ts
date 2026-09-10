@@ -2,6 +2,8 @@ import { deniedPathReason, redactSecrets } from "./secrets";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
 import { releaseOf } from "./deployment-release";
+import { establishedRuntime } from "./deployment-runtime";
+import { releaseFacts } from "./release-facts";
 import type { ReleaseScope } from "./release-scope";
 
 /** Retain observed images before a later deployment replaces runtime facts. */
@@ -42,19 +44,16 @@ export function rollbackSelection(
     throw new Error(
       "No previously verified images are recorded for this release on this host.",
     );
-  if (releaseId === record.lifecycle?.runtime.lastVerified?.releaseId)
-    throw new Error("This release is already the last verified runtime.");
-  const names = [
-    "app",
-    ...(release.plan.postgres ? ["postgres"] : []),
-    ...(release.plan.services ?? []).map((s) => s.name),
-  ];
+  // An observed-but-broken current release may return to verified images.
+  if (releaseId === establishedRuntime(record.lifecycle!.runtime)?.releaseId)
+    throw new Error("This release is already the current runtime.");
+  const facts = releaseFacts(release, record.id);
   const images = Object.fromEntries(
-    names.map((name) => {
+    facts.services.map(({ name }) => {
       // Application rollback never downgrades the running database image.
       const image =
-        name === "postgres"
-          ? record.serviceImages?.postgres
+        name === facts.database?.service
+          ? record.serviceImages?.[name]
           : verified.images[name];
       if (!image || !/^sha256:[0-9a-f]{64}$/.test(image))
         throw new Error(`The verified image for ${name} is unavailable.`);

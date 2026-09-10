@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts } from "@/server/release-facts";
 import { ArrowRight } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
@@ -118,6 +119,8 @@ export function ApplicationOverview({
     view.chats.find((chat) => chat.id === id)?.title ?? "another conversation";
   const runtime = deploymentRuntime(deployment);
   const uncertainRuntime = runtime.state === "unknown";
+  const observedRuntime = runtime.state === "observed";
+  const configuration = currentFacts(deployment);
   const live = runtime.state === "verified" || Boolean(facts.releases?.serving);
   const verifiedAt =
     runtime.lastVerified?.checkedAt ??
@@ -164,42 +167,48 @@ export function ApplicationOverview({
   // The headline is the state, not the name: the name is in navigation.
   const headline = uncertainRuntime
     ? "Runtime needs verification"
-    : monitoringSummary
-      ? monitoringSummary.title
-      : verifiedAt
-        ? stale
-          ? "Last verified over a day ago"
-          : live
-            ? "Running"
-            : "Earlier deployment verified"
-        : deployment
-          ? "Deployment not verified"
-          : "Not deployed yet";
+    : observedRuntime
+      ? "Running · behavior not verified"
+      : monitoringSummary
+        ? monitoringSummary.title
+        : verifiedAt
+          ? stale
+            ? "Last verified over a day ago"
+            : live
+              ? "Running"
+              : "Earlier deployment verified"
+          : deployment
+            ? "Deployment not verified"
+            : "Not deployed yet";
   const detail = uncertainRuntime
     ? "A deployment change may have reached the host. Earlier checks are historical; follow the latest operation to reconcile the outcome."
-    : monitoringSummary
-      ? [
-          monitoring?.collector.detail,
-          lastObservation
-            ? `last observed ${relativeTime(lastObservation, now)}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : verifiedAt
-        ? `Verified ${relativeTime(verifiedAt, now)} ${deployment?.plan?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
-        : "Nothing has been verified on a host yet.";
+    : observedRuntime
+      ? "The latest release runs its recorded images and passed readiness; its behavior is not verified. Earlier checks are historical."
+      : monitoringSummary
+        ? [
+            monitoring?.collector.detail,
+            lastObservation
+              ? `last observed ${relativeTime(lastObservation, now)}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : verifiedAt
+          ? `Verified ${relativeTime(verifiedAt, now)} ${configuration?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
+          : "Nothing has been verified on a host yet.";
   const conditionTone = uncertainRuntime
     ? "warn"
-    : monitoringSummary
-      ? monitoringSummary.tone
-      : verifiedAt
-        ? stale
-          ? "warn"
-          : live
-            ? "ok"
-            : "warn"
-        : "muted";
+    : observedRuntime
+      ? "warn"
+      : monitoringSummary
+        ? monitoringSummary.tone
+        : verifiedAt
+          ? stale
+            ? "warn"
+            : live
+              ? "ok"
+              : "warn"
+          : "muted";
 
   const runs: Run[] = [
     {
@@ -400,7 +409,7 @@ export function ApplicationOverview({
       fact: "Application responds and behaves",
       at: verifiedAt,
       detail:
-        deployment?.plan?.httpAccess === "controller"
+        configuration?.httpAccess === "controller"
           ? "HTTP checks from the controller’s network · not continuous"
           : "Public HTTP checks at deployment · not continuous",
       destination: "deployment",

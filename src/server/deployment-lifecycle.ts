@@ -137,43 +137,66 @@ export function invalidateDeploymentRuntime(record: DeploymentRecord) {
   lifecycle.runtime.state = "unknown";
 }
 
+/**
+ * `observed` records an established runtime without passing behavior checks.
+ * A failure after the exact runtime was observed (`established`) keeps that
+ * attributable runtime, with failed behavior, instead of leaving it unknown.
+ */
 export function finishDeploymentAttempt(
   record: DeploymentRecord,
   id: string,
-  outcome: "verified" | "failed" | "interrupted",
+  outcome: "verified" | "observed" | "failed" | "interrupted",
   error: string | null = null,
+  established = false,
 ) {
   const lifecycle = record.lifecycle;
   const attempt = lifecycle?.attempts.at(-1);
   if (!lifecycle || attempt?.id !== id || attempt.outcome !== "working")
     throw new Error("This deployment attempt is no longer active.");
   syncDeploymentHost(record);
-  if (outcome === "verified") {
-    const release = lifecycle.releases.find(
-      (item) => item.id === attempt.releaseId,
-    )!;
-    if (
-      !record.serverId ||
-      !record.verifiedAt ||
-      releaseOf(record)?.id !== release.id
-    )
-      throw new Error(
-        "The verified runtime must match this attempt's release and host.",
-      );
-    lifecycle.runtime = {
-      state: "verified",
-      lastVerified: {
-        attemptId: id,
-        releaseId: release.id,
-        hostId: attempt.hostId,
-        revision: release.revision,
-        checkedAt: record.verifiedAt,
-        images: structuredClone(
-          record.serviceImages ??
-            (record.imageId ? { app: record.imageId } : {}),
-        ),
-      },
+  const release = lifecycle.releases.find(
+    (item) => item.id === attempt.releaseId,
+  )!;
+  const matches = Boolean(
+    record.serverId && releaseOf(record)?.id === release.id,
+  );
+  if (
+    (outcome === "verified" || outcome === "observed") &&
+    (!matches || (outcome === "verified" && !record.verifiedAt))
+  )
+    throw new Error(
+      "The verified runtime must match this attempt's release and host.",
+    );
+  if (
+    outcome !== "interrupted" &&
+    (outcome !== "failed" || (established && matches))
+  ) {
+    const snapshot = {
+      attemptId: id,
+      releaseId: release.id,
+      hostId: attempt.hostId,
+      revision: release.revision,
+      checkedAt:
+        outcome === "verified" ? record.verifiedAt! : new Date().toISOString(),
+      images: structuredClone(
+        record.serviceImages ?? (record.imageId ? { app: record.imageId } : {}),
+      ),
     };
+    lifecycle.runtime =
+      outcome === "verified"
+        ? {
+            state: "verified",
+            lastVerified: snapshot,
+            observed: { ...snapshot, behavior: "passed" },
+          }
+        : {
+            state: "observed",
+            lastVerified: lifecycle.runtime.lastVerified,
+            observed: {
+              ...snapshot,
+              behavior: outcome === "observed" ? "unverified" : "failed",
+            },
+          };
   }
   rememberVerifiedImages(record);
   // A preflight failure preserves the previous observation. Once a remote

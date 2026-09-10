@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts, primaryHttp } from "@/server/release-facts";
 import {
   Condition,
   Facts,
@@ -26,6 +27,7 @@ const sshWord = {
  */
 export function SecurityView(props: ViewProps) {
   const { facts, stack, deployment, now, onAction, busy } = props;
+  const primary = primaryHttp(currentFacts(deployment ?? null));
   const security = facts.security;
   const privateServices = [
     ...stack.databases.map((item) =>
@@ -58,9 +60,7 @@ export function SecurityView(props: ViewProps) {
             rows={[
               [
                 "Public port",
-                deployment?.plan?.port
-                  ? `Port 80 → ${deployment.plan.port} · HTTP`
-                  : "Not recorded",
+                primary ? `Port 80 → ${primary.target} · HTTP` : "Not recorded",
               ],
               ["Administrative access", "SSH on port 22, key only"],
               [

@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts, releaseFacts } from "@/server/release-facts";
 import { deploymentRuntime } from "@/server/deployment-runtime";
 import { useState } from "react";
 import { LocalTime } from "./local-time";
@@ -63,7 +64,9 @@ export function DeploymentPanel({
   const verifiedRelease = record?.lifecycle?.releases.find(
     (release) => release.id === lastVerified?.releaseId,
   );
-  const verifiedPlan = verifiedRelease?.plan ?? record?.plan;
+  const verifiedFacts = verifiedRelease
+    ? releaseFacts(verifiedRelease, record!.id)
+    : currentFacts(record);
   const latestAttempt = record?.lifecycle?.attempts.at(-1);
   const working =
     record &&
@@ -125,19 +128,32 @@ export function DeploymentPanel({
           <h2>
             {runtime.state === "unknown"
               ? "Runtime needs verification"
-              : record.status === "live"
-                ? "Deployment verified"
-                : working
-                  ? "Working on your deployment"
-                  : record.status === "failed"
-                    ? "Needs attention"
-                    : "Recommendation waiting for your approval"}
+              : runtime.state === "observed"
+                ? "Running without verified behavior"
+                : record.status === "live"
+                  ? "Deployment verified"
+                  : working
+                    ? "Working on your deployment"
+                    : record.status === "failed"
+                      ? "Needs attention"
+                      : "Recommendation waiting for your approval"}
           </h2>
           {runtime.state === "unknown" && (
             <p>
               A deployment change may have reached the host. Follow the latest
               operation in the conversation to reconcile it; earlier
               verification does not establish what is running now.
+            </p>
+          )}
+          {runtime.state === "observed" && (
+            <p>
+              The latest release runs its recorded images and passed readiness,
+              but its behavior{" "}
+              {runtime.observed?.behavior === "failed"
+                ? "checks failed"
+                : "is not verified"}
+              . Earlier verification is historical; a corrective update can
+              start from this runtime.
             </p>
           )}
           {latestAttempt && (
@@ -174,9 +190,9 @@ export function DeploymentPanel({
                 <div>
                   <dt>Runtime</dt>
                   <dd>
-                    {verifiedPlan?.image
-                      ? "Pinned container image"
-                      : "Built from source"}
+                    {verifiedFacts?.services.some((service) => service.build)
+                      ? "Built from source"
+                      : "Pinned container image"}
                   </dd>
                 </div>
                 <div>
@@ -190,7 +206,7 @@ export function DeploymentPanel({
                 <div>
                   <dt>HTTP access</dt>
                   <dd>
-                    {verifiedPlan?.httpAccess === "controller"
+                    {verifiedFacts?.httpAccess === "controller"
                       ? "Restricted to the controller’s network"
                       : "Public"}
                   </dd>
