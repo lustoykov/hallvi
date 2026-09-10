@@ -15,6 +15,7 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
+import { ArchitecturePrototype } from "./architecture-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
@@ -264,13 +265,35 @@ export function ApplicationSectionView({
       {section === "architecture" ? (
         <>
           {activity && <div className="sg-section-activity">{activity}</div>}
-          <ArchitectureCanvas
-            application={app}
-            deployment={deployment}
-            stack={stack}
-            facts={facts}
-            onOpenDestination={onOpenDestination}
-          />
+          {/* PROTOTYPE (claude/architecture-directions): three directions
+              for this destination, development builds only. */}
+          {process.env.NODE_ENV !== "production" ? (
+            <ArchitecturePrototype
+              application={app}
+              deployment={deployment}
+              facts={facts}
+              operations={operations}
+              onOpenDestination={onOpenDestination}
+              onAsk={(draft) => onAsk(null, draft)}
+              current={
+                <ArchitectureCanvas
+                  application={app}
+                  deployment={deployment}
+                  stack={stack}
+                  facts={facts}
+                  onOpenDestination={onOpenDestination}
+                />
+              }
+            />
+          ) : (
+            <ArchitectureCanvas
+              application={app}
+              deployment={deployment}
+              stack={stack}
+              facts={facts}
+              onOpenDestination={onOpenDestination}
+            />
+          )}
         </>
       ) : (
         <div className="sg-section-content">
