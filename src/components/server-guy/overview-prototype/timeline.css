@@ -538,13 +538,162 @@
   background: rgb(244 201 143 / 12%);
 }
 
+/* ---------- Little Server's log, folded under the timeline ---------- */
+
+.axt-sign {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #dbe1ea;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axt-sign > span {
+  font-style: italic;
+}
+.axt-log-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ax-ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axt-log-toggle:hover {
+  background: #f1f4f8;
+}
+.axt-log-toggle svg {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axt-log-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.axt-log {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 420ms var(--ax-ease-out);
+}
+.axt-log.is-open {
+  grid-template-rows: 1fr;
+}
+.axt-log > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.axt-log-lines {
+  display: grid;
+  margin-top: 10px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+  color: #d9e1f2;
+}
+.axt-log-day {
+  padding: 6px 8px 2px 78px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #56627a;
+}
+.axt-log-line {
+  display: grid;
+  grid-template-columns: 48px 16px minmax(0, 1fr);
+  gap: 0 6px;
+  align-items: baseline;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  animation: axj2-line-in 420ms var(--ax-ease-out);
+  transition: background-color var(--ax-base);
+}
+.axt-log-line.is-newest {
+  background: #222c42;
+}
+.axt-log-line.is-lit {
+  background: #2c3958;
+}
+.axt-log-line time {
+  color: #56627a;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--ax-base);
+}
+.axt-log-line.is-lit time {
+  color: #9fb4f5;
+}
+.axt-log-line b {
+  text-align: center;
+  color: #7d8aa5;
+}
+.axt-log-line span {
+  overflow-wrap: anywhere;
+}
+.axt-log-line[data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axt-log-line[data-tone="pass"] span {
+  color: #b9e8d0;
+}
+.axt-log-line[data-tone="fail"] b,
+.axt-log-line[data-tone="fail"] span {
+  color: #ef8d86;
+}
+.axt-log-line[data-tone="work"] b,
+.axt-log-line[data-tone="work"] span {
+  color: #9fb4f5;
+}
+.axt-log-line em {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-style: normal;
+  color: #f4c98f;
+  background: rgb(244 201 143 / 12%);
+}
+.axt-caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 6px;
+  vertical-align: -2px;
+  background: #9fb4f5;
+  animation: axj2-caret 1s steps(1) infinite;
+}
+/* A line pointed at in the log lights its moment on the lanes. */
+.axt-ev.is-lit {
+  transform: translate(-50%, -50%) scale(1.3);
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 7px rgb(40 90 216 / 24%);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .axt-log,
+  .axt-log-line,
+  .axt-caret,
   .axt-gap,
   .axt-ev,
   .axt-ev::after {
     animation: none !important;
   }
 }
+:root[data-ax-motion="reduced"] .axt-log,
+:root[data-ax-motion="reduced"] .axt-log-line,
+:root[data-ax-motion="reduced"] .axt-caret,
 :root[data-ax-motion="reduced"] .axt-gap,
 :root[data-ax-motion="reduced"] .axt-ev,
 :root[data-ax-motion="reduced"] .axt-ev::after {

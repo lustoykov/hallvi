@@ -5,12 +5,15 @@
 // Server Guy last checked, copied, reached the server and read the
 // firewall, what is scheduled next, and how long nothing has looked.
 // Little Server stands at now; a re-check lands on the lanes as it happens.
+// Its log folds underneath, linked to the lanes: point at a line and its
+// moment lights up, point at a moment and its lines do.
 
-import { ArrowRight, ArrowsClockwise, ChatCircleText, SpinnerGap, X } from "@phosphor-icons/react";
-import { useCallback, useMemo, useState } from "react";
+import { ArrowRight, ArrowsClockwise, CaretDown, ChatCircleText, SpinnerGap, X } from "@phosphor-icons/react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 
 import { labelOf } from "../operation-model";
 import { ago } from "../architecture-prototype/model";
+import { reducedMotion } from "../architecture-prototype/motion";
 import type { HeroProps } from "./hero";
 import type { Overview, Vital } from "./overview-model";
 import { NeedCard, span, useCountdown, useDismiss, VitalPop, vitalIcon, whenWords } from "./shared";
@@ -137,6 +140,17 @@ export function TimelineHero({
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axt-pop, .axt-ev, .axt-lane-name", close);
   const toggle = (id: string) => setOpen((current) => (current === id ? null : id));
+  const [logOpen, setLogOpen] = useState(false);
+  // The moment being pointed at, on the lanes or in the log.
+  const [lit, setLit] = useState<string | null>(null);
+  const log = useRef<HTMLDivElement>(null);
+  // Which moment on the lanes each recorded line belongs to.
+  const momentOf = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const lane of timeline.lanes)
+      for (const event of lane.events) for (const line of event.lines) map[line.id] = event.id;
+    return map;
+  }, [timeline]);
 
   const planned = model.status !== "live";
   const vitals = Object.fromEntries(overview.vitals.map((vital) => [vital.id, vital])) as Record<
@@ -161,6 +175,8 @@ export function TimelineHero({
     .filter((day) => day.width > 9);
 
   const sub = subline(model, overview);
+  const showLog = logOpen || guy.simulating;
+  const lines = guy.lines.slice(-8);
 
   return (
     <section className={`axt${planned ? " is-planned" : ""}${guy.simulating ? " is-live" : ""}`} aria-label="How it is doing">
@@ -275,11 +291,13 @@ export function TimelineHero({
                     <div key={event.id}>
                       <button
                         type="button"
-                        className={`axt-ev${open === id ? " is-open" : ""}`}
+                        className={`axt-ev${open === id ? " is-open" : ""}${lit === event.id ? " is-lit" : ""}`}
                         data-tone={event.tone}
                         style={{ left: `${at}%` }}
                         aria-label={`${event.title}, ${whenWords(event.at, now)}`}
                         onClick={() => toggle(id)}
+                        onPointerEnter={() => setLit(event.id)}
+                        onPointerLeave={() => setLit(null)}
                       >
                         {event.lines.length > 1 && <b>{event.lines.length}</b>}
                       </button>
@@ -324,6 +342,75 @@ export function TimelineHero({
             <span className="axt-now-label" style={{ left: `${nowX}%` }}>
               Now · {clock(now)}
             </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="axt-sign">
+        <span>Little Server, from your network</span>
+        <button
+          type="button"
+          className="axt-log-toggle"
+          aria-expanded={showLog}
+          aria-controls="axt-log"
+          onClick={() => {
+            const next = !logOpen;
+            setLogOpen(next);
+            // Opened by hand: bring the log into view once it unfolds.
+            if (next)
+              window.setTimeout(
+                () =>
+                  log.current?.scrollIntoView({
+                    block: "nearest",
+                    behavior: reducedMotion() ? "auto" : "smooth",
+                  }),
+                440,
+              );
+          }}
+        >
+          {guy.simulating ? "What I'm doing" : "What I did last"}
+          <CaretDown weight="bold" />
+        </button>
+      </div>
+      <div className={`axt-log${showLog ? " is-open" : ""}`} id="axt-log" ref={log}>
+        <div>
+          <div className="axt-log-lines" role="log" aria-live="polite">
+            {lines.length === 0 && (
+              <div className="axt-log-line" data-tone="info">
+                <time>--:--</time>
+                <b aria-hidden="true">·</b>
+                <span>{planned ? "Nothing has run yet." : "No work recorded yet."}</span>
+              </div>
+            )}
+            {lines.map((line, i) => {
+              const previous = lines[i - 1];
+              const day = dayName(Date.parse(line.at), now);
+              const moment = momentOf[line.id];
+              const newest = i === lines.length - 1;
+              return (
+                <Fragment key={line.id}>
+                  {(!previous || dayName(Date.parse(previous.at), now) !== day) && (
+                    <div className="axt-log-day">{day}</div>
+                  )}
+                  <div
+                    className={`axt-log-line${newest ? " is-newest" : ""}${moment && lit === moment ? " is-lit" : ""}`}
+                    data-tone={line.tone}
+                    onPointerEnter={() => setLit(moment ?? null)}
+                    onPointerLeave={() => setLit(null)}
+                  >
+                    <time>{clock(line.at)}</time>
+                    <b aria-hidden="true">{glyph[line.tone]}</b>
+                    <span>
+                      {line.text}
+                      {line.invented && (
+                        <em>{line.id.startsWith("live:") ? "simulated" : "invented"}</em>
+                      )}
+                      {newest && guy.running && <i className="axt-caret" aria-hidden="true" />}
+                    </span>
+                  </div>
+                </Fragment>
+              );
+            })}
           </div>
         </div>
       </div>

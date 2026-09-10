@@ -69,7 +69,7 @@ map in miniature, recent work and one quiet line of ideas stay the same.
 
 | Key | Name | Structure | Signature interaction |
 | --- | --- | --- | --- |
-| A | Timeline | The last day and a half and the next half day as four lanes (checks, backups, server, access); the stretch since anything looked is drawn and named | Little Server stands at now; a re-check lands on the lanes as it happens and closes the gap; each moment opens its recorded lines |
+| A | Timeline | The last day and a half and the next half day as four lanes (checks, backups, server, access); the stretch since anything looked is drawn and named; Little Server's log folds underneath (B's terminal, at the owner's request) | Little Server stands at now; a re-check lands on the lanes and streams into the log; point at a log line and its moment lights up, point at a moment and its lines do |
 | B | Little Server's note | A short note in Little Server's words; every fact is a highlighted phrase in the certainty's colour | Phrases open their evidence in place; the countdown ticks inside the sentence; the console folds under the signature |
 | C | Console | Server Guy's console as the centrepiece; the vital signs are its status lines, the recorded work runs underneath | Rows open in place; a re-check streams into the log while the rows turn from checking to verified |
 
