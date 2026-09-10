@@ -1,5 +1,3 @@
-import { checkDeploymentSource } from "./deployment-source";
-import { deploymentSourceFiles } from "./deployment-source-files";
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
@@ -87,6 +85,8 @@ export async function readReleaseFile(
     throw new Error("Select a recorded release of this application.");
   if (deniedPathReason(path))
     throw new Error("Credential-bearing paths are excluded.");
+  const { checkDeploymentSource } = await import("./deployment-source");
+  const { deploymentSourceFiles } = await import("./deployment-source-files");
   const { token } = await checkDeploymentSource(record);
   const source = await deploymentSourceFiles(
     release.repository,
