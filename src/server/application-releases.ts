@@ -314,6 +314,12 @@ export async function runApplicationRelease(
           native,
         })!;
         const facts = releaseFacts(selected, record.id);
+        // Operation and runtime must agree: without a behavior criterion a
+        // release could only ever be observed, never verified.
+        if (!native.criterion)
+          throw new ReleaseScopeError(
+            "This application has no behavior criterion, so a release could not be verified. Releasing it needs the managed private check path, which is not implemented yet.",
+          );
         assertOwned(record, tracked, scope, facts);
         const buildFiles = facts.services.some((service) => service.build)
           ? await sourceTree()

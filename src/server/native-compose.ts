@@ -143,9 +143,8 @@ function mountedFiles(resolved: ResolvedCompose, paths: string[]) {
       ).flatMap((item) => (item.file ? [item.file] : [])),
     ),
   ].map(clean);
-  return paths.filter((path) =>
-    sources.some((source) => path === source || path.startsWith(`${source}/`)),
-  );
+  // The backup runner copies mounted files; directories are not supported.
+  return paths.filter((path) => sources.includes(path));
 }
 export function runtimeArtifacts(native: NativeConfiguration) {
   return mountedFiles(
@@ -167,10 +166,7 @@ function capabilityGaps(
   const gaps: string[] = [];
   const unsupported = (where: string, what: string) =>
     gaps.push(`${where}: ${what} is not supported by the managed executor.`);
-  const selected = (path: string) =>
-    paths.some(
-      (item) => item === clean(path) || item.startsWith(`${clean(path)}/`),
-    );
+  const selected = (path: string) => paths.includes(clean(path));
   for (const [name, service] of Object.entries(resolved.services)) {
     const where = `Service ${name}`;
     if (!/^[a-z0-9][a-z0-9_.-]{0,62}$/.test(name))
@@ -238,6 +234,13 @@ function capabilityGaps(
           `${where}: anonymous volume ${mount.target} has no identity; use a named volume.`,
         );
       else if (
+        mount.type === "volume" &&
+        (mount as { volume?: { subpath?: string } }).volume?.subpath
+      )
+        gaps.push(
+          `${where}: a subpath of volume ${mount.source} changes which data the service sees; data preservation, SQLite and backup records identify whole volumes.`,
+        );
+      else if (
         mount.type === "bind" &&
         (!inside(mount.source) || !selected(mount.source!))
       )
@@ -298,6 +301,10 @@ function capabilityGaps(
       network.driver_opts
     )
       unsupported(`Network ${key}`, "an external or non-bridge network");
+    else if (network.name !== `${project}_${key}`)
+      gaps.push(
+        `Network ${key}: keep its project-scoped name; joining a network named outside this application is not supported.`,
+      );
   for (const kind of ["configs", "secrets"] as const)
     for (const [key, item] of Object.entries(
       (resolved[kind] ?? {}) as Record<string, Record<string, unknown>>,

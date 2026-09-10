@@ -257,7 +257,7 @@ run_release() {
   ${rollbackImages ? `docker image inspect ${names(Object.values(rollbackImages))} >/dev/null || return $?` : ":"}
   phase=activate
   cp compose.json ${root}/compose.json || return $?
-  ${execution.activate.map(({ from, to }) => `mkdir -p ${shellQuote(`${root}/${posix.dirname(to)}`)} && cp ${shellQuote(from)} ${shellQuote(`${root}/${to}`)} || return $?`).join("\n  ") || ":"}
+  ${execution.activate.map(({ from, to }) => `mkdir -p ${shellQuote(`${root}/${posix.dirname(to)}`)} && cp -p ${shellQuote(from)} ${shellQuote(`${root}/${to}`)} || return $?`).join("\n  ") || ":"}
   cd ${root} || return $?
   phase=replace
   ${compose} up -d --no-build --pull never --remove-orphans --wait --wait-timeout 120 || return $?

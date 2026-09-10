@@ -6,7 +6,7 @@ Updated: 10 September 2026. Status: Opus candidate committed locally; awaiting C
 
 Support applications through their declared requirements with a small reusable core. Pi authors native configuration, chooses commands and recovery, and uses actual tool feedback. Server Guy retains identities, authority, data guarantees and evidence. No application-name branches, replacement service DSL, fixed model workflow or redundant Compose validator.
 
-Owner explicitly requested **Claude Opus 5, High effort** for this next step. Opus implements and tests in this worktree; Codex coordinates, reviews the diff, verifies the result, and handles PR/merge. Do not delegate further. This authorization is specific to this assignment; later Opus work needs another explicit owner request.
+Owner explicitly requested **Claude Opus 5, High effort** for this next step. Opus implements and tests in this worktree; Codex coordinates, reviews the diff, verifies the result, and handles PR/merge. Do not delegate further. Owner expanded authorization on 10 September: Opus 5 High is the workhorse for all three steps in [the generalization delivery plan](generalization-delivery.md); Codex coordinates, verifies and merges. No unrelated delegation.
 
 ## Sources of truth
 
@@ -100,3 +100,48 @@ Record decisions, changed files, validation, exact remaining work and concrete b
 - **Unfinished, with reason.** No managed-host private check path, so worker-only/no-public-endpoint intake stays closed; that arrangement is proven only through the local executor as observed and updatable. An operation completing a criterion-less release settles `verified` at operation level while its evidence and the runtime say behavior is unverified; production cannot reach that state yet.
 - **Found and fixed.** The shared tar writer stamped every entry with mtime 0, so BuildKit kept earlier synced files whose size and mtime matched: a same-size source change between releases built stale content (reproduced; legacy releases were affected too). Release and initial-deployment bundles now carry the current time.
 - **For Codex to verify.** Real Pi authoring through `deploy_release` with the configured model; the existing-app update on a real host (Paperless-style managed PostgreSQL and private inputs); native recreation and backup capture on a host; the host backup runner's remaining `app`/`postgres` naming assumptions; historical image retention when a same-name rebuild moves a tag (the pre-activation image check fails safely).
+
+## Codex review checkpoint and owner steering
+
+Candidate d0b2446 completed. Codex independently ran 20 focused tests (all passed) and actual Compose resolution probes. Two omissions reproduced: volume subpath and explicit foreign network name passed the current facts comparison. Owner explicitly prioritized architecture over additional hardening on 10 September: defer exhaustive field/security checks, broad backup rewrites and input-version machinery. The correction round prioritizes a real Pi authoring/execution/feedback proof, small fixes for demonstrated data-identity/ownership gaps, and a clear next PR for native INITIAL intake (still custom-plan based). Review details and evidence: ignored tests/results/native-compose-execution/codex-review.md and review-probes.mts. No merge yet.
+
+The standing mindset is recorded in [Product: Development priority](../../PRODUCT.md#development-priority): get the general architecture right first; fine-tune, harden and polish afterward. Apply this when selecting follow-up work and resuming after a context reset.
+
+## Expanded owner authorization: complete steps 1, 2 and 3
+
+The owner is going to sleep and explicitly authorized completing and merging the current PR, unifying initial deployment with native releases, and proving reuse across different application structures. Continue beyond this candidate under [generalization-delivery.md](generalization-delivery.md). Use Opus 5 High as implementer for the whole sequence, Codex as coordinator and independent verifier. Do not stop the monitoring heartbeat after step 1. Architecture and elegant simplicity take priority over extra hardening or speculative edge cases.
+
+## Opus correction round (after Codex review of d0b2446)
+
+Owner steering applied: prove the real architecture first; fix only demonstrated gaps; name broader hardening as follow-ups.
+
+**Small corrections, each with a focused real-resolver check in the opt-in Docker proof.**
+
+- A volume `subpath` is a capability error: preservation, SQLite and backup records identify whole volumes. Codex's `review-probes.mts` case is now refused.
+- Networks keep their project-scoped names; joining a foreign name is refused (Codex's second probe). Isolation changes such as `internal` flips are not compared yet; legacy baselines have no custom networks.
+- Bind mounts must be exactly selected files, not directories, which matches the host backup runner (read-only mounted files only).
+- Activation copies mounted files with `cp -p`; the script's `umask 077` otherwise left them unreadable to an unprivileged container.
+- A release without a behavior criterion is refused at the operation boundary, so an operation never says "Verified" while the runtime is only observed. Observed runtimes still arise from behavior failures (the operation fails, and its retry fixes forward).
+
+**Review items.** Native recreation is now proved (all containers replaced from recorded images, configuration fingerprints including a mounted file checked, the criterion verified again, data kept). The backup runner is not rewritten: reachable native releases satisfy its current rules (project-named volumes, file binds, a labeled `app`, the managed database as `postgres`, container images equal to `compose.json`), but a capture of a native release was not executed. Release identity binds private input names; an attempt executes the protected values current at execution, as legacy does, and no input version is recorded. `bundleHashes["compose.json"]` hashes the executable file including private values (also true for legacy), which could let a low-entropy input be guessed from it plus the public snapshot.
+
+**Architecture answer.** The release path removes the custom plan from Pi's work: `deploy_release` takes native files, and no plan JSON is written or parsed while releasing. The executed configuration is the retained resolved snapshot plus a retained controller override (pins, built-image names, revision labels); nothing is reduced or re-rendered. The loop is shared: selection → resolution → derived-fact scope → attempt → the same locked host script, receipt and reconciliation → verification → feedback. The custom plan survives only as initial intake and as the reader of historical releases (baseline views, facts, rollback). The remaining duplication is initial deployment's own upload/build/start sequence beside `releaseCommand`, two planner prompts, and the dual `plan`/`native` record behind `currentFacts`.
+
+**Smallest next PR: native initial intake.** Reuse the release mode for the first deployment with an empty baseline. Pi declares private input names/reasons, the HTTP access choice and any managed PostgreSQL association as records; the recommendation shows derived facts and the price; approval binds the native release identity. `executeDeployment` keeps provisioning, firewall and metadata guard, then runs the bundle through `releaseCommand` without retained volumes. A behavior criterion stays required, so check-less intake remains closed until the private check path exists. This retires `submit_plan`, `parseDeploymentPlan`, the legacy prompt and initial deployment's bespoke bundle code; the legacy renderer and facts stay read-only for history.
+
+**Deferred follow-ups.** Exhaustive Compose field audit; network isolation comparison; backup runner identity by labels and managed database by association, with an executed native capture; private-input versions and keyed fingerprints instead of plain hashes of secret-bearing files; the managed-host private check path; host-side revalidation of observed snapshots; historical image retention across same-name rebuilds.
+
+### Real configured-Pi proof (correction round)
+
+Opt-in: `SG_RUN_PI_PROOF=1 SG_PI_SETTINGS=<saved pi-settings.json>` on `native-release.docker.test.ts`.
+
+The run uses the controller's saved Pi choice (`openai-codex` / `gpt-5.6-sol`, high). Only its settings file is copied into a disposable config directory; the credential stays in place and is read only by Pi's runtime. Real components are the planner, workspace, file export, pinned resolver, controller override, fact scope, locked host script, verification and records. SSH runs the host script locally, and source listing comes from fixture trees. The fixture (`tests/fixtures/notes-app`) runs on managed PostgreSQL with a private signing key and adds a README-documented worker in v2.
+
+Run 1: Pi read the running configuration and records, authored `deploy.compose.yml` (app, worker, preserved `postgres:16` and `database` volume, private values only as `${NAME}`), replaced the criterion for v2, validated with Compose using placeholders, and submitted once. The selection was accepted, executed and verified in 1.6 minutes. The worker counted the retained note, the digest matched the synthetic key, and the database container and volume were kept. No correction was needed, so a second phase adds a host-only failure: v3's upstream Dockerfile pins a base-image digest no registry serves.
+
+Two-phase run: both phases verified, in 4.3 minutes including host builds.
+
+- **v2:** Pi authored its own `Dockerfile.release` (copying only application files) and `deploy.compose.yml` (app, worker, preserved PostgreSQL). A shared YAML anchor gave app and worker the same image name and build. The first execution failed in the host build, which built both. Pi then removed the anchor so only app builds and the worker reuses its image, and the second execution was verified.
+- **v3:** Pi first used the upstream Dockerfile. The host build failed with `python:3.12-alpine@sha256:d5d190…: not found`. Pi recreated the `Dockerfile.release` it had read from the retained v2 release, whose base uses the tag, and pointed its Compose file at it without editing repository files. The second execution was verified.
+- **After both releases:** the retained note still has its worker-computed word count, the digest matches the synthetic key, the PostgreSQL container and database volume are unchanged, and v3 serves. No private value appears in the evidence, the deployment record (which holds the feedback) or Pi's workspace journal. Pi also worked through native-tool errors in its workspace: `git status` fails because the export is not a repository, and only `python3` is installed.
+- **Harness note:** that run kept only the start of each error, so v2's final error line is not retained and its cause is inferred from Pi's fix. The harness now keeps error tails; it was not rerun.
