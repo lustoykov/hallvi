@@ -212,6 +212,9 @@ const CITIES: Record<string, [string, string]> = {
   sin: ["Singapore", "Singapore"],
 };
 
+const lowerFirst = (value: string | undefined) =>
+  value ? value.charAt(0).toLowerCase() + value.slice(1) : undefined;
+
 const list = (items: string[]) =>
   items.length <= 1
     ? (items[0] ?? "")
@@ -1209,7 +1212,7 @@ export function explain(model: ArchitectureModel, depth: Depth): Sentence[] {
       offsiteReal
         ? {
             ref: "offsite",
-            text: `A copy of both goes to ${p.offsite.name} ${fact("offsite", "Schedule")?.toLowerCase() ?? "on request"}`,
+            text: `A copy of both goes to ${p.offsite.name} ${lowerFirst(fact("offsite", "Schedule")) ?? "on request"}`,
           }
         : { ref: "offsite", text: "No off-site copy is set up yet" },
       offsiteReal && `, keeping ${fact("offsite", "Keeps")}`,
@@ -1281,7 +1284,9 @@ export function explain(model: ArchitectureModel, depth: Depth): Sentence[] {
       : { ref: "offsite", text: "no backup destination", mono: false },
     offsiteReal &&
       `: ${fact("offsite", "Schedule")}, keeps ${fact("offsite", "Keeps")}; last copy ${fact("offsite", "Last copy")}; SHA-256 verified.`,
-    offsiteReal && restoreFact && ` Restore test ${restoreFact}.`,
+    offsiteReal &&
+      restoreFact &&
+      ` Restore test ${restoreFact.replace(/\.$/, "")}.`,
     !offsiteReal && ".",
   );
   say(

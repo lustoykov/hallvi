@@ -21,7 +21,7 @@ import { useLiveRecord } from "./live-record";
 import { buildModel, type ArchitectureModel, type ScenarioId } from "./model";
 import { setMotionPreview } from "./motion";
 import { PrototypeBar, scenarios, type VariantEntry } from "./prototype-bar";
-import { SentenceDirection } from "./sentence";
+import { SentenceDirection } from "./plain-sentence";
 import { useRecheck, type Recheck } from "./use-recheck";
 import "./prototype.css";
 
