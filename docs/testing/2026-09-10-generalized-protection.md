@@ -19,7 +19,7 @@ After dependency-ordered sequential shutdown and reverse-order restart, final ca
 
 ## Forced interruption
 
-For run `1d3b0d7b-95e5-4540-96a1-5dc9162d36cc`, the acceptance operator killed the runner container with SIGKILL after its first service stop. The runner exited 137. Production recovery read the durable journal, restarted exactly one stopped service, marked the run interrupted, removed its staging, and reported `cleanupPending: false`. PostgreSQL and the broker were not restarted. The source application returned healthy.
+For final run `5985377e-8d8b-47b9-87fb-0857d6e1b5e7`, the acceptance operator killed the runner container with SIGKILL after its first service stop. The runner exited 137. Production recovery read the durable journal, restarted exactly one stopped service, marked the run interrupted, removed its staging, and reported `cleanupPending: false`. PostgreSQL and the broker were not restarted. The source application returned healthy.
 
 The interruption uses an isolated state directory and the real `perform_recovery` function. It proves the journal/recovery path, not systemd's invocation of that path. Earlier acceptance attempts tried to send SIGKILL from namespace PID 1 to itself; Linux did not terminate that process. Those completed captures are not interruption evidence.
 

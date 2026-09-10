@@ -353,6 +353,89 @@ describe("scheduled backup evidence", () => {
       ),
     ).not.toContain("private-host-password");
   });
+  it("credits a stack restore test only when every recorded kind of data was restored", () => {
+    const stack = backupPolicySchema.parse({
+      ...policy,
+      kind: "stack",
+      data: { postgres: true, sqlite: true },
+    });
+    const restoredWith = (...checks: string[]) => ({
+      ...snapshot,
+      runs: [
+        scheduledRunSchema.parse({
+          ...run,
+          restore: {
+            at,
+            recoveryPointAt: at,
+            outcome: "verified",
+            scope: "offline-database-and-files",
+            checks,
+            measurements: { files: 4 },
+            cleanupComplete: true,
+            errorCode: null,
+          },
+        }),
+      ],
+    });
+    const offline = [
+      "archive-hash",
+      "backup-identity",
+      "file-inventory",
+      "database-integrity",
+      "database-rows",
+    ];
+    expect(
+      scheduledProtection(deployment, stack, restoredWith(...offline), now)
+        .restoreTest,
+    ).toBeNull();
+    const facts = scheduledProtection(
+      deployment,
+      stack,
+      restoredWith(...offline, "database-restored"),
+      now,
+    );
+    expect(facts.restoreTest?.verified).toContain(
+      "Application boot was not tested",
+    );
+    expect(facts.restoreTest?.verified).not.toContain("file-hash");
+    // A database captured as files is credited on file hashes, and says so.
+    const fileOnly = backupPolicySchema.parse({
+      ...policy,
+      kind: "stack",
+      data: { postgres: false, sqlite: false, fileDatabases: true },
+    });
+    const hashed = restoredWith(
+      "archive-hash",
+      "backup-identity",
+      "file-inventory",
+    );
+    expect(
+      scheduledProtection(deployment, fileOnly, hashed, now).restoreTest
+        ?.verified,
+    ).toContain("File-captured databases received file-hash checks only.");
+    // A service that did not stop cleanly leaves no new recovery point.
+    const killed = {
+      ...run,
+      id: "00000000-0000-4000-8000-000000000004",
+      startedAt: "2026-09-09T16:01:00Z",
+      outcome: "failed" as const,
+      phase: "capture",
+      errorCode: "source-stop-failed",
+      bytes: null,
+      sha256: null,
+    };
+    const after = scheduledProtection(
+      deployment,
+      fileOnly,
+      { ...hashed, runs: [killed, ...hashed.runs] },
+      now,
+    );
+    expect(after.lastAttempt?.reason).toContain(
+      "failed to stop cleanly or exceeded the two-minute grace period",
+    );
+    expect(after.coverage[0].lastSuccessfulAt).toBe(at);
+    expect(after.restoreTest?.recoveryPointAt).toBe(at);
+  });
   it("uses the same validated host lock for backup and deployment mutations", () => {
     expect(deploymentLock(deploymentId, "docker compose up")).toContain(
       `/run/lock/server-guy-${deploymentId}.lock`,

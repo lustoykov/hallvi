@@ -9,7 +9,7 @@ import tarfile
 import tempfile
 import unittest
 import uuid
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -30,6 +30,8 @@ DEPLOYMENT = "22222222-2222-4222-8222-222222222222"
 OTHER_APPLICATION = "33333333-3333-4333-8333-333333333333"
 PREFIX = f"scheduled/{APPLICATION}/{DEPLOYMENT}/"
 SECRET = "s3cret-access-key-value"
+APP, WORKER, JOBS, DATABASE = "a" * 64, "b" * 64, "c" * 64, "d" * 64
+DUMP = b"PGDMP" + b"captured rows" * 4
 
 
 def settings(**overrides):
@@ -145,6 +147,8 @@ class FakeDocker:
         volumes=None,
         helper=None,
         exec_results=None,
+        images=None,
+        exit_codes=None,
     ):
         self.containers = dict(containers or {})
         self.services = dict(services or {})
@@ -162,6 +166,13 @@ class FakeDocker:
         self.volumes = dict(volumes or {})
         self.helper = helper
         self.exec_results = dict(exec_results or {})
+        self.images = dict(images or {})
+        self.exit_codes = dict(exit_codes or {})
+        # Containers outside this Compose project that may share its volumes.
+        self.foreign = set()
+        self.refuse_start = False
+        self.exec_running = {}
+        self.copied = {}
         self.started = []
         self.removed = []
         self.calls = []
@@ -174,6 +185,13 @@ class FakeDocker:
             raise subprocess.CalledProcessError(1, args)
         if args[1:2] == ("compose",):
             return " ".join(self.containers).encode()
+        if args[:2] == ("docker", "ps") and "--filter" in args:
+            volume = args[-1].removeprefix("volume=")
+            return "\n".join(
+                container
+                for container in [*self.containers, *self.foreign]
+                if any(m.get("Name") == volume for m in self.mounts.get(container, []))
+            ).encode()
         if args[:2] == ("docker", "ps"):
             return "\n".join(
                 f"{container} {'running' if running else 'exited'}"
@@ -198,7 +216,10 @@ class FakeDocker:
                         for value in requested
                     ]
                 ).encode()
-            if any(value not in self.containers for value in requested):
+            if any(
+                value not in self.containers and value not in self.foreign
+                for value in requested
+            ):
                 raise subprocess.CalledProcessError(1, args, stderr=b"No such object")
             return json.dumps([self.describe(value) for value in requested]).encode()
         if args[:4] == ("docker", "rm", "--force", "--volumes"):
@@ -206,8 +227,27 @@ class FakeDocker:
             self.named.pop(args[4], None)
             return b""
         if args[:2] == ("docker", "start"):
+            if self.refuse_start:
+                raise subprocess.CalledProcessError(1, args)
             self.started.append(args[2])
             self.containers[args[2]] = True
+            return b""
+        if args[:2] == ("docker", "stop"):
+            for container in args[4:]:
+                self.containers[container] = False
+            return b""
+        # The disposable restore database, owned through its label.
+        if args[:3] == ("docker", "image", "inspect"):
+            return b"[]"
+        if args[:3] == ("docker", "volume", "create"):
+            self.volumes[args[-1]] = dict([args[4].split("=", 1)])
+            return b""
+        if args[:2] == ("docker", "run"):
+            label = args[args.index("--label") + 1].split("=", 1)
+            self.named[args[args.index("--name") + 1]] = dict([label])
+            return b""
+        if args[:2] == ("docker", "cp"):
+            self.copied[args[3]] = Path(args[2]).read_bytes()
             return b""
         if (
             args[:2] == ("docker", "exec")
@@ -215,6 +255,9 @@ class FakeDocker:
             and args[3] in self.exec_results
         ):
             result = self.exec_results[args[3]]
+            self.exec_running[args[3]] = sorted(
+                container for container, running in self.containers.items() if running
+            )
             if stdout is not None:
                 Path(stdout).write_bytes(result)
                 return b""
@@ -224,13 +267,18 @@ class FakeDocker:
     def describe(self, container):
         return {
             "Id": container,
-            "State": {"Running": self.containers[container]},
+            "State": {
+                "Running": self.containers.get(container, True),
+                "ExitCode": self.exit_codes.get(container, 0),
+            },
             "Config": {
                 "Labels": {
                     "com.docker.compose.service": self.services.get(container, "app"),
                     **self.labels,
                 },
-                "Image": "louislam/uptime-kuma@sha256:" + "a" * 64,
+                "Image": self.images.get(
+                    container, "louislam/uptime-kuma@sha256:" + "a" * 64
+                ),
                 "Env": [
                     "POSTGRES_USER=serverguy",
                     "POSTGRES_DB=application",
@@ -1408,6 +1456,420 @@ class ScheduledBackupTest(unittest.TestCase):
                 config, state, str(uuid.uuid4()), docker, self.directory
             )
         self.assertEqual(raised.exception.code, "source-unsupported")
+
+    # Generic stack capture
+
+    def generic_stack(self):
+        """App and a read-only worker share SQLite; jobs only uses PostgreSQL."""
+        source = self.source_stack(
+            {
+                "app": {"image": "sg-app:rev-9"},
+                "worker": {"image": "sg-app:rev-9"},
+                "jobs": {"image": "example/jobs:1"},
+                "postgres": {"image": "postgres:16"},
+            }
+        )
+        (source / "configs").mkdir(exist_ok=True)
+        (source / "configs/app-settings").write_text("mode = production")
+        volumes = Path(tempfile.mkdtemp(dir=self.directory))
+        state, uploads = volumes / "state", volumes / "uploads"
+        (state / "db").mkdir(parents=True)
+        (state / "blobs").mkdir()
+        (state / "blobs/avatar.png").write_bytes(b"\x89PNG avatar")
+        uploads.mkdir()
+        (uploads / "report.pdf").write_bytes(b"%PDF quarterly report")
+        # An open writer that never checkpoints: every row lives only in the
+        # WAL, as after a writer that was killed rather than closed.
+        writer = sqlite3.connect(state / "db/app.sqlite")
+        self.addCleanup(writer.close)
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        with writer:
+            writer.execute("CREATE TABLE note (id INTEGER PRIMARY KEY, body TEXT)")
+            writer.executemany(
+                "INSERT INTO note VALUES (?, ?)", [(1, "first"), (2, "second")]
+            )
+        project = runner.compose_project(DEPLOYMENT)
+
+        def volume(name, path, target, rw=True):
+            return {
+                "Type": "volume",
+                "Name": f"{project}_{name}",
+                "Source": str(path),
+                "Destination": target,
+                "RW": rw,
+            }
+
+        docker = FakeDocker(
+            containers={APP: True, WORKER: True, JOBS: True, DATABASE: True},
+            services={APP: "app", WORKER: "worker", JOBS: "jobs", DATABASE: "postgres"},
+            images={
+                APP: "sg-app:rev-9",
+                WORKER: "sg-app:rev-9",
+                JOBS: "example/jobs:1",
+                DATABASE: "postgres:16",
+            },
+            mounts={
+                APP: [
+                    volume("state", state, "/srv/state"),
+                    volume("uploads", uploads, "/uploads"),
+                    {
+                        "Type": "bind",
+                        "Source": str(source / "configs/app-settings"),
+                        "Destination": "/etc/app/settings.toml",
+                        "RW": False,
+                    },
+                ],
+                WORKER: [volume("state", state, "/mnt/state", rw=False)],
+                DATABASE: [volume("database", volumes, "/var/lib/postgresql/data")],
+            },
+            exec_results={"psql": b"160004\n", "pg_dump": DUMP},
+        )
+        # The shape backupCapturePlan records when the app needs jobs: each
+        # dependent before what it needs, not the order Compose lists them in.
+        capture = {
+            "version": 1,
+            "pauseServices": ["worker", "app", "jobs"],
+            "postgres": "postgres",
+            "volumes": [
+                {
+                    "name": "state",
+                    "kind": "database",
+                    "sqlite": "db/app.sqlite",
+                    "mounts": [
+                        {"service": "app", "target": "/srv/state", "readOnly": False},
+                        {"service": "worker", "target": "/mnt/state", "readOnly": True},
+                    ],
+                },
+                {
+                    "name": "uploads",
+                    "kind": "files",
+                    "sqlite": None,
+                    "mounts": [
+                        {"service": "app", "target": "/uploads", "readOnly": False}
+                    ],
+                },
+            ],
+        }
+        path = write_private(
+            self.directory / "config.json",
+            settings(
+                kind="stack",
+                capture=capture,
+                composeSha256=runner.sha256(source / "compose.json"),
+            ),
+        )
+        # Through the real loader, which decides what the run may see.
+        return runner.load_config(path), docker
+
+    def storage(self, client):
+        return lambda config: runner.Storage(client, config["bucket"], config["prefix"])
+
+    def test_stack_capture_quiesces_every_application_service_around_one_recovery_point(
+        self,
+    ):
+        config, docker = self.generic_stack()
+        state = self.state(config)
+        wal = Path(docker.mounts[APP][0]["Source"]) / "db/app.sqlite-wal"
+        self.assertGreater(wal.stat().st_size, 0)
+        # Exiting on SIGTERM (143) is a clean stop; a SIGKILL (137) or any
+        # other exit code is not.
+        docker.exit_codes[JOBS] = 143
+        client = FakeClient()
+        result = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(result["outcome"], "succeeded", result["errorCode"])
+        stops = [call[2:] for call in docker.calls if call[:2] == ("docker", "stop")]
+        # One container per call in the recorded order (a multi-ID stop is
+        # parallel). Includes the client that mounts nothing; never the managed
+        # database, which alone is still running when it is dumped.
+        self.assertEqual(stops, [("--time", "120", c) for c in (WORKER, APP, JOBS)])
+        self.assertEqual(docker.exec_running["pg_dump"], [DATABASE])
+        # Restarted in reverse: each dependency is running before its dependents.
+        self.assertEqual(docker.started, [JOBS, APP, WORKER])
+        self.assertTrue(all(docker.containers.values()))
+        self.assertTrue(state.journals()[0]["complete"])
+        archive = self.directory / "stack.tar.gz"
+        archive.write_bytes(client.objects[result["objectKey"]])
+        extracted = self.directory / "extracted"
+        runner.safe_extract(archive, extracted)
+        # One copy of the shared volume, however many services mount it.
+        self.assertEqual(
+            sorted(path.name for path in (extracted / "state").iterdir()),
+            ["state", "uploads"],
+        )
+        data = extracted / "state/state"
+        self.assertEqual([p.name for p in (data / "db").iterdir()], ["app.sqlite"])
+        with closing(sqlite3.connect(data / "db/app.sqlite")) as copy:
+            self.assertEqual(copy.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(
+                copy.execute("SELECT body FROM note ORDER BY id").fetchall(),
+                [("first",), ("second",)],
+            )
+        self.assertEqual((data / "blobs/avatar.png").read_bytes(), b"\x89PNG avatar")
+        self.assertEqual(
+            (extracted / "state/uploads/report.pdf").read_bytes(),
+            b"%PDF quarterly report",
+        )
+        self.assertEqual((extracted / "database/dump.pgc").read_bytes(), DUMP)
+        self.assertEqual(
+            (extracted / "configuration/configs/app-settings").read_text(),
+            "mode = production",
+        )
+        manifest = json.loads((extracted / "manifest.json").read_text())
+        self.assertEqual(manifest["recoveryPointAt"], result["capturedAt"])
+        self.assertEqual(
+            manifest["stoppedServices"], {"app": 0, "worker": 0, "jobs": 143}
+        )
+        self.assertNotIn(SECRET, json.dumps(manifest))
+
+    def test_a_mixed_archive_restores_its_files_sqlite_and_captured_dump(self):
+        config, docker = self.generic_stack()
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        restorer = FakeDocker(
+            exec_results={"pg_isready": b"", "pg_restore": b"", "psql": b"2|7\n"}
+        )
+        restore = runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+        )["restore"]
+        self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        self.assertEqual(restore["recoveryPointAt"], stored["capturedAt"])
+        for check in (
+            "file-inventory",
+            "database-integrity",
+            "database-rows",
+            "database-restored",
+        ):
+            self.assertIn(check, restore["checks"])
+        names = runner.restore_names(stored["id"])
+        # PostgreSQL restores the dump captured with these files, not any dump.
+        self.assertEqual(restorer.copied[names["container"] + ":/tmp/dump.pgc"], DUMP)
+        self.assertEqual(restorer.removed, [names["container"], names["volume"]])
+        self.assertTrue(restore["cleanupComplete"])
+
+    def test_a_file_captured_database_restores_by_file_hashes_alone(self):
+        """A broker whose clean shutdown leaves all its state in files."""
+        source = self.source_stack(
+            {"app": {"image": "sg-app:rev-9"}, "queue": {"image": "example/queue:1"}}
+        )
+        data = Path(tempfile.mkdtemp(dir=self.directory))
+        (data / "segments").mkdir()
+        (data / "segments/000001.log").write_bytes(b"queued job 1")
+        docker = FakeDocker(
+            containers={APP: True, JOBS: True},
+            services={APP: "app", JOBS: "queue"},
+            images={APP: "sg-app:rev-9", JOBS: "example/queue:1"},
+            mounts={
+                JOBS: [
+                    {
+                        "Type": "volume",
+                        "Name": runner.compose_project(DEPLOYMENT) + "_queue",
+                        "Source": str(data),
+                        "Destination": "/data",
+                        "RW": True,
+                    }
+                ]
+            },
+        )
+        capture = {
+            "version": 1,
+            "pauseServices": ["app", "queue"],
+            "postgres": None,
+            "volumes": [
+                {
+                    "name": "queue",
+                    "kind": "database",
+                    "sqlite": None,
+                    "capture": "quiesced-files",
+                    "mounts": [
+                        {"service": "queue", "target": "/data", "readOnly": False}
+                    ],
+                }
+            ],
+        }
+        config = runner.load_config(
+            write_private(
+                self.directory / "config.json",
+                settings(
+                    kind="stack",
+                    capture=capture,
+                    composeSha256=runner.sha256(source / "compose.json"),
+                ),
+            )
+        )
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(stored["outcome"], "succeeded", stored["errorCode"])
+        archive = self.directory / "queue.tar.gz"
+        archive.write_bytes(client.objects[stored["objectKey"]])
+        # Named for what ran: neither the SQLite backup API nor a PostgreSQL dump.
+        method = runner.archive_manifest(archive)["method"]
+        self.assertNotRegex(method, "SQLite|PostgreSQL")
+        restorer = FakeDocker()
+        restore = runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+        )["restore"]
+        self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        # The segment and the recorded Compose definition, each hash-checked.
+        self.assertIn("file-inventory", restore["checks"])
+        self.assertEqual(restore["measurements"]["files"], 2)
+        # Hashes prove the files, not database semantics: no database check
+        # is claimed and no disposable database is started.
+        self.assertEqual([c for c in restore["checks"] if c.startswith("database")], [])
+        self.assertNotIn(("docker", "run"), [call[:2] for call in restorer.calls])
+
+    def test_a_legacy_postgres_archive_still_restores(self):
+        config = settings(kind="postgres")
+        state = self.state(config)
+        self.source_stack(
+            {
+                "app": {"image": "sg-todo:latest"},
+                "postgres": {"image": "postgres:16-alpine"},
+            }
+        )
+        docker = FakeDocker(
+            containers={APP: True, DATABASE: True},
+            services={APP: "app", DATABASE: "postgres"},
+            exec_results={"psql": b"160004\n", "pg_dump": DUMP},
+        )
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        restorer = FakeDocker(
+            exec_results={"pg_isready": b"", "pg_restore": b"", "psql": b"1|3\n"}
+        )
+        restore = runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+        )["restore"]
+        self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        self.assertEqual(restore["scope"], "offline-database")
+        self.assertIn("database-restored", restore["checks"])
+        self.assertEqual(len(restorer.removed), 2)
+
+    def test_stack_capture_refuses_an_unrecorded_or_changed_source(self):
+        project = runner.compose_project(DEPLOYMENT)
+        compose = self.directory / "source" / DEPLOYMENT / "compose.json"
+
+        def unrecorded_volume(docker, config):
+            docker.mounts[JOBS] = [
+                {
+                    "Type": "volume",
+                    "Name": "f" * 64,
+                    "Source": str(self.directory),
+                    "Destination": "/cache",
+                    "RW": True,
+                }
+            ]
+
+        def writable_reader(docker, config):
+            docker.mounts[WORKER][0]["RW"] = True
+
+        def outside_writer(docker, config):
+            docker.foreign.add("e" * 64)
+            docker.mounts["e" * 64] = [
+                {"Type": "volume", "Name": project + "_uploads", "RW": True}
+            ]
+
+        def rebuilt_image(docker, config):
+            docker.images[JOBS] = "example/jobs:2"
+
+        def unrecorded_service(docker, config):
+            services = json.loads(compose.read_text())["services"]
+            services["cache"] = {"image": "valkey/valkey:8"}
+            compose.write_text(json.dumps({"services": services}))
+            config["composeSha256"] = runner.sha256(compose)
+
+        def edited_compose(docker, config):
+            compose.write_text(compose.read_text().replace("jobs:1", "jobs:2"))
+
+        def linked_file(docker, config):
+            uploads = Path(docker.mounts[APP][1]["Source"])
+            (uploads / "escape").symlink_to("/etc/passwd")
+
+        cases = {
+            "unrecorded volume": (unrecorded_volume, "source-unsupported"),
+            "writable reader": (writable_reader, "source-unsupported"),
+            "outside writer": (outside_writer, "source-unsupported"),
+            "unrecorded service": (unrecorded_service, "source-unsupported"),
+            "rebuilt image": (rebuilt_image, "source-identity-mismatch"),
+            "edited compose": (edited_compose, "source-identity-mismatch"),
+            "linked file": (linked_file, "source-unsupported"),
+        }
+        for name, (change, code) in cases.items():
+            with self.subTest(name):
+                config, docker = self.generic_stack()
+                state = self.state(config)
+                change(docker, config)
+                run_id = str(uuid.uuid4())
+                with self.assertRaises(runner.BackupError) as raised:
+                    runner.capture_stack(
+                        config, state, run_id, docker, state.stage(run_id)
+                    )
+                self.assertEqual(raised.exception.code, code)
+                self.assertNotIn(("docker", "stop"), [c[:2] for c in docker.calls])
+                self.assertEqual(state.journals(), [])
+
+    def test_stack_capture_restarts_what_it_paused_after_a_failure_or_a_crash(self):
+        def bad_dump(docker):
+            docker.exec_results["pg_dump"] = b"not a dump"
+
+        def killed_after_grace_period(docker):
+            # SIGKILL: files may be mid-write, so there is no recovery point.
+            docker.exit_codes[WORKER] = 137
+
+        client = FakeClient()
+        for change, code in (
+            (bad_dump, "capture-failed"),
+            (killed_after_grace_period, "source-stop-failed"),
+        ):
+            with self.subTest(code):
+                config, docker = self.generic_stack()
+                state = self.state(config)
+                change(docker)
+                failed = runner.perform_run(
+                    config, state, storage_factory=self.storage(client), command=docker
+                )
+                self.assertEqual(failed["errorCode"], code)
+                # Dependencies first, as after a successful capture.
+                self.assertEqual(docker.started, [JOBS, APP, WORKER])
+                self.assertTrue(all(docker.containers.values()))
+                self.assertEqual(client.objects, {})
+        # The daemon refuses the restart: the journal stays open, and recovery
+        # later starts exactly the paused services.
+        config, docker = self.generic_stack()
+        docker.refuse_start = True
+        crashed = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(crashed["errorCode"], "source-restart-failed")
+        self.assertFalse(any(docker.containers[c] for c in (APP, WORKER, JOBS)))
+        self.assertTrue(state.cleanup_pending())
+        docker.refuse_start = False
+        result = runner.perform_recovery(config, state, command=docker)
+        self.assertEqual(docker.started, [JOBS, APP, WORKER])
+        self.assertTrue(all(docker.containers.values()))
+        self.assertFalse(result["cleanupPending"])
 
     def test_state_directories_are_private(self):
         state = self.state()

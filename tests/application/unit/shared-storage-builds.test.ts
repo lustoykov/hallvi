@@ -1,7 +1,9 @@
 import { expect, it } from "vitest";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { legacyPlans } from "../../fixtures/queue-worker/legacy-plans";
 import {
   deploymentPlanSchema,
+  type DeploymentPlan,
   type DeploymentRecord,
 } from "../../../src/server/deployment-types";
 import { composeDefinition } from "../../../src/server/deployment-compose";
@@ -11,7 +13,11 @@ import {
 } from "../../../src/server/deployment-layout";
 import { releaseBundle } from "../../../src/server/release-executor";
 import { stackOf } from "../../../src/server/application-stack";
-import { backupKind } from "../../../src/server/scheduled-backup-install";
+import {
+  backupKind,
+  backupSetupFor,
+} from "../../../src/server/scheduled-backup-install";
+import { backupCapturePlan } from "../../../src/server/backup-capture-plan";
 function plan() {
   const p = queuePlan();
   p.dependencies = [];
@@ -110,14 +116,95 @@ it("rejects missing/cyclic image references and inconsistent shared-state declar
   p.services![1].volumes[0].kind = "database";
   expect(() => deploymentPlanSchema.parse(p)).toThrow("same data kind");
 });
-it("does not claim legacy backup coverage for a new shared-storage arrangement", () => {
+const live = (p: DeploymentPlan) =>
+  ({ status: "live", revision: "revision", plan: p }) as DeploymentRecord;
+it("captures a shared volume once and pauses every reader, writer and data client", () => {
+  const built = plan();
+  const published = plan();
+  published.image = `grafana/grafana@sha256:${"a".repeat(64)}`;
+  // Support follows recorded data and consumers, not image names or builds.
+  for (const p of [built, published]) {
+    expect(backupKind(live(p))).toBe("stack");
+    expect(backupCapturePlan(p)).toMatchObject({
+      // Nothing records a dependency here, so only membership is meaningful.
+      pauseServices: expect.arrayContaining(["app", "api", "worker"]),
+      postgres: null,
+      volumes: [
+        {
+          name: "documents",
+          sqlite: null,
+          mounts: [
+            { service: "app", readOnly: false },
+            { service: "worker", readOnly: true },
+          ],
+        },
+      ],
+    });
+  }
+});
+it("records a generic SQLite path relative to its volume and keeps PostgreSQL running", () => {
   const p = plan();
-  p.image = `grafana/grafana@sha256:${"a".repeat(64)}`;
-  expect(() =>
-    backupKind({
-      status: "live",
-      revision: "revision",
-      plan: p,
-    } as DeploymentRecord),
-  ).toThrow("all writers");
+  p.postgres = { version: "17", variable: "DATABASE_URL", scheme: "postgres" };
+  p.volumes = [
+    {
+      name: "state",
+      target: "/srv/state/",
+      kind: "database",
+      sqlite: "/srv/state/db/app.sqlite",
+    },
+  ];
+  p.services![1].volumes = [
+    {
+      name: "state",
+      target: "/mnt/state",
+      kind: "database",
+      sqlite: "/mnt/state/db/app.sqlite",
+      readOnly: true,
+    },
+  ];
+  const capture = backupCapturePlan(deploymentPlanSchema.parse(p));
+  expect(capture.postgres).toBe("postgres");
+  expect(capture.pauseServices).not.toContain("postgres");
+  expect(capture.volumes).toHaveLength(1);
+  expect(capture.volumes[0]).toMatchObject({
+    kind: "database",
+    sqlite: "db/app.sqlite",
+  });
+});
+it("keeps previously supported layouts protected under the generic plan", () => {
+  const [postgresOnly, kuma, grafana] = legacyPlans();
+  expect(backupCapturePlan(postgresOnly)).toMatchObject({
+    postgres: "postgres",
+    volumes: [],
+  });
+  expect(backupCapturePlan(kuma).volumes[0].sqlite).toBe("kuma.db");
+  expect(backupCapturePlan(grafana)).toMatchObject({
+    pauseServices: expect.arrayContaining(["app", "prometheus"]),
+    volumes: [
+      { name: "data", sqlite: "grafana.db" },
+      { name: "metrics", kind: "files" },
+    ],
+  });
+});
+it("refuses data it has no consistent capture method for", () => {
+  // A broker's append-only store is database state without a SQLite file.
+  const queue = queuePlan();
+  expect(() => backupKind(live(queue))).toThrow(
+    "supported database capture method",
+  );
+  expect(backupSetupFor(live(queue))).toBeUndefined();
+  // Only an explicitly established clean-shutdown file capture is admitted.
+  queue.services![1].volumes[0].capture = "quiesced-files";
+  expect(backupKind(live(queue))).toBe("stack");
+  // Even declared before the worker, the broker stops after both its clients.
+  queue.services!.reverse();
+  const order = backupCapturePlan(queue).pauseServices;
+  expect(order.slice(0, 2).sort()).toEqual(["app", "worker"]);
+  expect(order.slice(2)).toEqual(["queue"]);
+  const stateless = plan();
+  stateless.volumes = [];
+  stateless.services![1].volumes = [];
+  expect(() => backupCapturePlan(stateless)).toThrow(
+    "No persistent application data",
+  );
 });
