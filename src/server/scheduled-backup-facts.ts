@@ -16,7 +16,7 @@ export function backupFailure(run: ScheduledRun) {
   if (run.errorCode === "interrupted")
     return "The backup was interrupted. Source recovery and cleanup are recorded separately.";
   if (run.errorCode === "source-identity-mismatch")
-    return "The deployed revision changed. Reconfigure the backup schedule for the current deployment.";
+    return "The deployment no longer matches the recorded backup configuration. Reconfigure the schedule for the current deployment.";
   const labels: Record<string, string> = {
     credentials:
       "Backup storage access could not be verified. Reconnect the scoped storage credential.",

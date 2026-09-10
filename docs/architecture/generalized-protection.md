@@ -26,7 +26,7 @@ Independent builds do not change the capture procedure. Network database clients
 
 Before pausing, the runner matches the installed Compose hash, deployment revision, running service identities, named mounts and access modes. It refuses undeclared mounts, foreign writable containers on captured volumes, and unsupported filesystem entries. The controller/host deployment lock coordinates Server Guy operations; it cannot prevent an unrelated host administrator from changing the application concurrently.
 
-A durable journal records the containers before any stop. Normal completion and interruption recovery restart only recorded containers that are stopped. A process-running observation is separate from application readiness. Upload follows source restart; interrupted runs retain their failed/interrupted outcome and cleanup obligations.
+A durable journal records the containers before any stop. Normal completion and interruption recovery restart only recorded containers that are stopped, in reverse shutdown order so dependencies start first. A process-running observation is separate from application readiness. Upload follows source restart; interrupted runs retain their failed/interrupted outcome and cleanup obligations.
 
 ## What the UI evidence means
 

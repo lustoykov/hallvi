@@ -869,7 +869,7 @@ def restart_recorded(command, journal):
     """Start what this run stopped. Idempotent, and safe to repeat."""
     ids = journal.get("stopped", [])
     restarted = 0
-    for container in recovery_plan(journal, running_containers(command, ids)):
+    for container in reversed(recovery_plan(journal, running_containers(command, ids))):
         try:
             command("docker", "start", container)
             restarted += 1

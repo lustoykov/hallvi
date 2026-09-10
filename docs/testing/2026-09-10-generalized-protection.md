@@ -15,7 +15,7 @@ That archive then booted a separate full Paperless stack, deployment `820ea014-e
 
 A new PDF became document 3, completed asynchronous processing, was searchable, and downloaded with SHA-256 `0b942ff92add11c9f4162bedfb8c1263258bfe68f16a00bee006ad84d72d88ec`. This is functional application evidence beyond the scheduled runner's offline restore checks; the product UI does not automatically claim it.
 
-After dependency-ordered sequential shutdown replaced parallel stop, a further capture `59bdb5b6-74b1-4831-9506-84d341b72654` passed the same offline checks with 32 files, 74 tables and 469 rows, with an 8.5-second process pause. This is one observation, not a downtime guarantee. The full application restore above used the initial archive.
+After dependency-ordered sequential shutdown and reverse-order restart, final capture `3c4cc597-cb7f-42a2-ad10-44d6aaf99916` passed the same offline checks with 32 files, 74 tables and 471 rows, with an 8.7-second process pause. This is one observation, not a downtime guarantee. The full application restore above used the initial archive.
 
 ## Forced interruption
 
