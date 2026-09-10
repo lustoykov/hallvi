@@ -69,11 +69,12 @@ export function assertReleaseScope(
           after.service === before.service &&
           after.target === before.target &&
           after.kind === before.kind &&
-          after.sqlite === before.sqlite,
+          after.sqlite === before.sqlite &&
+          Boolean(after.readOnly) === Boolean(before.readOnly),
       )
     )
       throw new ReleaseScopeError(
-        `Preserve volume ${before.name}, its owner, mount and recorded data path. Moving existing data needs a separate decision.`,
+        `Preserve volume ${before.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
       );
   }
 }

@@ -115,9 +115,9 @@ import {
 } from "../../../src/server/deployment-lifecycle";
 import { releaseOf } from "../../../src/server/deployment-release";
 
-it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
-  "releases v2 after native Compose build feedback while retaining SQLite data",
-  async () => {
+it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
+  "releases after failures and retains state (independent builds/shared volumes: %s)",
+  async (shared) => {
     const root = mkdtempSync(join(tmpdir(), "sg-release-docker-"));
     const id = randomUUID(),
       project = `sg-${id.slice(0, 8)}`;
@@ -139,11 +139,32 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
       },
     );
     vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "private"));
-    const files = ["Dockerfile", "app.py"].map((path) => ({
+    const files = (
+      shared
+        ? [
+            "web/Dockerfile",
+            "web/app.py",
+            "worker/Dockerfile",
+            "worker/worker.py",
+          ]
+        : ["Dockerfile", "app.py"]
+    ).map((path) => ({
       path,
       mode: 0o644,
-      content: readFileSync(join("tests/fixtures/release-app", path)),
+      content: readFileSync(
+        join(
+          shared
+            ? "tests/fixtures/shared-builds"
+            : "tests/fixtures/release-app",
+          path,
+        ),
+      ),
     }));
+    const versions = (value: string) =>
+      (shared
+        ? ["web/version.txt", "worker/version.txt"]
+        : ["version.txt"]
+      ).map((path) => ({ path, mode: 0o644, content: Buffer.from(value) }));
     const plan: DeploymentPlan = {
       summary: "Synthetic source application with retained SQLite state",
       dockerfile: "Dockerfile",
@@ -175,6 +196,53 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
         },
       ],
     };
+    if (shared) {
+      plan.context = "web";
+      plan.dockerfile = "web/Dockerfile";
+      plan.volumes!.push(
+        {
+          name: "documents",
+          target: "/documents",
+          kind: "files",
+          sqlite: null,
+        },
+        {
+          name: "results",
+          target: "/results",
+          kind: "files",
+          sqlite: null,
+          readOnly: true,
+        },
+      );
+      plan.services = [
+        {
+          name: "worker",
+          role: "worker",
+          build: { context: "worker", dockerfile: "worker/Dockerfile" },
+          command: null,
+          environment: [],
+          configs: [],
+          port: null,
+          healthPath: null,
+          checks: [],
+          healthCommand: [
+            "python",
+            "-c",
+            "from pathlib import Path; assert Path('/tmp/ready').exists()",
+          ],
+          volumes: [
+            {
+              name: "documents",
+              target: "/input",
+              kind: "files",
+              sqlite: null,
+              readOnly: true,
+            },
+            { name: "results", target: "/output", kind: "files", sqlite: null },
+          ],
+        },
+      ];
+    }
     const record: DeploymentRecord = {
       id,
       applicationId: "fixture",
@@ -211,9 +279,10 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
         join(root, "private", "deployments", id, "database-password"),
         "synthetic-password",
       );
-      for (const file of files)
+      for (const file of [...files, ...versions("v1")]) {
+        mkdirSync(join(root, "source", file.path, ".."), { recursive: true });
         writeFileSync(join(root, "source", file.path), file.content);
-      writeFileSync(join(root, "source/version.txt"), "v1");
+      }
       writeFileSync(
         join(root, "compose.json"),
         JSON.stringify(
@@ -268,10 +337,15 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
           contains: "retained-user-data",
         },
       ];
-      const v2Files = [
-        ...files,
-        { path: "version.txt", mode: 0o644, content: Buffer.from("v2") },
-      ];
+      const v2Files = [...files, ...versions("v2")];
+      if (shared)
+        next.checks.push({
+          ...next.checks[0],
+          name: "Worker result",
+          path: "/result",
+          contains: "retained-user-data@v2",
+          waitSeconds: 10,
+        });
       const failed = releaseOf({
         repository: record.repository,
         revision: "b".repeat(40),
@@ -341,6 +415,27 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
       await executeRelease(record, corrected, v2Files, signal);
       finishDeploymentAttempt(record, second.id, "verified");
       expect(record.imageId).not.toBe(originalImage);
+      if (shared) {
+        expect(record.serviceImages!.worker).not.toBe(record.imageId);
+        for (const [service, forbidden] of [
+          ["worker", "/input/forbidden"],
+          ["app", "/results/forbidden"],
+        ]) {
+          const container = docker([
+            "compose",
+            "-p",
+            project,
+            "-f",
+            join(root, "compose.json"),
+            "ps",
+            "-q",
+            service,
+          ]);
+          expect(() =>
+            docker(["exec", container, "touch", forbidden]),
+          ).toThrow();
+        }
+      }
       expect(record.lifecycle!.runtime.lastVerified!.revision).toBe(
         "b".repeat(40),
       );
@@ -373,7 +468,12 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
       }
       for (const revision of ["a".repeat(40), "b".repeat(40)]) {
         try {
-          docker(["image", "rm", `server-guy-${id}:${revision}`]);
+          docker([
+            "image",
+            "rm",
+            `server-guy-${id}:${revision}`,
+            ...(shared ? [`server-guy-${id}-worker:${revision}`] : []),
+          ]);
         } catch {
           /* absent after a failed build */
         }

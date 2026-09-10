@@ -14,6 +14,7 @@ export const volumeMountSchema = z.strictObject({
   name: serviceNameSchema,
   target,
   kind: z.enum(["database", "files"]),
+  readOnly: z.boolean().optional(),
   sqlite: z.string().max(250).nullable(),
 });
 export const configMountSchema = z.strictObject({
@@ -29,14 +30,23 @@ export const environmentSchema = z
     }),
   )
   .max(30);
+export const sourcePathSchema = z
+  .string()
+  .regex(/^(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/);
+export const sourceBuildSchema = z.strictObject({
+  context: sourcePathSchema,
+  dockerfile: sourcePathSchema,
+  generatedDockerfile: z.string().max(12000).nullable().optional(),
+});
 export const composeServiceSchema = z.strictObject({
   name: serviceNameSchema.refine(
     (n) => !["app", "postgres"].includes(n),
     "Reserved service name",
   ),
   image: imageReferenceSchema.optional(),
-  /** Reuse the exact primary image, built once if it comes from source. */
-  imageFrom: z.literal("app").optional(),
+  /** Reuse the exact image of another service. */
+  imageFrom: serviceNameSchema.optional(),
+  build: sourceBuildSchema.optional(),
   role: z.enum(["web", "worker", "broker", "service"]).optional(),
   /** Read-only readiness command inside this service, never the host. */
   healthCommand: z.array(z.string().min(1).max(500)).min(1).max(20).optional(),

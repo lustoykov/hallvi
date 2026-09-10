@@ -1,3 +1,4 @@
+import { serviceImage, sourceBuilds } from "./deployment-layout";
 import type { DeploymentPlan } from "./deployment-types";
 
 export function composeDefinition(
@@ -82,7 +83,9 @@ export function composeDefinition(
     const result: string[] = [];
     for (const volume of service.volumes ?? []) {
       volumes[volume.name] = {};
-      result.push(`${volume.name}:${volume.target}`);
+      result.push(
+        `${volume.name}:${volume.target}${volume.readOnly ? ":ro" : ""}`,
+      );
     }
     for (const config of service.configs ?? [])
       result.push(
@@ -97,9 +100,7 @@ export function composeDefinition(
   });
   for (const service of plan.services ?? []) {
     services[service.name] = {
-      image: service.imageFrom
-        ? (plan.image ?? `server-guy-${id}:${revision}`)
-        : service.image,
+      image: serviceImage(plan, revision, id, service.name),
       restart: "unless-stopped",
       ...(service.command ? { command: service.command.map(literal) } : {}),
       environment: Object.fromEntries(
@@ -111,6 +112,15 @@ export function composeDefinition(
         driver: "json-file",
         options: { "max-size": "10m", "max-file": "3" },
       },
+    };
+  }
+  for (const build of sourceBuilds(plan)) {
+    (services[build.name] as Record<string, unknown>).build = {
+      context: `./source/${build.context}`,
+      dockerfile:
+        build.context === "."
+          ? build.dockerfile
+          : `${"../".repeat(build.context.split("/").length)}${build.dockerfile}`,
     };
   }
   for (const service of [
@@ -155,7 +165,8 @@ export function composeDefinition(
 
 /** Build shared source once before Compose can try to pull a worker's image. */
 export function composeStartCommand(plan: DeploymentPlan, compose: string) {
-  return !plan.image && plan.services?.some((s) => s.imageFrom)
-    ? `${compose} build app && ${compose} up -d --no-build --wait --wait-timeout 120`
-    : `${compose} up -d --build --wait --wait-timeout 120`;
+  const builds = sourceBuilds(plan);
+  return builds.length
+    ? `${compose} build ${builds.map((b) => b.name).join(" ")} && ${compose} up -d --no-build --wait --wait-timeout 120`
+    : `${compose} up -d --wait --wait-timeout 120`;
 }

@@ -1,3 +1,4 @@
+import { serviceImage } from "./deployment-layout";
 import { z } from "zod";
 import {
   imageReferenceSchema,
@@ -107,8 +108,18 @@ export const deploymentPlanSchema = z
         .map((s) => s.name),
     ]);
     for (const service of plan.services ?? []) {
-      if (Boolean(service.image) === Boolean(service.imageFrom))
-        fail("Each service needs exactly one image or imageFrom reference.");
+      if (
+        [service.image, service.imageFrom, service.build].filter(Boolean)
+          .length !== 1
+      )
+        fail(
+          "Each service needs exactly one image, imageFrom reference or source build.",
+        );
+      try {
+        serviceImage(plan, "revision", "deployment", service.name);
+      } catch (error) {
+        fail((error as Error).message);
+      }
       if (service.imageFrom && !service.command?.length)
         fail("A service sharing the app image needs its own command.");
       if (service.checks.length && !(service.port && service.healthPath))
@@ -194,7 +205,7 @@ export const deploymentPlanSchema = z
     ];
     if (new Set(services.map((s) => s.name)).size !== services.length)
       fail("Service names must be unique.");
-    const volumes = new Set<string>(plan.postgres ? ["database"] : []);
+    const volumes = new Map<string, { kind: string; sqlite: string | null }>();
     for (const service of services) {
       const targets = [...service.volumes, ...service.configs].map(
         (m) => m.target,
@@ -207,9 +218,21 @@ export const deploymentPlanSchema = z
       )
         fail("Configuration names must be unique per service.");
       for (const volume of service.volumes) {
-        if (volumes.has(volume.name))
-          fail("Use a distinct named volume for each data owner.");
-        volumes.add(volume.name);
+        if (plan.postgres && volume.name === "database")
+          fail(
+            "The managed database volume cannot be mounted by another service.",
+          );
+        const relativeSqlite =
+          volume.sqlite?.slice(volume.target.replace(/\/$/, "").length) ?? null;
+        const prior = volumes.get(volume.name);
+        if (
+          prior &&
+          (prior.kind !== volume.kind || prior.sqlite !== relativeSqlite)
+        )
+          fail(
+            "Shared volume mounts must describe the same data kind and relative SQLite path.",
+          );
+        volumes.set(volume.name, { kind: volume.kind, sqlite: relativeSqlite });
         if (
           volume.sqlite &&
           (!volume.sqlite.startsWith(volume.target.replace(/\/$/, "") + "/") ||
