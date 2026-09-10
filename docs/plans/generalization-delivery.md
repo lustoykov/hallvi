@@ -34,7 +34,7 @@ Get the general architecture right first; fine-tune, harden and polish afterward
 
 ## Progress
 
-- [ ] Step 1 reviewed and merged (record PR and merge SHA).
+- [x] Step 1 reviewed and merged: PR #43, merge 4479f9833a593c6e7ba966cb570db88b4ecc3807. Real Pi proof and Codex focused verification passed.
 - [ ] Step 2 unified native initial/update path reviewed and merged.
 - [ ] Step 3 real Pi proofs completed and necessary corrections merged.
 - [ ] Final concise handoff: what changed, proof results, limitations and next useful product step.
@@ -46,3 +46,9 @@ The existing heartbeat `monitor-opus-compose-implementation` coordinates all thr
 When resuming after a context reset, read this plan and the current step checkpoint, then inspect Git/process state and the latest report. Update this file with branch/session/log details as steps change. Keep proposed work distinct from verified results.
 
 CLI note: the attempt to use `claude --bg` on 10 September reported an idle session but its daemon socket disappeared and no worker remained. The current correction round was therefore resumed with the known-working `claude -p` mode. Do not claim it is attachable. Prefer attachable background mode for later delegation only if it actually starts and remains alive; avoid spending the architecture budget on CLI tooling.
+
+## Active step 2 handoff
+
+Worktree: /Users/aiwithlyubomir/biz/code/server-guy/.worktrees/native-compose-intake
+
+Branch: `codex/native-compose-intake`, based on PR #43 merge `4479f98`. Opus 5 High session: `8301f2bd-bfea-483e-b464-4d15797ab0db`. Runtime task/log/report live in `tests/results/native-compose-intake/` in that worktree. Check THAT log/process for current completion, not the finished step-1 logs. Step-1 evidence stays in the previous native-compose-execution worktree. Read `docs/plans/native-compose-intake.md` for step-2 scope and checkpoint.
