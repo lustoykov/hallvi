@@ -20,6 +20,7 @@ export const volumeMountSchema = z.strictObject({
   kind: z.enum(["database", "files"]),
   readOnly: z.boolean().optional(),
   sqlite: z.string().max(250).nullable(),
+  capture: z.literal("quiesced-files").optional(),
 });
 export const configMountSchema = z.strictObject({
   name: serviceNameSchema,

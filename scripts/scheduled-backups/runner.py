@@ -20,6 +20,8 @@ import json
 import os
 import re
 import shutil
+import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 import tarfile
@@ -78,6 +80,7 @@ ERROR_CODES = {
     "capture-failed",
     "capture-timeout",
     "source-restart-failed",
+    "source-stop-failed",
     "unsafe-path",
     "upload-failed",
     "upload-timeout",
@@ -294,7 +297,10 @@ def load_config(path):
     if isinstance(keep, bool) or not isinstance(keep, int) or not 1 <= keep <= 90:
         raise BackupError("config", "config-invalid")
     checks = (
-        (config.get("kind"), lambda value: value in {"sqlite-stack", "postgres"}),
+        (
+            config.get("kind"),
+            lambda value: value in {"sqlite-stack", "postgres", "stack"},
+        ),
         (config.get("revision"), REVISION_PATTERN.match),
         (config.get("bucket"), BUCKET_PATTERN.match),
         (config.get("region"), REGION_PATTERN.match),
@@ -329,6 +335,14 @@ def load_config(path):
         "keep": keep,
         "schedule": config["schedule"],
         "timezone": config["timezone"],
+        **(
+            {
+                "capture": config.get("capture"),
+                "composeSha256": config.get("composeSha256"),
+            }
+            if config["kind"] == "stack"
+            else {}
+        ),
     }
 
 
@@ -855,7 +869,7 @@ def restart_recorded(command, journal):
     """Start what this run stopped. Idempotent, and safe to repeat."""
     ids = journal.get("stopped", [])
     restarted = 0
-    for container in recovery_plan(journal, running_containers(command, ids)):
+    for container in reversed(recovery_plan(journal, running_containers(command, ids))):
         try:
             command("docker", "start", container)
             restarted += 1
@@ -1027,7 +1041,330 @@ def capture_postgres(config, state, run_id, command, staging):
     }
 
 
-CAPTURES = {"sqlite-stack": capture_sqlite_stack, "postgres": capture_postgres}
+def capture_stack(config, state, run_id, command, staging):
+    """One quiesced recovery point for recorded volumes and managed PostgreSQL."""
+    root, definition = source_definition(config)
+    plan = config.get("capture") or {}
+    if config.get("composeSha256") != sha256(root / "compose.json"):
+        raise BackupError("capture", "source-identity-mismatch")
+    pause_services = plan.get("pauseServices")
+    volumes = plan.get("volumes")
+    postgres = plan.get("postgres")
+    if (
+        plan.get("version") != 1
+        or not isinstance(pause_services, list)
+        or not isinstance(volumes, list)
+    ):
+        raise BackupError("capture", "source-unsupported")
+    expected_services = set(pause_services) | (
+        {"postgres"} if postgres == "postgres" else set()
+    )
+    if (
+        set(definition["services"]) != expected_services
+        or not pause_services
+        or postgres not in {None, "postgres"}
+    ):
+        raise BackupError("capture", "source-unsupported")
+    ids = source_containers(command, root, config)
+    states = container_states(command, ids)
+    if (
+        {v["service"] for v in states.values()} != expected_services
+        or len(states) != len(expected_services)
+        or not all(v["running"] for v in states.values())
+    ):
+        raise BackupError("capture", "source-not-running")
+    verify_source_identity(config, states)
+    consumers = {v["service"]: (container, v) for container, v in states.items()}
+    expected_mounts = {}
+    sources = {}
+    for volume in volumes:
+        name = volume.get("name", "")
+        sqlite = volume.get("sqlite")
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", name) or name in sources:
+            raise BackupError("capture", "source-unsupported")
+        if sqlite is not None and (
+            not isinstance(sqlite, str)
+            or not sqlite
+            or Path(sqlite).is_absolute()
+            or ".." in Path(sqlite).parts
+        ):
+            raise BackupError("capture", "source-unsupported")
+        if volume.get("kind") not in {"files", "database"} or (
+            volume["kind"] == "database"
+            and not sqlite
+            and volume.get("capture") != "quiesced-files"
+        ):
+            raise BackupError("capture", "source-unsupported")
+        for mount in volume.get("mounts", []):
+            service = mount.get("service")
+            if service not in pause_services:
+                raise BackupError("capture", "source-unsupported")
+            key = (service, mount.get("target"))
+            if key in expected_mounts:
+                raise BackupError("capture", "source-unsupported")
+            expected_mounts[key] = (name, bool(mount.get("readOnly")))
+        sources[name] = None
+    bindings = {}
+    seen = set()
+    for service, (_, meta) in consumers.items():
+        if meta["image"] != definition["services"][service].get("image"):
+            raise BackupError("capture", "source-identity-mismatch")
+        for mount in meta["mounts"]:
+            if mount["Type"] == "volume":
+                if service == postgres:
+                    if (
+                        mount["Name"]
+                        != compose_project(config["deploymentId"]) + "_database"
+                    ):
+                        raise BackupError("capture", "source-unsupported")
+                    continue
+                key = (service, mount["Destination"])
+                wanted = expected_mounts.get(key)
+                if (
+                    not wanted
+                    or mount["Name"]
+                    != compose_project(config["deploymentId"]) + "_" + wanted[0]
+                    or bool(mount.get("RW")) == wanted[1]
+                ):
+                    raise BackupError("capture", "source-unsupported")
+                seen.add(key)
+                source = Path(mount["Source"])
+                if sources[wanted[0]] not in {None, source}:
+                    raise BackupError("capture", "source-unsupported")
+                sources[wanted[0]] = source
+            elif mount["Type"] == "bind":
+                path = Path(mount["Source"])
+                if (
+                    mount.get("RW")
+                    or not path.is_relative_to(root)
+                    or path.is_symlink()
+                    or not path.is_file()
+                ):
+                    raise BackupError("capture", "source-unsupported")
+                bindings[str(path.relative_to(root))] = path
+            else:
+                raise BackupError("capture", "source-unsupported")
+    if seen != set(expected_mounts) or any(
+        source is None for source in sources.values()
+    ):
+        raise BackupError("capture", "source-unsupported")
+    module = helper_module()
+    # Inventory before following paths; reject links and unsupported special files.
+    for source in sources.values():
+        if source.is_symlink() or not source.is_dir():
+            raise BackupError("capture", "source-unsupported")
+        try:
+            module.inventory(source)
+        except RuntimeError as error:
+            raise BackupError("capture", "source-unsupported") from error
+    # A service outside this application must not keep writing a captured volume.
+    for name in sources:
+        full_name = compose_project(config["deploymentId"]) + "_" + name
+        attached = (
+            command(
+                "docker",
+                "ps",
+                "--quiet",
+                "--no-trunc",
+                "--filter",
+                "volume=" + full_name,
+            )
+            .decode()
+            .split()
+        )
+        foreign = [container for container in attached if container not in states]
+        for other in (
+            json.loads(command("docker", "inspect", *foreign)) if foreign else []
+        ):
+            if any(
+                m.get("Name") == full_name and m.get("RW")
+                for m in other.get("Mounts", [])
+            ):
+                raise BackupError("capture", "source-unsupported")
+    paused = [consumers[name][0] for name in pause_services]
+    journal = {
+        "version": VERSION,
+        "kind": "source",
+        "runId": run_id,
+        "deploymentId": config["deploymentId"],
+        "stopped": paused,
+        "stoppedAt": iso(now()),
+        "complete": False,
+        "stageRemoved": True,
+    }
+    state.save_journal(journal)
+    stage = staging / "snapshot"
+    (stage / "configuration").mkdir(parents=True, mode=0o700)
+    manifest = {
+        "version": VERSION,
+        "kind": "stack",
+        "deploymentId": config["deploymentId"],
+        "runId": run_id,
+        "revision": config["revision"],
+        "capture": plan,
+        "sqlite": {},
+        "method": ", ".join(
+            ["quiesced application services and volume files"]
+            + (["SQLite backup API"] if any(v.get("sqlite") for v in volumes) else [])
+            + (["managed PostgreSQL dump"] if postgres else [])
+        ),
+    }
+    started = now()
+    try:
+        try:
+            # Stop dependents before dependencies so workers can finish with
+            # their broker/database still available. The journal covers all.
+            for container in paused:
+                command("docker", "stop", "--time", "120", container, timeout=150)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise BackupError("capture", "capture-failed") from error
+        stopped = json.loads(command("docker", "inspect", *paused))
+        if any(
+            c["State"]["Running"] or c["State"]["ExitCode"] not in {0, 143}
+            for c in stopped
+        ):
+            raise BackupError("capture", "source-stop-failed")
+        manifest["stoppedServices"] = {
+            c["Config"]["Labels"]["com.docker.compose.service"]: c["State"]["ExitCode"]
+            for c in stopped
+        }
+        quiesced = now()
+        manifest["recoveryPointAt"] = iso(quiesced)
+        shutil.copy2(root / "compose.json", stage / "configuration/compose.json")
+        for relative, source in bindings.items():
+            target = stage / "configuration" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        for volume in volumes:
+            source = sources[volume["name"]]
+            module.inventory(source)
+            target = stage / "state" / volume["name"]
+            sqlite = volume.get("sqlite")
+            excluded = (
+                {
+                    source / (sqlite + suffix)
+                    for suffix in ("", "-wal", "-shm", "-journal")
+                }
+                if sqlite
+                else set()
+            )
+            shutil.copytree(
+                source,
+                target,
+                ignore=lambda directory, names: [
+                    name for name in names if Path(directory) / name in excluded
+                ],
+            )
+            if sqlite:
+                original = source / sqlite
+                expected = module.sqlite_evidence(original)
+                with (
+                    closing(
+                        sqlite3.connect(f"file:{original}?mode=ro", uri=True)
+                    ) as reader,
+                    closing(sqlite3.connect(target / sqlite)) as writer,
+                ):
+                    reader.backup(writer, pages=256)
+                    writer.execute("PRAGMA journal_mode=DELETE")
+                shutil.copystat(original, target / sqlite)
+                if module.sqlite_evidence(target / sqlite) != expected:
+                    raise BackupError("capture", "capture-failed")
+                manifest["sqlite"][volume["name"] + "/" + sqlite] = expected
+            for path in [source, *source.rglob("*")]:
+                dest = target / path.relative_to(source)
+                if dest.exists():
+                    stat = path.stat()
+                    os.chown(dest, stat.st_uid, stat.st_gid)
+        if postgres:
+            container, meta = consumers[postgres]
+            manifest["postgres"] = capture_postgres_database(
+                container, meta, stage, command
+            )
+    finally:
+        restore_source(command, state, journal)
+    pause = now() - started
+    manifest["files"] = module.inventory(stage)
+    (stage / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    archive = staging / "archive.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        for child in sorted(stage.iterdir()):
+            bundle.add(child, arcname=child.name)
+    os.chmod(archive, 0o600)
+    remove_tree(stage)
+    return {
+        "path": archive,
+        "bytes": archive.stat().st_size,
+        "sha256": sha256(archive),
+        "pauseSeconds": pause,
+        "capturedAt": quiesced,
+    }
+
+
+def capture_postgres_database(container, meta, stage, command):
+    try:
+        user = source_environment(meta["environment"], "POSTGRES_USER")
+        name = source_environment(meta["environment"], "POSTGRES_DB")
+        if not IDENTIFIER_PATTERN.match(user or "") or not IDENTIFIER_PATTERN.match(
+            name or ""
+        ):
+            raise BackupError("capture", "source-unsupported")
+        version = int(
+            command(
+                "docker",
+                "exec",
+                container,
+                "psql",
+                "-U",
+                user,
+                "-d",
+                name,
+                "-tAqc",
+                "SHOW server_version_num",
+            )
+            .decode()
+            .strip()
+        )
+        (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
+        dump = stage / "database/dump.pgc"
+        command(
+            "docker",
+            "exec",
+            container,
+            "pg_dump",
+            "-U",
+            user,
+            "-d",
+            name,
+            "--format=custom",
+            "--no-owner",
+            "--no-acl",
+            stdout=dump,
+            timeout=CAPTURE_TIMEOUT,
+        )
+        os.chmod(dump, 0o600)
+        with dump.open("rb") as stream:
+            if stream.read(5) != b"PGDMP":
+                raise BackupError("capture", "capture-failed")
+        return {
+            "service": meta["service"],
+            "image": meta["image"],
+            "majorVersion": version // 10000,
+            "user": user,
+            "database": name,
+        }
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        ValueError,
+    ) as error:
+        raise BackupError("capture", "capture-failed") from error
+
+
+CAPTURES = {
+    "sqlite-stack": capture_sqlite_stack,
+    "postgres": capture_postgres,
+    "stack": capture_stack,
+}
 
 
 def plan_retention(keys, receipts, prefix, keep):
@@ -1479,7 +1816,7 @@ def build_status(config, state):
     }
 
 
-def verify_sqlite_restore(extracted, manifest, restore):
+def verify_sqlite_restore(extracted, manifest, restore, require_database=True):
     """Offline: every captured file and the database itself, against capture."""
     module = helper_module()
     files = manifest.get("files") or {}
@@ -1487,7 +1824,11 @@ def verify_sqlite_restore(extracted, manifest, restore):
         raise BackupError("restore", "manifest-mismatch")
     for name, expected in files.items():
         candidate = extracted / name
-        if ".." in Path(name).parts or not candidate.is_file():
+        if (
+            Path(name).is_absolute()
+            or ".." in Path(name).parts
+            or not candidate.is_file()
+        ):
             raise BackupError("restore", "manifest-mismatch")
         if sha256(candidate) != expected:
             raise BackupError("restore", "database-check-failed")
@@ -1495,12 +1836,14 @@ def verify_sqlite_restore(extracted, manifest, restore):
     restore["measurements"]["files"] = len(files)
     databases = manifest.get("sqlite") or {}
     if not databases:
-        raise BackupError("restore", "manifest-mismatch")
+        if require_database:
+            raise BackupError("restore", "manifest-mismatch")
+        return
     tables = 0
     rows = 0
     for name, expected in databases.items():
         path = extracted / "state" / name
-        if not path.is_file():
+        if Path(name).is_absolute() or ".." in Path(name).parts or not path.is_file():
             raise BackupError("restore", "manifest-mismatch")
         try:
             # Runs integrity_check and foreign_key_check on the restored copy.
@@ -1514,8 +1857,10 @@ def verify_sqlite_restore(extracted, manifest, restore):
         tables += len(evidence.get("tables") or {})
         rows += sum(table["rows"] for table in evidence.get("tables", {}).values())
     restore["checks"].extend(["database-integrity", "database-schema", "database-rows"])
-    restore["measurements"]["tables"] = tables
-    restore["measurements"]["rows"] = rows
+    restore["measurements"]["tables"] = (
+        restore["measurements"].get("tables", 0) + tables
+    )
+    restore["measurements"]["rows"] = restore["measurements"].get("rows", 0) + rows
 
 
 POSTGRES_COUNT_SQL = (
@@ -1633,8 +1978,10 @@ def verify_postgres_restore(extracted, manifest, restore, run_id, command, names
         .split("|")
     )
     tables, rows = int(measured[0]), int(measured[1])
-    restore["measurements"]["tables"] = tables
-    restore["measurements"]["rows"] = rows
+    restore["measurements"]["tables"] = (
+        restore["measurements"].get("tables", 0) + tables
+    )
+    restore["measurements"]["rows"] = restore["measurements"].get("rows", 0) + rows
     if tables:
         restore["checks"].append("database-tables")
         return
@@ -1674,7 +2021,7 @@ def perform_test_restore(
         "outcome": "failed",
         "scope": (
             "offline-database-and-files"
-            if receipt.get("kind") == "sqlite-stack"
+            if receipt.get("kind") in {"sqlite-stack", "stack"}
             else "offline-database"
         ),
         "checks": [],
@@ -1725,7 +2072,23 @@ def perform_test_restore(
         if manifest.get("deploymentId") != config["deploymentId"] or identity != run_id:
             raise BackupError("restore", "manifest-mismatch")
         restore["checks"].append("backup-identity")
-        if receipt["kind"] == "sqlite-stack":
+        if receipt["kind"] == "stack":
+            if manifest.get("kind") != "stack" or not manifest.get("capture"):
+                raise BackupError("restore", "manifest-mismatch")
+            expected_sqlite = {
+                v["name"] + "/" + v["sqlite"]
+                for v in manifest["capture"].get("volumes", [])
+                if v.get("sqlite")
+            }
+            if expected_sqlite != set(manifest.get("sqlite", {})):
+                raise BackupError("restore", "manifest-mismatch")
+            restore["recoveryPointAt"] = manifest.get("recoveryPointAt")
+            verify_sqlite_restore(extracted, manifest, restore, require_database=False)
+            if manifest["capture"].get("postgres"):
+                verify_postgres_restore(
+                    extracted, manifest, restore, run_id, command, names
+                )
+        elif receipt["kind"] == "sqlite-stack":
             restore["recoveryPointAt"] = iso(float(manifest["stopStartedAt"]))
             verify_sqlite_restore(extracted, manifest, restore)
         else:
@@ -1741,7 +2104,7 @@ def perform_test_restore(
         cleaned = True
         # Inspect even after a create command failed: it may have created a
         # resource before its response was lost. Names and labels both match.
-        if receipt["kind"] == "postgres":
+        if receipt["kind"] in {"postgres", "stack"}:
             for kind in ("container", "volume"):
                 if remove_owned(command, kind, names[kind], run_id) is None:
                     cleaned = False

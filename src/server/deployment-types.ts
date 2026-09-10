@@ -210,7 +210,10 @@ export const deploymentPlanSchema = z
     ];
     if (new Set(services.map((s) => s.name)).size !== services.length)
       fail("Service names must be unique.");
-    const volumes = new Map<string, { kind: string; sqlite: string | null }>();
+    const volumes = new Map<
+      string,
+      { kind: string; sqlite: string | null; capture?: string }
+    >();
     for (const service of services) {
       const targets = [...service.volumes, ...service.configs].map(
         (m) => m.target,
@@ -232,12 +235,18 @@ export const deploymentPlanSchema = z
         const prior = volumes.get(volume.name);
         if (
           prior &&
-          (prior.kind !== volume.kind || prior.sqlite !== relativeSqlite)
+          (prior.kind !== volume.kind ||
+            prior.sqlite !== relativeSqlite ||
+            prior.capture !== volume.capture)
         )
           fail(
-            "Shared volume mounts must describe the same data kind and relative SQLite path.",
+            "Shared volume mounts must describe the same data kind, capture method and relative SQLite path.",
           );
-        volumes.set(volume.name, { kind: volume.kind, sqlite: relativeSqlite });
+        volumes.set(volume.name, {
+          kind: volume.kind,
+          sqlite: relativeSqlite,
+          capture: volume.capture,
+        });
         if (
           volume.sqlite &&
           (!volume.sqlite.startsWith(volume.target.replace(/\/$/, "") + "/") ||

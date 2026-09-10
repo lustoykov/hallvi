@@ -23,7 +23,7 @@ export async function performBackupAction(
   },
 ) {
   const record = applicationDeployment(applicationId);
-  if (!record || record.status !== "live")
+  if (!record || (action !== "test-restore" && record.status !== "live"))
     throw new Error("Deploy and verify this application first.");
   return duringApplicationOperation(
     applicationId,

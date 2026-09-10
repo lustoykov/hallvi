@@ -17,15 +17,24 @@ export function proposeBackupOperation(
 ) {
   const record = applicationDeployment(applicationId);
   if (!record) throw new Error("Deploy and verify this application first.");
-  backupKind(record);
+  const installed = readBackupPolicy(record);
+  if (action === "configure-backups") backupKind(record);
   const policy = backupSelectionSchema.parse(selection);
-  if (action !== "configure-backups" && !readBackupPolicy(record))
+  if (action !== "configure-backups" && !installed)
     throw new Error("Configure a backup schedule and storage access first.");
+  if (action === "run-backup" && record.status !== "live")
+    throw new Error("A live deployment is required to capture a new backup.");
+  const pause =
+    action === "configure-backups" || installed?.kind === "stack"
+      ? "Capture pauses all application services; managed PostgreSQL stays running for its dump. Pause duration depends on shutdown and data size."
+      : installed?.kind === "postgres"
+        ? "The PostgreSQL dump runs online."
+        : "SQLite/file capture pauses the application.";
   const summary =
     action === "configure-backups"
-      ? `${scheduleLabel(policy)} Europe/Sofia. Keep the latest ${policy.keep} successful scheduled copies in the connected private storage. Existing manual proof archives are excluded. SQLite/file capture briefly pauses the application; PostgreSQL dumps run online. The host continues while the controller sleeps.`
+      ? `${scheduleLabel(policy)} Europe/Sofia. Keep the latest ${policy.keep} successful scheduled copies in the connected private storage. Existing manual proof archives are excluded. ${pause} The host continues while the controller sleeps.`
       : action === "run-backup"
-        ? "Create a consistent copy, upload it to the connected private storage and verify the downloaded archive. SQLite/file capture briefly pauses the application. Apply the existing retention policy after successful verification."
+        ? `Create a consistent copy, upload it to the connected private storage and verify the downloaded archive. ${pause} Apply the existing retention policy after successful verification.`
         : "Download a scheduled backup and restore its database/files into an isolated test destination. Live application data is not overwritten. This does not test application boot or production cutover.";
   return publicOperation(
     proposeOperation({
