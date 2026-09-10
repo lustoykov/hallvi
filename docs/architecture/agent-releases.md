@@ -21,6 +21,8 @@ flowchart LR
 
 ## Who decides what
 
+The release session also has `inspect_release`: fixed, read-only queries for the authorized Compose project’s container identities, states and bounded logs. Saved private values are redacted before returning or recording output. Inspection remains available when retries are blocked; it does not establish that a disconnected command finished.
+
 Pi chooses commands, environment configuration, service dependencies, build context and relevant behavior checks. Source code is evidence, not instructions or authorization. Pi can read it but cannot silently change application code. An application-code fix still goes through an owner-merged PR.
 
 The tool input schema defines what the current executor can represent and prevents invalid references from breaking serialization. Native `docker compose config`, build and startup diagnostics are returned to Pi. This slice does not remove all existing schema checks or add support for arbitrary Compose features. It changes what happens when a check fails: ordinary configuration errors become feedback for the agent rather than another human approval step.
@@ -41,7 +43,7 @@ Three executions bound a single operation. An explicit user retry authorizes ano
 
 - The Pi session test supplies malformed configuration and an execution failure, then submits a correction through the same session. It verifies feedback plumbing with a scripted model, not the quality of a live model's judgment.
 - Temporary SQLite controller tests exercise proposal, approval, two attempts, retained release/runtime history, unchanged original deployment receipt, and refusal to repeat an unknown remote outcome.
-- The opt-in Docker proof executes a source application with SQLite, seeds meaningful state, triggers a native Compose build failure, and applies a corrected newer revision using the production release script and verifiers. It checks a changed image, new version and retained state. The transport maps SSH to local shell and uses an ephemeral loopback port; it does not prove remote SSH, the host lock or a live Hetzner update.
+- The opt-in Docker proof executes a source application with SQLite, seeds meaningful state, triggers a native Compose build failure and a behavior-check failure, inspects running container state and logs, and applies a corrected newer revision using the production release script and verifiers. It checks a changed image, new version and retained state. The transport maps SSH to local shell and uses an ephemeral loopback port; it does not prove remote SSH, the host lock or a live Hetzner update.
 
 Run the Docker proof with `SG_RUN_DOCKER_PROOF=1 npm test -- tests/application/integration/release-docker.test.ts`.
 

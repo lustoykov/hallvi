@@ -1,3 +1,4 @@
+import { inspectRelease } from "./release-diagnostics";
 import { getApplication } from "./db";
 import { randomUUID } from "node:crypto";
 import {
@@ -92,11 +93,12 @@ export async function proposeApplicationRelease(
   );
 }
 
-function assertActive(
+function assertOwned(
   record: DeploymentRecord,
   tracked: StoredOperation,
   scope: ReleaseScope,
   plan: DeploymentPlan,
+  execution = true,
 ) {
   const app = getApplication(record.applicationId);
   if (
@@ -118,6 +120,7 @@ function assertActive(
       "This release operation does not hold active authorization.",
     );
   assertReleaseScope(record, scope, plan);
+  if (!execution) return;
   if (record.verificationPending || record.cleanup)
     throw new ReleaseScopeError(
       "Reconcile the previous verification object's outcome before another release.",
@@ -151,7 +154,7 @@ export async function runApplicationRelease(
     throw new ReleaseScopeError(
       "The deployment no longer belongs to this application.",
     );
-  assertActive(record, tracked, scope, record.plan!);
+  assertOwned(record, tracked, scope, record.plan!);
   const { token } = await checkDeploymentSource(record);
   const { data } = await githubJson(
     `/repos/${scope.repository}/commits/${scope.revision}`,
@@ -171,10 +174,14 @@ export async function runApplicationRelease(
   await planDeployment(files, record, signal, {
     revision: scope.revision,
     context: `Approved task: ${requirements}\nRelease scope: ${JSON.stringify(scope)}\nExisting plan: ${JSON.stringify(record.plan)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-plan approval.`,
+    inspect: async () => {
+      assertOwned(record, tracked, scope, record.plan!, false);
+      return inspectRelease(record, signal);
+    },
     apply: async (candidate) => {
       if (evidence) return { ok: true, message: evidence };
       try {
-        assertActive(record, tracked, scope, candidate);
+        assertOwned(record, tracked, scope, candidate);
         // A source/credential check is repeated immediately before execution.
         await checkDeploymentSource(record);
         if (candidate.image)
@@ -193,7 +200,7 @@ export async function runApplicationRelease(
           revision: scope.revision,
           plan: candidate,
         })!;
-        assertActive(record, tracked, scope, candidate);
+        assertOwned(record, tracked, scope, candidate);
         const result = await runDeploymentAttempt(
           record,
           "release",

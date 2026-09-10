@@ -103,6 +103,7 @@ import {
   composeDefinition,
   composeStartCommand,
 } from "../../../src/server/deployment-compose";
+import { inspectRelease } from "../../../src/server/release-diagnostics";
 import { executeRelease } from "../../../src/server/release-executor";
 import {
   verifyServiceImages,
@@ -298,6 +299,34 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
       expect(record.lifecycle!.runtime.lastVerified!.revision).toBe(
         "a".repeat(40),
       );
+      const brokenCheck = releaseOf({
+        repository: record.repository,
+        revision: "b".repeat(40),
+        plan: {
+          ...next,
+          checks: [{ ...next.checks[0], contains: "nonexistent-version" }],
+        },
+      })!;
+      const behavioral = beginDeploymentAttempt(
+        record,
+        "release",
+        "fixture-release",
+        brokenCheck,
+      );
+      await expect(
+        executeRelease(record, brokenCheck, v2Files, signal),
+      ).rejects.toMatchObject({ phase: "verification", retryable: true });
+      finishDeploymentAttempt(
+        record,
+        behavioral.id,
+        "failed",
+        "Behavior check failed",
+      );
+      const diagnostic = await inspectRelease(record, signal);
+      expect(diagnostic.ok).toBe(true);
+      expect(diagnostic.evidence).toContain('"running"');
+      expect(diagnostic.evidence).toContain("GET /version");
+      expect(record.lifecycle!.runtime.state).toBe("unknown");
       const corrected = releaseOf({
         repository: record.repository,
         revision: "b".repeat(40),

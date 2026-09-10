@@ -56,6 +56,12 @@ it("returns validation and execution feedback to the same Pi session, which corr
         const failure = await send(JSON.stringify(first));
         expect(failure.message).toContain("wrong.py");
         expect(failure.retryable).toBe(true);
+        const diagnostic = options.customTools.find(
+          (t: { name: string }) => t.name === "inspect_release",
+        );
+        expect((await diagnostic.execute()).content[0].text).toContain(
+          "wrong.py",
+        );
         expect((await send(JSON.stringify(second))).ok).toBe(true);
         // A repeated call after success cannot redeploy.
         await submit.execute("tool-call", { json: JSON.stringify(second) });
@@ -80,7 +86,10 @@ it("returns validation and execution feedback to the same Pi session, which corr
     ],
     record,
     new AbortController().signal,
-    { apply },
+    {
+      apply,
+      inspect: async () => ({ evidence: "Container exited: wrong.py missing" }),
+    },
   );
   expect(result.command).toEqual(second.command);
   expect(apply).toHaveBeenCalledTimes(2);
