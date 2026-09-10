@@ -1,4 +1,5 @@
 import { sweepApplicationPreviews } from "./application-preview";
+import { cleanupPiWorkspaces } from "./pi-workspace";
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -250,6 +251,7 @@ export async function runPiWorker(signal: AbortSignal) {
   let previewTimer: ReturnType<typeof setInterval> | undefined;
   try {
     interruptRunningPiRuns();
+    await cleanupPiWorkspaces().catch(() => undefined);
     const interrupted = interruptConformanceRuns();
     await sweepApplicationPreviews(true).catch(() => undefined);
     let sweeping = false;

@@ -4,6 +4,12 @@
 
 [Design](requirements-driven-deployment.md). This is design feedback, not evidence that the proposed runtime isolation or deployment behavior has been implemented.
 
+## Later direction change: native artifacts, reviewed below
+
+After these reviews, the owner supplied a critique of the normalized service-contract proposal. The design now prefers a proof using Pi-authored native Compose artifacts, derived operational inventory and explicit protection/evidence records before choosing a new persisted format. This reopens the first review's recommendation to keep a normalized executable service model and replaces the projection-first migration sequence after workspace tools.
+
+The first two responses below are preserved as historical feedback. The third review at the end reviews this later revision and explicitly reverses the earlier recommendation. Concerns about release identity, permitted effects, data semantics and recovery remain acceptance requirements; design approval is not implementation evidence.
+
 ## First review
 
 The first draft proposed composable dedicated verification operations. After this review, the owner clarified the preference for general `bash`, `read` and `write` tools, and the design was revised accordingly. This response therefore refers to the earlier draft.
@@ -109,3 +115,66 @@ Accepted the concrete findings; no production code changed.
 - Kept existing read-only mounts, minimal endpoint representation, explicit schedules/registry gaps and legacy check readers. Added no plugin framework or workflow language.
 
 Fable approved the reviewed design direction and identified a remaining networking prerequisite. The final document makes that prerequisite explicit and adopts the suggested sequencing; the post-review edits were not submitted for a third approval. This review does not certify the proposed implementation.
+
+## Third review: native artifacts and heavy reliance on Pi
+
+Requested and reported model: `claude-fable-5`, through Claude CLI with Read/Glob/Grep only. Reviewed draft SHA-256: `bb2de87b1af3bb4af27099daf240ee1f9dc8d8e0b87ff0f9a8ae74c308da949e`. The owner explicitly asked the reviewer to HEAVILY lean on Pi, native tools and model intelligence, challenging unnecessary restrictions, schemas and workflows.
+
+All facts I need are verified. Here is my review.
+
+---
+
+# Fable review 3: native-artifact revision
+
+Baseline re-verified this round: plan schema and verification recipe (`deployment-types.ts:13-285`), plan→Compose renderer (`deployment-compose.ts`), scope comparison (`release-scope.ts`), capture planning (`backup-capture-plan.ts`), rollback image mapping (`rollback.ts`), and `noTools: "all"` with phase-scoped tool menus (`pi.ts:155-189,797-812`). All of the design's "What exists" claims I checked hold. Grafana evidence and runner-isolation facts are carried from my second review, not re-inspected.
+
+## Verdict
+
+**Approve the revised direction, and I reverse my first review's Q1 answer on the merits.** Services, builds and dependencies should be Pi-authored native Compose. Two design edits are required before slices 3–4; nothing blocks slices 1–2.
+
+My earlier "keep the normalized model" conclusion conflated *needing certain facts* with *needing a custom language to carry them*. The code shows the custom plan is a hand-rebuilt Compose subset whose only executor consumer is a translator back into Compose (`deployment-compose.ts`), and that translator hardcodes the pathologies the owner objects to: unconditional public `80:${plan.port}` on a special `app` service (`deployment-compose.ts:44`), a five-service cap, mandatory `port`/`healthPath`/HTTP checks, and a schema-encoded POST→capture→GET→DELETE recipe (`deployment-types.ts:260-284`). Every genuinely load-bearing guarantee I cited — release identity, effect comparison, data semantics, rollback images — attaches to identities, records and the execution boundary, not to the input language. `release-scope.ts` compares mount facts (service/name/target/readOnly) all derivable from resolved Compose, plus kind/sqlite from protection records; `rollback.ts` needs per-service digests that come from observation (`serviceImages`), not the schema. My "imported surface" worry (privileged, host networking) is answered correctly in §1: gate *effect-bearing* fields on an understood execution boundary, pass ordinary fields through untouched. Under the schema path every model improvement waits on schema surface; under the native path better models improve output without core branches. The burden of proof has flipped: the custom schema now needs a specific unpreservable guarantee to survive, and I cannot name one.
+
+**Minimum records/capabilities outside native config** (§1's list is right; I confirm it with one addition, finding 2): identities (application/host/release/attempt, artifact-bundle hash, resolved per-service image digests, observed runtime snapshot); authority baseline (exposure set incl. `httpSourceIp`, mount-preservation set, postgres version, spending, the execution lock); data protection (volume kind, SQLite path, capture procedure, network-database writers, backup/restore evidence); managed PostgreSQL provisioning; the check criterion + execution-attached evidence record; decision records; private-input references with values kept out of model-visible artifacts.
+
+**Does the document still over-prescribe Pi?** The prose no longer does; every retained restriction I checked traces to identity, authority, data or network boundaries. The residue is structural, not textual — finding 4.
+
+## Findings
+
+**1. The reversal needs a symmetric, measurable stop condition (§1, slice 2).** Slice 2's stop rule ("stop if preserving guarantees requires a second executable service language") only guards one direction. Define the comparison concretely: a consumer-fact ledger (every fact execution, scope, backup, rollback and UI read from the plan today, sourced as derived/observed/recorded) plus net admission/renderer/validator code retired versus added. Otherwise the proof's outcome is arguable either way.
+
+**2. The canonical resolved configuration must be part of release identity (§1, before slice 4).** The doc resolves selected files and interpolation inputs "before comparing effects" but only retains authored files, inputs and image digests. Scope comparison and drift detection now run against *resolved* configuration; recomputing it later depends on the Compose resolver's version-specific interpolation/merge semantics. Retain the canonical resolved snapshot (and resolver version) in the release envelope, and derive the inventory from that snapshot plus runtime inspection. Concrete need: a historical baseline comparison must not change meaning when the tooling updates.
+
+**3. The flagship worker case is silently gated on the deferred network option (§2, slice 3, acceptance matrix).** Scoped runner egress — the preferred first path — reaches only public HTTP endpoints, i.e., the shape the product already supports. The no-public-endpoint worker arrangement that motivates this redesign needs the managed-host check container (or host-side commands), explicitly deferred. State this dependency in the acceptance matrix and plan the managed-host mechanism as required for the target case, not a fallback; otherwise today's HTTP-only limitation quietly persists through slice 3.
+
+**4. Phase-scoped tool menus survive every slice (`pi.ts:155-189`).** §Core forbids restricting general tools by legacy launch phases, but no slice retires `toolNamesForPhase`, and slice 1 doesn't say where workspace tools attach. If they land as another phase-menu entry, the "narrow menu of preselected solutions" persists structurally. Slice 1 should state: native tools available across the task, not appended to one phase's list.
+
+**5. `RecordedStack` becomes an unclassified fourth service view (`deployment-types.ts:367-418`).** Baseline already has plan services (authoritative), `stack` (descriptive), and observed `serviceImages`/`serviceReadiness`; the derived inventory adds a fourth. Classify it: processes/services/volumes are superseded by derived inventory; jobs/queues metadata become explicit operational records or recorded Pi interpretation. Unaddressed, it lingers as a shadow inventory the UI reads.
+
+## Delete or simplify
+
+The division-of-labor statement appears three times (§Core, §Responsibility boundary, §1 table) — merge to one. After slice 4, close new-application intake through the legacy plan rather than leaving "legacy input during migration" open-ended. Keep everything §1 already refuses: no metadata/plugin framework, no round-tripped reduced Compose, no per-field approvals.
+
+## Smallest next proof
+
+Slice 1 as written, then a no-host proof: one real recorded application; Pi adapts its native Compose in the workspace; produce (a) the finding-1 consumer-fact ledger and (b) a diff of Pi-authored resolved Compose against the legacy renderer's output for the same application. No schema, executor or persistence change.
+
+## Blocker
+
+None for slices 1–2. Finding 2 must be settled in the design before slice 4 (release hashing depends on it); finding 3 before slice 3 claims the worker case.
+
+## Verified versus proposed
+
+Verified above: schema/renderer/scope/backup/rollback/phase-gating facts. Design proposals, not established: derived-inventory sufficiency, egress and managed-host check boundaries, observed-vs-verified lifecycle behavior. The document labels these honestly; my approval covers the direction and sequencing, not those unproved properties.
+
+## Author disposition after review 3
+
+Accepted the five findings and the simplification of the next proof:
+
+- Added a consumer-fact ledger and a comparison of custom admission/rendering/validation code retired versus introduced, rather than assuming either architecture wins.
+- Required the retained resolved configuration and resolver version in release identity, with protected handling of materialized private inputs. A redacted view cannot replace the actual execution identity.
+- Made the managed-host check path required for the private worker acceptance case; HTTP egress cannot satisfy it.
+- Required common native-tool registration across conversation and planning sessions, independent of legacy phase menus.
+- Classified descriptive RecordedStack fields so they do not survive as a fourth competing inventory, and specified closing new intake through the legacy plan once native intake covers supported requirements.
+- Narrowed the next proof to one real application, its consumer-fact ledger and a resolved-configuration comparison, with no host/executor/persistence changes. The later managed execution still needs a real product proof.
+
+These final edits incorporate the review and have not been submitted for a fourth review. No deployment executor or schema was changed in this design-review task.

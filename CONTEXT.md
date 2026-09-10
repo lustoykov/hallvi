@@ -60,6 +60,8 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
 
+**Operational inventory**: An application's identifiable services, storage and network resources, with their source and observation time. Intended configuration and observed runtime are distinct inventory facts.
+
 **Observed runtime**: The application configuration and running images established on a host at a recorded time, whether or not its intended behavior has been verified. A known running configuration and a working application are separate claims.
 
 **Operability change**: A change needed to run or check the application, such as its start entrypoint or environment-driven port. Application-code changes in this category require an owner-merged PR.

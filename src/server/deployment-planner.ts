@@ -1,4 +1,10 @@
 import { sourceBuilds } from "./deployment-layout";
+import {
+  PI_BUILTIN_TOOLS,
+  PI_WORKSPACE_PROMPT,
+  PiWorkspace,
+  piWorkspaceTools,
+} from "./pi-workspace";
 import { releaseOf } from "./deployment-release";
 import { randomUUID } from "node:crypto";
 import { Type } from "typebox";
@@ -108,6 +114,26 @@ export async function planDeployment(
   let reads = 0;
   let lastFeedback = "";
   const submitName = options.apply ? "deploy_release" : "submit_plan";
+  const builtinWorkspace = new PiWorkspace({
+    applicationId: record.applicationId,
+    runId: record.releaseOperationId ?? record.operationId ?? record.id,
+    signal,
+    source: async () => {
+      const revision = options.revision ?? record.revision;
+      if (Array.isArray(source))
+        return {
+          description: `${record.repository}@${revision}`,
+          files: source,
+        };
+      if (!revision) throw new Error("No source revision selected.");
+      const { fetchBaseTree } = await import("./execution-tree");
+      const { token } = await checkDeploymentSource(record);
+      return {
+        description: `${record.repository}@${revision}`,
+        files: await fetchBaseTree(record.repository, revision, token, signal),
+      };
+    },
+  });
   const settingsManager = sdk.SettingsManager.inMemory({
     retry: { enabled: false },
   });
@@ -127,7 +153,7 @@ For each additional service record role="web", "worker", "broker" or "service". 
 Declare dependencies as [{service:"worker",needs:"queue",condition:"healthy"}]. Healthy dependencies require the target to have a healthCommand (or the managed postgres service); started means process startup only. Dependencies must be acyclic. A private connection uses the target's Compose service name in non-secret environment configuration, e.g. QUEUE_HOST="queue". Bind secrets only to consumers with inputBindings=[{service:"worker",variable:"QUEUE_PASSWORD",input:"QUEUE_PASSWORD"}]; the same input can be bound to multiple services. If inputBindings is present every missing input must have a binding; it replaces legacy injection of every supplied input into app. Never put secrets in commands, configuration files or literal environment values. The managed PostgreSQL shortcut supplies its URL to app when postgres.variable is set. Applications that require separate settings can set postgres.variable=null and use inputBindings with connection="postgres" and field="host", "port", "database", "username", or "password", assigning each value to the application's documented environment variable. Omitted field or field="url" supplies the full connection URL. The controller supplies these values; never invent or duplicate its password as a missing input. A worker can receive that same managed connection with {service:"worker",variable:"DATABASE_URL",connection:"postgres"} instead of input. Add a healthy dependency on postgres. Never invent or copy database credentials.
 Call ${submitName} with JSON matching the provided schema. ${options.inspect ? "After a runtime or behavior failure, use inspect_release to examine current container state and logs before choosing another execution. Inspection is available even when execution is blocked; it does not itself unlock unknown outcomes. After a lost connection, call reconcile_release before considering another deployment. A completed replacement must be verified without restarting it. Busy, missing or mismatched results remain blocked; explain what evidence is missing instead of repeating deployment." : ""} Tool errors are actionable feedback: inspect evidence, correct the configuration and resubmit when retryable. Do not treat ordinary configuration errors as a user approval request. Ports refer to the container port; public HTTP uses port 80. Generated Dockerfile should lock dependency installation using existing lock files when available, run a non-root application process, listen on 0.0.0.0 and reuse the actual source start command. Do not invent a health endpoint. Existing automatic startup migrations may run; migration changes require owner review. Do not include credentials. Required unknown secrets go in missingInputs. Admin credentials must be supplied privately, never use published default passwords. Disable open signup when the application supports that setting. Do not claim an installation wizard is already configured; normal user setup can follow protected deployment. The executor ${options.apply ? "reuses the saved private database password" : "supplies a random database password"} and injects the selected connection variable for optional Postgres. Keep non-secret environment configuration only in environment. Do not include DATABASE_URL there when postgres supplies it.
 Define meaningful application checks from route code you read. For a CRUD app create a unique test object then retrieve it, check its content, and delete it. Use SG_VERIFY_TOKEN in body/contains for a unique synthetic value. captureId is a dot-separated JSON response path (for example todo.id); subsequent paths may use {id}. Do not mutate existing user objects. A health response alone does not prove the application works. Static websites may check their recognizable public content. Complete at most one successful ${options.apply ? "release" : "plan"}. If unsafe or unsupported, explain why instead. ${options.context ?? ""}`,
-    appendSystemPromptOverride: () => [],
+    appendSystemPromptOverride: () => [PI_WORKSPACE_PROMPT],
     skillsOverride: () => ({ skills: [], diagnostics: [] }),
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     promptsOverride: () => ({ prompts: [], diagnostics: [] }),
@@ -141,14 +167,15 @@ Define meaningful application checks from route code you read. For a CRUD app cr
     settingsManager,
     resourceLoader: loader,
     sessionManager: sdk.SessionManager.inMemory(),
-    noTools: "all",
     tools: [
+      ...PI_BUILTIN_TOOLS,
       "read_source",
       submitName,
       ...(options.inspect ? ["inspect_release"] : []),
       ...(options.reconcile ? ["reconcile_release"] : []),
     ],
     customTools: [
+      ...piWorkspaceTools(sdk, builtinWorkspace),
       ...(options.reconcile
         ? [
             sdk.defineTool({
@@ -301,8 +328,15 @@ Define meaningful application checks from route code you read. For a CRUD app cr
     return plan;
   } finally {
     signal.removeEventListener("abort", abort);
-    await session.waitForIdle();
-    session.dispose();
+    try {
+      await session.waitForIdle();
+    } finally {
+      try {
+        session.dispose();
+      } finally {
+        await builtinWorkspace.dispose();
+      }
+    }
   }
 }
 

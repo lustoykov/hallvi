@@ -103,6 +103,8 @@ interface RequestOptions {
   /** Collect at most this many bytes of the response. */
   maxBytes?: number;
   onChunk?: (chunk: Buffer) => void;
+  /** Input for an attached Docker exec, sent after the HTTP upgrade. */
+  stdin?: Buffer;
 }
 
 export interface DockerResponse {
@@ -152,6 +154,25 @@ export class DockerClient {
       const chunks: Buffer[] = [];
       let received = 0;
       let truncated = false;
+      const receive = (chunk: Buffer) => {
+        options.onChunk?.(chunk);
+        if (received >= maxBytes) {
+          truncated = true;
+          return;
+        }
+        const room = maxBytes - received;
+        if (chunk.length > room) truncated = true;
+        const kept = chunk.subarray(0, room);
+        chunks.push(kept);
+        received += kept.length;
+      };
+      const finish = (res: IncomingMessage) =>
+        resolve({
+          status: res.statusCode ?? 0,
+          headers: res.headers,
+          body: Buffer.concat(chunks),
+          truncated,
+        });
       const req = httpRequest(
         {
           socketPath: this.socketPath,
@@ -162,6 +183,7 @@ export class DockerClient {
             ...(body !== undefined && !(body instanceof Readable)
               ? { "Content-Length": String(Buffer.byteLength(body)) }
               : {}),
+            ...(options.stdin ? { Connection: "Upgrade", Upgrade: "tcp" } : {}),
             ...headers,
           },
           signal: options.signal,
@@ -169,34 +191,73 @@ export class DockerClient {
         (res) => {
           res.on("data", (chunk: Buffer) => {
             try {
-              options.onChunk?.(chunk);
+              receive(chunk);
             } catch (error) {
               req.destroy(
                 error instanceof Error ? error : new Error(String(error)),
               );
-              return;
             }
-            if (received >= maxBytes) {
-              truncated = true;
-              return;
-            }
-            const room = maxBytes - received;
-            const kept = chunk.length > room ? chunk.subarray(0, room) : chunk;
-            if (chunk.length > room) truncated = true;
-            chunks.push(kept);
-            received += kept.length;
           });
-          res.on("end", () =>
-            resolve({
-              status: res.statusCode ?? 0,
-              headers: res.headers,
-              body: Buffer.concat(chunks),
-              truncated,
-            }),
-          );
+          res.on("end", () => finish(res));
           res.on("error", reject);
         },
       );
+      if (options.stdin)
+        req.on("upgrade", (res, socket, head) => {
+          const abort = () =>
+            socket.destroy(
+              new DockerError(
+                "Workspace execution interrupted.",
+                0,
+                "ABORT_ERR",
+              ),
+            );
+          options.signal?.addEventListener("abort", abort, { once: true });
+          let ended = false;
+          socket.once("close", () => {
+            options.signal?.removeEventListener("abort", abort);
+            if (!ended)
+              reject(
+                new DockerError(
+                  "Docker exec connection closed before its result completed.",
+                  0,
+                  "ECONNRESET",
+                ),
+              );
+          });
+          socket.on("error", reject);
+          socket.setTimeout(timeoutMs, () =>
+            socket.destroy(
+              new DockerError(
+                "The Docker Engine did not answer in time.",
+                0,
+                "ETIMEDOUT",
+              ),
+            ),
+          );
+          socket.on("data", (chunk: Buffer) => {
+            try {
+              receive(chunk);
+            } catch (error) {
+              socket.destroy(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          });
+          socket.on("end", () => {
+            ended = true;
+            finish(res);
+          });
+          try {
+            if (head.length) receive(head);
+            if (options.signal?.aborted) abort();
+            else socket.end(options.stdin!);
+          } catch (error) {
+            socket.destroy(
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          }
+        });
       req.setTimeout(timeoutMs, () => {
         req.destroy(
           new DockerError(
@@ -523,10 +584,20 @@ export class DockerClient {
       throw new DockerError(response.body.toString("utf8"), response.status);
   }
 
-  createVolume(name: string, labels: Record<string, string>) {
+  createVolume(
+    name: string,
+    labels: Record<string, string>,
+    driverOptions?: Record<string, string>,
+  ) {
     return this.json<{ Name: string }>("/volumes/create", {
       method: "POST",
-      body: JSON.stringify({ Name: name, Labels: labels }),
+      body: JSON.stringify({
+        Name: name,
+        Labels: labels,
+        ...(driverOptions
+          ? { Driver: "local", DriverOpts: driverOptions }
+          : {}),
+      }),
       headers: { "Content-Type": "application/json" },
     });
   }
