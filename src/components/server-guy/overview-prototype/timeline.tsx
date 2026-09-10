@@ -140,7 +140,8 @@ export function TimelineHero({
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axt-pop, .axt-ev, .axt-lane-name", close);
   const toggle = (id: string) => setOpen((current) => (current === id ? null : id));
-  const [logOpen, setLogOpen] = useState(false);
+  // Open from the start, so the log reads as the timeline's terminal.
+  const [logOpen, setLogOpen] = useState(true);
   // The moment being pointed at, on the lanes or in the log.
   const [lit, setLit] = useState<string | null>(null);
   const log = useRef<HTMLDivElement>(null);
@@ -176,7 +177,7 @@ export function TimelineHero({
 
   const sub = subline(model, overview);
   const showLog = logOpen || guy.simulating;
-  const lines = guy.lines.slice(-8);
+  const lines = guy.lines.slice(-6);
 
   return (
     <section className={`axt${planned ? " is-planned" : ""}${guy.simulating ? " is-live" : ""}`} aria-label="How it is doing">
