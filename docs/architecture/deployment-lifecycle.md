@@ -35,9 +35,9 @@ Deployment-worker recovery interrupts its unfinished attempt. Generic operation-
 
 ## Scope and next work
 
-This PR records attempts for initial deployment/retries and recreation on an existing Hetzner host. It does not add a public API for deploying a newer revision, rollback, BYOM adoption, host sharing, rolling/zero-downtime replacement, migration orchestration, secret-value versioning or a plugin runtime. Release identity still does not guarantee reproducible source builds.
+The original lifecycle slice records attempts for initial deployment/retries and recreation on an existing Hetzner host. The follow-up [scoped release executor](agent-releases.md) adds subsequent revisions and Pi-directed configuration correction on that host. Rollback, BYOM adoption, host sharing, rolling/zero-downtime replacement, migration orchestration, secret-value versioning and a plugin runtime remain unimplemented. Release identity still does not guarantee reproducible source builds.
 
-A subsequent-release executor can now target another release without replacing earlier release/attempt evidence. Its next concrete requirements are approval bound to that release, reuse of the stable host and retained state, data/migration compatibility checks, and fresh verification after replacement. If a change fails after remote effects, it must reconcile what runs; it cannot label the old release as serving solely because that release passed yesterday.
+The subsequent-release executor targets another release without replacing earlier release/attempt evidence. Authorization binds the host, selected revision and permitted effects; corrected configurations receive distinct release snapshots under that scope. If a change fails after remote effects, it must reconcile what runs; it cannot label the old release as serving solely because that release passed yesterday.
 
 The aggregate keeps history with each application and sends it with deployment state. Pagination/normalised storage is a later change if measured history size warrants it. Cancellation of a definitively uncreated setup retains its operation/chat receipts under the existing policy but removes the deployment aggregate; this slice does not introduce a separate cancelled-setup archive.
 

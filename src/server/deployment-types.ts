@@ -265,6 +265,8 @@ export type DeploymentStatus =
   | "live"
   | "failed";
 export interface DeploymentRecord {
+  /** Later release work owns its own receipt. */
+  releaseOperationId?: string;
   /** Lifecycle history alongside the legacy executor workspace. */
   lifecycle?: import("./deployment-runtime").DeploymentLifecycle;
   operationId?: string;

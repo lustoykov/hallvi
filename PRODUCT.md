@@ -42,6 +42,8 @@ Use [representative compatibility cases](docs/testing/self-hosted-compatibility.
 
 Model intelligence determines what to inspect, recommend and do next. Tools enforce access, spending limits and effect-specific authority. Recommendations and successful commands are not proof of a working or protected application.
 
+Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture/agent-releases.md) implements this loop for updates on an existing host; initial deployment still uses its priced recommendation approval.
+
 ## Experience
 
 Use **Fable's conversation-first design**: focused chat, interactive operation receipts, stable views, subtle activity indicators and continuity between conversations. The [design reference](src/components/server-guy/DESIGN.md) owns visual language; the [integration report](docs/design/2026-09-09-conversation-first-integration.md) describes the current implementation.

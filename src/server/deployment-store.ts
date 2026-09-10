@@ -1,3 +1,4 @@
+import type { DeploymentRelease } from "./deployment-release";
 import {
   beginDeploymentAttempt,
   finishDeploymentAttempt,
@@ -301,11 +302,17 @@ export function interruptDeployments() {
 /** The existing CAS save makes attempt, host and runtime transitions atomic. */
 export async function runDeploymentAttempt<T>(
   record: DeploymentRecord,
-  kind: "deploy" | "recreate",
+  kind: "deploy" | "recreate" | "release",
   operationId: string,
   work: () => Promise<T>,
+  selectedRelease?: DeploymentRelease,
 ): Promise<T> {
-  const attempt = beginDeploymentAttempt(record, kind, operationId);
+  const attempt = beginDeploymentAttempt(
+    record,
+    kind,
+    operationId,
+    selectedRelease,
+  );
   saveDeployment(record);
   try {
     const result = await work();
