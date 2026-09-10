@@ -26,6 +26,14 @@ This first slice retires **zero** deployment-schema/renderer/validator lines and
 
 The following PR should measure the custom admission, rendering and validation code actually removed against the native-artifact admission and effect-comparison code added. A new inventory must remain a projection; it must not grow into another configuration authoring format. Concrete preservation requirements in the table decide whether the replacement is adequate.
 
+### Managed native releases: measured result
+
+Measured against baseline `a7c2c7d`, Prettier-formatted, for the Opus candidate recorded in the [execution plan](../plans/native-compose-execution.md). Source changes total 2,598 lines added and 693 removed. **This PR adds more code than it retires**; the retirement arrives when initial intake stops using the legacy plan.
+
+- **Retired:** release-time authoring of the custom plan (JSON plan submission, plan-field image pinning and build selection in the release loop); the plan-field scope comparison, replaced by one comparison over derived facts; the web-only revision probe, folded into a per-service identity check; duplicated check validation, now one rule set shared by legacy plans and native criteria.
+- **Introduced:** `native-compose.ts` (850 lines: selection 128, resolution 64, effect/capability boundary 160, controller override 51, private references 86, protection and criterion records 91, preparation 132, Pi's baseline view 105); `release-facts.ts` (333 lines, the derived inventory for both representations); observed-versus-verified lifecycle; the planner's native release mode; the workspace file export and pinned resolver runner; facts-based consumers in executor, backup, stack and UI.
+- **Still present:** the legacy plan schema, compatibility renderer, layout and validator (785 lines across `deployment-types.ts`, `compose-plan.ts`, `deployment-compose.ts` and `deployment-layout.ts`) serve initial intake, historical releases and rollback to them. No new persisted service language was added: the native envelope retains Compose artifacts, their resolved snapshot and only the records listed above.
+
 ## Recorded Paperless comparison and correction
 
 Pi ran through the native workspace tools with the configured `openai-codex/gpt-5.6-sol` model at high effort. Inputs were the pinned upstream Paperless Compose/env files and the existing trial's recorded plan rendered with synthetic credentials. The same Compose 2.40.3 resolver normalized both inputs with project name `proof-comparison`; no stack was started.

@@ -8,7 +8,10 @@ import {
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import {
+  deploymentPlanSchema,
+  type DeploymentRecord,
+} from "../../../src/server/deployment-types";
 const run = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (original) => ({
   ...(await original<object>()),
@@ -32,13 +35,45 @@ const record = () =>
     serverId: 1,
     address: "203.0.113.1",
     imageId: digest,
-    plan: {
+    plan: deploymentPlanSchema.parse({
+      summary: "A published image with a retained files volume",
       image: `example/app@${digest}`,
+      dockerfile: "Dockerfile",
+      generatedDockerfile: null,
+      context: ".",
+      port: 8080,
+      command: null,
+      environment: [],
+      postgres: null,
+      missingInputs: [],
+      healthPath: "/health",
       volumes: [{ name: "data", target: "/data", kind: "files", sqlite: null }],
       services: [],
-    },
+      checks: [
+        {
+          name: "Home",
+          method: "GET",
+          path: "/",
+          body: null,
+          expectedStatus: 200,
+          contains: "ok",
+          captureId: null,
+        },
+      ],
+    }),
     bundleHashes: { "compose.json": "b".repeat(64) },
   }) as unknown as DeploymentRecord;
+const worker = () => ({
+  name: "worker",
+  imageFrom: "app",
+  command: ["python", "worker.py"],
+  environment: [],
+  volumes: [],
+  configs: [],
+  port: null,
+  healthPath: null,
+  checks: [],
+});
 function result(output: string, code = 0) {
   const child = new EventEmitter() as EventEmitter & {
     stdout: PassThrough;
@@ -108,9 +143,7 @@ it("records each accepted running service image", async () => {
 
 it("rejects a shared-image worker that is actually running different bytes", async () => {
   const r = record();
-  r.plan!.services = [
-    { name: "worker", imageFrom: "app" },
-  ] as unknown as NonNullable<typeof r.plan>["services"];
+  r.plan!.services = [worker()];
   run.mockImplementation(() =>
     result(
       [
@@ -142,9 +175,7 @@ it("clears earlier readiness when a service is no longer running", async () => {
 
 it("does not record a passing readiness result for an unhealthy worker", async () => {
   const r = record();
-  r.plan!.services = [
-    { name: "worker", imageFrom: "app", healthCommand: ["python", "ready.py"] },
-  ] as unknown as NonNullable<typeof r.plan>["services"];
+  r.plan!.services = [{ ...worker(), healthCommand: ["python", "ready.py"] }];
   run.mockImplementation(() => result("unhealthy\n"));
   await expect(
     verifyPrivateServices(r, new AbortController().signal),

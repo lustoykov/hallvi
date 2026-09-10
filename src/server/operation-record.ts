@@ -5,6 +5,7 @@
 // operations from the same data.
 import type { ApplicationSection } from "@/components/server-guy/application-sections";
 import type { DeploymentRecord } from "./deployment-types";
+import { currentFacts } from "./release-facts";
 
 /**
  * An inspection goes working → inspected. A change goes proposed → queued
@@ -127,26 +128,13 @@ export function deploymentOperation(
   record: DeploymentRecord,
 ): ApplicationOperation {
   const destinations: ApplicationSection[] = ["deployment", "architecture"];
-  if (record.plan) destinations.push("processes");
-  if (
-    record.plan?.postgres ||
-    record.plan?.volumes?.some((v) => v.sqlite) ||
-    record.plan?.services?.some((s) => s.volumes.some((v) => v.sqlite))
-  )
+  const facts = currentFacts(record);
+  if (facts) destinations.push("processes");
+  if (facts?.database || facts?.volumes.some((v) => v.sqlite))
     destinations.push("database");
-  if (
-    record.plan?.postgres ||
-    record.plan?.volumes?.length ||
-    record.plan?.services?.some((s) => s.volumes.length)
-  )
-    destinations.push("storage");
+  if (facts?.database || facts?.volumes.length) destinations.push("storage");
   if (record.status === "live") destinations.push("domains", "logs");
-  if (
-    record.plan &&
-    (record.plan.environment.length ||
-      record.plan.missingInputs.length ||
-      record.plan.postgres)
-  )
+  if (facts?.variables.length || facts?.database)
     destinations.push("variables");
   const base = {
     id: record.operationId ?? `deployment:${record.id}`,

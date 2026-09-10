@@ -321,7 +321,16 @@ export async function runDeploymentAttempt<T>(
   saveDeployment(record);
   try {
     const result = await work();
-    finishDeploymentAttempt(record, attempt.id, "verified");
+    // Without a behavior criterion, execution establishes only what runs.
+    const unverified =
+      typeof result === "object" &&
+      result !== null &&
+      (result as { behavior?: string }).behavior === "unverified";
+    finishDeploymentAttempt(
+      record,
+      attempt.id,
+      unverified ? "observed" : "verified",
+    );
     if (kind === "deploy") record.status = "live";
     saveDeployment(record);
     return result;
@@ -334,6 +343,7 @@ export async function runDeploymentAttempt<T>(
       redactSecrets(
         error instanceof Error ? error.message : "Deployment attempt failed.",
       ).text.slice(0, 2000),
+      (error as { established?: boolean } | null)?.established === true,
     );
     saveDeployment(record);
     throw error;

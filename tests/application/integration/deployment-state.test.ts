@@ -436,9 +436,9 @@ it("persists retries, immutable release snapshots, and the verified runtime thro
   expect(saved.lifecycle!.runtime.lastVerified!.images.app).toBe(
     "sha256:synthetic",
   );
-  saved.lifecycle!.releases[0].plan.port += 1;
+  saved.lifecycle!.releases[0].plan!.port += 1;
   expect(() => saveDeployment(saved)).toThrow("cannot be rewritten");
-  expect(getDeployment(r.id)!.lifecycle!.releases[0].plan.port).toBe(
+  expect(getDeployment(r.id)!.lifecycle!.releases[0].plan!.port).toBe(
     queuePlan().port,
   );
 });

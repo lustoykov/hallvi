@@ -12,21 +12,24 @@ import {
   DeploymentConflictError,
 } from "./deployment-store";
 import { ensureDeploymentLifecycle } from "./deployment-lifecycle";
-import { deploymentRuntime } from "./deployment-runtime";
+import { deploymentRuntime, establishedRuntime } from "./deployment-runtime";
 import { releaseOf } from "./deployment-release";
 import { checkDeploymentSource } from "./deployment-source";
 import { githubJson } from "./github-api";
-import { fetchBaseTree } from "./execution-tree";
+import { fetchBaseTree, type TreeFile } from "./execution-tree";
 import { deploymentSourceFiles } from "./deployment-source-files";
-import { sourceBuilds } from "./deployment-layout";
 import {
   operation,
   proposeOperation,
   publicOperation,
 } from "./operation-store";
 import type { StoredOperation } from "./operation-types";
-import { planDeployment } from "./deployment-planner";
-import { pinContainerImage } from "./container-images";
+import { planRelease } from "./deployment-planner";
+import {
+  currentConfigurationFiles,
+  prepareNativeRelease,
+} from "./native-compose";
+import { currentFacts, releaseFacts, type ReleaseFacts } from "./release-facts";
 import {
   assertReleaseScope,
   ReleaseScopeError,
@@ -38,7 +41,7 @@ import {
   releaseSecrets,
 } from "./release-executor";
 import { redactSecrets } from "./secrets";
-import type { DeploymentPlan, DeploymentRecord } from "./deployment-types";
+import type { DeploymentRecord } from "./deployment-types";
 
 export async function proposeApplicationRelease(
   applicationId: string,
@@ -48,11 +51,14 @@ export async function proposeApplicationRelease(
   rollbackRequest?: { releaseId: string; compatibilityEvidence: string },
 ) {
   const record = applicationDeployment(applicationId);
+  const state = deploymentRuntime(record).state;
+  // A known runtime, verified or merely observed, can baseline an update.
   if (
-    !record?.plan ||
+    !record ||
+    !currentFacts(record) ||
     !record.serverId ||
     !record.address ||
-    deploymentRuntime(record).state !== "verified"
+    (state !== "verified" && state !== "observed")
   )
     throw new Error(
       "Verify or reconcile the existing deployment before proposing a new release.",
@@ -90,7 +96,7 @@ export async function proposeApplicationRelease(
     repository: record.repository,
     repositoryId: record.repositoryId!,
     revision,
-    baselineReleaseId: lifecycle.runtime.lastVerified!.releaseId,
+    baselineReleaseId: establishedRuntime(lifecycle.runtime)!.releaseId,
     maxAttempts: 3,
     ...(rollback ? { rollback } : {}),
   };
@@ -98,7 +104,10 @@ export async function proposeApplicationRelease(
     assertReleaseScope(
       record,
       scope,
-      lifecycle.releases.find((r) => r.id === rollback.releaseId)!.plan,
+      releaseFacts(
+        lifecycle.releases.find((r) => r.id === rollback.releaseId)!,
+        record.id,
+      ),
     );
   saveDeployment(record);
   return publicOperation(
@@ -111,7 +120,7 @@ export async function proposeApplicationRelease(
       title: `${rollback ? "Roll back to" : "Release"} ${revision.slice(0, 12)}`,
       summary: rollback
         ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Preserve current data, private settings, database image and network exposure. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
-        : `Update this application to revision ${revision.slice(0, 12)} on its existing host. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, database version and network exposure. No server purchase or resize. Destructive data migrations need a separate decision.`,
+        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, the managed database and network exposure. No server purchase or resize. Destructive data migrations need a separate decision.`,
       destinations: ["deployment", "history", "processes"],
       command: {
         type: "release-deployment",
@@ -126,7 +135,7 @@ function assertOwned(
   record: DeploymentRecord,
   tracked: StoredOperation,
   scope: ReleaseScope,
-  plan: DeploymentPlan,
+  candidate: ReleaseFacts,
   execution = true,
 ) {
   const app = getApplication(record.applicationId);
@@ -148,7 +157,7 @@ function assertOwned(
     throw new ReleaseScopeError(
       "This release operation does not hold active authorization.",
     );
-  assertReleaseScope(record, scope, plan);
+  assertReleaseScope(record, scope, candidate);
   if (!execution) return;
   if (record.verificationPending || record.cleanup)
     throw new ReleaseScopeError(
@@ -187,7 +196,8 @@ export async function runApplicationRelease(
     throw new ReleaseScopeError(
       "The deployment no longer belongs to this application.",
     );
-  assertOwned(record, tracked, scope, record.plan!, false);
+  const current = () => currentFacts(record)!;
+  assertOwned(record, tracked, scope, current(), false);
   if (scope.rollback) {
     const selected = record.lifecycle!.releases.find(
       (r) => r.id === scope.rollback!.releaseId,
@@ -212,10 +222,10 @@ export async function runApplicationRelease(
       .at(-1);
     if (prior?.remoteStartedAt) {
       const result = await reconcileRelease(record, tracked, signal);
-      if (result.verified) return { evidence: result.message };
+      if (result.completed) return { evidence: result.message };
       if (!result.retryable) throw new ReleaseScopeError(result.message);
     }
-    assertOwned(record, tracked, scope, selected.plan);
+    assertOwned(record, tracked, scope, releaseFacts(selected, record.id));
     record.releaseOperationId = tracked.id;
     saveDeployment(record);
     return runDeploymentAttempt(
@@ -249,56 +259,64 @@ export async function runApplicationRelease(
     token,
     signal,
   );
+  const baseline = record.lifecycle!.releases.find(
+    (r) => r.id === scope.baselineReleaseId,
+  )!;
   record.releaseOperationId = tracked.id;
   saveDeployment(record);
+  // The immutable tree is fetched once: to compare selected files with the
+  // repository and, when the release builds, to upload exactly this source.
+  let tree: Promise<TreeFile[]> | undefined;
+  const sourceTree = () =>
+    (tree ??= fetchBaseTree(scope.repository, scope.revision, token, signal));
   let evidence: string | undefined;
-  await planDeployment(files, record, signal, {
+  await planRelease(files, record, signal, {
     revision: scope.revision,
-    context: `Approved task: ${requirements}\nRelease scope: ${JSON.stringify(scope)}\nExisting plan: ${JSON.stringify(record.plan)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-plan approval.`,
+    context: `Approved task: ${requirements}\nRelease scope: ${JSON.stringify(scope)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-attempt approval.`,
+    workspaceFiles: currentConfigurationFiles(record, baseline),
     reconcile: async () => {
-      if (evidence)
-        return {
-          ok: true,
-          verified: true,
-          message: evidence,
-          plan: record.plan!,
-        };
-      assertOwned(record, tracked, scope, record.plan!, false);
+      if (evidence) return { ok: true, completed: true, message: evidence };
+      assertOwned(record, tracked, scope, current(), false);
       const result = await reconcileRelease(record, tracked, signal);
-      if (result.verified) evidence = result.message;
+      if (result.completed) evidence = result.message;
       return result;
     },
     inspect: async () => {
-      assertOwned(record, tracked, scope, record.plan!, false);
+      assertOwned(record, tracked, scope, current(), false);
       return inspectRelease(record, signal);
     },
-    apply: async (candidate) => {
+    apply: async (selection, artifacts) => {
       if (evidence) return { ok: true, message: evidence };
       try {
-        assertOwned(record, tracked, scope, candidate);
+        assertOwned(record, tracked, scope, current(), false);
         // A source/credential check is repeated immediately before execution.
         await checkDeploymentSource(record);
-        if (candidate.image)
-          candidate.image = await pinContainerImage(candidate.image, signal);
-        for (const service of candidate.services ?? [])
-          if (service.image)
-            service.image = await pinContainerImage(service.image, signal);
         const secrets = releaseSecrets(record);
-        for (const input of candidate.missingInputs)
-          if (!secrets.supplied[input.name]?.trim())
-            throw new ReleaseScopeError(
-              `Private input ${input.name} is unavailable. Ask for it through private configuration; never put its value in a tool call.`,
-            );
+        const native = await prepareNativeRelease({
+          deploymentId: record.id,
+          revision: scope.revision,
+          selection,
+          artifacts,
+          repositoryFile: async (path) =>
+            files.paths.includes(path)
+              ? ((await sourceTree()).find((file) => file.path === path)
+                  ?.content ?? null)
+              : null,
+          inputs: Object.keys(secrets.supplied).filter((name) =>
+            secrets.supplied[name]?.trim(),
+          ),
+          baseline: releaseFacts(baseline, record.id),
+          signal,
+        });
         const selected = releaseOf({
           repository: scope.repository,
           revision: scope.revision,
-          plan: candidate,
+          native,
         })!;
-        assertOwned(record, tracked, scope, candidate);
-        // Published images need inspection evidence, not an executable copy
-        // of every upstream fixture/media asset. Builds need the full tree.
-        const buildFiles = sourceBuilds(candidate).length
-          ? await fetchBaseTree(scope.repository, scope.revision, token, signal)
+        const facts = releaseFacts(selected, record.id);
+        assertOwned(record, tracked, scope, facts);
+        const buildFiles = facts.services.some((service) => service.build)
+          ? await sourceTree()
           : [];
         const result = await runDeploymentAttempt(
           record,
@@ -339,6 +357,6 @@ export async function runApplicationRelease(
     },
   });
   if (!evidence)
-    throw new Error("The agent stopped without a verified release.");
+    throw new Error("The agent stopped without a completed release.");
   return { evidence };
 }

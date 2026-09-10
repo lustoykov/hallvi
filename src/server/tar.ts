@@ -157,6 +157,7 @@ function header(input: {
   mode: number;
   type: "0" | "5" | "x";
   uid: number;
+  mtime: number;
 }) {
   const block = Buffer.alloc(BLOCK, 0);
   block.write(input.path.slice(0, 100), 0, "utf8");
@@ -164,7 +165,7 @@ function header(input: {
   block.write(input.uid.toString(8).padStart(7, "0"), 108, "ascii");
   block.write(input.uid.toString(8).padStart(7, "0"), 116, "ascii");
   block.write(input.size.toString(8).padStart(11, "0"), 124, "ascii");
-  block.write("00000000000", 136, "ascii");
+  block.write(input.mtime.toString(8).padStart(11, "0"), 136, "ascii");
   block.write("        ", 148, "ascii");
   block.write(input.type, 156, "ascii");
   block.write("ustar", 257, "ascii");
@@ -187,12 +188,15 @@ function padded(content: Buffer) {
 /**
  * Writes entries as a tar owned by uid/gid 1000, the workload user, with
  * parent directories included so extraction leaves nothing root-owned.
+ * Build contexts need a real mtime: BuildKit keeps an earlier synced file
+ * whose size and mtime are unchanged, so a same-size edit would build stale.
  */
 export function writeTar(
   entries: Array<{ path: string; content: Buffer; mode?: number }>,
-  options: { uid?: number } = {},
+  options: { uid?: number; mtime?: number } = {},
 ) {
   const uid = options.uid ?? 1000;
+  const mtime = options.mtime ?? 0;
   const directories = new Set<string>();
   for (const entry of entries) {
     const parts = entry.path.split("/");
@@ -217,12 +221,13 @@ export function writeTar(
           mode: 0o644,
           type: "x",
           uid,
+          mtime,
         }),
         padded(pax),
       );
     }
     blocks.push(
-      header({ path, size: content.length, mode, type, uid }),
+      header({ path, size: content.length, mode, type, uid, mtime }),
       padded(content),
     );
   };

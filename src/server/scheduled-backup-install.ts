@@ -1,3 +1,4 @@
+import { currentFacts } from "./release-facts";
 import { backupCapturePlan } from "./backup-capture-plan";
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, lstatSync } from "node:fs";
@@ -63,11 +64,12 @@ function privateJson(file: string) {
   return JSON.parse(readFileSync(file, "utf8"));
 }
 export function backupKind(record: DeploymentRecord): BackupPolicy["kind"] {
-  if (record.status !== "live" || !record.plan || !record.revision)
+  const facts = currentFacts(record);
+  if (record.status !== "live" || !facts || !record.revision)
     throw new Error(
       "A live deployment with recorded configuration is required.",
     );
-  backupCapturePlan(record.plan);
+  backupCapturePlan(facts);
   return "stack";
 }
 /** Public capability facts contain no endpoint or credential material. */
@@ -109,7 +111,8 @@ export async function installScheduledBackups(
   },
 ) {
   const kind = backupKind(record);
-  const capture = backupCapturePlan(record.plan!);
+  const facts = currentFacts(record)!;
+  const capture = backupCapturePlan(facts);
   let destination: z.infer<typeof destinationSchema>;
   let credentials: z.infer<typeof credentialSchema>;
   try {
@@ -132,7 +135,7 @@ export async function installScheduledBackups(
     revision: record.revision,
     kind,
     data: {
-      postgres: Boolean(record.plan!.postgres),
+      postgres: Boolean(facts.database),
       fileDatabases: capture.volumes.some(
         (v) =>
           v.kind === "database" && v.capture === "quiesced-files" && !v.sqlite,

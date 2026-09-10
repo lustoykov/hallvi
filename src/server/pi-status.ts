@@ -1,3 +1,4 @@
+import { currentFacts } from "./release-facts";
 import { deploymentRuntime } from "./deployment-runtime";
 import { applicationDeployment } from "./deployment-store";
 import { Type } from "typebox";
@@ -39,7 +40,7 @@ export function readPiApplicationStatus(
             runtime: deploymentRuntime(deployment),
             latestAttempt: deployment.lifecycle?.attempts.at(-1),
             revision: deployment.revision,
-            plan: deployment.plan?.summary,
+            plan: currentFacts(deployment)?.summary,
             serverId: deployment.serverId,
             address: deployment.address,
             url: deployment.url,

@@ -5,6 +5,7 @@ import { sharedVolumes, serviceImage } from "./deployment-layout";
 // web process and PostgreSQL come from the plan the executor runs; the rest
 // comes from `record.stack` once a deployment records it.
 import { deploymentRuntime } from "./deployment-runtime";
+import { currentFacts } from "./release-facts";
 import type { DeploymentRecord } from "./deployment-types";
 
 export type StackState = "running" | "planned" | "unknown";
@@ -82,7 +83,92 @@ export const emptyStack: ApplicationStack = {
   volumes: [],
 };
 
+/**
+ * Native releases: the inventory derived from the retained configuration and
+ * observed runtime. Descriptive recorded processes and services do not compete
+ * with it; recorded jobs and queues remain operational records.
+ */
+function nativeStack(record: DeploymentRecord): ApplicationStack {
+  const facts = currentFacts(record)!;
+  const runtime = deploymentRuntime(record);
+  const state: StackState =
+    runtime.state === "unknown"
+      ? "unknown"
+      : record.status === "live"
+        ? "running"
+        : "planned";
+  const usedBy = (mounts: { service: string }[]) =>
+    [...new Set(mounts.map((m) => m.service))].join(", ");
+  return {
+    recorded: true,
+    processes: facts.services
+      .filter((service) => service.name !== facts.database?.service)
+      .map((service) => {
+        const exposure = facts.exposure.find((e) => e.service === service.name);
+        return {
+          name: service.name,
+          role: exposure ? ("web" as const) : ("service" as const),
+          command: service.command,
+          image: record.serviceImages?.[service.name] ?? service.pinned,
+          port: exposure?.target ?? null,
+          healthPath: null,
+          consumes: null,
+          private: !exposure,
+          dependsOn: service.dependsOn,
+          ...(record.serviceReadiness?.[service.name]
+            ? { readiness: record.serviceReadiness[service.name] }
+            : {}),
+          state,
+        };
+      }),
+    databases: [
+      ...(facts.database
+        ? [
+            {
+              kind: "postgres" as const,
+              name: facts.database.service,
+              version: facts.database.version,
+              location: `${facts.database.volume ?? "database"} volume`,
+              state,
+            },
+          ]
+        : []),
+      ...facts.volumes
+        .filter((volume) => volume.sqlite)
+        .map((volume) => ({
+          kind: "sqlite" as const,
+          name: usedBy(volume.mounts),
+          version: null,
+          location: volume.mounts[0].sqlite!,
+          state,
+        })),
+    ],
+    services: [],
+    queues: record.stack?.queues ?? [],
+    jobs: record.stack?.jobs ?? [],
+    volumes: facts.volumes.map((volume) => ({
+      name: volume.name,
+      usedBy: usedBy(volume.mounts),
+      mount:
+        volume.mounts.length === 1 && !volume.mounts[0].readOnly
+          ? volume.mounts[0].target
+          : volume.mounts
+              .map(
+                (m) =>
+                  `${m.service}: ${m.target} (${m.readOnly ? "read-only" : "read/write"})`,
+              )
+              .join(" · "),
+      ...(volume.mounts.length > 1 || volume.mounts.some((m) => m.readOnly)
+        ? { mounts: volume.mounts }
+        : {}),
+      kind: volume.kind,
+      state,
+    })),
+  };
+}
+
 export function stackOf(record: DeploymentRecord | null): ApplicationStack {
+  if (record?.native) return nativeStack(record);
   const plan = record?.plan;
   if (!record || !plan) return emptyStack;
   const runtime = deploymentRuntime(record);

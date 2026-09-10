@@ -5,6 +5,7 @@ const mock = vi.hoisted(() => ({
   create: vi.fn(),
   workspace: vi.fn(),
   execute: vi.fn(),
+  exportFiles: vi.fn(),
   dispose: vi.fn(),
 }));
 vi.mock("../../../src/server/deployment-store", () => ({
@@ -43,18 +44,43 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
       mock.workspace(options);
     }
     execute = mock.execute;
+    exportFiles = mock.exportFiles;
     dispose = mock.dispose;
   },
 }));
-import { planDeployment } from "../../../src/server/deployment-planner";
+import {
+  planDeployment,
+  planRelease,
+} from "../../../src/server/deployment-planner";
 import { PI_BUILTIN_TOOLS } from "../../../src/server/pi-workspace";
 import { callNativeToolsThroughSdk } from "../fixtures/native-tools";
 
-it("returns validation and execution feedback to the same Pi session, which corrects and resubmits", async () => {
+const selection = {
+  compose: ["./compose.yaml"],
+  summary: "Release the corrected worker entry point",
+};
+const source = { paths: ["compose.yaml"], read: async () => "" };
+const session = (prompt: () => Promise<void>) => ({
+  session: {
+    prompt,
+    waitForIdle: async () => {},
+    dispose: vi.fn(),
+    abort: vi.fn(),
+  },
+});
+type Tool = {
+  name: string;
+  execute: (...args: unknown[]) => Promise<{ content: { text: string }[] }>;
+};
+const tool = (options: { customTools: Tool[] }, name: string) =>
+  options.customTools.find((t) => t.name === name)!;
+
+it("returns selection, execution and inspection feedback to the same Pi session, which corrects and resubmits", async () => {
   const seen: unknown[] = [];
-  const first = queuePlan();
-  first.command = ["python", "wrong.py"];
-  const second = queuePlan();
+  const files = [
+    { path: "compose.yaml", mode: 0o644, content: Buffer.from("services: {}") },
+  ];
+  mock.exportFiles.mockReset().mockResolvedValue(files);
   const apply = vi
     .fn()
     .mockResolvedValueOnce({
@@ -64,65 +90,61 @@ it("returns validation and execution feedback to the same Pi session, which corr
       message: "python: can't open file wrong.py",
     })
     .mockResolvedValueOnce({ ok: true, message: "Verified" });
-  mock.create.mockImplementation(async (options) => ({
-    session: {
-      prompt: async () => {
-        const submit = options.customTools.find(
-          (t: { name: string }) => t.name === "deploy_release",
+  mock.create.mockImplementation(async (options) =>
+    session(async () => {
+      const send = async (args: unknown) => {
+        const result = await tool(options, "deploy_release").execute(
+          "call",
+          args,
         );
-        const send = async (json: string) => {
-          const result = await submit.execute("tool-call", { json });
-          const feedback = JSON.parse(result.content[0].text);
-          seen.push(feedback);
-          return feedback;
-        };
-        expect((await send("{")).retryable).toBe(true);
-        const failure = await send(JSON.stringify(first));
-        expect(failure.message).toContain("wrong.py");
-        expect(failure.retryable).toBe(true);
-        const diagnostic = options.customTools.find(
-          (t: { name: string }) => t.name === "inspect_release",
-        );
-        expect((await diagnostic.execute()).content[0].text).toContain(
-          "wrong.py",
-        );
-        expect((await send(JSON.stringify(second))).ok).toBe(true);
-        // A repeated call after success cannot redeploy.
-        await submit.execute("tool-call", { json: JSON.stringify(second) });
-      },
-      waitForIdle: async () => {},
-      dispose: vi.fn(),
-      abort: vi.fn(),
-    },
-  }));
-  const record = {
-    repository: "qa/example",
-    revision: "a".repeat(40),
-    requirements: "Update",
-  } as DeploymentRecord;
-  const result = await planDeployment(
-    [
-      {
-        path: "Dockerfile",
-        mode: 0o644,
-        content: Buffer.from("FROM python:3.12"),
-      },
-    ],
-    record,
+        const feedback = JSON.parse(result.content[0].text);
+        seen.push(feedback);
+        return feedback;
+      };
+      // A path outside the workspace is refused before any file is read.
+      expect(
+        await send({ ...selection, compose: ["../compose.yaml"] }),
+      ).toMatchObject({
+        ok: false,
+        retryable: true,
+      });
+      expect(mock.exportFiles).not.toHaveBeenCalled();
+      expect((await send(selection)).message).toContain("wrong.py");
+      expect(
+        (await tool(options, "inspect_release").execute()).content[0].text,
+      ).toContain("wrong.py");
+      expect((await send(selection)).ok).toBe(true);
+      // A repeated call after success cannot redeploy.
+      await tool(options, "deploy_release").execute("call", selection);
+    }),
+  );
+  await planRelease(
+    source,
+    { repository: "qa/example", requirements: "Update" } as DeploymentRecord,
     new AbortController().signal,
     {
+      revision: "a".repeat(40),
+      context: "",
+      workspaceFiles: [],
       apply,
       inspect: async () => ({ evidence: "Container exited: wrong.py missing" }),
+      reconcile: vi.fn(),
     },
   );
-  expect(result.command).toEqual(second.command);
   expect(apply).toHaveBeenCalledTimes(2);
+  // The exact exported bytes and normalized Compose order reach execution.
+  expect(apply.mock.calls[0][0].compose).toEqual(["compose.yaml"]);
+  expect(apply.mock.calls[0][1]).toBe(files);
+  expect(mock.exportFiles).toHaveBeenCalledWith(
+    ["compose.yaml"],
+    expect.any(Number),
+  );
   expect(mock.create).toHaveBeenCalledTimes(1);
   expect(seen).toHaveLength(3);
 });
 
-it("accepts verified reconciliation as completion without another deploy tool call", async () => {
-  const selected = queuePlan();
+it("accepts a completed reconciliation without another deploy tool call", async () => {
+  mock.exportFiles.mockReset().mockResolvedValue([]);
   const apply = vi.fn().mockResolvedValue({
     ok: false,
     kind: "transport",
@@ -131,41 +153,29 @@ it("accepts verified reconciliation as completion without another deploy tool ca
   });
   const reconcile = vi.fn().mockResolvedValue({
     ok: true,
-    verified: true,
-    plan: selected,
+    completed: true,
     message: "Verified existing containers",
   });
-  mock.create.mockImplementation(async (options) => ({
-    session: {
-      prompt: async () => {
-        const deploy = options.customTools.find(
-          (t: { name: string }) => t.name === "deploy_release",
-        );
-        const recovery = options.customTools.find(
-          (t: { name: string }) => t.name === "reconcile_release",
-        );
-        await deploy.execute("deploy", { json: JSON.stringify(selected) });
-        expect(
-          JSON.parse((await recovery.execute()).content[0].text).verified,
-        ).toBe(true);
-        await deploy.execute("duplicate", { json: JSON.stringify(selected) });
-      },
-      waitForIdle: async () => {},
-      dispose: vi.fn(),
-      abort: vi.fn(),
-    },
-  }));
-  await planDeployment(
-    [
-      {
-        path: "Dockerfile",
-        mode: 0o644,
-        content: Buffer.from("FROM python:3.12"),
-      },
-    ],
-    { repository: "qa/example", revision: "a".repeat(40) } as DeploymentRecord,
+  mock.create.mockImplementation(async (options) =>
+    session(async () => {
+      await tool(options, "deploy_release").execute("deploy", selection);
+      const recovered = await tool(options, "reconcile_release").execute();
+      expect(JSON.parse(recovered.content[0].text).completed).toBe(true);
+      await tool(options, "deploy_release").execute("duplicate", selection);
+    }),
+  );
+  await planRelease(
+    source,
+    { repository: "qa/example" } as DeploymentRecord,
     new AbortController().signal,
-    { apply, reconcile },
+    {
+      revision: "a".repeat(40),
+      context: "",
+      workspaceFiles: [],
+      apply,
+      inspect: vi.fn(),
+      reconcile,
+    },
   );
   expect(apply).toHaveBeenCalledTimes(1);
   expect(reconcile).toHaveBeenCalledTimes(1);

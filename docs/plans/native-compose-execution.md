@@ -1,6 +1,6 @@
 # Native Compose execution: implementation plan and handoff
 
-Updated: 10 September 2026. Status: Opus outline recorded (below); implementation in progress.
+Updated: 10 September 2026. Status: Opus candidate committed locally; awaiting Codex review and independent verification.
 
 ## Goal and ownership
 
@@ -77,9 +77,9 @@ CI is not a user gate. Run appropriate local checks once, repeat only for change
 - [x] Reviewed direction and consumer-fact ledger available.
 - [x] Next assignment isolated and explicitly delegated to Opus 5 High.
 - [x] Concrete implementation outline and lifecycle scope recorded by Opus.
-- [ ] Native artifact selection/resolution and generic effect feedback implemented.
-- [ ] Managed execution wired through the existing operation boundary.
-- [ ] Meaningful acceptance checks passed; remaining topology limits explicit.
+- [x] Native artifact selection/resolution and generic effect feedback implemented.
+- [x] Managed execution wired through the existing operation boundary.
+- [x] Meaningful local acceptance checks passed (unit, integration, opt-in Docker); remaining topology limits explicit. No real host or live model run.
 - [ ] Codex review and independent verification.
 - [ ] PR merged and next step recorded.
 
@@ -91,4 +91,12 @@ On a context reset: read this file, inspect Git state and the latest Opus report
 
 ## Latest implementation handoff
 
-Pending Opus implementation. Record decisions, changed files, validation, exact remaining work and concrete blockers here. Preserve the boundary between model-generated configuration, observed runtime and verified application behavior.
+Record decisions, changed files, validation, exact remaining work and concrete blockers here. Preserve the boundary between model-generated configuration, observed runtime and verified application behavior.
+
+**Opus candidate, 10 September 2026.** Exact commit, commands, results and file list: `tests/results/native-compose-execution/opus-report.md`. Not pushed or merged.
+
+- **Delivered.** Releases and their corrections are native Compose. Pi receives the running release under `.server-guy/current/` (configuration with private values as `${NAME}`, mounted/built files, records), authors Compose and packaging with its own tools, and calls `deploy_release` with file paths. The controller exports those exact bytes, refuses edits to repository files, and resolves them with the pinned Compose 2.40.3 in a networkless container, with sentinels standing in for private inputs. A retained controller override pins public image tags, names built images and labels revisions. The release envelope keeps artifacts, the resolved snapshot, resolver version and records; legacy hashes are unchanged. Derived facts serve scope comparison, verification, rollback, recreation, backup capture, stack/UI and operation facts for both representations. The same locked script, receipt, attempt budget and reconciliation execute the snapshot; rollback to legacy releases uses the legacy renderer.
+- **Lifecycle.** Observed-versus-verified runtime as outlined above. Releases keep a criterion whenever their baseline has one. A behavior failure after identity is established leaves an observed runtime; the failed operation's retry corrects forward under its own scope, and rollback still needs verified images. Existing queue semantics still block other proposals until that failed operation is retried.
+- **Unfinished, with reason.** No managed-host private check path, so worker-only/no-public-endpoint intake stays closed; that arrangement is proven only through the local executor as observed and updatable. An operation completing a criterion-less release settles `verified` at operation level while its evidence and the runtime say behavior is unverified; production cannot reach that state yet.
+- **Found and fixed.** The shared tar writer stamped every entry with mtime 0, so BuildKit kept earlier synced files whose size and mtime matched: a same-size source change between releases built stale content (reproduced; legacy releases were affected too). Release and initial-deployment bundles now carry the current time.
+- **For Codex to verify.** Real Pi authoring through `deploy_release` with the configured model; the existing-app update on a real host (Paperless-style managed PostgreSQL and private inputs); native recreation and backup capture on a host; the host backup runner's remaining `app`/`postgres` naming assumptions; historical image retention when a same-name rebuild moves a tag (the pre-activation image check fails safely).

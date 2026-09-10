@@ -24,6 +24,7 @@ const model = vi.hoisted(() => {
   ];
   return {
     plan: vi.fn(),
+    prepare: vi.fn(),
     execute: vi.fn(),
     verify: vi.fn(),
     ssh: vi.fn(),
@@ -32,7 +33,13 @@ const model = vi.hoisted(() => {
   };
 });
 vi.mock("../../../src/server/deployment-planner", () => ({
-  planDeployment: model.plan,
+  planRelease: model.plan,
+}));
+// Resolution runs the pinned Compose in Docker; the opt-in Docker proof
+// exercises it. Here Pi's selection resolves to a recorded configuration.
+vi.mock("../../../src/server/native-compose", async (original) => ({
+  ...(await original<object>()),
+  prepareNativeRelease: model.prepare,
 }));
 vi.mock("../../../src/server/deployment-source", () => ({
   checkDeploymentSource: async () => ({ token: "synthetic" }),
@@ -105,6 +112,13 @@ import type {
   DeploymentRecord,
 } from "../../../src/server/deployment-types";
 import type { StoredOperation } from "../../../src/server/operation-types";
+import { rollbackSelection } from "../../../src/server/rollback";
+import type { NativeConfiguration } from "../../../src/server/deployment-release";
+import {
+  currentFacts,
+  planFacts,
+  releaseFacts,
+} from "../../../src/server/release-facts";
 let template: string, root: string, app: string, chat: string;
 // One schema push per file; each test starts from its own copy.
 beforeAll(() => {
@@ -130,6 +144,60 @@ function plan() {
     },
   ];
   return p;
+}
+const REVISION = "b".repeat(40);
+const selection = () => ({
+  compose: ["compose.yaml"],
+  summary: "The example application in native Compose",
+});
+/** What resolution retains for the example application's one service. */
+function native(
+  deploymentId: string,
+  change: (app: Record<string, unknown>) => void = () => {},
+): NativeConfiguration {
+  const project = `sg-${deploymentId.slice(0, 8)}`;
+  const app: Record<string, unknown> = {
+    build: { context: ".", dockerfile: "Dockerfile" },
+    image: `server-guy-${deploymentId}-app:${REVISION}`,
+    command: ["python", "app.py", "web"],
+    ports: [{ target: 8080, published: "80", protocol: "tcp" }],
+    volumes: [{ type: "volume", source: "data", target: "/data" }],
+    labels: { "server-guy.revision": REVISION },
+  };
+  change(app);
+  return {
+    format: 1,
+    resolver: "docker compose 2.40.3",
+    compose: ["compose.yaml", ".server-guy/override.compose.json"],
+    files: [],
+    resolved: {
+      name: project,
+      services: { app },
+      volumes: { data: { name: `${project}_data` } },
+    },
+    inputs: [],
+    data: [{ volume: "data", kind: "database", sqlite: "app.sqlite" }],
+    database: null,
+    httpAccess: "public",
+    criterion: planFacts(plan(), deploymentId, REVISION).criterion,
+    summary: "The example application in native Compose",
+  };
+}
+const published = (app: Record<string, unknown>) => {
+  delete app.build;
+  app.image = `ghcr.io/qa/example@sha256:${"c".repeat(64)}`;
+};
+/** The record transition executeRelease makes before contacting the host. */
+function adopt(r: DeploymentRecord, release: DeploymentRelease) {
+  if (release.native) {
+    r.native = release.native;
+    r.plan = null;
+  } else {
+    r.plan = release.plan;
+    delete r.native;
+  }
+  r.revision = release.revision;
+  r.releaseId = release.id;
 }
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "sg-release-state-"));
@@ -166,6 +234,9 @@ beforeEach(() => {
     "synthetic-private-password",
   );
   vi.clearAllMocks();
+  model.prepare.mockImplementation(async ({ deploymentId }) =>
+    native(deploymentId),
+  );
 });
 afterEach(() => {
   globalThis.__serverGuyDb?.$client.close();
@@ -185,12 +256,13 @@ it("one scope authorizes a failed image configuration and a corrected source bui
   const deploymentId = (tracked.command as { scope: { deploymentId: string } })
     .scope.deploymentId;
   const initialReceipt = operation(`deployment:${deploymentId}`)!;
+  model.prepare.mockImplementationOnce(async ({ deploymentId }) =>
+    native(deploymentId, published),
+  );
   model.execute.mockImplementation(async (r, release) => {
     recordOperationRemoteEffect();
     invalidateDeploymentRuntime(r);
-    r.plan = release.plan;
-    r.revision = release.revision;
-    r.releaseId = release.id;
+    adopt(r, release);
     const attempt = r.lifecycle.attempts.at(-1);
     attempt.remoteResult = {
       phase: "replace",
@@ -210,25 +282,30 @@ it("one scope authorizes a failed image configuration and a corrected source bui
     return { evidence: "Verified new revision" };
   });
   model.plan.mockImplementation(async (_files, r, _signal, options) => {
-    const wrong = plan();
-    wrong.image = "ghcr.io/qa/example:1";
-    wrong.command = ["python", "wrong.py"];
-    const feedback = await options.apply(wrong);
+    // Pi starts from the running release's configuration and records.
+    expect(
+      options.workspaceFiles.map((file: { path: string }) => file.path),
+    ).toEqual(
+      expect.arrayContaining([
+        ".server-guy/current/compose.json",
+        ".server-guy/current/release.json",
+      ]),
+    );
+    const feedback = await options.apply(selection(), []);
     expect(feedback).toMatchObject({
       ok: false,
       retryable: true,
       kind: "replace",
     });
     expect(feedback.message).toContain("wrong.py");
-    // Planning and a published image need no executable source archive.
+    // A published image needs no executable source archive.
     expect(model.archive).not.toHaveBeenCalled();
     expect(getDeployment(r.id)!.lifecycle!.runtime.lastVerified!.revision).toBe(
       "a".repeat(40),
     );
     expect(getDeployment(r.id)!.lifecycle!.runtime.state).toBe("unknown");
     expect(operation(started.id)!.approvedAt).toBe(started.approvedAt);
-    expect((await options.apply(plan())).ok).toBe(true);
-    return plan();
+    expect((await options.apply(selection(), [])).ok).toBe(true);
   });
   await executeOperation(started, () =>
     runApplicationRelease(started, new AbortController().signal),
@@ -239,20 +316,27 @@ it("one scope authorizes a failed image configuration and a corrected source bui
     "failed",
     "verified",
   ]);
-  expect(saved.lifecycle!.runtime.lastVerified!.revision).toBe("b".repeat(40));
+  expect(saved.lifecycle!.runtime.lastVerified!.revision).toBe(REVISION);
   expect(saved.lifecycle!.runtime.state).toBe("verified");
   expect(saved.serverId).toBe(7);
+  expect(saved.plan).toBeNull();
+  expect(saved.native).toEqual(saved.lifecycle!.releases.at(-1)!.native);
   expect(operation(initialReceipt.id)).toEqual(initialReceipt);
   expect(operation(started.id)!.state).toBe("verified");
+  // Resolution compared against the authorized baseline's derived facts.
+  expect(model.prepare.mock.calls[0][0]).toMatchObject({
+    revision: REVISION,
+    baseline: { exposure: [{ service: "app", published: "80" }] },
+  });
   const [image, build] = model.execute.mock.calls;
-  expect(image[1].plan.image).toBe(
+  expect(image[1].native.resolved.services.app.image).toBe(
     `ghcr.io/qa/example@sha256:${"c".repeat(64)}`,
   );
   expect(image[2]).toEqual([]);
   expect(model.archive).toHaveBeenCalledTimes(1);
   expect(model.archive).toHaveBeenCalledWith(
     "qa/example",
-    "b".repeat(40),
+    REVISION,
     "synthetic",
     expect.any(AbortSignal),
   );
@@ -272,11 +356,11 @@ it("returns an unknown remote outcome to Pi but refuses another execution", asyn
     );
   });
   model.plan.mockImplementation(async (_files, _r, _signal, options) => {
-    expect(await options.apply(plan())).toMatchObject({
+    expect(await options.apply(selection(), [])).toMatchObject({
       ok: false,
       retryable: false,
     });
-    const blocked = await options.apply(plan());
+    const blocked = await options.apply(selection(), []);
     expect(blocked).toMatchObject({
       ok: false,
       retryable: false,
@@ -312,11 +396,11 @@ it("bounds executions per approval and gives an explicit retry a fresh budget", 
   });
   model.plan.mockImplementation(async (_files, _r, _signal, options) => {
     for (let i = 0; i < 3; i++)
-      expect(await options.apply(plan())).toMatchObject({
+      expect(await options.apply(selection(), [])).toMatchObject({
         ok: false,
         retryable: true,
       });
-    expect(await options.apply(plan())).toMatchObject({
+    expect(await options.apply(selection(), [])).toMatchObject({
       ok: false,
       retryable: false,
       kind: "authorization",
@@ -332,7 +416,7 @@ it("bounds executions per approval and gives an explicit retry a fresh budget", 
   const failed = operation(started.id)!;
   const retried = retryOperation(failed.id, failed.updatedAt);
   model.plan.mockImplementation(async (_files, _r, _signal, options) => {
-    expect(await options.apply(plan())).toMatchObject({
+    expect(await options.apply(selection(), [])).toMatchObject({
       ok: false,
       retryable: true,
       kind: "build",
@@ -354,9 +438,7 @@ it("reconciles a lost successful result and verifies without a second replacemen
   model.execute.mockImplementation(async (r, release) => {
     recordOperationRemoteEffect();
     invalidateDeploymentRuntime(r);
-    r.plan = release.plan;
-    r.revision = release.revision;
-    r.releaseId = release.id;
+    adopt(r, release);
     saveDeployment(r);
     throw new ReleaseExecutionError("Lost result", false, "transport");
   });
@@ -381,14 +463,14 @@ it("reconciles a lost successful result and verifies without a second replacemen
     return { evidence: "Verified recovered release" };
   });
   model.plan.mockImplementation(async (_files, r, _signal, options) => {
-    expect(await options.apply(plan())).toMatchObject({
+    expect(await options.apply(selection(), [])).toMatchObject({
       ok: false,
       retryable: false,
     });
     originalAttempt = structuredClone(r.lifecycle.attempts.at(-1));
     expect(await options.reconcile()).toMatchObject({
       ok: true,
-      verified: true,
+      completed: true,
     });
     return plan();
   });
@@ -422,9 +504,7 @@ it.each(["unreadable", "mismatch"])(
     model.execute.mockImplementation(async (r, release) => {
       recordOperationRemoteEffect();
       invalidateDeploymentRuntime(r);
-      r.plan = release.plan;
-      r.revision = release.revision;
-      r.releaseId = release.id;
+      adopt(r, release);
       saveDeployment(r);
       throw new ReleaseExecutionError("Lost result", false, "transport");
     });
@@ -440,12 +520,12 @@ it.each(["unreadable", "mismatch"])(
       });
     });
     model.plan.mockImplementation(async (_files, _r, _signal, options) => {
-      await options.apply(plan());
+      await options.apply(selection(), []);
       expect(await options.reconcile()).toMatchObject({
         ok: false,
         retryable: false,
       });
-      expect(await options.apply(plan())).toMatchObject({
+      expect(await options.apply(selection(), [])).toMatchObject({
         ok: false,
         retryable: false,
       });
@@ -470,9 +550,7 @@ it("an explicitly retried operation reconciles a known failure before another ex
   model.execute.mockImplementation(async (r, release) => {
     recordOperationRemoteEffect();
     invalidateDeploymentRuntime(r);
-    r.plan = release.plan;
-    r.revision = release.revision;
-    r.releaseId = release.id;
+    adopt(r, release);
     if (model.execute.mock.calls.length === 1) {
       saveDeployment(r);
       throw new ReleaseExecutionError("Lost build reply", false, "transport");
@@ -488,7 +566,7 @@ it("an explicitly retried operation reconciles a known failure before another ex
     return { evidence: "Verified corrected release" };
   });
   model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
-    await options.apply(plan());
+    await options.apply(selection(), []);
     throw new Error("Connection unavailable");
   });
   await expect(
@@ -509,7 +587,7 @@ it("an explicitly retried operation reconciles a known failure before another ex
     });
   });
   model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
-    expect(await options.apply(plan())).toMatchObject({
+    expect(await options.apply(selection(), [])).toMatchObject({
       ok: false,
       retryable: false,
     });
@@ -518,7 +596,7 @@ it("an explicitly retried operation reconciles a known failure before another ex
       ok: true,
       retryable: true,
     });
-    expect(await options.apply(plan())).toMatchObject({ ok: true });
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
     return plan();
   });
   await executeOperation(retried, () =>
@@ -553,11 +631,6 @@ const rollBack = (releaseId: string, compatibilityEvidence = EVIDENCE) =>
     releaseId,
     compatibilityEvidence,
   });
-function v2Plan() {
-  const p = plan();
-  p.command = ["python", "app.py", "v2"];
-  return p;
-}
 /** v1 is live and verified with the image digests the host reported. */
 function verifiedV1(
   change: (p: DeploymentPlan) => void = () => {},
@@ -580,12 +653,14 @@ function replaced(image = V2) {
   ) => {
     recordOperationRemoteEffect();
     invalidateDeploymentRuntime(r);
-    const images =
-      rollback ?? observed(release.plan, image, r.serviceImages?.postgres);
+    const images = rollback ?? {
+      app: image,
+      ...(r.serviceImages?.postgres
+        ? { postgres: r.serviceImages.postgres }
+        : {}),
+    };
+    adopt(r, release);
     Object.assign(r, {
-      plan: release.plan,
-      revision: release.revision,
-      releaseId: release.id,
       serviceImages: structuredClone(images),
       imageId: images.app,
       verifiedAt: new Date().toISOString(),
@@ -606,8 +681,7 @@ async function releasedV2() {
   const started = startChange(proposed.id, proposed.updatedAt);
   model.execute.mockImplementationOnce(replaced());
   model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
-    expect(await options.apply(v2Plan())).toMatchObject({ ok: true });
-    return v2Plan();
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
   });
   await run(started);
   vi.clearAllMocks();
@@ -697,7 +771,10 @@ it("rolls back to the exact earlier release and recorded images on the same host
     address: "203.0.113.7",
     revision: v1.revision,
   });
-  expect(saved.plan!.volumes).toEqual(v2.plan.volumes);
+  // Data identity and access are unchanged across both representations.
+  expect(currentFacts(saved)!.volumes).toEqual(
+    releaseFacts(v2, saved.id).volumes,
+  );
   expect(saved.lifecycle!.runtime).toMatchObject({
     state: "verified",
     lastVerified: {
@@ -818,11 +895,7 @@ it("refuses rollback to a never-verified or current release, or without a compat
     .mockImplementationOnce(async (r, release) => {
       recordOperationRemoteEffect();
       invalidateDeploymentRuntime(r);
-      Object.assign(r, {
-        plan: release.plan,
-        revision: release.revision,
-        releaseId: release.id,
-      });
+      adopt(r, release);
       r.lifecycle.attempts.at(-1).remoteResult = {
         phase: "replace",
         exitCode: 1,
@@ -832,12 +905,12 @@ it("refuses rollback to a never-verified or current release, or without a compat
       throw new ReleaseExecutionError("Unknown entry point", true, "replace");
     })
     .mockImplementationOnce(replaced());
+  model.prepare.mockImplementationOnce(async ({ deploymentId }) =>
+    native(deploymentId, (app) => (app.command = ["python", "wrong.py"])),
+  );
   model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
-    const wrong = v2Plan();
-    wrong.command = ["python", "wrong.py"];
-    expect(await options.apply(wrong)).toMatchObject({ ok: false });
-    expect(await options.apply(v2Plan())).toMatchObject({ ok: true });
-    return v2Plan();
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: false });
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
   });
   await run(started);
   const current = applicationDeployment(app)!;
@@ -869,12 +942,8 @@ it("reconciles a lost rollback reply before any repeat and never replaces again"
     async (r, release, _files, _signal, images) => {
       recordOperationRemoteEffect();
       invalidateDeploymentRuntime(r);
-      Object.assign(r, {
-        plan: release.plan,
-        revision: release.revision,
-        releaseId: release.id,
-        serviceImages: structuredClone(images),
-      });
+      adopt(r, release);
+      r.serviceImages = structuredClone(images);
       saveDeployment(r);
       throw new ReleaseExecutionError("Lost result", false, "transport");
     },
@@ -924,5 +993,72 @@ it("reconciles a lost rollback reply before any repeat and never replaces again"
   expect(operation(recovered.id)).toMatchObject({
     state: "verified",
     blocksQueue: false,
+  });
+});
+
+it("a release that ran but failed its behavior stays observed; its retry fixes it forward, and it is never a rollback target", async () => {
+  verifiedV1();
+  const proposed = await proposeApplicationRelease(app, chat);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementationOnce(async (r, release) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.serviceImages = { app: V2 };
+    r.lifecycle.attempts.at(-1).remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    // Identity and readiness were observed; the behavior check then failed.
+    throw new ReleaseExecutionError(
+      "Application behavior check failed: Version (HTTP 500).",
+      true,
+      "verification",
+      true,
+    );
+  });
+  model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection(), [])).toMatchObject({
+      ok: false,
+      kind: "verification",
+    });
+    throw new Error("Pi stopped: the new revision misbehaves.");
+  });
+  await expect(run(started)).rejects.toThrow("misbehaves");
+  const broken = applicationDeployment(app)!;
+  const [v1, v2] = broken.lifecycle!.releases;
+  expect(broken.lifecycle!.runtime).toMatchObject({
+    state: "observed",
+    lastVerified: { releaseId: v1.id },
+    observed: { releaseId: v2.id, behavior: "failed", images: { app: V2 } },
+  });
+  // It can return to verified images but is never a rollback target itself.
+  expect(rollbackSelection(broken, v1.id, EVIDENCE).images).toEqual({
+    app: V1,
+  });
+  expect(() => rollbackSelection(broken, v2.id, EVIDENCE)).toThrow(
+    "verified images",
+  );
+  // The operation's retry corrects forward from the observed runtime.
+  const failed = operation(started.id)!;
+  const retried = retryOperation(failed.id, failed.updatedAt);
+  model.prepare.mockImplementationOnce(async ({ deploymentId }) =>
+    native(deploymentId, (app) => (app.command = ["python", "app.py", "fix"])),
+  );
+  model.execute.mockImplementationOnce(replaced(digest("3")));
+  model.plan.mockImplementationOnce(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
+  });
+  await run(retried);
+  const fixed = applicationDeployment(app)!;
+  expect(fixed.lifecycle!.attempts.slice(-2).map((a) => a.outcome)).toEqual([
+    "failed",
+    "verified",
+  ]);
+  expect(fixed.lifecycle!.runtime).toMatchObject({
+    state: "verified",
+    lastVerified: { images: { app: digest("3") } },
   });
 });

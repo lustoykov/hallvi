@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts } from "@/server/release-facts";
 import { ArrowSquareOut } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
@@ -255,7 +256,7 @@ export function ApplicationSectionView({
             >
               Open application <ArrowSquareOut aria-hidden="true" />
             </a>
-            {deployment?.plan?.httpAccess === "controller" && (
+            {currentFacts(deployment ?? null)?.httpAccess === "controller" && (
               <small>Restricted to the controller’s network</small>
             )}
           </div>

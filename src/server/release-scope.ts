@@ -1,5 +1,7 @@
-import type { DeploymentPlan, DeploymentRecord } from "./deployment-types";
+import type { DeploymentRecord } from "./deployment-types";
 import { releaseOf } from "./deployment-release";
+import { establishedRuntime } from "./deployment-runtime";
+import { releaseFacts, type ReleaseFacts } from "./release-facts";
 
 /** One task, one existing host, one selected revision, no new spending. */
 export interface ReleaseScope {
@@ -22,10 +24,68 @@ export interface ReleaseScope {
 }
 export class ReleaseScopeError extends Error {}
 
+/**
+ * Effects a release may not change without a separate decision. Ordinary
+ * configuration, commands, builds and service additions are corrections.
+ */
+export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
+  const problems: string[] = [];
+  const listener = (item: ReleaseFacts["exposure"][number]) =>
+    `${item.service} ${item.hostIp || "*"}:${item.published || "(any)"}/${item.protocol}`;
+  const before = new Set(baseline.exposure.map(listener));
+  const after = new Set(next.exposure.map(listener));
+  const added = [...after].filter((item) => !before.has(item));
+  const removed = [...before].filter((item) => !after.has(item));
+  if (added.length || removed.length || baseline.httpAccess !== next.httpAccess)
+    problems.push(
+      `This release scope does not permit changing public network exposure${[
+        added.length ? ` (adds ${added.join(", ")})` : "",
+        removed.length ? ` (removes ${removed.join(", ")})` : "",
+        baseline.httpAccess !== next.httpAccess
+          ? ` (HTTP access ${baseline.httpAccess} → ${next.httpAccess})`
+          : "",
+      ].join("")}.`,
+    );
+  const database = baseline.database;
+  if (
+    database &&
+    (next.database?.service !== database.service ||
+      next.database.version !== database.version ||
+      next.database.image !== database.image)
+  )
+    problems.push(
+      `Removing or upgrading the managed database (${database.service}, ${database.image}) needs a separate data-change decision.`,
+    );
+  for (const volume of baseline.volumes) {
+    const kept = next.volumes.find(
+      (item) =>
+        item.dockerName === volume.dockerName &&
+        item.kind === volume.kind &&
+        item.sqlite === volume.sqlite,
+    );
+    if (
+      !kept ||
+      volume.mounts.some(
+        (mount) =>
+          !kept.mounts.some(
+            (item) =>
+              item.service === mount.service &&
+              item.target === mount.target &&
+              item.readOnly === mount.readOnly,
+          ),
+      )
+    )
+      problems.push(
+        `Preserve volume ${volume.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
+      );
+  }
+  return problems;
+}
+
 export function assertReleaseScope(
   record: DeploymentRecord,
   scope: ReleaseScope,
-  plan: DeploymentPlan,
+  candidate: ReleaseFacts,
 ) {
   if (
     record.id !== scope.deploymentId ||
@@ -38,11 +98,18 @@ export function assertReleaseScope(
     throw new ReleaseScopeError(
       "The application, source or host changed. Review a new release scope.",
     );
+  // Retries under this authorization may replace their own observed runtime.
+  const established = establishedRuntime(record.lifecycle.runtime);
   if (
-    record.lifecycle.runtime.lastVerified?.releaseId !== scope.baselineReleaseId
+    established?.releaseId !== scope.baselineReleaseId &&
+    !record.lifecycle.attempts.some(
+      (attempt) =>
+        attempt.id === established?.attemptId &&
+        attempt.authorizationId === scope.id,
+    )
   )
     throw new ReleaseScopeError(
-      "A different release has been verified since this scope was proposed. Review the update again.",
+      "A different release has been established since this scope was proposed. Review the update again.",
     );
   const baseline = record.lifecycle.releases.find(
     (r) => r.id === scope.baselineReleaseId,
@@ -51,36 +118,9 @@ export function assertReleaseScope(
     throw new ReleaseScopeError(
       "The baseline release is unavailable. Reconcile its identity first.",
     );
-  if ((plan.httpAccess ?? "public") !== (baseline.plan.httpAccess ?? "public"))
-    throw new ReleaseScopeError(
-      "This release scope does not permit changing public network exposure.",
-    );
-  if (
-    baseline.plan.postgres &&
-    baseline.plan.postgres.version !== plan.postgres?.version
-  )
-    throw new ReleaseScopeError(
-      "Removing or upgrading the managed database needs a separate data-change decision.",
-    );
-  const mounts = (p: DeploymentPlan) =>
-    [{ name: "app", volumes: p.volumes ?? [] }, ...(p.services ?? [])].flatMap(
-      (s) => s.volumes.map((v) => ({ service: s.name, ...v })),
-    );
-  const next = mounts(plan);
-  for (const before of mounts(baseline.plan)) {
-    if (
-      !next.some(
-        (after) =>
-          after.name === before.name &&
-          after.service === before.service &&
-          after.target === before.target &&
-          after.kind === before.kind &&
-          after.sqlite === before.sqlite &&
-          Boolean(after.readOnly) === Boolean(before.readOnly),
-      )
-    )
-      throw new ReleaseScopeError(
-        `Preserve volume ${before.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
-      );
-  }
+  const problems = scopeDifferences(
+    releaseFacts(baseline, record.id),
+    candidate,
+  );
+  if (problems.length) throw new ReleaseScopeError(problems.join(" "));
 }

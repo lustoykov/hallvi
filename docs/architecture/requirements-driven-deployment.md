@@ -207,6 +207,8 @@ Use a compact matrix, not a combinatorial test suite:
 
 Reuse existing Docker/operation tests and add only coverage for these new boundaries. Handle tests locally; delegate to Opus only when the owner explicitly requests it. Local Docker remains useful but cannot substitute for the final remote/Pi proof. No implementation or test changes are part of this design-only task.
 
+**Implementation status (10 September 2026):** releases now execute Pi-selected native Compose through the managed path, with observed-versus-verified baselines; initial intake remains the legacy plan and the private check path is not built. Evidence and limits: [execution plan](../plans/native-compose-execution.md).
+
 ## Review questions (addressed in Fable review 3; retain for the proof)
 
 1. Revisit the earlier recommendation to retain a normalized executable service model: can native Compose artifacts, derived inventory and the existing protection records preserve the same guarantees with less code? Identify a concrete missing fact or execution guarantee rather than assuming a complete custom schema is necessary.

@@ -123,8 +123,8 @@ export async function reconcileRelease(
     );
     return {
       ok: true,
-      verified: true,
-      plan: release.plan,
+      completed: true,
+      behavior: result.behavior,
       message: `${result.evidence} Reconciled the completed host command without rebuilding or restarting containers.`,
     };
   } catch (error) {

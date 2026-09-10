@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts } from "@/server/release-facts";
 import { ArrowRight } from "@phosphor-icons/react";
 
 import {
@@ -48,16 +49,7 @@ const groups = [
 export function VariablesView(props: ViewProps) {
   const { deployment, facts, now, operations } = props;
   const variables = facts.variables;
-  const fallback = [
-    ...new Set([
-      ...(deployment?.plan?.environment.map((item) => item.name) ?? []),
-      ...(deployment?.plan?.missingInputs.map((item) => item.name) ?? []),
-      ...(deployment?.plan?.inputBindings?.map((item) => item.variable) ?? []),
-      ...(deployment?.plan?.postgres?.variable
-        ? [deployment.plan.postgres.variable]
-        : []),
-    ]),
-  ];
+  const fallback = currentFacts(deployment ?? null)?.variables ?? [];
   if (!variables)
     return (
       <>

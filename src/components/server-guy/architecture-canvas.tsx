@@ -1,5 +1,6 @@
 "use client";
 
+import { currentFacts } from "@/server/release-facts";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowCounterClockwise, Pause, Play } from "@phosphor-icons/react";
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -105,7 +106,8 @@ export function ArchitectureCanvas({
           : "unknown";
     return "unknown";
   };
-  const postgres = deployment?.plan?.postgres;
+  const configuration = currentFacts(deployment ?? null);
+  const postgres = configuration?.database;
   const sqlite = stack?.databases.find((item) => item.kind === "sqlite");
   const service = stack?.services[0];
   const workers = stack?.processes.filter((item) => item.name !== "app");
@@ -130,7 +132,7 @@ export function ArchitectureCanvas({
       tone: toneOf("http"),
       destination: "processes" as ApplicationSection,
       description: deployment?.url
-        ? `Address: ${deployment.url}. ${deployment.plan?.httpAccess === "controller" ? "HTTP is restricted to the controller’s network. " : "Public HTTP. "}${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
+        ? `Address: ${deployment.url}. ${configuration?.httpAccess === "controller" ? "HTTP is restricted to the controller’s network. " : "Public HTTP. "}${deployment?.verifiedAt ? `Last verified ${formatTimestamp(deployment.verifiedAt)}.` : "Not externally verified yet."}`
         : "Your application's runtime will appear here once a deployment is recorded.",
     },
     {
@@ -217,9 +219,10 @@ export function ArchitectureCanvas({
     {
       from: "source",
       to: "app",
-      label: deployment?.plan?.image
-        ? "Configuration revision"
-        : "Build from revision",
+      label:
+        configuration && !configuration.services.some((s) => s.build)
+          ? "Configuration revision"
+          : "Build from revision",
       vertical: false,
     },
     { from: "app", to: "host", label: "Docker Compose", vertical: false },
