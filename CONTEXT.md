@@ -50,7 +50,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Release**: A selected immutable source/image identity and deployment configuration intended to run for an Application.
 
-**Deployment attempt (Deployment in existing code)**: An attempt to put a specific release into the application's runtime and verify it. A failed attempt does not identify which release is serving.
+**Deployment attempt**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same.
+
+**Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
 
 **Operability change**: A change needed to run or check the application, such as its start entrypoint or environment-driven port. Application-code changes in this category require an owner-merged PR.
 

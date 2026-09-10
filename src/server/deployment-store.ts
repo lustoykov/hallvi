@@ -1,4 +1,10 @@
 import {
+  beginDeploymentAttempt,
+  finishDeploymentAttempt,
+  syncDeploymentHost,
+} from "./deployment-lifecycle";
+import { redactSecrets } from "./secrets";
+import {
   syncDeploymentOperation,
   operation,
   cancelOperation,
@@ -63,6 +69,28 @@ export function saveDeployment(record: DeploymentRecord) {
         ),
       );
       if (mentions.size) record.mentions = [...mentions.values()];
+      // Completed outcomes and selected releases are retained, not rewritten
+      // by a retry or an unrelated save of the legacy executor workspace.
+      for (const key of ["releases", "attempts"] as const) {
+        for (const [index, entry] of (
+          latest.lifecycle?.[key] ?? []
+        ).entries()) {
+          if (
+            key === "attempts" &&
+            "outcome" in entry &&
+            entry.outcome === "working"
+          )
+            continue;
+          if (
+            JSON.stringify(record.lifecycle?.[key][index]) !==
+            JSON.stringify(entry)
+          )
+            throw new Error(
+              "Recorded releases and completed attempts cannot be rewritten.",
+            );
+        }
+      }
+      syncDeploymentHost(record);
       record.updatedAt = new Date().toISOString();
       const result = db()
         .update(deployments)
@@ -255,9 +283,47 @@ export function interruptDeployments() {
     )
       continue;
     remember(body);
+    const active = body.lifecycle?.attempts.at(-1);
+    if (active?.outcome === "working")
+      finishDeploymentAttempt(
+        body,
+        active.id,
+        "interrupted",
+        "The deployment worker stopped.",
+      );
     body.status = "failed";
     body.error =
       "The worker stopped. Retry to reconcile this same deployment; a new server will not be purchased blindly.";
     saveDeployment(body);
+  }
+}
+
+/** The existing CAS save makes attempt, host and runtime transitions atomic. */
+export async function runDeploymentAttempt<T>(
+  record: DeploymentRecord,
+  kind: "deploy" | "recreate",
+  operationId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const attempt = beginDeploymentAttempt(record, kind, operationId);
+  saveDeployment(record);
+  try {
+    const result = await work();
+    finishDeploymentAttempt(record, attempt.id, "verified");
+    if (kind === "deploy") record.status = "live";
+    saveDeployment(record);
+    return result;
+  } catch (error) {
+    if (error instanceof DeploymentConflictError) throw error;
+    finishDeploymentAttempt(
+      record,
+      attempt.id,
+      "failed",
+      redactSecrets(
+        error instanceof Error ? error.message : "Deployment attempt failed.",
+      ).text.slice(0, 2000),
+    );
+    saveDeployment(record);
+    throw error;
   }
 }

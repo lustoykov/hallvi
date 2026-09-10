@@ -1,5 +1,6 @@
 "use client";
 
+import { deploymentRuntime } from "@/server/deployment-runtime";
 import { useState } from "react";
 import { LocalTime } from "./local-time";
 import type { DeploymentRecord } from "@/server/deployment-types";
@@ -54,6 +55,16 @@ export function DeploymentPanel({
       setBusy(false);
     }
   }
+  const runtime = deploymentRuntime(record);
+  const lastVerified = runtime.lastVerified;
+  const verifiedAt =
+    lastVerified?.checkedAt ??
+    (runtime.state === "verified" ? record?.verifiedAt : null);
+  const verifiedRelease = record?.lifecycle?.releases.find(
+    (release) => release.id === lastVerified?.releaseId,
+  );
+  const verifiedPlan = verifiedRelease?.plan ?? record?.plan;
+  const latestAttempt = record?.lifecycle?.attempts.at(-1);
   const working =
     record &&
     ["queued", "planning", "deploy-queued", "deploying"].includes(
@@ -112,37 +123,56 @@ export function DeploymentPanel({
       {record && (
         <>
           <h2>
-            {record.status === "live"
-              ? "Deployment verified"
-              : working
-                ? "Working on your deployment"
-                : record.status === "failed"
-                  ? "Needs attention"
-                  : "Recommendation waiting for your approval"}
+            {runtime.state === "unknown"
+              ? "Runtime needs verification"
+              : record.status === "live"
+                ? "Deployment verified"
+                : working
+                  ? "Working on your deployment"
+                  : record.status === "failed"
+                    ? "Needs attention"
+                    : "Recommendation waiting for your approval"}
           </h2>
-          {record.status === "live" && record.verifiedAt && (
+          {runtime.state === "unknown" && (
+            <p>
+              A deployment change may have reached the host. Follow the latest
+              operation in the conversation to reconcile it; earlier
+              verification does not establish what is running now.
+            </p>
+          )}
+          {latestAttempt && (
+            <p>
+              Latest attempt:{" "}
+              {latestAttempt.kind === "recreate"
+                ? "container recreation"
+                : latestAttempt.kind === "legacy"
+                  ? "imported deployment"
+                  : "deployment"}{" "}
+              · {latestAttempt.outcome}.
+            </p>
+          )}
+          {verifiedAt && (
             <div className="sg-deployment-summary">
               <p>
-                Last verified <LocalTime value={record.verifiedAt} />. This is a
+                Last verified <LocalTime value={verifiedAt} />. This is a
                 recorded check, not continuous monitoring.
               </p>
               <dl className="sg-section-facts">
                 <div>
-                  <dt>
-                    {record.plan?.image
-                      ? "Configuration revision"
-                      : "Serving revision"}
-                  </dt>
+                  <dt>Last verified revision</dt>
                   <dd>
                     <code>
-                      {record.revision?.slice(0, 12) ?? "Not recorded"}
+                      {(lastVerified?.revision ?? record.revision)?.slice(
+                        0,
+                        12,
+                      ) ?? "Not recorded"}
                     </code>
                   </dd>
                 </div>
                 <div>
                   <dt>Runtime</dt>
                   <dd>
-                    {record.plan?.image
+                    {verifiedPlan?.image
                       ? "Pinned container image"
                       : "Built from source"}
                   </dd>
@@ -158,7 +188,7 @@ export function DeploymentPanel({
                 <div>
                   <dt>HTTP access</dt>
                   <dd>
-                    {record.plan?.httpAccess === "controller"
+                    {verifiedPlan?.httpAccess === "controller"
                       ? "Restricted to the controller’s network"
                       : "Public"}
                   </dd>
@@ -170,6 +200,55 @@ export function DeploymentPanel({
             <p className="sg-deployment-error" role="alert">
               {record.error}
             </p>
+          )}
+          {record.lifecycle && (
+            <details>
+              <summary>
+                {record.lifecycle.attempts.length} deployment{" "}
+                {record.lifecycle.attempts.length === 1
+                  ? "attempt"
+                  : "attempts"}{" "}
+                · {record.lifecycle.releases.length}{" "}
+                {record.lifecycle.releases.length === 1
+                  ? "release"
+                  : "releases"}
+              </summary>
+              <p>
+                A release is the selected source and configuration. Retrying or
+                recreating it adds an attempt on the same host.
+              </p>
+              <ol className="sg-deployment-timeline">
+                {record.lifecycle.attempts.map((attempt) => (
+                  <li key={attempt.id}>
+                    <strong>
+                      {attempt.kind === "recreate"
+                        ? "Recreate containers"
+                        : attempt.kind === "legacy"
+                          ? "Imported deployment"
+                          : "Deploy release"}{" "}
+                      · {attempt.outcome}
+                    </strong>
+                    <div>
+                      Release <code>{attempt.releaseId.slice(0, 12)}</code> ·{" "}
+                      <LocalTime
+                        value={attempt.finishedAt ?? attempt.startedAt}
+                      />
+                    </div>
+                    {attempt.error && (
+                      <p className="sg-deployment-error">{attempt.error}</p>
+                    )}
+                    {(attempt.outcome === "failed" ||
+                      attempt.outcome === "interrupted") && (
+                      <div>
+                        {attempt.remoteStartedAt
+                          ? "Remote changes may have occurred."
+                          : "Stopped before remote changes."}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </details>
           )}
           {record.events.length > 0 && (
             <details open={Boolean(working)}>

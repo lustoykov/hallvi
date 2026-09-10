@@ -1,6 +1,13 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  beginDeploymentAttempt,
+  ensureDeploymentLifecycle,
+} from "../../../src/server/deployment-lifecycle";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
 const run = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (original) => ({
@@ -49,8 +56,15 @@ function result(output: string, code = 0) {
   });
   return child;
 }
+let privateDirectory: string;
 beforeEach(() => {
+  privateDirectory = mkdtempSync(join(tmpdir(), "sg-recreation-unit-"));
+  vi.stubEnv("SERVER_GUY_CONFIG_DIR", privateDirectory);
   run.mockReset();
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  rmSync(privateDirectory, { recursive: true, force: true });
 });
 it("stops before container replacement when a persistent volume is missing", async () => {
   run.mockImplementation((_file: string, args: string[]) => {
@@ -137,4 +151,42 @@ it("does not record a passing readiness result for an unhealthy worker", async (
   ).rejects.toThrow("has not passed");
   expect(r.serviceReadiness).toEqual({});
   expect(run.mock.calls[0][1].at(-1)).not.toContain(".Config.Env");
+});
+
+it("persists runtime uncertainty before sending the recreation command", async () => {
+  const r = record();
+  Object.assign(r, {
+    repository: "qa/example",
+    revision: "a".repeat(40),
+    events: [],
+    createdAt: "2026-09-10T08:00:00Z",
+    verifiedAt: "2026-09-10T08:30:00Z",
+  });
+  r.plan!.missingInputs = [];
+  r.logs = "";
+  const previous = structuredClone(
+    ensureDeploymentLifecycle(r).runtime.lastVerified,
+  );
+  const attempt = beginDeploymentAttempt(r, "recreate", "recreate-1");
+  run.mockImplementation((_file: string, args: string[]) => {
+    const command = args.at(-1)!;
+    if (command.includes("sha256sum"))
+      return result(`${"b".repeat(64)}  compose.json\n`);
+    if (command.includes("ps -q")) return result("old-container\n");
+    if (command.includes("volume inspect")) return result("retained-volume\n");
+    if (command.includes("--force-recreate")) {
+      expect(attempt.remoteStartedAt).not.toBeNull();
+      expect(r.lifecycle!.runtime).toEqual({
+        state: "unknown",
+        lastVerified: previous,
+      });
+      return result("Synthetic SSH interruption", 1);
+    }
+    throw Error(`Unexpected command: ${command}`);
+  });
+  await expect(
+    recreateDeployment(r, new AbortController().signal),
+  ).rejects.toThrow("ssh failed");
+  expect(attempt.remoteStartedAt).not.toBeNull();
+  expect(r.lifecycle!.runtime.lastVerified).toEqual(previous);
 });

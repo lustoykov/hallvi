@@ -1,3 +1,10 @@
+import {
+  beginDeploymentAttempt,
+  ensureDeploymentLifecycle,
+  invalidateDeploymentRuntime,
+} from "../../../src/server/deployment-lifecycle";
+import { getDeployment } from "../../../src/server/deployment-store";
+import { queuePlan } from "../../fixtures/queue-worker/plan";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -447,4 +454,55 @@ it("a request follows the recorded result when the worker wins its claim race", 
   });
   expect(result).toEqual({ branch: "existing" });
   expect(effect).not.toHaveBeenCalled();
+});
+
+it("recovers a dead recreation worker without rewriting the original deployment receipt", () => {
+  const r = requestDeployment(app, firstChat);
+  r.status = "live";
+  r.plan = queuePlan();
+  r.revision = "a".repeat(40);
+  r.serverId = 7;
+  r.verifiedAt = new Date().toISOString();
+  r.imageId = "sha256:original";
+  saveDeployment(r);
+  const original = operation(`deployment:${r.id}`)!;
+  const proposed = proposeOperation({
+    applicationId: app,
+    chatId: firstChat,
+    source: { type: "release", id: r.id },
+    target: "recreate-deployment",
+    kind: "change",
+    title: "Recreate containers",
+    summary: "Synthetic recreation",
+    destinations: ["deployment"],
+    command: { type: "recreate-deployment", deploymentId: r.id },
+  });
+  startChange(proposed.id, proposed.updatedAt);
+  const claimed = claimOperation(proposed.id)!;
+  const prior = structuredClone(
+    ensureDeploymentLifecycle(r).runtime.lastVerified,
+  );
+  const attempt = beginDeploymentAttempt(r, "recreate", proposed.id);
+  markOperationRemoteEffect(claimed.id, claimed.executionId!);
+  invalidateDeploymentRuntime(r);
+  saveDeployment(r);
+  vi.spyOn(process, "kill").mockImplementation(() => {
+    throw Object.assign(new Error("dead"), { code: "ESRCH" });
+  });
+  recoverDeadOperations();
+  const saved = getDeployment(r.id)!;
+  expect(saved.lifecycle!.attempts.at(-1)).toMatchObject({
+    id: attempt.id,
+    outcome: "interrupted",
+  });
+  expect(saved.lifecycle!.runtime).toEqual({
+    state: "unknown",
+    lastVerified: prior,
+  });
+  expect(operation(proposed.id)).toMatchObject({
+    state: "failed",
+    blocksQueue: true,
+  });
+  operationsFor(app);
+  expect(operation(original.id)).toEqual(original);
 });

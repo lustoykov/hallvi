@@ -1,3 +1,4 @@
+import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
 import { assertApprovedRelease } from "./deployment-release";
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
@@ -376,6 +377,8 @@ export async function executeDeployment(
   record.status = "deploying";
   record.error = null;
   saveDeployment(record);
+  invalidateDeploymentRuntime(record);
+  saveDeployment(record);
   await provision(record, signal);
   deploymentEvent(
     record,
@@ -605,7 +608,8 @@ export async function executeDeployment(
   await verifyDeployment(record, signal);
   await verifyPrivateServices(record, signal);
   await collectDeploymentLogs(record, signal);
-  record.status = "live";
+  // The attempt wrapper publishes success together with its runtime evidence.
+  if (!record.lifecycle) record.status = "live";
   record.url = `http://${record.address}`;
   record.verifiedAt = new Date().toISOString();
   deploymentEvent(
@@ -1070,6 +1074,8 @@ export async function recreateDeployment(
   const { recordOperationRemoteEffect } =
     await import("./application-operations");
   recordOperationRemoteEffect();
+  invalidateDeploymentRuntime(record);
+  saveDeployment(record);
   deploymentEvent(
     record,
     "Recreating the accepted containers without rebuilding images or removing persistent volumes",

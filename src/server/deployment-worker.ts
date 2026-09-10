@@ -13,6 +13,7 @@ import {
   interruptDeployments,
   pendingDeployments,
   saveDeployment,
+  runDeploymentAttempt,
 } from "./deployment-store";
 import { inspectDeployment } from "./deployment-planner";
 import { executeDeployment } from "./deployment-executor";
@@ -55,7 +56,13 @@ export async function runDeploymentWorker(signal: AbortSignal) {
         ]);
         if (record.status === "queued")
           await inspectDeployment(record, bounded);
-        else await executeDeployment(record, bounded);
+        else
+          await runDeploymentAttempt(
+            record,
+            "deploy",
+            record.operationId ?? `deployment:${record.id}`,
+            () => executeDeployment(record, bounded),
+          );
       } catch (error) {
         if (error instanceof DeploymentConflictError) continue;
         if (record.status === "awaiting-approval") continue;

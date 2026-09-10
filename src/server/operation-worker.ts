@@ -36,14 +36,17 @@ async function dispatch(record: StoredOperation) {
     }
     case "recreate-deployment":
     case "collect-logs": {
-      const { getDeployment } = await import("./deployment-store");
+      const { getDeployment, runDeploymentAttempt } =
+        await import("./deployment-store");
       const executor = await import("./deployment-executor");
       const deployment = getDeployment(command.deploymentId);
       if (!deployment || deployment.applicationId !== id)
         throw new Error("Deployment no longer belongs to this application.");
       const signal = AbortSignal.timeout(10 * 60000);
       if (command.type === "recreate-deployment")
-        return executor.recreateDeployment(deployment, signal);
+        return runDeploymentAttempt(deployment, "recreate", record.id, () =>
+          executor.recreateDeployment(deployment, signal),
+        );
       await executor.collectDeploymentLogs(deployment, signal);
       return {
         evidence: `Collected host logs at ${deployment.logsCollectedAt}.`,
