@@ -8,6 +8,7 @@ import {
   persistentState,
   type ApplicationStack,
 } from "@/server/application-stack";
+import { deploymentRuntime } from "@/server/deployment-runtime";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
@@ -115,12 +116,14 @@ export function ApplicationOverview({
   if (!application) return null;
   const chatTitle = (id: string) =>
     view.chats.find((chat) => chat.id === id)?.title ?? "another conversation";
-  // A later failure never erases the last verified state: the record keeps
-  // its verification, address and revision until a new one replaces them.
-  const live =
-    deployment?.status === "live" || Boolean(facts.releases?.serving);
+  const runtime = deploymentRuntime(deployment);
+  const uncertainRuntime = runtime.state === "unknown";
+  const live = runtime.state === "verified" || Boolean(facts.releases?.serving);
   const verifiedAt =
-    facts.releases?.serving?.verifiedAt ?? deployment?.verifiedAt ?? null;
+    runtime.lastVerified?.checkedAt ??
+    facts.releases?.serving?.verifiedAt ??
+    deployment?.verifiedAt ??
+    null;
   const monitoring = facts.monitoring;
   const lastObservation = monitoring?.collector.lastObservationAt ?? null;
   const watching = monitoring?.collector.state === "running";
@@ -159,57 +162,66 @@ export function ApplicationOverview({
     ? monitoringStatus(monitoring, now)
     : null;
   // The headline is the state, not the name: the name is in navigation.
-  const headline = monitoringSummary
-    ? monitoringSummary.title
-    : verifiedAt
-      ? stale
-        ? "Last verified over a day ago"
-        : live
-          ? "Running"
-          : "Running · later work failed"
-      : deployment
-        ? "Deployment not verified"
-        : "Not deployed yet";
-  const detail = monitoringSummary
-    ? [
-        monitoring?.collector.detail,
-        lastObservation
-          ? `last observed ${relativeTime(lastObservation, now)}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : verifiedAt
-      ? `Verified ${relativeTime(verifiedAt, now)} ${deployment?.plan?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
-      : "Nothing has been verified on a host yet.";
-  const conditionTone = monitoringSummary
-    ? monitoringSummary.tone
-    : verifiedAt
-      ? stale
-        ? "warn"
-        : live
-          ? "ok"
-          : "warn"
-      : "muted";
+  const headline = uncertainRuntime
+    ? "Runtime needs verification"
+    : monitoringSummary
+      ? monitoringSummary.title
+      : verifiedAt
+        ? stale
+          ? "Last verified over a day ago"
+          : live
+            ? "Running"
+            : "Earlier deployment verified"
+        : deployment
+          ? "Deployment not verified"
+          : "Not deployed yet";
+  const detail = uncertainRuntime
+    ? "A deployment change may have reached the host. Earlier checks are historical; follow the latest operation to reconcile the outcome."
+    : monitoringSummary
+      ? [
+          monitoring?.collector.detail,
+          lastObservation
+            ? `last observed ${relativeTime(lastObservation, now)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : verifiedAt
+        ? `Verified ${relativeTime(verifiedAt, now)} ${deployment?.plan?.httpAccess === "controller" ? "from the controller’s network" : "by public HTTP checks"} · no continuous monitoring yet`
+        : "Nothing has been verified on a host yet.";
+  const conditionTone = uncertainRuntime
+    ? "warn"
+    : monitoringSummary
+      ? monitoringSummary.tone
+      : verifiedAt
+        ? stale
+          ? "warn"
+          : live
+            ? "ok"
+            : "warn"
+        : "muted";
 
   const runs: Run[] = [
     {
       key: "application",
       label: "Application",
-      value: facts.releases?.serving ? (
+      value: runtime.lastVerified ? (
+        <code>{runtime.lastVerified.revision.slice(0, 12)}</code>
+      ) : facts.releases?.serving ? (
         <code>{facts.releases.serving.revision.slice(0, 12)}</code>
       ) : deployment?.revision ? (
         <code>{deployment.revision.slice(0, 12)}</code>
       ) : (
         "Not deployed"
       ),
-      note:
-        facts.releases?.serving?.message ??
-        (verifiedAt
-          ? `Verified ${relativeTime(verifiedAt, now)}`
-          : deployment?.revision
-            ? "Not deployed yet"
-            : "No revision selected"),
+      note: uncertainRuntime
+        ? "Earlier evidence · current runtime unverified"
+        : (facts.releases?.serving?.message ??
+          (verifiedAt
+            ? `Verified ${relativeTime(verifiedAt, now)}`
+            : deployment?.revision
+              ? "Not deployed yet"
+              : "No revision selected")),
       destination: "deployment",
     },
     {

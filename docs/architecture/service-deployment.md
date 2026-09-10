@@ -23,7 +23,7 @@ GET behavior checks can opt into `waitSeconds` (1–30) for asynchronous results
 
 A release identifies the selected repository revision and approved plan, including pinned external images and secret **references**, not supplied secret values. Its content hash excludes host address, spending approval, attempt ID and outcome. New recommendations persist this identity; execution refuses a changed plan/revision before provisioning. The managed PostgreSQL shortcut retains its legacy version tags; observed image IDs are recorded and checked on recreation. Source Dockerfile base images are not automatically pinned, so release identity is not a reproducible-build guarantee. Legacy records project a release from their saved data without rewriting them.
 
-The existing Deployment record still stores the host assignment and initial attempt. This PR separates release identity from that mutable state, but **does not yet create independent host records, support BYOM, or schedule subsequent releases**. The next lifecycle slice should allow two attempts at the same release and preserve which release is actually serving. Changing a secret value is not yet a versioned configuration release.
+The existing Deployment record still stores the host assignment and initial attempt. This PR separates release identity from that mutable state, but **does not yet create independent host records, support BYOM, or schedule subsequent releases**. The [next lifecycle slice](deployment-lifecycle.md) records distinct retry/recreation attempts, the stable host binding and timestamped runtime evidence. Subsequent release execution remains separate work. Changing a secret value is not yet a versioned configuration release.
 
 ## Compatibility and evidence
 

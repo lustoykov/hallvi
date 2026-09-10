@@ -3,9 +3,10 @@
 // the views, Overview, navigation and the architecture canvas agree. The
 // web process and PostgreSQL come from the plan the executor runs; the rest
 // comes from `record.stack` once a deployment records it.
+import { deploymentRuntime } from "./deployment-runtime";
 import type { DeploymentRecord } from "./deployment-types";
 
-export type StackState = "running" | "planned";
+export type StackState = "running" | "planned" | "unknown";
 
 export interface StackProcess {
   name: string;
@@ -77,7 +78,13 @@ export const emptyStack: ApplicationStack = {
 export function stackOf(record: DeploymentRecord | null): ApplicationStack {
   const plan = record?.plan;
   if (!record || !plan) return emptyStack;
-  const state: StackState = record.status === "live" ? "running" : "planned";
+  const runtime = deploymentRuntime(record);
+  const state: StackState =
+    runtime.state === "unknown"
+      ? "unknown"
+      : record.status === "live"
+        ? "running"
+        : "planned";
   const extra = record.stack ?? {};
   const imageServices = plan.services ?? [];
   const plannedVolumes = [

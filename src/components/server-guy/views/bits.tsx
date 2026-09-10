@@ -185,9 +185,14 @@ export function SubHeading({ children }: { children: ReactNode }) {
   return <h3 className="sg-subheading">{children}</h3>;
 }
 
-export const stateText = (state: "running" | "planned", verified: ReactNode) =>
+export const stateText = (
+  state: "running" | "planned" | "unknown",
+  verified: ReactNode,
+) =>
   state === "running" ? (
     <>Running · verified {verified}</>
+  ) : state === "unknown" ? (
+    "Runtime needs verification"
   ) : (
     "Planned · not deployed yet"
   );

@@ -1,3 +1,4 @@
+import { deploymentRuntime } from "./deployment-runtime";
 import { applicationDeployment } from "./deployment-store";
 import { Type } from "typebox";
 
@@ -35,6 +36,8 @@ export function readPiApplicationStatus(
           ...status,
           deployment: {
             status: deployment.status,
+            runtime: deploymentRuntime(deployment),
+            latestAttempt: deployment.lifecycle?.attempts.at(-1),
             revision: deployment.revision,
             plan: deployment.plan?.summary,
             serverId: deployment.serverId,

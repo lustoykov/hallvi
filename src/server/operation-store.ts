@@ -1,3 +1,5 @@
+import { finishDeploymentAttempt } from "./deployment-lifecycle";
+import { deploymentRuntime } from "./deployment-runtime";
 import { redactSecrets } from "./secrets";
 import { createHash, randomUUID } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
@@ -89,7 +91,12 @@ export function currentOperationFacts(
     permissionPolicy: app.approvalMode,
     contract: contract?.id ?? null,
     sourceRevision: contract?.commitSha ?? deployment?.revision ?? null,
-    servingRevision: deployment?.verifiedAt ? deployment.revision : null,
+    servingRevision:
+      deploymentRuntime(deployment ?? null).state === "verified"
+        ? (deployment?.lifecycle?.runtime.lastVerified?.revision ??
+          deployment?.revision ??
+          null)
+        : null,
     stack: deployment?.plan ? hash(deployment.plan) : null,
     inputNames: deployment?.plan
       ? hash(deployment.plan.missingInputs.map((input) => input.name).sort())
@@ -126,6 +133,12 @@ export function syncDeploymentOperation(record: DeploymentRecord) {
   return transaction(() => {
     const projected = deploymentOperation(record);
     const previous = operation(projected.id);
+    // Recreation has its own operation. Do not rewrite the initial deployment
+    // receipt with the recreation's verification date or mutable workspace.
+    if (previous && record.lifecycle?.attempts.at(-1)?.kind === "recreate") {
+      syncDeploymentLogs(record);
+      return previous;
+    }
     const next = {
       ...(previous ??
         defaults(projected, record.applicationId, {
@@ -174,20 +187,7 @@ export function syncDeploymentOperation(record: DeploymentRecord) {
         hash({ ...previous, updatedAt: null })
     )
       put(next, Boolean(previous));
-    if (record.logsCollectedAt) {
-      const snapshot = logsOperation(record);
-      if (!operation(snapshot.id))
-        put(
-          {
-            ...defaults(snapshot, record.applicationId, null),
-            result: {
-              collectedAt: record.logsCollectedAt,
-              logs: redactSecrets(record.logs).text.slice(-12000),
-            },
-          },
-          false,
-        );
-    }
+    syncDeploymentLogs(record);
     if (["live", "failed"].includes(record.status))
       advanceQueue(record.applicationId);
     return operation(projected.id)!;
@@ -511,6 +511,32 @@ export function settleOperation(
       const encoded = redactSecrets(JSON.stringify(result)).text;
       if (encoded.length <= 1_000_000) record.result = JSON.parse(encoded);
     }
+    if (
+      outcome === "failed" &&
+      record.command?.type === "recreate-deployment"
+    ) {
+      const saved = db()
+        .select()
+        .from(deployments)
+        .where(eq(deployments.id, record.command.deploymentId))
+        .get();
+      const active = saved?.body.lifecycle?.attempts.at(-1);
+      // Normal completion already settled the attempt. This also covers a
+      // killed worker: settle both records in the same recovery transaction.
+      if (saved && active?.operationId === id && active.outcome === "working") {
+        finishDeploymentAttempt(
+          saved.body,
+          active.id,
+          "interrupted",
+          evidence.slice(0, 2000),
+        );
+        db()
+          .update(deployments)
+          .set({ body: saved.body })
+          .where(eq(deployments.id, saved.id))
+          .run();
+      }
+    }
     record.state = outcome;
     record.evidence = evidence.slice(0, 12000);
     record.summary = evidence.slice(0, 2000);
@@ -663,4 +689,21 @@ export function markOperationRemoteEffect(id: string, executionId: string) {
     record.blocksQueue = record.kind === "change";
     put(record);
   });
+}
+
+function syncDeploymentLogs(record: DeploymentRecord) {
+  if (record.logsCollectedAt) {
+    const snapshot = logsOperation(record);
+    if (!operation(snapshot.id))
+      put(
+        {
+          ...defaults(snapshot, record.applicationId, null),
+          result: {
+            collectedAt: record.logsCollectedAt,
+            logs: redactSecrets(record.logs).text.slice(-12000),
+          },
+        },
+        false,
+      );
+  }
 }

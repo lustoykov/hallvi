@@ -218,7 +218,7 @@ export function deploymentOperation(
       return {
         ...base,
         state: "verified",
-        summary: `${record.plan?.image ? `Accepted image with configuration revision ${revision(record)}` : `Revision ${revision(record)}`} is running at ${record.url ?? record.address ?? "the host"}.`,
+        summary: `${record.plan?.image ? `Accepted image with configuration revision ${revision(record)}` : `Revision ${revision(record)}`} was verified at ${record.url ?? record.address ?? "the host"}.`,
         evidence: `Verified ${record.verifiedAt ? new Date(record.verifiedAt).toISOString() : "at deployment"} · ${record.httpSourceIp ? "controller-restricted" : "public"} HTTP checks passed${record.plan ? `: ${record.plan.checks.map((check) => check.name).join(", ")}` : ""}.`,
       };
     case "failed":
@@ -226,7 +226,7 @@ export function deploymentOperation(
         ...base,
         state: "failed",
         summary:
-          "Stopped before claiming success. The last verified state, if any, is unchanged.",
+          "Stopped before claiming success. Earlier verification is historical; it does not establish the current runtime.",
         steps: [
           ...eventSteps(record, "done", 3),
           { label: "Stopped", state: "failed" },

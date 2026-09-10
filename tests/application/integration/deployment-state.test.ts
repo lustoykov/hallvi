@@ -1,3 +1,9 @@
+import { queuePlan } from "../../fixtures/queue-worker/plan";
+import {
+  beginDeploymentAttempt,
+  invalidateDeploymentRuntime,
+} from "../../../src/server/deployment-lifecycle";
+import { runDeploymentAttempt } from "../../../src/server/deployment-store";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -363,4 +369,67 @@ it("requires owner-confirmed provider evidence and clears spending authority aft
     200,
   );
   expect(getDeployment(r.id)?.status).toBe("queued"); // inspect, never purchase
+});
+
+function executable() {
+  const r = recommendation();
+  r.revision = "a".repeat(40);
+  r.plan = queuePlan();
+  r.authority = {
+    connectionId: "hetzner-a",
+    acceptedAt: new Date().toISOString(),
+    maxMonthly: 5,
+  };
+  r.status = "deploy-queued";
+  saveDeployment(r);
+  return r;
+}
+it("persists retries, immutable release snapshots, and the verified runtime through CAS saves", async () => {
+  const r = executable();
+  await expect(
+    runDeploymentAttempt(r, "deploy", "attempt-operation-1", async () => {
+      r.status = "deploying";
+      invalidateDeploymentRuntime(r);
+      saveDeployment(r);
+      throw new Error("Synthetic startup failure");
+    }),
+  ).rejects.toThrow("Synthetic startup failure");
+  const failed = structuredClone(getDeployment(r.id)!.lifecycle!.attempts[0]);
+  expect(failed.outcome).toBe("failed");
+  await runDeploymentAttempt(r, "deploy", "attempt-operation-2", async () => {
+    invalidateDeploymentRuntime(r);
+    saveDeployment(r);
+    r.serverId = 77;
+    r.imageId = "sha256:synthetic";
+    r.verifiedAt = new Date().toISOString();
+  });
+  const saved = getDeployment(r.id)!;
+  expect(saved.status).toBe("live");
+  expect(saved.lifecycle!.host.serverId).toBe(77);
+  expect(saved.lifecycle!.attempts).toHaveLength(2);
+  expect(saved.lifecycle!.attempts[0]).toEqual(failed);
+  expect(saved.lifecycle!.attempts[1].releaseId).toBe(failed.releaseId);
+  expect(saved.lifecycle!.runtime.lastVerified!.images.app).toBe(
+    "sha256:synthetic",
+  );
+  saved.lifecycle!.releases[0].plan.port += 1;
+  expect(() => saveDeployment(saved)).toThrow("cannot be rewritten");
+  expect(getDeployment(r.id)!.lifecycle!.releases[0].plan.port).toBe(
+    queuePlan().port,
+  );
+});
+it("records an interrupted attempt before another worker can retry", () => {
+  const r = executable();
+  const attempt = beginDeploymentAttempt(r, "deploy", "attempt-operation-1");
+  r.status = "deploying";
+  invalidateDeploymentRuntime(r);
+  saveDeployment(r);
+  interruptDeployments();
+  const saved = getDeployment(r.id)!;
+  expect(saved.lifecycle!.attempts[0]).toMatchObject({
+    id: attempt.id,
+    outcome: "interrupted",
+  });
+  expect(saved.lifecycle!.runtime.state).toBe("unknown");
+  expect(() => saveDeployment(r)).toThrow(DeploymentConflictError);
 });
