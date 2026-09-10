@@ -1,3 +1,4 @@
+import { sourceBuilds } from "./deployment-layout";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -57,21 +58,23 @@ export function releaseBundle(
   password: string,
   supplied: Record<string, string>,
 ) {
-  const source = plan.image
+  const source = !sourceBuilds(plan).length
     ? []
     : files.filter((file) => !deniedPathReason(file.path));
   const compose = composeDefinition(plan, revision, id, password, supplied);
   return [
     ...source.map((file) => ({ ...file, path: `source/${file.path}` })),
-    ...(plan.generatedDockerfile
-      ? [
-          {
-            path: `source/${plan.dockerfile}`,
-            content: Buffer.from(plan.generatedDockerfile),
-            mode: 0o644,
-          },
-        ]
-      : []),
+    ...[
+      ...new Map(
+        sourceBuilds(plan)
+          .filter((b) => b.generatedDockerfile)
+          .map((b) => [b.dockerfile, b]),
+      ).values(),
+    ].map((b) => ({
+      path: `source/${b.dockerfile}`,
+      content: Buffer.from(b.generatedDockerfile!),
+      mode: 0o644,
+    })),
     ...[
       { name: "app", configs: plan.configs ?? [] },
       ...(plan.services ?? []),
@@ -122,7 +125,13 @@ run_release() {
   ${compose} config --quiet || return $?
   ${retainedVolumes.length ? `docker volume inspect ${retainedVolumes.map((name) => shellQuote(`sg-${id.slice(0, 8)}_${name}`)).join(" ")} >/dev/null || return $?` : ":"}
   phase=build
-  ${!plan.image ? `${compose} build app || return $?` : ":"}
+  ${
+    sourceBuilds(plan).length
+      ? `${compose} build ${sourceBuilds(plan)
+          .map((b) => b.name)
+          .join(" ")} || return $?`
+      : ":"
+  }
   ${pull.length ? `${compose} pull ${pull.map(shellQuote).join(" ")} || return $?` : ":"}
   phase=activate
   cp compose.json ${root}/compose.json || return $?

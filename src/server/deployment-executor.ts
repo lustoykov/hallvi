@@ -1,3 +1,4 @@
+import { sourceBuilds } from "./deployment-layout";
 import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
 import { assertApprovedRelease } from "./deployment-release";
 import { getApplication } from "./db";
@@ -501,7 +502,7 @@ export async function executeDeployment(
       "Host prepared; uploading the exact source revision and deployment configuration",
     );
     const { token } = await checkDeploymentSource(record);
-    const files = record.plan.image
+    const files = !sourceBuilds(record.plan).length
       ? []
       : await fetchBaseTree(record.repository, record.revision, token, signal);
     const safe = files.filter((file) => !deniedPathReason(file.path));
@@ -509,12 +510,16 @@ export async function executeDeployment(
       throw new Error(
         "The repository contains credential-bearing paths. Review them before transferring source to the host.",
       );
-    if (record.plan.generatedDockerfile)
-      safe.push({
-        path: record.plan.dockerfile,
-        content: Buffer.from(record.plan.generatedDockerfile),
-        mode: 0o644,
-      });
+    for (const build of sourceBuilds(record.plan))
+      if (
+        build.generatedDockerfile &&
+        !safe.some((f) => f.path === build.dockerfile)
+      )
+        safe.push({
+          path: build.dockerfile,
+          content: Buffer.from(build.generatedDockerfile),
+          mode: 0o644,
+        });
     const compose = composeDefinition(
       record.plan,
       record.revision,
@@ -557,7 +562,7 @@ export async function executeDeployment(
         ...sshArgs(record),
         deploymentLock(
           record.id,
-          `umask 077; mkdir -p ${root}; tar -xf - -C ${root}`,
+          `umask 077; mkdir -p ${root}; tar -xpf - -C ${root}`,
         ),
       ],
       signal,
@@ -913,9 +918,9 @@ export async function verifyServiceImages(
     images[name] = container.Image;
   }
   for (const service of record.plan?.services ?? []) {
-    if (service.imageFrom && images[service.name] !== images.app)
+    if (service.imageFrom && images[service.name] !== images[service.imageFrom])
       throw new Error(
-        `Service ${service.name} does not use the same image as app.`,
+        `Service ${service.name} does not use the same image as ${service.imageFrom}.`,
       );
   }
   record.serviceImages = images;

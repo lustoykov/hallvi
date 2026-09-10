@@ -1,3 +1,4 @@
+import { sharedVolumes, sourceBuilds } from "./deployment-layout";
 import { randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, lstatSync } from "node:fs";
 import { join } from "node:path";
@@ -65,6 +66,13 @@ export function backupKind(record: DeploymentRecord): BackupPolicy["kind"] {
   if (record.status !== "live" || !record.plan || !record.revision)
     throw new Error(
       "A live deployment with recorded configuration is required.",
+    );
+  if (
+    sharedVolumes(record.plan).some((v) => v.mounts.length > 1) ||
+    sourceBuilds(record.plan).some((b) => b.name !== "app")
+  )
+    throw new Error(
+      "Scheduled capture does not yet verify all writers and state in this shared-storage or multiple-build layout.",
     );
   if (
     record.plan.postgres &&

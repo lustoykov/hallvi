@@ -1,3 +1,4 @@
+import { sharedVolumes, serviceImage } from "./deployment-layout";
 // The application's stack as recorded: what runs on the one instance, what
 // stores state, and what protects it. Derived from the deployment record so
 // the views, Overview, navigation and the architecture canvas agree. The
@@ -50,6 +51,12 @@ export type StackJob = NonNullable<
 export interface StackVolume {
   name: string;
   usedBy: string;
+  mounts?: {
+    service: string;
+    target: string;
+    readOnly: boolean;
+    sqlite: string | null;
+  }[];
   mount: string;
   kind: "database" | "files";
   state: StackState;
@@ -87,18 +94,22 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
         : "planned";
   const extra = record.stack ?? {};
   const imageServices = plan.services ?? [];
-  const plannedVolumes = [
-    { name: "app", volumes: plan.volumes ?? [] },
-    ...imageServices,
-  ].flatMap((service) =>
-    service.volumes.map((v) => ({
-      name: v.name,
-      usedBy: service.name,
-      mount: v.target,
-      kind: v.kind,
-      sqlite: v.sqlite,
-    })),
-  );
+  const plannedVolumes = sharedVolumes(plan).map((v) => ({
+    name: v.name,
+    usedBy: [...new Set(v.mounts.map((m) => m.service))].join(", "),
+    mount:
+      v.mounts.length === 1 && !v.mounts[0].readOnly
+        ? v.mounts[0].target
+        : v.mounts
+            .map(
+              (m) =>
+                `${m.service}: ${m.target} (${m.readOnly ? "read-only" : "read/write"})`,
+            )
+            .join(" · "),
+    kind: v.kind,
+    sqlite: v.mounts[0].sqlite,
+    mounts: v.mounts,
+  }));
   const processes: StackProcess[] = [
     {
       name: "app",
@@ -126,9 +137,14 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
         service.role ??
         (service.port ? ("web" as const) : ("service" as const)),
       command: service.command?.join(" ") ?? null,
-      image: service.imageFrom
-        ? (record.serviceImages?.[service.name] ?? plan.image ?? record.imageId)
-        : (service.image ?? null),
+      image:
+        record.serviceImages?.[service.name] ??
+        serviceImage(
+          plan,
+          record.revision ?? "unbuilt",
+          record.id,
+          service.name,
+        ),
       port: service.port,
       private: true,
       healthPath: service.healthPath,
@@ -202,6 +218,9 @@ export function stackOf(record: DeploymentRecord | null): ApplicationStack {
       name: v.name,
       usedBy: v.usedBy,
       mount: v.mount,
+      ...(v.mounts.length > 1 || v.mounts.some((m) => m.readOnly)
+        ? { mounts: v.mounts }
+        : {}),
       kind: v.kind,
       state,
     })),
@@ -251,9 +270,11 @@ export function persistentState(stack: ApplicationStack) {
                 volume.usedBy === "postgres") ||
               (database.kind === "sqlite" &&
                 database.name === volume.usedBy &&
-                database.location.startsWith(
-                  volume.mount.replace(/\/$/, "") + "/",
-                )),
+                (volume.mounts
+                  ? volume.mounts.some((m) => m.sqlite === database.location)
+                  : database.location.startsWith(
+                      volume.mount.replace(/\/$/, "") + "/",
+                    ))),
           ),
       )
       .map((volume) => ({
