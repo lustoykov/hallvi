@@ -177,6 +177,16 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
         ],
         { encoding: "utf8" },
       ).trim();
+      // Keep one job pending while all containers are recreated. Only the
+      // worker can produce its result; an empty retained volume cannot pass.
+      compose("stop", "worker");
+      const pendingResponse = await fetch(`http://${record.address}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "synthetic-retained-job" }),
+      });
+      expect(pendingResponse.status).toBe(201);
+      const pending = (await pendingResponse.json()) as { id: string };
       compose(
         "up",
         "-d",
@@ -190,6 +200,18 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
       );
       updateAddress();
       await observe();
+      const retained = await fetch(
+        `http://${record.address}/jobs/${pending.id}`,
+      );
+      expect(retained.status).toBe(200);
+      expect(await retained.json()).toEqual({
+        result: "processed:synthetic-retained-job",
+      });
+      const removed = await fetch(
+        `http://${record.address}/jobs/${pending.id}`,
+        { method: "DELETE" },
+      );
+      expect(removed.status).toBe(200);
       await verifyDeployment(record, signal);
       clean();
       expect(
