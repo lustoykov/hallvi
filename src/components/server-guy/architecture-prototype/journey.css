@@ -16,6 +16,7 @@
 }
 .axj-condition p {
   margin: 0;
+  text-wrap: pretty;
   max-width: 76ch;
   font-size: 16px;
   line-height: 1.5;
@@ -219,6 +220,19 @@
 }
 .axj-stage.is-planned .axj-line.j-visit {
   stroke-dasharray: 8 7;
+}
+.axj-stage.is-planned .axj-line.j-data,
+.axj-stage.is-planned .axj-line.j-data-inner {
+  stroke-dasharray: 10 8;
+}
+/* A plan is not a path anything has travelled: no lit overlay, only a tint. */
+.axj-stage.is-planned .axj-lit {
+  opacity: 0;
+}
+.axj-stage.is-planned[data-journey="visit"] .axj-line.j-visit,
+.axj-stage.is-planned[data-journey="data"] .axj-line.j-data,
+.axj-stage.is-planned[data-journey="release"] .axj-line.j-release {
+  stroke: #5f82ee;
 }
 .axj-lit {
   fill: none;
@@ -536,14 +550,14 @@
 .axj-drawer > div {
   min-height: 0;
   overflow: hidden;
-  padding: 0 1px;
+  padding: 8px 1px 2px;
 }
 .axj-card {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
   gap: 28px;
-  margin: 12px 0 4px;
+  margin: 4px 0 4px;
   padding: 20px 24px 22px;
   border: 1px solid var(--ax-line);
   border-radius: 12px;

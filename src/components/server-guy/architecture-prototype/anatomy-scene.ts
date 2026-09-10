@@ -26,7 +26,7 @@ export interface SceneCallbacks {
 }
 
 const COLOR = {
-  edge: 0x56627a,
+  edge: 0x4a566e,
   host: 0xe4e9f1,
   tray: 0xedf1f7,
   drum: 0xd7dfeb,
@@ -231,11 +231,11 @@ export class AnatomyScene {
     host.appendChild(this.renderer.domElement);
     this.family = getComputedStyle(document.body).fontFamily || "system-ui";
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd3dae6, 1.85));
-    const key = new THREE.DirectionalLight(0xffffff, 1.25);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xc9d1de, 1.45));
+    const key = new THREE.DirectionalLight(0xffffff, 1.7);
     key.position.set(-6, 12, 9);
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xdfe8ff, 0.55);
+    const fill = new THREE.DirectionalLight(0xdfe8ff, 0.4);
     fill.position.set(9, 5, -6);
     this.scene.add(fill);
 
@@ -539,10 +539,10 @@ export class AnatomyScene {
           group.position.set(appX, 0, 0.15);
           addBox(2.0, 1.1, 1.6, base);
           const stripe = new THREE.Mesh(
-            new THREE.BoxGeometry(2.0, 0.07, 1.6),
+            new THREE.BoxGeometry(1.5, 0.035, 1.05),
             new THREE.MeshBasicMaterial({ color: COLOR.blue }),
           );
-          stripe.position.y = 1.135;
+          stripe.position.y = 1.118;
           group.add(stripe);
           anchor = new THREE.Vector3(0.6, 1.1, 0.8);
           break;
@@ -572,15 +572,15 @@ export class AnatomyScene {
           const geometry = new THREE.BufferGeometry().setFromPoints(
             curve.getPoints(64).map((p) => new THREE.Vector3(p.x, p.y, 0)),
           );
-          const ring = new THREE.LineSegments(
+          const ring = new THREE.LineLoop(
             geometry,
             new THREE.LineDashedMaterial({
-              color: 0xb9c2d0,
+              color: 0x8b95a5,
               dashSize: 0.1,
               gapSize: 0.08,
               transparent: true,
             }),
-          ) as EdgeLines;
+          ) as unknown as EdgeLines;
           ring.computeLineDistances();
           const hit = new THREE.Mesh(
             new THREE.CircleGeometry(0.66, 32),

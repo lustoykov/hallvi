@@ -65,12 +65,12 @@ const lenses: { id: Lens; label: string; hint: string }[] = [
 
 const lensNote: Record<Lens, string> = {
   structure:
-    "Bottom to top: the server, its disk, the private network, the services, and the cover whose doors are the ways in. Dashed pieces aren't set up.",
+    "Bottom to top: the server, its disk, the private network, the services, and the cover whose doors are the ways in.",
   exposure:
-    "Blue is the way in. Only port 80 opens for visits; Prometheus has no door at all.",
-  data: "What must survive lives on the disk. Every night a copy leaves the server.",
+    "Blue is the way in: port 80, and only for your network. Prometheus has no door at all.",
+  data: "What must survive lives on the disk; every night a copy leaves the server.",
   certainty:
-    "Green only while the evidence is under a day old. Amber is older; hatched was never observed.",
+    "Green while the evidence is under a day old, amber when older, hatched if never observed.",
 };
 
 function gapPart(gap: Gap): Part {
@@ -285,23 +285,51 @@ export function AnatomyDirection({
     if (!instance || !box) return;
     const width = box.clientWidth;
     const height = box.clientHeight;
-    const sides: Record<"left" | "right", { id: string; x: number; y: number }[]> =
-      { left: [], right: [] };
+    // Half the callouts on each side, by where their parts sit, then each
+    // column resolves overlaps top-down and bottom-up so none leave the plate.
+    const entries: { id: string; x: number; y: number }[] = [];
     for (const id of ids.current) {
       const anchor = instance.anchor(id);
-      if (!anchor) continue;
-      sides[anchor.x < width * 0.47 ? "left" : "right"].push({ id, ...anchor });
+      if (anchor) entries.push({ id, ...anchor });
     }
+    entries.sort((a, b) => a.x - b.x);
+    const half = Math.ceil(entries.length / 2);
+    const sides = { left: entries.slice(0, half), right: entries.slice(half) };
     for (const side of ["left", "right"] as const) {
-      const list = sides[side].sort((a, b) => a.y - b.y);
-      let cursor = 14;
-      for (const entry of list) {
-        const element = callouts.current[entry.id];
-        if (!element) continue;
+      const list = sides[side]
+        .filter((entry) => callouts.current[entry.id])
+        .sort((a, b) => a.y - b.y);
+      const heights = list.map(
+        (entry) => callouts.current[entry.id]!.offsetHeight,
+      );
+      const top = 12;
+      const bottom = height - 40;
+      const sum = heights.reduce((total, h) => total + h, 0);
+      const gap =
+        list.length > 1
+          ? Math.max(2, Math.min(8, (bottom - top - sum) / (list.length - 1)))
+          : 8;
+      const ys: number[] = [];
+      let cursor = top;
+      list.forEach((entry, i) => {
+        ys[i] = Math.max(cursor, entry.y - heights[i] / 2);
+        cursor = ys[i] + heights[i] + gap;
+      });
+      let limit = bottom;
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (ys[i] + heights[i] > limit) ys[i] = limit - heights[i];
+        limit = ys[i] - gap;
+      }
+      // Never above the plate: when a column is too full, it runs long instead.
+      if (ys.length && ys[0] < top) {
+        const shift = top - ys[0];
+        for (let i = 0; i < ys.length; i++) ys[i] += shift;
+      }
+      list.forEach((entry, i) => {
+        const element = callouts.current[entry.id]!;
         const w = element.offsetWidth;
-        const h = element.offsetHeight;
-        const y = Math.max(cursor, Math.min(height - h - 40, entry.y - h / 2));
-        cursor = y + h + 8;
+        const h = heights[i];
+        const y = ys[i];
         const x = side === "left" ? 14 : width - 14 - w;
         element.style.transform = `translate(${x}px, ${y}px)`;
         element.dataset.side = side;
@@ -317,7 +345,7 @@ export function AnatomyDirection({
           dot.setAttribute("cx", String(entry.x));
           dot.setAttribute("cy", String(entry.y));
         }
-      }
+      });
     }
     const roof = instance.roof();
     if (caretaker.current)
@@ -503,6 +531,10 @@ export function AnatomyDirection({
         </button>
       </div>
 
+      <p className="axc-note" key={lens}>
+        {lensNote[lens]}
+      </p>
+
       <div
         ref={stage}
         className={`axc-stage axc-lens-${lens}${planned ? " is-planned" : ""}`}
@@ -574,9 +606,6 @@ export function AnatomyDirection({
             }}
           />
         </div>
-        <p className="axc-note" key={lens}>
-          {lensNote[lens]}
-        </p>
         <button
           type="button"
           className="axc-reset"

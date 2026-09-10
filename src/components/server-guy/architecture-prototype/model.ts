@@ -252,6 +252,10 @@ function inventedMonitoring(
 ): MonitoringFacts {
   const at = new Date(now - 4 * MINUTE).toISOString();
   const service = deployment?.plan?.services?.[0]?.name ?? "worker";
+  const serviceName = productName(
+    deployment?.plan?.services?.[0]?.image,
+    service,
+  );
   return {
     collector: {
       state: "running",
@@ -271,7 +275,7 @@ function inventedMonitoring(
       },
       {
         id: "service",
-        name: `${service} readiness`,
+        name: `${serviceName} readiness`,
         kind: "process",
         target: service,
         state: "failing",
@@ -979,7 +983,7 @@ export function buildModel({
       label: "Your data",
       stops: [...volumes.map((v) => v.id), "offsite"],
       summary: protection?.destination
-        ? `${protection.policy?.schedule ?? "On request"}, ${list(volumes.map((v) => v.name))} are copied to ${byId.offsite.name} and checked by checksum.`
+        ? `${protection.policy ? `${protection.policy.schedule} (${protection.policy.timezone})` : "On request"}, ${list(volumes.map((v) => v.name))} are copied to ${byId.offsite.name} and checked by checksum.`
         : "Nothing copies the data off the server yet.",
     },
     {
@@ -1297,10 +1301,4 @@ export function explain(model: ArchitectureModel, depth: Depth): Sentence[] {
     !planned && ".",
   );
   return out;
-}
-
-function restoreAt(model: ArchitectureModel) {
-  // The restore test's time is not a fact row of its own; read it back from
-  // the part's plain sentence would be brittle, so keep it on the evidence.
-  return model.restoreAt;
 }

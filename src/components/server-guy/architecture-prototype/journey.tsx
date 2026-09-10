@@ -416,10 +416,23 @@ export function JourneyDirection({
       : model.condition.certainty === "failed"
         ? "worry"
         : "idle";
+  // Where the caretaker stands to look at a stop without covering its label.
   const beside = useCallback(
     (id: string): Point => {
       const p = layoutRef.current.at[id] ?? layout.at.app;
-      return { x: p.x + 34, y: p.y };
+      const offset: Point =
+        id === "gate:http"
+          ? { x: 38, y: 0 }
+          : id === "app"
+            ? { x: 86, y: 0 }
+            : id === "host"
+              ? { x: 42, y: 0 }
+              : id.startsWith("svc:")
+                ? { x: 34, y: 48 }
+                : id.startsWith("vol:") || id === "offsite"
+                  ? { x: 44, y: 0 }
+                  : { x: 34, y: 0 };
+      return { x: p.x + offset.x, y: p.y + offset.y };
     },
     [layout.at.app],
   );
@@ -746,9 +759,6 @@ export function JourneyDirection({
           ))}
         </svg>
 
-        <span className="axj-zone" style={pct({ x: 22, y: 424 })}>
-          Outside
-        </span>
         <button
           type="button"
           className="axj-zone axj-zone-host"
@@ -772,9 +782,11 @@ export function JourneyDirection({
         {model.restricted && (
           <span
             className="axj-zone axj-zone-refused"
-            style={pct({ x: 150, y: 100 })}
+            style={pct({ x: 112, y: 100 })}
           >
-            Anyone else is turned away
+            {planned
+              ? "Anyone else will be turned away"
+              : "Anyone else is turned away"}
           </span>
         )}
 
