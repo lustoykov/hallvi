@@ -1,16 +1,18 @@
 "use client";
 
 // PROTOTYPE · claude/architecture-directions · throwaway.
-// Direction A, second pass: Journeys, polished. The same idea as the first
-// pass (a visit, your data and a release travel through one server), drawn
-// as crafted cards on a quiet canvas. Thin wires carry light; stops light up
-// as it passes; details open beside the stop. Below the map, the agent's
-// terminal shows its recorded work, and Little Server hops down from the
-// server's roof to walk along it whenever it works.
+// Direction A, third pass: Journeys. A visit, your data and a release travel
+// through one server, drawn as crafted cards on a quiet canvas; stops light
+// up as the light passes and open their details beside themselves. The header
+// says what is true now and what is missing. Below the map, Server Guy's
+// console keeps its recorded work folded to one line. It opens while Server
+// Guy works, and Little Server lives on it.
 
 import {
   ArrowRight,
+  ArrowSquareOut,
   ArrowsClockwise,
+  CaretDown,
   ChartLineUp,
   ChatCircleText,
   CloudArrowUp,
@@ -49,6 +51,7 @@ import {
   ago,
   type ArchitectureModel,
   type Certainty,
+  type Gap,
   type JourneyId,
   type LogLine,
   type Part,
@@ -68,19 +71,21 @@ const LittleServer = dynamic(
 );
 
 const W = 1120;
-const H = 560;
+/** The map is drawn from y = 0; the view starts at TOP, just above the server. */
+const TOP = 60;
+const H = 500;
 type Rect = { x: number; y: number; w: number; h: number };
 
 const pct = (value: number, total: number) => `${(value / total) * 100}%`;
 const place = (r: Rect): CSSProperties => ({
   left: pct(r.x, W),
-  top: pct(r.y, H),
+  top: pct(r.y - TOP, H),
   width: pct(r.w, W),
   height: pct(r.h, H),
 });
 const point = (x: number, y: number): CSSProperties => ({
   left: pct(x, W),
-  top: pct(y, H),
+  top: pct(y - TOP, H),
 });
 
 const BOX: Record<string, Rect> = {
@@ -98,8 +103,6 @@ const BOX: Record<string, Rect> = {
   http: { x: 211, y: 286, w: 102, h: 28 },
   ssh: { x: 211, y: 368, w: 102, h: 28 },
 };
-/** Where Little Server stands on the roof, in stage units. */
-const ROOF = { x: 770, y: -14, size: 112 };
 
 interface Layout {
   rects: Record<string, Rect>;
@@ -191,6 +194,12 @@ function draftFor(part: Part, model: ArchitectureModel) {
   }
 }
 
+function gapDraft(gap: Gap, model: ArchitectureModel) {
+  return gap.id === "tls"
+    ? `Set up a domain with HTTPS for ${model.headline}.`
+    : `Watch ${model.headline} continuously and tell me when something fails.`;
+}
+
 /** What a simulated check of a part would say it saw. */
 function checkLine(part: Part) {
   const fact = (label: string) =>
@@ -218,15 +227,23 @@ const conditionWord: Record<Certainty, string> = {
   absent: "Not set up",
 };
 
-/** Little Server's face, as the controller's icon. */
+/** Little Server's face, antennas and all, as the controller's icon. */
 function ServerGuyFace() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="5" fill="#192338" />
-      <rect x="7" y="8.5" width="2.6" height="5.2" rx="1.3" fill="#edf3ff" />
-      <rect x="14.4" y="8.5" width="2.6" height="5.2" rx="1.3" fill="#edf3ff" />
       <path
-        d="M9.2 15.6Q12 17.4 14.8 15.6"
+        d="M7.6 6V3.4M16.4 6V3.4"
+        stroke="#3e4a60"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <circle cx="7.6" cy="2.9" r="1.35" fill="#9dbbff" />
+      <circle cx="16.4" cy="2.9" r="1.35" fill="#9dbbff" />
+      <rect x="2" y="6" width="20" height="15" rx="4.8" fill="#192338" />
+      <rect x="7" y="10" width="2.6" height="4.8" rx="1.3" fill="#edf3ff" />
+      <rect x="14.4" y="10" width="2.6" height="4.8" rx="1.3" fill="#edf3ff" />
+      <path
+        d="M9.2 16.6Q12 18.3 14.8 16.6"
         stroke="#d6e5ff"
         strokeWidth="1.3"
         fill="none"
@@ -417,7 +434,7 @@ function Popover({
     const stage = pop?.parentElement;
     if (!pop || !stage) return;
     const stageHeight = stage.clientHeight;
-    const wanted = (Math.max(0, rect.y - 8) / H) * stageHeight;
+    const wanted = (Math.max(0, rect.y - TOP - 8) / H) * stageHeight;
     const top = Math.max(-8, Math.min(wanted, stageHeight - pop.offsetHeight + 24));
     pop.style.top = `${top}px`;
   }, [rect]);
@@ -488,6 +505,57 @@ function Popover({
   );
 }
 
+/** Something not set up, as a ghost chip that explains itself on click. */
+function GapChip({
+  gap,
+  draft,
+  onAsk,
+}: {
+  gap: Gap;
+  draft: string;
+  onAsk: (draft: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  return (
+    <span ref={wrap} className="axj3-gap">
+      <button
+        type="button"
+        className={`axj3-gap-chip${open ? " is-open" : ""}`}
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {gap.id === "tls" ? <LockOpen weight="bold" /> : <Heartbeat weight="bold" />}
+        {gap.title}
+      </button>
+      {open && (
+        <span className="axj3-gap-pop" role="dialog" aria-label={gap.title}>
+          <span>{gap.detail}</span>
+          <button type="button" className="ax-textlink" onClick={() => onAsk(draft)}>
+            <ChatCircleText weight="bold" />
+            Ask in the conversation
+          </button>
+        </span>
+      )}
+    </span>
+  );
+}
+
 const clock = (at: string) =>
   new Date(at).toLocaleTimeString(undefined, {
     hour: "2-digit",
@@ -503,12 +571,15 @@ const glyph: Record<LogLine["tone"], string> = {
   work: "›",
   info: "·",
 };
+const tagOf = (line: LogLine | undefined) =>
+  line?.invented ? (line.id.startsWith("live:") ? "sim" : "invented") : undefined;
 
 export function JourneyDirection({
   model,
   recheck,
   onOpenDestination,
   onAsk,
+  page,
 }: DirectionProps) {
   const reduced = useReducedMotion();
   const layout = useMemo(() => layoutFor(model), [model]);
@@ -530,9 +601,11 @@ export function JourneyDirection({
   const [mood, setMood] = useState<MascotMood | null>(null);
   const [gesture, setGesture] = useState(0);
   const [liveLines, setLiveLines] = useState<LogLine[]>([]);
-  const [perch, setPerch] = useState<"roof" | "terminal">("roof");
+  const [perch, setPerch] = useState<"home" | "work">("home");
+  const [open, setOpen] = useState(false);
+  const openRef = useRef(open);
+  const autoOpened = useRef(false);
   const section = useRef<HTMLElement>(null);
-  const stage = useRef<HTMLDivElement>(null);
   const terminal = useRef<HTMLDivElement>(null);
   const newest = useRef<HTMLSpanElement>(null);
   const mascot = useRef<HTMLDivElement>(null);
@@ -550,6 +623,9 @@ export function JourneyDirection({
     const list = timers.current;
     return () => list.forEach((timer) => window.clearTimeout(timer));
   }, []);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setEntering(false), 1500);
@@ -717,7 +793,7 @@ export function JourneyDirection({
     };
   }, [model.condition.certainty, say]);
 
-  // The simulated re-check writes to the terminal, step by step.
+  // The simulated re-check writes to the console, step by step.
   useEffect(() => {
     if (recheck.phase === "idle") {
       seenMarks.current = {};
@@ -759,38 +835,46 @@ export function JourneyDirection({
     return () => window.clearTimeout(timer);
   }, [recheck.marks, recheck.phase, model.byId]);
 
-  // Celebrate a pass, open a failure, and send Little Server where the work is.
+  // Work opens the console and sends Little Server to it; a pass is
+  // celebrated and the console folds away again; a failure stays in view.
   useEffect(() => {
+    const local: number[] = [];
+    const at = (fn: () => void, ms: number) => local.push(window.setTimeout(fn, ms));
     if (recheck.phase === "running") {
-      const timer = window.setTimeout(() => setPerch("terminal"), 0);
-      return () => window.clearTimeout(timer);
-    }
-    if (recheck.phase === "idle") {
-      const timer = window.setTimeout(() => setPerch("roof"), 0);
-      return () => window.clearTimeout(timer);
-    }
-    if (recheck.phase === "passed") {
-      const timers = [
-        window.setTimeout(() => {
-          setPopped(true);
-          setMood("celebrating");
-          setGesture((value) => value + 1);
-          burstAt(mascot.current, {
-            count: 22,
-            spread: 64,
-            size: 10,
-            palette: sparklePalettes.verified,
-          });
-        }, 120),
-        window.setTimeout(() => setPopped(false), 1200),
-        window.setTimeout(() => setMood(null), 2800),
-        window.setTimeout(() => setPerch("roof"), 3300),
-      ];
-      return () => timers.forEach((timer) => window.clearTimeout(timer));
-    }
-    if (recheck.phase === "failed" && recheck.active) {
+      at(() => {
+        setPerch("work");
+        if (!openRef.current) {
+          autoOpened.current = true;
+          setOpen(true);
+        }
+      }, 0);
+    } else if (recheck.phase === "idle") {
+      at(() => setPerch("home"), 0);
+    } else if (recheck.phase === "passed") {
+      at(() => {
+        setPopped(true);
+        setMood("celebrating");
+        setGesture((value) => value + 1);
+        burstAt(mascot.current, {
+          count: 22,
+          spread: 64,
+          size: 10,
+          palette: sparklePalettes.verified,
+        });
+      }, 120);
+      at(() => setPopped(false), 1200);
+      at(() => setMood(null), 2800);
+      at(() => {
+        setPerch("home");
+        if (autoOpened.current) {
+          autoOpened.current = false;
+          setOpen(false);
+        }
+      }, 3400);
+    } else if (recheck.phase === "failed" && recheck.active) {
       const failed = recheck.active;
-      const timer = window.setTimeout(() => {
+      autoOpened.current = false;
+      at(() => {
         setSelected(failed);
         burstAt(mascot.current, {
           count: 8,
@@ -798,36 +882,37 @@ export function JourneyDirection({
           palette: sparklePalettes.failed,
         });
       }, 120);
-      return () => window.clearTimeout(timer);
     }
+    return () => local.forEach((timer) => window.clearTimeout(timer));
   }, [recheck.phase, recheck.active]);
 
-  // Little Server's spot: the roof of the server, or the end of the newest
-  // terminal line. It hops between them and walks along the terminal.
+  // Little Server stands on the console: at home on its left end, or above
+  // the end of the newest line while it works.
   const lines = useMemo(
     () => [...model.log, ...liveLines].slice(-8),
     [model.log, liveLines],
   );
+  const latest = lines[lines.length - 1];
   const reposition = useCallback(
     (animate: boolean) => {
       const host = section.current;
-      const map = stage.current;
       const element = mascot.current;
-      if (!host || !map || !element) return;
+      const term = terminal.current;
+      if (!host || !element || !term) return;
       const origin = host.getBoundingClientRect();
+      const box = term.getBoundingClientRect();
       const size = element.offsetWidth;
-      let x: number;
-      let y: number;
-      const term = terminal.current?.getBoundingClientRect();
-      if (perch === "terminal" && term) {
-        const end = newest.current?.getBoundingClientRect().right ?? term.left + 200;
-        x = Math.min(term.right - size - 10, Math.max(term.left + 10, end - size * 0.3)) - origin.left;
-        y = term.top - origin.top - size * 0.84;
-      } else {
-        const r = map.getBoundingClientRect();
-        x = r.left - origin.left + (ROOF.x / W) * r.width;
-        y = r.top - origin.top + (ROOF.y / H) * r.height;
+      let left = box.left + 18;
+      if (perch === "work") {
+        const end = newest.current?.getBoundingClientRect().right;
+        if (end)
+          left = Math.min(
+            box.right - size - 12,
+            Math.max(box.left + 12, end - size * 0.3),
+          );
       }
+      const x = left - origin.left;
+      const y = box.top - origin.top - size * 0.84;
       const from = spot.current;
       spot.current = { x, y };
       const to = `translate(${x}px, ${y}px)`;
@@ -835,7 +920,7 @@ export function JourneyDirection({
       if (!animate || !from || reducedMotion()) return;
       const distance = Math.hypot(x - from.x, y - from.y);
       if (distance < 2) return;
-      const lift = Math.min(90, 18 + distance * 0.16);
+      const lift = Math.min(70, 16 + distance * 0.12);
       element.animate(
         [
           { transform: `translate(${from.x}px, ${from.y}px)` },
@@ -846,17 +931,17 @@ export function JourneyDirection({
           { transform: to },
         ],
         {
-          duration: Math.min(820, 360 + distance * 0.55),
+          duration: Math.min(820, 360 + distance * 0.5),
           easing: "cubic-bezier(0.35, 0.1, 0.25, 1)",
         },
       );
     },
     [perch],
   );
-  const newestId = lines[lines.length - 1]?.id;
+  const newestId = latest?.id;
   useLayoutEffect(() => {
     reposition(true);
-  }, [reposition, newestId]);
+  }, [reposition, newestId, open, recheck.phase]);
   useEffect(() => {
     const host = section.current;
     if (!host) return;
@@ -898,7 +983,17 @@ export function JourneyDirection({
   const selectedPart = selected ? model.byId[selected] : null;
   const selectedRect = selected ? layout.rects[selected] : null;
   const simulating = recheck.phase !== "idle";
-  const lastRecorded = model.log[model.log.length - 1];
+  const running = recheck.phase === "running";
+  const greet = () => {
+    setMood("waving");
+    setGesture((value) => value + 1);
+    say(
+      planned
+        ? "I'll build this once you approve the plan."
+        : "Hi! I look after this server from your network.",
+    );
+    later(() => setMood(null), 2600);
+  };
   const cardProps = (part: Part) => ({
     part,
     model,
@@ -917,12 +1012,45 @@ export function JourneyDirection({
       className="axj2"
       aria-label="Architecture as journeys"
     >
-      <div className="axj2-condition">
-        <CertaintyTag certainty={model.condition.certainty}>
-          {conditionWord[model.condition.certainty]}
-        </CertaintyTag>
-        <p key={model.condition.text}>{model.condition.text}</p>
-      </div>
+      {/* What is true now, and what is missing. */}
+      <header className="axj3-head">
+        {page?.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
+        <div className="axj3-title">
+          <h1>Architecture</h1>
+          {page?.openUrl && !planned && (
+            <div className="axj3-open">
+              {model.restricted && (
+                <small>
+                  <ShieldCheck weight="bold" /> Only from your network
+                </small>
+              )}
+              <a href={page.openUrl} target="_blank" rel="noreferrer">
+                Open {model.headline}
+                <ArrowSquareOut weight="bold" />
+              </a>
+            </div>
+          )}
+        </div>
+        <div className="axj2-condition axj3-status">
+          <CertaintyTag certainty={model.condition.certainty}>
+            {conditionWord[model.condition.certainty]}
+          </CertaintyTag>
+          <p key={model.condition.text}>{model.condition.text}</p>
+        </div>
+        {model.gaps.length > 0 && (
+          <div className="axj3-gaps" aria-label="Not set up yet">
+            {model.gaps.map((gap) => (
+              <GapChip
+                key={gap.id}
+                gap={gap}
+                draft={gapDraft(gap, model)}
+                onAsk={onAsk}
+              />
+            ))}
+          </div>
+        )}
+      </header>
+      {page?.busy && page.chrome.activity}
 
       <div className="axj2-controls">
         <span className="axj2-label">Follow</span>
@@ -950,25 +1078,9 @@ export function JourneyDirection({
         <p className="axj2-caption" key={`${journey}:${replay}`}>
           {current?.summary}
         </p>
-        <button
-          type="button"
-          className="ax-button"
-          disabled={recheck.phase === "running" || planned}
-          onClick={() => {
-            setSelected(null);
-            recheck.run(order, 1100);
-          }}
-        >
-          {recheck.phase === "running" && (
-            <SpinnerGap weight="bold" className="ax-spin" />
-          )}
-          {recheck.phase === "running" ? "Checking…" : "Ask Server Guy to re-check"}
-          <span className="ax-invented">simulated</span>
-        </button>
       </div>
 
       <div
-        ref={stage}
         className={`axj2-stage${entering ? " is-entering" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
         data-journey={journey}
         data-shift={shift ?? undefined}
@@ -1013,7 +1125,7 @@ export function JourneyDirection({
         {/* Wires, and the light that travels them. */}
         <svg
           className="axj2-wires"
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 ${TOP} ${W} ${H}`}
           preserveAspectRatio="none"
           aria-hidden="true"
         >
@@ -1154,87 +1266,163 @@ export function JourneyDirection({
         )}
       </div>
 
-      {/* The agent's terminal: what it did, and what it is doing. */}
+      {/* Server Guy's console: its recorded work, folded to the latest line. */}
       <div
         ref={terminal}
-        className={`axj2-term${simulating ? " is-live" : ""}`}
-        aria-label="Server Guy's recent work"
+        className={`axj2-term${open ? " is-open" : ""}${simulating ? " is-live" : ""}`}
       >
-        <header>
-          <span>
-            server-guy · {model.headline.toLowerCase()} · {host?.name.toLowerCase() ?? "server"}
-          </span>
-          <em className={simulating ? "is-simulated" : undefined}>
-            {simulating
-              ? recheck.phase === "running"
-                ? "Simulated re-check · nothing is contacted"
-                : "Simulated re-check · nothing was contacted"
-              : lastRecorded
-                ? `Recorded work · last ${ago(lastRecorded.at, model.now)}`
-                : "No work recorded yet"}
-          </em>
-        </header>
-        <div className="axj2-term-lines" role="log" aria-live="polite">
-          {lines.length === 0 && (
-            <div className="axj2-term-line" data-tone="info">
-              <time>--:--:--</time>
-              <b>·</b>
-              <span ref={newest}>
-                {planned
-                  ? "Nothing has run yet. The plan waits for your approval."
-                  : "No work recorded yet."}
+        <div className="axj2-term-bar">
+          <button
+            type="button"
+            className="axj2-term-toggle"
+            aria-expanded={open}
+            aria-controls="axj2-term-body"
+            onClick={() => {
+              autoOpened.current = false;
+              const next = !open;
+              setOpen(next);
+              // Opened by hand: bring the work into view once it has unfolded.
+              if (next)
+                later(
+                  () =>
+                    terminal.current?.scrollIntoView({
+                      block: "nearest",
+                      behavior: reducedMotion() ? "auto" : "smooth",
+                    }),
+                  440,
+                );
+            }}
+          >
+            {open && !running ? (
+              <span className="axj2-term-title">
+                server-guy · {model.headline.toLowerCase()} ·{" "}
+                {host?.name.toLowerCase() ?? "server"}
               </span>
-            </div>
+            ) : (
+              <span className="axj2-term-ticker" data-tone={latest?.tone ?? "info"}>
+                <b aria-hidden="true">{latest ? glyph[latest.tone] : "·"}</b>
+                <span ref={newest} data-tag={tagOf(latest)}>
+                  {latest?.text ??
+                    (planned
+                      ? "Nothing has run yet. The plan waits for your approval."
+                      : "No work recorded yet.")}
+                </span>
+              </span>
+            )}
+            <em className={simulating ? "is-simulated" : undefined}>
+              {simulating
+                ? running
+                  ? "Simulated re-check · nothing is contacted"
+                  : "Simulated re-check · nothing was contacted"
+                : latest
+                  ? open
+                    ? `Recorded work · last ${ago(latest.at, model.now)}`
+                    : ago(latest.at, model.now)
+                  : ""}
+            </em>
+            <CaretDown weight="bold" className="axj2-term-caret" aria-hidden="true" />
+            <span className="ax-visually-hidden">
+              {open ? "Hide Server Guy's work" : "Show Server Guy's work"}
+            </span>
+          </button>
+          {!planned && (
+            <button
+              type="button"
+              className="axj2-term-action"
+              disabled={running}
+              onClick={() => {
+                setSelected(null);
+                recheck.run(order, 1100);
+              }}
+            >
+              {running ? (
+                <SpinnerGap weight="bold" className="ax-spin" />
+              ) : (
+                <ArrowsClockwise weight="bold" />
+              )}
+              {running ? "Checking…" : "Re-check"}
+              <span className="ax-invented">simulated</span>
+            </button>
           )}
-          {lines.map((line, i) => {
-            const previous = lines[i - 1];
-            const isNewest = i === lines.length - 1;
-            return (
-              <Fragment key={line.id}>
-                {(!previous || day(previous.at) !== day(line.at)) && (
-                  <div className="axj2-term-day">{day(line.at)}</div>
+        </div>
+        <div className="axj2-term-body" id="axj2-term-body">
+          <div>
+            {page?.last && (
+              <p className="axj2-term-origin">
+                # Last change: {page.last.title}
+                {page.last.conversation && page.last.open && (
+                  <>
+                    {" "}· from{" "}
+                    <button type="button" onClick={page.last.open}>
+                      {page.last.conversation}
+                    </button>
+                  </>
+                )}{" "}
+                · {ago(page.last.at, model.now)}
+                {page.earlier > 0 && (
+                  <>
+                    {" "}·{" "}
+                    <button type="button" onClick={() => onOpenDestination("history")}>
+                      {page.earlier} earlier
+                    </button>
+                  </>
                 )}
-                <div
-                  className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
-                  data-tone={line.tone}
-                >
-                  <time>{clock(line.at)}</time>
-                  <b aria-hidden="true">{glyph[line.tone]}</b>
-                  <span
-                    ref={isNewest ? newest : undefined}
-                    data-tag={
-                      line.invented
-                        ? line.id.startsWith("live:")
-                          ? "sim"
-                          : "invented"
-                        : undefined
-                    }
-                  >
-                    {line.text}
-                    {isNewest && recheck.phase === "running" && (
-                      <i className="axj2-caret" aria-hidden="true" />
-                    )}
+              </p>
+            )}
+            <div className="axj2-term-lines" role="log" aria-live="polite">
+              {lines.length === 0 && (
+                <div className="axj2-term-line" data-tone="info">
+                  <time>--:--:--</time>
+                  <b>·</b>
+                  <span>
+                    {planned
+                      ? "Nothing has run yet. The plan waits for your approval."
+                      : "No work recorded yet."}
                   </span>
                 </div>
-              </Fragment>
-            );
-          })}
+              )}
+              {lines.map((line, i) => {
+                const previous = lines[i - 1];
+                const isNewest = i === lines.length - 1;
+                return (
+                  <Fragment key={line.id}>
+                    {(!previous || day(previous.at) !== day(line.at)) && (
+                      <div className="axj2-term-day">{day(line.at)}</div>
+                    )}
+                    <div
+                      className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
+                      data-tone={line.tone}
+                    >
+                      <time>{clock(line.at)}</time>
+                      <b aria-hidden="true">{glyph[line.tone]}</b>
+                      <span
+                        ref={open && !running && isNewest ? newest : undefined}
+                        data-tag={tagOf(line)}
+                      >
+                        {line.text}
+                        {isNewest && running && (
+                          <i className="axj2-caret" aria-hidden="true" />
+                        )}
+                      </span>
+                    </div>
+                  </Fragment>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Little Server: on the roof of its server, or at work on the terminal. */}
+      {/* Little Server lives on the console. */}
       <div
         ref={mascot}
-        className={`axj2-mascot${perch === "terminal" ? " is-working" : ""}`}
-        onClick={() => {
-          setMood("waving");
-          setGesture((value) => value + 1);
-          say(
-            planned
-              ? "I'll build this once you approve the plan."
-              : "Hi! I look after this server.",
-          );
-          later(() => setMood(null), 2600);
+        className={`axj2-mascot${perch === "work" ? " is-working" : ""}`}
+        onClick={greet}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            greet();
+          }
         }}
         role="button"
         tabIndex={0}
@@ -1247,36 +1435,6 @@ export function JourneyDirection({
           </div>
         )}
       </div>
-
-      {model.gaps.length > 0 && (
-        <div className="axj2-gaps">
-          {model.gaps.map((gap) => (
-            <div key={gap.id} className="axj2-gap">
-              <span className="axj2-gap-icon" aria-hidden="true">
-                {gap.id === "tls" ? <LockOpen weight="bold" /> : <Heartbeat weight="bold" />}
-              </span>
-              <div>
-                <b>{gap.title}</b>
-                <p>{gap.detail}</p>
-              </div>
-              <button
-                type="button"
-                className="ax-textlink"
-                onClick={() =>
-                  onAsk(
-                    gap.id === "tls"
-                      ? `Set up a domain with HTTPS for ${model.headline}.`
-                      : `Watch ${model.headline} continuously and tell me when something fails.`,
-                  )
-                }
-              >
-                <ChatCircleText weight="bold" />
-                Ask in the conversation
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

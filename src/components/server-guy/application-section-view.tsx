@@ -236,56 +236,54 @@ export function ApplicationSectionView({
       content = null;
       break;
   }
-  return (
-    <div className={`sg-section-page sg-section-${section}`}>
-      {bar}
-      <header className="sg-section-header">
-        <div>
-          <h1>
-            {applicationSections.find((item) => item.id === section)?.label}
-          </h1>
-          <p>{descriptions[section]}</p>
+  const header = (
+    <header className="sg-section-header">
+      <div>
+        <h1>
+          {applicationSections.find((item) => item.id === section)?.label}
+        </h1>
+        <p>{descriptions[section]}</p>
+      </div>
+      {(live || facts.releases?.serving) && address && (
+        <div className="sg-open-application">
+          <a
+            className="sg-section-open-app"
+            href={address}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open application <ArrowSquareOut aria-hidden="true" />
+          </a>
+          {deployment?.plan?.httpAccess === "controller" && (
+            <small>Restricted to the controller’s network</small>
+          )}
         </div>
-        {(live || facts.releases?.serving) && address && (
-          <div className="sg-open-application">
-            <a
-              className="sg-section-open-app"
-              href={address}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open application <ArrowSquareOut aria-hidden="true" />
-            </a>
-            {deployment?.plan?.httpAccess === "controller" && (
-              <small>Restricted to the controller’s network</small>
-            )}
-          </div>
-        )}
-      </header>
-      {section === "architecture" ? (
-        <>
-          {activity && <div className="sg-section-activity">{activity}</div>}
-          {/* PROTOTYPE (claude/architecture-directions): three directions
-              for this destination, development builds only. */}
-          {process.env.NODE_ENV !== "production" ? (
-            <ArchitecturePrototype
-              application={app}
-              deployment={deployment}
-              facts={facts}
-              operations={operations}
-              onOpenDestination={onOpenDestination}
-              onAsk={(draft) => onAsk(null, draft)}
-              current={
-                <ArchitectureCanvas
-                  application={app}
-                  deployment={deployment}
-                  stack={stack}
-                  facts={facts}
-                  onOpenDestination={onOpenDestination}
-                />
-              }
-            />
-          ) : (
+      )}
+    </header>
+  );
+  // PROTOTYPE (claude/architecture-directions): directions for this
+  // destination, development builds only. The prototype receives the page's
+  // chrome so a direction can draw its own header.
+  if (section === "architecture" && process.env.NODE_ENV !== "production")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <ArchitecturePrototype
+          application={app}
+          deployment={deployment}
+          facts={facts}
+          operations={operations}
+          chats={view.chats}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
             <ArchitectureCanvas
               application={app}
               deployment={deployment}
@@ -293,7 +291,24 @@ export function ApplicationSectionView({
               facts={facts}
               onOpenDestination={onOpenDestination}
             />
-          )}
+          }
+        />
+      </div>
+    );
+  return (
+    <div className={`sg-section-page sg-section-${section}`}>
+      {bar}
+      {header}
+      {section === "architecture" ? (
+        <>
+          {activity && <div className="sg-section-activity">{activity}</div>}
+          <ArchitectureCanvas
+            application={app}
+            deployment={deployment}
+            stack={stack}
+            facts={facts}
+            onOpenDestination={onOpenDestination}
+          />
         </>
       ) : (
         <div className="sg-section-content">
