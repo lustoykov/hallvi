@@ -2154,3 +2154,326 @@ it.skipIf(!piProof)(
   },
   90 * 60_000,
 );
+
+const reuseEvidence = join(
+  process.cwd(),
+  "tests/results/native-compose-proof/pi-proof",
+);
+const sharedBuilds = (path: string) =>
+  file(path, readFileSync(join("tests/fixtures/shared-builds", path)));
+it.skipIf(!piProof)(
+  "the configured Pi model installs independently built web and worker services that share files and SQLite, then updates them keeping their data",
+  async () => {
+    // The product's saved Pi choice. Only the settings file is copied; the
+    // credential it names stays in place and is read by Pi's runtime alone.
+    const settings = process.env.SG_PI_SETTINGS;
+    if (!settings || !existsSync(settings))
+      throw new Error("Set SG_PI_SETTINGS to a saved pi-settings.json.");
+    mkdirSync(join(root, "private"), { recursive: true });
+    copyFileSync(settings, join(root, "private", "pi-settings.json"));
+    const tree = (version: string) => [
+      ...[
+        "README.md",
+        "web/Dockerfile",
+        "web/app.py",
+        "worker/Dockerfile",
+        "worker/worker.py",
+      ].map(sharedBuilds),
+      file("web/version.txt", version),
+      file("worker/version.txt", version),
+    ];
+    // v2's worker runs as its own UID. A fresh install tolerates that, but
+    // the results volume v1 created stays owned by the old UID: a failure
+    // only the host reveals, and only with retained data.
+    host.trees = {
+      [A]: tree("v1"),
+      [B]: tree("v2").map((item) =>
+        item.path === "worker/Dockerfile"
+          ? file(
+              item.path,
+              item.content.toString().replaceAll("65534:65534", "10001:10001"),
+            )
+          : item,
+      ),
+    };
+    host.head = A;
+    const { app, chat } = newApplication("shared-builds");
+    const web = (path: string, init?: RequestInit) =>
+      fetch(`http://${host.endpoint}${path}`, init);
+    const result = async () => (await (await web("/result")).json()).result;
+    const compose = (...args: string[]) =>
+      docker([
+        "compose",
+        "-p",
+        `sg-${host.id.slice(0, 8)}`,
+        "-f",
+        join(host.root, "compose.json"),
+        ...args,
+      ]);
+    /** Each service's build, image and volume mounts, recorded and running. */
+    const arrangement = () => {
+      const record = applicationDeployment(app)!;
+      const facts = currentFacts(record)!;
+      const sorted = <T extends { target: string }>(items: T[]) =>
+        items.sort((a, b) => a.target.localeCompare(b.target));
+      return facts.services.map((service) => {
+        const container = compose("ps", "-q", service.name);
+        const [image, mounts] = JSON.parse(
+          docker([
+            "inspect",
+            "--format",
+            "[{{json .Image}},{{json .Mounts}}]",
+            container,
+          ]),
+        ) as [
+          string,
+          { Type: string; Name?: string; Destination: string; RW: boolean }[],
+        ];
+        return {
+          service: service.name,
+          container,
+          build: record.native?.resolved.services[service.name].build ?? null,
+          image,
+          recorded: sorted(
+            facts.volumes.flatMap((volume) =>
+              volume.mounts
+                .filter((mount) => mount.service === service.name)
+                .map((mount) => ({
+                  volume: volume.dockerName,
+                  target: mount.target,
+                  readOnly: mount.readOnly,
+                })),
+            ),
+          ),
+          running: sorted(
+            mounts
+              .filter((mount) => mount.Type === "volume")
+              .map((mount) => ({
+                volume: mount.Name!,
+                target: mount.Destination,
+                readOnly: !mount.RW,
+              })),
+          ),
+        };
+      });
+    };
+    const created = () =>
+      Object.fromEntries(
+        currentFacts(applicationDeployment(app))!.volumes.map((volume) => [
+          volume.dockerName,
+          docker([
+            "volume",
+            "inspect",
+            "--format",
+            "{{.CreatedAt}}",
+            volume.dockerName,
+          ]),
+        ]),
+      );
+    const value = "retained value from v1";
+    stubLocalFetch();
+    try {
+      const installed = await observe(app, () =>
+        install(
+          app,
+          chat,
+          "Deploy this application with its background worker. Its stored value, submitted documents and results must survive updates.",
+          (record) =>
+            Object.fromEntries(
+              currentFacts(record)!.inputs.map((name) => [
+                name,
+                `synthetic-${name.toLowerCase()}`,
+              ]),
+            ),
+          40 * 60_000,
+        ),
+      );
+      // Harness steps between phases must not lose the model evidence: a
+      // failure is recorded, the evidence written, and then it is reported.
+      let problem: unknown = null;
+      let before: ReturnType<typeof arrangement> | null = null;
+      let after: ReturnType<typeof arrangement> | null = null;
+      let volumes: Record<string, string> | null = null;
+      let processed: unknown = null;
+      let updated: Awaited<ReturnType<typeof observe>> | null = null;
+      try {
+        if (installed.status === "live") {
+          before = arrangement();
+          volumes = created();
+          expect(
+            (
+              await web("/value", {
+                method: "POST",
+                body: JSON.stringify({ value }),
+              })
+            ).status,
+          ).toBe(200);
+          // The job reaches the worker through the shared documents, and its
+          // result returns through the shared results.
+          await expect.poll(result, { timeout: 60000 }).toBe(`${value}@v1`);
+          processed = await result();
+          updated = await observe(app, async () => {
+            host.head = B;
+            const proposed = await proposeApplicationRelease(
+              app,
+              chat,
+              "HEAD",
+              "Update to the latest revision. Keep the stored value, the submitted documents and the worker's results.",
+            );
+            const started = startChange(proposed.id, proposed.updatedAt);
+            await executeOperation(started, () =>
+              runApplicationRelease(started, AbortSignal.timeout(45 * 60_000)),
+            );
+          });
+          if (updated.outcome === "completed") after = arrangement();
+        }
+      } catch (error) {
+        problem = error;
+      }
+      const current = applicationDeployment(app)!;
+      const chosen = JSON.parse(readFileSync(settings, "utf8"));
+      const text = JSON.stringify(
+        {
+          model: {
+            providerId: chosen.providerId,
+            modelId: chosen.modelId,
+            reasoningEffort: chosen.reasoningEffort,
+          },
+          transport:
+            "Worker, approval route, provisioning code, planners, workspace, resolver, executor and verification are real. Stand-ins: SSH runs the host script locally; the provider API is a fake that returns this machine; GitHub listings come from fixture trees; the host's port 80 is mapped to a loopback port at execution.",
+          fixture:
+            "tests/fixtures/shared-builds with version.txt v1 at A; B has v2 and a worker Dockerfile running as UID 10001 instead of 65534.",
+          provider: {
+            servers: host.cloud.servers.length,
+            firewall: host.cloud.firewall,
+          },
+          phases: [installed, updated].map(
+            (phase) => phase && { ...phase, journal: undefined },
+          ),
+          arrangement: { installed: before, updated: after },
+          volumesCreated: volumes,
+          processedBeforeUpdate: processed,
+          runtime: current.lifecycle?.runtime,
+          harnessError: problem ? String(problem) : null,
+        },
+        null,
+        2,
+      );
+      mkdirSync(reuseEvidence, { recursive: true });
+      writeFileSync(join(reuseEvidence, "evidence.json"), text);
+      const journals = JSON.stringify([installed.journal, updated?.journal]);
+      // No private value reached the evidence, the record or Pi's workspace.
+      const password = join(
+        root,
+        "private",
+        "deployments",
+        host.id,
+        "database-password",
+      );
+      for (const secret of [
+        ...(existsSync(password) ? [readFileSync(password, "utf8")] : []),
+        ...(currentFacts(current)?.inputs ?? []).map(
+          (name) => `synthetic-${name.toLowerCase()}`,
+        ),
+      ]) {
+        expect(text).not.toContain(secret);
+        expect(JSON.stringify(current)).not.toContain(secret);
+        expect(journals).not.toContain(secret);
+      }
+      writeFileSync(join(reuseEvidence, "journal.json"), journals);
+      if (problem) throw problem;
+      expect(installed).toMatchObject({ outcome: "completed", status: "live" });
+      expect(
+        installed.selections.some(
+          (entry) => entry.stage === "intake" && entry.accepted,
+        ),
+      ).toBe(true);
+      expect(updated).toMatchObject({ outcome: "completed" });
+      expect(current.lifecycle!.runtime).toMatchObject({
+        state: "verified",
+        lastVerified: { revision: B },
+      });
+      for (const services of [before!, after!]) {
+        // What runs is what the release records.
+        for (const item of services)
+          expect(item.running).toEqual(item.recorded);
+        // At least two services build their own, distinct images.
+        const builds = services.filter((item) => item.build);
+        expect(builds.length).toBeGreaterThanOrEqual(2);
+        expect(new Set(builds.map((item) => item.image)).size).toBe(
+          builds.length,
+        );
+      }
+      // The update replaced every built image.
+      for (const item of after!.filter((item) => item.build))
+        expect(
+          before!.find((previous) => previous.service === item.service)?.image,
+        ).not.toBe(item.image);
+      // A volume one service writes and another only reads; read-only mounts
+      // refuse writes.
+      const mounts = after!.flatMap((item) =>
+        item.running.map((mount) => ({ ...mount, container: item.container })),
+      );
+      const shared = [...new Set(mounts.map((mount) => mount.volume))].filter(
+        (volume) => {
+          const users = mounts.filter((mount) => mount.volume === volume);
+          return (
+            users.some((mount) => mount.readOnly) &&
+            users.some((mount) => !mount.readOnly)
+          );
+        },
+      );
+      expect(shared.length).toBeGreaterThanOrEqual(1);
+      const readOnly = mounts.filter((mount) => mount.readOnly);
+      for (const mount of readOnly)
+        expect(() =>
+          docker([
+            "exec",
+            mount.container,
+            "touch",
+            `${mount.target}/forbidden`,
+          ]),
+        ).toThrow(/Read-only file system/);
+      // Old state survives, and the new worker processed the retained
+      // document into the retained results.
+      expect(await (await web("/value")).json()).toEqual({ value });
+      await expect.poll(result, { timeout: 60000 }).toBe(`${value}@v2`);
+      expect(await (await web("/version")).json()).toEqual({ version: "v2" });
+      expect(created()).toEqual(volumes);
+      writeFileSync(
+        join(reuseEvidence, "checks.json"),
+        JSON.stringify(
+          {
+            processedBeforeUpdate: processed,
+            valueRetained: value,
+            processedAfterUpdate: `${value}@v2`,
+            version: "v2",
+            volumesKept: volumes,
+            sharedWithMixedAccess: shared,
+            readOnlyWritesRefused: readOnly.map(
+              ({ volume, target }) => `${volume} at ${target}`,
+            ),
+            builtImages: Object.fromEntries(
+              after!
+                .filter((item) => item.build)
+                .map((item) => [
+                  item.service,
+                  {
+                    before: before!.find(
+                      (previous) => previous.service === item.service,
+                    )?.image,
+                    after: item.image,
+                  },
+                ]),
+            ),
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      cleanup(host.id, []);
+    }
+  },
+  90 * 60_000,
+);
