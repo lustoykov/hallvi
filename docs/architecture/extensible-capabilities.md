@@ -2,6 +2,8 @@
 
 10 September 2026. **Agreed direction; first deployment slice described in [service-based deployment](service-deployment.md). Plugin execution remains undecided.**
 
+The [requirements-driven deployment design](requirements-driven-deployment.md) reviews the remaining generalization gaps against `ee396b2`, after generalized backups and compatible rollback merged. It proposes reusable tools composed by Pi before any plugin runtime. The baseline assessment below is historical, not the current backup-support limit.
+
 [Product](../../PRODUCT.md#generalization-and-extensibility) owns the scope and experience. [Roadmap](../../ROADMAP.md#current-priority-service-based-deployment) owns sequencing. This brief explains the proposed responsibility boundary, not a new parallel delivery plan or a completed plugin system.
 
 ## Why this direction

@@ -24,6 +24,9 @@ const mocks = vi.hoisted(() => ({
   propose: vi.fn(),
   deployment: vi.fn(),
   read: vi.fn(),
+  workspace: vi.fn(),
+  execute: vi.fn(),
+  dispose: vi.fn(),
 }));
 vi.mock("../../../src/server/application-releases", () => ({
   proposeApplicationRelease: mocks.propose,
@@ -36,7 +39,13 @@ vi.mock("../../../src/server/rollback", async (original) => ({
   ...(await original<typeof import("../../../src/server/rollback")>()),
   readReleaseFile: mocks.read,
 }));
-vi.mock("@earendil-works/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
+  // Pi's own native tool schemas and descriptions; execution is replaced.
+  ...Object.fromEntries(
+    Object.entries(
+      await original<typeof import("@earendil-works/pi-coding-agent")>(),
+    ).filter(([name]) => /^create\w+ToolDefinition$/.test(name)),
+  ),
   createAgentSession: mocks.create,
   defineTool: <T>(tool: T) => tool,
   DefaultResourceLoader: class {
@@ -46,6 +55,17 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
     async reload() {}
   },
   SettingsManager: { inMemory: () => ({ isolated: true }) },
+}));
+// A Run's workspace executes in Docker; these tests observe what reaches it.
+vi.mock("../../../src/server/pi-workspace", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi-workspace")>()),
+  PiWorkspace: class {
+    constructor(options: unknown) {
+      mocks.workspace(options);
+    }
+    execute = mocks.execute;
+    dispose = mocks.dispose;
+  },
 }));
 vi.mock("../../../src/server/operation-tools", () => ({
   operationContext: () => [],
@@ -79,6 +99,11 @@ import {
   searchDecisionParameters,
 } from "../../../src/server/pi-decisions";
 import { applicationStatusParameters } from "../../../src/server/pi-status";
+import { PI_BUILTIN_TOOLS } from "../../../src/server/pi-workspace";
+import {
+  callNativeToolsThroughSdk,
+  nativeToolCalls,
+} from "../fixtures/native-tools";
 
 const model = {
   provider: "openai-codex",
@@ -161,6 +186,11 @@ type Options = {
   model: unknown;
   thinkingLevel: string;
 };
+/** A tool registered in the first session, by name. */
+function registered(name: string) {
+  const options = mocks.create.mock.calls[0][0] as Options;
+  return options.customTools.find((tool) => tool.name === name)!;
+}
 let session: ReturnType<typeof fakeSession>;
 let handles: Array<{
   sessionManager: { getSessionFile: () => string };
@@ -555,12 +585,19 @@ describe("native Pi adapter", () => {
     expect(mocks.open).toHaveBeenCalledWith(run.applicationId, run.chatId);
     const options = mocks.create.mock.calls[0][0] as Options;
     expect(options).toMatchObject({
-      noTools: "all",
       sessionManager: handles[0].sessionManager,
       settingsManager: { isolated: true },
     });
     const names = options.customTools.map((tool) => tool.name);
     expect(names).toEqual([
+      "read",
+      "write",
+      "edit",
+      "bash",
+      "powershell",
+      "grep",
+      "find",
+      "ls",
       "propose_decision",
       "search_decisions",
       "get_application_status",
@@ -573,8 +610,8 @@ describe("native Pi adapter", () => {
       "propose_change",
       "record_inspection",
     ]);
-    // With noTools "all", a registered tool missing from the allowlist is
-    // never offered to the model.
+    // The allowlist offers exactly the registered tools. A native name
+    // without a registered replacement would run on the controller.
     expect([...options.tools].sort()).toEqual([...names].sort());
     expect(mocks.search).not.toHaveBeenCalled();
     // Nothing is read on the model's behalf before it asks.
@@ -614,6 +651,51 @@ describe("native Pi adapter", () => {
       session.dispose.mock.invocationCallOrder[0],
     );
   });
+  it.each(["start", "inspect-app", "make-launch-ready"] as const)(
+    "offers Pi's native tools in the %s phase only through the Run's workspace, never the controller",
+    async (phaseKey) => {
+      const answer = {
+        content: [{ type: "text", text: "workspace result" }],
+        details: {},
+      };
+      mocks.execute.mockResolvedValue(answer);
+      const cancel = new AbortController();
+      let native:
+        Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
+      session.prompt.mockImplementation(async () => {
+        native = await callNativeToolsThroughSdk(
+          mocks.create.mock.calls[0][0] as Options,
+          cancel.signal,
+        );
+        session.finish();
+      });
+      await askPi({ ...input, phaseKey });
+      expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          applicationId: run.applicationId,
+          runId: run.id,
+        }),
+      );
+      // Each call, with its cancellation signal, reached the Run's workspace.
+      expect(mocks.execute.mock.calls).toEqual(
+        PI_BUILTIN_TOOLS.map((name) => [
+          name,
+          `call-${name}`,
+          nativeToolCalls[name],
+          cancel.signal,
+        ]),
+      );
+      expect(Object.values(native!.results)).toEqual(
+        PI_BUILTIN_TOOLS.map(() => answer),
+      );
+      expect(native!.controllerFiles).toEqual([]);
+      // The Run's namespace ends with its session.
+      expect(mocks.dispose).toHaveBeenCalledOnce();
+      expect(mocks.dispose.mock.invocationCallOrder[0]).toBeGreaterThan(
+        session.dispose.mock.invocationCallOrder[0],
+      );
+    },
+  );
   it("opens distinct Chat handles and applies new preferences only to later sessions", async () => {
     const first = fakeSession();
     const pending = deferred();
@@ -654,12 +736,11 @@ describe("native Pi adapter", () => {
   it("binds lookup/proposals to the Run application and labels successful proposals pending", async () => {
     let pendingResult: unknown;
     session.prompt.mockImplementation(async () => {
-      const options = mocks.create.mock.calls[0][0] as Options;
-      pendingResult = await options.customTools[0].execute("proposal", {
+      pendingResult = await registered("propose_decision").execute("proposal", {
         kind: "launch-priority",
         value: "  Recover quickly  ",
       });
-      await options.customTools[1].execute("lookup", {
+      await registered("search_decisions").execute("lookup", {
         query: "recovery",
         offset: 0,
       });
@@ -690,20 +771,17 @@ describe("native Pi adapter", () => {
       sourceProposal: null,
       acceptanceProposal: null,
     });
-    expect(
-      (mocks.create.mock.calls[0][0] as Options).customTools[0]
-        .constrainedSampling,
-    ).toEqual({ type: "json_schema", strict: "require" });
+    expect(registered("propose_decision").constrainedSampling).toEqual({
+      type: "json_schema",
+      strict: "require",
+    });
   });
   it("reads status only for the Run's application and Chat and returns the projection as tool content", async () => {
     let result: unknown;
     session.prompt.mockImplementation(async () => {
-      const tool = (mocks.create.mock.calls[0][0] as Options).customTools[2];
-      expect(tool).toMatchObject({
-        name: "get_application_status",
-        label: "Look up application status",
-      });
-      result = await tool.execute("status", {});
+      const status = registered("get_application_status");
+      expect(status).toMatchObject({ label: "Look up application status" });
+      result = await status.execute("status", {});
       session.finish();
     });
     await askPi(input);
@@ -803,10 +881,9 @@ describe("native Pi adapter", () => {
       throw new Error("Status storage unavailable");
     });
     session.prompt.mockImplementation(async () => {
-      const tool = (mocks.create.mock.calls[0][0] as Options).customTools[2];
-      await expect(tool.execute("status", {})).rejects.toThrow(
-        "Status storage unavailable",
-      );
+      await expect(
+        registered("get_application_status").execute("status", {}),
+      ).rejects.toThrow("Status storage unavailable");
       session.finish();
     });
     await expect(askPi(input)).resolves.toMatchObject({ message: "Done." });
@@ -816,15 +893,15 @@ describe("native Pi adapter", () => {
       throw new Error("Replacement is no longer active");
     });
     session.prompt.mockImplementation(async () => {
-      const tool = (mocks.create.mock.calls[0][0] as Options).customTools[0];
+      const proposal = registered("propose_decision");
       await expect(
-        tool.execute("bad", {
+        proposal.execute("bad", {
           kind: "launch-priority",
           value: "Wrong target",
           replaces: "old-id",
         }),
       ).rejects.toThrow("no longer active");
-      await tool.execute("corrected", {
+      await proposal.execute("corrected", {
         kind: "launch-priority",
         value: "Add recovery",
       });
@@ -912,15 +989,16 @@ describe("native Pi adapter", () => {
       expect(session.abortCompaction).toHaveBeenCalled();
       expect(session.abort).toHaveBeenCalledOnce();
       if (phase === "tool") {
-        const tools = (mocks.create.mock.calls[0][0] as Options).customTools;
         await expect(
-          tools[0].execute("late", {
+          registered("propose_decision").execute("late", {
             kind: "launch-priority",
             value: "Too late",
           }),
         ).rejects.toThrow();
         expect(mocks.collect).not.toHaveBeenCalled();
-        await expect(tools[2].execute("late-status", {})).rejects.toThrow();
+        await expect(
+          registered("get_application_status").execute("late-status", {}),
+        ).rejects.toThrow();
         expect(mocks.status).not.toHaveBeenCalled();
       }
       expect(handles[0].release).not.toHaveBeenCalled();

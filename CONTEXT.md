@@ -8,6 +8,8 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Stack**: The services, worker processes, schedules, private connections and persistent state required by one Application on one instance.
 
+**Application requirement**: A declared need for running or checking an Application, grounded in its software configuration, documentation or the owner's request. Declaring a requirement does not establish that Server Guy can fulfill it.
+
 **Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state.
 
 **Application view**: An inspectable projection of recorded application facts and work, such as deployment, data or health. Chat receipts and views refer to the same records.
@@ -32,6 +34,8 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Observation**: A timestamped fact attributed to its source, such as a probe result, command output, metric sample or provider response.
 
+**Behavior criterion**: An observable outcome chosen to establish that an Application performs an intended task. An observation can satisfy or fail a criterion; a running process alone does not establish useful behavior.
+
 **Finding / diagnosis**: The agent's interpretation of observations, including uncertainty and possible cause. It remains distinguishable from the observations themselves.
 
 **Decision**: An explicit application-specific user requirement or choice, saved with its origin. A replacement supersedes the earlier decision without erasing history.
@@ -55,6 +59,10 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 **Deployment attempt**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same.
 
 **Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
+
+**Operational inventory**: An application's identifiable services, storage and network resources, with their source and observation time. Intended configuration and observed runtime are distinct inventory facts.
+
+**Observed runtime**: The application configuration and running images established on a host at a recorded time, whether or not its intended behavior has been verified. A known running configuration and a working application are separate claims.
 
 **Operability change**: A change needed to run or check the application, such as its start entrypoint or environment-driven port. Application-code changes in this category require an owner-merged PR.
 

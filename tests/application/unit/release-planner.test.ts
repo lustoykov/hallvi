@@ -1,7 +1,12 @@
 import { expect, it, vi } from "vitest";
 import { queuePlan } from "../../fixtures/queue-worker/plan";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
-const mock = vi.hoisted(() => ({ create: vi.fn() }));
+const mock = vi.hoisted(() => ({
+  create: vi.fn(),
+  workspace: vi.fn(),
+  execute: vi.fn(),
+  dispose: vi.fn(),
+}));
 vi.mock("../../../src/server/deployment-store", () => ({
   deploymentEvent: vi.fn(),
   deploymentMessage: vi.fn(),
@@ -15,7 +20,13 @@ vi.mock("../../../src/server/pi-configuration", () => ({
   }),
   piConfigDir: () => "/tmp/synthetic-pi",
 }));
-vi.mock("@earendil-works/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
+  // Pi's own native tool schemas and descriptions; execution is replaced.
+  ...Object.fromEntries(
+    Object.entries(
+      await original<typeof import("@earendil-works/pi-coding-agent")>(),
+    ).filter(([name]) => /^create\w+ToolDefinition$/.test(name)),
+  ),
   defineTool: (tool: unknown) => tool,
   createAgentSession: mock.create,
   SettingsManager: { inMemory: () => ({}) },
@@ -24,7 +35,20 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
     async reload() {}
   },
 }));
+// The planning workspace executes in Docker; tests observe what reaches it.
+vi.mock("../../../src/server/pi-workspace", async (original) => ({
+  ...(await original<typeof import("../../../src/server/pi-workspace")>()),
+  PiWorkspace: class {
+    constructor(options: unknown) {
+      mock.workspace(options);
+    }
+    execute = mock.execute;
+    dispose = mock.dispose;
+  },
+}));
 import { planDeployment } from "../../../src/server/deployment-planner";
+import { PI_BUILTIN_TOOLS } from "../../../src/server/pi-workspace";
+import { callNativeToolsThroughSdk } from "../fixtures/native-tools";
 
 it("returns validation and execution feedback to the same Pi session, which corrects and resubmits", async () => {
   const seen: unknown[] = [];
@@ -145,4 +169,62 @@ it("accepts verified reconciliation as completion without another deploy tool ca
   );
   expect(apply).toHaveBeenCalledTimes(1);
   expect(reconcile).toHaveBeenCalledTimes(1);
+});
+
+it("gives the planner Pi's native tools only through a workspace seeded with the planned tree", async () => {
+  const files = [
+    {
+      path: "Dockerfile",
+      mode: 0o644,
+      content: Buffer.from("FROM python:3.12"),
+    },
+  ];
+  const answer = {
+    content: [{ type: "text", text: "workspace result" }],
+    details: {},
+  };
+  mock.workspace.mockClear();
+  mock.dispose.mockClear();
+  mock.execute.mockReset().mockResolvedValue(answer);
+  let native: Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
+  mock.create.mockImplementation(async (options) => ({
+    session: {
+      prompt: async () => {
+        native = await callNativeToolsThroughSdk(options);
+        await options.customTools
+          .find((t: { name: string }) => t.name === "submit_plan")
+          .execute("plan", { json: JSON.stringify(queuePlan()) });
+      },
+      waitForIdle: async () => {},
+      dispose: vi.fn(),
+      abort: vi.fn(),
+    },
+  }));
+  const revision = "a".repeat(40);
+  const record = {
+    id: "deployment-a",
+    applicationId: "app-a",
+    operationId: "operation-a",
+    repository: "qa/example",
+    revision,
+  } as DeploymentRecord;
+  await planDeployment(files, record, new AbortController().signal);
+  expect(mock.execute.mock.calls.map(([name]) => name)).toEqual([
+    ...PI_BUILTIN_TOOLS,
+  ]);
+  expect(Object.values(native!.results)).toEqual(
+    PI_BUILTIN_TOOLS.map(() => answer),
+  );
+  expect(native!.controllerFiles).toEqual([]);
+  const [workspace] = mock.workspace.mock.calls[0];
+  expect(workspace).toMatchObject({
+    applicationId: "app-a",
+    runId: "operation-a",
+  });
+  // Pi explores exactly the tree being planned.
+  await expect(workspace.source()).resolves.toEqual({
+    description: `qa/example@${revision}`,
+    files,
+  });
+  expect(mock.dispose).toHaveBeenCalledOnce();
 });
