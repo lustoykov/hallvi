@@ -1,3 +1,4 @@
+import { assertApprovedRelease } from "./deployment-release";
 import { getApplication } from "./db";
 import { spawn } from "node:child_process";
 import { deploymentLock } from "./deployment-ssh";
@@ -27,7 +28,6 @@ import {
 } from "./deployment-store";
 import {
   deploymentPlanSchema,
-  type DeploymentPlan,
   type DeploymentRecord,
 } from "./deployment-types";
 import { fetchBaseTree } from "./execution-tree";
@@ -76,119 +76,8 @@ function databasePassword(record: DeploymentRecord) {
     });
   return readFileSync(path, "utf8");
 }
-export function composeDefinition(
-  plan: DeploymentPlan,
-  revision: string,
-  id: string,
-  password: string,
-  supplied: Record<string, string>,
-) {
-  const environment = Object.fromEntries(
-    plan.environment.map((item) => [item.name, item.value]),
-  );
-  Object.assign(environment, supplied);
-  if (plan.postgres)
-    environment[plan.postgres.variable] =
-      `${plan.postgres.scheme}://serverguy:${password}@postgres:5432/application`;
-  // Compose interprets dollars in values, including user secrets. Escape once
-  // at serialization; never let a remote shell expand these strings.
-  const literal = (value: string) => value.replaceAll("$", () => "$$");
-  const volumes: Record<string, object> = plan.postgres ? { database: {} } : {};
-  const services: Record<string, unknown> = {
-    app: {
-      image: plan.image ?? `server-guy-${id}:${revision}`,
-      ...(plan.image
-        ? {}
-        : {
-            build: {
-              context: `./source/${plan.context}`,
-              dockerfile:
-                plan.context === "."
-                  ? plan.dockerfile
-                  : `${"../".repeat(plan.context.split("/").length)}${plan.dockerfile}`,
-            },
-          }),
-      restart: "unless-stopped",
-      ports: [`80:${plan.port}`],
-      environment: Object.fromEntries(
-        Object.entries(environment).map(([key, value]) => [
-          key,
-          literal(value),
-        ]),
-      ),
-      labels: { "server-guy.revision": revision, "server-guy.deployment": id },
-      ...(plan.command ? { command: plan.command.map(literal) } : {}),
-      ...(plan.postgres
-        ? { depends_on: { postgres: { condition: "service_healthy" } } }
-        : {}),
-      logging: {
-        driver: "json-file",
-        options: { "max-size": "10m", "max-file": "3" },
-      },
-    },
-  };
-  if (plan.postgres)
-    services.postgres = {
-      image: `postgres:${plan.postgres.version}`,
-      restart: "unless-stopped",
-      environment: {
-        POSTGRES_USER: "serverguy",
-        POSTGRES_PASSWORD: password,
-        POSTGRES_DB: "application",
-      },
-      volumes: [
-        `database:/var/lib/postgresql${plan.postgres.version === "18" ? "" : "/data"}`,
-      ],
-      healthcheck: {
-        test: ["CMD-SHELL", "pg_isready -U serverguy -d application"],
-        interval: "5s",
-        timeout: "5s",
-        retries: 20,
-      },
-      logging: {
-        driver: "json-file",
-        options: { "max-size": "10m", "max-file": "3" },
-      },
-    };
-  const mount = (service: {
-    name: string;
-    volumes?: DeploymentPlan["volumes"];
-    configs?: DeploymentPlan["configs"];
-  }) => {
-    const result: string[] = [];
-    for (const volume of service.volumes ?? []) {
-      volumes[volume.name] = {};
-      result.push(`${volume.name}:${volume.target}`);
-    }
-    for (const config of service.configs ?? [])
-      result.push(
-        `./configs/${service.name}-${config.name}:${config.target}:ro`,
-      );
-    return result;
-  };
-  (services.app as Record<string, unknown>).volumes = mount({
-    name: "app",
-    volumes: plan.volumes,
-    configs: plan.configs,
-  });
-  for (const service of plan.services ?? []) {
-    services[service.name] = {
-      image: service.image,
-      restart: "unless-stopped",
-      ...(service.command ? { command: service.command.map(literal) } : {}),
-      environment: Object.fromEntries(
-        service.environment.map((e) => [e.name, literal(e.value)]),
-      ),
-      volumes: mount(service),
-      labels: { "server-guy.revision": revision, "server-guy.deployment": id },
-      logging: {
-        driver: "json-file",
-        options: { "max-size": "10m", "max-file": "3" },
-      },
-    };
-  }
-  return { services, volumes };
-}
+export { composeDefinition } from "./deployment-compose";
+import { composeDefinition, composeStartCommand } from "./deployment-compose";
 
 async function command(
   file: string,
@@ -473,6 +362,7 @@ export async function executeDeployment(
       "The application source changed. This deployment cannot be applied to another repository.",
     );
   deploymentPlanSchema.parse(record.plan);
+  assertApprovedRelease(record);
   for (const image of [
     record.plan.image,
     ...(record.plan.services ?? []).map((s) => s.image),
@@ -680,7 +570,7 @@ export async function executeDeployment(
         ...sshArgs(record),
         deploymentLock(
           record.id,
-          `cd ${root} && docker compose -p sg-${record.id.slice(0, 8)} -f compose.json up -d --build --wait --wait-timeout 120`,
+          `cd ${root} && ${composeStartCommand(record.plan, `docker compose -p sg-${record.id.slice(0, 8)} -f compose.json`)}`,
         ),
       ],
       signal,
@@ -759,7 +649,11 @@ export async function verifyDeployment(
     return fetch(url, {
       ...init,
       redirect: "error",
-      signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+      signal: AbortSignal.any([
+        signal,
+        AbortSignal.timeout(20000),
+        ...(init.signal ? [init.signal] : []),
+      ]),
     });
   };
   // A running container may still be initializing its HTTP listener. Retry
@@ -791,6 +685,13 @@ export async function verifyDeployment(
     throw new Error(
       "The public application did not become ready within the verification window. The existing host is retained.",
     );
+  record.serviceReadiness ??= {};
+  record.serviceReadiness.app ??= {
+    checkedAt: new Date().toISOString(),
+    kind: "http",
+    imageId: record.serviceImages?.app ?? record.imageId ?? null,
+  };
+  saveDeployment(record);
   const cleanup = async () => {
     if (!record.cleanup) return;
     const response = await request(record.cleanup.path, { method: "DELETE" });
@@ -865,13 +766,32 @@ export async function verifyDeployment(
         record.verificationPending = marker;
         saveDeployment(record);
       }
-      const response = await request(path, {
+      const waitSignal = check.waitSeconds
+        ? AbortSignal.timeout(check.waitSeconds * 1000)
+        : undefined;
+      let response = await request(path, {
+        signal: waitSignal,
         method: check.method,
         ...(body
           ? { body, headers: { "Content-Type": "application/json" } }
           : {}),
       });
-      const text = await response.text();
+      let text = await response.text();
+      const matches = () =>
+        response.status === check.expectedStatus &&
+        responseContains(
+          text,
+          check.contains.replaceAll("SG_VERIFY_TOKEN", marker),
+        );
+      // Only the explicitly declared read is polled. Never repeat a POST,
+      // and always retain the marked-object cleanup protocol on failure.
+      while (check.method === "GET" && waitSignal && !matches()) {
+        await delay(1000, undefined, {
+          signal: AbortSignal.any([signal, waitSignal]),
+        });
+        response = await request(path, { method: "GET", signal: waitSignal });
+        text = await response.text();
+      }
       if (check.captureId) {
         let value: unknown = JSON.parse(text);
         for (const part of check.captureId.split("."))
@@ -941,6 +861,8 @@ export async function verifyServiceImages(
   record: DeploymentRecord,
   signal: AbortSignal,
 ) {
+  record.serviceReadiness = {};
+  saveDeployment(record);
   const expected = [
     "app",
     ...(record.plan?.postgres ? ["postgres"] : []),
@@ -986,6 +908,12 @@ export async function verifyServiceImages(
       throw new Error(`Service ${name} changed since it was recorded.`);
     images[name] = container.Image;
   }
+  for (const service of record.plan?.services ?? []) {
+    if (service.imageFrom && images[service.name] !== images.app)
+      throw new Error(
+        `Service ${service.name} does not use the same image as app.`,
+      );
+  }
   record.serviceImages = images;
   saveDeployment(record);
 }
@@ -994,6 +922,35 @@ export async function verifyPrivateServices(
   record: DeploymentRecord,
   signal: AbortSignal,
 ) {
+  // Clear previous readiness before observing this attempt; failure must not
+  // leave an earlier passing check attached to a replaced container.
+  record.serviceReadiness = {};
+  saveDeployment(record);
+  for (const service of [
+    { name: "app", healthCommand: record.plan!.healthCommand },
+    ...(record.plan!.services ?? []),
+  ]) {
+    if (!service.healthCommand) continue;
+    const output = await command(
+      "ssh",
+      [
+        ...sshArgs(record),
+        `cd /opt/server-guy/${record.id} && docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q ${service.name})`,
+      ],
+      signal,
+    );
+    if (output.trim() !== "healthy")
+      throw new Error(
+        `Service ${service.name} has not passed its readiness command.`,
+      );
+    record.serviceReadiness[service.name] = {
+      checkedAt: new Date().toISOString(),
+      kind: "command",
+      imageId: record.serviceImages?.[service.name] ?? null,
+    };
+    saveDeployment(record);
+    deploymentEvent(record, `Verified readiness command: ${service.name}`);
+  }
   for (const service of record.plan!.services ?? []) {
     if (!service.port || !service.healthPath) continue;
     const output = await command(
@@ -1030,6 +987,12 @@ export async function verifyPrivateServices(
         `Verified private ${service.name}: ${check.path}`,
       );
     }
+    record.serviceReadiness[service.name] = {
+      checkedAt: new Date().toISOString(),
+      kind: "http",
+      imageId: record.serviceImages?.[service.name] ?? null,
+    };
+    saveDeployment(record);
   }
 }
 

@@ -15,6 +15,7 @@ vi.mock("../../../src/server/deployment-store", () => ({
 import {
   recreateDeployment,
   verifyServiceImages,
+  verifyPrivateServices,
 } from "../../../src/server/deployment-executor";
 const digest = `sha256:${"a".repeat(64)}`;
 const record = () =>
@@ -89,4 +90,51 @@ it("records each accepted running service image", async () => {
   );
   await verifyServiceImages(r, new AbortController().signal);
   expect(r.serviceImages).toEqual({ app: digest });
+});
+
+it("rejects a shared-image worker that is actually running different bytes", async () => {
+  const r = record();
+  r.plan!.services = [
+    { name: "worker", imageFrom: "app" },
+  ] as unknown as NonNullable<typeof r.plan>["services"];
+  run.mockImplementation(() =>
+    result(
+      [
+        [digest, `example/app@${digest}`, "app", true],
+        [`sha256:${"b".repeat(64)}`, `example/app@${digest}`, "worker", true],
+      ]
+        .map((c) => JSON.stringify(c))
+        .join("\n"),
+    ),
+  );
+  await expect(
+    verifyServiceImages(r, new AbortController().signal),
+  ).rejects.toThrow("same image as app");
+});
+
+it("clears earlier readiness when a service is no longer running", async () => {
+  const r = record();
+  r.serviceReadiness = {
+    app: { checkedAt: "yesterday", kind: "command", imageId: digest },
+  };
+  run.mockImplementation(() =>
+    result(JSON.stringify([digest, `example/app@${digest}`, "app", false])),
+  );
+  await expect(
+    verifyServiceImages(r, new AbortController().signal),
+  ).rejects.toThrow("not running");
+  expect(r.serviceReadiness).toEqual({});
+});
+
+it("does not record a passing readiness result for an unhealthy worker", async () => {
+  const r = record();
+  r.plan!.services = [
+    { name: "worker", imageFrom: "app", healthCommand: ["python", "ready.py"] },
+  ] as unknown as NonNullable<typeof r.plan>["services"];
+  run.mockImplementation(() => result("unhealthy\n"));
+  await expect(
+    verifyPrivateServices(r, new AbortController().signal),
+  ).rejects.toThrow("has not passed");
+  expect(r.serviceReadiness).toEqual({});
+  expect(run.mock.calls[0][1].at(-1)).not.toContain(".Config.Env");
 });

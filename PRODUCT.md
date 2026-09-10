@@ -50,7 +50,17 @@ An Application has its own name, host, configuration, releases and history. Mult
 
 The agent recommends one sensible path, explains why on demand and lets the user override it. Ask only for missing inputs, consequential choices or required authority. No mandatory stages, setup questionnaire, permanent right rail or proliferation of equivalent controls. Each supported flow needs reusable interactive components and a discoverable durable view; capability lists do not dictate sidebar labels or a tab per dependency. Unused infrastructure should not clutter the interface.
 
-The user can inspect work, facts and evidence without generating a new view. Custom **Plugins** remain an optional later extension, not a prerequisite for core care or a commitment to self-generating UI now.
+The user can inspect work, facts and evidence without generating a new view. Plugins should normally contribute findings and actions to the existing application views, with their origin visible. A dedicated panel is appropriate when the domain needs it; installing a plugin should not automatically add another sidebar destination.
+
+## Generalization and extensibility
+
+**The agreed direction is a reusable core with optional, versioned Plugins.** Different images, paths, ports and environment values belong in configuration. Capabilities promised by the supported scope belong in the core; a plugin must not become a required workaround for an incomplete core capability. Specialised application APIs, functional checks and domain-specific presentation are appropriate extensions. Application-name branches in core deployment or backup behavior require a concrete, documented reason; representative application tests remain valuable.
+
+Server Guy should be able to help author a plugin when a missing specialised capability blocks useful work. Drafting and testing the package are separate from enabling its code and access. Users should be able to inspect its source, origin, version, requested access and test evidence; keep it private, export it, or propose it upstream through a PR. Community distribution is a direction, not a promise of a marketplace or universal compatibility.
+
+The core retains authority enforcement, secret handling, operation coordination, durable evidence and recovery records. A plugin cannot grant itself access or silently redefine a successful operation. Exportable packages exclude credentials; recovery preserves the selected version, required configuration and extension state, with secrets separately protected. Disabling a plugin must retain historical evidence and identify any ongoing work that depends on it.
+
+This is a design direction agreed on 10 September 2026, not a shipped plugin runtime. The [architecture brief](docs/architecture/extensible-capabilities.md) records the boundary and open questions; [ROADMAP.md](ROADMAP.md) owns implementation order. API shape, code isolation and UI contribution mechanisms remain open for review with Fable.
 
 ## Reliability and limits
 
@@ -60,4 +70,4 @@ Manual replacement-host recovery preserves application history and establishes o
 
 **Coolify is a reference, not a feature-parity requirement.** Excluded: multi-host application/database orchestration, replicas/clusters, automatic failover, Kafka/RabbitMQ operation and MySQL/MariaDB support. WordPress therefore remains outside the selected database scope. When a stack outgrows one instance, preserve portable configuration and data so its owner can move elsewhere.
 
-Previews, automatic-on-push releases, extra provisioners, dedicated build servers, richer teams, plugin runtime and integrated external-agent transports are not prerequisites for this product. Their priority belongs only in the roadmap.
+Previews, automatic-on-push releases, extra provisioners, dedicated build servers, richer teams, a general plugin marketplace and integrated external-agent transports are not prerequisites for this product. Plugin extraction should grow from concrete capabilities rather than block core generalization on a broad runtime. Priority belongs only in the roadmap.

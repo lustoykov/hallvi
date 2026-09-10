@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const name = z.string().regex(/^[a-z][a-z0-9-]{0,39}$/);
+export const serviceNameSchema = z.string().regex(/^[a-z][a-z0-9-]{0,39}$/);
 const target = z
   .string()
   .regex(/^\/(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/)
@@ -11,13 +11,13 @@ export const imageReferenceSchema = z
     /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[0-9a-f]{64})$/,
   );
 export const volumeMountSchema = z.strictObject({
-  name,
+  name: serviceNameSchema,
   target,
   kind: z.enum(["database", "files"]),
   sqlite: z.string().max(250).nullable(),
 });
 export const configMountSchema = z.strictObject({
-  name,
+  name: serviceNameSchema,
   target,
   content: z.string().max(20000),
 });
@@ -30,11 +30,16 @@ export const environmentSchema = z
   )
   .max(30);
 export const composeServiceSchema = z.strictObject({
-  name: name.refine(
+  name: serviceNameSchema.refine(
     (n) => !["app", "postgres"].includes(n),
     "Reserved service name",
   ),
-  image: imageReferenceSchema,
+  image: imageReferenceSchema.optional(),
+  /** Reuse the exact primary image, built once if it comes from source. */
+  imageFrom: z.literal("app").optional(),
+  role: z.enum(["web", "worker", "broker", "service"]).optional(),
+  /** Read-only readiness command inside this service, never the host. */
+  healthCommand: z.array(z.string().min(1).max(500)).min(1).max(20).optional(),
   command: z.array(z.string().min(1).max(500)).max(20).nullable(),
   environment: environmentSchema,
   volumes: z.array(volumeMountSchema).max(8),
@@ -61,4 +66,19 @@ export const composeServiceSchema = z.strictObject({
       }),
     )
     .max(5),
+});
+
+export const dependencySchema = z.strictObject({
+  service: serviceNameSchema,
+  needs: serviceNameSchema,
+  condition: z.enum(["started", "healthy"]),
+});
+export const inputBindingSchema = z.strictObject({
+  service: serviceNameSchema,
+  variable: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+  input: z
+    .string()
+    .regex(/^[A-Z_][A-Z0-9_]*$/)
+    .optional(),
+  connection: z.literal("postgres").optional(),
 });

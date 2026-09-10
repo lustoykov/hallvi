@@ -54,7 +54,11 @@ export function stackSummary(stack: ApplicationStack) {
   if (!stack.recorded) return "Not deployed yet";
   const workers = stack.processes.filter((item) => item.role === "worker");
   return [
-    `${stack.processes.length - workers.length} web`,
+    `${stack.processes.filter((p) => p.role === "web").length} web`,
+    ...(["broker", "service"] as const).flatMap((role) => {
+      const count = stack.processes.filter((p) => p.role === role).length;
+      return count ? [`${count} ${role}${count === 1 ? "" : "s"}`] : [];
+    }),
     ...(workers.length
       ? [`${workers.length} worker${workers.length === 1 ? "" : "s"}`]
       : []),

@@ -50,9 +50,11 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Release**: A selected immutable source/image identity and deployment configuration intended to run for an Application.
 
-**Deployment**: An attempt to put a specific release into the application's runtime and verify it. A failed attempt does not identify which release is serving.
+**Deployment attempt (Deployment in existing code)**: An attempt to put a specific release into the application's runtime and verify it. A failed attempt does not identify which release is serving.
 
 **Operability change**: A change needed to run or check the application, such as its start entrypoint or environment-driven port. Application-code changes in this category require an owner-merged PR.
+
+**Service role**: The responsibility of a running component within a stack: serving HTTP, consuming background work, brokering work, or providing another private service. A role does not prove health or behavior.
 
 ## Background work and protection
 
