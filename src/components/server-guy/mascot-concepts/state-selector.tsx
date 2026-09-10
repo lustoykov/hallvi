@@ -10,10 +10,17 @@ import {
   WarningCircle,
   type Icon,
 } from "@phosphor-icons/react";
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
-import { MotionContext } from "./mascot";
 import { STATES, stateMeta, type StateId } from "./model";
+import { MotionContext } from "./motion";
 
 export const STATE_ICONS: Record<StateId, Icon> = {
   calm: Leaf,
@@ -25,25 +32,54 @@ export const STATE_ICONS: Record<StateId, Icon> = {
   verified: Sparkle,
 };
 
-const SPARK_COLORS = ["#ffc94d", "#8fb3ff", "#ffffff", "#ffc94d", "#8fb3ff", "#ffffff", "#ffc94d"];
+const SPARK_COLORS = [
+  "#ffc94d",
+  "#8fb3ff",
+  "#ffffff",
+  "#ffc94d",
+  "#8fb3ff",
+  "#ffffff",
+  "#ffc94d",
+];
 
 /**
  * A sliding pill for the application state. The thumb is a damped spring:
  * it stretches toward where it is going, overshoots a little and settles.
  * Click a segment, drag the thumb, or use the arrow keys.
  */
-export function StateSelector({ value, onChange }: { value: StateId; onChange: (s: StateId) => void }) {
+export function StateSelector({
+  value,
+  onChange,
+}: {
+  value: StateId;
+  onChange: (s: StateId) => void;
+}) {
   const { reduced } = useContext(MotionContext);
   const trackRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
   const segs = useRef<(HTMLButtonElement | null)[]>([]);
   const fx = useRef<HTMLDivElement>(null);
-  const sim = useRef({ x: 0, w: 0, v: 0, vw: 0, tx: 0, tw: 0, raf: 0, last: 0 });
-  const drag = useRef<{ id: number; startX: number; moved: boolean } | null>(null);
+  const sim = useRef({
+    x: 0,
+    w: 0,
+    v: 0,
+    vw: 0,
+    tx: 0,
+    tw: 0,
+    raf: 0,
+    last: 0,
+  });
+  const drag = useRef<{ id: number; startX: number; moved: boolean } | null>(
+    null,
+  );
   const [dragOver, setDragOver] = useState<number | null>(null);
   const index = STATES.findIndex((s) => s.id === value);
   const reduced$ = useRef(reduced);
-  reduced$.current = reduced;
+  const valueRef = useRef(value);
+  useEffect(() => {
+    reduced$.current = reduced;
+    valueRef.current = value;
+  }, [reduced, value]);
 
   const paint = () => {
     const s = sim.current;
@@ -65,7 +101,11 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
     s.x += s.v * dt;
     s.vw += (k * (s.tw - s.w) - c * s.vw) * dt;
     s.w += s.vw * dt;
-    const settled = Math.abs(s.tx - s.x) < 0.3 && Math.abs(s.v) < 6 && Math.abs(s.tw - s.w) < 0.3 && Math.abs(s.vw) < 6;
+    const settled =
+      Math.abs(s.tx - s.x) < 0.3 &&
+      Math.abs(s.v) < 6 &&
+      Math.abs(s.tw - s.w) < 0.3 &&
+      Math.abs(s.vw) < 6;
     if (settled) {
       Object.assign(s, { x: s.tx, w: s.tw, v: 0, vw: 0, raf: 0 });
       paint();
@@ -96,7 +136,8 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
     return el ? { x: el.offsetLeft, w: el.offsetWidth } : { x: 0, w: 0 };
   };
 
-  // Place the thumb without animation on mount and whenever the layout changes (fonts, resize).
+  // Place the thumb without animation on mount and whenever the layout
+  // changes (fonts, resize).
   const first = useRef(true);
   useLayoutEffect(() => {
     const snap = () => {
@@ -109,23 +150,7 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
     return () => ro.disconnect();
   }, []);
 
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    const b = segBox(index);
-    moveTo(b.x, b.w);
-    if (!reduced) celebrate(b.x + b.w / 2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
-
-  useEffect(() => () => cancelAnimationFrame(sim.current.raf), []);
-
-  /** Sparkles fly out of the thumb and a soft sheen sweeps across the control. */
+  /** Sparkles fly out of the thumb; a soft sheen sweeps across the control. */
   const celebrate = (cx: number) => {
     const host = fx.current;
     if (!host) return;
@@ -145,18 +170,46 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
       el.style.left = `${cx}px`;
       el.style.setProperty("--c", SPARK_COLORS[i]);
       host.appendChild(el);
-      const a = -Math.PI / 2 + ((i - 3) / 3) * 1.25 + (Math.random() - 0.5) * 0.3;
+      const a =
+        -Math.PI / 2 + ((i - 3) / 3) * 1.25 + (Math.random() - 0.5) * 0.3;
       const d = 22 + Math.random() * 16;
       el.animate(
         [
-          { transform: "translate(-50%, -50%) scale(0.2) rotate(0deg)", opacity: 1 },
-          { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(1) rotate(90deg)`, opacity: 1, offset: 0.55 },
-          { transform: `translate(calc(-50% + ${Math.cos(a) * d * 1.3}px), calc(-50% + ${Math.sin(a) * d * 1.3 + 6}px)) scale(0.3) rotate(160deg)`, opacity: 0 },
+          {
+            transform: "translate(-50%, -50%) scale(0.2) rotate(0deg)",
+            opacity: 1,
+          },
+          {
+            transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(1) rotate(90deg)`,
+            opacity: 1,
+            offset: 0.55,
+          },
+          {
+            transform: `translate(calc(-50% + ${Math.cos(a) * d * 1.3}px), calc(-50% + ${Math.sin(a) * d * 1.3 + 6}px)) scale(0.3) rotate(160deg)`,
+            opacity: 0,
+          },
         ],
-        { duration: 720 + i * 20, delay: 120, easing: "cubic-bezier(.2,.8,.3,1)" },
+        {
+          duration: 720 + i * 20,
+          delay: 120,
+          easing: "cubic-bezier(.2,.8,.3,1)",
+        },
       ).onfinish = () => el.remove();
     }
   };
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const b = segBox(index);
+    moveTo(b.x, b.w);
+    if (!reduced) celebrate(b.x + b.w / 2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  useEffect(() => () => cancelAnimationFrame(sim.current.raf), []);
 
   const nearest = (clientX: number) => {
     const track = trackRef.current!;
@@ -190,7 +243,10 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
     const { i, px } = nearest(e.clientX);
     const s = sim.current;
     const trackW = trackRef.current!.clientWidth;
-    moveTo(Math.min(Math.max(px - s.tw / 2, 2), trackW - s.tw - 2), segBox(i).w);
+    moveTo(
+      Math.min(Math.max(px - s.tw / 2, 2), trackW - s.tw - 2),
+      segBox(i).w,
+    );
     setDragOver(i);
   };
 
@@ -264,7 +320,11 @@ export function StateSelector({ value, onChange }: { value: StateId; onChange: (
               data-tone={s.tone}
               onClick={() => onChange(s.id)}
             >
-              <I size={14} weight={on ? "bold" : "regular"} aria-hidden="true" />
+              <I
+                size={14}
+                weight={on ? "bold" : "regular"}
+                aria-hidden="true"
+              />
               {s.label}
             </button>
           );

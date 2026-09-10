@@ -1,17 +1,14 @@
 /**
- * The data behind the mascot exploration: application states, the
- * parametric expression each state maps to, the six concepts and the
- * scripted terminal loop. Everything here is invented for the prototype.
+ * The data behind the mascot family exploration: application states, the
+ * family mood each state maps to, what each cousin adds, and the scripted
+ * terminal loop. Everything here is invented for the prototype.
  */
 
+import type { Mood } from "../mascot-family/pose";
+import type { FamilyId } from "../mascot-family/roster";
+
 export type StateId =
-  | "calm"
-  | "checking"
-  | "working"
-  | "waiting"
-  | "failed"
-  | "stale"
-  | "verified";
+  "calm" | "checking" | "working" | "waiting" | "failed" | "stale" | "verified";
 
 export type Tone = "verified" | "working" | "waiting" | "failed" | "neutral";
 
@@ -24,162 +21,167 @@ export type StateMeta = {
 };
 
 export const STATES: StateMeta[] = [
-  { id: "calm", label: "Calm", moment: "Verified, nothing needs you", tone: "verified" },
-  { id: "checking", label: "Checking", moment: "Reading health checks and logs", tone: "working" },
-  { id: "working", label: "Working", moment: "Recreating 2 containers", tone: "working" },
-  { id: "waiting", label: "Waiting for you", moment: "Approve a new server, €5.99/mo", tone: "waiting" },
-  { id: "failed", label: "Failed", moment: "A readiness check timed out", tone: "failed" },
-  { id: "stale", label: "Stale", moment: "No new evidence for 26 hours", tone: "neutral" },
-  { id: "verified", label: "Verified!", moment: "The restore test just passed", tone: "verified" },
+  {
+    id: "calm",
+    label: "Calm",
+    moment: "Verified, nothing needs you",
+    tone: "verified",
+  },
+  {
+    id: "checking",
+    label: "Checking",
+    moment: "Reading health checks and logs",
+    tone: "working",
+  },
+  {
+    id: "working",
+    label: "Working",
+    moment: "Recreating 2 containers",
+    tone: "working",
+  },
+  {
+    id: "waiting",
+    label: "Waiting for you",
+    moment: "Approve a new server, €5.99/mo",
+    tone: "waiting",
+  },
+  {
+    id: "failed",
+    label: "Failed",
+    moment: "A readiness check timed out",
+    tone: "failed",
+  },
+  {
+    id: "stale",
+    label: "Stale",
+    moment: "No new evidence for 26 hours",
+    tone: "neutral",
+  },
+  {
+    id: "verified",
+    label: "Verified!",
+    moment: "The restore test just passed",
+    tone: "verified",
+  },
 ];
 
 export const stateMeta = (id: StateId) => STATES.find((s) => s.id === id)!;
 
-export type EyeShape = "open" | "happy" | "closed" | "wide" | "sparkle" | "squint";
-export type MouthShape = "smile" | "open" | "o" | "wobbly" | "flat" | "grin";
-export type LoopId = "breathe" | "look" | "busy" | "wait" | "steady" | "doze" | "none";
-
-/** One face and posture. Every field transitions smoothly in CSS. */
-export type Expression = {
-  eyes: EyeShape;
-  /** Vertical eye openness, 0 closed to 1 open. */
-  open: number;
-  /** Resting gaze in character units (about ±6 across, ±4 down). */
-  gazeX: number;
-  gazeY: number;
-  /** Brow angle in degrees: positive is worried (inner ends up), negative focused. */
-  brow: number;
-  browLift: number;
-  /** Extra lift for the right brow only: the curious raised brow. */
-  browAsym: number;
-  browOpacity: number;
-  mouth: MouthShape;
-  /** 1 neutral, below 1 squashed, above 1 stretched. */
-  squash: number;
-  tilt: number;
-  loop: LoopId;
+/** Each application state as one of Little Server's moods. */
+export const MOOD_FOR: Record<StateId, Mood> = {
+  calm: "ready",
+  checking: "checking",
+  working: "working",
+  waiting: "waiting",
+  failed: "attention",
+  stale: "resting",
+  verified: "celebrating",
 };
 
-export const EXPRESSIONS: Record<StateId, Expression> = {
-  calm: {
-    eyes: "open", open: 1, gazeX: 0, gazeY: 0, brow: 0, browLift: 0, browAsym: 0,
-    browOpacity: 0, mouth: "smile", squash: 1, tilt: 0, loop: "breathe",
-  },
-  checking: {
-    eyes: "open", open: 1, gazeX: 0, gazeY: -1, brow: 0, browLift: 3, browAsym: 5,
-    browOpacity: 1, mouth: "o", squash: 1.03, tilt: -4, loop: "look",
-  },
-  working: {
-    eyes: "open", open: 0.82, gazeX: 1, gazeY: 3, brow: -5, browLift: 1, browAsym: 0,
-    browOpacity: 1, mouth: "flat", squash: 1, tilt: 0, loop: "busy",
-  },
-  waiting: {
-    eyes: "wide", open: 1, gazeX: 0, gazeY: 0, brow: 5, browLift: 4, browAsym: 0,
-    browOpacity: 1, mouth: "smile", squash: 1.02, tilt: 4, loop: "wait",
-  },
-  failed: {
-    eyes: "open", open: 0.9, gazeX: 0, gazeY: 1, brow: 12, browLift: 2, browAsym: 0,
-    browOpacity: 1, mouth: "flat", squash: 0.97, tilt: 0, loop: "steady",
-  },
-  stale: {
-    eyes: "squint", open: 0.42, gazeX: -1, gazeY: 2, brow: -3, browLift: -2, browAsym: 0,
-    browOpacity: 0, mouth: "flat", squash: 0.95, tilt: -5, loop: "doze",
-  },
-  verified: {
-    eyes: "happy", open: 1, gazeX: 0, gazeY: 0, brow: 0, browLift: 5, browAsym: 0,
-    browOpacity: 0, mouth: "grin", squash: 1, tilt: 0, loop: "none",
-  },
+/** What the whole family does in each state, for the expressions sheet. */
+export const STATE_POSE: Record<StateId, string> = {
+  calm: "pill eyes · smile · breathing, blinking",
+  checking: "squint · brows up · clipboard",
+  working: "narrow eyes · flat mouth · wrench",
+  waiting: "looks at you · waves once · blank card",
+  failed: "worried brows · concern mouth · warm eyes",
+  stale: "eyes closed · slow sway · z",
+  verified: "happy eyes · joy · jump with arms up",
 };
 
-/** Short, human description of an expression for the expressions sheet. */
-export function describeExpression(e: Expression): string {
-  const brow =
-    e.browOpacity === 0 ? "no brows" : e.brow > 0 ? `brows +${e.brow}°` : e.brow < 0 ? `brows ${e.brow}°` : "brows up";
-  return `eyes ${e.eyes} · ${brow} · mouth ${e.mouth} · body ${e.squash.toFixed(2)}`;
-}
-
-export type ConceptId = "otter" | "crab" | "tardigrade" | "lantern" | "beaver" | "mote";
-
-export type Concept = {
-  id: ConceptId;
-  name: string;
-  species: string;
+export type Profile = {
+  role: string;
   pitch: string;
   metaphor: string;
   words: [string, string, string];
-  /** The single characterful accent the concept introduces. */
-  accent: string;
-  accentName: string;
+  poke: string;
+  idle: string;
+  /** What this cousin adds to a state on top of the family's shared pose. */
+  signature: Partial<Record<StateId, string>>;
 };
 
-export const CONCEPTS: Concept[] = [
-  {
-    id: "otter",
-    name: "Tuck",
-    species: "Sea otter",
-    pitch: "Floats on its back, unbothered, with your data tucked safely under its arm.",
+export const PROFILES: Record<FamilyId, Profile> = {
+  server: {
+    role: "The original · caretaker",
+    pitch:
+      "The one from your home page: a small, steady server with a screen for a face, looking after what you run.",
     metaphor:
-      "Otters keep a favourite stone in a pouch under the arm. Tuck's pebble is your data: held, polished, never dropped.",
-    words: ["Calm", "Loyal", "Playful"],
-    accent: "#7d5238",
-    accentName: "Cocoa brown",
+      "Clipboard for checks, wrench for fixes, a wave when you arrive. Every cousin on this page is built from its parts.",
+    words: ["Steady", "Friendly", "Handy"],
+    poke: "pops its hatch",
+    idle: "waves hello",
+    signature: {},
   },
-  {
-    id: "crab",
-    name: "Nook",
-    species: "Hermit crab",
-    pitch: "Carries a tiny server rack as its shell. Self-hosting is carrying your own home.",
+  tower: {
+    role: "Tower · night watch",
+    pitch:
+      "A tall, patient cousin who stays up while you sleep. Its status light is the last one on in the house.",
     metaphor:
-      "The rack is the shell: a home you own and move with. Eye-stalks do the acting; when worried it tucks in and peeks out.",
-    words: ["Curious", "Shy", "Scrappy"],
-    accent: "#d4694b",
-    accentName: "Terracotta",
+      "Backups run at 03:00 and checks run all night. Lumen's light pulses while it looks and dims when it naps.",
+    words: ["Patient", "Watchful", "Quiet"],
+    poke: "flashes its light",
+    idle: "looks around like a lighthouse",
+    signature: {
+      checking: "light pulses",
+      working: "bays blink",
+      stale: "light dims",
+    },
   },
-  {
-    id: "tardigrade",
-    name: "Moss",
-    species: "Tardigrade",
-    pitch: "The near-indestructible moss piglet. Data that survives the host.",
+  rack: {
+    role: "1U rack · heavy lifter",
+    pitch:
+      "Wide, low and happiest carrying something. Tug hauls the deploy crate onto the server.",
     metaphor:
-      "Tardigrades survive by curling into a tun and uncurling when it's safe. Moss does the same under stress, then gets back to work.",
-    words: ["Sturdy", "Earnest", "Unflappable"],
-    accent: "#e2c69a",
-    accentName: "Oatmeal",
+      "Rack units are built to be stacked and carried: rack ears, four stubby feet, and a crate on its back while a deploy runs.",
+    words: ["Strong", "Earnest", "Unhurried"],
+    poke: "wobbles like a loaf",
+    idle: "naps",
+    signature: { working: "crate on its back" },
   },
-  {
-    id: "lantern",
-    name: "Wick",
-    species: "Lantern keeper",
-    pitch: "A small lantern whose flame is its heart, keeping the night watch.",
+  pip: {
+    role: "Single-board · scout",
+    pitch:
+      "The youngest cousin: a big face on a small board, always first to go and look.",
     metaphor:
-      "Backups run at 03:00 while you sleep. Wick stays up: brightness and flicker show where its attention is.",
-    words: ["Cosy", "Watchful", "Sleepy"],
-    accent: "#ffbf4d",
-    accentName: "Flame",
+      "Tiny computers go everywhere. Pip wears its chip on its chest and peeks around corners. The clearest at 24 px.",
+    words: ["Curious", "Quick", "Bright"],
+    poke: "spins around",
+    idle: "hops over to peek",
+    signature: { working: "board light blinks" },
   },
-  {
-    id: "beaver",
-    name: "Birch",
-    species: "Beaver",
-    pitch: "Builds the dam, then keeps fixing it. Earnest, a bit goofy, pencil behind the ear.",
+  vault: {
+    role: "Backup keeper",
+    pitch:
+      "Chunky, careful and never without its disk. Trove keeps a copy of everything that matters.",
     metaphor:
-      "Beavers build and maintain. Birch gnaws through the work, and slaps its tail when something needs attention.",
-    words: ["Earnest", "Handy", "Goofy"],
-    accent: "#a8683f",
-    accentName: "Russet",
+      "A vault dial on the belly and drive bays beside it. It sets the disk down gently to work and picks it straight back up.",
+    words: ["Careful", "Loyal", "Sturdy"],
+    poke: "hugs its disk tighter",
+    idle: "pats its disk",
+    signature: {
+      checking: "dial ticks",
+      working: "dial spins · disk set down",
+      failed: "holds the disk close",
+      verified: "disk held high",
+    },
   },
-  {
-    id: "mote",
-    name: "Mote",
-    species: "Pebble sprite",
-    pitch: "A soft sea-glass pebble with two eyes. All acting is squash, stretch and shape.",
+  relay: {
+    role: "Relay · network and security",
+    pitch:
+      "A router whose antennas are ears. They perk up at every knock and droop when a line goes quiet.",
     metaphor:
-      "No limbs, no props: just a little presence that is always there. The most universal concept and the clearest at 16px.",
-    words: ["Simple", "Warm", "Bouncy"],
-    accent: "#9ec3e6",
-    accentName: "Sea glass",
+      "Networks are mostly listening. Ping hears the domain, the firewall and the certificate, and its ears show what it heard.",
+    words: ["Alert", "Chatty", "Protective"],
+    poke: "ears go boing",
+    idle: "listens, ears swivelling",
+    signature: {
+      checking: "ears perk and swivel",
+      working: "lights chatter",
+      failed: "ears droop",
+      stale: "ears flop",
+    },
   },
-];
+};
 
 export type LogLine = {
   text: string;
@@ -190,13 +192,43 @@ export type LogLine = {
 };
 
 export const TERMINAL_SCRIPT: LogLine[] = [
-  { text: "Last evidence for grafana: 26 h ago", state: "stale", kind: "plain", hold: 2600 },
-  { text: "Checking Grafana health…", state: "checking", kind: "work", hold: 2600 },
+  {
+    text: "Last evidence for grafana: 26 h ago",
+    state: "stale",
+    kind: "plain",
+    hold: 2600,
+  },
+  {
+    text: "Checking Grafana health…",
+    state: "checking",
+    kind: "work",
+    hold: 2600,
+  },
   { text: "✓ database ok", state: "calm", kind: "ok", hold: 1800 },
-  { text: "Recreating 2 containers…", state: "working", kind: "work", hold: 3000 },
-  { text: "Waiting for your approval: create server €5.99/mo", state: "waiting", kind: "wait", hold: 3600 },
-  { text: "Approved · creating cx22 in fsn1…", state: "working", kind: "work", hold: 2600 },
-  { text: "✗ prometheus /-/ready timed out", state: "failed", kind: "fail", hold: 3000 },
+  {
+    text: "Recreating 2 containers…",
+    state: "working",
+    kind: "work",
+    hold: 3000,
+  },
+  {
+    text: "Waiting for your approval: create server €5.99/mo",
+    state: "waiting",
+    kind: "wait",
+    hold: 3600,
+  },
+  {
+    text: "Approved · creating cx22 in fsn1…",
+    state: "working",
+    kind: "work",
+    hold: 2600,
+  },
+  {
+    text: "✗ prometheus /-/ready timed out",
+    state: "failed",
+    kind: "fail",
+    hold: 3000,
+  },
   { text: "Retrying…", state: "working", kind: "work", hold: 2600 },
   { text: "✓ Verified", state: "verified", kind: "ok", hold: 4200 },
 ];

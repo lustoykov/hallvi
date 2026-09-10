@@ -1,0 +1,182 @@
+/* Live and still renders of the Little Server family. Everything is prefixed mf-. */
+
+.mf-live {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mf-live canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.mf-fx,
+.mf-glyph,
+.mf-z,
+.mf-fallback {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mf-fx {
+  inset: 0;
+}
+
+/* The outline sits on the element and the star shape on ::before, so clip-path does not cut the outline. */
+.mf-spark {
+  position: absolute;
+  top: var(--mf-head-y, 20%);
+  left: var(--mf-head-x, 50%);
+  width: 15px;
+  height: 15px;
+  margin: -7.5px 0 0 -7.5px;
+  opacity: 0;
+  filter: drop-shadow(0 0 0.7px #26324a) drop-shadow(0 0 0.5px #26324a);
+}
+
+.mf-spark:nth-child(even) {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+}
+
+.mf-live[data-framing="walker"] .mf-spark {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+}
+
+.mf-spark::before,
+.mf-glyph i {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--c, #ffc94d);
+  clip-path: polygon(
+    50% 0,
+    61% 39%,
+    100% 50%,
+    61% 61%,
+    50% 100%,
+    39% 61%,
+    0 50%,
+    39% 39%
+  );
+}
+
+/* The still sparkle for reduced motion. */
+.mf-glyph {
+  top: var(--mf-head-y, 20%);
+  left: var(--mf-head-x, 50%);
+  width: 36px;
+  height: 36px;
+  margin: -30px 0 0 10px;
+  opacity: 0;
+  filter: drop-shadow(0 0 0.8px #26324a) drop-shadow(0 0 0.6px #26324a);
+  transition: opacity 150ms ease;
+}
+
+.mf-glyph i:first-child {
+  inset: 0 10px 10px 0;
+}
+
+.mf-glyph i:last-child {
+  inset: auto 0 0 auto;
+  width: 13px;
+  height: 13px;
+  --c: #ffffff;
+}
+
+.mf-live[data-glyph="1"] .mf-glyph {
+  opacity: 1;
+}
+
+/* Dozing z's beside the head. */
+.mf-z {
+  top: var(--mf-z-y, 20%);
+  left: var(--mf-z-x, 70%);
+  color: #3e4a60;
+  font:
+    700 18px/1 var(--font-geist-sans),
+    system-ui,
+    sans-serif;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+
+.mf-z b {
+  position: absolute;
+  top: -10px;
+  left: 0;
+  animation: mf-z 2.6s ease-in-out infinite;
+}
+
+.mf-z b + b {
+  top: -27px;
+  left: 14px;
+  font-size: 13px;
+  animation-delay: 1.3s;
+}
+
+.mf-live[data-framing="walker"] .mf-z {
+  font-size: 13px;
+}
+
+.mf-live[data-framing="walker"] .mf-z b + b {
+  top: -20px;
+  left: 10px;
+  font-size: 10px;
+}
+
+.mf-live[data-nap="1"] .mf-z {
+  opacity: 1;
+}
+
+.mf-live[data-still="1"] .mf-z b {
+  animation: none;
+}
+
+/* Shown only when the browser gives no WebGL context. */
+.mf-fallback {
+  inset: 0;
+  display: none;
+  place-items: center;
+  color: #192338;
+  font:
+    600 14px/1.15 var(--font-geist-mono),
+    ui-monospace,
+    monospace;
+  text-align: center;
+}
+
+.mf-live[data-broken="1"] .mf-fallback {
+  display: grid;
+}
+
+.mf-still {
+  display: block;
+}
+
+.mf-still--wait {
+  border-radius: 6px;
+  background: rgb(140 159 185 / 12%);
+}
+
+@keyframes mf-z {
+  0% {
+    opacity: 0;
+    translate: 0 5px;
+  }
+  30%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 7px -13px;
+  }
+}
