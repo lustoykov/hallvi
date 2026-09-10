@@ -64,6 +64,12 @@ The core retains authority enforcement, secret handling, operation coordination,
 
 This is a design direction agreed on 10 September 2026, not a shipped plugin runtime. The [architecture brief](docs/architecture/extensible-capabilities.md) records the boundary and open questions; [ROADMAP.md](ROADMAP.md) owns implementation order. API shape, code isolation and UI contribution mechanisms remain open for review with Fable.
 
+## Development priority
+
+**Get the general architecture right first; fine-tune, harden and polish afterward.** Prioritize reusable capabilities, simple interfaces and Pi's ability to reason, execute and recover across applications. Do not let speculative edge cases or an expanding hardening checklist displace that work.
+
+Fix concrete failures that prevent the current flow from working or violate its existing data and authority guarantees. Keep those fixes proportional; document secondary limitations and defer them until the shared architecture is proven.
+
 ## Reliability and limits
 
 Configured host-side collection, schedules and backups should continue when the controller or a chat is offline. Show last observation, retained coverage and gaps. Bounded off-host diagnostic archives preserve earlier evidence when the host is unavailable; they do not prove its current health or guarantee the final seconds before failure.
