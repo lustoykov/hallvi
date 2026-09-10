@@ -89,6 +89,52 @@ it("lets a worker reuse the managed PostgreSQL connection without copying secret
   expect(JSON.stringify(plan)).not.toContain("random-password");
 });
 
+it("supplies each consumer only the managed PostgreSQL field it binds", () => {
+  const plan = queuePlan();
+  plan.postgres = { version: "16", variable: null, scheme: "postgresql" };
+  for (const [variable, field] of [
+    ["PAPERLESS_DBHOST", "host"],
+    ["PAPERLESS_DBPORT", "port"],
+    ["PAPERLESS_DBNAME", "database"],
+    ["PAPERLESS_DBUSER", "username"],
+    ["PAPERLESS_DBPASS", "password"],
+  ] as const)
+    plan.inputBindings!.push({
+      service: "app",
+      variable,
+      connection: "postgres",
+      field,
+    });
+  plan.inputBindings!.push({
+    service: "worker",
+    variable: "DATABASE_URL",
+    connection: "postgres",
+  });
+  deploymentPlanSchema.parse(plan);
+  const compose = composeDefinition(plan, "rev", "id", "random-password", {
+    QUEUE_PASSWORD: "synthetic",
+  }) as { services: Record<string, { environment: object }> };
+  expect(compose.services.app.environment).toEqual({
+    QUEUE_HOST: "queue",
+    QUEUE_PASSWORD: "synthetic",
+    PAPERLESS_DBHOST: "postgres",
+    PAPERLESS_DBPORT: "5432",
+    PAPERLESS_DBNAME: "application",
+    PAPERLESS_DBUSER: "serverguy",
+    PAPERLESS_DBPASS: "random-password",
+  });
+  expect(compose.services.worker.environment).toEqual({
+    QUEUE_HOST: "queue",
+    QUEUE_PASSWORD: "synthetic",
+    DATABASE_URL:
+      "postgresql://serverguy:random-password@postgres:5432/application",
+  });
+  expect(JSON.stringify(compose.services.queue)).not.toContain(
+    "random-password",
+  );
+  expect(JSON.stringify(plan)).not.toContain("random-password");
+});
+
 it.each([
   [
     "cycle",
@@ -123,6 +169,11 @@ it.each([
     "unknown secret",
     (p: ReturnType<typeof queuePlan>): unknown =>
       (p.inputBindings![0].input = "MISSING"),
+  ],
+  [
+    "connection field on a private input",
+    (p: ReturnType<typeof queuePlan>): unknown =>
+      (p.inputBindings![0].field = "password"),
   ],
   [
     "shadowed variable",

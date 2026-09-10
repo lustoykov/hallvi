@@ -42,7 +42,10 @@ export const deploymentPlanSchema = z
     postgres: z
       .strictObject({
         version: z.enum(["16", "17", "18"]),
-        variable: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
+        variable: z
+          .string()
+          .regex(/^[A-Z_][A-Z0-9_]*$/)
+          .nullable(),
         scheme: z.enum(["postgresql", "postgresql+psycopg", "postgres"]),
       })
       .nullable(),
@@ -174,6 +177,8 @@ export const deploymentPlanSchema = z
           fail("Bind either a private input or a managed connection.");
         if (binding.input && !inputs.has(binding.input))
           fail("Input binding refers to an undeclared private input.");
+        if (binding.field && !binding.connection)
+          fail("A connection field requires a managed connection binding.");
         if (binding.connection && !plan.postgres)
           fail("The managed PostgreSQL connection is not configured.");
         const key = `${binding.service}:${binding.variable}`;

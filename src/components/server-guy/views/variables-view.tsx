@@ -52,7 +52,8 @@ export function VariablesView(props: ViewProps) {
     ...new Set([
       ...(deployment?.plan?.environment.map((item) => item.name) ?? []),
       ...(deployment?.plan?.missingInputs.map((item) => item.name) ?? []),
-      ...(deployment?.plan?.postgres
+      ...(deployment?.plan?.inputBindings?.map((item) => item.variable) ?? []),
+      ...(deployment?.plan?.postgres?.variable
         ? [deployment.plan.postgres.variable]
         : []),
     ]),

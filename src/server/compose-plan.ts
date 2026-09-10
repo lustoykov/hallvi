@@ -5,10 +5,14 @@ const target = z
   .string()
   .regex(/^\/(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/)
   .max(250);
+const imageName = "[a-z0-9]+(?:[._-][a-z0-9]+)*";
+const hubNamespace = "[a-z0-9]+(?:[_-][a-z0-9]+)*";
 export const imageReferenceSchema = z
   .string()
   .regex(
-    /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)?[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[0-9a-f]{64})$/,
+    new RegExp(
+      `^(?!localhost/)(?:(?:docker\\.io/)?(?:${hubNamespace}/)?${imageName}|ghcr\\.io/${imageName}(?:/${imageName})+)(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[0-9a-f]{64})$`,
+    ),
   );
 export const volumeMountSchema = z.strictObject({
   name: serviceNameSchema,
@@ -91,4 +95,7 @@ export const inputBindingSchema = z.strictObject({
     .regex(/^[A-Z_][A-Z0-9_]*$/)
     .optional(),
   connection: z.literal("postgres").optional(),
+  field: z
+    .enum(["url", "host", "port", "database", "username", "password"])
+    .optional(),
 });

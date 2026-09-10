@@ -16,6 +16,8 @@ import { releaseOf } from "./deployment-release";
 import { checkDeploymentSource } from "./deployment-source";
 import { githubJson } from "./github-api";
 import { fetchBaseTree } from "./execution-tree";
+import { deploymentSourceFiles } from "./deployment-source-files";
+import { sourceBuilds } from "./deployment-layout";
 import {
   operation,
   proposeOperation,
@@ -167,7 +169,7 @@ export async function runApplicationRelease(
   );
   if ((data as { sha?: string }).sha !== scope.revision)
     throw new Error("The selected source revision is unavailable.");
-  const files = await fetchBaseTree(
+  const files = await deploymentSourceFiles(
     scope.repository,
     scope.revision,
     token,
@@ -219,6 +221,11 @@ export async function runApplicationRelease(
           plan: candidate,
         })!;
         assertOwned(record, tracked, scope, candidate);
+        // Published images need inspection evidence, not an executable copy
+        // of every upstream fixture/media asset. Builds need the full tree.
+        const buildFiles = sourceBuilds(candidate).length
+          ? await fetchBaseTree(scope.repository, scope.revision, token, signal)
+          : [];
         const result = await runDeploymentAttempt(
           record,
           "release",
@@ -226,7 +233,7 @@ export async function runApplicationRelease(
           async () => {
             record.lifecycle!.attempts.at(-1)!.authorizationId = scope.id;
             saveDeployment(record);
-            return executeRelease(record, selected, files, signal);
+            return executeRelease(record, selected, buildFiles, signal);
           },
           selected,
         );
