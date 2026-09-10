@@ -158,6 +158,7 @@ export function toolNamesForPhase(phaseKey: PhaseKey) {
     "search_decisions",
     "get_application_status",
     "prepare_deployment",
+    "prepare_release",
     "list_operations",
     "propose_change",
     "record_inspection",
@@ -534,6 +535,31 @@ export async function askPi(
     });
     const operationTools = [
       defineTool({
+        name: "prepare_release",
+        label: "Prepare application update",
+        description:
+          "Propose updating an already deployed application to a selected revision on its existing host. Resolves a branch/tag once and requests task-scoped approval: preserve volumes/exposure, no spending, up to three agent-corrected attempts. Supply ref only when the user names one. This tool does not execute or grant itself permission.",
+        parameters: Type.Object(
+          { ref: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })) },
+          { additionalProperties: false },
+        ),
+        async execute(_id, params) {
+          options.signal?.throwIfAborted();
+          const { proposeApplicationRelease } =
+            await import("./application-releases");
+          const result = await proposeApplicationRelease(
+            input.run.applicationId,
+            input.run.chatId,
+            params.ref,
+            input.userMessage,
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            details: {},
+          };
+        },
+      }),
+      defineTool({
         name: "list_operations",
         label: "Read application operations",
         description:
@@ -635,6 +661,8 @@ export async function askPi(
       systemPromptOverride: () =>
         systemPromptForPhase(phaseKey) +
         `
+
+For an already deployed application, use prepare_release when the user asks to update or deploy a newer revision. The operation requests one approval for the selected revision and permitted effects; its Pi release session receives configuration/runtime errors and can correct and retry within scope. Unknown remote outcomes, unavailable private inputs and destructive data migrations require resolution, not blind retry. The original deployment flow still uses a priced recommendation.
 
 The application now has a separate real deployment goal flow. When the user asks to deploy, use prepare_deployment to queue source inspection and an inline Hetzner recommendation, instead of sending them through phase buttons. This tool records a local request only; it grants no spending authority. The user accepts the priced recommendation and supplies secrets through the inline deployment card. The deployment worker then performs the accepted operations and records verification. Internal phase readiness is not deployment status. get_application_status includes deployment evidence when present: use that evidence for deployment questions. Never claim the old phase prevents this deployment flow, and never invent its progress. To discuss the current deployment you may also call prepare_deployment if a request already exists; it returns that same request without restarting it.`,
       appendSystemPromptOverride: () => [

@@ -37,11 +37,11 @@ Pi interprets repository/upstream evidence, investigates ambiguity and revises t
 
 `deployment-store.ts` retains the initial deployment intent, source/connection identity, recommendation/approval, progress and results. Conditional writes prevent stale record replacement. Provider creation uncertainty is reconciled using the original identity before another purchase. Exact cost/offer and source identity are refreshed at the effect boundary.
 
-`operation-store.ts` persists application operations. Existing deployment writes synchronize their receipt into this store; each log collection keeps a separate snapshot record. The existing deployment row still owns provider identity, source and spending authority. History, chat receipts, view activity, navigation marks and Overview consume the shared operation list. This adds operation history, not a completed multi-release executor.
+`operation-store.ts` persists application operations. Existing deployment writes synchronize their receipt into this store; each log collection keeps a separate snapshot record. The existing deployment row still owns provider identity, source and spending authority. History, chat receipts, view activity, navigation marks and Overview consume the shared operation list. Subsequent releases have their own operation receipts and release/attempt evidence; they no longer rewrite the initial receipt.
 
 A partial unique index allows one `working` change per application. Approval, queue selection and completion run in immediate SQLite transactions. Approved changes blocked by another change are `queued`, with a reference to the blocker. Completion advances the oldest approved change. Repository, contract, revision, plan and input-name assumptions are checked both on advancement and executor claim; a changed assumption returns the operation to `proposed` without running it. Inspections do not take this change slot.
 
-Existing source preparation/publication commands and initial deployment are the current executors. Typed persisted commands let queued source work resume without its originating HTTP request. Source permissions, approved file digests, provenance and deployment pricing checks remain mandatory. The model cannot supply arbitrary shell commands or declare unsupported operations executable.
+Existing source preparation/publication commands, initial deployment, scoped releases, recreation and backup actions use recorded executors. Typed persisted commands let queued source work resume without its originating HTTP request. Source permissions, approved file digests, provenance and deployment pricing checks remain mandatory. The model cannot supply arbitrary shell commands or declare unsupported operations executable.
 
 The generic decision endpoint accepts approve/retry/cancel with an `updatedAt` comparison. Deployment approval and recovery retain their source/price/secret checks in the dedicated endpoint; a deployment still waiting behind another operation can be cancelled through the generic endpoint before any host effect. Cancelled records remain in History. Retrying creates a linked attempt and retains the failure.
 
@@ -84,6 +84,8 @@ Periodically archive bounded diagnostics to the configured R2/S3 destination ind
 An unreachable host does not prove a crash. Cached/archived evidence remains inspectable but is not live health. A shared-host failure stops both controller and host collection; no archive guarantees the last seconds or provides independent outage detection. Choose the simplest host tooling that passes these cases; a custom telemetry platform is not mandated.
 
 ## Releases, protection and recovery
+
+The [scoped release executor](agent-releases.md) separates configuration correctness from authorization. Pi receives tool and Compose diagnostics and may correct and retry within the selected revision, host and permitted effects. Deterministic checks retain authority, data preservation, uncertain-outcome handling and factual verification; ordinary configuration errors are not new approval requests. Initial deployment still uses its priced-recommendation approval.
 
 A release binds the chosen source/image, configuration and applicable checks. Reuse GitHub Actions when useful; a push makes a candidate available and the user requests release. Keep attempts and actual serving state separate. Existing migrations need outcome reconciliation; an image rollback does not reverse schema/data changes.
 

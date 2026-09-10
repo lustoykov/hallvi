@@ -135,7 +135,13 @@ export function syncDeploymentOperation(record: DeploymentRecord) {
     const previous = operation(projected.id);
     // Recreation has its own operation. Do not rewrite the initial deployment
     // receipt with the recreation's verification date or mutable workspace.
-    if (previous && record.lifecycle?.attempts.at(-1)?.kind === "recreate") {
+    if (
+      previous &&
+      (record.releaseOperationId ||
+        ["recreate", "release"].includes(
+          record.lifecycle?.attempts.at(-1)?.kind ?? "",
+        ))
+    ) {
       syncDeploymentLogs(record);
       return previous;
     }
@@ -347,7 +353,10 @@ export function proposeOperation(input: {
                 kind: "approval",
                 note: input.summary,
                 inputs: [],
-                action: "Approve change",
+                action:
+                  input.command?.type === "release-deployment"
+                    ? "Approve release scope"
+                    : "Approve change",
               }
             : null,
       },
@@ -513,12 +522,20 @@ export function settleOperation(
     }
     if (
       outcome === "failed" &&
-      record.command?.type === "recreate-deployment"
+      (record.command?.type === "recreate-deployment" ||
+        record.command?.type === "release-deployment")
     ) {
       const saved = db()
         .select()
         .from(deployments)
-        .where(eq(deployments.id, record.command.deploymentId))
+        .where(
+          eq(
+            deployments.id,
+            record.command.type === "release-deployment"
+              ? record.command.scope.deploymentId
+              : record.command.deploymentId,
+          ),
+        )
         .get();
       const active = saved?.body.lifecycle?.attempts.at(-1);
       // Normal completion already settled the attempt. This also covers a

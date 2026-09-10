@@ -38,6 +38,8 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/
 
 **Authority**: The permitted target, effects and limits for an action, including required user approval. A model recommendation or available credential does not widen it.
 
+**Release authorization**: Permission to update one application to a selected revision on its existing host, within stated data, exposure and execution limits. A corrected configuration can remain within that permission while creating a distinct release and attempt.
+
 **Activity event**: A meaningful application change or consequential operational result. It is not every message or internal tool call.
 
 **Evidence packet**: A bounded, redacted bundle of application/revision identity, observations, impact and a verification target that an owner or coding agent can use.

@@ -29,8 +29,10 @@ export function DeploymentView(props: ViewProps & { children?: ReactNode }) {
       <>
         {props.children}
         <p className="sg-section-note">
-          This version supports the initial deployment. Routine releases,
-          rollback and automatic deployment on push are not implemented yet.
+          Ask in the conversation to release an update on this application’s
+          existing host. You approve the scope once; Server Guy can correct
+          configuration and retry within it. Rollback and automatic deployment
+          on push are not implemented yet.
         </p>
       </>
     );

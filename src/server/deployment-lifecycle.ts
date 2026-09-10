@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { assertApprovedRelease, releaseOf } from "./deployment-release";
+import {
+  assertApprovedRelease,
+  releaseOf,
+  type DeploymentRelease,
+} from "./deployment-release";
 import type { DeploymentRecord } from "./deployment-types";
 import type {
   DeploymentLifecycle,
@@ -87,11 +91,14 @@ export function syncDeploymentHost(record: DeploymentRecord) {
 
 export function beginDeploymentAttempt(
   record: DeploymentRecord,
-  kind: "deploy" | "recreate",
+  kind: "deploy" | "recreate" | "release",
   operationId: string,
+  selectedRelease?: DeploymentRelease,
 ): DeploymentAttempt {
   assertApprovedRelease(record);
-  const release = releaseOf(record);
+  const release = selectedRelease ?? releaseOf(record);
+  if (release && releaseOf(release)?.id !== release.id)
+    throw new Error("Release content does not match its identity.");
   if (!release)
     throw new Error("A selected release is required before execution.");
   const lifecycle = ensureDeploymentLifecycle(record);

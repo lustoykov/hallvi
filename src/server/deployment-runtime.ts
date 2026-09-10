@@ -6,7 +6,9 @@ export interface DeploymentAttempt {
   operationId: string;
   releaseId: string;
   hostId: string;
-  kind: "deploy" | "recreate" | "legacy";
+  kind: "deploy" | "recreate" | "release" | "legacy";
+  authorizationId?: string;
+  remoteResult?: { phase: string; exitCode: number; at: string };
   startedAt: string;
   finishedAt: string | null;
   outcome: "working" | "verified" | "failed" | "interrupted";

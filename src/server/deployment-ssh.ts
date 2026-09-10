@@ -53,7 +53,7 @@ export function deploymentSsh(
         error
           ? reject(
               new Error(
-                "The host backup command did not complete. Refresh its status before retrying.",
+                "The host command did not complete. Refresh its status before retrying.",
               ),
             )
           : resolve(stdout),

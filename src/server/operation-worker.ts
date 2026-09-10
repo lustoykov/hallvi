@@ -12,6 +12,10 @@ async function dispatch(record: StoredOperation) {
   const phase = await import("./phase-three");
   const preparation = await import("./preparation");
   switch (command.type) {
+    case "release-deployment": {
+      const { runApplicationRelease } = await import("./application-releases");
+      return runApplicationRelease(record, AbortSignal.timeout(30 * 60000));
+    }
     case "configure-backups":
     case "run-backup":
     case "test-restore": {

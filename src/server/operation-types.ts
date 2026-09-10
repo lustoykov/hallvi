@@ -3,6 +3,11 @@ import type { ApplicationOperation } from "./operation-record";
 /** Executable intents are chosen by the server, never arbitrary agent code. */
 export type OperationCommand =
   | { type: "deployment"; deploymentId: string }
+  | {
+      type: "release-deployment";
+      scope: import("./release-scope").ReleaseScope;
+      requirements: string;
+    }
   | { type: "recreate-deployment"; deploymentId: string }
   | { type: "collect-logs"; deploymentId: string }
   | { type: "run-backup" | "test-restore"; deploymentId: string }
