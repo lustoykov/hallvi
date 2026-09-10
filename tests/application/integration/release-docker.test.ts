@@ -17,10 +17,35 @@ import type {
 const transport = vi.hoisted(() => ({
   root: "",
   endpoint: "",
+  loseResult: false,
+  executions: 0,
   record: null as DeploymentRecord | null,
 }));
 vi.mock("../../../src/server/deployment-store", () => ({
   saveDeployment: vi.fn(),
+  runDeploymentAttempt: async (
+    r: DeploymentRecord,
+    kind: "reconcile",
+    operationId: string,
+    work: () => Promise<unknown>,
+    release: import("../../../src/server/deployment-release").DeploymentRelease,
+  ) => {
+    const lifecycle = await import("../../../src/server/deployment-lifecycle");
+    const attempt = lifecycle.beginDeploymentAttempt(
+      r,
+      kind,
+      operationId,
+      release,
+    );
+    try {
+      const result = await work();
+      lifecycle.finishDeploymentAttempt(r, attempt.id, "verified");
+      return result;
+    } catch (error) {
+      lifecycle.finishDeploymentAttempt(r, attempt.id, "failed", String(error));
+      throw error;
+    }
+  },
   deploymentMessage: vi.fn(),
   deploymentEvent: (r: DeploymentRecord, message: string) =>
     r.events.push({ at: new Date().toISOString(), message }),
@@ -64,6 +89,7 @@ vi.mock("node:child_process", async (original) => {
       callback: (error: unknown, stdout: string) => void,
     ) => {
       if (file !== "ssh") throw new Error("Unexpected fixture transport");
+      if (args.at(-1)!.includes("run_release()")) transport.executions++;
       return real.execFile(
         "sh",
         ["-c", map(args.at(-1)!)],
@@ -90,7 +116,17 @@ vi.mock("node:child_process", async (original) => {
                   { encoding: "utf8" },
                 )
                 .trim();
-            callback(error, stdout);
+            if (
+              !error &&
+              transport.loseResult &&
+              stdout.includes("SG_RELEASE_RESULT:replace:0")
+            ) {
+              transport.loseResult = false;
+              callback(
+                new Error("Synthetic lost SSH reply after the host completed"),
+                "",
+              );
+            } else callback(error, stdout);
           } catch (transportError) {
             callback(transportError, stdout);
           }
@@ -103,6 +139,8 @@ import {
   composeDefinition,
   composeStartCommand,
 } from "../../../src/server/deployment-compose";
+import { reconcileRelease } from "../../../src/server/release-reconciliation";
+import type { StoredOperation } from "../../../src/server/operation-types";
 import { inspectRelease } from "../../../src/server/release-diagnostics";
 import { executeRelease } from "../../../src/server/release-executor";
 import {
@@ -122,6 +160,8 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
     const id = randomUUID(),
       project = `sg-${id.slice(0, 8)}`;
     transport.root = root;
+    transport.loseResult = false;
+    transport.executions = 0;
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
@@ -412,8 +452,41 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
         "fixture-release",
         corrected,
       );
-      await executeRelease(record, corrected, v2Files, signal);
-      finishDeploymentAttempt(record, second.id, "verified");
+      second.authorizationId = "fixture-scope";
+      transport.loseResult = true;
+      await expect(
+        executeRelease(record, corrected, v2Files, signal),
+      ).rejects.toMatchObject({ phase: "transport", retryable: false });
+      finishDeploymentAttempt(record, second.id, "failed", "Lost SSH reply");
+      const original = structuredClone(second);
+      const currentContainer = () =>
+        docker([
+          "compose",
+          "-p",
+          project,
+          "-f",
+          join(root, "compose.json"),
+          "ps",
+          "-q",
+          "app",
+        ]);
+      const running = currentContainer();
+      expect(record.lifecycle!.runtime.state).toBe("unknown");
+      const reconciled = await reconcileRelease(
+        record,
+        {
+          id: "fixture-release",
+          command: {
+            type: "release-deployment",
+            scope: { id: "fixture-scope" },
+          },
+        } as StoredOperation,
+        signal,
+      );
+      expect(reconciled).toMatchObject({ ok: true, verified: true });
+      expect(currentContainer()).toBe(running);
+      expect(second).toEqual(original);
+      expect(transport.executions).toBe(3);
       expect(record.imageId).not.toBe(originalImage);
       if (shared) {
         expect(record.serviceImages!.worker).not.toBe(record.imageId);
@@ -484,4 +557,61 @@ it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1").each([false, true])(
     }
   },
   300000,
+);
+
+it.skipIf(process.env.SG_RUN_DOCKER_PROOF !== "1")(
+  "cannot read a completion receipt while the Linux deployment lock is held",
+  async () => {
+    const { deploymentLock } =
+      await import("../../../src/server/deployment-ssh");
+    const id = randomUUID(),
+      name = `sg-lock-${id}`;
+    const run = (args: string[]) =>
+      execFileSync("docker", args, {
+        encoding: "utf8",
+        timeout: 30000,
+        stdio: "pipe",
+      }).trim();
+    const inside = (command: string) =>
+      run(["exec", name, "sh", "-c", command]);
+    const waitForFile = async (path: string) => {
+      for (let i = 0; i < 100; i++) {
+        try {
+          inside(`test -f ${path}`);
+          return;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+      throw new Error(`Linux fixture never reached ${path}`);
+    };
+    try {
+      // Use the Linux filesystem: macOS shared mounts do not preserve Linux
+      // advisory-lock behavior across independent Docker Desktop mounts.
+      run([
+        "run",
+        "-d",
+        "--name",
+        name,
+        "--platform",
+        "linux/amd64",
+        "--tmpfs",
+        "/run/lock",
+        "python:3.12-alpine",
+        "sh",
+        "-c",
+        `printf '{"exitCode":0}' > /run/lock/result.json; ${deploymentLock(id, "touch /run/lock/held; while [ ! -f /run/lock/release ]; do sleep 0.1; done")}; touch /run/lock/released; sleep 30`,
+      ]);
+      await waitForFile("/run/lock/held");
+      const inspect = () =>
+        inside(deploymentLock(id, "cat /run/lock/result.json"));
+      expect(inspect).toThrow();
+      inside("touch /run/lock/release");
+      await waitForFile("/run/lock/released");
+      expect(JSON.parse(inspect())).toEqual({ exitCode: 0 });
+    } finally {
+      run(["rm", "-f", name]);
+    }
+  },
+  60000,
 );

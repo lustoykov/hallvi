@@ -1,3 +1,4 @@
+import { reconcileRelease } from "./release-reconciliation";
 import { inspectRelease } from "./release-diagnostics";
 import { getApplication } from "./db";
 import { randomUUID } from "node:crypto";
@@ -126,7 +127,7 @@ function assertOwned(
       "Reconcile the previous verification object's outcome before another release.",
     );
   const attempts = record.lifecycle!.attempts.filter(
-    (a) => a.authorizationId === scope.id,
+    (a) => a.authorizationId === scope.id && a.kind === "release",
   );
   if (
     attempts.filter((a) => a.operationId === tracked.id).length >=
@@ -136,7 +137,11 @@ function assertOwned(
       "The three-attempt execution budget is used. Review the recorded failures before authorizing more work.",
     );
   const last = attempts.at(-1);
-  if (last?.remoteStartedAt && !last.remoteResult)
+  if (
+    last?.remoteStartedAt &&
+    !last.remoteResult &&
+    !record.lifecycle!.reconciliations?.some((r) => r.attemptId === last.id)
+  )
     throw new ReleaseScopeError(
       "The previous remote outcome is unknown. Reconcile it before repeating execution.",
     );
@@ -154,7 +159,7 @@ export async function runApplicationRelease(
     throw new ReleaseScopeError(
       "The deployment no longer belongs to this application.",
     );
-  assertOwned(record, tracked, scope, record.plan!);
+  assertOwned(record, tracked, scope, record.plan!, false);
   const { token } = await checkDeploymentSource(record);
   const { data } = await githubJson(
     `/repos/${scope.repository}/commits/${scope.revision}`,
@@ -174,6 +179,19 @@ export async function runApplicationRelease(
   await planDeployment(files, record, signal, {
     revision: scope.revision,
     context: `Approved task: ${requirements}\nRelease scope: ${JSON.stringify(scope)}\nExisting plan: ${JSON.stringify(record.plan)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-plan approval.`,
+    reconcile: async () => {
+      if (evidence)
+        return {
+          ok: true,
+          verified: true,
+          message: evidence,
+          plan: record.plan!,
+        };
+      assertOwned(record, tracked, scope, record.plan!, false);
+      const result = await reconcileRelease(record, tracked, signal);
+      if (result.verified) evidence = result.message;
+      return result;
+    },
     inspect: async () => {
       assertOwned(record, tracked, scope, record.plan!, false);
       return inspectRelease(record, signal);

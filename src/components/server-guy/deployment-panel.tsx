@@ -143,11 +143,13 @@ export function DeploymentPanel({
           {latestAttempt && (
             <p>
               Latest attempt:{" "}
-              {latestAttempt.kind === "recreate"
-                ? "container recreation"
-                : latestAttempt.kind === "legacy"
-                  ? "imported deployment"
-                  : "deployment"}{" "}
+              {latestAttempt.kind === "reconcile"
+                ? "Release verification"
+                : latestAttempt.kind === "recreate"
+                  ? "container recreation"
+                  : latestAttempt.kind === "legacy"
+                    ? "imported deployment"
+                    : "deployment"}{" "}
               · {latestAttempt.outcome}.
             </p>
           )}
@@ -221,11 +223,13 @@ export function DeploymentPanel({
                 {record.lifecycle.attempts.map((attempt) => (
                   <li key={attempt.id}>
                     <strong>
-                      {attempt.kind === "recreate"
-                        ? "Recreate containers"
-                        : attempt.kind === "legacy"
-                          ? "Imported deployment"
-                          : "Deploy release"}{" "}
+                      {attempt.kind === "reconcile"
+                        ? "Reconcile release"
+                        : attempt.kind === "recreate"
+                          ? "Recreate containers"
+                          : attempt.kind === "legacy"
+                            ? "Imported deployment"
+                            : "Deploy release"}{" "}
                       · {attempt.outcome}
                     </strong>
                     <div>

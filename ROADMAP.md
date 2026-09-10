@@ -70,7 +70,7 @@ Connect R2 and S3. Discover PostgreSQL, SQLite and other required persistent sta
 
 ### 4. Release updates and recover from failure
 
-**Delivered slice:** chat proposes an exact source revision on the existing host. One approved scope allows three execution attempts with agent-corrected configuration, retained named volumes and fresh verification. Native Compose failures return to Pi; an unknown remote outcome stops repetition. The [architecture and evidence](docs/architecture/agent-releases.md) distinguish this from rollback, migration orchestration, automatic reconciliation and broad standing authorization, which remain unfinished.
+**Delivered slice:** chat proposes an exact source revision on the existing host. One approved scope allows three execution attempts with agent-corrected configuration, retained named volumes and fresh verification. Native Compose failures return to Pi. [Release reconciliation](docs/architecture/release-reconciliation.md) checks a durable host result under the deployment lock and verifies completed replacements without restarting; unknown outcomes without sufficient evidence still stop repetition. The [architecture and evidence](docs/architecture/agent-releases.md) distinguish this from rollback, migration orchestration, recovery without a trustworthy host result and broad standing authorization, which remain unfinished.
 
 Reuse existing GitHub Actions/checks or prepare a reviewed workflow when useful. Prebuilt images do not need a source build. A passing commit/image becomes a candidate; the user requests its release. Record distinct attempts and the actual serving revision rather than overwriting the initial-deployment record.
 

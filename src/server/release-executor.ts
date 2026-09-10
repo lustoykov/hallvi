@@ -95,12 +95,19 @@ export function releaseBundle(
 
 /** Compose owns config/build errors; one lock covers upload and replacement. */
 export function releaseCommand(
-  plan: DeploymentPlan,
+  release: DeploymentRelease,
   id: string,
   attemptId: string,
   retainedVolumes: string[],
   newManagedDatabase = false,
 ) {
+  const plan = release.plan;
+  z.string()
+    .regex(/^[0-9a-f]{64}$/)
+    .parse(release.id);
+  z.string()
+    .regex(/^[0-9a-f]{40}$/)
+    .parse(release.revision);
   z.uuid().parse(id);
   z.uuid().parse(attemptId);
   const root = `/opt/server-guy/${id}`;
@@ -143,6 +150,7 @@ run_release() {
 }
 run_release 2>&1
 result=$?
+printf '{"attemptId":"${attemptId}","releaseId":"${release.id}","revision":"${release.revision}","phase":"%s","exitCode":%s}\\n' "$phase" "$result" > ${stage}/result.tmp && mv ${stage}/result.tmp ${stage}/result.json || exit 1
 printf '\\nSG_RELEASE_RESULT:%s:%s\\n' "$phase" "$result"
 `;
   // Output is bounded by the SSH transport and redacted before reaching Pi.
@@ -206,7 +214,7 @@ export async function executeRelease(
     output = await deploymentSsh(
       record,
       releaseCommand(
-        release.plan,
+        release,
         record.id,
         attempt.id,
         volumes,
@@ -243,6 +251,16 @@ export async function executeRelease(
   saveDeployment(record);
   if (attempt.remoteResult.exitCode !== 0)
     throw new ReleaseExecutionError(safe.slice(-10000), true, result[1]);
+  return verifyRelease(record, release, signal);
+}
+
+/** Verify an existing replacement without building or restarting containers. */
+export async function verifyRelease(
+  record: DeploymentRecord,
+  release: DeploymentRelease,
+  signal: AbortSignal,
+) {
+  const secrets = releaseSecrets(record);
   try {
     await verifyServiceImages(record, signal);
     const revision = await deploymentSsh(

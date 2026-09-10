@@ -72,7 +72,7 @@ export function saveDeployment(record: DeploymentRecord) {
       if (mentions.size) record.mentions = [...mentions.values()];
       // Completed outcomes and selected releases are retained, not rewritten
       // by a retry or an unrelated save of the legacy executor workspace.
-      for (const key of ["releases", "attempts"] as const) {
+      for (const key of ["releases", "attempts", "reconciliations"] as const) {
         for (const [index, entry] of (
           latest.lifecycle?.[key] ?? []
         ).entries()) {
@@ -83,7 +83,7 @@ export function saveDeployment(record: DeploymentRecord) {
           )
             continue;
           if (
-            JSON.stringify(record.lifecycle?.[key][index]) !==
+            JSON.stringify(record.lifecycle?.[key]?.[index]) !==
             JSON.stringify(entry)
           )
             throw new Error(
@@ -302,7 +302,7 @@ export function interruptDeployments() {
 /** The existing CAS save makes attempt, host and runtime transitions atomic. */
 export async function runDeploymentAttempt<T>(
   record: DeploymentRecord,
-  kind: "deploy" | "recreate" | "release",
+  kind: "deploy" | "recreate" | "release" | "reconcile",
   operationId: string,
   work: () => Promise<T>,
   selectedRelease?: DeploymentRelease,

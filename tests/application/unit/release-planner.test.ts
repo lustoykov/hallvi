@@ -96,3 +96,57 @@ it("returns validation and execution feedback to the same Pi session, which corr
   expect(mock.create).toHaveBeenCalledTimes(1);
   expect(seen).toHaveLength(3);
 });
+
+it("accepts verified reconciliation as completion without another deploy tool call", async () => {
+  const selected = queuePlan();
+  const apply = vi
+    .fn()
+    .mockResolvedValue({
+      ok: false,
+      kind: "transport",
+      retryable: false,
+      message: "Lost reply",
+    });
+  const reconcile = vi
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      verified: true,
+      plan: selected,
+      message: "Verified existing containers",
+    });
+  mock.create.mockImplementation(async (options) => ({
+    session: {
+      prompt: async () => {
+        const deploy = options.customTools.find(
+          (t: { name: string }) => t.name === "deploy_release",
+        );
+        const recovery = options.customTools.find(
+          (t: { name: string }) => t.name === "reconcile_release",
+        );
+        await deploy.execute("deploy", { json: JSON.stringify(selected) });
+        expect(
+          JSON.parse((await recovery.execute()).content[0].text).verified,
+        ).toBe(true);
+        await deploy.execute("duplicate", { json: JSON.stringify(selected) });
+      },
+      waitForIdle: async () => {},
+      dispose: vi.fn(),
+      abort: vi.fn(),
+    },
+  }));
+  await planDeployment(
+    [
+      {
+        path: "Dockerfile",
+        mode: 0o644,
+        content: Buffer.from("FROM python:3.12"),
+      },
+    ],
+    { repository: "qa/example", revision: "a".repeat(40) } as DeploymentRecord,
+    new AbortController().signal,
+    { apply, reconcile },
+  );
+  expect(apply).toHaveBeenCalledTimes(1);
+  expect(reconcile).toHaveBeenCalledTimes(1);
+});
