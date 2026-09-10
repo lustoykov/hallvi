@@ -1,0 +1,683 @@
+/* PROTOTYPE · claude/architecture-directions · throwaway.
+   Overview in the Journeys language. Prefix: axo-. The header and Server
+   Guy's report come from the Journeys styles. */
+
+.axo {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  padding-top: 10px;
+}
+.axo .axj3-head {
+  margin-bottom: 2px;
+}
+
+/* ---------- The report leads, a little larger here ---------- */
+
+.axo .axj3-report {
+  margin-top: 0;
+}
+.axo .axj3-report-head {
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+}
+.axo .axj3-report .axj2-mascot {
+  width: 112px;
+  height: 112px;
+  margin-bottom: -17px;
+}
+
+/* ---------- What needs you: only what is real, and unmistakable ---------- */
+
+.axo-needs {
+  display: grid;
+  gap: 10px;
+  margin: -4px 18px 18px 144px;
+}
+.axo-need {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px 13px 13px;
+  border: 1px solid var(--ax-failed-line);
+  border-radius: 14px;
+  background: var(--ax-failed-bg);
+  animation: axo-rise 420ms var(--ax-ease-out) both;
+}
+.axo-need[data-tone="waiting"] {
+  border-color: var(--ax-waiting-line);
+  background: var(--ax-waiting-bg);
+}
+.axo-need-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--ax-failed);
+  animation: axo-breathe 2.4s ease-in-out infinite;
+}
+.axo-need[data-tone="waiting"] .axo-need-icon {
+  color: var(--ax-amber);
+  animation: none;
+}
+.axo-need-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.axo-need b {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-need p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axo-need-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+@keyframes axo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes axo-breathe {
+  0% {
+    box-shadow: 0 0 0 0 rgb(166 49 43 / 24%);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgb(166 49 43 / 0%);
+  }
+}
+
+/* ---------- Ideas, three ways ---------- */
+
+/* Quiet: one line, at the foot of the page. */
+.axo-quiet-wrap {
+  display: grid;
+  gap: 10px;
+}
+.axo-quiet {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ax-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color var(--ax-base),
+    background-color var(--ax-base);
+}
+.axo-quiet:hover,
+.axo-quiet[aria-expanded="true"] {
+  color: var(--ax-ink-2);
+  background: #eef1f6;
+}
+.axo-quiet svg {
+  width: 15px;
+  height: 15px;
+}
+.axo-quiet .axo-caret {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axo-quiet[aria-expanded="true"] .axo-caret {
+  transform: rotate(180deg);
+}
+.axo-ideas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.axo-idea {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px dashed #c9d1de;
+  border-radius: 14px;
+  background: #fbfcfe;
+  animation: axo-rise 380ms var(--ax-ease-out) both;
+}
+.axo-idea:nth-child(2) {
+  animation-delay: 60ms;
+}
+.axo-idea:nth-child(3) {
+  animation-delay: 120ms;
+}
+.axo-idea b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-idea b svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ax-muted);
+}
+.axo-idea p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axo-idea .ax-textlink {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+/* Little Server suggests: one idea at a time, in its own words. */
+.axo-suggest {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin: -4px 18px 18px 144px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid #d7e2f7;
+  border-radius: 14px;
+  background: #f5f8ff;
+  animation: axo-pop 560ms var(--ax-spring) both;
+  transform-origin: left center;
+}
+.axo-suggest::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 18px;
+  width: 12px;
+  height: 12px;
+  background: #f5f8ff;
+  border-left: 1px solid #d7e2f7;
+  border-bottom: 1px solid #d7e2f7;
+  transform: rotate(45deg);
+}
+.axo-suggest small {
+  display: block;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axo-suggest b {
+  display: block;
+  margin-top: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-suggest p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axo-suggest-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axo-later {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ax-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.axo-later:hover {
+  color: var(--ax-ink-2);
+  background: #e9eef8;
+}
+.axo-suggest.is-leaving {
+  animation: axo-leave 320ms var(--ax-ease-out) forwards;
+}
+.axo-snoozed {
+  margin: -8px 18px 16px 144px;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+  animation: axo-rise 380ms var(--ax-ease-out) both;
+}
+@keyframes axo-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes axo-leave {
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+/* Two lanes: what needs you, and what could be better. */
+.axo-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+.axo-lane {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+.axo-lane.is-calm {
+  border-style: dashed;
+  background: #fbfcfe;
+}
+.axo-lane h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-lane h2 small {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+.axo-lane .axo-needs {
+  margin: 0;
+}
+.axo-lane .axo-idea {
+  border-style: solid;
+  border-color: var(--ax-line);
+  background: #ffffff;
+}
+.axo-lane-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified-text);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+.axo-lane-empty svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ---------- Vital signs: what people check, each opening its details ---------- */
+
+.axo-vitals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.axo-vital-wrap {
+  position: relative;
+}
+.axo-vital {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  width: 100%;
+  min-height: 136px;
+  padding: 15px 16px 14px;
+  border: 1px solid var(--ax-line);
+  border-radius: 16px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
+  animation: axo-rise 480ms var(--ax-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  transition:
+    transform 320ms var(--ax-spring),
+    box-shadow var(--ax-base),
+    border-color var(--ax-base);
+}
+.axo-vital:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 5%),
+    0 18px 36px -26px rgb(23 34 56 / 38%);
+}
+.axo-vital.is-open {
+  border-color: var(--ax-blue);
+}
+.axo-vital-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ax-muted);
+}
+.axo-vital-label svg {
+  width: 16px;
+  height: 16px;
+}
+.axo-vital-value {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ax-ink);
+  font-variant-numeric: tabular-nums;
+}
+.axo-vital-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--ax-muted);
+}
+.axo-vital-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.axo-vital-status[data-c="verified"] {
+  color: var(--ax-verified-text);
+}
+.axo-vital-status[data-c="stale"] {
+  color: var(--ax-waiting-text);
+}
+.axo-vital-status[data-c="failed"] {
+  color: var(--ax-failed);
+}
+.axo-vital-lines {
+  display: grid;
+  gap: 2px;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axo-vital-lines b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.axo-pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 12;
+  width: 340px;
+}
+.axo-pop.is-end {
+  left: auto;
+  right: 0;
+}
+.axo-pop .axj2-pop {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+
+/* ---------- The map in miniature, and recent work ---------- */
+
+.axo-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.axo-map {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 12px 12px 40px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f4f6fa 100%);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axo-map:hover {
+  border-color: var(--ax-working-line);
+  box-shadow: 0 18px 36px -28px rgb(23 34 56 / 40%);
+}
+.axo-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.axo-map-open {
+  position: absolute;
+  left: 18px;
+  bottom: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ax-link);
+}
+.axo-map-open svg {
+  width: 13px;
+  height: 13px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axo-map:hover .axo-map-open svg {
+  transform: translateX(3px);
+}
+.axo-map-server {
+  fill: #ffffff;
+  stroke: #dfe5ee;
+  stroke-width: 2;
+}
+.axo-map-rule {
+  stroke: #e6ebf2;
+  stroke-width: 2;
+}
+.axo-map-title {
+  font-size: 22px;
+  font-weight: 600;
+  fill: var(--ax-ink);
+}
+.axo-map-private {
+  fill: rgb(238 243 255 / 80%);
+  stroke: #c3d3f3;
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+.axo-map-shelf {
+  fill: #eef2f7;
+  stroke: #e0e6ef;
+  stroke-width: 2;
+}
+.axo-map-wall {
+  fill: none;
+  stroke: #cdd5e1;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 9 12 15 12;
+}
+.axo-map-wire {
+  fill: none;
+  stroke: #d3dbe7;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.axo-map-wire.j-release {
+  stroke-dasharray: 2 9;
+}
+.axo-map-lit {
+  fill: none;
+  stroke: #6f8ff0;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.axo-map-dot {
+  fill: #ffffff;
+  stroke: #285ad8;
+  stroke-width: 3;
+}
+.axo-map-door rect {
+  fill: #ffffff;
+  stroke: #c9d2df;
+  stroke-width: 2;
+}
+.axo-map-door text {
+  font-size: 18px;
+  font-weight: 650;
+  fill: var(--ax-ink-2);
+}
+.axo-map-card rect {
+  fill: #ffffff;
+  stroke: #dfe5ee;
+  stroke-width: 2;
+}
+.axo-map-card text {
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--ax-ink);
+}
+.axo-map-card[data-c="planned"] rect,
+.axo-map.is-planned .axo-map-server {
+  stroke-dasharray: 8 6;
+}
+.axo-map-card[data-c="failed"] rect {
+  stroke: #e2aaa5;
+  fill: #fff6f5;
+}
+.axo-map-card.is-checking rect {
+  stroke: var(--ax-blue);
+  animation: axo-map-check 900ms ease-in-out infinite;
+}
+@keyframes axo-map-check {
+  50% {
+    stroke-width: 5;
+  }
+}
+.axo-map-ghost rect {
+  fill: none;
+  stroke: #c3ccda;
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+.axo-map-ghost text {
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--ax-faint);
+}
+.axo-recent {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+.axo-recent h2 {
+  margin: 0 0 6px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-recent-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ax-base);
+}
+.axo-recent-row:hover:not(:disabled) {
+  background: #f5f7fb;
+}
+.axo-recent-row:disabled {
+  cursor: default;
+}
+.axo-recent-row b {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axo-recent-row small {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axo-recent .ax-textlink {
+  justify-self: start;
+  margin: 6px 0 0 6px;
+}
+.axo-recent-empty {
+  margin: 4px 6px;
+  font-size: 13px;
+  color: var(--ax-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axo-need,
+  .axo-need-icon,
+  .axo-idea,
+  .axo-suggest,
+  .axo-snoozed,
+  .axo-vital,
+  .axo-map-card.is-checking rect {
+    animation: none !important;
+  }
+}
+:root[data-ax-motion="reduced"] .axo-need,
+:root[data-ax-motion="reduced"] .axo-need-icon,
+:root[data-ax-motion="reduced"] .axo-idea,
+:root[data-ax-motion="reduced"] .axo-suggest,
+:root[data-ax-motion="reduced"] .axo-snoozed,
+:root[data-ax-motion="reduced"] .axo-vital,
+:root[data-ax-motion="reduced"] .axo-map-card.is-checking rect {
+  animation: none !important;
+}
+.axo-idea-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 2px;
+}

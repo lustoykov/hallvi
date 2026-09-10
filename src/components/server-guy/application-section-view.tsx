@@ -16,6 +16,7 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
+import { OverviewPrototype } from "./overview-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
@@ -261,9 +262,26 @@ export function ApplicationSectionView({
       )}
     </header>
   );
-  // PROTOTYPE (claude/architecture-directions): directions for this
-  // destination, development builds only. The prototype receives the page's
+  // PROTOTYPE (claude/architecture-directions): directions for these
+  // destinations, development builds only. The prototype receives the page's
   // chrome so a direction can draw its own header.
+  if (section === "overview" && process.env.NODE_ENV !== "production")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <OverviewPrototype
+          application={app}
+          deployment={deployment}
+          facts={facts}
+          operations={operations}
+          chats={view.chats}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{ bar, header, activity: null }}
+          current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
   if (section === "architecture" && process.env.NODE_ENV !== "production")
     return (
       <div className={`sg-section-page sg-section-${section}`}>

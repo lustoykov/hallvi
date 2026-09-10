@@ -1559,3 +1559,26 @@
   white-space: nowrap;
   color: #56627a;
 }
+
+/* The report's headline, above the verdict. */
+.axj3-report-say {
+  display: grid;
+  gap: 5px;
+  padding: 18px 0 20px;
+}
+.axj3-report-say .axj3-verdict {
+  padding: 0;
+}
+.axj3-headline {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ax-ink);
+  animation: axj2-fade 520ms var(--ax-ease-out);
+}
+.axj3-report-say .axj3-verdict p {
+  font-size: 15px;
+  color: var(--ax-ink-2);
+}
