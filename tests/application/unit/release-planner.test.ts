@@ -99,22 +99,18 @@ it("returns validation and execution feedback to the same Pi session, which corr
 
 it("accepts verified reconciliation as completion without another deploy tool call", async () => {
   const selected = queuePlan();
-  const apply = vi
-    .fn()
-    .mockResolvedValue({
-      ok: false,
-      kind: "transport",
-      retryable: false,
-      message: "Lost reply",
-    });
-  const reconcile = vi
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      verified: true,
-      plan: selected,
-      message: "Verified existing containers",
-    });
+  const apply = vi.fn().mockResolvedValue({
+    ok: false,
+    kind: "transport",
+    retryable: false,
+    message: "Lost reply",
+  });
+  const reconcile = vi.fn().mockResolvedValue({
+    ok: true,
+    verified: true,
+    plan: selected,
+    message: "Verified existing containers",
+  });
   mock.create.mockImplementation(async (options) => ({
     session: {
       prompt: async () => {
