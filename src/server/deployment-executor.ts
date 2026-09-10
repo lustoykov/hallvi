@@ -908,7 +908,11 @@ export async function verifyServiceImages(
       name === "app"
         ? record.plan!.image
         : record.plan!.services?.find((s) => s.name === name)?.image;
-    if (pinned && container.reference !== pinned)
+    if (
+      pinned &&
+      container.reference !== pinned &&
+      container.reference !== record.serviceImages?.[name]
+    )
       throw new Error(`Service ${name} differs from its approved image.`);
     if (
       record.serviceImages?.[name] &&

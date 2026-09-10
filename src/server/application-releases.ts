@@ -1,3 +1,4 @@
+import { rememberVerifiedImages, rollbackSelection } from "./rollback";
 import { reconcileRelease } from "./release-reconciliation";
 import { inspectRelease } from "./release-diagnostics";
 import { getApplication } from "./db";
@@ -44,6 +45,7 @@ export async function proposeApplicationRelease(
   chatId: string,
   ref = "HEAD",
   requirements = "Update this application.",
+  rollbackRequest?: { releaseId: string; compatibilityEvidence: string },
 ) {
   const record = applicationDeployment(applicationId);
   if (
@@ -55,15 +57,30 @@ export async function proposeApplicationRelease(
     throw new Error(
       "Verify or reconcile the existing deployment before proposing a new release.",
     );
-  const { token } = await checkDeploymentSource(record);
-  const { data } = await githubJson(
-    `/repos/${record.repository}/commits/${encodeURIComponent(ref)}`,
-    token,
-  );
-  const revision = (data as { sha?: string }).sha;
-  if (!revision || !/^[0-9a-f]{40}$/.test(revision))
-    throw new Error("GitHub did not identify an exact revision.");
   const lifecycle = ensureDeploymentLifecycle(record);
+  rememberVerifiedImages(record);
+  const rollback = rollbackRequest
+    ? rollbackSelection(
+        record,
+        rollbackRequest.releaseId,
+        releaseSecrets(record).redact(rollbackRequest.compatibilityEvidence),
+      )
+    : undefined;
+  let revision: string;
+  if (rollback) {
+    revision = lifecycle.releases.find(
+      (r) => r.id === rollback.releaseId,
+    )!.revision;
+  } else {
+    const { token } = await checkDeploymentSource(record);
+    const { data } = await githubJson(
+      `/repos/${record.repository}/commits/${encodeURIComponent(ref)}`,
+      token,
+    );
+    revision = (data as { sha?: string }).sha!;
+    if (!revision || !/^[0-9a-f]{40}$/.test(revision))
+      throw new Error("GitHub did not identify an exact revision.");
+  }
   const scope: ReleaseScope = {
     id: randomUUID(),
     deploymentId: record.id,
@@ -75,7 +92,14 @@ export async function proposeApplicationRelease(
     revision,
     baselineReleaseId: lifecycle.runtime.lastVerified!.releaseId,
     maxAttempts: 3,
+    ...(rollback ? { rollback } : {}),
   };
+  if (rollback)
+    assertReleaseScope(
+      record,
+      scope,
+      lifecycle.releases.find((r) => r.id === rollback.releaseId)!.plan,
+    );
   saveDeployment(record);
   return publicOperation(
     proposeOperation({
@@ -84,8 +108,10 @@ export async function proposeApplicationRelease(
       source: { type: "release", id: `${record.id}:${revision}` },
       target: "release-deployment",
       kind: "change",
-      title: `Release ${revision.slice(0, 12)}`,
-      summary: `Update this application to revision ${revision.slice(0, 12)} on its existing host. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, database version and network exposure. No server purchase or resize. Destructive data migrations need a separate decision.`,
+      title: `${rollback ? "Roll back to" : "Release"} ${revision.slice(0, 12)}`,
+      summary: rollback
+        ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Preserve current data, private settings, database image and network exposure. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
+        : `Update this application to revision ${revision.slice(0, 12)} on its existing host. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, database version and network exposure. No server purchase or resize. Destructive data migrations need a separate decision.`,
       destinations: ["deployment", "history", "processes"],
       command: {
         type: "release-deployment",
@@ -162,6 +188,54 @@ export async function runApplicationRelease(
       "The deployment no longer belongs to this application.",
     );
   assertOwned(record, tracked, scope, record.plan!, false);
+  if (scope.rollback) {
+    const selected = record.lifecycle!.releases.find(
+      (r) => r.id === scope.rollback!.releaseId,
+    );
+    const expected = rollbackSelection(
+      record,
+      scope.rollback.releaseId,
+      scope.rollback.compatibilityEvidence,
+    );
+    if (
+      !selected ||
+      JSON.stringify(expected) !== JSON.stringify(scope.rollback)
+    )
+      throw new ReleaseScopeError(
+        "The selected rollback evidence changed. Review the rollback again.",
+      );
+    // Unknown outcomes use the same recorded host-result protocol as releases.
+    const prior = record
+      .lifecycle!.attempts.filter(
+        (a) => a.authorizationId === scope.id && a.kind === "release",
+      )
+      .at(-1);
+    if (prior?.remoteStartedAt) {
+      const result = await reconcileRelease(record, tracked, signal);
+      if (result.verified) return { evidence: result.message };
+      if (!result.retryable) throw new ReleaseScopeError(result.message);
+    }
+    assertOwned(record, tracked, scope, selected.plan);
+    record.releaseOperationId = tracked.id;
+    saveDeployment(record);
+    return runDeploymentAttempt(
+      record,
+      "release",
+      tracked.id,
+      async () => {
+        record.lifecycle!.attempts.at(-1)!.authorizationId = scope.id;
+        saveDeployment(record);
+        return executeRelease(
+          record,
+          selected,
+          [],
+          signal,
+          scope.rollback!.images,
+        );
+      },
+      selected,
+    );
+  }
   const { token } = await checkDeploymentSource(record);
   const { data } = await githubJson(
     `/repos/${scope.repository}/commits/${scope.revision}`,

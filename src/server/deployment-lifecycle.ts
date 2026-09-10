@@ -1,3 +1,4 @@
+import { rememberVerifiedImages } from "./rollback";
 import { randomUUID } from "node:crypto";
 import {
   assertApprovedRelease,
@@ -102,6 +103,7 @@ export function beginDeploymentAttempt(
   if (!release)
     throw new Error("A selected release is required before execution.");
   const lifecycle = ensureDeploymentLifecycle(record);
+  rememberVerifiedImages(record);
   if (lifecycle.attempts.some((attempt) => attempt.outcome === "working"))
     throw new Error(
       "Reconcile the unfinished deployment attempt before retrying.",
@@ -173,6 +175,7 @@ export function finishDeploymentAttempt(
       },
     };
   }
+  rememberVerifiedImages(record);
   // A preflight failure preserves the previous observation. Once a remote
   // effect was possible, only a fresh successful verification restores it.
   attempt.outcome = outcome;

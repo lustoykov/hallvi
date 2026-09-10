@@ -57,16 +57,34 @@ export function releaseBundle(
   files: TreeFile[],
   password: string,
   supplied: Record<string, string>,
+  rollbackImages?: Record<string, string>,
 ) {
-  const source = !sourceBuilds(plan).length
-    ? []
-    : files.filter((file) => !deniedPathReason(file.path));
+  const source =
+    rollbackImages || !sourceBuilds(plan).length
+      ? []
+      : files.filter((file) => !deniedPathReason(file.path));
   const compose = composeDefinition(plan, revision, id, password, supplied);
+  if (rollbackImages) {
+    if (
+      Object.keys(compose.services).length !==
+      Object.keys(rollbackImages).length
+    )
+      throw new Error("Rollback needs a verified image for every service.");
+    for (const [name, service] of Object.entries(compose.services)) {
+      const image = rollbackImages[name];
+      z.string()
+        .regex(/^sha256:[0-9a-f]{64}$/)
+        .parse(image);
+      const definition = service as { image: string; build?: unknown };
+      definition.image = image;
+      delete definition.build;
+    }
+  }
   return [
     ...source.map((file) => ({ ...file, path: `source/${file.path}` })),
     ...[
       ...new Map(
-        sourceBuilds(plan)
+        (rollbackImages ? [] : sourceBuilds(plan))
           .filter((b) => b.generatedDockerfile)
           .map((b) => [b.dockerfile, b]),
       ).values(),
@@ -100,8 +118,13 @@ export function releaseCommand(
   attemptId: string,
   retainedVolumes: string[],
   newManagedDatabase = false,
+  rollbackImages?: Record<string, string>,
 ) {
   const plan = release.plan;
+  for (const image of Object.values(rollbackImages ?? {}))
+    z.string()
+      .regex(/^sha256:[0-9a-f]{64}$/)
+      .parse(image);
   z.string()
     .regex(/^[0-9a-f]{64}$/)
     .parse(release.id);
@@ -133,13 +156,14 @@ run_release() {
   ${retainedVolumes.length ? `docker volume inspect ${retainedVolumes.map((name) => shellQuote(`sg-${id.slice(0, 8)}_${name}`)).join(" ")} >/dev/null || return $?` : ":"}
   phase=build
   ${
-    sourceBuilds(plan).length
+    !rollbackImages && sourceBuilds(plan).length
       ? `${compose} build ${sourceBuilds(plan)
           .map((b) => b.name)
           .join(" ")} || return $?`
       : ":"
   }
-  ${pull.length ? `${compose} pull ${pull.map(shellQuote).join(" ")} || return $?` : ":"}
+  ${!rollbackImages && pull.length ? `${compose} pull ${pull.map(shellQuote).join(" ")} || return $?` : ":"}
+  ${rollbackImages ? `docker image inspect ${Object.values(rollbackImages).map(shellQuote).join(" ")} >/dev/null || return $?` : ":"}
   phase=activate
   cp compose.json ${root}/compose.json || return $?
   mkdir -p ${root}/configs || return $?
@@ -162,6 +186,7 @@ export async function executeRelease(
   release: DeploymentRelease,
   files: TreeFile[],
   signal: AbortSignal,
+  rollbackImages?: Record<string, string>,
 ) {
   const attempt = record.lifecycle?.attempts.at(-1);
   if (attempt?.kind !== "release" || attempt.outcome !== "working")
@@ -174,6 +199,7 @@ export async function executeRelease(
     files,
     secrets.password,
     secrets.supplied,
+    rollbackImages,
   );
   const priorPlan =
     record.lifecycle!.releases.find(
@@ -192,8 +218,9 @@ export async function executeRelease(
   record.releaseId = release.id;
   record.imageId = null;
   // Reuse the managed database image without an incidental pull or upgrade.
-  record.serviceImages =
-    priorPlan.postgres && record.serviceImages?.postgres
+  record.serviceImages = rollbackImages
+    ? structuredClone(rollbackImages)
+    : priorPlan.postgres && record.serviceImages?.postgres
       ? { postgres: record.serviceImages.postgres }
       : {};
   record.serviceReadiness = {};
@@ -219,6 +246,7 @@ export async function executeRelease(
         attempt.id,
         volumes,
         Boolean(release.plan.postgres && !priorPlan.postgres),
+        rollbackImages,
       ),
       { input: archive, signal, timeout: 20 * 60000 },
     );
