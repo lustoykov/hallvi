@@ -4,9 +4,10 @@
 // Direction A, third pass: Journeys. A visit, your data and a release travel
 // through one server, drawn as crafted cards on a quiet canvas; stops light
 // up as the light passes and open their details beside themselves. The header
-// says what is true now and what is missing. Below the map, Server Guy's
-// console keeps its recorded work folded to one line. It opens while Server
-// Guy works, and Little Server lives on it.
+// keeps the way back and Open; under it, Server Guy's verdict sits on its
+// evidence: Little Server reports the status, and the console below keeps
+// the work behind it, folded to its latest line. What is not set up is drawn
+// on the map, where it would go.
 
 import {
   ArrowRight,
@@ -100,6 +101,7 @@ const BOX: Record<string, Rect> = {
   appVol: { x: 332, y: 434, w: 196, h: 60 },
   svcVol: { x: 612, y: 434, w: 196, h: 60 },
   offsite: { x: 924, y: 428, w: 176, h: 72 },
+  watch: { x: 924, y: 96, w: 176, h: 72 },
   http: { x: 211, y: 286, w: 102, h: 28 },
   ssh: { x: 211, y: 368, w: 102, h: 28 },
 };
@@ -178,6 +180,8 @@ const sectionLabel = (id: string | undefined) =>
   applicationSections.find((section) => section.id === id)?.label ?? id;
 
 function draftFor(part: Part, model: ArchitectureModel) {
+  if (part.id === "gap:monitoring")
+    return `Watch ${model.headline} continuously and tell me when something fails.`;
   switch (part.evidence.certainty) {
     case "failed":
       return `Investigate why ${part.name} isn't answering.`;
@@ -192,12 +196,6 @@ function draftFor(part: Part, model: ArchitectureModel) {
     default:
       return `Explain ${part.name} in more detail.`;
   }
-}
-
-function gapDraft(gap: Gap, model: ArchitectureModel) {
-  return gap.id === "tls"
-    ? `Set up a domain with HTTPS for ${model.headline}.`
-    : `Watch ${model.headline} continuously and tell me when something fails.`;
 }
 
 /** What a simulated check of a part would say it saw. */
@@ -220,7 +218,7 @@ function checkLine(part: Part) {
 
 const conditionWord: Record<Certainty, string> = {
   verified: "Verified",
-  stale: "Stale",
+  stale: "Out of date",
   failed: "Failed",
   planned: "Planned",
   unknown: "Not observed",
@@ -254,6 +252,7 @@ function ServerGuyFace() {
 }
 
 function iconFor(part: Part, restricted: boolean): ReactNode {
+  if (part.id.startsWith("gap:")) return <Heartbeat weight="bold" />;
   switch (part.kind) {
     case "controller":
       return <ServerGuyFace />;
@@ -293,6 +292,7 @@ function titleFor(part: Part) {
 function subtitleFor(part: Part, model: ArchitectureModel) {
   const fact = (label: string) =>
     part.facts.find((item) => item.label === label)?.value;
+  if (part.id.startsWith("gap:")) return `would watch ${model.headline}`;
   switch (part.kind) {
     case "controller":
       return "your network";
@@ -322,6 +322,7 @@ function Card({
   arriving,
   popped,
   compact,
+  ghost,
   onSelect,
 }: {
   part: Part;
@@ -334,13 +335,14 @@ function Card({
   arriving: boolean;
   popped: boolean;
   compact?: boolean;
+  ghost?: boolean;
   onSelect: (id: string) => void;
 }) {
   const certainty = part.quiet ? "quiet" : part.evidence.certainty;
   return (
     <button
       type="button"
-      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${popped ? " is-popped" : ""}${part.checking ? " is-checking" : ""}`}
+      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${popped ? " is-popped" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={certainty}
       style={{ ...place(rect), ["--i" as string]: index }}
       onClick={(event) => {
@@ -505,55 +507,26 @@ function Popover({
   );
 }
 
-/** Something not set up, as a ghost chip that explains itself on click. */
-function GapChip({
-  gap,
-  draft,
-  onAsk,
-}: {
-  gap: Gap;
-  draft: string;
-  onAsk: (draft: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrap = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: PointerEvent) => {
-      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", key);
-    };
-  }, [open]);
-  return (
-    <span ref={wrap} className="axj3-gap">
-      <button
-        type="button"
-        className={`axj3-gap-chip${open ? " is-open" : ""}`}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {gap.id === "tls" ? <LockOpen weight="bold" /> : <Heartbeat weight="bold" />}
-        {gap.title}
-      </button>
-      {open && (
-        <span className="axj3-gap-pop" role="dialog" aria-label={gap.title}>
-          <span>{gap.detail}</span>
-          <button type="button" className="ax-textlink" onClick={() => onAsk(draft)}>
-            <ChatCircleText weight="bold" />
-            Ask in the conversation
-          </button>
-        </span>
-      )}
-    </span>
-  );
+/** Something not set up, drawn as a ghost where it would go. */
+function gapPart(gap: Gap, headline: string): Part {
+  return {
+    id: `gap:${gap.id}`,
+    kind: "offsite",
+    name: gap.id === "monitoring" ? "Monitoring" : gap.title,
+    role: gap.title,
+    plain:
+      gap.id === "monitoring"
+        ? `A watcher outside the server would check ${headline} every minute and tell you when it stops answering.`
+        : gap.detail,
+    facts: [],
+    evidence: {
+      certainty: "absent",
+      short: "Not set up",
+      detail: gap.detail,
+      at: null,
+    },
+    destination: gap.destination,
+  };
 }
 
 const clock = (at: string) =>
@@ -601,15 +574,10 @@ export function JourneyDirection({
   const [mood, setMood] = useState<MascotMood | null>(null);
   const [gesture, setGesture] = useState(0);
   const [liveLines, setLiveLines] = useState<LogLine[]>([]);
-  const [perch, setPerch] = useState<"home" | "work">("home");
   const [open, setOpen] = useState(false);
-  const openRef = useRef(open);
-  const autoOpened = useRef(false);
   const section = useRef<HTMLElement>(null);
   const terminal = useRef<HTMLDivElement>(null);
-  const newest = useRef<HTMLSpanElement>(null);
   const mascot = useRef<HTMLDivElement>(null);
-  const spot = useRef<{ x: number; y: number } | null>(null);
   const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
   const comets = useRef<(SVGGElement | null)[]>([]);
   const tourId = useRef(0);
@@ -623,9 +591,6 @@ export function JourneyDirection({
     const list = timers.current;
     return () => list.forEach((timer) => window.clearTimeout(timer));
   }, []);
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setEntering(false), 1500);
@@ -793,14 +758,25 @@ export function JourneyDirection({
     };
   }, [model.condition.certainty, say]);
 
-  // The simulated re-check writes to the console, step by step.
+  // The simulated re-check writes to the console, step by step. Each run
+  // starts a fresh page of lines, with ids of its own.
+  const run = useRef(0);
+  const lastPhase = useRef(recheck.phase);
   useEffect(() => {
+    const starting =
+      recheck.phase === "running" && lastPhase.current !== "running";
+    lastPhase.current = recheck.phase;
     if (recheck.phase === "idle") {
       seenMarks.current = {};
       const timer = window.setTimeout(() => setLiveLines([]), 0);
       return () => window.clearTimeout(timer);
     }
+    if (starting) {
+      run.current += 1;
+      seenMarks.current = {};
+    }
     const at = new Date().toISOString();
+    const prefix = `live:${run.current}`;
     const add: LogLine[] = [];
     for (const [id, mark] of Object.entries(recheck.marks)) {
       if (seenMarks.current[id] === mark) continue;
@@ -808,11 +784,11 @@ export function JourneyDirection({
       if (!part) continue;
       add.push(
         mark === "checking"
-          ? { id: `live:${id}:checking`, at, tone: "work", text: `Checking ${part.name}…`, invented: true }
+          ? { id: `${prefix}:${id}:checking`, at, tone: "work", text: `Checking ${part.name}…`, invented: true }
           : mark === "passed"
-            ? { id: `live:${id}:passed`, at, tone: "pass", text: checkLine(part), invented: true }
+            ? { id: `${prefix}:${id}:passed`, at, tone: "pass", text: checkLine(part), invented: true }
             : {
-                id: `live:${id}:failed`,
+                id: `${prefix}:${id}:failed`,
                 at,
                 tone: "fail",
                 text: `${part.name} isn't answering · ${part.evidence.detail.replace(/^Simulated re-check\. /, "")}`,
@@ -822,35 +798,28 @@ export function JourneyDirection({
     }
     seenMarks.current = { ...recheck.marks };
     if (recheck.phase === "passed")
-      add.push({ id: "live:done", at, tone: "pass", text: "Everything answered.", invented: true });
-    if (!add.length) return;
+      add.push({ id: `${prefix}:done`, at, tone: "pass", text: "Everything answered.", invented: true });
+    if (!add.length && !starting) return;
     const timer = window.setTimeout(
       () =>
-        setLiveLines((previous) => [
-          ...previous,
-          ...add.filter((line) => !previous.some((old) => old.id === line.id)),
-        ]),
+        setLiveLines((previous) =>
+          starting
+            ? add
+            : [
+                ...previous,
+                ...add.filter((line) => !previous.some((old) => old.id === line.id)),
+              ],
+        ),
       0,
     );
     return () => window.clearTimeout(timer);
   }, [recheck.marks, recheck.phase, model.byId]);
 
-  // Work opens the console and sends Little Server to it; a pass is
-  // celebrated and the console folds away again; a failure stays in view.
+  // A pass is celebrated; a failure opens where it happened.
   useEffect(() => {
     const local: number[] = [];
     const at = (fn: () => void, ms: number) => local.push(window.setTimeout(fn, ms));
-    if (recheck.phase === "running") {
-      at(() => {
-        setPerch("work");
-        if (!openRef.current) {
-          autoOpened.current = true;
-          setOpen(true);
-        }
-      }, 0);
-    } else if (recheck.phase === "idle") {
-      at(() => setPerch("home"), 0);
-    } else if (recheck.phase === "passed") {
+    if (recheck.phase === "passed") {
       at(() => {
         setPopped(true);
         setMood("celebrating");
@@ -864,16 +833,8 @@ export function JourneyDirection({
       }, 120);
       at(() => setPopped(false), 1200);
       at(() => setMood(null), 2800);
-      at(() => {
-        setPerch("home");
-        if (autoOpened.current) {
-          autoOpened.current = false;
-          setOpen(false);
-        }
-      }, 3400);
     } else if (recheck.phase === "failed" && recheck.active) {
       const failed = recheck.active;
-      autoOpened.current = false;
       at(() => {
         setSelected(failed);
         burstAt(mascot.current, {
@@ -886,69 +847,46 @@ export function JourneyDirection({
     return () => local.forEach((timer) => window.clearTimeout(timer));
   }, [recheck.phase, recheck.active]);
 
-  // Little Server stands on the console: at home on its left end, or above
-  // the end of the newest line while it works.
+  // Little Server stands at the start of the console, beside the verdict it
+  // reports, and hops once for each new line of work.
   const lines = useMemo(
     () => [...model.log, ...liveLines].slice(-8),
     [model.log, liveLines],
   );
   const latest = lines[lines.length - 1];
-  const reposition = useCallback(
-    (animate: boolean) => {
-      const host = section.current;
-      const element = mascot.current;
-      const term = terminal.current;
-      if (!host || !element || !term) return;
-      const origin = host.getBoundingClientRect();
-      const box = term.getBoundingClientRect();
-      const size = element.offsetWidth;
-      let left = box.left + 18;
-      if (perch === "work") {
-        const end = newest.current?.getBoundingClientRect().right;
-        if (end)
-          left = Math.min(
-            box.right - size - 12,
-            Math.max(box.left + 12, end - size * 0.3),
-          );
-      }
-      const x = left - origin.left;
-      const y = box.top - origin.top - size * 0.84;
-      const from = spot.current;
-      spot.current = { x, y };
-      const to = `translate(${x}px, ${y}px)`;
-      element.style.transform = to;
-      if (!animate || !from || reducedMotion()) return;
-      const distance = Math.hypot(x - from.x, y - from.y);
-      if (distance < 2) return;
-      const lift = Math.min(70, 16 + distance * 0.12);
-      element.animate(
-        [
-          { transform: `translate(${from.x}px, ${from.y}px)` },
-          {
-            transform: `translate(${(from.x + x) / 2}px, ${Math.min(from.y, y) - lift}px)`,
-            offset: 0.5,
-          },
-          { transform: to },
-        ],
-        {
-          duration: Math.min(820, 360 + distance * 0.5),
-          easing: "cubic-bezier(0.35, 0.1, 0.25, 1)",
-        },
-      );
-    },
-    [perch],
-  );
-  const newestId = latest?.id;
+  const reposition = useCallback(() => {
+    const host = section.current;
+    const element = mascot.current;
+    const term = terminal.current;
+    if (!host || !element || !term) return;
+    const origin = host.getBoundingClientRect();
+    const box = term.getBoundingClientRect();
+    const size = element.offsetWidth;
+    element.style.transform = `translate(${box.left - origin.left + 12}px, ${box.top - origin.top - size * 0.84}px)`;
+  }, []);
   useLayoutEffect(() => {
-    reposition(true);
-  }, [reposition, newestId, open, recheck.phase]);
+    reposition();
+  }, [reposition]);
   useEffect(() => {
     const host = section.current;
     if (!host) return;
-    const observer = new ResizeObserver(() => reposition(false));
+    const observer = new ResizeObserver(() => reposition());
     observer.observe(host);
     return () => observer.disconnect();
   }, [reposition]);
+  const newestId = latest?.id;
+  useEffect(() => {
+    const element = mascot.current;
+    if (!element || !newestId?.startsWith("live:") || reducedMotion()) return;
+    element.animate(
+      [
+        { translate: "0 0" },
+        { translate: "0 -12px", offset: 0.4 },
+        { translate: "0 0" },
+      ],
+      { duration: 380, easing: "cubic-bezier(0.3, 0.7, 0.4, 1)" },
+    );
+  }, [newestId]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -974,14 +912,20 @@ export function JourneyDirection({
   const onPath = new Set(layout.stops[journey]);
   const service = model.parts.find((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
+  const monitoringGap = model.gaps.find((gap) => gap.id === "monitoring");
+  const ghostPart = monitoringGap ? gapPart(monitoringGap, model.headline) : null;
   const planned = model.status !== "live";
   const host = model.byId.host;
   const order = ["host", "gate:http", "app", service?.id].filter(
     (id): id is string => Boolean(id && model.byId[id]),
   );
   const current = model.journeys.find((item) => item.id === journey);
-  const selectedPart = selected ? model.byId[selected] : null;
-  const selectedRect = selected ? layout.rects[selected] : null;
+  const selectedPart = selected
+    ? (model.byId[selected] ?? (ghostPart?.id === selected ? ghostPart : null))
+    : null;
+  const selectedRect = selected
+    ? (layout.rects[selected] ?? (ghostPart?.id === selected ? BOX.watch : null))
+    : null;
   const simulating = recheck.phase !== "idle";
   const running = recheck.phase === "running";
   const greet = () => {
@@ -1012,7 +956,7 @@ export function JourneyDirection({
       className="axj2"
       aria-label="Architecture as journeys"
     >
-      {/* What is true now, and what is missing. */}
+      {/* Where you are, and what you can open. */}
       <header className="axj3-head">
         {page?.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">
@@ -1031,25 +975,145 @@ export function JourneyDirection({
             </div>
           )}
         </div>
-        <div className="axj2-condition axj3-status">
+      </header>
+
+      {/* Server Guy's verdict, and the work behind it. */}
+      <div className="axj3-report">
+        <div className="axj2-condition axj3-verdict">
           <CertaintyTag certainty={model.condition.certainty}>
             {conditionWord[model.condition.certainty]}
           </CertaintyTag>
           <p key={model.condition.text}>{model.condition.text}</p>
         </div>
-        {model.gaps.length > 0 && (
-          <div className="axj3-gaps" aria-label="Not set up yet">
-            {model.gaps.map((gap) => (
-              <GapChip
-                key={gap.id}
-                gap={gap}
-                draft={gapDraft(gap, model)}
-                onAsk={onAsk}
-              />
-            ))}
+        <div
+          ref={terminal}
+          className={`axj2-term${open ? " is-open" : ""}${simulating ? " is-live" : ""}`}
+        >
+          <div className="axj2-term-bar">
+            <button
+              type="button"
+              className="axj2-term-toggle"
+              aria-expanded={open}
+              aria-controls="axj2-term-body"
+              onClick={() => setOpen((value) => !value)}
+            >
+              {open && !running ? (
+                <span className="axj2-term-title">
+                  server-guy · {model.headline.toLowerCase()} ·{" "}
+                  {host?.name.toLowerCase() ?? "server"}
+                </span>
+              ) : (
+                <span className="axj2-term-ticker" data-tone={latest?.tone ?? "info"}>
+                  <b aria-hidden="true">{latest ? glyph[latest.tone] : "·"}</b>
+                  <span data-tag={tagOf(latest)}>
+                    {latest?.text ??
+                      (planned
+                        ? "Nothing has run yet. The plan waits for your approval."
+                        : "No work recorded yet.")}
+                  </span>
+                </span>
+              )}
+              <em className={simulating ? "is-simulated" : undefined}>
+                {simulating
+                  ? running
+                    ? "Simulated re-check · nothing is contacted"
+                    : "Simulated re-check · nothing was contacted"
+                  : latest
+                    ? open
+                      ? `Recorded work · last ${ago(latest.at, model.now)}`
+                      : ago(latest.at, model.now)
+                    : ""}
+              </em>
+              <CaretDown weight="bold" className="axj2-term-caret" aria-hidden="true" />
+              <span className="ax-visually-hidden">
+                {open ? "Hide Server Guy's work" : "Show Server Guy's work"}
+              </span>
+            </button>
+            {!planned && (
+              <button
+                type="button"
+                className="axj2-term-action"
+                disabled={running}
+                onClick={() => {
+                  setSelected(null);
+                  recheck.run(order, 1100);
+                }}
+              >
+                {running ? (
+                  <SpinnerGap weight="bold" className="ax-spin" />
+                ) : (
+                  <ArrowsClockwise weight="bold" />
+                )}
+                {running ? "Checking…" : "Re-check"}
+                <span className="ax-invented">simulated</span>
+              </button>
+            )}
           </div>
-        )}
-      </header>
+          <div className="axj2-term-body" id="axj2-term-body">
+            <div>
+              {page?.last && (
+                <p className="axj2-term-origin">
+                  # Last change: {page.last.title}
+                  {page.last.conversation && page.last.open && (
+                    <>
+                      {" "}· from{" "}
+                      <button type="button" onClick={page.last.open}>
+                        {page.last.conversation}
+                      </button>
+                    </>
+                  )}{" "}
+                  · {ago(page.last.at, model.now)}
+                  {page.earlier > 0 && (
+                    <>
+                      {" "}·{" "}
+                      <button type="button" onClick={() => onOpenDestination("history")}>
+                        {page.earlier} earlier
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+              <div className="axj2-term-lines" role="log" aria-live="polite">
+                {lines.length === 0 && (
+                  <div className="axj2-term-line" data-tone="info">
+                    <time>--:--:--</time>
+                    <b>·</b>
+                    <span>
+                      {planned
+                        ? "Nothing has run yet. The plan waits for your approval."
+                        : "No work recorded yet."}
+                    </span>
+                  </div>
+                )}
+                {lines.map((line, i) => {
+                  const previous = lines[i - 1];
+                  const isNewest = i === lines.length - 1;
+                  return (
+                    <Fragment key={line.id}>
+                      {(!previous || day(previous.at) !== day(line.at)) && (
+                        <div className="axj2-term-day">{day(line.at)}</div>
+                      )}
+                      <div
+                        className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
+                        data-tone={line.tone}
+                      >
+                        <time>{clock(line.at)}</time>
+                        <b aria-hidden="true">{glyph[line.tone]}</b>
+                        <span data-tag={tagOf(line)}>
+                          {line.text}
+                          {isNewest && running && (
+                            <i className="axj2-caret" aria-hidden="true" />
+                          )}
+                        </span>
+                      </div>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       {page?.busy && page.chrome.activity}
 
       <div className="axj2-controls">
@@ -1081,7 +1145,7 @@ export function JourneyDirection({
       </div>
 
       <div
-        className={`axj2-stage${entering ? " is-entering" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
+        className={`axj2-stage${entering ? " is-entering" : ""}${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
         data-journey={journey}
         data-shift={shift ?? undefined}
         onClick={() => setSelected(null)}
@@ -1147,6 +1211,12 @@ export function JourneyDirection({
               <feGaussianBlur stdDeviation="3" />
             </filter>
           </defs>
+          {/* The firewall: a wall of blocks, open only where a door is. */}
+          <path className="axj2-wall" d="M262 146V280M262 320V362M262 402V510" />
+          <path
+            className="axj2-jamb"
+            d="M255 280H269M255 320H269M255 362H269M255 402H269"
+          />
           {layout.wires.map((wire) => (
             <path
               key={`base:${wire.d}`}
@@ -1157,6 +1227,7 @@ export function JourneyDirection({
               className={`axj2-wire j-${wire.journey}${wire.journey === journey ? " is-on" : ""}`}
             />
           ))}
+          {ghostPart && <path d="M878 132H924" className="axj2-wire-ghost" />}
           {!planned &&
             layout.legs[journey].flat().map((d) => (
               <g key={`glow:${journey}:${d}`} className={`axj2-glow${touring ? "" : " is-lit"}`}>
@@ -1196,9 +1267,24 @@ export function JourneyDirection({
         </svg>
 
         {/* The ways in. */}
+        {/* The firewall's legend, on its outer face. */}
+        <button
+          type="button"
+          className={`axj2-wall-note axj2-wall-name${selected === "gate:http" ? " is-selected" : ""}`}
+          style={point(250, 198)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelected((currentId) =>
+              currentId === "gate:http" ? null : "gate:http",
+            );
+          }}
+        >
+          <ShieldCheck weight="bold" /> Firewall
+        </button>
         {model.restricted && (
-          <span className="axj2-ghost axj2-ghost-refused" style={point(262, 250)}>
-            <Prohibit weight="bold" /> Everyone else: turned away
+          <span className="axj2-wall-note axj2-wall-refused" style={point(250, 236)}>
+            Everyone else is turned away
+            <Prohibit weight="bold" />
           </span>
         )}
         {(["gate:http", "gate:ssh"] as const).map((id) =>
@@ -1253,6 +1339,24 @@ export function JourneyDirection({
           ) : null,
         )}
 
+        {ghostPart && (
+          <Card
+            index={9}
+            rect={BOX.watch}
+            part={ghostPart}
+            model={model}
+            selected={selected === ghostPart.id}
+            dim={false}
+            lit={false}
+            arriving={false}
+            popped={false}
+            ghost
+            onSelect={(id) =>
+              setSelected((currentId) => (currentId === id ? null : id))
+            }
+          />
+        )}
+
         {selectedPart && selectedRect && (
           <Popover
             key={selectedPart.id}
@@ -1266,157 +1370,10 @@ export function JourneyDirection({
         )}
       </div>
 
-      {/* Server Guy's console: its recorded work, folded to the latest line. */}
-      <div
-        ref={terminal}
-        className={`axj2-term${open ? " is-open" : ""}${simulating ? " is-live" : ""}`}
-      >
-        <div className="axj2-term-bar">
-          <button
-            type="button"
-            className="axj2-term-toggle"
-            aria-expanded={open}
-            aria-controls="axj2-term-body"
-            onClick={() => {
-              autoOpened.current = false;
-              const next = !open;
-              setOpen(next);
-              // Opened by hand: bring the work into view once it has unfolded.
-              if (next)
-                later(
-                  () =>
-                    terminal.current?.scrollIntoView({
-                      block: "nearest",
-                      behavior: reducedMotion() ? "auto" : "smooth",
-                    }),
-                  440,
-                );
-            }}
-          >
-            {open && !running ? (
-              <span className="axj2-term-title">
-                server-guy · {model.headline.toLowerCase()} ·{" "}
-                {host?.name.toLowerCase() ?? "server"}
-              </span>
-            ) : (
-              <span className="axj2-term-ticker" data-tone={latest?.tone ?? "info"}>
-                <b aria-hidden="true">{latest ? glyph[latest.tone] : "·"}</b>
-                <span ref={newest} data-tag={tagOf(latest)}>
-                  {latest?.text ??
-                    (planned
-                      ? "Nothing has run yet. The plan waits for your approval."
-                      : "No work recorded yet.")}
-                </span>
-              </span>
-            )}
-            <em className={simulating ? "is-simulated" : undefined}>
-              {simulating
-                ? running
-                  ? "Simulated re-check · nothing is contacted"
-                  : "Simulated re-check · nothing was contacted"
-                : latest
-                  ? open
-                    ? `Recorded work · last ${ago(latest.at, model.now)}`
-                    : ago(latest.at, model.now)
-                  : ""}
-            </em>
-            <CaretDown weight="bold" className="axj2-term-caret" aria-hidden="true" />
-            <span className="ax-visually-hidden">
-              {open ? "Hide Server Guy's work" : "Show Server Guy's work"}
-            </span>
-          </button>
-          {!planned && (
-            <button
-              type="button"
-              className="axj2-term-action"
-              disabled={running}
-              onClick={() => {
-                setSelected(null);
-                recheck.run(order, 1100);
-              }}
-            >
-              {running ? (
-                <SpinnerGap weight="bold" className="ax-spin" />
-              ) : (
-                <ArrowsClockwise weight="bold" />
-              )}
-              {running ? "Checking…" : "Re-check"}
-              <span className="ax-invented">simulated</span>
-            </button>
-          )}
-        </div>
-        <div className="axj2-term-body" id="axj2-term-body">
-          <div>
-            {page?.last && (
-              <p className="axj2-term-origin">
-                # Last change: {page.last.title}
-                {page.last.conversation && page.last.open && (
-                  <>
-                    {" "}· from{" "}
-                    <button type="button" onClick={page.last.open}>
-                      {page.last.conversation}
-                    </button>
-                  </>
-                )}{" "}
-                · {ago(page.last.at, model.now)}
-                {page.earlier > 0 && (
-                  <>
-                    {" "}·{" "}
-                    <button type="button" onClick={() => onOpenDestination("history")}>
-                      {page.earlier} earlier
-                    </button>
-                  </>
-                )}
-              </p>
-            )}
-            <div className="axj2-term-lines" role="log" aria-live="polite">
-              {lines.length === 0 && (
-                <div className="axj2-term-line" data-tone="info">
-                  <time>--:--:--</time>
-                  <b>·</b>
-                  <span>
-                    {planned
-                      ? "Nothing has run yet. The plan waits for your approval."
-                      : "No work recorded yet."}
-                  </span>
-                </div>
-              )}
-              {lines.map((line, i) => {
-                const previous = lines[i - 1];
-                const isNewest = i === lines.length - 1;
-                return (
-                  <Fragment key={line.id}>
-                    {(!previous || day(previous.at) !== day(line.at)) && (
-                      <div className="axj2-term-day">{day(line.at)}</div>
-                    )}
-                    <div
-                      className={`axj2-term-line${isNewest ? " is-newest" : ""}${line.invented ? " is-invented" : ""}`}
-                      data-tone={line.tone}
-                    >
-                      <time>{clock(line.at)}</time>
-                      <b aria-hidden="true">{glyph[line.tone]}</b>
-                      <span
-                        ref={open && !running && isNewest ? newest : undefined}
-                        data-tag={tagOf(line)}
-                      >
-                        {line.text}
-                        {isNewest && running && (
-                          <i className="axj2-caret" aria-hidden="true" />
-                        )}
-                      </span>
-                    </div>
-                  </Fragment>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Little Server lives on the console. */}
+      {/* Little Server, at the start of the console, reporting. */}
       <div
         ref={mascot}
-        className={`axj2-mascot${perch === "work" ? " is-working" : ""}`}
+        className={`axj2-mascot${running ? " is-working" : ""}`}
         onClick={greet}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {

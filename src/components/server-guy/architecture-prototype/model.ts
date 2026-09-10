@@ -1035,7 +1035,10 @@ export function buildModel({
         : app.evidence.certainty === "stale"
           ? {
               certainty: "stale",
-              text: `${headline} last passed its checks ${ago(app.evidence.at, now)}. Nothing has looked since, so read this as history.`,
+              text:
+                byId.host?.evidence.certainty === "verified"
+                  ? `The server answered ${ago(byId.host.evidence.at, now)}, but ${headline} itself was last checked ${ago(app.evidence.at, now)}. It may have changed since.`
+                  : `${headline} was last checked ${ago(app.evidence.at, now)}. Nothing has checked it since, so it may have changed.`,
             }
           : {
               certainty: app.evidence.certainty,
