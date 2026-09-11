@@ -367,6 +367,8 @@ export function ApplicationSectionView({
           onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
           decisionFor={decisionFor}
+          decisions={view.decisions}
+          activity={view.activity}
           chrome={{ bar, header, activity: null }}
           current={<div className="sg-section-content">{content}</div>}
         />
