@@ -203,7 +203,7 @@ Source authority: `application-shell.css`, `application-navigation.tsx`, `applic
 
 Fable A is the selected experience: conversation first, inline operation receipts and quiet navigation marks, with stable full-page application views. There is no permanent right pane, split mode or floating window. Operations are shared across conversations and application views; completed evidence stays historical while application facts reflect later verified work.
 
-**Built into the shell on 9 September.** `operator-shell.tsx` now renders this design against the real deployment record: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `deployment-decision.tsx` (the real approval and recovery inside the receipt), `destination-activity.tsx` (activity cards and origin lines above a view's facts), `application-overview.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. The development-only `/explore` route remains a simulated interaction reference. See the [integration report](../../../docs/design/2026-09-09-conversation-first-integration.md) and [adoption details](../../../docs/design/2026-09-09-conversation-first-adoption.md).
+**Built into the shell on 9 September.** `operator-shell.tsx` now renders this design against the real deployment record: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `deployment-decision.tsx` (the real approval and recovery inside the receipt), `destination-activity.tsx` (activity cards and origin lines above a view's facts), `application-overview.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. The development-only `/explore` route remains a simulated interaction reference. See the [integration report](../../../docs/design/screens.md) and [adoption details](../../../docs/design/screens.md).
 
 ## The visual vocabulary (later on 9 September)
 
@@ -298,7 +298,7 @@ The September 9 direction favors predictable built-in views over generated UI. A
 
 ## Conversation-first design language from Fable
 
-Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the [reference prototype](../../../docs/design/2026-09-09-final-ui-screens-reference.md) under `/prototype` (development only) is the living source: every view, state and dialog built from the product’s own components with invented data, replayable step by step. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](../../../docs/archive/previous-direction/explore-DESIGN.md).
+Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the [UI reference](../../../docs/design/screens.md) under `/prototype` (development only) is the living source: every view, state and dialog built from the product’s own components with invented data, replayable step by step. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/previous-direction/explore-DESIGN.md).
 
 ## Colors
 

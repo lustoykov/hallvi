@@ -1,27 +1,36 @@
 # Testing and evidence
 
-[Roadmap](../../ROADMAP.md) owns delivery status. A dated result proves only the inspected candidate/configuration; neither a prototype nor a documentation update proves live support.
+[Requirements](../requirements.md) define user outcomes; [Roadmap](../../ROADMAP.md) distinguishes shipped work from gaps. [Test runners](../../tests/README.md) owns commands, fixtures and opt-in Docker/model runs. The small [acceptance guide](phase-one-acceptance.md) stays at its existing path because the local test dashboard loads it.
 
-## Current acceptance
+## What the current architecture has proved
 
-- [Compatibility cases](self-hosted-compatibility.md): source app plus representative images/stacks, persistence, updates, restore and controlled failures.
-- [Core journeys](../user-journeys/README.md): what the user can achieve, including shared conversation/view state.
-- [Test runners](../../tests/README.md): application suites, browser fixtures, opt-in Docker checks and real-model evaluations.
-- [Fable integration](../design/2026-09-09-conversation-first-integration.md): current receipt/navigation behavior and remaining limits.
+At main `0682ab2` (PR #45), the actual configured Pi model (`openai-codex` / `gpt-5.6-sol`, high effort) installed and updated two materially different applications through the shared native path:
+
+- Notes with PostgreSQL/private input: Pi corrected real host build failures and retained data/private configuration through the update.
+- Independently built web/worker services with shared files and SQLite: both images changed, all three volume identities and stored data survived, the v2 worker processed the retained document, and read-only writes were refused. Pi corrected an unsuitable intake check and anticipated a UID/retained-volume permission problem before execution. This second proof required no production changes.
+
+The model, workspace, resolver, host script, records and verification were real. The provider was fake, SSH mapped to local execution, repository trees were fixtures and host HTTP was mapped to loopback. Worker processing in the second proof was asserted by the harness; the product checked image identity, readiness and HTTP behavior. That application did not demonstrate correction from host feedback; the notes application did. Neither establishes universal Compose support or every app's rollback/backup behavior.
+
+The final proof passed once in 215.6 seconds. Its default suite had 1,006 passing tests and 26 opt-in skips; Codex separately passed TypeScript and a scripted first-deployment Docker regression. These are dated results, not today's suite status. Reusable proof code remains in [native-release.docker.test.ts](../../tests/application/integration/native-release.docker.test.ts).
 
 ## Dated evidence
 
-- [9 September final UI integration](2026-09-09-final-ui-integration.md): Fable’s completed reference screens integrated with the hardened deployment branch, with live/reference isolation and combined validation.
+Keep this concise index rather than one permanent working-tree report per development session. Each link identifies the original committed account, with exact revisions, commands, failures and limitations. A historical record is not a current uptime or compatibility claim.
 
-- [9 September independent review](../reviews/2026-09-09-final-integration-review.md): approval race fix and explicit disposition of recovery limitations.
-- [9 September final integration](2026-09-09-final-integration.md): combined-candidate tests, browser rerun, cross-conversation race correction and explicit legacy acceptance disposition.
+| Proof | Established result and boundary |
+| --- | --- |
+| [Native reuse, 11 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-11-native-compose-reuse.md) | The second real-Pi install/update described above; local transport/provider stand-ins; no backup/rollback on that native topology. |
+| [Generalized protection, 10 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-10-generalized-protection.md) | Real local Paperless capture with PostgreSQL/files/broker, isolated full-stack restore, another processed document and interrupted-capture recovery. Transfer adapter was local, not R2/S3; useful full-app restore was harness evidence. |
+| [Paperless intake, 10 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-10-paperless-intake.md) | The more involved upstream stack/version trial and concrete intake gaps; separate from subsequent native Pi evidence. |
+| [Compatible rollback](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/architecture/compatible-rollback.md) | Scripted local Docker updates and return to retained verified images for SQLite and independent-build/shared-volume layouts; retained data, missing-image refusal and reconciliation. Not a full remote Pi rollback or proof that migrations are reversible. |
+| [Scheduled protection, 9 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-09-scheduled-backups.md) | R2 schedules/retention and restore evidence for PostgreSQL, Kuma and Grafana/Prometheus, with failure/interruption limits. Does not certify arbitrary native service names. |
+| [Recovered controller worker, 9 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-09-controller-worker-recovery.md) | Isolated Linux recovery followed by a real Pi request and clean rollback; not second-device recovery or complete independent takeover. |
+| [Runtime, 9 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-09-single-instance-runtime.md) | Live test-stack deployment/recreation and the disposition of provider/verification uncertainty. Later native architecture changes need their own evidence. |
+| [Initial deployment, 8 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-08-real-deployment-acceptance.md) | Product deployed a source app with private PostgreSQL on Hetzner and checked create/read/delete behavior. |
+| [Integration acceptance, 9 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-09-final-integration.md) | Conversation/view state, browser and operation-coordination checks, with explicit retained/retired legacy acceptance. Not current browser coverage for later changes. |
 
-- [8 September real deployment](2026-09-08-real-deployment-acceptance.md): one source application plus PostgreSQL on Hetzner, verified through the product.
-- [8 September hardening](2026-09-08-deployment-hardening.md): bounded fixes, live checks, tests and stated limits.
-- [8 September review](../reviews/2026-09-08-fable-merge-readiness.md): findings on its original snapshot; consult the hardening report for their follow-up.
+## Current proof gaps
 
-## Legacy regression coverage
+Private command/background-only verification, broader native backup/restore and rollback, BYOM, additional public endpoints, replacement-host cutover and broader monitoring remain incomplete. Do not convert a requirements table into support claims. The historical [phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) retains old rubrics and judgment evidence where legacy behavior still matters; it does not require restoring phase navigation.
 
-The [phase acceptance entry point](phase-one-acceptance.md) remains available to the testing dashboard and links the full archived casebook. Existing phase-oriented expectations require explicit preservation, replacement or retirement as the current UI changes. Unreviewed model answers remain unreviewed; automated schema checks do not establish semantic quality.
-
-Before claiming the integration ready, exercise the final candidate's affected application tests, browser journeys, build and relevant failure/recovery paths. Keep synthetic-provider, real-model, local Docker and live-host evidence distinct. The final integration report records application acceptance separately from documentation link checks.
+Run checks proportionate to changed behavior. Distinguish scripted model callbacks, actual Pi, local Docker, simulated providers and real hosts. Preserve exact candidate/configuration, failed or uncertain outcomes, observation time and cleanup evidence. Do not repeat expensive model or full-suite runs without a concrete reason, and do not claim document/link checks validate runtime behavior.

@@ -79,6 +79,6 @@ Make launch-ready publishes Server Guy's staged change as one commit on the cont
 
 `tests/application/integration/github-setup.test.ts` exercises the real coordinator, connection files, route boundary and repository adapter against synthetic provider responses. `tests/application/unit/github-api.test.ts` tests request/error handling without real tokens or network requests. `tests/browser/github.spec.ts` covers consent, device cancellation/denial/success, disconnect/reconnect, exact saved evidence and permission recovery in a disposable desktop app.
 
-The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](../archive/implementation/phase-one-acceptance.md#latest-verification).
+The browser fixture replaces only GitHub's API/credential boundary. The real GitHub setup routes, coordinator, domain code and SQLite run in the fixture. Pi and ChatGPT login use their existing synthetic adapters. CI never authorizes a real account. Current local/live evidence is recorded in the [Phase 1 acceptance guide](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md#latest-verification).
 
-UI conventions for future changes live in the [shared settings design reference](../architecture/settings/DESIGN.md).
+UI conventions for future changes live in the [shared settings design reference](../design/settings.md).

@@ -30,7 +30,7 @@ This is the agreed support target, not a list of shipped capabilities. [ROADMAP.
 
 A source repository need not belong to the user, and GitHub Actions is not mandatory for prebuilt software. Existing external services remain usable, with explicit limits on what Server Guy can observe or manage.
 
-Use [representative compatibility cases](docs/testing/self-hosted-compatibility.md) to expose missing machinery: Uptime Kuma, Grafana/Prometheus, Forgejo, Vaultwarden, Paperless-ngx and Immich. Each is a target to verify on an appropriately sized VPS, not a certification or promise to run the entire suite on a tiny server.
+Use the [representative requirements cases](docs/requirements.md#proving-reuse) to expose missing machinery: Uptime Kuma, Grafana/Prometheus, Forgejo, Vaultwarden, Paperless-ngx and Immich. Each is a target to verify on an appropriately sized VPS, not a certification or promise to run the entire suite on a tiny server.
 
 ## Operating boundary
 
@@ -42,11 +42,11 @@ Use [representative compatibility cases](docs/testing/self-hosted-compatibility.
 
 Model intelligence determines what to inspect, recommend and do next. Tools enforce access, spending limits and effect-specific authority. Recommendations and successful commands are not proof of a working or protected application.
 
-Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture/agent-releases.md) implements this loop for updates on an existing host; a first deployment runs through the same loop once the owner approves its priced recommendation.
+Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture.md) implements this loop for updates on an existing host; a first deployment runs through the same loop once the owner approves its priced recommendation.
 
 ## Experience
 
-Use **Fable's conversation-first design**: focused chat, interactive operation receipts, stable views, subtle activity indicators and continuity between conversations. The [design reference](src/components/server-guy/DESIGN.md) owns visual language; the [integration report](docs/design/2026-09-09-conversation-first-integration.md) describes the current implementation.
+Use **Fable's conversation-first design**: focused chat, interactive operation receipts, stable views, subtle activity indicators and continuity between conversations. The [design reference](src/components/server-guy/DESIGN.md) owns visual language; the [UI reference](docs/design/screens.md) explains real and simulated surfaces.
 
 An Application has its own name, host, configuration, releases and history. Multiple conversations retain separate transcripts/drafts and share operational state. A second independent deployment of the same source is another Application; there is no mandatory Production/Staging hierarchy.
 
@@ -62,7 +62,7 @@ Server Guy should be able to help author a plugin when a missing specialised cap
 
 The core retains authority enforcement, secret handling, operation coordination, durable evidence and recovery records. A plugin cannot grant itself access or silently redefine a successful operation. Exportable packages exclude credentials; recovery preserves the selected version, required configuration and extension state, with secrets separately protected. Disabling a plugin must retain historical evidence and identify any ongoing work that depends on it.
 
-This is a design direction agreed on 10 September 2026, not a shipped plugin runtime. The [architecture brief](docs/architecture/extensible-capabilities.md) records the boundary and open questions; [ROADMAP.md](ROADMAP.md) owns implementation order. API shape, code isolation and UI contribution mechanisms remain open for review with Fable.
+This is a design direction agreed on 10 September 2026, not a shipped plugin runtime. The [architecture brief](docs/architecture.md) records the boundary and open questions; [ROADMAP.md](ROADMAP.md) owns implementation order. API shape, code isolation and UI contribution mechanisms remain open for review with Fable.
 
 ## Development priority
 

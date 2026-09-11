@@ -24,9 +24,9 @@ rounded: {card: "14px", button: "7px", help: "12px"}
 
 ## Overview
 
-GitHub settings extends the approved Pi setup layout. This is an Operate surface: make the current account, next action, and repository-access implications easy to inspect. These conventions describe the existing desktop implementation as of 2026-09-04.
+GitHub settings extends the approved Pi setup layout. This is an Operate surface: make the current account, next action, and repository-access implications easy to inspect. This is a settings-specific implementation reference, originally observed on 4 September 2026 and checked against the shared settings CSS on 11 September. It is not a separate product color system. The [application design reference](../../src/components/server-guy/DESIGN.md) owns overall visual language; this document records the settings surface's existing differences.
 
-The implementation remains the source of truth: [shared settings styles](../../../src/components/server-guy/pi-setup-screen.module.css), [Pi screen](../../../src/components/server-guy/pi-setup-screen.tsx), [GitHub screen](../../../src/components/server-guy/github-setup-screen.tsx), and [shared page shell](../../../src/app/server-guy.css). Recheck them before extending this reference.
+The implementation remains the source of truth: [shared settings styles](../../src/components/server-guy/pi-setup-screen.module.css), [Pi screen](../../src/components/server-guy/pi-setup-screen.tsx), [GitHub screen](../../src/components/server-guy/github-setup-screen.tsx), and [shared page shell](../../src/app/server-guy.css). Recheck them before extending this reference.
 
 ## Colors
 
@@ -34,7 +34,7 @@ Use the pale canvas, white card, dark topbar, and dark body text. Blue marks pri
 
 ## Typography
 
-Inherit Geist Sans from the [app layout](../../../src/app/layout.tsx) and [global styles](../../../src/app/globals.css). Section titles are compact (17px); introductory copy is slightly larger than body copy (15px); hints use smaller text (13px). Device codes use the separate monospace role and remain selectable.
+Inherit Geist Sans from the [app layout](../../src/app/layout.tsx) and [global styles](../../src/app/globals.css). Section titles are compact (17px); introductory copy is slightly larger than body copy (15px); hints use smaller text (13px). Device codes use the separate monospace role and remain selectable.
 
 ## Layout
 
@@ -50,13 +50,13 @@ Retain the shared card, primary-button, and help-panel radii above. Controls use
 
 ## Components
 
-- **Navigation:** reuse [SettingsNav](../../../src/components/server-guy/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
+- **Navigation:** reuse [SettingsNav](../../src/components/server-guy/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
 - **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (2px in the primary blue, offset 3px, shared by every screen) and disabled treatment.
 - **Account choice:** distinguish a detected login from an accepted connection. Show the account and credential source, explicit reuse, an alternative login when available, and a way to retain the current connection.
 - **Device sign-in:** show the code, copy feedback, provider link, stable waiting announcement, expiry, and cancel action. While replacing an account, name the account still in use. Keep the changing countdown outside the live announcement.
 - **Repository access:** show GitHub App installation guidance only for an App connection. Existing CLI/environment connections use their existing permissions. Account connection does not claim repository verification; adding an application checks access and the exact commit.
 - **Help and errors:** keep inline copy concise; disclose storage details in the titled popover. Show actionable errors near the account controls. Disconnect uses the existing confirmation dialog.
-- **Return path:** the [GitHub route](../../../src/app/setup/github/page.tsx) preserves `from=add` as “Back to add application”; otherwise the footer says “View applications”.
+- **Return path:** the [GitHub route](../../src/app/setup/github/page.tsx) preserves `from=add` as “Back to add application”; otherwise the footer says “View applications”.
 
 ## Do's and Don'ts
 

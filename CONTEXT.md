@@ -1,6 +1,6 @@
 # Domain language
 
-Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture/agent-directed-operations.md) and code. This glossary does not schedule implementation or claim that every concept has a dedicated database table.
+Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.md) and code. This glossary does not schedule implementation or claim that every concept has a dedicated database table.
 
 ## Application and collaboration
 

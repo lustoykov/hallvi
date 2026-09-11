@@ -1,8 +1,8 @@
 // The viewed phase, described for a person: its purpose, what is happening
 // now, whose move it is, the distinct next actions, the Phase 3 stages and
 // an honest remaining-work sentence. Derived only from the Operator View, so
-// the chat, the record and a reload all say the same thing. Lifted from the
-// shell prototype (docs/design/shell-prototype-2026-09-07.md).
+// the chat, the record and a reload all say the same thing. The original
+// prototype is in Git history; current UI guidance: docs/design/screens.md.
 import type { ConformanceView, OperatorView } from "@/server/types";
 
 export const PHASE_PURPOSE: Record<string, string> = {

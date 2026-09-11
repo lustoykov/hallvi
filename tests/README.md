@@ -2,7 +2,7 @@
 
 Run `npm run test:dashboard` and open <http://127.0.0.1:4317> to launch suites, inspect recorded runs and review saved model answers. Opening the dashboard runs nothing. It is a separate local developer tool, not the product UI.
 
-[Current acceptance](../docs/testing/README.md) connects journeys, compatibility targets and dated evidence. The [archived phase casebook](../docs/archive/implementation/phase-one-acceptance.md) preserves regression rubrics and older results. [Roadmap](../ROADMAP.md) alone owns implementation order.
+[Current acceptance](../docs/testing/README.md) connects journeys, compatibility targets and dated evidence. The [archived phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) preserves regression rubrics and older results. [Roadmap](../ROADMAP.md) alone owns implementation order.
 
 ## Suites and files
 
@@ -39,7 +39,7 @@ Select a browser group with `npm run test:e2e -- --grep @journey-github-connecti
 
 Live evals use the configured ChatGPT subscription through Pi. The dashboard shows the selected cases/repetitions and asks before starting model work. It selects unattempted cases by default; rerunning a case creates new evidence instead of replacing earlier answers.
 
-A dashboard live run can automatically judge its saved answers when selected at confirmation. Judging saved answers also makes model calls. Human verdicts and model judgments remain separate. Judge-first triage cannot clear failed code checks, missing evidence or old-policy judgments; spot-check model-cleared answers against human labels. See [judge calibration](../docs/archive/implementation/phase-one-acceptance.md#calibrating-the-judge).
+A dashboard live run can automatically judge its saved answers when selected at confirmation. Judging saved answers also makes model calls. Human verdicts and model judgments remain separate. Judge-first triage cannot clear failed code checks, missing evidence or old-policy judgments; spot-check model-cleared answers against human labels. See [judge calibration](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md#calibrating-the-judge).
 
 Run history records candidate, scope, command, timing and bounded output. Archive/restore changes visibility, not verdicts. Keep saved reports and reviews private; temporary eval databases/native sessions are disposable. Detailed UI behavior lives in the [testing design reference](dashboard/DESIGN.md).
 
