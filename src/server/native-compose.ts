@@ -12,6 +12,7 @@ import type {
 } from "./deployment-release";
 import {
   checkIssues,
+  commandCheckSchema,
   httpPathSchema,
   primaryCheckSchema,
   serviceCheckSchema,
@@ -69,6 +70,7 @@ export const criterionSchema = z
       )
       .max(8)
       .default([]),
+    commands: z.array(commandCheckSchema).max(8).optional(),
   })
   .superRefine((criterion, ctx) => {
     for (const message of checkIssues(criterion.healthPath, criterion.checks))
@@ -587,6 +589,8 @@ function criterionOf(
   json: string | undefined,
   inherited: Criterion | null,
   resolved: ResolvedCompose,
+  /** Private inputs, by name, whose values commands may receive. */
+  inputs: string[],
 ): Criterion | null {
   if (json === undefined) return inherited;
   let value: unknown;
@@ -607,6 +611,33 @@ function criterionOf(
       throw new NativeConfigurationError(
         `Criterion service ${service.name} is not in the configuration.`,
       );
+  for (const command of parsed.data.commands ?? []) {
+    if (!resolved.services[command.service])
+      throw new NativeConfigurationError(
+        `Command check ${command.name}: service ${command.service} is not in the configuration.`,
+      );
+    const unknown = (command.inputs ?? []).filter(
+      (name) => !inputs.includes(name),
+    );
+    if (unknown.length)
+      throw new NativeConfigurationError(
+        `Command check ${command.name}: ${unknown.join(", ")} is not a recorded private input. Name only ${inputs.join(", ") || "(none recorded)"}.`,
+      );
+  }
+  // Verified behavior stays: a check is corrected under its name, never
+  // dropped to pass.
+  const kept = new Set(
+    [...parsed.data.checks, ...(parsed.data.commands ?? [])].map(
+      (check) => check.name,
+    ),
+  );
+  const dropped = [...(inherited?.checks ?? []), ...(inherited?.commands ?? [])]
+    .map((check) => check.name)
+    .filter((name) => !kept.has(name));
+  if (dropped.length)
+    throw new NativeConfigurationError(
+      `The criterion drops recorded checks: ${dropped.join(", ")}. Keep each one, corrected under its name when the revision changes its response; removing verified behavior needs the owner's decision.`,
+    );
   if (redactSecrets(json).count)
     throw new NativeConfigurationError("Credentials cannot appear in checks.");
   return parsed.data;
@@ -737,7 +768,12 @@ export async function prepareNativeRelease(input: {
         }
       : null,
     httpAccess: baseline.httpAccess,
-    criterion: criterionOf(selection.criterion, baseline.criterion, resolved),
+    criterion: criterionOf(
+      selection.criterion,
+      baseline.criterion,
+      resolved,
+      names,
+    ),
     summary,
   };
   if (native.criterion && !primaryHttp(nativeFacts(native)))

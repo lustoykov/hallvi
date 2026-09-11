@@ -3,7 +3,7 @@
 // and CSRF token, as a browser would; content steps use BookStack's REST API
 // with a token created through its own form. Redirects are never followed
 // (their targets derive from APP_URL). Evidence is appended to evidence.jsonl.
-// Usage: node bookstack.mjs <base-url> setup|verify <label>
+// Usage: node bookstack.mjs <base-url> setup|verify|reset-default <label>
 import { createHash, randomBytes } from "node:crypto";
 import {
   appendFileSync,
@@ -23,8 +23,10 @@ const here =
   join(dirname(fileURLToPath(import.meta.url)), "../../results/rig/workflow");
 mkdirSync(here, { recursive: true });
 const [base, mode, label = mode] = process.argv.slice(2);
-if (!base || !["setup", "verify"].includes(mode))
-  throw new Error("Usage: node bookstack.mjs <base-url> setup|verify <label>");
+if (!base || !["setup", "verify", "reset-default"].includes(mode))
+  throw new Error(
+    "Usage: node bookstack.mjs <base-url> setup|verify|reset-default <label>",
+  );
 // Test credentials for this disposable instance; never the owner's.
 const stateFile = join(here, "bookstack-state.json");
 const DEFAULT = { email: "admin@admin.com", password: "password" };
@@ -322,6 +324,29 @@ if (mode === "setup") {
     imageUrl: image.url,
   });
   record("verify", await verify(state, session));
+} else if (mode === "reset-default") {
+  // Replay intervention: return the administrator to BookStack's published
+  // defaults through its own forms, recreating the audit's first symptom.
+  const state = JSON.parse(readFileSync(stateFile, "utf8"));
+  const current = await login(state);
+  if (!current.authenticated)
+    throw new Error("The recorded administrator cannot log in.");
+  const profile = await current.session.form(
+    "/my-account/profile",
+    { name: "Admin", email: DEFAULT.email },
+    { method: "PUT" },
+  );
+  const password = await current.session.form(
+    "/my-account/auth/password",
+    { password: DEFAULT.password, "password-confirm": DEFAULT.password },
+    { method: "PUT", from: "/my-account/auth" },
+  );
+  record("reset-default", {
+    profileStatus: profile.status,
+    passwordStatus: password.status,
+    defaultAuthenticated: (await login(DEFAULT)).authenticated,
+    ownerAuthenticated: (await login(state)).authenticated,
+  });
 } else {
   const state = JSON.parse(readFileSync(stateFile, "utf8"));
   const old = await login(DEFAULT);

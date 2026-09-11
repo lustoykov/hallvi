@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
 import type {
+  commandCheckSchema,
   DeploymentRecord,
   primaryCheckSchema,
   serviceCheckSchema,
@@ -16,6 +17,8 @@ export interface Criterion {
     healthPath: string;
     checks: z.infer<typeof serviceCheckSchema>[];
   }[];
+  /** Commands in the application's containers; absent in older releases. */
+  commands?: z.infer<typeof commandCheckSchema>[];
 }
 
 /** Normalized Compose fields the controller reads; others pass through. */

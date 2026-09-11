@@ -19,6 +19,11 @@ export interface ServiceFacts {
   command: string | null;
   healthcheck: boolean;
   dependsOn: string[];
+  /**
+   * Runs to completion instead of serving: another service waits for it
+   * with Compose's service_completed_successfully condition.
+   */
+  completes?: true;
   /** Carries the controller's revision label. */
   labeled: boolean;
 }
@@ -76,6 +81,16 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
   for (const [name, service] of Object.entries(resolved.services))
     if (service.image && !owner.has(service.image))
       owner.set(service.image, name);
+  const completing = new Set(
+    Object.values(resolved.services).flatMap((service) =>
+      Object.entries(service.depends_on ?? {}).flatMap(([name, dependency]) =>
+        (dependency as { condition?: string } | null)?.condition ===
+        "service_completed_successfully"
+          ? [name]
+          : [],
+      ),
+    ),
+  );
   const volumes = new Map<string, VolumeFacts>();
   const services = Object.entries(resolved.services).map(([name, service]) => {
     for (const mount of service.volumes ?? []) {
@@ -122,6 +137,7 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
         health?.test?.length && !health.disable && health.test[0] !== "NONE",
       ),
       dependsOn: Object.keys(service.depends_on ?? {}),
+      ...(completing.has(name) ? { completes: true as const } : {}),
       // The managed database keeps running across releases unlabeled.
       labeled:
         name !== database?.service &&

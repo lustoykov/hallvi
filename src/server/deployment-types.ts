@@ -30,6 +30,23 @@ export const serviceCheckSchema = z.strictObject({
     .nullable(),
   equals: z.union([z.string(), z.number(), z.boolean()]).nullable(),
 });
+/**
+ * A command run in a running service's container after the HTTP checks. It
+ * passes when it exits 0 and its output contains `contains`. Named private
+ * inputs reach its environment; their values never enter records or model
+ * context. A command may change data: it runs under the release's authority.
+ */
+export const commandCheckSchema = z.strictObject({
+  name: z.string().min(1).max(120),
+  service: z.string().min(1).max(63),
+  run: z.array(z.string().min(1).max(4000)).min(1).max(40),
+  inputs: z
+    .array(z.string().regex(/^[A-Z_][A-Z0-9_]*$/))
+    .max(10)
+    .optional(),
+  contains: z.string().max(300).optional(),
+  timeoutSeconds: z.number().int().min(1).max(300).optional(),
+});
 type PrimaryCheck = z.infer<typeof primaryCheckSchema>;
 /** A health route proves readiness, not behavior; created objects are owned. */
 export function checkIssues(healthPath: string, checks: PrimaryCheck[]) {
@@ -132,7 +149,12 @@ export interface DeploymentRecord {
   /** Historical readiness evidence, not continuous monitoring. */
   serviceReadiness?: Record<
     string,
-    { checkedAt: string; kind: "command" | "http"; imageId: string | null }
+    {
+      checkedAt: string;
+      /** A readiness command, an HTTP check, or a one-shot's exit 0. */
+      kind: "command" | "http" | "completed";
+      imageId: string | null;
+    }
   >;
   /** Identity of the selected configuration's release. */
   releaseId?: string;

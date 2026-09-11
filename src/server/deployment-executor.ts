@@ -623,6 +623,8 @@ export async function verifyDeployment(
   const marker = `sg-check-${randomBytes(6).toString("hex")}`;
   try {
     for (const check of criterion.checks) {
+      const at = new Date().toISOString();
+      const started = Date.now();
       const path = check.path.replaceAll("{id}", encodeURIComponent(captured));
       if (check.path.includes("{id}") && !captured)
         throw new Error("A verification step requires a captured object ID.");
@@ -684,13 +686,23 @@ export async function verifyDeployment(
           saveDeployment(record);
         }
       }
-      if (
-        response.status !== check.expectedStatus ||
-        !responseContains(
+      const passed =
+        response.status === check.expectedStatus &&
+        responseContains(
           text,
           check.contains.replaceAll("SG_VERIFY_TOKEN", marker),
-        )
-      )
+        );
+      const { recordCheck } = await import("./command-checks");
+      recordCheck(record, {
+        name: check.name,
+        kind: "http",
+        target: `${check.method} ${check.path}`,
+        at,
+        durationMs: Date.now() - started,
+        passed,
+        status: response.status,
+      });
+      if (!passed)
         throw new Error(
           `Application behavior check failed: ${check.name} (HTTP ${response.status}).`,
         );
@@ -736,7 +748,7 @@ export async function verifyServiceImages(
     "ssh",
     [
       ...sshArgs(record),
-      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}},{{json (index .Config.Labels "server-guy.revision")}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
+      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}},{{json (index .Config.Labels "server-guy.revision")}},{{json .State.Status}},{{json .State.ExitCode}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -a -q)`,
     ],
     signal,
   );
@@ -745,15 +757,40 @@ export async function verifyServiceImages(
     .trim()
     .split("\n")
     .map((line) => {
-      const [Image, reference, service, running, revision] = JSON.parse(
-        line,
-      ) as [string, string, string, boolean, string | undefined];
-      return { Image, reference, service, running, revision };
+      const [Image, reference, service, running, revision, status, exitCode] =
+        JSON.parse(line) as [
+          string,
+          string,
+          string,
+          boolean,
+          string | undefined,
+          string,
+          number,
+        ];
+      return {
+        Image,
+        reference,
+        service,
+        running,
+        revision,
+        status,
+        exitCode,
+      };
     });
   const images: Record<string, string> = {};
   for (const service of facts.services) {
     const matches = containers.filter((c) => c.service === service.name);
-    if (matches.length !== 1 || !matches[0].running)
+    // A one-shot service proves itself by exiting 0; a crash is a failure.
+    if (
+      service.completes &&
+      (matches.length !== 1 ||
+        matches[0].status !== "exited" ||
+        matches[0].exitCode !== 0)
+    )
+      throw new Error(
+        `One-shot service ${service.name} did not complete successfully (${matches.length === 1 ? `${matches[0].status}, exit ${matches[0].exitCode}` : `${matches.length} containers`}).`,
+      );
+    if (!service.completes && (matches.length !== 1 || !matches[0].running))
       throw new Error(
         `Compose service ${service.name} is not running exactly once.`,
       );
@@ -799,6 +836,15 @@ export async function verifyPrivateServices(
   saveDeployment(record);
   const facts = currentFacts(record)!;
   for (const service of facts.services) {
+    // verifyServiceImages established this one-shot service's exit 0.
+    if (service.completes) {
+      record.serviceReadiness[service.name] = {
+        checkedAt: new Date().toISOString(),
+        kind: "completed",
+        imageId: record.serviceImages?.[service.name] ?? null,
+      };
+      continue;
+    }
     // The managed database's health already gates its dependents.
     if (!service.healthcheck || service.name === facts.database?.service)
       continue;
@@ -1000,6 +1046,8 @@ export async function verifyRuntime(
   established?.();
   await verifyDeployment(record, signal);
   await verifyPrivateServices(record, signal);
+  const { verifyCommandChecks } = await import("./command-checks");
+  await verifyCommandChecks(record, signal);
   await collectDeploymentLogs(record, signal);
   return currentFacts(record)?.criterion
     ? ("passed" as const)
