@@ -1,6 +1,6 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction A for Processes and Database, Line. It borrows Transit's
-   classes (axm-) from Deployment; the additions are prefixed axsl-. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Processes.
+   Line borrows Transit's classes (axm-) from Deployment; the additions are
+   prefixed axsl-. */
 
 .axsl-code {
   font-family: var(--ax-mono);
@@ -36,13 +36,11 @@
   border: 0;
   background: var(--ax-ink-2);
 }
-.axsl-changes,
-.axsl-other {
+.axsl-changes {
   display: grid;
   gap: 8px;
 }
-.axsl-changes h3,
-.axsl-other h3 {
+.axsl-changes h3 {
   margin: 0 0 2px;
   font-size: 13px;
   font-weight: 600;
@@ -83,29 +81,4 @@
   font-size: 12px;
   color: var(--ax-muted);
   font-variant-numeric: tabular-nums;
-}
-.axsl-other p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--ax-ink-2);
-}
-.axsl-other code {
-  font-family: var(--ax-mono);
-  font-size: 12px;
-}
-.axsl-other .ax-textlink {
-  font-size: 12.5px;
-}
-.axsl-note {
-  max-width: 64ch;
-  margin: 8px 0 0 54px;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--ax-muted);
-}
-.axsl-empty {
-  margin: 8px 0 0;
-  font-size: 15px;
-  color: var(--ax-muted);
 }

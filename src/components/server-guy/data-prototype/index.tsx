@@ -1,10 +1,13 @@
 "use client";
 
 // PROTOTYPE · opus-ui-improvements · throwaway.
-// Processes in the Transit language (line.tsx), on the real route and
-// inside the real shell. The owner chose it from three directions, which
-// stay on claude/processes-database. The bar at the bottom switches to the
-// shipped view (0), which also stands in while nothing is recorded.
+// Directions for the Database and Storage destinations, on the real routes
+// and inside the real shell, switchable with ?variant= and the prototype bar
+// (← → keys). Each direction draws both pages, and none uses the Transit
+// line: A Cutaway opens the server up in space, B Timeline follows the data
+// through time in Overview's lanes, and C Answers puts it in plain questions
+// and answers. 0 is the shipped view, which also stands in while nothing
+// is recorded.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -16,32 +19,46 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { ApplicationSection } from "../application-sections";
 import { operationsFor, unresolved } from "../operation-model";
 import type { PageChrome } from "../architecture-prototype";
-import type { ScenarioId } from "../architecture-prototype/model";
+import { CITIES, type ScenarioId } from "../architecture-prototype/model";
 import { setMotionPreview } from "../architecture-prototype/motion";
 import {
   PrototypeBar,
   type VariantEntry,
 } from "../architecture-prototype/prototype-bar";
 import { PageHead } from "../deployment-prototype/page-head";
-import { LineDirection } from "./line";
-import { buildStackStory, type StackStory } from "./stack-model";
+import { AnswersDirection } from "./answers";
+import { CutawayDirection } from "./cutaway";
+import { buildDataStory, type DataStory } from "./data-model";
+import { TimelineDirection } from "./timeline";
 import "../architecture-prototype/prototype.css";
 import "../architecture-prototype/journey-v2.css";
 
-export interface StackDirectionProps {
-  story: StackStory;
+export type DataPage = "database" | "storage";
+export interface DataDirectionProps {
+  page: DataPage;
+  story: DataStory;
+  now: number;
   head: ReactNode;
   /** Work in progress on this destination, as the shell shows it. */
   activity: ReactNode;
+  /** The server it all lives on, for the directions that name it. */
+  server: { label: string; city: string | null } | null;
   onAsk: (draft: string) => void;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }
 
 const variants: VariantEntry[] = [
-  { key: "A", id: "line", name: "Line" },
+  { key: "A", id: "cutaway", name: "Cutaway" },
+  { key: "B", id: "timeline", name: "Timeline" },
+  { key: "C", id: "answers", name: "Answers" },
   { key: "0", id: "current", name: "Current page" },
 ];
+const directions: Record<string, (props: DataDirectionProps) => ReactNode> = {
+  cutaway: CutawayDirection,
+  timeline: TimelineDirection,
+  answers: AnswersDirection,
+};
 const choices: ScenarioId[] = ["live", "later"];
 const DAY = 86_400_000;
 
@@ -56,7 +73,8 @@ function writeUrl(variant: string, scenario: ScenarioId) {
   window.history.replaceState(window.history.state, "", url);
 }
 
-export function StackPrototype({
+export function DataPrototype({
+  page,
   record,
   stack,
   facts,
@@ -68,6 +86,7 @@ export function StackPrototype({
   chrome,
   current,
 }: {
+  page: DataPage;
   record: DeploymentRecord | null;
   stack: ApplicationStack;
   facts: ApplicationFacts;
@@ -81,7 +100,7 @@ export function StackPrototype({
   current: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
-  const [variantId, setVariantId] = useState("line");
+  const [variantId, setVariantId] = useState("cutaway");
   const [scenario, setScenario] = useState<ScenarioId>("live");
   const [reduced, setReduced] = useState(false);
 
@@ -106,10 +125,10 @@ export function StackPrototype({
 
   const now = scenario === "later" ? clock + 3 * DAY : clock;
   const story = useMemo(
-    () => buildStackStory({ record, stack, facts, operations, now }),
+    () => buildDataStory({ record, stack, facts, operations, now }),
     [record, stack, facts, operations, now],
   );
-  const busy = operationsFor("processes", operations).some(
+  const busy = operationsFor(page, operations).some(
     (operation) =>
       operation.state === "working" ||
       operation.state === "queued" ||
@@ -118,13 +137,20 @@ export function StackPrototype({
   );
   const variant = variants.find((item) => item.id === variantId) ?? variants[0];
   // With nothing recorded, the shipped page's honest empty state stands in.
-  const shipped = variant.id === "current" || story.state === "none";
-  const props: StackDirectionProps = {
+  const shipped =
+    variant.id === "current" ||
+    story.state === "none" ||
+    (page === "database" ? !story.database : !story.volumes.length);
+  const Direction = directions[variant.id] ?? CutawayDirection;
+  const offer = record?.offer ?? null;
+  const props: DataDirectionProps = {
+    page,
     story,
+    now,
     head: (
       <PageHead
         bar={chrome.bar}
-        title="Processes"
+        title={page === "database" ? "Database" : "Storage"}
         name={story.name}
         openUrl={
           story.state === "running"
@@ -135,6 +161,12 @@ export function StackPrototype({
       />
     ),
     activity: busy ? chrome.activity : null,
+    server: offer
+      ? {
+          label: `Hetzner ${offer.serverType.toUpperCase()}`,
+          city: CITIES[offer.location]?.[0] ?? offer.location,
+        }
+      : null,
     onAsk,
     onOpenConversation,
     onOpenDestination,
@@ -158,7 +190,7 @@ export function StackPrototype({
         ) : shipped ? (
           current
         ) : (
-          <LineDirection {...props} />
+          <Direction {...props} />
         )}
         <PrototypeBar
           variants={variants}

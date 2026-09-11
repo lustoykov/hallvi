@@ -17,6 +17,7 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
+import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
@@ -366,13 +367,41 @@ export function ApplicationSectionView({
         />
       </div>
     );
-  // PROTOTYPE (opus-ui-improvements): directions for Processes and
-  // Database, beside the shipped view (direction 0).
-  if (section === "processes" || section === "database")
+  // PROTOTYPE (opus-ui-improvements): Processes in the Transit language, and
+  // directions for Database and Storage, beside the shipped view (0).
+  if (section === "database" || section === "storage")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <DataPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  if (section === "processes")
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         <StackPrototype
-          page={section}
           record={deployment}
           stack={stack}
           facts={facts}

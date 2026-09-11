@@ -76,38 +76,50 @@ History places finished work by its newest recorded step. The deployment
 operation's `updatedAt` is its record's and moves whenever the record is
 rewritten, which files an old deploy under Today in the shipped page.
 
-## Processes and Database: three directions (`stack-prototype/`)
+## Processes: Line (`stack-prototype/`)
 
-On `opus-ui-improvements`, not chosen yet. Each direction draws both pages
-from the same record: the stack derived from the deployment, the checks the
-deployment passed for each process, where the database lives, and the
-backup and restore operations on record. Nothing on these pages is observed
-live; each says when it was recorded. With nothing recorded, the shipped
-page's empty state stands in.
+Chosen from three directions. Transit's language, as on Deployment and
+History: now on the left, and on the right how a visit reaches the
+processes, from your network through port 80 to the web app, with the
+private processes behind a wall and ghosts where missing pieces would go.
+It reads the stack derived from the deployment and the checks the
+deployment passed for each process; nothing is observed live. With nothing
+recorded, the shipped page stands in.
 
-- **A · Line.** Transit's language, as on Deployment and History. Processes:
-  now on the left, and on the right how a visit reaches them, from your
-  network through port 80 to the web app, with the private processes behind
-  a wall. Database: where your data goes, from the process that writes it to
-  the file, the schedule, the off-host copy and a tested restore.
-- **B · Machine.** The server drawn as its front panel, with Little Server
-  on top. Processes are modules with their port and a light for each check;
-  a cable from the web app's port carries a light while you point at it.
-  Database is the storage bay: the database's drive, a backup rack with a
-  slot for each copy the schedule keeps, and a restore lamp. Opening a
-  module pulls out its spec plate.
-- **C · Console.** The record read like a terminal listing, labelled as
-  recorded: one line per process with an inspect pane, and the database in
-  sections for where it lives, how it answered, what protects it and what
-  isn't measured.
+## Database and Storage: three directions (`data-prototype/`)
+
+On `opus-ui-improvements`, not chosen yet. The owner doubted Transit would
+carry these pages, so none of the three uses the line. Each draws both
+pages from the same record: where the data lives, the check that read the
+database, the volumes and the container replacement that kept them, the
+backup plan (`persistentState`) and the backup and restore operations on
+record. Sizes and disk use appear only once measured, and until then each
+page says so. With nothing recorded, the shipped page stands in.
+
+- **A · Cutaway.** The server opened up, in section: its processes above
+  the disk, a mount line from each into the volume it writes, `grafana.db`
+  inside its volume, and the copy off the server outside, joined by a
+  dashed arrow. Database brings the database forward and dims the rest;
+  Storage shows every volume and what survives a container replacement or
+  losing the server. Pointing at a process lights its mount; a part opens
+  its facts below.
+- **B · Timeline.** Overview's lanes. Database: the database check, copies
+  off the server and restore tests. Storage: each volume's life, the
+  copies, and the disk as a ghost. Quiet stretches longer than two hours
+  fold, so minutes of work and two quiet days share one line, and "To
+  scale" slides every moment to its clock time. The stretch since the
+  newest copy is shaded and named, and Little Server stands at now.
+- **C · Answers.** No diagram: the questions you come with, each answered
+  in a sentence, with its dated record under it and the exact values a
+  click away. Storage adds a grid of what survives what, volume by volume.
 
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
   clock moved), _Prometheus failing_ (an invented monitoring check) and
   _Before deploy_ (the plan with nothing running). The bar labels each one.
-  Deployment offers Live record, 3 days later and Before deploy; History
-  offers Live record and 3 days later.
+  Deployment offers Live record, 3 days later and Before deploy; History,
+  Processes, Database and Storage offer Live record and 3 days later.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -133,7 +145,8 @@ with the log from Little Server's note folded underneath.
 On 11 Sep the owner loved Architecture and its data flows but found the
 entrance animation too much, and asked for a balance so the app doesn't
 become all diagrams. For Deployment and History they chose Transit ("D is
-great, let's take it").
+great, let's take it"), and later its Line for Processes too. For Database
+and Storage they asked for new directions, doubting the line fits there.
 
 ## Where the exploration lives
 
@@ -142,4 +155,5 @@ Everything explored along the way stays off main: on
 exploded-server (Three.js) directions with their kits, Overview's note and
 console directions, and the mascot family; on `claude/deployment-history`,
 Deployment and History's Story, Narrated and Replay directions and the first
-round's Ledger.
+round's Ledger; on `claude/processes-database`, the Machine and Console
+directions for Processes and Database.
