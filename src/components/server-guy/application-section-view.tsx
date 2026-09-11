@@ -17,6 +17,7 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
+import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
@@ -373,6 +374,35 @@ export function ApplicationSectionView({
           activity={view.activity}
           chrome={{ bar, header, activity: null }}
           current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
+  // Storage in Flow and Backups in Calendar, chosen on opus-ui-improvements,
+  // are the default the same way.
+  if (section === "storage" || section === "backups")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <BackupPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
         />
       </div>
     );
