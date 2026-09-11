@@ -1,0 +1,256 @@
+/* PROTOTYPE · claude/deployment-history · throwaway.
+   Direction D for History, Transit. Prefix: axhm-, over Story's rows. The
+   left column of each row becomes the gutter the threads run in; the time
+   moves to a timetable column on the right. Only a pointed-at thread
+   moves. */
+
+.axhm {
+  --axh-time: 46px;
+  --axh-dot: 22px;
+  --axh-gap: 10px;
+}
+.axhm-body {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  align-items: start;
+  gap: 48px;
+}
+
+/* ---------- The almanac ---------- */
+
+.axhm-almanac {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 22px;
+  padding-top: 6px;
+}
+.axhm-sum {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.axhm-filters {
+  display: grid;
+  gap: 2px;
+}
+.axhm-filters button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ax-ink-2);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition:
+    background-color var(--ax-base),
+    color var(--ax-base);
+}
+.axhm-filters button b {
+  font-weight: 600;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axhm-filters button:hover:not(:disabled) {
+  background: #f4f6fa;
+}
+.axhm-filters button[aria-pressed="true"] {
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axhm-filters button[aria-pressed="true"] b {
+  color: #c9d3e6;
+}
+.axhm-filters button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.axhm-index ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ax-line);
+  padding-top: 12px;
+  list-style: none;
+}
+.axhm-index button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ax-base);
+}
+.axhm-index button:hover {
+  background: #f4f6fa;
+}
+.axhm-index span {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--ax-ink);
+}
+.axhm-index i {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.axhm-index em {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ax-verified);
+}
+.axhm-index em[data-state="failed"] {
+  background: var(--ax-failed);
+}
+.axhm-index em[data-state="inspected"] {
+  background: #8b95a5;
+}
+.axhm-index em:is([data-state="working"], [data-state="queued"]) {
+  background: var(--ax-blue);
+}
+.axhm-index em[data-state="proposed"] {
+  background: var(--ax-amber);
+}
+
+/* ---------- The line and its timetable ---------- */
+
+.axhm-feed {
+  position: relative;
+  display: grid;
+  gap: 24px;
+}
+.axhm .axh-row {
+  grid-template-columns:
+    var(--axh-time) var(--axh-dot) minmax(0, 1fr)
+    auto auto;
+}
+.axhm .axh-time {
+  grid-row: 1;
+  grid-column: 4;
+  padding: 3px 4px 0 12px;
+}
+.axhm .axh-dot {
+  grid-row: 1;
+  grid-column: 2;
+}
+.axhm .axh-body {
+  grid-row: 1;
+  grid-column: 3;
+}
+.axhm .axh-actions {
+  grid-row: 1;
+  grid-column: 5;
+}
+.axhm .axh-list::before {
+  left: calc(var(--axh-time) + var(--axh-gap) + var(--axh-dot) / 2 - 1.5px);
+  width: 3px;
+  border-radius: 2px;
+  background: #c9d6fa;
+}
+/* Stations: a white stop ringed in its state. */
+.axhm .axh-dot {
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  margin-top: 5px;
+  border: 3px solid var(--ax-verified);
+  background: #ffffff;
+}
+.axhm .axh-row[data-state="failed"] .axh-dot {
+  border-color: var(--ax-failed);
+  background: #ffffff;
+}
+.axhm .axh-row[data-state="inspected"] .axh-dot {
+  border-color: #8b95a5;
+  background: #ffffff;
+}
+.axhm .axh-row:is([data-state="working"], [data-state="queued"]) .axh-dot {
+  border-color: var(--ax-blue);
+  background: #ffffff;
+}
+.axhm .axh-row[data-state="proposed"] .axh-dot {
+  border-color: var(--ax-amber);
+  background: #ffffff;
+}
+.axhm .axh-row.is-linked {
+  background: #f7f9fc;
+}
+.axhm .axh-row.is-linked .axh-dot {
+  box-shadow: 0 0 0 3px #f7f9fc;
+}
+.axhm-arcs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+.axhm-arc {
+  fill: none;
+  stroke: #c3ccdb;
+  stroke-width: 1.75;
+  stroke-dasharray: 3 4;
+  transition: stroke var(--ax-base);
+}
+.axhm-flow {
+  fill: none;
+  stroke: var(--ax-verified);
+  stroke-width: 2.75;
+  stroke-linecap: round;
+  stroke-dasharray: 16 84;
+  stroke-dashoffset: 100;
+  opacity: 0;
+  transition: opacity var(--ax-base);
+}
+.is-lit .axhm-arc {
+  stroke: #9fb4f5;
+  stroke-dasharray: none;
+}
+.is-lit .axhm-flow {
+  opacity: 1;
+  animation: axhm-flow 1300ms linear infinite;
+}
+@keyframes axhm-flow {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 1080px) {
+  .axhm-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .axhm-almanac {
+    position: static;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-lit .axhm-flow {
+    animation: none;
+    opacity: 0;
+  }
+}
+:root[data-ax-motion="reduced"] .is-lit .axhm-flow {
+  animation: none;
+  opacity: 0;
+}

@@ -81,7 +81,7 @@ export function PrototypeBar({
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
-          target.closest("[role='radiogroup']"))
+          target.closest("[role='radiogroup'], [role='slider']"))
       )
         return;
       if (event.key === "ArrowLeft") step(-1);

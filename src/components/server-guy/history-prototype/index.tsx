@@ -3,8 +3,10 @@
 // PROTOTYPE · claude/deployment-history · throwaway.
 // Directions for the History destination, on the real route and inside the
 // real shell, switchable with ?variant= and the prototype bar (← → keys).
-// A Story and B Ledger read the same record, in two densities; 0 is the
-// shipped view. The filter is shared, so switching directions keeps it.
+// A Story was the start; B Narrated, C Replay and D Transit are three takes
+// on it: the record as a diary, as a recording, and as a line with a
+// timetable. 0 is the shipped view. The filter is shared, so switching
+// directions keeps it.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -25,7 +27,9 @@ import {
 import { PageHead } from "../deployment-prototype/page-head";
 import { FeedDirection } from "./feed";
 import { buildHistory, type Filter, type HistoryRecord } from "./history-model";
-import { TableDirection } from "./table";
+import { NarratedHistory } from "./narrated";
+import { ReplayHistory } from "./replay";
+import { TransitHistory } from "./transit";
 import "../architecture-prototype/prototype.css";
 import "../architecture-prototype/journey-v2.css";
 
@@ -42,9 +46,18 @@ export interface HistoryDirectionProps {
 
 const variants: VariantEntry[] = [
   { key: "A", id: "story", name: "Story" },
-  { key: "B", id: "ledger", name: "Ledger" },
+  { key: "B", id: "narrated", name: "Narrated" },
+  { key: "C", id: "replay", name: "Replay" },
+  { key: "D", id: "transit", name: "Transit" },
   { key: "0", id: "current", name: "Current history" },
 ];
+const directions: Record<string, (props: HistoryDirectionProps) => ReactNode> =
+  {
+    story: FeedDirection,
+    narrated: NarratedHistory,
+    replay: ReplayHistory,
+    transit: TransitHistory,
+  };
 const choices: ScenarioId[] = ["live", "later"];
 const DAY = 86_400_000;
 
@@ -114,6 +127,7 @@ export function HistoryPrototype({
     [operations, chats, filter],
   );
   const variant = variants.find((item) => item.id === variantId) ?? variants[0];
+  const Direction = directions[variant.id] ?? FeedDirection;
   const live = record?.status === "live";
   const props: HistoryDirectionProps = {
     history,
@@ -151,10 +165,8 @@ export function HistoryPrototype({
           <p className="ax-loading">Reading the record…</p>
         ) : variant.id === "current" ? (
           current
-        ) : variant.id === "ledger" ? (
-          <TableDirection {...props} />
         ) : (
-          <FeedDirection {...props} />
+          <Direction {...props} />
         )}
         <PrototypeBar
           variants={variants}

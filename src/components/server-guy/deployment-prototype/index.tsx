@@ -3,10 +3,11 @@
 // PROTOTYPE · claude/deployment-history · throwaway.
 // Directions for the Deployment destination, on the real route and inside
 // the real shell, switchable with ?variant= and the prototype bar (← → keys).
-// A Story and B Ledger read the same derived story, in two densities; 0 is
-// the shipped view. The product's own panel still handles the actions that
-// need it (connecting Hetzner, starting a first deployment), and approval
-// stays in the conversation.
+// A Story was the start; B Narrated, C Replay and D Transit are three takes
+// on it that disagree about structure: the account in words, the record as
+// a recording, and the way here as a line. 0 is the shipped view. The
+// product's own panel still handles the actions that need it (connecting
+// Hetzner, starting a first deployment), and approval stays in chat.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -27,9 +28,11 @@ import {
   type VariantEntry,
 } from "../architecture-prototype/prototype-bar";
 import { buildStory, type DeploymentStory } from "./deployment-model";
-import { LedgerDirection } from "./ledger";
+import { NarratedDirection } from "./narrated";
 import { PageHead } from "./page-head";
+import { ReplayDirection } from "./replay";
 import { StoryDirection } from "./story";
+import { TransitDirection } from "./transit";
 import "../architecture-prototype/prototype.css";
 import "../architecture-prototype/journey-v2.css";
 
@@ -48,9 +51,17 @@ export interface DirectionProps {
 
 const variants: VariantEntry[] = [
   { key: "A", id: "story", name: "Story" },
-  { key: "B", id: "ledger", name: "Ledger" },
+  { key: "B", id: "narrated", name: "Narrated" },
+  { key: "C", id: "replay", name: "Replay" },
+  { key: "D", id: "transit", name: "Transit" },
   { key: "0", id: "current", name: "Current deployment" },
 ];
+const directions: Record<string, (props: DirectionProps) => ReactNode> = {
+  story: StoryDirection,
+  narrated: NarratedDirection,
+  replay: ReplayDirection,
+  transit: TransitDirection,
+};
 const choices: ScenarioId[] = ["live", "later", "planned"];
 const DAY = 86_400_000;
 
@@ -167,6 +178,7 @@ export function DeploymentPrototype({
         (operation.state === "failed" && unresolved(operation, operations)),
     );
   const variant = variants.find((item) => item.id === variantId) ?? variants[0];
+  const Direction = directions[variant.id] ?? StoryDirection;
   const restricted = currentFacts(shaped)?.httpAccess === "controller";
   const openUrl =
     story.state === "live"
@@ -208,10 +220,8 @@ export function DeploymentPrototype({
           <p className="ax-loading">Reading the record…</p>
         ) : variant.id === "current" ? (
           current
-        ) : variant.id === "ledger" ? (
-          <LedgerDirection {...props} />
         ) : (
-          <StoryDirection {...props} />
+          <Direction {...props} />
         )}
         <PrototypeBar
           variants={variants}

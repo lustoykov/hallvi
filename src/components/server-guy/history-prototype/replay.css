@@ -1,0 +1,191 @@
+/* PROTOTYPE · claude/deployment-history · throwaway.
+   Direction C for History, Replay. Prefix: axhr-, over Story's rows. Still
+   at now; a replay you start, or a playhead you drag, moves the marks'
+   meaning, never the page. */
+
+/* The ruler stays in view while the record scrolls under it. */
+.axhr-deck {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  gap: 12px;
+  margin: 0 -14px;
+  padding: 10px 14px 14px;
+  border-bottom: 1px solid var(--ax-line);
+  background: #ffffff;
+}
+.axhr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.axhr-play {
+  height: 32px;
+}
+.axhr-play[aria-pressed="true"] {
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axhr-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axhr-readout svg {
+  width: 14px;
+  height: 14px;
+}
+.axhr-stage {
+  position: relative;
+  margin: 0 30px;
+  padding-top: 60px;
+}
+.axhr-guy {
+  position: absolute;
+  top: 0;
+  width: 58px;
+  height: 58px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: left 600ms var(--ax-ease-out);
+}
+.axhr-scene {
+  width: 100%;
+  height: 100%;
+}
+.axhr-ruler {
+  position: relative;
+  height: 28px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.axhr-ruler:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.axhr-axis,
+.axhr-played {
+  position: absolute;
+  top: 13px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+}
+.axhr-axis {
+  right: 0;
+  background: var(--ax-line-2);
+}
+.axhr-played {
+  background: var(--ax-blue);
+  transition: width 600ms var(--ax-ease-out);
+}
+/* A folded stretch: two slashes across the axis. */
+.axhr-break {
+  position: absolute;
+  top: 7px;
+  width: 9px;
+  height: 14px;
+  margin-left: -4.5px;
+  border-right: 1.5px solid #b9c2d0;
+  border-left: 1.5px solid #b9c2d0;
+  background: #ffffff;
+  transform: skewX(-20deg);
+}
+.axhr-mark {
+  position: absolute;
+  top: 8px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--ax-verified);
+  box-shadow: 0 0 0 3px #ffffff;
+  transition: opacity var(--ax-base);
+}
+.axhr-mark[data-state="failed"] {
+  background: var(--ax-failed);
+}
+.axhr-mark[data-state="inspected"] {
+  background: #8b95a5;
+}
+.axhr-mark:is([data-state="working"], [data-state="queued"]) {
+  background: var(--ax-blue);
+}
+.axhr-mark[data-state="proposed"] {
+  background: var(--ax-amber);
+}
+.axhr-mark[data-state="cancelled"] {
+  border: 1.5px dashed #9aa6ba;
+  background: #ffffff;
+}
+.axhr-mark[data-later] {
+  opacity: 0.3;
+}
+.axhr-head {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--ax-ink);
+  pointer-events: none;
+  transition: left 600ms var(--ax-ease-out);
+}
+.axhr-stage.is-dragging :is(.axhr-guy, .axhr-head, .axhr-played) {
+  transition: none;
+}
+.axhr-days {
+  position: relative;
+  height: 18px;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--ax-muted);
+}
+.axhr-days span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+.axhr-days .is-gap {
+  color: var(--ax-faint);
+  transform: translateX(-50%);
+}
+.axhr-days .is-now {
+  font-weight: 560;
+  color: var(--ax-ink-2);
+  transform: translateX(-100%);
+}
+
+/* After the playhead: History as it stood then. */
+.axhr .axh-row {
+  transition:
+    opacity var(--ax-base),
+    background-color var(--ax-base);
+}
+.axhr .axh-row.is-later {
+  opacity: 0.32;
+}
+.axhr .axh-row.is-current {
+  background: var(--ax-working-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axhr-guy,
+  .axhr-head,
+  .axhr-played {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] :is(.axhr-guy, .axhr-head, .axhr-played) {
+  transition: none;
+}
