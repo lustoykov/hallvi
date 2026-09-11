@@ -14,8 +14,13 @@ if (!root) {
   process.exit(255);
 }
 const original = process.argv.at(-1) ?? "";
+// Only the host's per-deployment paths: a path inside a container, such as
+// /opt/server-guy/check.php in a check command, must pass through unchanged.
 let command = original
-  .replaceAll("/opt/server-guy/", `${root}/opt/server-guy/`)
+  .replace(
+    /\/opt\/server-guy\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
+    `${root}/opt/server-guy/`,
+  )
   .replaceAll("/run/lock/", `${root}/run/lock/`);
 let note = "";
 if (command.includes("server-guy-metadata-guard")) {

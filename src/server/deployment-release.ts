@@ -21,6 +21,19 @@ export interface Criterion {
   commands?: z.infer<typeof commandCheckSchema>[];
 }
 
+/**
+ * Commands, chosen from the application's documentation, that protect state
+ * the core cannot copy as files: `dump` prints a consistent copy while the
+ * state's writers are stopped, `restore` loads that copy from standard input
+ * into a fresh instance, and `verify` prints a content fingerprint that must
+ * be identical for the source and the restored copy.
+ */
+export interface StateProcedure {
+  dump: string[];
+  restore: string[];
+  verify: string[];
+}
+
 /** Normalized Compose fields the controller reads; others pass through. */
 export interface ResolvedService {
   image?: string;
@@ -77,7 +90,14 @@ export interface NativeConfiguration {
     volume: string;
     kind: "database" | "files";
     sqlite: string | null;
-    capture?: "quiesced-files";
+    capture?: "quiesced-files" | "dump";
+    /**
+     * The service that owns this state: it keeps its image across
+     * application releases and rollbacks, and its procedure runs in it.
+     */
+    owner?: string;
+    /** For capture "dump": commands run in the owner's container. */
+    procedure?: StateProcedure;
   }[];
   database: { service: string; version: "16" | "17" | "18" } | null;
   httpAccess: "public" | "controller";

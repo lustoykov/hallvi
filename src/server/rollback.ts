@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
 import { releaseIdentityHolds, releaseOf } from "./deployment-release";
 import { establishedRuntime } from "./deployment-runtime";
-import { releaseFacts } from "./release-facts";
+import { currentFacts, releaseFacts, stateOwners } from "./release-facts";
 import type { ReleaseScope } from "./release-scope";
 
 /** Retain observed images before a later deployment replaces runtime facts. */
@@ -47,13 +47,18 @@ export function rollbackSelection(
   if (releaseId === establishedRuntime(record.lifecycle!.runtime)?.releaseId)
     throw new Error("This release is already the current runtime.");
   const facts = releaseFacts(release);
+  // Rollback never downgrades a service that owns persistent data: the
+  // earlier code runs against the current data and its current owners.
+  const current = currentFacts(record);
+  const owners = new Set([
+    ...stateOwners(facts),
+    ...(current ? stateOwners(current) : []),
+  ]);
   const images = Object.fromEntries(
     facts.services.map(({ name }) => {
-      // Application rollback never downgrades the running database image.
-      const image =
-        name === facts.database?.service
-          ? record.serviceImages?.[name]
-          : verified.images[name];
+      const image = owners.has(name)
+        ? record.serviceImages?.[name]
+        : verified.images[name];
       if (!image || !/^sha256:[0-9a-f]{64}$/.test(image))
         throw new Error(`The verified image for ${name} is unavailable.`);
       return [name, image];

@@ -29,7 +29,12 @@ import {
   currentConfigurationFiles,
   prepareNativeRelease,
 } from "./native-compose";
-import { currentFacts, releaseFacts, type ReleaseFacts } from "./release-facts";
+import {
+  currentFacts,
+  releaseFacts,
+  stateOwners,
+  type ReleaseFacts,
+} from "./release-facts";
 import {
   assertReleaseScope,
   ReleaseScopeError,
@@ -49,6 +54,7 @@ export async function proposeApplicationRelease(
   ref = "HEAD",
   requirements = "Update this application.",
   rollbackRequest?: { releaseId: string; compatibilityEvidence: string },
+  stateChangeRequest?: { services: string[]; evidence: string },
 ) {
   const record = applicationDeployment(applicationId);
   const state = deploymentRuntime(record).state;
@@ -72,6 +78,47 @@ export async function proposeApplicationRelease(
         releaseSecrets(record).redact(rollbackRequest.compatibilityEvidence),
       )
     : undefined;
+  const facts = currentFacts(record)!;
+  // Owners keep their image unless this approval names them.
+  let stateChange: ReleaseScope["stateChange"];
+  if (stateChangeRequest) {
+    const owners = [...stateOwners(facts)].filter(
+      (name) => name !== facts.database?.service,
+    );
+    const services = [...new Set(stateChangeRequest.services)];
+    const unknown = services.filter((name) => !owners.includes(name));
+    const evidence = releaseSecrets(record)
+      .redact(stateChangeRequest.evidence.trim())
+      .slice(0, 5000);
+    if (rollback)
+      throw new Error(
+        "A rollback keeps the current images of services that own data. Propose an image change as a separate release.",
+      );
+    if (unknown.length)
+      throw new Error(
+        `${unknown.join(", ")}: not a declared owner of persistent data. Declared owners: ${owners.join(", ") || "none"}.`,
+      );
+    if (!evidence)
+      throw new Error("Explain why the new image can use the current data.");
+    stateChange = { services, evidence };
+  }
+  const kept = [
+    facts.volumes.length
+      ? `the data in ${facts.volumes.map((volume) => volume.name).join(", ")}`
+      : null,
+    ...[...stateOwners(facts)]
+      .filter((name) => !stateChange?.services.includes(name))
+      .map((name) =>
+        name === facts.database?.service
+          ? "the managed PostgreSQL image"
+          : `the ${name} image`,
+      ),
+    "network exposure",
+  ].filter((item): item is string => Boolean(item));
+  const keeps =
+    kept.length > 1
+      ? `${kept.slice(0, -1).join(", ")} and ${kept.at(-1)}`
+      : kept[0];
   let revision: string;
   if (rollback) {
     revision = lifecycle.releases.find(
@@ -99,6 +146,7 @@ export async function proposeApplicationRelease(
     baselineReleaseId: establishedRuntime(lifecycle.runtime)!.releaseId,
     maxAttempts: 3,
     ...(rollback ? { rollback } : {}),
+    ...(stateChange ? { stateChange } : {}),
   };
   if (rollback)
     assertReleaseScope(
@@ -118,8 +166,8 @@ export async function proposeApplicationRelease(
       kind: "change",
       title: `${rollback ? "Roll back to" : "Release"} ${revision.slice(0, 12)}`,
       summary: rollback
-        ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Preserve current data, private settings, database image and network exposure. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
-        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, the managed database and network exposure. No server purchase or resize. Destructive data migrations need a separate decision. Task: ${requirements.slice(0, 1200)}`,
+        ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Keep private settings, ${keeps}. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
+        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Keep ${keeps}.${stateChange ? ` Allow changing the image of ${stateChange.services.join(", ")}, which own${stateChange.services.length === 1 ? "s" : ""} persistent data; the earlier version may not read that data afterwards, so take a verified backup first. Compatibility assessment: ${stateChange.evidence}` : ""} No server purchase or resize. Destructive data migrations need a separate decision. Task: ${requirements.slice(0, 1200)}`,
       destinations: ["deployment", "history", "processes"],
       command: {
         type: "release-deployment",

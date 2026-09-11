@@ -7,6 +7,7 @@ import type {
   Criterion,
   DeploymentRelease,
   NativeConfiguration,
+  StateProcedure,
 } from "./deployment-release";
 
 export interface ServiceFacts {
@@ -31,7 +32,10 @@ export interface VolumeFacts {
   name: string;
   dockerName: string;
   kind: "files" | "database";
-  capture?: "quiesced-files";
+  capture?: "quiesced-files" | "dump";
+  /** The service that owns this state; it keeps its image across releases. */
+  owner?: string;
+  procedure?: StateProcedure;
   /** SQLite file relative to the volume root. */
   sqlite: string | null;
   mounts: {
@@ -103,6 +107,8 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
           `${resolved.name}_${mount.source}`,
         kind: record?.kind ?? "files",
         ...(record?.capture ? { capture: record.capture } : {}),
+        ...(record?.owner ? { owner: record.owner } : {}),
+        ...(record?.procedure ? { procedure: record.procedure } : {}),
         sqlite: record?.sqlite ?? null,
         mounts: [],
       };
@@ -191,6 +197,18 @@ export function currentFacts(
   record: Pick<DeploymentRecord, "native"> | null,
 ): ReleaseFacts | null {
   return record?.native ? nativeFacts(record.native) : null;
+}
+
+/**
+ * Services whose state outlives application releases: the managed database
+ * and every declared owner. They keep their image unless the owner approves
+ * a change, and releases leave them unlabeled so a label never recreates them.
+ */
+export function stateOwners(facts: Pick<ReleaseFacts, "database" | "volumes">) {
+  return new Set([
+    ...(facts.database ? [facts.database.service] : []),
+    ...facts.volumes.flatMap((volume) => (volume.owner ? [volume.owner] : [])),
+  ]);
 }
 
 /** The host port 80 listener, when the release serves primary HTTP. */

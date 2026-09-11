@@ -134,8 +134,12 @@ retention failure separately.
 `scope` is the honest limit of the exercise. `offline-database-and-files`
 compares a restored SQLite database and every captured file against the capture
 manifest; `offline-database` restores the dump into a disposable PostgreSQL
-container and measures it. Neither starts the application, serves traffic or
-verifies the product in a browser, and neither touches the live deployment.
+container and measures it. For a `stack`, each declared owner's dump is also
+loaded into a fresh instance of the owner's recorded image and environment, on
+its own labeled volume with no network, and passes only when the owner's
+`verify` command prints exactly what it printed from the source at capture
+(`database-content`). None of them starts the application, serves traffic or
+verifies the product in a browser, and none touches the live deployment.
 
 `cleanupComplete` reports whether the disposable container, volume and
 directory were removed. It is deliberately separate from `outcome`: a verified
@@ -146,7 +150,7 @@ restore with leftover resources reports `outcome: "verified"` and
 
 `archive-hash`, `archive-structure`, `backup-identity`, `file-inventory`,
 `database-integrity`, `database-schema`, `database-rows`, `database-restored`,
-`database-tables`, `database-empty`.
+`database-tables`, `database-empty`, `database-content`.
 
 ## Status
 
@@ -232,18 +236,26 @@ Bounded and stable. No SDK text, no exception messages, no paths, no addresses.
    exclusive `flock`, the same lock the controller takes for deploy and
    recreate. Held, and the run exits 75 without recording anything.
 2. Write the `running` receipt durably before touching the source.
-3. Check that the running application still carries this deployment id and
-   revision in its `server-guy.deployment` and `server-guy.revision` labels.
-   A redeploy since the config was written stops the run as
-   `source-identity-mismatch` before the source is touched, rather than filing
-   a newer deployment's data under an older revision.
+3. Check that every running container the controller labeled still carries
+   this deployment id and revision in its `server-guy.deployment` and
+   `server-guy.revision` labels, whatever its service is called. State
+   owners run unlabeled so a release never recreates them; the configuration
+   hash binds them instead. A redeploy since the config was written stops the
+   run as `source-identity-mismatch` before the source is touched, rather than
+   filing a newer deployment's data under an older revision.
 4. Capture consistently.
-   - `sqlite-stack`: the proven quiesced helper — stop the source, copy every
-     volume file with ownership, take the database through SQLite's backup API,
-     verify the copy against the quiesced source, restart the source. Nothing is
-     written to the application.
-   - `postgres`: `pg_dump --format=custom --no-owner --no-acl` inside the
-     running database container, with no pause and no canary write.
+   - `stack`: stop every service in `pauseServices`, dependents first; copy
+     each recorded volume's files with ownership and take SQLite files through
+     SQLite's backup API; dump the managed PostgreSQL, and run each declared
+     owner's `dump` and `verify` commands inside its still-running container,
+     keeping the dump and the printed content fingerprint; restart what was
+     stopped. Finished one-shot services in `oneShot` stay stopped.
+   - `sqlite-stack` (legacy): the proven quiesced helper — stop the source,
+     copy every volume file with ownership, take the database through SQLite's
+     backup API, verify the copy against the quiesced source, restart the
+     source. Nothing is written to the application.
+   - `postgres` (legacy): `pg_dump --format=custom --no-owner --no-acl` inside
+     the running database container, with no pause and no canary write.
    Both archives carry `manifest.json`, the Compose definition and every
    file-bound configuration file needed to rebuild the stack.
 5. Confirm the source is running again before any byte leaves the host.

@@ -179,6 +179,12 @@ class FakeDocker:
 
     def __call__(self, *args, input=None, timeout=None, stdout=None):
         self.calls.append(args)
+        # A command fed on standard input: record what it received.
+        if args[:3] == ("docker", "exec", "--interactive"):
+            args = ("docker", "exec", *args[3:])
+            if not hasattr(self, "stdin"):
+                self.stdin = {}
+            self.stdin.setdefault(args[3], []).append(input)
         if self.helper and args[0] == sys.executable:
             return self.helper(args[-2], args[-1])
         if not self.available:
@@ -1870,6 +1876,169 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertEqual(docker.started, [JOBS, APP, WORKER])
         self.assertTrue(all(docker.containers.values()))
         self.assertFalse(result["cleanupPending"])
+
+    # Declared owner dumps
+
+    def dump_stack(self):
+        """A web service writes files and a database it does not own; the
+        owner dumps it with its recorded commands; a migration job has
+        finished. No service is called app or postgres."""
+        image = "mariadb:11.4@sha256:" + "e" * 64
+        source = self.source_stack(
+            {
+                "web": {"image": "example/shelf:2"},
+                "db": {
+                    "image": image,
+                    "environment": {
+                        "MARIADB_ROOT_PASSWORD": SECRET,
+                        "MARIADB_DATABASE": "shelf",
+                    },
+                },
+                "migrate": {"image": "example/shelf:2"},
+            }
+        )
+        files = Path(tempfile.mkdtemp(dir=self.directory))
+        (files / "attachment.bin").write_bytes(b"attached bytes")
+        project = runner.compose_project(DEPLOYMENT)
+        docker = FakeDocker(
+            containers={APP: True, DATABASE: True},
+            services={APP: "web", DATABASE: "db"},
+            images={APP: "example/shelf:2", DATABASE: image},
+            mounts={
+                APP: [
+                    {
+                        "Type": "volume",
+                        "Name": f"{project}_files",
+                        "Source": str(files),
+                        "Destination": "/srv/files",
+                        "RW": True,
+                    }
+                ],
+                DATABASE: [
+                    {
+                        "Type": "volume",
+                        "Name": f"{project}_data",
+                        "Source": "/var/lib/docker/volumes/data",
+                        "Destination": "/var/lib/mysql",
+                        "RW": True,
+                    }
+                ],
+            },
+            exec_results={
+                "mariadb-dump": b"-- dump of shelf\nINSERT 42;\n",
+                "mariadb-fingerprint": b"pages 3 sha 9f\n",
+            },
+        )
+        capture = {
+            "version": 1,
+            "pauseServices": ["web"],
+            "postgres": None,
+            "volumes": [
+                {
+                    "name": "files",
+                    "kind": "files",
+                    "sqlite": None,
+                    "mounts": [
+                        {"service": "web", "target": "/srv/files", "readOnly": False},
+                        {"service": "migrate", "target": "/srv/files", "readOnly": False},
+                    ],
+                }
+            ],
+            "dumps": [
+                {
+                    "volume": "data",
+                    "service": "db",
+                    "target": "/var/lib/mysql",
+                    "dump": ["mariadb-dump", "--all-databases"],
+                    "restore": ["mariadb", "--batch"],
+                    "verify": ["mariadb-fingerprint"],
+                }
+            ],
+            "oneShot": ["migrate"],
+        }
+        path = write_private(
+            self.directory / "config.json",
+            settings(
+                kind="stack",
+                capture=capture,
+                composeSha256=runner.sha256(source / "compose.json"),
+            ),
+        )
+        return runner.load_config(path), docker
+
+    def test_a_declared_owner_dumps_while_its_writers_are_stopped(self):
+        config, docker = self.dump_stack()
+        state = self.state(config)
+        client = FakeClient()
+        result = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(result["outcome"], "succeeded", result["errorCode"])
+        # Only the writer stops; the owner keeps running to dump and verify.
+        stops = [call[4] for call in docker.calls if call[:2] == ("docker", "stop")]
+        self.assertEqual(stops, [APP])
+        self.assertEqual(docker.exec_running["mariadb-dump"], [DATABASE])
+        self.assertEqual(docker.exec_running["mariadb-fingerprint"], [DATABASE])
+        self.assertEqual(docker.started, [APP])
+        archive = self.directory / "dump.tar.gz"
+        archive.write_bytes(client.objects[result["objectKey"]])
+        extracted = self.directory / "dump-extracted"
+        runner.safe_extract(archive, extracted)
+        self.assertEqual(
+            (extracted / "database/data.dump").read_bytes(),
+            b"-- dump of shelf\nINSERT 42;\n",
+        )
+        self.assertEqual(
+            (extracted / "state/files/attachment.bin").read_bytes(), b"attached bytes"
+        )
+        manifest = json.loads((extracted / "manifest.json").read_text())
+        self.assertEqual(manifest["dumps"]["data"]["service"], "db")
+        self.assertEqual(manifest["dumps"]["data"]["fingerprint"], "pages 3 sha 9f\n")
+        self.assertNotIn(SECRET, json.dumps(manifest))
+
+    def test_a_declared_dump_restores_into_a_fresh_instance_and_must_match_its_fingerprint(
+        self,
+    ):
+        config, docker = self.dump_stack()
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        names = runner.restore_names(stored["id"])
+
+        def restore(fingerprint):
+            restorer = FakeDocker(
+                exec_results={"mariadb": b"", "mariadb-fingerprint": fingerprint}
+            )
+            result = runner.perform_test_restore(
+                config,
+                state,
+                stored["id"],
+                storage_factory=self.storage(client),
+                command=restorer,
+            )["restore"]
+            return result, restorer
+
+        verified, restorer = restore(b"pages 3 sha 9f\n")
+        self.assertEqual(verified["outcome"], "verified", verified["errorCode"])
+        for check in ("file-inventory", "database-restored", "database-content"):
+            self.assertIn(check, verified["checks"])
+        # The dump captured with these files was loaded on standard input.
+        self.assertEqual(
+            restorer.stdin["mariadb"], [b"-- dump of shelf\nINSERT 42;\n"]
+        )
+        run = next(call for call in restorer.calls if call[:2] == ("docker", "run"))
+        self.assertIn("--env-file", run)
+        self.assertEqual(run[run.index("--network") + 1], "none")
+        # Private values reach the instance through a file, never an argument.
+        self.assertNotIn(SECRET, json.dumps(restorer.calls))
+        self.assertEqual(restorer.removed, [names["container"], names["volume"]])
+        self.assertTrue(verified["cleanupComplete"])
+        changed, _ = restore(b"pages 2 sha 01\n")
+        self.assertEqual(changed["outcome"], "failed")
+        self.assertEqual(changed["errorCode"], "database-check-failed")
+        self.assertTrue(changed["cleanupComplete"])
 
     def test_state_directories_are_private(self):
         state = self.state()

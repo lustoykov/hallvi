@@ -1,7 +1,7 @@
 import type { DeploymentRecord } from "./deployment-types";
 import { releaseIdentityHolds } from "./deployment-release";
 import { establishedRuntime } from "./deployment-runtime";
-import { releaseFacts, type ReleaseFacts } from "./release-facts";
+import { releaseFacts, stateOwners, type ReleaseFacts } from "./release-facts";
 
 /** One task, one existing host, one selected revision, no new spending. */
 export interface ReleaseScope {
@@ -26,6 +26,11 @@ export interface ReleaseScope {
     images: Record<string, string>;
     compatibilityEvidence: string;
   };
+  /**
+   * Image changes the owner approved for services that own persistent
+   * data, with the compatibility assessment shown in that approval.
+   */
+  stateChange?: { services: string[]; evidence: string };
 }
 export class ReleaseScopeError extends Error {}
 
@@ -33,7 +38,12 @@ export class ReleaseScopeError extends Error {}
  * Effects a release may not change without a separate decision. Ordinary
  * configuration, commands, builds and service additions are corrections.
  */
-export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
+export function scopeDifferences(
+  baseline: ReleaseFacts,
+  next: ReleaseFacts,
+  /** State owners whose image change the owner approved. */
+  allowed: string[] = [],
+) {
   const problems: string[] = [];
   const listener = (item: ReleaseFacts["exposure"][number]) =>
     `${item.service} ${item.hostIp || "*"}:${item.published || "(any)"}/${item.protocol}`;
@@ -61,6 +71,17 @@ export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
     problems.push(
       `Removing or upgrading the managed database (${database.service}, ${database.image}) needs a separate data-change decision.`,
     );
+  // A declared owner keeps its image: the data it wrote may not be readable
+  // by another version. An approved state change permits one.
+  for (const owner of stateOwners(baseline)) {
+    if (owner === database?.service || allowed.includes(owner)) continue;
+    const was = baseline.services.find((service) => service.name === owner);
+    const now = next.services.find((service) => service.name === owner);
+    if (was && (!now || now.pinned !== was.pinned || now.build !== was.build))
+      problems.push(
+        `Service ${owner} owns persistent data, so changing its image (${was.pinned ?? "built"} → ${now ? (now.pinned ?? "built") : "removed"}) needs the owner's decision: propose it as a state change with its compatibility evidence.`,
+      );
+  }
   for (const volume of baseline.volumes) {
     const kept = next.volumes.find(
       (item) =>
@@ -125,6 +146,10 @@ export function assertReleaseScope(
     throw new ReleaseScopeError(
       "The baseline release is unavailable. Reconcile its identity first.",
     );
-  const problems = scopeDifferences(releaseFacts(baseline), candidate);
+  const problems = scopeDifferences(
+    releaseFacts(baseline),
+    candidate,
+    scope.stateChange?.services,
+  );
   if (problems.length) throw new ReleaseScopeError(problems.join(" "));
 }

@@ -141,6 +141,7 @@ export async function installScheduledBackups(
           v.kind === "database" && v.capture === "quiesced-files" && !v.sqlite,
       ),
       sqlite: capture.volumes.some((v) => v.sqlite !== null),
+      dumps: Boolean(capture.dumps?.length),
     },
     provider: destination.provider,
     bucket: destination.bucket,

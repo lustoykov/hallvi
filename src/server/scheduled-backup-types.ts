@@ -12,6 +12,8 @@ export const backupPolicySchema = z.object({
       postgres: z.boolean(),
       sqlite: z.boolean(),
       fileDatabases: z.boolean().optional(),
+      /** Databases their declared owners dump by recorded commands. */
+      dumps: z.boolean().optional(),
     })
     .optional(),
   provider: z.enum(["r2", "s3"]),

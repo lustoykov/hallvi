@@ -47,7 +47,9 @@ export interface NativeSelection {
     volume: string;
     kind: "database" | "files";
     sqlite?: string | null;
-    capture?: "quiesced-files";
+    capture?: "quiesced-files" | "dump";
+    owner?: string;
+    procedure?: NativeConfiguration["data"][number]["procedure"];
   }[];
   /** JSON criterion in the current criterion's shape; omit to keep it. */
   criterion?: string;
@@ -481,6 +483,8 @@ async function controllerOverride(
   deploymentId: string,
   revision: string,
   database: string | null,
+  /** Services that own persistent state; a label must never recreate them. */
+  owners: Set<string>,
   signal: AbortSignal,
 ) {
   const built = new Set(
@@ -494,8 +498,9 @@ async function controllerOverride(
   > = {};
   for (const [name, service] of Object.entries(resolved.services)) {
     const entry: { labels?: Record<string, string>; image?: string } = {};
-    // The managed database keeps running across application releases.
-    if (name !== database)
+    // State owners keep running across application releases: a changed
+    // revision label alone would make Compose recreate them.
+    if (name !== database && !owners.has(name))
       entry.labels = {
         "server-guy.revision": revision,
         "server-guy.deployment": deploymentId,
@@ -557,15 +562,19 @@ function dataRecords(
           kind: declaration.kind,
           sqlite: declaration.sqlite ?? null,
           capture: declaration.capture,
+          owner: declaration.owner,
+          procedure: declaration.procedure,
         }
       : previous && {
           kind: previous.kind,
           sqlite: previous.sqlite,
           capture: previous.capture,
+          owner: previous.owner,
+          procedure: previous.procedure,
         };
     if (!record)
       throw new NativeConfigurationError(
-        `Declare data for new volume ${volume}: kind "files" or "database", with its SQLite path relative to the volume root, or capture "quiesced-files" only when a clean shutdown leaves all state consistent in it.`,
+        `Declare data for new volume ${volume}: kind "files" or "database", with its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all state consistent in it, or capture "dump" with its owner and procedure.`,
       );
     if (
       record.sqlite !== null &&
@@ -576,11 +585,56 @@ function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: sqlite is a file path relative to the volume root.`,
       );
+    if (
+      record.owner &&
+      !resolved.services[record.owner]?.volumes?.some(
+        (mount) =>
+          mount.type === "volume" &&
+          mount.source === volume &&
+          !mount.read_only,
+      )
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: owner ${record.owner} must be a service that mounts it read-write.`,
+      );
+    const commands = record.procedure
+      ? [record.procedure.dump, record.procedure.restore, record.procedure.verify]
+      : [];
+    if (
+      record.capture === "dump" &&
+      (!record.owner ||
+        commands.length !== 3 ||
+        commands.some(
+          (command) =>
+            !Array.isArray(command) ||
+            !command.length ||
+            command.length > 40 ||
+            command.some(
+              (part) => typeof part !== "string" || !part || part.length > 4000,
+            ),
+        ))
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: capture "dump" names its owner service and a procedure of dump, restore and verify commands, each an argument list run in the owner's container.`,
+      );
+    if (record.procedure && record.capture !== "dump")
+      throw new NativeConfigurationError(
+        `Volume ${volume}: a procedure applies only to capture "dump".`,
+      );
+    if (
+      record.procedure &&
+      redactSecrets(JSON.stringify(record.procedure)).count
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: commands reach credentials through the owner's environment, never as written values.`,
+      );
     return {
       volume,
       kind: record.kind,
       sqlite: record.sqlite,
       ...(record.capture ? { capture: record.capture } : {}),
+      ...(record.owner ? { owner: record.owner } : {}),
+      ...(record.procedure ? { procedure: record.procedure } : {}),
     };
   });
 }
@@ -719,6 +773,12 @@ export async function prepareNativeRelease(input: {
           input.deploymentId,
           input.revision,
           baseline.database?.service ?? null,
+          new Set([
+            ...(baseline.database ? [baseline.database.service] : []),
+            ...[...baseline.volumes, ...(selection.data ?? [])].flatMap(
+              (item) => (item.owner ? [item.owner] : []),
+            ),
+          ]),
           signal,
         ),
         null,

@@ -734,19 +734,25 @@ def verify_source_identity(config, states):
     """The running application must be the deployment this config protects.
 
     Without this a redeploy would be captured and then filed under the old
-    revision, so it is checked before the source is touched at all.
+    revision, so it is checked before the source is touched at all. Every
+    running container the controller labeled must carry this deployment and
+    revision, whatever its service is called; state owners run unlabeled so
+    a release never recreates them, and the configuration hash covers them.
     """
-    app = next(
-        (value for value in states.values() if value["service"] == "app"),
-        None,
-    )
-    if app is None:
-        raise BackupError("capture", "source-not-running")
-    if (
-        app["labels"].get("server-guy.deployment") != config["deploymentId"]
-        or app["labels"].get("server-guy.revision") != config["revision"]
-    ):
+    labeled = [
+        value
+        for value in states.values()
+        if {"server-guy.deployment", "server-guy.revision"} & set(value["labels"])
+    ]
+    # Running containers the controller never labeled are not this deployment.
+    if not labeled:
         raise BackupError("capture", "source-identity-mismatch")
+    for value in labeled:
+        if (
+            value["labels"].get("server-guy.deployment") != config["deploymentId"]
+            or value["labels"].get("server-guy.revision") != config["revision"]
+        ):
+            raise BackupError("capture", "source-identity-mismatch")
 
 
 HELPER_MODULE = []
@@ -1050,31 +1056,57 @@ def capture_stack(config, state, run_id, command, staging):
     pause_services = plan.get("pauseServices")
     volumes = plan.get("volumes")
     postgres = plan.get("postgres")
+    dumps = plan.get("dumps") or []
+    one_shot = plan.get("oneShot") or []
+    service_name = r"[a-z0-9][a-z0-9_.-]{0,62}"
     if (
         plan.get("version") != 1
         or not isinstance(pause_services, list)
         or not isinstance(volumes, list)
+        or not isinstance(dumps, list)
+        or not isinstance(one_shot, list)
+        or (postgres is not None and not re.fullmatch(service_name, str(postgres)))
     ):
         raise BackupError("capture", "source-unsupported")
-    expected_services = set(pause_services) | (
-        {"postgres"} if postgres == "postgres" else set()
+    for dump in dumps:
+        if (
+            not isinstance(dump, dict)
+            or not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", str(dump.get("volume")))
+            or not re.fullmatch(service_name, str(dump.get("service")))
+            or not isinstance(dump.get("target"), str)
+            or not all(
+                isinstance(dump.get(step), list)
+                and dump[step]
+                and all(isinstance(part, str) and part for part in dump[step])
+                for step in ("dump", "restore", "verify")
+            )
+        ):
+            raise BackupError("capture", "source-unsupported")
+    # Owners with a dump keep running to dump; finished one-shots stay stopped.
+    running_services = (
+        set(pause_services)
+        | ({postgres} if postgres else set())
+        | {dump["service"] for dump in dumps}
     )
     if (
-        set(definition["services"]) != expected_services
+        set(definition["services"]) != running_services | set(one_shot)
         or not pause_services
-        or postgres not in {None, "postgres"}
     ):
         raise BackupError("capture", "source-unsupported")
     ids = source_containers(command, root, config)
     states = container_states(command, ids)
     if (
-        {v["service"] for v in states.values()} != expected_services
-        or len(states) != len(expected_services)
+        {v["service"] for v in states.values()} != running_services
+        or len(states) != len(running_services)
         or not all(v["running"] for v in states.values())
     ):
         raise BackupError("capture", "source-not-running")
     verify_source_identity(config, states)
     consumers = {v["service"]: (container, v) for container, v in states.items()}
+    project = compose_project(config["deploymentId"])
+    # A dumped volume is captured through its owner, never copied as files.
+    dumped = {project + "_" + dump["volume"] for dump in dumps}
+    postgres_volume = project + "_" + (plan.get("postgresVolume") or "database")
     expected_mounts = {}
     sources = {}
     for volume in volumes:
@@ -1097,6 +1129,9 @@ def capture_stack(config, state, run_id, command, staging):
             raise BackupError("capture", "source-unsupported")
         for mount in volume.get("mounts", []):
             service = mount.get("service")
+            # A finished one-shot service is stopped and mounts nothing live.
+            if service in one_shot:
+                continue
             if service not in pause_services:
                 raise BackupError("capture", "source-unsupported")
             key = (service, mount.get("target"))
@@ -1111,11 +1146,10 @@ def capture_stack(config, state, run_id, command, staging):
             raise BackupError("capture", "source-identity-mismatch")
         for mount in meta["mounts"]:
             if mount["Type"] == "volume":
+                if mount["Name"] in dumped:
+                    continue
                 if service == postgres:
-                    if (
-                        mount["Name"]
-                        != compose_project(config["deploymentId"]) + "_database"
-                    ):
+                    if mount["Name"] != postgres_volume:
                         raise BackupError("capture", "source-unsupported")
                     continue
                 key = (service, mount["Destination"])
@@ -1207,6 +1241,7 @@ def capture_stack(config, state, run_id, command, staging):
             ["quiesced application services and volume files"]
             + (["SQLite backup API"] if any(v.get("sqlite") for v in volumes) else [])
             + (["managed PostgreSQL dump"] if postgres else [])
+            + (["declared owner dumps"] if dumps else [])
         ),
     }
     started = now()
@@ -1279,6 +1314,12 @@ def capture_stack(config, state, run_id, command, staging):
             container, meta = consumers[postgres]
             manifest["postgres"] = capture_postgres_database(
                 container, meta, stage, command
+            )
+        # Owners dump while every writer is stopped: one recovery point.
+        for dump in dumps:
+            container, meta = consumers[dump["service"]]
+            manifest.setdefault("dumps", {})[dump["volume"]] = (
+                capture_declared_dump(container, meta, dump, stage, command)
             )
     finally:
         restore_source(command, state, journal)
@@ -1358,6 +1399,151 @@ def capture_postgres_database(container, meta, stage, command):
         ValueError,
     ) as error:
         raise BackupError("capture", "capture-failed") from error
+
+
+def capture_declared_dump(container, meta, dump, stage, command):
+    """An owner's own dump and content fingerprint, taken during the pause.
+
+    Both are commands from the recorded plan, run in the owner's container
+    with its environment; nothing here passes through a shell.
+    """
+    (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
+    target = stage / "database" / (dump["volume"] + ".dump")
+    try:
+        command(
+            "docker",
+            "exec",
+            container,
+            *dump["dump"],
+            stdout=target,
+            timeout=CAPTURE_TIMEOUT,
+        )
+        os.chmod(target, 0o600)
+        fingerprint = command(
+            "docker", "exec", container, *dump["verify"], timeout=COMMAND_TIMEOUT
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise BackupError("capture", "capture-failed") from error
+    if not target.stat().st_size or len(fingerprint) > 64 * 1024:
+        raise BackupError("capture", "capture-failed")
+    return {
+        "service": meta["service"],
+        "image": meta["image"],
+        "target": dump["target"],
+        "bytes": target.stat().st_size,
+        "sha256": sha256(target),
+        "fingerprint": fingerprint.decode("utf-8", "replace"),
+    }
+
+
+def verify_declared_dump_restore(
+    extracted, manifest, declared, restore, run_id, command, names
+):
+    """Load an owner's dump into a fresh instance and compare its content.
+
+    The instance runs the recorded image with the owner's environment from
+    the archived configuration, on its own labeled volume and no network.
+    The restore passes only when the owner's verify command prints exactly
+    what it printed from the source at capture: a loaded dump, not a copied
+    file, is what proves the database can recover.
+    """
+    captured = (manifest.get("dumps") or {}).get(declared.get("volume"))
+    dump = extracted / "database" / (str(declared.get("volume")) + ".dump")
+    if (
+        not isinstance(captured, dict)
+        or not isinstance(captured.get("image"), str)
+        or not isinstance(captured.get("target"), str)
+        or not isinstance(captured.get("fingerprint"), str)
+        or not dump.is_file()
+        or sha256(dump) != captured.get("sha256")
+    ):
+        raise BackupError("restore", "manifest-mismatch")
+    try:
+        definition = json.loads((extracted / "configuration/compose.json").read_text())
+        service = definition["services"][declared["service"]]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise BackupError("restore", "manifest-mismatch") from error
+    try:
+        command("docker", "image", "inspect", captured["image"])
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise BackupError("restore", "restore-image-unavailable") from error
+    # Private values stay off command lines: the owner's environment goes
+    # through a private file in this restore's own workspace.
+    environment = extracted.parent / "owner.env"
+    environment.write_text(
+        "".join(
+            f"{key}={value}\n"
+            for key, value in (service.get("environment") or {}).items()
+            if value is not None and "\n" not in str(value)
+        )
+    )
+    os.chmod(environment, 0o600)
+    entrypoint = service.get("entrypoint")
+    arguments = service.get("command")
+    entrypoint = entrypoint if isinstance(entrypoint, list) else []
+    arguments = arguments if isinstance(arguments, list) else []
+    name, volume = names["container"], names["volume"]
+    command(
+        "docker", "volume", "create", "--label", RESTORE_LABEL + "=" + run_id, volume
+    )
+    command(
+        "docker",
+        "run",
+        "--detach",
+        "--name",
+        name,
+        "--network",
+        "none",
+        "--label",
+        RESTORE_LABEL + "=" + run_id,
+        "--memory",
+        "1g",
+        "--cpus",
+        "1",
+        "--env-file",
+        str(environment),
+        "--volume",
+        volume + ":" + captured["target"],
+        *(["--entrypoint", entrypoint[0]] if entrypoint else []),
+        captured["image"],
+        *entrypoint[1:],
+        *arguments,
+    )
+    payload = dump.read_bytes()
+    deadline = now() + RESTORE_TIMEOUT
+    while True:
+        try:
+            command(
+                "docker",
+                "exec",
+                "--interactive",
+                name,
+                *declared["restore"],
+                input=payload,
+                timeout=RESTORE_TIMEOUT,
+            )
+            break
+        except subprocess.TimeoutExpired as error:
+            raise BackupError("restore", "restore-timeout") from error
+        except subprocess.CalledProcessError as error:
+            # A fresh server refuses connections while it initializes; a
+            # partial load is still caught by the fingerprint below.
+            if now() >= deadline:
+                raise BackupError("restore", "restore-failed") from error
+            time.sleep(2)
+    restore["checks"].append("database-restored")
+    try:
+        fingerprint = command(
+            "docker", "exec", name, *declared["verify"], timeout=COMMAND_TIMEOUT
+        ).decode("utf-8", "replace")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise BackupError("restore", "database-check-failed") from error
+    if fingerprint != captured["fingerprint"]:
+        raise BackupError("restore", "database-check-failed")
+    restore["checks"].append("database-content")
+    restore["measurements"]["databases"] = (
+        restore["measurements"].get("databases", 0) + 1
+    )
 
 
 CAPTURES = {
@@ -2087,6 +2273,16 @@ def perform_test_restore(
             if manifest["capture"].get("postgres"):
                 verify_postgres_restore(
                     extracted, manifest, restore, run_id, command, names
+                )
+            for index, declared in enumerate(manifest["capture"].get("dumps") or []):
+                # One disposable instance at a time under the recorded names,
+                # so recovery always knows exactly what to remove.
+                if index or manifest["capture"].get("postgres"):
+                    for kind in ("container", "volume"):
+                        if remove_owned(command, kind, names[kind], run_id) is None:
+                            raise BackupError("restore", "restore-failed")
+                verify_declared_dump_restore(
+                    extracted, manifest, declared, restore, run_id, command, names
                 )
         elif receipt["kind"] == "sqlite-stack":
             restore["recoveryPointAt"] = iso(float(manifest["stopStartedAt"]))

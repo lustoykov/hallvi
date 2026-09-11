@@ -401,6 +401,18 @@ export async function askPi(
             instructions: Type.Optional(
               Type.String({ minLength: 1, maxLength: 4000 }),
             ),
+            stateChange: Type.Optional(
+              Type.Object(
+                {
+                  services: Type.Array(
+                    Type.String({ minLength: 1, maxLength: 63 }),
+                    { minItems: 1, maxItems: 8 },
+                  ),
+                  evidence: Type.String({ minLength: 1, maxLength: 5000 }),
+                },
+                { additionalProperties: false },
+              ),
+            ),
           },
           { additionalProperties: false },
         ),
@@ -414,6 +426,8 @@ export async function askPi(
               input.run.chatId,
               params.ref,
               params.instructions ?? input.userMessage,
+              undefined,
+              params.stateChange,
             ),
           );
         },

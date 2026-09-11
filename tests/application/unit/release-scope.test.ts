@@ -198,6 +198,26 @@ it("names every out-of-scope effect: exposure, data identity or access and the m
   ).toThrow("host changed");
 });
 
+it("keeps a declared state owner's image unless the owner approved changing it", () => {
+  const owned = (image: string) => {
+    const facts = native((c) => {
+      c.services.queue.image = image;
+    });
+    facts.volumes[0].owner = "queue";
+    return facts;
+  };
+  const pinned = (digit: string) =>
+    `valkey/valkey:8.1.3-alpine@sha256:${digit.repeat(64)}`;
+  const baseline = owned(pinned("a"));
+  expect(scopeDifferences(baseline, owned(pinned("a")))).toEqual([]);
+  expect(scopeDifferences(baseline, owned(pinned("b"))).join()).toContain(
+    "Service queue owns persistent data",
+  );
+  expect(scopeDifferences(baseline, owned(pinned("b")), ["queue"])).toEqual(
+    [],
+  );
+});
+
 it("binds the established runtime: its own retries may supersede an observation, another authorization's may not", () => {
   const { r, scope } = fixture();
   r.revision = "b".repeat(40);
