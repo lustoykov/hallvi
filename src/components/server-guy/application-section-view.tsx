@@ -17,10 +17,12 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
+import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
+import { StackPrototype } from "./stack-prototype";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
 import { CdnView } from "./views/cdn-view";
@@ -371,6 +373,63 @@ export function ApplicationSectionView({
           activity={view.activity}
           chrome={{ bar, header, activity: null }}
           current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
+  // Processes in Transit's Line and Database in Overview's Timeline, chosen
+  // on opus-ui-improvements, are the default the same way.
+  if (section === "database")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <DataPrototype
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  if (section === "processes")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <StackPrototype
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
         />
       </div>
     );

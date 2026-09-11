@@ -76,13 +76,35 @@ History places finished work by its newest recorded step. The deployment
 operation's `updatedAt` is its record's and moves whenever the record is
 rewritten, which files an old deploy under Today in the shipped page.
 
+## Processes: Line (`stack-prototype/`)
+
+Chosen from three directions. Transit's language, as on Deployment and
+History: now on the left, and on the right how a visit reaches the
+processes, from your network through port 80 to the web app, with the
+private processes behind a wall and ghosts where missing pieces would go.
+It reads the stack derived from the deployment and the checks the
+deployment passed for each process; nothing is observed live. With nothing
+recorded, the shipped page stands in.
+
+## Database: Timeline (`data-prototype/`)
+
+Chosen from three directions that don't use Transit's line. Overview's
+lanes, for the database: the check that read it, its copies off the server
+and its restore tests. Quiet stretches longer than two hours fold, so
+minutes of work and two quiet days share one line, and "To scale" slides
+every moment to its clock time. The stretch since the newest copy is shaded
+and named, and Little Server stands at now. Nothing is observed live:
+scheduled backups may have run since the newest copy on record, and the page
+says so. With nothing recorded, the shipped page stands in. Storage still
+shows the shipped page.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
   clock moved), _Prometheus failing_ (an invented monitoring check) and
   _Before deploy_ (the plan with nothing running). The bar labels each one.
-  Deployment offers Live record, 3 days later and Before deploy; History
-  offers Live record and 3 days later.
+  Deployment offers Live record, 3 days later and Before deploy; History,
+  Processes, Database and Storage offer Live record and 3 days later.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -108,7 +130,9 @@ with the log from Little Server's note folded underneath.
 On 11 Sep the owner loved Architecture and its data flows but found the
 entrance animation too much, and asked for a balance so the app doesn't
 become all diagrams. For Deployment and History they chose Transit ("D is
-great, let's take it").
+great, let's take it"), and later its Line for Processes too. For Database
+they asked for directions without the line and chose the Timeline; Storage
+goes on to a round of its own with Backups.
 
 ## Where the exploration lives
 
@@ -117,4 +141,7 @@ Everything explored along the way stays off main: on
 exploded-server (Three.js) directions with their kits, Overview's note and
 console directions, and the mascot family; on `claude/deployment-history`,
 Deployment and History's Story, Narrated and Replay directions and the first
-round's Ledger.
+round's Ledger; on `claude/processes-database`, the Machine and Console
+directions for Processes and Database; on `claude/database-storage`, the
+Cutaway and Answers directions for Database and Storage, and the Timeline's
+Storage page.
