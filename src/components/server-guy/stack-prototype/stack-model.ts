@@ -362,7 +362,11 @@ export function buildStackStory({
             ? "Not deployed yet"
             : "Nothing recorded",
     verifiedAt,
-    name: productName(record?.plan?.image, "the application"),
+    // Named after the web process's image; newer records carry no plan.
+    name: productName(
+      (web && (pinnedOf(web.name) ?? web.image)) ?? undefined,
+      "the application",
+    ),
     restricted,
     from: record?.httpSourceIp ?? null,
     processes,
