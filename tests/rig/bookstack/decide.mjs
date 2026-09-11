@@ -10,9 +10,16 @@ const { operations } = await (
 const matches = operations.filter(
   (item) => item.id === target || item.title === target,
 );
-const wanted = action === "retry" ? "failed" : "proposed";
+// Approve a proposal; retry a stopped operation; cancel a proposal, a
+// queued operation or a stopped one (the card offers Cancel for those).
+const wanted =
+  action === "retry"
+    ? ["failed"]
+    : action === "cancel"
+      ? ["proposed", "queued", "failed"]
+      : ["proposed"];
 const operation =
-  matches.find((item) => item.state === wanted) ?? matches.at(-1);
+  matches.find((item) => wanted.includes(item.state)) ?? matches.at(-1);
 if (!operation) throw new Error(`No operation matches ${target}.`);
 console.log(
   JSON.stringify({
@@ -23,8 +30,8 @@ console.log(
     decision: operation.decision ?? null,
   }),
 );
-if (operation.state !== wanted)
-  throw new Error(`Operation is ${operation.state}, not ${wanted}.`);
+if (!wanted.includes(operation.state))
+  throw new Error(`Operation is ${operation.state}, not ${wanted.join("/")}.`);
 const response = await fetch(
   `${base}/api/applications/${applicationId}/operations/${operation.id}/decision`,
   {
