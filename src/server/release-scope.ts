@@ -79,10 +79,7 @@ export function scopeDifferences(
   }
   for (const volume of baseline.volumes) {
     const kept = next.volumes.find(
-      (item) =>
-        item.dockerName === volume.dockerName &&
-        item.kind === volume.kind &&
-        item.sqlite === volume.sqlite,
+      (item) => item.dockerName === volume.dockerName,
     );
     if (
       !kept ||
@@ -95,21 +92,29 @@ export function scopeDifferences(
               item.readOnly === mount.readOnly,
           ),
       )
-    )
+    ) {
       problems.push(
-        `Preserve volume ${volume.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
+        `Preserve volume ${volume.name}, its existing consumers, access and mount. Moving existing data needs a separate decision.`,
       );
-    // Its declared owner and capture stay through ordinary corrections: an
-    // owner that vanished from the records would lose its image protection
-    // and its data would lose its capture on the next release.
-    if (
-      kept &&
-      volume.owner &&
-      !allowed.includes(volume.owner) &&
-      (kept.owner !== volume.owner || kept.capture !== volume.capture)
-    )
+      continue;
+    }
+    // What a volume is recorded as, who owns it and how it is captured stay
+    // through ordinary corrections: a declaration that quietly changed would
+    // lose image protection or capture on the next release. Its owner's
+    // approved state change covers its declaration.
+    const identity = kept.kind !== volume.kind || kept.sqlite !== volume.sqlite;
+    const declaration =
+      kept.owner !== volume.owner || kept.capture !== volume.capture;
+    if (volume.owner) {
+      if ((identity || declaration) && !allowed.includes(volume.owner))
+        problems.push(
+          `Volume ${volume.name} is owned by ${volume.owner}${volume.capture ? ` with capture "${volume.capture}"` : ""} as ${volume.kind}; a correction keeps that declaration. Changing or removing it needs the owner's decision: propose it as a state change for ${volume.owner}.`,
+        );
+    } else if (identity)
+      // Adding an owner or a capture to unowned data is a correction;
+      // recording it as another kind of data is not.
       problems.push(
-        `Volume ${volume.name} is owned by ${volume.owner}${volume.capture ? ` with capture "${volume.capture}"` : ""}; a correction keeps that declaration. Changing or removing it needs the owner's decision: propose it as a state change for ${volume.owner}.`,
+        `Preserve volume ${volume.name}'s recorded kind and data path. Changing how existing data is recorded needs a separate decision.`,
       );
   }
   return problems;

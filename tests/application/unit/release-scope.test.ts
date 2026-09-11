@@ -230,9 +230,7 @@ it("keeps a declared state owner's image unless the owner approved changing it",
   expect(scopeDifferences(baseline, owned(pinned("b"))).join()).toContain(
     "Service queue owns persistent data",
   );
-  expect(scopeDifferences(baseline, owned(pinned("b")), ["queue"])).toEqual(
-    [],
-  );
+  expect(scopeDifferences(baseline, owned(pinned("b")), ["queue"])).toEqual([]);
 });
 
 it("keeps a volume's declared owner and capture through corrections unless the owner decides otherwise", () => {
@@ -252,7 +250,7 @@ it("keeps a volume's declared owner and capture through corrections unless the o
     delete volume.capture;
   });
   expect(scopeDifferences(baseline, unowned).join()).toContain(
-    'Volume queue-data is owned by queue with capture "dump"; a correction keeps that declaration',
+    'Volume queue-data is owned by queue with capture "dump" as database; a correction keeps that declaration',
   );
   const recaptured = owned((volume) => {
     delete volume.capture;
@@ -260,10 +258,26 @@ it("keeps a volume's declared owner and capture through corrections unless the o
   expect(scopeDifferences(baseline, recaptured).join()).toContain(
     "propose it as a state change for queue",
   );
-  // Adding protection is an ordinary correction; removing it is that
-  // owner's state change.
+  // Adding protection to an unowned volume is an ordinary correction;
+  // removing it is that owner's state change, and so is recording the
+  // owned volume as something else.
   expect(scopeDifferences(unowned, baseline)).toEqual([]);
   expect(scopeDifferences(baseline, unowned, ["queue"])).toEqual([]);
+  const asFiles = owned((volume) => {
+    volume.kind = "files";
+    volume.capture = "quiesced-files";
+  });
+  expect(scopeDifferences(baseline, asFiles).join()).toContain(
+    "propose it as a state change for queue",
+  );
+  expect(scopeDifferences(baseline, asFiles, ["queue"])).toEqual([]);
+  // An unowned volume's recorded kind still needs a separate decision.
+  const plain = native();
+  const relabeled = native();
+  relabeled.volumes[0].kind = "files";
+  expect(scopeDifferences(plain, relabeled).join()).toContain(
+    "recorded kind and data path",
+  );
 });
 
 it("binds the established runtime: its own retries may supersede an observation, another authorization's may not", () => {
