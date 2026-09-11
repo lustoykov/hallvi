@@ -5,12 +5,7 @@ import { redactSecrets } from "./secrets";
 import { createHash, randomUUID } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
 import { db, getApplication, getChat, insertMessage } from "./db";
-import {
-  applicationContracts,
-  deployments,
-  operationRecords,
-  applicationOperationProcesses,
-} from "./db-schema";
+import { deployments, operationRecords } from "./db-schema";
 import {
   deploymentOperation,
   logsOperation,
@@ -81,30 +76,18 @@ export function currentOperationFacts(
     .from(deployments)
     .where(eq(deployments.applicationId, applicationId))
     .get()?.body;
-  const contract = db()
-    .select()
-    .from(applicationContracts)
-    .where(eq(applicationContracts.applicationId, applicationId))
-    .orderBy(desc(applicationContracts.version))
-    .get();
   const runtime = deploymentRuntime(deployment ?? null);
   const configuration = currentFacts(deployment ?? null);
   return {
     repository: app.repositoryUrl,
-    permissionPolicy: app.approvalMode,
-    contract: contract?.id ?? null,
-    sourceRevision: contract?.commitSha ?? deployment?.revision ?? null,
+    sourceRevision: deployment?.revision ?? null,
     servingRevision:
       runtime.state === "verified"
         ? (runtime.lastVerified?.revision ?? deployment?.revision ?? null)
         : runtime.state === "observed"
           ? (runtime.observed?.revision ?? null)
           : null,
-    stack: deployment?.native
-      ? hash(deployment.native)
-      : deployment?.plan
-        ? hash(deployment.plan)
-        : null,
+    stack: deployment?.native ? hash(deployment.native) : null,
     inputNames: configuration ? hash([...configuration.inputs].sort()) : null,
   };
 }
@@ -415,27 +398,10 @@ function start(record: StoredOperation) {
   const keys = changedFacts(record);
   if (keys.length) return resetApproval(record, keys);
   const blocker = blockedBy(record.applicationId, record.id);
-  // Retained pre-v13 guards are liveness only. Migration never discards one
-  // whose process may still be running; normal migration stops both workers.
-  const legacy = db()
-    .select()
-    .from(applicationOperationProcesses)
-    .where(
-      eq(applicationOperationProcesses.applicationId, record.applicationId),
-    )
-    .all()
-    .some((row) => {
-      try {
-        process.kill(row.pid, 0);
-        return true;
-      } catch (error) {
-        return (error as NodeJS.ErrnoException).code !== "ESRCH";
-      }
-    });
-  if (blocker || legacy) {
+  if (blocker) {
     record.state = "queued";
-    record.waitingForId = blocker?.id ?? null;
-    record.waitingForTitle = blocker?.title ?? "Earlier preparation";
+    record.waitingForId = blocker.id;
+    record.waitingForTitle = blocker.title;
     record.summary = `Queued · after ${record.waitingForTitle}`;
     record.steps = [
       {
@@ -584,23 +550,46 @@ export function settleOperation(
     return record;
   });
 }
-export function cancelOperation(id: string, expectedUpdatedAt: string) {
+/** The recovery input an owner completes to release a retired hold. */
+export const ATTESTATION_INPUT = "What you verified";
+export function cancelOperation(
+  id: string,
+  expectedUpdatedAt: string,
+  attestation?: string,
+) {
   return transaction(() => {
     const record = operation(id);
     if (!record || record.updatedAt !== expectedUpdatedAt)
       throw new OperationConflictError();
     if (
       !["proposed", "queued", "failed"].includes(record.state) ||
-      record.blocksQueue
+      (record.blocksQueue && record.command)
     )
       throw new Error(
         "Only stopped, resolved or queued work can be cancelled. Reconcile uncertain effects first.",
       );
+    // Retired work has no executor to reconcile it. Its hold ends only on the
+    // owner's recorded statement, never on a migration or a plain cancel.
+    const statement = attestation?.trim() ?? "";
+    const attested = record.blocksQueue;
+    if (attested) {
+      if (statement.length < 10)
+        throw new Error(
+          "Record what you verified about this operation's outcome before releasing its hold.",
+        );
+      record.evidence =
+        `${record.evidence ?? ""}\n\nOwner statement, ${timestamp()}: ${statement.slice(0, 1000)}\nServer Guy did not verify this statement; the change queue hold was released on it.`
+          .trim()
+          .slice(-12000);
+      record.blocksQueue = false;
+    }
     record.state = "cancelled";
     record.decision = null;
     record.waitingForId = null;
     record.waitingForTitle = null;
-    record.summary = "Cancelled by the user. Retained in application history.";
+    record.summary = attested
+      ? "Closed on the owner's recorded statement; Server Guy did not verify the outcome. Retained in application history."
+      : "Cancelled by the user. Retained in application history.";
     put(record);
     if (record.origin && !getChat(record.origin.chatId)?.archivedAt)
       insertMessage(
@@ -623,6 +612,11 @@ export function retryOperation(id: string, expectedUpdatedAt: string) {
       previous.resolvedById
     )
       throw new OperationConflictError();
+    // Without a command there is no executor: its capability was retired.
+    if (!previous.command)
+      throw new Error(
+        "This operation's capability was retired; it cannot run again. Dismiss it, or record what you verified to release its hold.",
+      );
     const at = timestamp();
     const next: StoredOperation = {
       ...previous,

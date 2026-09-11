@@ -23,9 +23,6 @@ const application: ApplicationRecord = {
   repositoryUrl: "https://github.com/one/todo",
   repositoryOwner: "one",
   repositoryName: "todo",
-  environment: "production",
-  approvalMode: "pi-decides",
-  approvalScope: "Current application launch",
   createdAt: "2026-09-04T00:00:00Z",
   updatedAt: "2026-09-04T00:00:00Z",
 };
@@ -94,18 +91,20 @@ describe("application navigation", () => {
     expect(html.match(/<input[^>]*id="application-name"[^>]*>/)?.[0]).toContain(
       "disabled",
     );
-    expect(html).toMatch(/<fieldset[^>]*disabled/);
   });
 
-  it("starts creation with an empty URL and an explicit permission choice", () => {
+  it("starts creation with an empty URL and no retired permission choice", () => {
     const html = renderToStaticMarkup(<NewApplicationScreen />);
     expect(html).toContain('name="repositoryUrl"');
     expect(html).toContain('value=""');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Add application/);
     expect(html).not.toContain("todo-fastapi");
-    expect(html).toContain("Always ask");
-    expect(html).toContain("Let Server Guy decide");
-    expect(html).toContain("Full autonomy");
+    for (const retired of [
+      "Always ask",
+      "Let Server Guy decide",
+      "Full autonomy",
+    ])
+      expect(html).not.toContain(retired);
     expect(html).toContain('href="/applications"');
   });
 });

@@ -19,19 +19,15 @@ import {
 } from "vitest";
 import * as database from "../../../src/server/db";
 import * as configuration from "../../../src/server/pi-configuration";
-import { getApplicationStatus } from "../../../src/server/phase-one";
+import { readPiApplicationStatus } from "../../../src/server/pi-status";
 import * as runs from "../../../src/server/pi-runs";
 import { openNativeChatSession } from "../../../src/server/pi-sessions";
-import type {
-  ApplicationStatus,
-  PhaseOneOperatorView,
-} from "../../../src/server/types";
 import {
   nativeEvalEvidence,
   seedStaleStatusHistory,
 } from "../../evals/native-scenarios";
-import { phaseOneCases } from "../../evals/phase-one-cases";
-import { seedPhaseOneEvalCase } from "../../evals/seed-phase-one";
+import { evalCases } from "../../evals/cases";
+import { seedEvalCase, type EvalView } from "../../evals/seed";
 import { pushTestDatabase } from "../../test-database";
 
 const DAY = 86_400_000;
@@ -39,7 +35,10 @@ const syntheticModel = {
   providerId: "synthetic-no-network",
   modelId: "never-requested",
 };
-const byId = (id: string) => phaseOneCases.find((item) => item.id === id)!;
+const byId = (id: string) => evalCases.find((item) => item.id === id)!;
+type Status = ReturnType<typeof readPiApplicationStatus>["status"];
+const statusOf = (view: EvalView) =>
+  readPiApplicationStatus(view.application!.id, view.selectedChatId!).status;
 let root: string;
 const fetch = vi.fn(() => {
   throw new Error("Status seed tests cannot make network requests.");
@@ -77,7 +76,7 @@ const text = (message: { content: Array<{ type: string; text?: string }> }) =>
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("");
-async function nativeStatusExchange(view: PhaseOneOperatorView) {
+async function nativeStatusExchange(view: EvalView) {
   const native = await openNativeChatSession(
     view.application!.id,
     view.selectedChatId!,
@@ -107,7 +106,7 @@ async function nativeStatusExchange(view: PhaseOneOperatorView) {
           entry.type === "custom_message" &&
           entry.customType === "eval-fixture-history",
       ),
-      stale: JSON.parse(text(result.message)) as ApplicationStatus,
+      stale: JSON.parse(text(result.message)) as Status,
       assistantText,
     };
   } finally {
@@ -145,12 +144,10 @@ function statusResult(manager: SessionManager, id: string, isError = false) {
     timestamp: Date.now(),
   });
 }
-const repository = (status: ApplicationStatus) =>
-  status.checks.find((check) => check.key === "repository-readable")!;
 
 describe("application status eval cases", () => {
   it("declares which cases must, and which need not, look up status", () => {
-    const declared = phaseOneCases.filter((item) => item.statusLookup);
+    const declared = evalCases.filter((item) => item.statusLookup);
     expect(declared.map((item) => item.id)).toEqual([
       "greeting",
       "github-connected-not-readable",
@@ -161,7 +158,6 @@ describe("application status eval cases", () => {
       "status-blocking-next-step",
       "status-repository-still-readable",
       "status-stale-check-history",
-      "status-approval-mode-changed",
       "status-ready-not-deployed",
     ]);
     expect(
@@ -175,36 +171,29 @@ describe("application status eval cases", () => {
     ]);
     expect(declared.every((item) => item.expectedProposals === 0)).toBe(true);
     expect(
-      phaseOneCases.filter((item) => item.staleHistory).map((item) => item.id),
-    ).toEqual(["status-stale-check-history", "status-approval-mode-changed"]);
+      evalCases.filter((item) => item.staleHistory).map((item) => item.id),
+    ).toEqual(["status-stale-check-history"]);
   });
 
   it("ages the verified repository check so retrieval time and observation time differ", () => {
-    const before = seedPhaseOneEvalCase(
-      byId("status-repository-still-readable"),
-      1,
-    );
+    const before = seedEvalCase(byId("status-repository-still-readable"), 1);
     const age = Date.now() - Date.parse(before.observations[0].observedAt);
     expect(age).toBeGreaterThan(1.9 * DAY);
     expect(age).toBeLessThan(2.1 * DAY);
-    const status = getApplicationStatus(
-      before.application!.id,
-      before.selectedChatId!,
-    );
-    expect(repository(status)).toMatchObject({
+    const status = statusOf(before);
+    expect(status.repositoryAccess).toMatchObject({
       status: "passed",
-      evidence: [{ observedAt: before.observations[0].observedAt }],
+      checkedAt: before.observations[0].observedAt,
     });
     expect(
       Date.parse(status.retrievedAt) -
-        Date.parse(repository(status).evidence[0].observedAt),
+        Date.parse(status.repositoryAccess.checkedAt!),
     ).toBeGreaterThan(1.9 * DAY);
-    expect(status.workspace.status).toBe("ready");
   });
 
   it("seeds an older success that a newer failed check supersedes, with history claiming readiness", async () => {
     const item = byId("status-stale-check-history");
-    const before = seedPhaseOneEvalCase(item, 1);
+    const before = seedEvalCase(item, 1);
     expect(
       before.observations.map((observation) => observation.status),
     ).toEqual(["failed", "passed"]);
@@ -214,56 +203,33 @@ describe("application status eval cases", () => {
     ).toBeGreaterThan(2.9 * DAY);
     const after = await seedStaleStatusHistory(item, before, syntheticModel);
     expect(after.observations).toEqual(before.observations);
-    expect(after.checks).toEqual(before.checks);
     expect(after.messages).toEqual(before.messages);
     const { note, stale, assistantText } = await nativeStatusExchange(after);
     expect(note).toBe(true);
-    expect(stale.workspace.status).toBe("ready");
-    expect(repository(stale)).toMatchObject({
+    expect(stale.repositoryAccess).toMatchObject({
       status: "passed",
-      evidence: [{ recordId: passed.id, observedAt: passed.observedAt }],
+      result: passed.summary,
+      checkedAt: passed.observedAt,
     });
     expect(
-      assistantText.some((body) => body.includes("Launch Brief is ready")),
+      assistantText.some((body) =>
+        body.includes("The repository check passed"),
+      ),
     ).toBe(true);
-    const current = getApplicationStatus(
-      after.application!.id,
-      after.selectedChatId!,
-    );
-    expect(current.workspace.status).toBe("in-progress");
-    expect(repository(current)).toMatchObject({
+    const current = statusOf(after);
+    expect(current.repositoryAccess).toMatchObject({
       status: "blocked",
       result: failed.summary,
-      evidence: [{ recordId: failed.id }],
+      checkedAt: failed.observedAt,
     });
-    expect(JSON.stringify(current)).not.toContain(passed.id);
+    expect(JSON.stringify(current)).not.toContain(passed.summary);
     expect(
       runs.chatRunSnapshot(after.application!.id, after.selectedChatId!).runs,
     ).toEqual([]);
   });
 
-  it("seeds an outdated Approval Mode answer while the saved mode is Always ask", async () => {
-    const item = byId("status-approval-mode-changed");
-    const before = seedPhaseOneEvalCase(item, 1);
-    const after = await seedStaleStatusHistory(item, before, syntheticModel);
-    expect(after.application).toEqual(before.application);
-    expect(after.application?.approvalMode).toBe("always-ask");
-    const { stale, assistantText } = await nativeStatusExchange(after);
-    expect(stale.application.approvalMode).toEqual({
-      key: "pi-decides",
-      label: "Let Server Guy decide",
-    });
-    expect(
-      assistantText.some((body) => body.includes("Let Server Guy decide")),
-    ).toBe(true);
-    expect(
-      getApplicationStatus(after.application!.id, after.selectedChatId!)
-        .application.approvalMode,
-    ).toEqual({ key: "always-ask", label: "Always ask" });
-  });
-
   it("counts a status lookup only from a successful call in the requested Run", async () => {
-    const before = seedPhaseOneEvalCase(byId("status-blocking-next-step"), 1);
+    const before = seedEvalCase(byId("status-blocking-next-step"), 1);
     const applicationId = before.application!.id;
     const chatId = before.selectedChatId!;
     const accepted = runs.sendChatMessage(

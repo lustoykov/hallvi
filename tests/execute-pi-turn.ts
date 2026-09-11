@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { claimNextPiRun, sendChatMessage } from "../src/server/pi-runs";
 import { executePiRun } from "../src/server/pi-worker";
-import { getPhaseOneOperatorView } from "../src/server/phase-one";
+import { getOperatorView } from "../src/server/operator-view";
 import { PiUnavailableError } from "../src/server/pi";
 
 export async function executePiTurn(
@@ -25,5 +25,5 @@ export async function executePiTurn(
     throw new PiUnavailableError(
       result?.error ?? "The application was removed.",
     );
-  return getPhaseOneOperatorView(applicationId, chatId);
+  return getOperatorView(applicationId, chatId);
 }

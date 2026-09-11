@@ -1,11 +1,11 @@
-// Reply references: which reply a saved record sits under, and the status a
-// replaced proposal shows so an old reply cannot look approvable.
+// Reply references: which reply a saved requirement sits under, so the
+// transcript can point at it without a second set of controls.
 import { describe, expect, it } from "vitest";
 
 import { recordReferences } from "../../../src/components/server-guy/record-references";
 import type {
   ChatMessage,
-  ConformanceProposalRecord,
+  Decision,
   OperatorView,
 } from "../../../src/server/types";
 
@@ -28,33 +28,14 @@ function message(
   };
 }
 
-function proposal(
-  id: string,
-  sourceMessageId: string,
-  status: ConformanceProposalRecord["status"] = "proposed",
-): ConformanceProposalRecord {
+function decision(id: string, sourceMessageId: string): Decision {
   return {
     id,
     applicationId: "app",
-    workspaceId: "ws",
-    origin: "server-guy",
-    status,
-    baseSha: "a".repeat(40),
-    contractId: "contract-1",
-    contractVersion: 1,
-    summary: "Add /health.",
-    changes: [{ path: "app/main.py", content: "…", baseObservationId: null }],
-    filesDigest: `digest-${id}`,
-    mapping: [],
-    requestApproval: true,
     sourceMessageId,
-    piRunId: null,
-    approval: null,
-    publication: null,
-    publicationError: null,
-    external: null,
-    candidate: null,
-    verification: null,
+    kind: "launch-priority",
+    label: "Requirement",
+    value: "Data stays in the EU",
     supersededById: null,
     createdAt: at,
   };
@@ -63,85 +44,45 @@ function proposal(
 function view(overrides: Partial<OperatorView>): OperatorView {
   return {
     application: null,
-    workspace: null,
-    workspaces: [],
     chats: [],
     selectedChatId: null,
     messages: [],
-    checks: [],
     decisions: [],
-    observations: [],
-    upcomingRequirements: [],
     activity: [],
-    inspection: null,
-    contract: null,
-    conformance: null,
     ...overrides,
   };
 }
 
 describe("recordReferences", () => {
-  it("places a record under the reply that followed its request", () => {
-    const first = proposal("p1", "request-1", "superseded");
-    const second = proposal("p2", "request-2");
+  it("places a saved requirement under the reply that followed its request", () => {
     const references = recordReferences(
       view({
         messages: [
-          message("request-1", "user", "server-guy"),
+          message("request-1", "user", "user"),
           message("reply-1", "assistant"),
           message("request-2", "user", "user"),
           message("reply-2", "assistant"),
         ],
-        conformance: {
-          retained: null,
-          brief: null,
-          proposal: second,
-          proposals: [first, second],
-          acceptance: null,
-          proposedAcceptance: null,
-          runs: [],
-          latestPreview: null,
-          latestCandidateRun: null,
-          environment: null,
-          grant: null,
-          contractBlocked: null,
-        },
+        decisions: [decision("d1", "request-2")],
       }),
     );
-    expect(references.get("reply-1")).toEqual([
-      expect.objectContaining({
-        label: "Proposed change",
-        status: "replaced",
-        tone: "replaced",
-        section: "change",
-      }),
-    ]);
     expect(references.get("reply-2")).toEqual([
-      expect.objectContaining({
-        label: "Proposed change",
-        status: "waiting for your approval",
-        tone: "waiting",
-      }),
+      {
+        key: "decision:d1",
+        label: "Saved requirement",
+        status: "current",
+        tone: "current",
+      },
     ]);
-    expect(references.has("request-1")).toBe(false);
+    expect(references.has("reply-1")).toBe(false);
+    expect(references.has("request-2")).toBe(false);
   });
 
   it("ignores records whose request is not in this chat", () => {
     const references = recordReferences(
       view({
         messages: [message("reply-1", "assistant")],
-        decisions: [
-          {
-            id: "d1",
-            applicationId: "app",
-            sourceMessageId: "elsewhere",
-            kind: "launch-priority",
-            label: "Requirement",
-            value: "Data stays in the EU",
-            supersededById: null,
-            createdAt: at,
-          },
-        ],
+        decisions: [decision("d1", "elsewhere")],
       }),
     );
     expect(references.size).toBe(0);

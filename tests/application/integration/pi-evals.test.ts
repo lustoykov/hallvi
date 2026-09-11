@@ -1,29 +1,23 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
-import { checkPhaseOne } from "../../evals/check-phase-one";
+import { checkTurn } from "../../evals/checks";
 import {
+  evalCases,
   evalRepeatCount,
-  phaseOneCases,
-  selectPhaseOneCases,
-  type PhaseOneEvalCase,
-} from "../../evals/phase-one-cases";
-import type {
-  Decision,
-  PhaseOneOperatorView,
-  PiTurnResult,
-} from "../../../src/server/types";
+  selectEvalCases,
+  type EvalCase,
+} from "../../evals/cases";
+import type { EvalView } from "../../evals/seed";
+import type { Decision, PiTurnResult } from "../../../src/server/types";
 
-function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
+function example(scenario: EvalCase = evalCases[1]) {
   const application = {
     id: "app",
     name: "example",
     repositoryUrl: "https://github.com/qa/example",
     repositoryOwner: "qa",
     repositoryName: "example",
-    environment: "production" as const,
-    approvalMode: "always-ask" as const,
-    approvalScope: "Current application launch",
     createdAt: "2026-09-04T00:00:00Z",
     updatedAt: "2026-09-04T00:00:00Z",
   };
@@ -37,20 +31,13 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
     supersededById: null,
     createdAt: application.createdAt,
   };
-  const before: PhaseOneOperatorView = {
+  const before: EvalView = {
     application,
-    workspace: null,
-    workspaces: [],
-    inspection: null,
-    contract: null,
-    conformance: null,
     chats: [],
     selectedChatId: "chat",
     messages: [],
-    checks: [],
     decisions: scenario.existingPriority ? [prior] : [],
     observations: [],
-    upcomingRequirements: [],
     activity: [],
   };
   const reply: PiTurnResult = {
@@ -65,7 +52,7 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
         ]
       : [],
   };
-  const after: PhaseOneOperatorView = {
+  const after: EvalView = {
     ...before,
     messages: [
       {
@@ -103,26 +90,27 @@ function example(scenario: PhaseOneEvalCase = phaseOneCases[1]) {
     ...d,
     supersededById: scenario.replacesExisting ? "new" : null,
   }));
-  const check = () => checkPhaseOne(scenario, before, after, reply, history);
+  const check = () => checkTurn(scenario, before, after, reply, history);
   return { before, after, reply, history, check };
 }
 
-describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
-  it("has forty-three uniquely named cases with explicit semantic rubrics", () => {
-    expect(new Set(phaseOneCases.map((c) => c.id)).size).toBe(43);
-    expect(phaseOneCases.every((c) => c.message && c.rubric)).toBe(true);
+describe("Pi eval casebook and exact graders (no model calls)", () => {
+  it("has twenty-nine uniquely named cases with explicit semantic rubrics", () => {
+    expect(new Set(evalCases.map((c) => c.id)).size).toBe(29);
+    expect(evalCases.every((c) => c.message && c.rubric)).toBe(true);
   });
 
   it("selects a case subset without silently expanding invalid selections", () => {
-    expect(selectPhaseOneCases().length).toBe(43);
-    expect(
-      selectPhaseOneCases("greeting,hypothetical").map((c) => c.id),
-    ).toEqual(["greeting", "hypothetical"]);
+    expect(selectEvalCases().length).toBe(29);
+    expect(selectEvalCases("greeting,hypothetical").map((c) => c.id)).toEqual([
+      "greeting",
+      "hypothetical",
+    ]);
     for (const value of ["", "missing", "greeting,greeting", "greeting,", ".*"])
-      expect(() => selectPhaseOneCases(value)).toThrow("PI_EVAL_CASES");
+      expect(() => selectEvalCases(value)).toThrow("PI_EVAL_CASES");
   });
 
-  it.each(phaseOneCases)(
+  it.each(evalCases)(
     "accepts correct structural/state evidence for $id",
     (scenario) => {
       expect(Object.values(example(scenario).check()).every(Boolean)).toBe(
@@ -152,15 +140,13 @@ describe("Phase 1 eval casebook and exact graders (no model calls)", () => {
         observedAt: "2026-09-05T00:00:00Z",
       },
     ];
-    expect(
-      fixture.check()["repository evidence and gate results unchanged by chat"],
-    ).toBe(false);
+    expect(fixture.check()["repository evidence unchanged by chat"]).toBe(
+      false,
+    );
   });
 
   it("detects fabricated replacement IDs and incorrect supersession", () => {
-    const fixture = example(
-      phaseOneCases.find((c) => c.id === "revise-existing")!,
-    );
+    const fixture = example(evalCases.find((c) => c.id === "revise-existing")!);
     fixture.reply.decisionProposals[0].replaces = "fabricated";
     fixture.history[0].supersededById = null;
     expect(fixture.check()["exact replacement target"]).toBe(false);

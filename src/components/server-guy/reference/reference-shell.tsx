@@ -309,21 +309,11 @@ export function ReferenceShell({
   }
   const view: OperatorView = {
     application: state.application,
-    workspace: null,
-    workspaces: [],
     chats: state.chats,
     selectedChatId: chat?.id ?? null,
     messages: state.messages.filter((item) => item.chatId === chat?.id),
-    checks: [],
     decisions: [],
-    observations: [],
-    upcomingRequirements: [],
     activity: [],
-    inspection: null,
-    contract: null,
-    conformance: null,
-    preview: null,
-    preparation: null,
   };
   const other = scenarios.find((item) => item.id !== scenario.id)!;
   const otherApplication = other.initial().application;

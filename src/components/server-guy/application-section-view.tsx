@@ -186,7 +186,14 @@ export function ApplicationSectionView({
       );
       break;
     case "history":
-      content = <HistoryView {...viewProps} decisionFor={decisionFor} />;
+      content = (
+        <HistoryView
+          {...viewProps}
+          decisions={view.decisions}
+          activity={view.activity}
+          decisionFor={decisionFor}
+        />
+      );
       break;
     case "deployment":
       content = <DeploymentView {...viewProps}>{children}</DeploymentView>;

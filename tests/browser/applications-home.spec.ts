@@ -20,7 +20,6 @@ test(
           repositoryUrl: `https://github.com/qa/${name.toLowerCase().replaceAll(" ", "-")}`,
           name,
           requestKey: crypto.randomUUID(),
-          approvalMode: "pi-decides",
         },
       });
       expect(response.status()).toBe(201);

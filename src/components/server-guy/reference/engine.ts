@@ -42,11 +42,11 @@ export function allOperations(state: ReferenceState): ApplicationOperation[] {
         ...item,
         decision: {
           kind: "approval" as const,
-          note: `${state.deployment.plan?.summary ?? ""} Creates one ${state.deployment.offer.serverType.toUpperCase()} at Hetzner and deploys this exact revision.`,
+          note: `${state.deployment.native?.summary ?? ""} Creates one ${state.deployment.offer.serverType.toUpperCase()} at Hetzner and deploys this exact revision.`,
           cost: `${state.deployment.offer.currency} ${state.deployment.offer.monthly.toFixed(2)} per month · ${state.deployment.offer.cores} CPUs · ${state.deployment.offer.memory} GB RAM · ${state.deployment.offer.location} · hourly billing`,
-          inputs: (state.deployment.plan?.missingInputs ?? []).map((input) => ({
-            name: input.name,
-            hint: input.reason,
+          inputs: (state.deployment.native?.inputs ?? []).map((name) => ({
+            name,
+            hint: state.deployment?.native?.inputReasons?.[name],
             secret: true,
           })),
           action: "Create server and deploy",
@@ -372,7 +372,9 @@ export function archiveChat(state: ReferenceState, chatId: string) {
   const next = structuredClone(state);
   later(next);
   const found = next.chats.find((item) => item.id === chatId);
-  if (found && !found.isPrimary) found.archivedAt = next.clock;
+  // One conversation always stays active.
+  if (found && next.chats.filter((item) => !item.archivedAt).length > 1)
+    found.archivedAt = next.clock;
   return next;
 }
 

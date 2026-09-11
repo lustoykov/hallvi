@@ -244,21 +244,6 @@ vi.mock("../../../src/server/http", () => ({
     }
   },
 }));
-vi.mock("../../../src/server/deployment-compose", async (original) => {
-  const real =
-    await original<typeof import("../../../src/server/deployment-compose")>();
-  return {
-    ...real,
-    // The legacy renderer publishes port 80; bind a loopback port locally.
-    composeDefinition: (...args: Parameters<typeof real.composeDefinition>) => {
-      const value = real.composeDefinition(...args);
-      (value.services.app as { ports: string[] }).ports = ["127.0.0.1::8080"];
-      for (const service of Object.values(value.services))
-        (service as Record<string, unknown>).platform = "linux/amd64";
-      return value;
-    },
-  };
-});
 vi.mock("../../../src/server/deployment-source", () => ({
   checkDeploymentSource: async () => ({ token: "synthetic" }),
 }));
@@ -361,11 +346,7 @@ vi.mock("../../../src/server/native-compose", async (original) => {
     },
   };
 });
-import {
-  insertApplication,
-  insertChat,
-  insertWorkspace,
-} from "../../../src/server/db";
+import { insertApplication, insertChat } from "../../../src/server/db";
 import {
   applicationDeployment,
   requestDeployment,
@@ -378,13 +359,7 @@ import {
 } from "../../../src/server/application-releases";
 import { operation, startChange } from "../../../src/server/operation-store";
 import { executeOperation } from "../../../src/server/application-operations";
-import { composeDefinition } from "../../../src/server/deployment-compose";
-import { legacyStartCommand } from "../../fixtures/queue-worker/legacy-plans";
-import {
-  recreateDeployment,
-  verifyDeployment,
-  verifyServiceImages,
-} from "../../../src/server/deployment-executor";
+import { recreateDeployment } from "../../../src/server/deployment-executor";
 import { executeRelease } from "../../../src/server/release-executor";
 import { runDeploymentWorker } from "../../../src/server/deployment-worker";
 import { POST as deploymentRoute } from "../../../src/app/api/applications/[applicationId]/deployment/route";
@@ -395,14 +370,15 @@ import {
 import { releaseOf } from "../../../src/server/deployment-release";
 import {
   currentFacts,
-  planFacts,
+  nativeFacts,
   type ReleaseFacts,
 } from "../../../src/server/release-facts";
 import { scopeDifferences } from "../../../src/server/release-scope";
-import type {
-  DeploymentPlan,
-  DeploymentRecord,
-} from "../../../src/server/deployment-types";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import {
+  convertPlan,
+  legacyReleaseId,
+} from "../../../scripts/retire-preparation.mjs";
 import type { TreeFile } from "../../../src/server/execution-tree";
 
 const proof = process.env.SG_RUN_DOCKER_PROOF === "1";
@@ -484,11 +460,8 @@ function newApplication(repositoryName: string) {
     repositoryUrl: `https://github.com/qa/${repositoryName}`,
     repositoryOwner: "qa",
     repositoryName,
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Test",
   }).id;
-  const chat = insertChat(insertWorkspace(app).id, "Release", true).id;
+  const chat = insertChat(app, "Release").id;
   return { app, chat };
 }
 /** A live application record on the "host" with its private inputs. */
@@ -568,7 +541,7 @@ function cleanup(id: string, images: string[]) {
 }
 
 it.skipIf(!proof)(
-  "converts an existing app to equivalent native Compose, corrects within scope, refuses a data move, reconciles a lost reply and rolls back",
+  "runs a converted legacy release natively, lets Pi author equivalent Compose, corrects within scope, refuses a data move, reconciles a lost reply and rolls back to the converted release",
   async () => {
     const source = ["Dockerfile", "app.py"].map((path) =>
       file(path, readFileSync(join("tests/fixtures/release-app", path))),
@@ -578,7 +551,8 @@ it.skipIf(!proof)(
       [B]: [...source, file("version.txt", "v2")],
     };
     const { app, chat, record } = application("release");
-    const plan: DeploymentPlan = {
+    // The plan a retired Server Guy planner recorded for v1.
+    const plan = {
       summary: "Synthetic source application with retained SQLite state",
       dockerfile: "Dockerfile",
       generatedDockerfile: null,
@@ -609,50 +583,35 @@ it.skipIf(!proof)(
         },
       ],
     };
-    Object.assign(record, { revision: A, plan });
+    // Schema 14 converted the live record once, under the release identity
+    // its approval named.
+    const releaseId = legacyReleaseId(record.repository, A, plan);
+    Object.assign(record, {
+      revision: A,
+      releaseId,
+      native: convertPlan(plan, record.id, A),
+    });
     saveDeployment(record);
+    const v1 = releaseOf(record)!;
+    expect(v1.id).toBe(releaseId);
     const project = `sg-${record.id.slice(0, 8)}`;
     stubLocalFetch();
     try {
-      // v1 runs as the legacy renderer deployed it.
-      mkdirSync(join(host.root, "source"));
-      for (const item of host.trees[A])
-        writeFileSync(join(host.root, "source", item.path), item.content);
-      writeFileSync(
-        join(host.root, "compose.json"),
-        JSON.stringify(
-          composeDefinition(plan, A, record.id, "synthetic-password", {}),
-        ),
-      );
-      execFileSync(
-        "sh",
-        [
-          "-c",
-          legacyStartCommand(
-            plan,
-            `docker compose -p ${project} -f compose.json`,
-          ),
-        ],
-        { cwd: host.root, stdio: "pipe", timeout: 300000, env: platform },
-      );
-      host.endpoint = docker([
-        "compose",
-        "-p",
-        project,
-        "-f",
-        join(host.root, "compose.json"),
-        "port",
-        "app",
-        "8080",
-      ]);
+      // v1 runs from its converted configuration through the native
+      // executor, under the project, volume and image names it always had.
       const live = applicationDeployment(app)!;
-      await verifyServiceImages(live, AbortSignal.timeout(90000));
-      await verifyDeployment(live, AbortSignal.timeout(90000));
-      Object.assign(live, {
-        imageId: live.serviceImages!.app,
-        verifiedAt: new Date().toISOString(),
+      await runDeploymentAttempt(
+        live,
+        "release",
+        "converted-v1",
+        () =>
+          executeRelease(live, v1, host.trees[A], AbortSignal.timeout(600000)),
+        v1,
+      );
+      expect(applicationDeployment(app)!.lifecycle!.runtime).toMatchObject({
+        state: "verified",
+        lastVerified: { releaseId },
       });
-      saveDeployment(live);
       expect(
         (
           await fetch(`http://${host.endpoint}/value`, {
@@ -691,7 +650,9 @@ it.skipIf(!proof)(
             .find((f) => f.path === ".server-guy/current/compose.json")!
             .content.toString(),
         );
-        expect(view.services.app.volumes).toEqual(["data:/data"]);
+        expect(view.services.app.volumes).toEqual([
+          { type: "volume", source: "data", target: "/data" },
+        ]);
         const compose = `services:
   app:
     build: { context: ., dockerfile: Dockerfile }
@@ -714,14 +675,12 @@ volumes:
         ).toMatchObject({ ok: true });
       });
       expect(converted.state).toBe("verified");
-      // Equivalent effects need no new decision; the rebuilt image replaces
-      // the container exactly as a legacy release of this revision would.
+      // Equivalent effects need no new decision, and the data stays put.
       expect(volume()).toBe(v1Volume);
       let current = applicationDeployment(app)!;
       expect(
-        scopeDifferences(planFacts(plan, record.id, A), currentFacts(current)!),
+        scopeDifferences(nativeFacts(v1.native), currentFacts(current)!),
       ).toEqual([]);
-      expect(current.plan).toBeNull();
       expect(current.native).toMatchObject({
         resolver: "docker compose 2.40.3",
         resolved: { name: project },
@@ -730,7 +689,7 @@ volumes:
         "compose.yaml",
         ".server-guy/override.compose.json",
       ]);
-      expect(current.lifecycle!.releases[0].plan).toEqual(plan);
+      expect(current.lifecycle!.releases[0]).toEqual(v1);
       expect(current.lifecycle!.runtime).toMatchObject({
         state: "verified",
         lastVerified: { releaseId: current.releaseId },
@@ -928,8 +887,8 @@ volumes:
         await (await fetch(`http://${host.endpoint}/value`)).json(),
       ).toEqual({ value: "retained-user-data" });
 
-      // 3. Compatible rollback to the legacy release's verified images.
-      const v1 = current.lifecycle!.releases[0];
+      // 3. Compatible rollback to the converted release's verified images.
+      expect(current.lifecycle!.releases[0]).toEqual(v1);
       const back = await change(app, chat, async () => {}, {
         releaseId: v1.id,
         compatibilityEvidence:
@@ -937,8 +896,8 @@ volumes:
       });
       expect(back.state).toBe("verified");
       current = applicationDeployment(app)!;
-      expect(current).toMatchObject({ plan, revision: A });
-      expect(current.native).toBeUndefined();
+      expect(current).toMatchObject({ revision: A, releaseId: v1.id });
+      expect(current.native).toEqual(v1.native);
       expect(
         await (await fetch(`http://${host.endpoint}/version`)).text(),
       ).toContain("v1");
@@ -1199,7 +1158,8 @@ it.skipIf(!piProof)(
       contains,
       captureId: null,
     });
-    const plan: DeploymentPlan = {
+    // The plan a retired Server Guy planner recorded for v1.
+    const plan = {
       summary:
         "Notes web application with managed PostgreSQL and a private signing key",
       dockerfile: "Dockerfile",
@@ -1222,8 +1182,17 @@ it.skipIf(!piProof)(
         check("Notes", "/notes", '"notes"'),
       ],
     };
-    Object.assign(record, { revision: A, plan });
+    // Schema 14 converted the live record once, under the release identity
+    // its approval named.
+    const releaseId = legacyReleaseId(record.repository, A, plan);
+    Object.assign(record, {
+      revision: A,
+      releaseId,
+      native: convertPlan(plan, record.id, A),
+    });
     saveDeployment(record);
+    const v1 = releaseOf(record)!;
+    expect(v1.id).toBe(releaseId);
     const project = `sg-${record.id.slice(0, 8)}`;
     const compose = (...args: string[]) =>
       docker([
@@ -1335,38 +1304,16 @@ it.skipIf(!piProof)(
     }
     stubLocalFetch();
     try {
-      // v1 runs as the legacy renderer deployed it, with its private values.
-      mkdirSync(join(host.root, "source"));
-      for (const item of host.trees[A])
-        writeFileSync(join(host.root, "source", item.path), item.content);
-      writeFileSync(
-        join(host.root, "compose.json"),
-        JSON.stringify(
-          composeDefinition(plan, A, record.id, "synthetic-password", {
-            APP_SECRET: secret,
-          }),
-        ),
-      );
-      execFileSync(
-        "sh",
-        [
-          "-c",
-          legacyStartCommand(
-            plan,
-            `docker compose -p ${project} -f compose.json`,
-          ),
-        ],
-        { cwd: host.root, stdio: "pipe", timeout: 600000, env: platform },
-      );
-      host.endpoint = compose("port", "app", "8080");
+      // v1 runs from its converted configuration, with its private values.
       const live = applicationDeployment(app)!;
-      await verifyServiceImages(live, AbortSignal.timeout(90000));
-      await verifyDeployment(live, AbortSignal.timeout(120000));
-      Object.assign(live, {
-        imageId: live.serviceImages!.app,
-        verifiedAt: new Date().toISOString(),
-      });
-      saveDeployment(live);
+      await runDeploymentAttempt(
+        live,
+        "release",
+        "converted-v1",
+        () =>
+          executeRelease(live, v1, host.trees[A], AbortSignal.timeout(600000)),
+        v1,
+      );
       const note = "retained note from v1";
       expect(
         (
@@ -1823,7 +1770,6 @@ it.skipIf(!proof)(
       expect(live).toMatchObject({
         status: "live",
         url: "http://127.0.0.1",
-        plan: null,
       });
       const approvedId = live.authority!.releaseId!;
       expect(live.lifecycle!.releases[0].id).toBe(approvedId);

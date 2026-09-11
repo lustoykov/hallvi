@@ -59,7 +59,7 @@ export function parseGithubRepository(value: string): RepositoryIdentity {
     throw new Error("Enter a GitHub HTTPS or SSH repository URL.");
   }
   if (url.hostname.toLowerCase() !== "github.com") {
-    throw new Error("Phase 1 currently accepts GitHub repositories only.");
+    throw new Error("Server Guy currently accepts GitHub repositories only.");
   }
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts.length !== 2) {

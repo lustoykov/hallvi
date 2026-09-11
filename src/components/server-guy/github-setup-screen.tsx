@@ -16,7 +16,7 @@ import type {
   GithubLoginAttempt,
   GithubSetupStatus,
 } from "@/server/github-setup";
-import type { GithubRepositoryCheckResult } from "@/server/phase-one";
+import type { GithubRepositoryCheckResult } from "@/server/applications";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
@@ -123,7 +123,7 @@ export function GithubSetupScreen({
           checking: false,
           results: [],
           error:
-            "Could not finish checking repositories. Open your application and retry Check 2.",
+            "Could not finish checking repositories. Open your application and choose Check again.",
         });
       }
     },
@@ -501,13 +501,13 @@ export function GithubSetupScreen({
                             }
                           >
                             {check.status === "passed"
-                              ? "Check 2 passed."
+                              ? "Repository access passed."
                               : check.result}
                           </p>
                           {check.status !== "passed" && (
                             <p className={s.hint}>
                               After fixing access, open this application and
-                              retry Check 2.
+                              choose Check again.
                             </p>
                           )}
                         </li>

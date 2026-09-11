@@ -1,5 +1,5 @@
 import { handle } from "@/server/http";
-import { withGithubConnectionTransition } from "@/server/phase-one";
+import { withGithubConnectionTransition } from "@/server/applications";
 import { assertSameOrigin, parseJsonRequest } from "@/server/schemas";
 import {
   adoptGithubCliLogin,

@@ -33,9 +33,9 @@ import { openNativeChatSession } from "../../../src/server/pi-sessions";
 import { readPiApplicationStatus } from "../../../src/server/pi-status";
 import {
   createChat,
-  getPhaseOneOperatorView,
   removeApplication,
-} from "../../../src/server/phase-one";
+} from "../../../src/server/applications";
+import { getOperatorView } from "../../../src/server/operator-view";
 import { savePiConfiguration } from "../../../src/server/pi-configuration";
 import { pushTestDatabase } from "../../test-database";
 
@@ -60,12 +60,9 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/test",
     repositoryOwner: "qa",
     repositoryName: "test",
-    environment: "production",
-    approvalMode: "pi-decides",
-    approvalScope: "test",
   });
   applicationId = app.id;
-  chatId = store.insertChat(store.insertWorkspace(app.id).id, "Main", true).id;
+  chatId = store.insertChat(app.id, "Main").id;
   mocks.ask.mockReset().mockImplementation(async (_input, options) => {
     options.onModelCall?.();
     return { message: "Done", decisionProposals: [] };
@@ -104,7 +101,7 @@ describe("durable Pi acceptance and outcomes", () => {
     expect(mocks.ask).not.toHaveBeenCalled();
   });
   it("serializes Chats, shares saved Decisions and sends only scoped operational context", async () => {
-    const second = createChat(applicationId, "Second").selectedChatId!;
+    const second = createChat(applicationId, "Second").id;
     enqueue("priority: recover");
     const later = enqueue("What priority?", second);
     mocks.ask.mockResolvedValueOnce({
@@ -127,12 +124,10 @@ describe("durable Pi acceptance and outcomes", () => {
       userMessage: "What priority?",
     });
     expect(Object.keys(secondInput).sort()).toEqual([
-      "phaseKey",
       "run",
       "runContext",
       "userMessage",
     ]);
-    expect(secondInput.phaseKey).toBe("start");
     expect(JSON.parse(secondInput.runContext)).toMatchObject({
       chatId: second,
       applicationId,
@@ -148,7 +143,7 @@ describe("durable Pi acceptance and outcomes", () => {
     expect(secondInput.runContext).not.toContain("Let Server Guy decide");
   });
   it("rolls back all Decisions and final text if a later proposal is invalid", async () => {
-    const before = getPhaseOneOperatorView(applicationId);
+    const before = getOperatorView(applicationId);
     const accepted = enqueue();
     mocks.ask.mockResolvedValueOnce({
       message: "Saved both!",
@@ -162,7 +157,7 @@ describe("durable Pi acceptance and outcomes", () => {
     expect(store.listActiveDecisions(applicationId)).toEqual([]);
     // The rolled-back save leaves no requirement event; the failed attempt
     // remains recorded.
-    expect(store.listActivity(before.workspace!.id)).toEqual(before.activity);
+    expect(store.listActivity(applicationId)).toEqual(before.activity);
     expect(store.listMessages(chatId).at(-1)).toMatchObject({
       body: "",
       status: "failed",
@@ -253,7 +248,7 @@ describe("durable Pi acceptance and outcomes", () => {
   });
   it("rejects an archived Chat and scoped run operations from another Chat", () => {
     const accepted = enqueue();
-    const other = createChat(applicationId, "Other").selectedChatId!;
+    const other = createChat(applicationId, "Other").id;
     expect(() =>
       runs.cancelPiRun(applicationId, other, accepted.run.id),
     ).toThrow("not found");
@@ -305,7 +300,6 @@ describe("minimal native Run context", () => {
         "createdAt",
         "previousAttempt",
         "runId",
-        "userMessageId",
       ]);
       expect(context).not.toHaveProperty("currentApplication");
       expect(context).not.toHaveProperty("decisions");
@@ -323,7 +317,7 @@ describe("minimal native Run context", () => {
     });
     expect(context.previousAttempt.savedOutcome).toContain("were committed");
     runs.finishPiRun(next.id, "cancelled", "Stop test");
-    const other = createChat(applicationId, "Other").selectedChatId!;
+    const other = createChat(applicationId, "Other").id;
     enqueue("Fresh Chat", other);
     expect(JSON.parse(buildPiRunContext(claimed())).previousAttempt).toBeNull();
   });

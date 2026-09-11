@@ -9,6 +9,7 @@ import { z } from "zod";
 import { handle } from "@/server/http";
 import { parseJsonRequest } from "@/server/schemas";
 import {
+  ATTESTATION_INPUT,
   cancelOperation,
   operation,
   publicOperation,
@@ -67,7 +68,11 @@ export function POST(
       throw new Error(
         "Use the deployment card so source, current pricing and protected inputs are checked together.",
       );
-    if (Object.keys(input.inputs).length)
+    const { [ATTESTATION_INPUT]: attestation, ...others } = input.inputs;
+    if (
+      Object.keys(others).length ||
+      (attestation !== undefined && input.action !== "cancel")
+    )
       throw new Error(
         "This operation does not accept protected inputs. None were saved.",
       );
@@ -75,7 +80,7 @@ export function POST(
       input.action === "approve"
         ? startChange(record.id, input.updatedAt)
         : input.action === "cancel"
-          ? cancelOperation(record.id, input.updatedAt)
+          ? cancelOperation(record.id, input.updatedAt, attestation)
           : retryOperation(record.id, input.updatedAt);
     return { operation: publicOperation(result) };
   });

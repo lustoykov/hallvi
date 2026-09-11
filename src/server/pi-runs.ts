@@ -10,16 +10,14 @@ import {
 } from "./db";
 import { logDiagnostic, type DiagnosticFailure } from "./diagnostics";
 import { messages, piRuns } from "./db-schema";
-import { savePiDecisions } from "./phase-one";
-import { commitContractProposal } from "./phase-two";
-import { commitConformanceProposals } from "./phase-three";
-import { sendChatMessageRequestSchema } from "./schemas";
 import {
   assertChatWritable,
   ExistingApplicationConflictError,
   loadChat,
   NotFoundError,
-} from "./workspaces";
+  savePiDecisions,
+} from "./applications";
+import { sendChatMessageRequestSchema } from "./schemas";
 import type {
   AcceptedPiRun,
   ChatRunSnapshot,
@@ -37,7 +35,7 @@ export function chatRunSnapshot(
   applicationId: string,
   chatId: string,
 ): ChatRunSnapshot {
-  const { workspace } = loadChat(applicationId, chatId);
+  loadChat(applicationId, chatId);
   return withTransaction(() => {
     const runs = db()
       .select()
@@ -49,7 +47,7 @@ export function chatRunSnapshot(
       messages: listMessages(chatId),
       operations: operationsFor(applicationId),
       runs,
-      activity: listActivity(workspace.id),
+      activity: listActivity(applicationId),
     };
   });
 }
@@ -83,8 +81,8 @@ export function sendChatMessage(
   let created = false;
   return withTransaction(
     () => {
-      const { workspace, chat } = loadChat(applicationId, chatId);
-      assertChatWritable(chat, workspace);
+      const { chat } = loadChat(applicationId, chatId);
+      assertChatWritable(chat);
       const existing = db()
         .select()
         .from(piRuns)
@@ -110,14 +108,7 @@ export function sendChatMessage(
       created = true;
       const user = insertMessage(chatId, "user", input.message, "user");
       return accepted(
-        insertRun(
-          applicationId,
-          workspace.id,
-          chatId,
-          user.id,
-          input.requestKey,
-          null,
-        ),
+        insertRun(applicationId, chatId, user.id, input.requestKey, null),
       );
     },
     (result) => {
@@ -127,43 +118,8 @@ export function sendChatMessage(
   );
 }
 
-/**
- * A request Server Guy starts itself, such as the first inspection after the
- * phase transition. The accepted message is recorded with source
- * `server-guy`, never as the engineer's words. Without a worker it stays
- * visibly queued like any other request.
- */
-export function enqueueServerGuyRequest(
-  applicationId: string,
-  chatId: string,
-  body: string,
-) {
-  let created: AcceptedPiRun | undefined;
-  return withTransaction(
-    () => {
-      const { workspace, chat } = loadChat(applicationId, chatId);
-      assertChatWritable(chat, workspace);
-      const user = insertMessage(chatId, "user", body, "server-guy");
-      created = accepted(
-        insertRun(
-          applicationId,
-          workspace.id,
-          chatId,
-          user.id,
-          randomUUID(),
-          null,
-        ),
-      );
-      return created;
-    },
-    (result) =>
-      logDiagnostic("reply.accepted", result.run, { outcome: "queued" }),
-  );
-}
-
 function insertRun(
   applicationId: string,
-  workspaceId: string,
   chatId: string,
   userMessageId: string,
   requestKey: string,
@@ -175,7 +131,6 @@ function insertRun(
     .values({
       id: randomUUID(),
       applicationId,
-      workspaceId,
       chatId,
       userMessageId,
       assistantMessageId: assistant.id,
@@ -194,8 +149,7 @@ export function retryPiRun(applicationId: string, chatId: string, id: string) {
   return withTransaction(
     () => {
       const run = scopedRun(applicationId, chatId, id);
-      const scope = loadChat(applicationId, chatId);
-      assertChatWritable(scope.chat, scope.workspace);
+      assertChatWritable(loadChat(applicationId, chatId).chat);
       const existing = db()
         .select()
         .from(piRuns)
@@ -211,14 +165,7 @@ export function retryPiRun(applicationId: string, chatId: string, id: string) {
         );
       created = true;
       return accepted(
-        insertRun(
-          applicationId,
-          run.workspaceId,
-          chatId,
-          run.userMessageId,
-          randomUUID(),
-          id,
-        ),
+        insertRun(applicationId, chatId, run.userMessageId, randomUUID(), id),
       );
     },
     (result) => {
@@ -350,24 +297,14 @@ export function completePiRun(id: string, reply: PiTurnResult) {
     () => {
       const run = getPiRun(id);
       if (run?.status !== "running") return false;
-      const { chat, workspace } = loadChat(run.applicationId, run.chatId);
-      if (workspace.id !== run.workspaceId)
-        throw new Error(
-          "Application execution context changed before this reply could be saved.",
-        );
-      // A phase completed or a Chat archived while the answer was being
-      // produced cannot receive it; the attempt fails instead of crossing
-      // the boundary.
-      assertChatWritable(chat, workspace);
+      // A Chat archived while the answer was being produced cannot receive
+      // it; the attempt fails instead of crossing the boundary.
+      assertChatWritable(loadChat(run.applicationId, run.chatId).chat);
       savePiDecisions(
         run.applicationId,
-        run.workspaceId,
         run.userMessageId,
         reply.decisionProposals,
       );
-      if (reply.contractProposal)
-        commitContractProposal(run, reply.contractProposal);
-      commitConformanceProposals(run, reply);
       db()
         .update(messages)
         .set({
@@ -397,12 +334,7 @@ export function completePiRun(id: string, reply: PiTurnResult) {
           durationMs:
             Date.parse(run.finishedAt!) -
             Date.parse(run.startedAt ?? run.createdAt),
-          metadata: {
-            requirements: reply.decisionProposals.length,
-            contract: reply.contractProposal ? 1 : 0,
-            sourceChange: reply.sourceProposal ? 1 : 0,
-            acceptanceChecks: reply.acceptanceProposal ? 1 : 0,
-          },
+          metadata: { requirements: reply.decisionProposals.length },
         });
     },
   );

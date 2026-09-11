@@ -6,10 +6,13 @@ const mocks = vi.hoisted(() => ({
   sendChatMessage: vi.fn(),
 }));
 
-vi.mock("../../../src/server/phase-one", () => ({
+vi.mock("../../../src/server/applications", () => ({
   ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class NotFoundError extends Error {},
   createChat: mocks.createChat,
+}));
+vi.mock("../../../src/server/operator-view", () => ({
+  getOperatorView: () => ({ selectedChatId: "chat-id" }),
 }));
 vi.mock("../../../src/server/pi-runs", () => ({
   sendChatMessage: mocks.sendChatMessage,
@@ -37,14 +40,14 @@ const chatContext = {
   }),
 };
 
-describe("Phase 1 Chat request validation", () => {
+describe("Chat request validation", () => {
   beforeEach(() => {
     mocks.createChat.mockReset();
     mocks.sendChatMessage.mockReset();
   });
 
   it("trims a valid Chat title before calling the domain", async () => {
-    mocks.createChat.mockReturnValue({ selectedChatId: "chat-id" });
+    mocks.createChat.mockReturnValue({ id: "chat-id" });
 
     const response = await createChat(
       request("/api/applications/application-id/chats", {
@@ -61,7 +64,7 @@ describe("Phase 1 Chat request validation", () => {
   });
 
   it("keeps the current untitled Chat request valid", async () => {
-    mocks.createChat.mockReturnValue({ selectedChatId: "chat-id" });
+    mocks.createChat.mockReturnValue({ id: "chat-id" });
 
     const response = await createChat(
       request("/api/applications/application-id/chats", {}),

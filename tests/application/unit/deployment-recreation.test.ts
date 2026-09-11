@@ -1,17 +1,16 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  beginDeploymentAttempt,
-  ensureDeploymentLifecycle,
-} from "../../../src/server/deployment-lifecycle";
+import { beginDeploymentAttempt } from "../../../src/server/deployment-lifecycle";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
 import {
-  deploymentPlanSchema,
-  type DeploymentRecord,
-} from "../../../src/server/deployment-types";
+  nativeApp,
+  verifiedLifecycle,
+  type NativeShape,
+} from "../../fixtures/native";
 const run = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (original) => ({
   ...(await original<object>()),
@@ -28,27 +27,20 @@ import {
   verifyPrivateServices,
 } from "../../../src/server/deployment-executor";
 const digest = `sha256:${"a".repeat(64)}`;
-const record = () =>
+const record = (services: NativeShape["services"] = []) =>
   ({
     id: "00000000-0000-4000-8000-000000000099",
     status: "live",
     serverId: 1,
     address: "203.0.113.1",
     imageId: digest,
-    plan: deploymentPlanSchema.parse({
+    native: nativeApp({
+      deploymentId: "00000000-0000-4000-8000-000000000099",
       summary: "A published image with a retained files volume",
       image: `example/app@${digest}`,
-      dockerfile: "Dockerfile",
-      generatedDockerfile: null,
-      context: ".",
       port: 8080,
-      command: null,
-      environment: [],
-      postgres: null,
-      missingInputs: [],
-      healthPath: "/health",
-      volumes: [{ name: "data", target: "/data", kind: "files", sqlite: null }],
-      services: [],
+      volumes: [{ name: "data", target: "/data", kind: "files" }],
+      services,
       checks: [
         {
           name: "Home",
@@ -63,16 +55,12 @@ const record = () =>
     }),
     bundleHashes: { "compose.json": "b".repeat(64) },
   }) as unknown as DeploymentRecord;
-const worker = () => ({
+/** A worker running the application's image. */
+const worker = (healthcheck?: string[]) => ({
   name: "worker",
-  imageFrom: "app",
+  sharesAppImage: true,
   command: ["python", "worker.py"],
-  environment: [],
-  volumes: [],
-  configs: [],
-  port: null,
-  healthPath: null,
-  checks: [],
+  healthcheck,
 });
 function result(output: string, code = 0) {
   const child = new EventEmitter() as EventEmitter & {
@@ -142,8 +130,7 @@ it("records each accepted running service image", async () => {
 });
 
 it("rejects a shared-image worker that is actually running different bytes", async () => {
-  const r = record();
-  r.plan!.services = [worker()];
+  const r = record([worker()]);
   run.mockImplementation(() =>
     result(
       [
@@ -174,8 +161,7 @@ it("clears earlier readiness when a service is no longer running", async () => {
 });
 
 it("does not record a passing readiness result for an unhealthy worker", async () => {
-  const r = record();
-  r.plan!.services = [{ ...worker(), healthCommand: ["python", "ready.py"] }];
+  const r = record([worker(["python", "ready.py"])]);
   run.mockImplementation(() => result("unhealthy\n"));
   await expect(
     verifyPrivateServices(r, new AbortController().signal),
@@ -193,11 +179,11 @@ it("persists runtime uncertainty before sending the recreation command", async (
     createdAt: "2026-09-10T08:00:00Z",
     verifiedAt: "2026-09-10T08:30:00Z",
   });
-  r.plan!.missingInputs = [];
   r.logs = "";
   const previous = structuredClone(
-    ensureDeploymentLifecycle(r).runtime.lastVerified,
+    verifiedLifecycle(r).lifecycle!.runtime.lastVerified,
   );
+  expect(previous).not.toBeNull();
   const attempt = beginDeploymentAttempt(r, "recreate", "recreate-1");
   run.mockImplementation((_file: string, args: string[]) => {
     const command = args.at(-1)!;

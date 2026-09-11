@@ -15,7 +15,7 @@ import {
   JUDGE_PROMPT_VERSION,
 } from "./judge";
 import { createEvalScratch, releaseEvalScratch } from "./scratch";
-import { phaseOneCases } from "./phase-one-cases";
+import { evalCases } from "./cases";
 
 if (process.env.SERVER_GUY_LIVE_JUDGE !== "1")
   throw new Error("Explicit LLM-judge opt-in required");
@@ -58,7 +58,7 @@ it("reviews selected saved answers without rerunning Server Guy", async () => {
       // Grade against the casebook's current wording when the case still
       // exists; the judgment records the wording it used.
       const rubric =
-        phaseOneCases.find((item) => item.id === record.caseId)?.rubric ??
+        evalCases.find((item) => item.id === record.caseId)?.rubric ??
         record.rubric;
       const result = await judgeAnswer(sdk, runtime, { ...record, rubric });
       saveReview(root, run, hash, key, {

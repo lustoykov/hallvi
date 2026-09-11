@@ -96,18 +96,7 @@ cpSync(
   join(source, "tests/browser-fixtures/github-api.ts.txt"),
   join(app, "src/server/github-api.ts"),
 );
-// The runner is scripted too: no containers in the desktop journeys. The real
-// executor module stays beside it for the shared types and helpers.
-renameSync(
-  join(app, "src/server/conformance-executor.ts"),
-  join(app, "src/server/conformance-executor-real.ts"),
-);
-cpSync(
-  join(source, "tests/browser-fixtures/conformance-executor.ts.txt"),
-  join(app, "src/server/conformance-executor.ts"),
-);
-// Synthetic repositories, GitHub tree/contents responses and the scripted
-// contract builder, shared with the deterministic tests and eval seeds.
+// Synthetic repositories and their GitHub tree and contents responses.
 cpSync(join(source, "tests/fixtures"), join(app, "src/server/qa-fixtures"), {
   recursive: true,
 });
@@ -211,7 +200,7 @@ const manifest = {
   initialSetup,
   database: env.SERVER_GUY_DB_PATH,
   externalAdapters:
-    "Production Pi adapter, native SDK sessions and tools; only model responses, GitHub API/credentials (fixture repository trees, contents, branches and pull requests at synthetic commits) and the conformance runner are synthetic. ChatGPT OAuth " +
+    "Production Pi adapter, native SDK sessions and tools; only model responses and GitHub API/credentials (fixture repository trees and contents at synthetic commits) are synthetic. ChatGPT OAuth " +
     loginMode +
     " and GitHub device flow are simulated without provider calls",
 };

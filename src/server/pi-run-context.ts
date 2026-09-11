@@ -7,9 +7,9 @@ import type { PiRun } from "./types";
  * The bounded execution envelope appended before each new engineer message:
  * Run/application/Chat identity, when it was prepared, and the previous
  * attempt's actual outcome, so a failed or cancelled proposal is never
- * mistaken for a committed Decision. It carries no application state. Current
- * checks, Approval Mode and evidence come from `get_application_status` when
- * an answer depends on them; saved requirements from `search_decisions`.
+ * mistaken for a committed Decision. It carries no application state; current
+ * facts come from `get_application_status` and saved requirements from
+ * `search_decisions`.
  */
 export function buildPiRunContext(run: PiRun) {
   const previous = db()
@@ -29,9 +29,6 @@ export function buildPiRunContext(run: PiRun) {
     runId: run.id,
     applicationId: run.applicationId,
     chatId: run.chatId,
-    // The engineer's accepted message: the only message a contract field may
-    // quote as user-confirmed in this request.
-    userMessageId: run.userMessageId,
     previousAttempt: previous
       ? {
           runId: previous.id,

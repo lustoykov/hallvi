@@ -103,7 +103,6 @@ def capture(args):
         for table, column, terminal in [
             ('pi_runs', 'status', ('succeeded', 'failed', 'cancelled', 'interrupted', 'timed-out')),
             ('application_operations', 'state', ('verified', 'failed', 'inspected', 'cancelled', 'proposed')),
-            ('conformance_runs', 'status', ('passed', 'failed', 'cancelled', 'interrupted', 'timed-out', 'unavailable')),
             ('deployments', 'status', ('live', 'failed', 'awaiting-approval')),
         ]:
             placeholders = ','.join('?' for _ in terminal)

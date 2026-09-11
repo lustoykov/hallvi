@@ -53,7 +53,7 @@ vi.mock("@langfuse/otel", async () => {
     },
   };
 });
-let root: string, app: string, chat: string, workspace: string;
+let root: string, app: string, chat: string;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "server-guy-history-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "test.db"));
@@ -70,12 +70,8 @@ beforeEach(async () => {
     repositoryUrl: "https://github.com/qa/audit",
     repositoryOwner: "qa",
     repositoryName: "audit",
-    environment: "production",
-    approvalMode: "pi-decides",
-    approvalScope: "test",
   }).id;
-  workspace = store.insertWorkspace(app).id;
-  chat = store.insertChat(workspace, "Main", true).id;
+  chat = store.insertChat(app, "Main").id;
   mocks.spans.length = 0;
   mocks.langfuseCreated = 0;
   mocks.failSetup = false;
@@ -165,7 +161,7 @@ it("logs bounded correlated steps with export disabled and preserves only author
   ).toBe(true);
   expect(JSON.stringify(output)).not.toContain("secret-canary");
   expect(output.some((row) => row.traceId)).toBe(true);
-  expect(store.listActivity(workspace).map((event) => event.kind)).toEqual([
+  expect(store.listActivity(app).map((event) => event.kind)).toEqual([
     "decision-recorded",
   ]);
   const snapshot = runs.chatRunSnapshot(app, chat);
@@ -220,7 +216,7 @@ it("records a status lookup as a diagnostic step, never as application Activity"
     ["tool:2", "get_application_status", "failed"],
     ["save", "save", "completed"],
   ]);
-  expect(store.listActivity(workspace)).toEqual([]);
+  expect(store.listActivity(app)).toEqual([]);
 });
 
 it("keeps tool completion diagnostic while a rejected save leaves no successful outcome or Decision", async () => {
@@ -258,7 +254,7 @@ it("keeps tool completion diagnostic while a rejected save leaves no successful 
     false,
   );
   expect(store.listActiveDecisions(app)).toEqual([]);
-  expect(store.listActivity(workspace)).toEqual([]);
+  expect(store.listActivity(app)).toEqual([]);
 });
 
 it("defers accepted, cancelled and successful outcome claims until the outer transaction commits", () => {
@@ -310,7 +306,7 @@ it("logs a final commit failure without saved claims and rolls Decisions and Act
     await executePiRun(runs.claimNextPiRun()!);
     expect(status(run.id)).toBe("failed");
     expect(store.listActiveDecisions(app)).toEqual([]);
-    expect(store.listActivity(workspace)).toEqual([]);
+    expect(store.listActivity(app)).toEqual([]);
     expect(logs(run.id).some((row) => row.event === "reply.succeeded")).toBe(
       false,
     );
@@ -354,7 +350,7 @@ it.each(["cancelled", "timed-out", "interrupted"] as const)(
       logs(retry.run.id).filter((row) => row.event === "reply.retry"),
     ).toHaveLength(1);
     expect(logs(retry.run.id)[0].retryOfId).toBe(run.id);
-    expect(store.listActivity(workspace)).toEqual([]);
+    expect(store.listActivity(app)).toEqual([]);
   },
 );
 
@@ -441,7 +437,7 @@ it.each([false, true])(
     expect(JSON.stringify(spans.map((span) => span.attributes))).not.toContain(
       "secret-canary",
     );
-    expect(store.listActivity(workspace).map((event) => event.kind)).toEqual([
+    expect(store.listActivity(app).map((event) => event.kind)).toEqual([
       "decision-recorded",
     ]);
   },

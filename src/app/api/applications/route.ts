@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { createApplication } from "@/server/applications";
 import { handle } from "@/server/http";
-import { createPhaseOneApplication } from "@/server/phase-one";
+import { getOperatorView } from "@/server/operator-view";
 import {
   createApplicationRequestSchema,
   parseJsonRequest,
@@ -16,15 +17,13 @@ export async function POST(request: NextRequest) {
       request,
       createApplicationRequestSchema,
     );
-    const result = await createPhaseOneApplication({
+    const { application, created } = await createApplication({
       requestKey: body.requestKey,
       ...(body.name ? { name: body.name } : {}),
       repositoryUrl: body.repositoryUrl,
-      environment: "production",
-      approvalMode: body.approvalMode,
     });
-    return NextResponse.json(result.view, {
-      status: result.created ? 201 : 200,
+    return NextResponse.json(getOperatorView(application.id), {
+      status: created ? 201 : 200,
     });
   });
 }

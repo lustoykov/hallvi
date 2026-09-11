@@ -20,7 +20,7 @@ import {
   writeJson,
 } from "./results.ts";
 import { browserJourneys } from "../browser/journeys.ts";
-import { phaseOneCases } from "../evals/phase-one-cases.ts";
+import { evalCases } from "../evals/cases.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
 
@@ -28,7 +28,7 @@ import { guidePage, renderMarkdown } from "./markdown.ts";
 // quietly against a stale process.
 export const API_VERSION = 6;
 const currentRubrics = Object.fromEntries(
-  phaseOneCases.map((item) => [item.id, item.rubric]),
+  evalCases.map((item) => [item.id, item.rubric]),
 );
 export const suites = [
   {
@@ -62,7 +62,7 @@ export const suites = [
     id: "live",
     name: "Live agent evals",
     command: "npm run eval:pi",
-    scope: `${phaseOneCases.length} selectable cases · real Server Guy agent responses to review`,
+    scope: `${evalCases.length} selectable cases · real Server Guy agent responses to review`,
     cost: "Uses subscription",
     ci: "On demand only",
     ciDetail: "Local only · never in CI",
@@ -82,9 +82,9 @@ const startSchema = z.strictObject({
     .refine((ids) => new Set(ids).size === ids.length)
     .optional(),
   cases: z
-    .array(z.enum(phaseOneCases.map((item) => item.id)))
+    .array(z.enum(evalCases.map((item) => item.id)))
     .min(1)
-    .max(phaseOneCases.length)
+    .max(evalCases.length)
     .refine((ids) => new Set(ids).size === ids.length)
     .optional(),
   repeats: z.number().int().min(1).max(5).optional(),
@@ -140,9 +140,9 @@ export function commandFor(request: StartRequest) {
       Object.assign(env, {
         SERVER_GUY_LIVE_EVALS: "1",
         PI_EVAL_REPEATS: String(input.repeats ?? 1),
-        PI_EVAL_CASES: (
-          input.cases ?? phaseOneCases.map((item) => item.id)
-        ).join(","),
+        PI_EVAL_CASES: (input.cases ?? evalCases.map((item) => item.id)).join(
+          ",",
+        ),
         PI_EVAL_EXPECTED_MODEL: input.model,
         PI_EVAL_EXPECTED_EFFORT: input.effort,
       });
@@ -510,7 +510,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         // The newest attempt of each case, summarised for the picker: its
         // triage status, when it ran, and whether the rubric wording has
         // changed since. Reports are newest first.
-        const lastAttempt = (item: (typeof phaseOneCases)[number]) => {
+        const lastAttempt = (item: (typeof evalCases)[number]) => {
           for (const report of reports) {
             const records = report.results.filter(
               (record) =>
@@ -541,7 +541,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
             guide: suiteGuides[suite.id],
           })),
           journeys: browserJourneys,
-          evalCases: phaseOneCases.map((item) => ({
+          evalCases: evalCases.map((item) => ({
             ...item,
             hasRun: attempted.has(item.id),
             last: lastAttempt(item),
@@ -664,7 +664,7 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const root = process.cwd();
-  if (!existsSync(join(root, "tests/evals", "phase-one-cases.ts")))
+  if (!existsSync(join(root, "tests/evals", "cases.ts")))
     throw new Error("Run from the Server Guy repository");
   const dashboard = createDashboard(root);
   dashboard.server.listen(4317, "127.0.0.1", () =>

@@ -29,9 +29,6 @@ function initial(): ReferenceState {
       repositoryUrl: "https://github.com/louislam/uptime-kuma",
       repositoryOwner: "louislam",
       repositoryName: "uptime-kuma",
-      environment: "production",
-      approvalMode: "pi-decides",
-      approvalScope: "Deployment surroundings on the application host",
       createdAt: "2026-09-09T08:00:00.000Z",
       updatedAt: "2026-09-09T08:00:00.000Z",
     },
@@ -42,7 +39,7 @@ function initial(): ReferenceState {
     messages: [],
     clock: "2026-09-09T08:00:00.000Z",
   };
-  chat(state, "chat-deploy", "Deploy application", { primary: true });
+  chat(state, "chat-deploy", "Deploy application");
   message(
     state,
     "chat-deploy",
@@ -60,11 +57,20 @@ function planned(state: ReferenceState): DeploymentRecord {
     chatId: "chat-deploy",
     repository: "louislam/uptime-kuma",
     revision: REVISION,
+    image: "louislam/uptime-kuma:1.23.16",
     port: 3001,
     command: null,
     postgres: null,
     environment: [{ name: "UPTIME_KUMA_PORT", value: "3001" }],
-    missingInputs: [],
+    inputs: [],
+    volumes: [
+      {
+        name: "data",
+        target: "/app/data",
+        kind: "database",
+        sqlite: "kuma.db",
+      },
+    ],
     healthPath: "/api/status-page/heartbeat/default",
     checks: [{ name: "Status page", path: "/", contains: "Uptime Kuma" }],
     offer: { serverType: "cx22", monthly: 4.29, cores: 2, memory: 4 },
@@ -88,14 +94,6 @@ function planned(state: ReferenceState): DeploymentRecord {
       "Passed: Status page",
       "Deployment verified",
     ],
-    stack: {
-      databases: [
-        { kind: "sqlite", name: "kuma.db", path: "/app/data/kuma.db" },
-      ],
-      volumes: [
-        { name: "data", usedBy: "app", mount: "/app/data", kind: "files" },
-      ],
-    },
   });
 }
 

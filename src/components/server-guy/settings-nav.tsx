@@ -5,7 +5,7 @@ export function SettingsNav({
   current,
   prototype = false,
 }: {
-  current: "pi" | "github" | "execution" | "connections";
+  current: "pi" | "github" | "connections";
   /** The reference prototype adds the designed Connections home. */
   prototype?: boolean;
 }) {
@@ -30,12 +30,6 @@ export function SettingsNav({
         aria-current={current === "github" ? "page" : undefined}
       >
         GitHub
-      </Link>
-      <Link
-        href="/setup/execution"
-        aria-current={current === "execution" ? "page" : undefined}
-      >
-        Execution
       </Link>
       {process.env.NODE_ENV === "development" && (
         <a

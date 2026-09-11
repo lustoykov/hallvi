@@ -49,7 +49,8 @@ vi.mock("../../../src/server/pi", async (original) => ({
 
 let root: string;
 let store: typeof import("../../../src/server/db");
-let phaseOne: typeof import("../../../src/server/phase-one");
+let applications: typeof import("../../../src/server/applications");
+let views: typeof import("../../../src/server/operator-view");
 let runs: typeof import("../../../src/server/pi-runs");
 let worker: typeof import("../../../src/server/pi-worker");
 
@@ -97,7 +98,8 @@ beforeAll(async () => {
   pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
   delete globalThis.__serverGuyDb;
   store = await import("../../../src/server/db");
-  phaseOne = await import("../../../src/server/phase-one");
+  applications = await import("../../../src/server/applications");
+  views = await import("../../../src/server/operator-view");
   runs = await import("../../../src/server/pi-runs");
   worker = await import("../../../src/server/pi-worker");
 });
@@ -123,21 +125,22 @@ afterAll(() => {
 });
 
 async function application(repository = "qa/app") {
-  const { view } = await phaseOne.createPhaseOneApplication({
+  const { application } = await applications.createApplication({
     repositoryUrl: `https://github.com/${repository}`,
-    environment: "production",
-    approvalMode: "pi-decides",
   });
   return {
-    id: view.application!.id,
-    workspaceId: view.workspace!.id,
-    chatId: view.selectedChatId!,
+    id: application.id,
+    chatId: store.listApplicationChats(application.id)[0].id,
   };
+}
+/** The repository access status the application reports. */
+function access(id: string) {
+  return applications.repositoryAccess(applications.loadApplication(id)).status;
 }
 type App = Awaited<ReturnType<typeof application>>;
 function feed(app: App) {
   return store
-    .listActivity(app.workspaceId)
+    .listActivity(app.id)
     .map((event) => [event.kind, event.summary, event.detail] as const);
 }
 function invalidated(app: App) {
@@ -169,8 +172,8 @@ async function reply(
   };
 }
 
-describe("application creation, checks and chat administration", () => {
-  it("records workspace creation and the repository result once, and nothing for chat creation or archiving", async () => {
+describe("application creation and chat administration", () => {
+  it("records application creation and the repository result once, and nothing for chat creation or archiving", async () => {
     const app = await application();
     const created = feed(app);
     expect(created).toEqual([
@@ -180,14 +183,14 @@ describe("application creation, checks and chat administration", () => {
         "qa/app is readable at main · 12345678.",
       ],
       [
-        "workspace-created",
-        "Application workspace created",
+        "application-created",
+        "Application created",
         expect.stringContaining("https://github.com/qa/app"),
       ],
     ]);
-    const view = phaseOne.createChat(app.id, "Side question");
-    phaseOne.archiveChat(app.id, view.selectedChatId!);
-    const chats = store.listChats(app.workspaceId);
+    const side = applications.createChat(app.id, "Side question");
+    applications.archiveChat(app.id, side.id);
+    const chats = store.listApplicationChats(app.id);
     expect(chats).toHaveLength(2);
     expect(chats[1].archivedAt).not.toBeNull();
     expect(feed(app)).toEqual(created);
@@ -196,13 +199,13 @@ describe("application creation, checks and chat administration", () => {
   it("records each explicit recheck outcome truthfully", async () => {
     const app = await application();
     mocks.inspect.mockResolvedValueOnce(failing(FIRST));
-    await phaseOne.observeRepository(app.id);
+    await applications.observeRepository(app.id);
     expect(feed(app)[0]).toEqual([
       "repository-unavailable",
       "Repository check did not pass",
       "Grant repository access, then retry.",
     ]);
-    await phaseOne.observeRepository(app.id);
+    await applications.observeRepository(app.id);
     expect(feed(app)[0]).toEqual([
       "repository-observed",
       "Repository identity recorded",
@@ -213,26 +216,21 @@ describe("application creation, checks and chat administration", () => {
 
   it("keeps stored reply history and legacy chat rows out of the feed without deleting them", async () => {
     const app = await application();
-    store.insertActivity(app.workspaceId, "chat-created", "Chat created", "x");
-    store.insertActivity(
-      app.workspaceId,
-      "chat-archived",
-      "Chat archived",
-      "x",
-    );
+    store.insertActivity(app.id, "chat-created", "Chat created", "x");
+    store.insertActivity(app.id, "chat-archived", "Chat archived", "x");
     await reply(app, "Hello");
     expect(feed(app).map(([kind]) => kind)).toEqual([
       "repository-observed",
-      "workspace-created",
+      "application-created",
     ]);
     const stored = store
       .db()
       .$client.prepare(
-        "select kind from activity_events where workspace_id = ? order by rowid",
+        "select kind from activity_events where application_id = ? order by rowid",
       )
-      .all(app.workspaceId) as { kind: string }[];
+      .all(app.id) as { kind: string }[];
     expect(stored.map((row) => row.kind)).toEqual([
-      "workspace-created",
+      "application-created",
       "repository-observed",
       "chat-created",
       "chat-archived",
@@ -343,14 +341,14 @@ describe("repository verification invalidation", () => {
     const verified = await application("qa/verified");
     const blocked = await application("qa/blocked");
     mocks.inspect.mockResolvedValueOnce(failing(FIRST));
-    await phaseOne.observeRepository(blocked.id);
+    await applications.observeRepository(blocked.id);
     const verifiedBefore = feed(verified);
     const blockedBefore = feed(blocked);
-    phaseOne.getPhaseOneOperatorView(verified.id);
+    views.getOperatorView(verified.id);
     runs.chatRunSnapshot(verified.id, verified.chatId);
     expect(feed(verified)).toEqual(verifiedBefore);
 
-    await phaseOne.withGithubConnectionTransition(() => disconnectGithub());
+    await applications.withGithubConnectionTransition(() => disconnectGithub());
     expect(feed(verified)).toEqual([
       [
         "repository-verification-invalidated",
@@ -363,12 +361,10 @@ describe("repository verification invalidation", () => {
     expect(detail).toContain("does not show that access was lost");
     expect(detail).toContain("Earlier result: qa/verified is readable at main");
     expect(feed(blocked)).toEqual(blockedBefore);
-    expect(phaseOne.getPhaseOneOperatorView(verified.id).checks[1].status).toBe(
-      "not-yet",
-    );
+    expect(access(verified.id)).toBe("not-yet");
 
-    await phaseOne.withGithubConnectionTransition(() => disconnectGithub());
-    phaseOne.getPhaseOneOperatorView(verified.id);
+    await applications.withGithubConnectionTransition(() => disconnectGithub());
+    views.getOperatorView(verified.id);
     expect(invalidated(verified)).toHaveLength(1);
   });
 
@@ -383,30 +379,26 @@ describe("repository verification invalidation", () => {
       saveGithubConnection(login(SECOND, 2));
     };
     const pending = Promise.all([
-      phaseOne.withGithubConnectionTransition(replace),
-      phaseOne.withGithubConnectionTransition(replace),
+      applications.withGithubConnectionTransition(replace),
+      applications.withGithubConnectionTransition(replace),
     ]);
     release();
     await pending;
     expect(invalidated(app)).toHaveLength(1);
     expect(feed(app)[0][2]).toContain("The GitHub connection was replaced");
-    expect(phaseOne.getPhaseOneOperatorView(app.id).checks[1].status).toBe(
-      "not-yet",
-    );
+    expect(access(app.id)).toBe("not-yet");
 
-    await phaseOne.recheckGithubRepositories(SECOND);
+    await applications.recheckGithubRepositories(SECOND);
     expect(feed(app)[0]).toEqual([
       "repository-observed",
       "Repository identity recorded",
       "qa/app is readable at main · 12345678.",
     ]);
-    expect(phaseOne.getPhaseOneOperatorView(app.id).checks[1].status).toBe(
-      "passed",
-    );
+    expect(access(app.id)).toBe("passed");
     expect(invalidated(app)).toHaveLength(1);
 
     // A later disconnect is a new transition against the new verification.
-    await phaseOne.withGithubConnectionTransition(() => disconnectGithub());
+    await applications.withGithubConnectionTransition(() => disconnectGithub());
     expect(invalidated(app)).toHaveLength(2);
     expect(feed(app)[0][2]).toContain("GitHub was disconnected");
   });
@@ -414,15 +406,15 @@ describe("repository verification invalidation", () => {
   it("records nothing when the latest check did not pass, or when the same login only renews", async () => {
     const app = await application();
     mocks.inspect.mockResolvedValueOnce(failing(FIRST));
-    await phaseOne.observeRepository(app.id);
+    await applications.observeRepository(app.id);
     const before = feed(app);
-    await phaseOne.withGithubConnectionTransition(() =>
+    await applications.withGithubConnectionTransition(() =>
       saveGithubConnection({
         ...login(FIRST),
         connectedAt: new Date(Date.now() + 1000).toISOString(),
       }),
     );
-    await phaseOne.withGithubConnectionTransition(() => disconnectGithub());
+    await applications.withGithubConnectionTransition(() => disconnectGithub());
     expect(feed(app)).toEqual(before);
   });
 
@@ -453,7 +445,7 @@ describe("repository verification invalidation", () => {
     );
     expect(reused.status).toBe(400);
     expect(readGithubConnection()).toBeNull();
-    await phaseOne.withGithubConnectionTransition(() =>
+    await applications.withGithubConnectionTransition(() =>
       saveGithubConnection(login(SECOND)),
     );
     // Reconnecting after a disconnect finds no current verification to
@@ -461,7 +453,7 @@ describe("repository verification invalidation", () => {
     expect(invalidated(app)).toHaveLength(1);
     const connection = readGithubConnection()!;
     expect(connection.id).not.toBe(FIRST);
-    await phaseOne.recheckGithubRepositories(connection.id);
+    await applications.recheckGithubRepositories(connection.id);
     expect(feed(app)[0][0]).toBe("repository-observed");
     expect(invalidated(app)).toHaveLength(1);
   });

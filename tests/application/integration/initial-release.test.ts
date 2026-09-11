@@ -67,11 +67,7 @@ vi.mock("../../../src/server/http", () => ({
     }
   },
 }));
-import {
-  insertApplication,
-  insertChat,
-  insertWorkspace,
-} from "../../../src/server/db";
+import { insertApplication, insertChat } from "../../../src/server/db";
 import {
   getDeployment,
   requestDeployment,
@@ -109,11 +105,8 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/notes",
     repositoryOwner: "qa",
     repositoryName: "notes",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Test",
   }).id;
-  chat = insertChat(insertWorkspace(app).id, "Deploy", true).id;
+  chat = insertChat(app, "Deploy").id;
   for (const mock of Object.values(model)) mock.mockReset();
 });
 afterEach(() => {
@@ -242,7 +235,6 @@ async function approved() {
 /** The record transition executeRelease makes before contacting the host. */
 function adopt(r: DeploymentRecord, release: DeploymentRelease) {
   r.native = release.native;
-  r.plan = null;
   r.revision = release.revision;
   r.releaseId = release.id;
 }

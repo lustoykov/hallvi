@@ -88,7 +88,7 @@ import { askPi } from './src/server/pi.ts';
 import { acquireWorkerLock } from './src/server/pi-worker.ts';
 import { claimNextPiRun, completePiRun, recordPiCall } from './src/server/pi-runs.ts';
 import { buildPiRunContext } from './src/server/pi-run-context.ts';
-import { loadChat } from './src/server/phase-one.ts';
+import { loadChat } from './src/server/applications.ts';
 import { listMessages } from './src/server/db.ts';
 // Keep the acquired handle explicitly reachable throughout every pause.
 globalThis.crashFixtureWorkerRelease = acquireWorkerLock();
@@ -111,7 +111,6 @@ let root: string;
 let copy: string;
 let applicationId: string;
 let chatId: string;
-let workspaceId: string;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "server-guy-crash-boundaries-"));
   vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "test.db"));
@@ -139,13 +138,9 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/crash",
     repositoryOwner: "qa",
     repositoryName: "crash",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Current application",
   });
   applicationId = application.id;
-  workspaceId = database.insertWorkspace(applicationId).id;
-  chatId = database.insertChat(workspaceId, "Main", true).id;
+  chatId = database.insertChat(applicationId, "Main").id;
 });
 afterAll(() => {
   globalThis.__serverGuyDb?.$client.close();
@@ -250,7 +245,7 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
       );
       expect(
         database
-          .listActivity(workspaceId)
+          .listActivity(applicationId)
           .filter((event) => event.kind === "decision-recorded"),
       ).toHaveLength(success ? 1 : 0);
       expect(database.listMessages(chatId).at(-1)).toMatchObject({
@@ -260,7 +255,7 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
           : "",
       });
       const decisionsBefore = database.listActiveDecisions(applicationId);
-      const activityBefore = database.listActivity(workspaceId);
+      const activityBefore = database.listActivity(applicationId);
       await stop(initial.child);
       const release = acquireWorkerLock();
       release();
@@ -280,7 +275,7 @@ it.each(["proposal", "native-final", "sqlite-success"] as const)(
         decisionsBefore,
       );
       // Startup preserves domain Activity and saved native conversation.
-      expect(database.listActivity(workspaceId)).toEqual(activityBefore);
+      expect(database.listActivity(applicationId)).toEqual(activityBefore);
       expect(runs.chatRunSnapshot(applicationId, chatId)).not.toHaveProperty(
         "executions",
       );

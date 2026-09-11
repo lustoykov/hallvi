@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import type { ApplicationOperation } from "@/server/operation-record";
+import type { ActivityEvent, Decision } from "@/server/types";
 import { OperationSteps, StateChip } from "../operation-receipt";
 import { LocalTime } from "../local-time";
 import { relativeTime, attentionItems, labelOf } from "../operation-model";
@@ -25,10 +26,17 @@ export function HistoryView({
   now,
   onOpenConversation,
   onOpenDestination,
+  decisions = [],
+  activity = [],
   decisionFor,
 }: ViewProps & {
+  /** Active saved requirements, with when each was saved. */
+  decisions?: Decision[];
+  /** Application events, including retained history of retired work. */
+  activity?: ActivityEvent[];
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
 }) {
+  const [allActivity, setAllActivity] = useState(false);
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const needs = new Set(attentionItems(operations).map((item) => item.id));
   const matches = (item: ApplicationOperation, value: string) =>
@@ -206,6 +214,47 @@ export function HistoryView({
           <ol className="sg-operation-history">{group.items.map(row)}</ol>
         </div>
       ))}
+      {filter === "All" && decisions.length > 0 && (
+        <div className="sg-band" id="history-requirements">
+          <h2>Saved requirements</h2>
+          <ul className="sg-history-records">
+            {decisions.map((decision) => (
+              <li key={decision.id}>
+                <strong>{decision.value}</strong>
+                <small>
+                  Saved{" "}
+                  <LocalTime value={decision.createdAt} variant="compact" />
+                </small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {filter === "All" && activity.length > 0 && (
+        <div className="sg-band" id="history-activity">
+          <h2>Application activity</h2>
+          <ul className="sg-history-records">
+            {(allActivity ? activity : activity.slice(0, 12)).map((event) => (
+              <li key={event.id}>
+                <strong>{event.summary}</strong>
+                <small>
+                  <LocalTime value={event.createdAt} variant="compact" />
+                </small>
+                {event.detail && <p>{event.detail}</p>}
+              </li>
+            ))}
+          </ul>
+          {activity.length > 12 && !allActivity && (
+            <button
+              type="button"
+              className="sg-op-text-link"
+              onClick={() => setAllActivity(true)}
+            >
+              Show all {activity.length} events
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }

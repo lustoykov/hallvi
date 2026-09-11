@@ -19,10 +19,7 @@ import {
   looksLikeSecret,
   redactSecrets,
 } from "../../../src/server/secrets";
-import {
-  contentsResponse,
-  treeResponse,
-} from "../../fixtures/github-responses";
+import { treeResponse } from "../../fixtures/github-responses";
 
 const SHA = "a".repeat(40);
 const file = (content: string | Buffer, size?: number) => ({
@@ -143,11 +140,18 @@ describe("bounded tree and file reads", () => {
   });
 
   it("decodes, bounds and redacts a file pinned to the commit", async () => {
-    const content = contentsResponse(
-      "qa/fastapi-secret",
-      "app/config.py",
-      SHA,
-    )!;
+    const config =
+      'SECRET_KEY = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab"\nDEBUG = False\n';
+    const content = {
+      type: "file",
+      encoding: "base64",
+      size: Buffer.byteLength(config),
+      name: "config.py",
+      path: "app/config.py",
+      sha: "c".repeat(40),
+      content: Buffer.from(config).toString("base64"),
+      url: `https://api.github.com/repos/qa/fastapi-secret/contents/app/config.py?ref=${SHA}`,
+    };
     mocks.githubJson.mockResolvedValueOnce({ data: content, scopes: [] });
     const read = await fetchRepositoryFile(
       "qa/fastapi-secret",

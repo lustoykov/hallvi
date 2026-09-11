@@ -35,11 +35,10 @@ function applicationInput(name: string) {
     repositoryName: name,
     environment: "production" as const,
     approvalMode: "pi-decides" as const,
-    approvalScope: "Current application launch",
   };
 }
 
-describe("Phase 1 schema", () => {
+describe("Schema", () => {
   it("requires an explicit schema push for a fresh database", async () => {
     databaseDirectory = mkdtempSync(join(tmpdir(), "server-guy-schema-"));
     process.env.SERVER_GUY_DB_PATH = join(databaseDirectory, "missing.db");
@@ -67,17 +66,13 @@ describe("Phase 1 schema", () => {
     );
   });
 
-  it("stores durable domain and Pi execution records without persisted blockers or Gate Checks", async () => {
+  it("stores applications, conversations, Pi runs, decisions, evidence and operations, and no retired preparation tables", async () => {
     const database = await loadFreshDatabase();
     const client = database.db().$client;
     const tables = client
       .prepare(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
       )
-      .all()
-      .map((row) => (row as { name: string }).name);
-    const workspaceColumns = client
-      .prepare("PRAGMA table_info(phase_workspaces)")
       .all()
       .map((row) => (row as { name: string }).name);
     const indexes = client
@@ -88,45 +83,24 @@ describe("Phase 1 schema", () => {
       .map((row) => (row as { name: string }).name);
 
     expect(tables).toEqual([
-      "acceptance_checks",
       "activity_events",
-      "application_contracts",
-      "application_operation_processes",
       "application_operations",
-      "application_previews",
       "applications",
       "chat_summaries",
       "chats",
-      "conformance_proposals",
-      "conformance_runs",
       "decisions",
       "deployments",
       "messages",
       "observations",
-      "phase_workspaces",
       "pi_runs",
-      "preparation_branches",
-      "publication_grants",
-    ]);
-    expect(workspaceColumns).toEqual([
-      "id",
-      "application_id",
-      "phase_key",
-      "created_at",
-      "completed_at",
-      "deliverable_evidence",
     ]);
     expect(indexes).toEqual([
-      "idx_activity_workspace",
-      "idx_conformance_proposals_application",
-      "idx_conformance_runs_application",
-      "idx_conformance_runs_queue",
+      "idx_activity_application",
       "idx_decisions_application",
       "idx_messages_chat",
       "idx_observations_application_kind",
       "idx_pi_runs_chat",
       "idx_pi_runs_queue",
-      "idx_publication_grants_application",
     ]);
     expect(client.pragma("user_version", { simple: true })).toBe(
       schemaVersion.version,
@@ -196,8 +170,7 @@ describe("Phase 1 schema", () => {
     const application = database.insertApplication(
       applicationInput("decision-history"),
     );
-    const workspace = database.insertWorkspace(application.id);
-    const chat = database.insertChat(workspace.id, "Decision history", true);
+    const chat = database.insertChat(application.id, "Decision history");
     const sourceMessage = database.insertMessage(
       chat.id,
       "user",

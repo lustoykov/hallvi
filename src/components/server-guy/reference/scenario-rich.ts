@@ -98,9 +98,6 @@ function initial(): ReferenceState {
       repositoryUrl: "https://github.com/example/document-archive",
       repositoryOwner: "example",
       repositoryName: "document-archive",
-      environment: "production",
-      approvalMode: "pi-decides",
-      approvalScope: "Deployment surroundings on the application host",
       createdAt: "2026-09-08T17:48:00.000Z",
       updatedAt: "2026-09-08T18:31:00.000Z",
     },
@@ -112,7 +109,6 @@ function initial(): ReferenceState {
     clock: DEPLOYED,
   };
   chat(state, "chat-deploy", "Deploy application", {
-    primary: true,
     at: "2026-09-08T17:48:00.000Z",
   });
   message(
@@ -163,22 +159,34 @@ function initial(): ReferenceState {
     chatId: "chat-deploy",
     repository: "example/document-archive",
     revision: REVISION,
+    image: "ghcr.io/paperless-ngx/paperless-ngx:2.14.7",
     port: 8000,
     command: null,
-    postgres: {
-      version: "16",
-      variable: "PAPERLESS_DBHOST",
-      scheme: "postgresql",
-    },
+    postgres: "16",
     environment: [
+      { name: "PAPERLESS_DBHOST", value: "postgres" },
       { name: "PAPERLESS_URL", value: "http://203.0.113.24" },
       { name: "PAPERLESS_TIME_ZONE", value: "Europe/Berlin" },
       { name: "PAPERLESS_REDIS", value: "redis://broker:6379" },
       { name: "PAPERLESS_OCR_LANGUAGE", value: "deu+eng" },
     ],
-    missingInputs: [
+    inputs: [
       { name: "PAPERLESS_SECRET_KEY", reason: "Signs sessions at runtime" },
       { name: "PAPERLESS_ADMIN_PASSWORD", reason: "First administrator login" },
+    ],
+    volumes: [
+      { name: "media", target: "/usr/src/paperless/media", kind: "files" },
+      { name: "data", target: "/usr/src/paperless/data", kind: "files" },
+      { name: "consume", target: "/usr/src/paperless/consume", kind: "files" },
+      { name: "export", target: "/usr/src/paperless/export", kind: "files" },
+    ],
+    services: [
+      {
+        name: "worker",
+        image: "ghcr.io/paperless-ngx/paperless-ngx:2.14.7",
+        command: ["celery", "-A", "paperless", "worker", "-l", "INFO"],
+      },
+      { name: "broker", image: "valkey/valkey:8" },
     ],
     healthPath: "/api/ui_settings/",
     checks: [
@@ -208,23 +216,6 @@ function initial(): ReferenceState {
       "Deployment verified",
     ],
     stack: {
-      processes: [
-        {
-          name: "worker",
-          role: "worker",
-          command: "celery -A paperless worker -l INFO",
-          consumes: "Celery queue on Valkey",
-        },
-      ],
-      services: [
-        {
-          kind: "valkey",
-          name: "broker",
-          version: "8",
-          role: "broker",
-          persistence: "Append-only file · pending work survives a restart",
-        },
-      ],
       queues: [{ library: "Celery", backend: "redis", workers: ["worker"] }],
       jobs: [
         {
@@ -265,32 +256,6 @@ function initial(): ReferenceState {
             outcome: "succeeded",
             durationSeconds: 2,
           },
-        },
-      ],
-      volumes: [
-        {
-          name: "media",
-          usedBy: "app",
-          mount: "/usr/src/paperless/media",
-          kind: "files",
-        },
-        {
-          name: "data",
-          usedBy: "app",
-          mount: "/usr/src/paperless/data",
-          kind: "files",
-        },
-        {
-          name: "consume",
-          usedBy: "app",
-          mount: "/usr/src/paperless/consume",
-          kind: "files",
-        },
-        {
-          name: "export",
-          usedBy: "app",
-          mount: "/usr/src/paperless/export",
-          kind: "files",
         },
       ],
     },
@@ -1204,8 +1169,16 @@ export const richScenario: Scenario = {
             1,
           ),
         });
-        state.deployment!.stack!.processes![0].command =
-          "celery -A paperless worker -l INFO --concurrency 1";
+        state.deployment!.native!.resolved.services.worker.command = [
+          "celery",
+          "-A",
+          "paperless",
+          "worker",
+          "-l",
+          "INFO",
+          "--concurrency",
+          "1",
+        ];
       },
     },
     {

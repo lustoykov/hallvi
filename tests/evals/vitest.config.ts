@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import { evalRepeatCount, selectPhaseOneCases } from "./phase-one-cases";
+import { evalRepeatCount, selectEvalCases } from "./cases";
 
 if (process.env.SERVER_GUY_LIVE_EVALS !== "1") {
   throw new Error(
@@ -7,15 +7,14 @@ if (process.env.SERVER_GUY_LIVE_EVALS !== "1") {
   );
 }
 evalRepeatCount(process.env.PI_EVAL_REPEATS);
-selectPhaseOneCases(process.env.PI_EVAL_CASES);
+selectEvalCases(process.env.PI_EVAL_CASES);
 
 export default defineConfig({
   test: {
-    include: ["tests/evals/phase-one.eval.ts"],
+    include: ["tests/evals/pi.eval.ts"],
     fileParallelism: false,
     maxWorkers: 1,
-    // One Phase 1 turn fits in a minute; a Make launch-ready turn reads,
-    // stages, previews and answers, and does not.
+    // One turn usually fits in a minute; compaction cases take longer.
     testTimeout: 600_000,
     hookTimeout: 30_000,
   },

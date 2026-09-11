@@ -1,5 +1,6 @@
+import { archiveChat } from "@/server/applications";
 import { handle } from "@/server/http";
-import { archiveChat } from "@/server/phase-one";
+import { getOperatorView } from "@/server/operator-view";
 import { assertSameOrigin } from "@/server/schemas";
 
 export const runtime = "nodejs";
@@ -11,6 +12,7 @@ export async function POST(
   return handle(async () => {
     assertSameOrigin(request);
     const { applicationId, chatId } = await context.params;
-    return archiveChat(applicationId, chatId);
+    archiveChat(applicationId, chatId);
+    return getOperatorView(applicationId);
   });
 }

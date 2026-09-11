@@ -17,7 +17,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pushTestDatabase } from "../../test-database";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { verifiedLifecycle } from "../../fixtures/native";
 const model = vi.hoisted(() => {
   const source = [
     { path: "Dockerfile", mode: 0o644, content: Buffer.from("FROM python\n") },
@@ -71,11 +71,7 @@ vi.mock("../../../src/server/deployment-ssh", async (original) => ({
   ...(await original<object>()),
   deploymentSsh: model.ssh,
 }));
-import {
-  insertApplication,
-  insertWorkspace,
-  insertChat,
-} from "../../../src/server/db";
+import { insertApplication, insertChat } from "../../../src/server/db";
 import {
   requestDeployment,
   getDeployment,
@@ -107,18 +103,11 @@ import {
   ReleaseScopeError,
   type ReleaseScope,
 } from "../../../src/server/release-scope";
-import type {
-  DeploymentPlan,
-  DeploymentRecord,
-} from "../../../src/server/deployment-types";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
 import type { StoredOperation } from "../../../src/server/operation-types";
 import { rollbackSelection } from "../../../src/server/rollback";
 import type { NativeConfiguration } from "../../../src/server/deployment-release";
-import {
-  currentFacts,
-  planFacts,
-  releaseFacts,
-} from "../../../src/server/release-facts";
+import { currentFacts, releaseFacts } from "../../../src/server/release-facts";
 let template: string, root: string, app: string, chat: string;
 // One schema push per file; each test starts from its own copy.
 beforeAll(() => {
@@ -129,22 +118,6 @@ beforeAll(() => {
   pushTestDatabase(template);
 });
 afterAll(() => rmSync(dirname(template), { recursive: true, force: true }));
-function plan() {
-  const p = queuePlan();
-  p.services = [];
-  p.dependencies = [];
-  p.inputBindings = [];
-  p.missingInputs = [];
-  p.volumes = [
-    {
-      name: "data",
-      target: "/data",
-      kind: "database",
-      sqlite: "/data/app.sqlite",
-    },
-  ];
-  return p;
-}
 const REVISION = "b".repeat(40);
 const selection = () => ({
   compose: ["compose.yaml"],
@@ -154,15 +127,16 @@ const selection = () => ({
 function native(
   deploymentId: string,
   change: (app: Record<string, unknown>) => void = () => {},
+  revision = REVISION,
 ): NativeConfiguration {
   const project = `sg-${deploymentId.slice(0, 8)}`;
   const app: Record<string, unknown> = {
     build: { context: ".", dockerfile: "Dockerfile" },
-    image: `server-guy-${deploymentId}-app:${REVISION}`,
+    image: `server-guy-${deploymentId}-app:${revision}`,
     command: ["python", "app.py", "web"],
     ports: [{ target: 8080, published: "80", protocol: "tcp" }],
     volumes: [{ type: "volume", source: "data", target: "/data" }],
-    labels: { "server-guy.revision": REVISION },
+    labels: { "server-guy.revision": revision },
   };
   change(app);
   return {
@@ -179,7 +153,21 @@ function native(
     data: [{ volume: "data", kind: "database", sqlite: "app.sqlite" }],
     database: null,
     httpAccess: "public",
-    criterion: planFacts(plan(), deploymentId, REVISION).criterion,
+    criterion: {
+      healthPath: "/health",
+      checks: [
+        {
+          name: "Home",
+          method: "GET",
+          path: "/",
+          body: null,
+          expectedStatus: 200,
+          contains: "Example",
+          captureId: null,
+        },
+      ],
+      services: [],
+    },
     summary: "The example application in native Compose",
   };
 }
@@ -189,13 +177,7 @@ const published = (app: Record<string, unknown>) => {
 };
 /** The record transition executeRelease makes before contacting the host. */
 function adopt(r: DeploymentRecord, release: DeploymentRelease) {
-  if (release.native) {
-    r.native = release.native;
-    r.plan = null;
-  } else {
-    r.plan = release.plan;
-    delete r.native;
-  }
+  r.native = release.native;
   r.revision = release.revision;
   r.releaseId = release.id;
 }
@@ -209,17 +191,14 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/example",
     repositoryOwner: "qa",
     repositoryName: "example",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Test",
   }).id;
-  chat = insertChat(insertWorkspace(app).id, "Release", true).id;
+  chat = insertChat(app, "Release").id;
   const r = requestDeployment(app, chat);
   Object.assign(r, {
     status: "live",
     repositoryId: 10,
     revision: "a".repeat(40),
-    plan: plan(),
+    native: native(r.id, () => {}, "a".repeat(40)),
     serverId: 7,
     address: "203.0.113.7",
     verifiedAt: new Date().toISOString(),
@@ -245,6 +224,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 it("one scope authorizes a failed image configuration and a corrected source build, retaining the old runtime evidence", async () => {
+  verifiedV1();
   const proposed = await proposeApplicationRelease(app, chat);
   const tracked = operation(proposed.id)!;
   expect(tracked.state).toBe("proposed");
@@ -319,7 +299,6 @@ it("one scope authorizes a failed image configuration and a corrected source bui
   expect(saved.lifecycle!.runtime.lastVerified!.revision).toBe(REVISION);
   expect(saved.lifecycle!.runtime.state).toBe("verified");
   expect(saved.serverId).toBe(7);
-  expect(saved.plan).toBeNull();
   expect(saved.native).toEqual(saved.lifecycle!.releases.at(-1)!.native);
   expect(operation(initialReceipt.id)).toEqual(initialReceipt);
   expect(operation(started.id)!.state).toBe("verified");
@@ -343,6 +322,7 @@ it("one scope authorizes a failed image configuration and a corrected source bui
   expect(build[2]).toBe(model.source);
 });
 it("returns an unknown remote outcome to Pi but refuses another execution", async () => {
+  verifiedV1();
   const proposed = await proposeApplicationRelease(app, chat);
   const started = startChange(proposed.id, proposed.updatedAt);
   model.execute.mockImplementation(async (r) => {
@@ -379,6 +359,7 @@ it("returns an unknown remote outcome to Pi but refuses another execution", asyn
 });
 
 it("bounds executions per approval and gives an explicit retry a fresh budget", async () => {
+  verifiedV1();
   const { retryOperation } =
     await import("../../../src/server/operation-store");
   const proposed = await proposeApplicationRelease(app, chat);
@@ -432,6 +413,7 @@ it("bounds executions per approval and gives an explicit retry a fresh budget", 
 });
 
 it("reconciles a lost successful result and verifies without a second replacement", async () => {
+  verifiedV1();
   const proposed = await proposeApplicationRelease(app, chat);
   const started = startChange(proposed.id, proposed.updatedAt);
   let originalAttempt: unknown;
@@ -472,7 +454,6 @@ it("reconciles a lost successful result and verifies without a second replacemen
       ok: true,
       completed: true,
     });
-    return plan();
   });
   await executeOperation(started, () =>
     runApplicationRelease(started, new AbortController().signal),
@@ -499,6 +480,7 @@ it("reconciles a lost successful result and verifies without a second replacemen
 it.each(["unreadable", "mismatch"])(
   "keeps %s remote evidence blocked",
   async (failure) => {
+    verifiedV1();
     const proposed = await proposeApplicationRelease(app, chat);
     const started = startChange(proposed.id, proposed.updatedAt);
     model.execute.mockImplementation(async (r, release) => {
@@ -543,6 +525,7 @@ it.each(["unreadable", "mismatch"])(
 );
 
 it("an explicitly retried operation reconciles a known failure before another execution", async () => {
+  verifiedV1();
   const { retryOperation } =
     await import("../../../src/server/operation-store");
   const proposed = await proposeApplicationRelease(app, chat);
@@ -597,7 +580,6 @@ it("an explicitly retried operation reconciles a known failure before another ex
       retryable: true,
     });
     expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
-    return plan();
   });
   await executeOperation(retried, () =>
     runApplicationRelease(retried, new AbortController().signal),
@@ -612,16 +594,28 @@ const V1 = digest("1"),
   V2 = digest("2"),
   EVIDENCE =
     "v2 only added a nullable column that v1 never reads; v1 writes rows v2 accepts.";
-const pg = {
-  version: "16",
-  variable: "DATABASE_URL",
-  scheme: "postgresql",
-} as const;
+type Change = (n: NativeConfiguration) => void;
+/** Pi's configuration with the managed PostgreSQL service added. */
+function withPostgres(n: NativeConfiguration, version: "16" | "17") {
+  n.resolved.services.postgres = {
+    image: `postgres:${version}`,
+    volumes: [
+      {
+        type: "volume",
+        source: "database",
+        target: "/var/lib/postgresql/data",
+      },
+    ],
+  };
+  n.resolved.volumes!.database = { name: `${n.resolved.name}_database` };
+  n.data.push({ volume: "database", kind: "database", sqlite: null });
+  n.database = { service: "postgres", version };
+}
 const observed = (
-  p: DeploymentPlan,
+  n: NativeConfiguration,
   app: string,
   postgres = digest("d"),
-): Record<string, string> => (p.postgres ? { app, postgres } : { app });
+): Record<string, string> => (n.database ? { app, postgres } : { app });
 const run = (tracked: StoredOperation) =>
   executeOperation(tracked, () =>
     runApplicationRelease(tracked, new AbortController().signal),
@@ -632,14 +626,12 @@ const rollBack = (releaseId: string, compatibilityEvidence = EVIDENCE) =>
     compatibilityEvidence,
   });
 /** v1 is live and verified with the image digests the host reported. */
-function verifiedV1(
-  change: (p: DeploymentPlan) => void = () => {},
-  postgres?: string,
-) {
+function verifiedV1(change: Change = () => {}, postgres?: string) {
   const r = applicationDeployment(app)!;
-  change(r.plan!);
-  r.serviceImages = observed(r.plan!, V1, postgres);
+  change(r.native!);
+  r.serviceImages = observed(r.native!, V1, postgres);
   r.imageId = V1;
+  verifiedLifecycle(r);
   saveDeployment(r);
 }
 /** Stands in for the host: records what it replaced, as executeRelease does. */
@@ -688,17 +680,14 @@ async function releasedV2() {
   return applicationDeployment(app)!;
 }
 /** v2 arrives through a separately authorized change, outside release scope. */
-async function changedV2(
-  change: (p: DeploymentPlan) => void,
-  postgres?: string,
-) {
+async function changedV2(change: Change, postgres?: string) {
   const r = applicationDeployment(app)!;
-  const next = structuredClone(r.plan!);
+  const next = structuredClone(r.native!);
   change(next);
   const release = releaseOf({
     repository: r.repository,
     revision: "b".repeat(40),
-    plan: next,
+    native: next,
   })!;
   await runDeploymentAttempt(
     r,
@@ -706,7 +695,7 @@ async function changedV2(
     "separate-change",
     async () => {
       Object.assign(r, {
-        plan: next,
+        native: next,
         revision: release.revision,
         releaseId: release.id,
         serviceImages: observed(next, V2, postgres),
@@ -771,10 +760,8 @@ it("rolls back to the exact earlier release and recorded images on the same host
     address: "203.0.113.7",
     revision: v1.revision,
   });
-  // Data identity and access are unchanged across both representations.
-  expect(currentFacts(saved)!.volumes).toEqual(
-    releaseFacts(v2, saved.id).volumes,
-  );
+  // Data identity and access are unchanged.
+  expect(currentFacts(saved)!.volumes).toEqual(releaseFacts(v2).volumes);
   expect(saved.lifecycle!.runtime).toMatchObject({
     state: "verified",
     lastVerified: {
@@ -809,10 +796,10 @@ it("rolls back to the exact earlier release and recorded images on the same host
 });
 
 it("keeps the current managed database image while returning to earlier application images", async () => {
-  verifiedV1((p) => (p.postgres = pg), digest("3"));
+  verifiedV1((n) => withPostgres(n, "16"), digest("3"));
   // A separately authorized same-version database patch changed its image.
   const current = await changedV2(
-    (p) => (p.command = ["python", "app.py", "v2"]),
+    (n) => (n.resolved.services.app.command = ["python", "app.py", "v2"]),
     digest("4"),
   );
   const v1 = current.lifecycle!.releases[0];
@@ -836,38 +823,37 @@ it("keeps the current managed database image while returning to earlier applicat
   });
 });
 
-type Change = (p: DeploymentPlan) => void;
 it.each<{ limit: string; v1: Change; v2: Change; reason: string }>([
   {
     limit: "a data mount",
     v1: () => {},
-    v2: (p) => {
-      p.volumes!.push({
-        name: "uploads",
+    v2: (n) => {
+      n.resolved.services.app.volumes!.push({
+        type: "volume",
+        source: "uploads",
         target: "/uploads",
-        kind: "files",
-        sqlite: null,
       });
+      n.resolved.volumes!.uploads = { name: `${n.resolved.name}_uploads` };
+      n.data.push({ volume: "uploads", kind: "files", sqlite: null });
     },
     reason: "volume uploads",
   },
   {
     limit: "the database version",
-    v1: (p) => {
-      p.postgres = pg;
-    },
-    v2: (p) => {
-      p.postgres = { ...pg, version: "17" };
+    v1: (n) => withPostgres(n, "16"),
+    v2: (n) => {
+      n.database!.version = "17";
+      n.resolved.services.postgres.image = "postgres:17";
     },
     reason: "database",
   },
   {
     limit: "network exposure",
-    v1: (p) => {
-      p.httpAccess = "controller";
+    v1: (n) => {
+      n.httpAccess = "controller";
     },
-    v2: (p) => {
-      p.httpAccess = "public";
+    v2: (n) => {
+      n.httpAccess = "public";
     },
     reason: "exposure",
   },

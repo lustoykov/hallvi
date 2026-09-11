@@ -1,0 +1,2337 @@
+{
+  "deploymentId": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+  "revision": "0123456789abcdef0123456789abcdef01234567",
+  "repository": "fixture/app",
+  "cases": [
+    {
+      "name": "postgres",
+      "plan": {
+        "summary": "A legacy HTTP deployment plan",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": null,
+        "environment": [],
+        "postgres": {
+          "version": "16",
+          "variable": "DATABASE_URL",
+          "scheme": "postgresql"
+        },
+        "missingInputs": [],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Application",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "4b5f7d494531a4c2d9ea9b96ae5c61db707502d7ac2c3aa5f38e51c0fea170ce",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": false,
+            "dependsOn": ["postgres"],
+            "labeled": true
+          },
+          {
+            "name": "postgres",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": true,
+            "dependsOn": [],
+            "labeled": false
+          }
+        ],
+        "volumes": [
+          {
+            "name": "database",
+            "dockerName": "sg-3f2b1c4d_database",
+            "kind": "database",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "postgres",
+                "target": "/var/lib/postgresql/data",
+                "readOnly": false,
+                "sqlite": null
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": {
+          "service": "postgres",
+          "version": "16",
+          "image": "postgres:16",
+          "volume": "database"
+        },
+        "inputs": [],
+        "variables": ["DATABASE_URL"],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Application",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A legacy HTTP deployment plan"
+      },
+      "values": {
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "postgres": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "build": {
+                "context": "./source/.",
+                "dockerfile": "Dockerfile"
+              },
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "DATABASE_URL": "postgresql://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "depends_on": {
+                "postgres": {
+                  "condition": "service_healthy"
+                }
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": []
+            },
+            "postgres": {
+              "image": "postgres:16",
+              "restart": "unless-stopped",
+              "environment": {
+                "POSTGRES_USER": "serverguy",
+                "POSTGRES_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "POSTGRES_DB": "application"
+              },
+              "volumes": ["database:/var/lib/postgresql/data"],
+              "healthcheck": {
+                "test": ["CMD-SHELL", "pg_isready -U serverguy -d application"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "database": {}
+          }
+        },
+        "files": []
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "DATABASE_URL": "postgresql://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "depends_on": {
+                "postgres": {
+                  "condition": "service_healthy"
+                }
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": []
+            },
+            "postgres": {
+              "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "restart": "unless-stopped",
+              "environment": {
+                "POSTGRES_USER": "serverguy",
+                "POSTGRES_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "POSTGRES_DB": "application"
+              },
+              "volumes": ["database:/var/lib/postgresql/data"],
+              "healthcheck": {
+                "test": ["CMD-SHELL", "pg_isready -U serverguy -d application"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "database": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "kuma-sqlite",
+      "plan": {
+        "image": "louislam/uptime-kuma@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "volumes": [
+          {
+            "name": "data",
+            "target": "/app/data",
+            "kind": "database",
+            "sqlite": "/app/data/kuma.db"
+          }
+        ],
+        "summary": "A legacy HTTP deployment plan",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": null,
+        "environment": [],
+        "postgres": null,
+        "missingInputs": [],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Application",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "8b542d3f62e061b09298caba30fe66669beaeb478d5b1df4cb734e99cf428e47",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": "louislam/uptime-kuma@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "build": false,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": true
+          }
+        ],
+        "volumes": [
+          {
+            "name": "data",
+            "dockerName": "sg-3f2b1c4d_data",
+            "kind": "database",
+            "sqlite": "kuma.db",
+            "mounts": [
+              {
+                "service": "app",
+                "target": "/app/data",
+                "readOnly": false,
+                "sqlite": "/app/data/kuma.db"
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": null,
+        "inputs": [],
+        "variables": [],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Application",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A legacy HTTP deployment plan"
+      },
+      "values": {
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "louislam/uptime-kuma@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {},
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": ["data:/app/data"]
+            }
+          },
+          "volumes": {
+            "data": {}
+          }
+        },
+        "files": []
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {},
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": ["data:/app/data"]
+            }
+          },
+          "volumes": {
+            "data": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "grafana-prometheus",
+      "plan": {
+        "image": "grafana/grafana@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "volumes": [
+          {
+            "name": "data",
+            "target": "/var/lib/grafana",
+            "kind": "database",
+            "sqlite": "/var/lib/grafana/grafana.db"
+          }
+        ],
+        "configs": [
+          {
+            "name": "source",
+            "target": "/etc/grafana/provisioning/datasources/source.yaml",
+            "content": "url: http://prometheus:9090"
+          }
+        ],
+        "services": [
+          {
+            "name": "prometheus",
+            "image": "prom/prometheus@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "command": null,
+            "environment": [],
+            "volumes": [
+              {
+                "name": "metrics",
+                "target": "/prometheus",
+                "kind": "files",
+                "sqlite": null
+              }
+            ],
+            "configs": [],
+            "port": 9090,
+            "healthPath": "/-/ready",
+            "checks": []
+          }
+        ],
+        "summary": "A legacy HTTP deployment plan",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": null,
+        "environment": [],
+        "postgres": null,
+        "missingInputs": [],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Application",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "fd043e2b150a937ed515a1f17746a938c3ce170dfdbdf2eb2c17e5f5f2e404dd",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": "grafana/grafana@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "build": false,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": true
+          },
+          {
+            "name": "prometheus",
+            "pinned": "prom/prometheus@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "build": false,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": false
+          }
+        ],
+        "volumes": [
+          {
+            "name": "data",
+            "dockerName": "sg-3f2b1c4d_data",
+            "kind": "database",
+            "sqlite": "grafana.db",
+            "mounts": [
+              {
+                "service": "app",
+                "target": "/var/lib/grafana",
+                "readOnly": false,
+                "sqlite": "/var/lib/grafana/grafana.db"
+              }
+            ]
+          },
+          {
+            "name": "metrics",
+            "dockerName": "sg-3f2b1c4d_metrics",
+            "kind": "files",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "prometheus",
+                "target": "/prometheus",
+                "readOnly": false,
+                "sqlite": null
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": null,
+        "inputs": [],
+        "variables": [],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Application",
+              "captureId": null
+            }
+          ],
+          "services": [
+            {
+              "name": "prometheus",
+              "port": 9090,
+              "healthPath": "/-/ready",
+              "checks": []
+            }
+          ]
+        },
+        "summary": "A legacy HTTP deployment plan"
+      },
+      "values": {
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "prometheus": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "grafana/grafana@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {},
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [
+                "data:/var/lib/grafana",
+                "./configs/app-source:/etc/grafana/provisioning/datasources/source.yaml:ro"
+              ]
+            },
+            "prometheus": {
+              "image": "prom/prometheus@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "restart": "unless-stopped",
+              "environment": {},
+              "volumes": ["metrics:/prometheus"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "data": {},
+            "metrics": {}
+          }
+        },
+        "files": [
+          {
+            "path": "configs/app-source",
+            "mode": 384,
+            "content": "url: http://prometheus:9090"
+          }
+        ]
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {},
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [
+                "data:/var/lib/grafana",
+                "./configs/app-source:/etc/grafana/provisioning/datasources/source.yaml:ro"
+              ]
+            },
+            "prometheus": {
+              "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "restart": "unless-stopped",
+              "environment": {},
+              "volumes": ["metrics:/prometheus"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "data": {},
+            "metrics": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "queue-worker",
+      "plan": {
+        "services": [
+          {
+            "name": "worker",
+            "imageFrom": "app",
+            "role": "worker",
+            "healthCommand": ["python", "app.py", "ready"],
+            "command": ["python", "app.py", "worker"],
+            "environment": [
+              {
+                "name": "QUEUE_HOST",
+                "value": "queue"
+              }
+            ],
+            "volumes": [],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          },
+          {
+            "name": "queue",
+            "image": "valkey/valkey:8.1.3-alpine",
+            "role": "broker",
+            "healthCommand": [
+              "sh",
+              "-c",
+              "REDISCLI_AUTH=\"$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "exec valkey-server --requirepass \"$QUEUE_PASSWORD\" --appendonly yes"
+            ],
+            "environment": [],
+            "volumes": [
+              {
+                "name": "queue-data",
+                "target": "/data",
+                "kind": "database",
+                "sqlite": null
+              }
+            ],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          }
+        ],
+        "dependencies": [
+          {
+            "service": "app",
+            "needs": "queue",
+            "condition": "healthy"
+          },
+          {
+            "service": "worker",
+            "needs": "queue",
+            "condition": "healthy"
+          }
+        ],
+        "inputBindings": [
+          {
+            "service": "app",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          },
+          {
+            "service": "worker",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          },
+          {
+            "service": "queue",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          }
+        ],
+        "summary": "A web application and worker sharing one image with a private queue",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": ["python", "app.py", "web"],
+        "environment": [
+          {
+            "name": "QUEUE_HOST",
+            "value": "queue"
+          }
+        ],
+        "postgres": null,
+        "missingInputs": [
+          {
+            "name": "QUEUE_PASSWORD",
+            "reason": "Private broker authentication"
+          }
+        ],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Home content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Background job fixture",
+            "captureId": null
+          },
+          {
+            "name": "Submit synthetic job",
+            "method": "POST",
+            "path": "/jobs",
+            "body": {
+              "message": "SG_VERIFY_TOKEN"
+            },
+            "expectedStatus": 201,
+            "contains": "SG_VERIFY_TOKEN",
+            "captureId": "id"
+          },
+          {
+            "name": "Worker processed the job",
+            "method": "GET",
+            "waitSeconds": 5,
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "processed:SG_VERIFY_TOKEN",
+            "captureId": null
+          },
+          {
+            "name": "Remove synthetic job",
+            "method": "DELETE",
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "deleted",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "03c3543efe881acc13e195fd6bf3aa571a4bf8dcd9fb29c3ee0c875d70731cae",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": "python app.py web",
+            "healthcheck": false,
+            "dependsOn": ["queue"],
+            "labeled": true
+          },
+          {
+            "name": "worker",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": "app",
+            "command": "python app.py worker",
+            "healthcheck": true,
+            "dependsOn": ["queue"],
+            "labeled": false
+          },
+          {
+            "name": "queue",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": null,
+            "command": "sh -c exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes",
+            "healthcheck": true,
+            "dependsOn": [],
+            "labeled": false
+          }
+        ],
+        "volumes": [
+          {
+            "name": "queue-data",
+            "dockerName": "sg-3f2b1c4d_queue-data",
+            "kind": "database",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "queue",
+                "target": "/data",
+                "readOnly": false,
+                "sqlite": null
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": null,
+        "inputs": ["QUEUE_PASSWORD"],
+        "variables": ["QUEUE_HOST", "QUEUE_PASSWORD"],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Home content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Background job fixture",
+              "captureId": null
+            },
+            {
+              "name": "Submit synthetic job",
+              "method": "POST",
+              "path": "/jobs",
+              "body": {
+                "message": "SG_VERIFY_TOKEN"
+              },
+              "expectedStatus": 201,
+              "contains": "SG_VERIFY_TOKEN",
+              "captureId": "id"
+            },
+            {
+              "name": "Worker processed the job",
+              "method": "GET",
+              "waitSeconds": 5,
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "processed:SG_VERIFY_TOKEN",
+              "captureId": null
+            },
+            {
+              "name": "Remove synthetic job",
+              "method": "DELETE",
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "deleted",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A web application and worker sharing one image with a private queue"
+      },
+      "values": {
+        "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$HOME-${X}",
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "worker": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "queue": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "build": {
+                "context": "./source/.",
+                "dockerfile": "Dockerfile"
+              },
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [],
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "worker": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "restart": "unless-stopped",
+              "command": ["python", "app.py", "worker"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": ["CMD", "python", "app.py", "ready"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "queue": {
+              "image": "valkey/valkey:8.1.3-alpine",
+              "restart": "unless-stopped",
+              "command": [
+                "sh",
+                "-c",
+                "exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes"
+              ],
+              "environment": {
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": ["queue-data:/data"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": [
+                  "CMD",
+                  "sh",
+                  "-c",
+                  "REDISCLI_AUTH=\"$$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+                ],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "queue-data": {}
+          }
+        },
+        "files": []
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [],
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "worker": {
+              "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "restart": "unless-stopped",
+              "command": ["python", "app.py", "worker"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": ["CMD", "python", "app.py", "ready"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "queue": {
+              "image": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+              "restart": "unless-stopped",
+              "command": [
+                "sh",
+                "-c",
+                "exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes"
+              ],
+              "environment": {
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": ["queue-data:/data"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": [
+                  "CMD",
+                  "sh",
+                  "-c",
+                  "REDISCLI_AUTH=\"$$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+                ],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "queue-data": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "shared-storage-builds",
+      "plan": {
+        "volumes": [
+          {
+            "name": "documents",
+            "target": "/documents",
+            "kind": "files",
+            "sqlite": null
+          }
+        ],
+        "services": [
+          {
+            "name": "api",
+            "build": {
+              "context": "backend",
+              "dockerfile": "backend/Dockerfile"
+            },
+            "role": "service",
+            "command": null,
+            "environment": [],
+            "volumes": [],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          },
+          {
+            "name": "worker",
+            "imageFrom": "api",
+            "role": "service",
+            "command": ["python", "worker.py"],
+            "environment": [],
+            "volumes": [
+              {
+                "name": "documents",
+                "target": "/input",
+                "kind": "files",
+                "readOnly": true,
+                "sqlite": null
+              }
+            ],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          }
+        ],
+        "dependencies": [],
+        "inputBindings": [],
+        "summary": "A web application and worker sharing one image with a private queue",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": ["python", "app.py", "web"],
+        "environment": [
+          {
+            "name": "QUEUE_HOST",
+            "value": "queue"
+          }
+        ],
+        "postgres": null,
+        "missingInputs": [],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Home content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Background job fixture",
+            "captureId": null
+          },
+          {
+            "name": "Submit synthetic job",
+            "method": "POST",
+            "path": "/jobs",
+            "body": {
+              "message": "SG_VERIFY_TOKEN"
+            },
+            "expectedStatus": 201,
+            "contains": "SG_VERIFY_TOKEN",
+            "captureId": "id"
+          },
+          {
+            "name": "Worker processed the job",
+            "method": "GET",
+            "waitSeconds": 5,
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "processed:SG_VERIFY_TOKEN",
+            "captureId": null
+          },
+          {
+            "name": "Remove synthetic job",
+            "method": "DELETE",
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "deleted",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "6803f2aa7bf0713f1ebf3d7e8a9f00fe0378ed53348f291ce14a4092b9f06e02",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": "python app.py web",
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": true
+          },
+          {
+            "name": "api",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": false
+          },
+          {
+            "name": "worker",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": "api",
+            "command": "python worker.py",
+            "healthcheck": false,
+            "dependsOn": [],
+            "labeled": false
+          }
+        ],
+        "volumes": [
+          {
+            "name": "documents",
+            "dockerName": "sg-3f2b1c4d_documents",
+            "kind": "files",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "app",
+                "target": "/documents",
+                "readOnly": false,
+                "sqlite": null
+              },
+              {
+                "service": "worker",
+                "target": "/input",
+                "readOnly": true,
+                "sqlite": null
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": null,
+        "inputs": [],
+        "variables": ["QUEUE_HOST"],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Home content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Background job fixture",
+              "captureId": null
+            },
+            {
+              "name": "Submit synthetic job",
+              "method": "POST",
+              "path": "/jobs",
+              "body": {
+                "message": "SG_VERIFY_TOKEN"
+              },
+              "expectedStatus": 201,
+              "contains": "SG_VERIFY_TOKEN",
+              "captureId": "id"
+            },
+            {
+              "name": "Worker processed the job",
+              "method": "GET",
+              "waitSeconds": 5,
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "processed:SG_VERIFY_TOKEN",
+              "captureId": null
+            },
+            {
+              "name": "Remove synthetic job",
+              "method": "DELETE",
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "deleted",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A web application and worker sharing one image with a private queue"
+      },
+      "values": {
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "api": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "worker": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "build": {
+                "context": "./source/.",
+                "dockerfile": "Dockerfile"
+              },
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": ["documents:/documents"]
+            },
+            "api": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d-api:0123456789abcdef0123456789abcdef01234567",
+              "restart": "unless-stopped",
+              "environment": {},
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "build": {
+                "context": "./source/backend",
+                "dockerfile": "../backend/Dockerfile"
+              }
+            },
+            "worker": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d-api:0123456789abcdef0123456789abcdef01234567",
+              "restart": "unless-stopped",
+              "command": ["python", "worker.py"],
+              "environment": {},
+              "volumes": ["documents:/input:ro"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "documents": {}
+          }
+        },
+        "files": []
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": ["documents:/documents"]
+            },
+            "api": {
+              "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "restart": "unless-stopped",
+              "environment": {},
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            },
+            "worker": {
+              "image": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+              "restart": "unless-stopped",
+              "command": ["python", "worker.py"],
+              "environment": {},
+              "volumes": ["documents:/input:ro"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            }
+          },
+          "volumes": {
+            "documents": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "postgres-connection-bindings",
+      "plan": {
+        "services": [
+          {
+            "name": "worker",
+            "imageFrom": "app",
+            "role": "worker",
+            "healthCommand": ["python", "app.py", "ready"],
+            "command": ["python", "app.py", "worker"],
+            "environment": [
+              {
+                "name": "QUEUE_HOST",
+                "value": "queue"
+              }
+            ],
+            "volumes": [],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          },
+          {
+            "name": "queue",
+            "image": "valkey/valkey:8.1.3-alpine",
+            "role": "broker",
+            "healthCommand": [
+              "sh",
+              "-c",
+              "REDISCLI_AUTH=\"$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "exec valkey-server --requirepass \"$QUEUE_PASSWORD\" --appendonly yes"
+            ],
+            "environment": [],
+            "volumes": [
+              {
+                "name": "queue-data",
+                "target": "/data",
+                "kind": "database",
+                "sqlite": null
+              }
+            ],
+            "configs": [],
+            "port": null,
+            "healthPath": null,
+            "checks": []
+          }
+        ],
+        "dependencies": [
+          {
+            "service": "app",
+            "needs": "queue",
+            "condition": "healthy"
+          },
+          {
+            "service": "worker",
+            "needs": "queue",
+            "condition": "healthy"
+          },
+          {
+            "service": "worker",
+            "needs": "postgres",
+            "condition": "healthy"
+          }
+        ],
+        "inputBindings": [
+          {
+            "service": "app",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          },
+          {
+            "service": "worker",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          },
+          {
+            "service": "queue",
+            "variable": "QUEUE_PASSWORD",
+            "input": "QUEUE_PASSWORD"
+          },
+          {
+            "service": "worker",
+            "variable": "WORKER_DATABASE_URL",
+            "connection": "postgres",
+            "field": "url"
+          },
+          {
+            "service": "worker",
+            "variable": "PGPASSWORD",
+            "connection": "postgres",
+            "field": "password"
+          },
+          {
+            "service": "worker",
+            "variable": "PGHOST",
+            "connection": "postgres",
+            "field": "host"
+          }
+        ],
+        "summary": "A web application and worker sharing one image with a private queue",
+        "dockerfile": "Dockerfile",
+        "generatedDockerfile": null,
+        "context": ".",
+        "port": 8080,
+        "command": ["python", "app.py", "web"],
+        "environment": [
+          {
+            "name": "QUEUE_HOST",
+            "value": "queue"
+          }
+        ],
+        "postgres": {
+          "version": "17",
+          "variable": "DATABASE_URL",
+          "scheme": "postgres"
+        },
+        "missingInputs": [
+          {
+            "name": "QUEUE_PASSWORD",
+            "reason": "Private broker authentication"
+          }
+        ],
+        "healthPath": "/health",
+        "checks": [
+          {
+            "name": "Home content",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Background job fixture",
+            "captureId": null
+          },
+          {
+            "name": "Submit synthetic job",
+            "method": "POST",
+            "path": "/jobs",
+            "body": {
+              "message": "SG_VERIFY_TOKEN"
+            },
+            "expectedStatus": 201,
+            "contains": "SG_VERIFY_TOKEN",
+            "captureId": "id"
+          },
+          {
+            "name": "Worker processed the job",
+            "method": "GET",
+            "waitSeconds": 5,
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "processed:SG_VERIFY_TOKEN",
+            "captureId": null
+          },
+          {
+            "name": "Remove synthetic job",
+            "method": "DELETE",
+            "path": "/jobs/{id}",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "deleted",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "2d2453ee1f8249e51ac767df72696eec72ab8df7f10080967e1723775fd03530",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": "python app.py web",
+            "healthcheck": false,
+            "dependsOn": ["postgres", "queue"],
+            "labeled": true
+          },
+          {
+            "name": "postgres",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": null,
+            "command": null,
+            "healthcheck": true,
+            "dependsOn": [],
+            "labeled": false
+          },
+          {
+            "name": "worker",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": "app",
+            "command": "python app.py worker",
+            "healthcheck": true,
+            "dependsOn": ["queue", "postgres"],
+            "labeled": false
+          },
+          {
+            "name": "queue",
+            "pinned": null,
+            "build": false,
+            "sharesImageWith": null,
+            "command": "sh -c exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes",
+            "healthcheck": true,
+            "dependsOn": [],
+            "labeled": false
+          }
+        ],
+        "volumes": [
+          {
+            "name": "database",
+            "dockerName": "sg-3f2b1c4d_database",
+            "kind": "database",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "postgres",
+                "target": "/var/lib/postgresql/data",
+                "readOnly": false,
+                "sqlite": null
+              }
+            ]
+          },
+          {
+            "name": "queue-data",
+            "dockerName": "sg-3f2b1c4d_queue-data",
+            "kind": "database",
+            "sqlite": null,
+            "mounts": [
+              {
+                "service": "queue",
+                "target": "/data",
+                "readOnly": false,
+                "sqlite": null
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8080,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "public",
+        "database": {
+          "service": "postgres",
+          "version": "17",
+          "image": "postgres:17",
+          "volume": "database"
+        },
+        "inputs": ["QUEUE_PASSWORD"],
+        "variables": [
+          "QUEUE_HOST",
+          "QUEUE_PASSWORD",
+          "WORKER_DATABASE_URL",
+          "PGPASSWORD",
+          "PGHOST",
+          "DATABASE_URL"
+        ],
+        "criterion": {
+          "healthPath": "/health",
+          "checks": [
+            {
+              "name": "Home content",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Background job fixture",
+              "captureId": null
+            },
+            {
+              "name": "Submit synthetic job",
+              "method": "POST",
+              "path": "/jobs",
+              "body": {
+                "message": "SG_VERIFY_TOKEN"
+              },
+              "expectedStatus": 201,
+              "contains": "SG_VERIFY_TOKEN",
+              "captureId": "id"
+            },
+            {
+              "name": "Worker processed the job",
+              "method": "GET",
+              "waitSeconds": 5,
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "processed:SG_VERIFY_TOKEN",
+              "captureId": null
+            },
+            {
+              "name": "Remove synthetic job",
+              "method": "DELETE",
+              "path": "/jobs/{id}",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "deleted",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A web application and worker sharing one image with a private queue"
+      },
+      "values": {
+        "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$HOME-${X}",
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "postgres": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "worker": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "queue": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "build": {
+                "context": "./source/.",
+                "dockerfile": "Dockerfile"
+              },
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "DATABASE_URL": "postgres://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "depends_on": {
+                "postgres": {
+                  "condition": "service_healthy"
+                },
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": []
+            },
+            "postgres": {
+              "image": "postgres:17",
+              "restart": "unless-stopped",
+              "environment": {
+                "POSTGRES_USER": "serverguy",
+                "POSTGRES_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "POSTGRES_DB": "application"
+              },
+              "volumes": ["database:/var/lib/postgresql/data"],
+              "healthcheck": {
+                "test": ["CMD-SHELL", "pg_isready -U serverguy -d application"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            },
+            "worker": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "restart": "unless-stopped",
+              "command": ["python", "app.py", "worker"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}",
+                "WORKER_DATABASE_URL": "postgres://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application",
+                "PGPASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "PGHOST": "postgres"
+              },
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": ["CMD", "python", "app.py", "ready"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                },
+                "postgres": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "queue": {
+              "image": "valkey/valkey:8.1.3-alpine",
+              "restart": "unless-stopped",
+              "command": [
+                "sh",
+                "-c",
+                "exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes"
+              ],
+              "environment": {
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": ["queue-data:/data"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": [
+                  "CMD",
+                  "sh",
+                  "-c",
+                  "REDISCLI_AUTH=\"$$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+                ],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "database": {},
+            "queue-data": {}
+          }
+        },
+        "files": []
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8080"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "DATABASE_URL": "postgres://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["python", "app.py", "web"],
+              "depends_on": {
+                "postgres": {
+                  "condition": "service_healthy"
+                },
+                "queue": {
+                  "condition": "service_healthy"
+                }
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": []
+            },
+            "postgres": {
+              "image": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "restart": "unless-stopped",
+              "environment": {
+                "POSTGRES_USER": "serverguy",
+                "POSTGRES_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "POSTGRES_DB": "application"
+              },
+              "volumes": ["database:/var/lib/postgresql/data"],
+              "healthcheck": {
+                "test": ["CMD-SHELL", "pg_isready -U serverguy -d application"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            },
+            "worker": {
+              "image": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+              "restart": "unless-stopped",
+              "command": ["python", "app.py", "worker"],
+              "environment": {
+                "QUEUE_HOST": "queue",
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}",
+                "WORKER_DATABASE_URL": "postgres://serverguy:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978@postgres:5432/application",
+                "PGPASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978",
+                "PGHOST": "postgres"
+              },
+              "volumes": [],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": ["CMD", "python", "app.py", "ready"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              },
+              "depends_on": {
+                "queue": {
+                  "condition": "service_healthy"
+                },
+                "postgres": {
+                  "condition": "service_healthy"
+                }
+              }
+            },
+            "queue": {
+              "image": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+              "restart": "unless-stopped",
+              "command": [
+                "sh",
+                "-c",
+                "exec valkey-server --requirepass \"$$QUEUE_PASSWORD\" --appendonly yes"
+              ],
+              "environment": {
+                "QUEUE_PASSWORD": "value-QUEUE_PASSWORD-$$HOME-$${X}"
+              },
+              "volumes": ["queue-data:/data"],
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "healthcheck": {
+                "test": [
+                  "CMD",
+                  "sh",
+                  "-c",
+                  "REDISCLI_AUTH=\"$$QUEUE_PASSWORD\" valkey-cli ping | grep -qx PONG"
+                ],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "database": {},
+            "queue-data": {}
+          }
+        }
+      }
+    },
+    {
+      "name": "generated-dockerfile-controller",
+      "plan": {
+        "volumes": [
+          {
+            "name": "state",
+            "target": "/srv/state/",
+            "kind": "database",
+            "sqlite": "/srv/state/app.sqlite3",
+            "capture": "quiesced-files"
+          }
+        ],
+        "configs": [
+          {
+            "name": "settings",
+            "target": "/srv/settings.toml",
+            "content": "a = 1\n"
+          }
+        ],
+        "healthCommand": ["python", "-c", "print('ok')"],
+        "httpAccess": "controller",
+        "summary": "A generated Dockerfile in a nested context behind the controller",
+        "dockerfile": "deploy/web.Dockerfile",
+        "generatedDockerfile": "FROM python:3.12-slim\nWORKDIR /srv\nCOPY . .\nCMD [\"python\", \"main.py\"]\n",
+        "context": "web",
+        "port": 8000,
+        "command": ["sh", "-c", "exec python main.py --price \"$5\""],
+        "environment": [
+          {
+            "name": "MODE",
+            "value": "production"
+          },
+          {
+            "name": "TEMPLATE",
+            "value": "cost is $10 ${NOT_A_REF}"
+          }
+        ],
+        "postgres": null,
+        "missingInputs": [
+          {
+            "name": "ADMIN_TOKEN",
+            "reason": "Protect the admin API"
+          },
+          {
+            "name": "SMTP_PASSWORD",
+            "reason": "Send notification email"
+          }
+        ],
+        "healthPath": "/healthz",
+        "checks": [
+          {
+            "name": "Home",
+            "method": "GET",
+            "path": "/",
+            "body": null,
+            "expectedStatus": 200,
+            "contains": "Welcome",
+            "captureId": null
+          }
+        ]
+      },
+      "releaseId": "df7de1a28843b684782ac4d7d16cbaf899a0445435c162b292d6275d6c5bb8b0",
+      "facts": {
+        "services": [
+          {
+            "name": "app",
+            "pinned": null,
+            "build": true,
+            "sharesImageWith": null,
+            "command": "sh -c exec python main.py --price \"$$5\"",
+            "healthcheck": true,
+            "dependsOn": [],
+            "labeled": true
+          }
+        ],
+        "volumes": [
+          {
+            "name": "state",
+            "dockerName": "sg-3f2b1c4d_state",
+            "kind": "database",
+            "capture": "quiesced-files",
+            "sqlite": "app.sqlite3",
+            "mounts": [
+              {
+                "service": "app",
+                "target": "/srv/state/",
+                "readOnly": false,
+                "sqlite": "/srv/state/app.sqlite3"
+              }
+            ]
+          }
+        ],
+        "exposure": [
+          {
+            "service": "app",
+            "published": "80",
+            "target": 8000,
+            "protocol": "tcp",
+            "hostIp": ""
+          }
+        ],
+        "httpAccess": "controller",
+        "database": null,
+        "inputs": ["ADMIN_TOKEN", "SMTP_PASSWORD"],
+        "variables": ["MODE", "TEMPLATE", "ADMIN_TOKEN", "SMTP_PASSWORD"],
+        "criterion": {
+          "healthPath": "/healthz",
+          "checks": [
+            {
+              "name": "Home",
+              "method": "GET",
+              "path": "/",
+              "body": null,
+              "expectedStatus": 200,
+              "contains": "Welcome",
+              "captureId": null
+            }
+          ],
+          "services": []
+        },
+        "summary": "A generated Dockerfile in a nested context behind the controller"
+      },
+      "values": {
+        "ADMIN_TOKEN": "value-ADMIN_TOKEN-$HOME-${X}",
+        "SMTP_PASSWORD": "value-SMTP_PASSWORD-$HOME-${X}",
+        "SERVER_GUY_DATABASE_PASSWORD": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a6978"
+      },
+      "rollbackImages": {
+        "app": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "build": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "server-guy-3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:0123456789abcdef0123456789abcdef01234567",
+              "build": {
+                "context": "./source/web",
+                "dockerfile": "../deploy/web.Dockerfile"
+              },
+              "restart": "unless-stopped",
+              "ports": ["80:8000"],
+              "environment": {
+                "MODE": "production",
+                "TEMPLATE": "cost is $$10 $${NOT_A_REF}",
+                "ADMIN_TOKEN": "value-ADMIN_TOKEN-$$HOME-$${X}",
+                "SMTP_PASSWORD": "value-SMTP_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["sh", "-c", "exec python main.py --price \"$$5\""],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [
+                "state:/srv/state/",
+                "./configs/app-settings:/srv/settings.toml:ro"
+              ],
+              "healthcheck": {
+                "test": ["CMD", "python", "-c", "print('ok')"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "state": {}
+          }
+        },
+        "files": [
+          {
+            "path": "source/deploy/web.Dockerfile",
+            "mode": 420,
+            "content": "FROM python:3.12-slim\nWORKDIR /srv\nCOPY . .\nCMD [\"python\", \"main.py\"]\n"
+          },
+          {
+            "path": "configs/app-settings",
+            "mode": 384,
+            "content": "a = 1\n"
+          }
+        ]
+      },
+      "rollback": {
+        "compose": {
+          "services": {
+            "app": {
+              "image": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "restart": "unless-stopped",
+              "ports": ["80:8000"],
+              "environment": {
+                "MODE": "production",
+                "TEMPLATE": "cost is $$10 $${NOT_A_REF}",
+                "ADMIN_TOKEN": "value-ADMIN_TOKEN-$$HOME-$${X}",
+                "SMTP_PASSWORD": "value-SMTP_PASSWORD-$$HOME-$${X}"
+              },
+              "labels": {
+                "server-guy.revision": "0123456789abcdef0123456789abcdef01234567",
+                "server-guy.deployment": "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+              },
+              "command": ["sh", "-c", "exec python main.py --price \"$$5\""],
+              "logging": {
+                "driver": "json-file",
+                "options": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              },
+              "volumes": [
+                "state:/srv/state/",
+                "./configs/app-settings:/srv/settings.toml:ro"
+              ],
+              "healthcheck": {
+                "test": ["CMD", "python", "-c", "print('ok')"],
+                "interval": "5s",
+                "timeout": "5s",
+                "retries": 20
+              }
+            }
+          },
+          "volumes": {
+            "state": {}
+          }
+        }
+      }
+    }
+  ]
+}

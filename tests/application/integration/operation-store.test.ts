@@ -1,10 +1,11 @@
 import {
   beginDeploymentAttempt,
-  ensureDeploymentLifecycle,
   invalidateDeploymentRuntime,
 } from "../../../src/server/deployment-lifecycle";
 import { getDeployment } from "../../../src/server/deployment-store";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { queueNative } from "../../fixtures/queue-worker/native";
+import { verifiedLifecycle } from "../../fixtures/native";
+import type { OperationCommand } from "../../../src/server/operation-types";
 import {
   afterAll,
   afterEach,
@@ -25,7 +26,6 @@ import {
   db,
   insertApplication,
   insertChat,
-  insertWorkspace,
   listMessages,
 } from "../../../src/server/db";
 import { applications, operationRecords } from "../../../src/server/db-schema";
@@ -73,13 +73,9 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/ops",
     repositoryOwner: "qa",
     repositoryName: "ops",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Test",
   }).id;
-  const workspace = insertWorkspace(app);
-  firstChat = insertChat(workspace.id, "First", true).id;
-  secondChat = insertChat(workspace.id, "Second", false).id;
+  firstChat = insertChat(app, "First").id;
+  secondChat = insertChat(app, "Second").id;
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -92,17 +88,21 @@ function propose(
   target: string,
   chatId = firstChat,
   kind: "change" | "inspection" = "change",
+  command: OperationCommand = {
+    type: "collect-logs",
+    deploymentId: "fixture-deployment",
+  },
 ) {
   return proposeOperation({
     applicationId: app,
-    source: { type: "preparation", id: target },
+    source: { type: "logs", id: target },
     target,
     kind,
     chatId,
     title: target,
     summary: `Perform ${target}`,
     destinations: ["deployment"],
-    command: { type: "start-preparation" },
+    command,
   });
 }
 const approve = (value: ReturnType<typeof propose>) =>
@@ -228,7 +228,7 @@ describe("application operation scheduling", () => {
         (message) => message.id === again.mentions[0].messageId,
       ),
     ).toBe(true);
-    expect(findUnresolved(app, "preparation", "same")?.id).toBe(first.id);
+    expect(findUnresolved(app, "logs", "same")?.id).toBe(first.id);
     expect(operationContext(app)[0].conversation).toBe("First");
     expect(JSON.stringify(operationContext(app))).not.toContain(
       "I’m referring",
@@ -394,27 +394,36 @@ it("rejects stale and cross-application decisions and retains queued deployment 
   ).toBe(true);
 });
 
-it("the persistent worker claims queued source commands and drains them in order", async () => {
-  const preparation = await import("../../../src/server/preparation");
+it("the persistent worker claims queued commands and drains them in order", async () => {
+  const executor = await import("../../../src/server/deployment-executor");
   const { runOperationWorker } =
     await import("../../../src/server/operation-worker");
-  const first = approve(propose("first worker command"));
-  const second = approve(propose("second worker command", secondChat));
+  const deployment = requestDeployment(app, firstChat);
+  deployment.status = "live";
+  saveDeployment(deployment);
+  const logs = { type: "collect-logs", deploymentId: deployment.id } as const;
+  const first = approve(
+    propose("first worker command", firstChat, "change", logs),
+  );
+  const second = approve(
+    propose("second worker command", secondChat, "change", logs),
+  );
   let release!: () => void;
   const hold = new Promise<void>((resolve) => {
     release = resolve;
   });
   const calls: string[] = [];
-  vi.spyOn(preparation, "startPreparation").mockImplementation(async () => {
-    const executing = operationsFor(app).find(
-      (item) => item.state === "working" && item.kind === "change",
-    )!;
-    calls.push(executing.id);
-    if (executing.id === first.id) await hold;
-    return { id: "verified-fixture-branch" } as Awaited<
-      ReturnType<typeof preparation.startPreparation>
-    >;
-  });
+  const at = "2026-09-11T10:00:00.000Z";
+  vi.spyOn(executor, "collectDeploymentLogs").mockImplementation(
+    async (record) => {
+      const executing = operationsFor(app).find(
+        (item) => item.state === "working" && item.kind === "change",
+      )!;
+      calls.push(executing.id);
+      if (executing.id === first.id) await hold;
+      record.logsCollectedAt = at;
+    },
+  );
   const controller = new AbortController();
   const worker = runOperationWorker(controller.signal);
   try {
@@ -427,7 +436,8 @@ it("the persistent worker claims queued source commands and drains them in order
     );
     expect(calls).toEqual([first.id, second.id]);
     expect(operation(second.id)?.result).toEqual({
-      id: "verified-fixture-branch",
+      evidence: `Collected host logs at ${at}.`,
+      collectedAt: at,
     });
   } finally {
     release();
@@ -464,28 +474,29 @@ it("a request follows the recorded result when the worker wins its claim race", 
       "verified",
       "Worker completed",
       false,
-      { branch: "existing" },
+      { evidence: "existing" },
     );
     return null;
   });
   const effect = vi.fn();
   const result = await duringApplicationOperation(app, effect, {
-    command: { type: "start-preparation" },
+    command: { type: "collect-logs", deploymentId: "fixture-deployment" },
     kind: "change",
-    title: "Start preparation",
+    title: "Collect logs",
   });
-  expect(result).toEqual({ branch: "existing" });
+  expect(result).toEqual({ evidence: "existing" });
   expect(effect).not.toHaveBeenCalled();
 });
 
 it("recovers a dead recreation worker without rewriting the original deployment receipt", () => {
   const r = requestDeployment(app, firstChat);
   r.status = "live";
-  r.plan = queuePlan();
+  r.native = queueNative(r.id, "a".repeat(40));
   r.revision = "a".repeat(40);
   r.serverId = 7;
   r.verifiedAt = new Date().toISOString();
   r.imageId = "sha256:original";
+  verifiedLifecycle(r);
   saveDeployment(r);
   const original = operation(`deployment:${r.id}`)!;
   const proposed = proposeOperation({
@@ -501,9 +512,8 @@ it("recovers a dead recreation worker without rewriting the original deployment 
   });
   startChange(proposed.id, proposed.updatedAt);
   const claimed = claimOperation(proposed.id)!;
-  const prior = structuredClone(
-    ensureDeploymentLifecycle(r).runtime.lastVerified,
-  );
+  const prior = structuredClone(r.lifecycle!.runtime.lastVerified);
+  expect(prior).not.toBeNull();
   const attempt = beginDeploymentAttempt(r, "recreate", proposed.id);
   markOperationRemoteEffect(claimed.id, claimed.executionId!);
   invalidateDeploymentRuntime(r);

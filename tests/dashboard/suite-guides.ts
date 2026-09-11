@@ -18,7 +18,7 @@ const browserGuide = {
     "HTML report, failure screenshots and traces: tests/results/browser-report/ and tests/results/browser-artifacts/.",
   sources: [
     "tests/browser/fixtures.ts",
-    "tests/browser/phase-one.spec.ts",
+    "tests/browser/applications.spec.ts",
     "tests/browser/github.spec.ts",
     "tests/browser/journeys.ts",
   ],
@@ -34,7 +34,7 @@ export const suiteGuides = {
     mocked:
       "Pi, GitHub and OAuth/provider boundaries are replaced with test responses. Route tests stub domain calls when testing the HTTP boundary alone.",
     isolation:
-      "Unit tests do not open SQLite. The database-backed integration tests create temporary databases: Phase 1 tests reuse one file but clear its application rows before every test, while schema tests create a fresh file for every test. Example: a chat saved by one Phase 1 test cannot appear in the next. After the tests, database connections close and these temporary folders are deleted. Your normal Server Guy database is never opened.",
+      "Unit tests do not open SQLite. The database-backed integration tests create temporary databases: application tests reuse one file but clear its application rows before every test, while schema tests create a fresh file for every test. Example: a chat saved by one application test cannot appear in the next. After the tests, database connections close and these temporary folders are deleted. Your normal Server Guy database is never opened.",
     checks:
       "Code assertions compare expected values, errors, saved messages, Decisions and rollback behavior. No human or LLM grading.",
     limits:
@@ -43,7 +43,7 @@ export const suiteGuides = {
       "Dashboard runs save the command and terminal output under tests/results/runs/. Temporary integration databases are removed during test teardown.",
     sources: [
       "tests/application/vitest.config.mjs",
-      "tests/application/integration/phase-one.test.ts",
+      "tests/application/integration/applications.test.ts",
       "tests/application/integration/db.test.ts",
     ],
   },
@@ -70,7 +70,7 @@ export const suiteGuides = {
       "Vitest enqueues a saved message, claims its Pi Run, and executes the same worker code in Node.js. No Next.js server, HTTP request or browser is involved.",
     real: "Pi, the configured model, tool proposals, domain validation and the SQLite transaction. Uses your configured ChatGPT subscription.",
     mocked:
-      "Application data and existing Decisions are seeded examples. Conversation memory & compaction cases also seed earlier history and usage, with a smaller retained-history setting to trigger real compaction affordably. Application Contract cases seed a Phase 2 workspace with a synthetic inspection and saved reads of a fixture repository; Conformance Result cases seed a Phase 3 workspace on top of it with a deterministic runner in place of Docker. GitHub is blocked; model replies, tool choices and compaction summaries are not mocked.",
+      "Application data and existing Decisions are seeded examples. Conversation memory & compaction cases also seed earlier history and usage, with a smaller retained-history setting to trigger real compaction affordably. GitHub is blocked; model replies, tool choices and compaction summaries are not mocked.",
     isolation:
       "Each live eval run creates one temporary eval database under /tmp/server-guy-pi-eval-*. All selected cases share that file, but every case and repetition gets a new application and chat. Example: the greeting case cannot inherit messages or Decisions from revise-existing. After the reports are written, the database connection closes and the /tmp/server-guy-pi-eval-* directory is deleted; what remains for review is under tests/results/. The answer report is saved separately under tests/results/evals/. Your normal application database is never opened; configured Pi credentials are real and may be refreshed.",
     checks:
@@ -80,9 +80,9 @@ export const suiteGuides = {
     artifacts:
       "Answers, before/after state and reviews: tests/results/evals/. Temporary eval databases are deleted once the run's reports are written. Archiving a saved run hides it; it does not delete its files.",
     sources: [
-      "tests/evals/phase-one-cases.ts",
-      "tests/evals/phase-one.eval.ts",
-      "tests/evals/check-phase-one.ts",
+      "tests/evals/cases.ts",
+      "tests/evals/pi.eval.ts",
+      "tests/evals/checks.ts",
       "tests/evals/judge.ts",
     ],
   },

@@ -31,7 +31,6 @@ CREATE TABLE chats (application_id TEXT, id TEXT, native_session_id TEXT);
 INSERT INTO chats VALUES ('app','chat','native');
 CREATE TABLE pi_runs (status TEXT); INSERT INTO pi_runs VALUES ('succeeded');
 CREATE TABLE application_operations (state TEXT); INSERT INTO application_operations VALUES ('verified');
-CREATE TABLE conformance_runs (status TEXT);
 CREATE TABLE deployments (status TEXT); INSERT INTO deployments VALUES ('live');
 PRAGMA user_version=14;''')
         session = self.config / 'pi-sessions/app/chat.jsonl'

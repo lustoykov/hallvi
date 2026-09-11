@@ -3,6 +3,10 @@
 // product database. The shapes are the product's own records, so the
 // components render them exactly as they will render real ones.
 import type { ApplicationFacts } from "@/server/application-facts";
+import type {
+  NativeConfiguration,
+  ResolvedCompose,
+} from "@/server/deployment-release";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type {
   ApplicationOperation,
@@ -67,14 +71,12 @@ export function chat(
   state: ReferenceState,
   id: string,
   title: string,
-  options: { primary?: boolean; at?: string } = {},
+  options: { at?: string } = {},
 ) {
   const created: ChatSummary = {
     id,
     applicationId: state.application.id,
-    workspaceId: "reference",
     title,
-    isPrimary: options.primary ?? false,
     createdAt: options.at ?? state.clock,
     archivedAt: null,
     lastActivityAt: options.at ?? state.clock,
@@ -179,17 +181,24 @@ export function liveDeployment(input: {
   chatId: string;
   repository: string;
   revision: string;
+  /** The upstream image the application runs. */
+  image: string;
   port: number;
   command: string[] | null;
-  postgres: DeploymentRecord["plan"] extends infer P
-    ? P extends { postgres: infer Q }
-      ? Q
-      : never
-    : never;
+  postgres: "16" | "17" | "18" | null;
   environment: { name: string; value: string }[];
-  missingInputs: { name: string; reason: string }[];
+  inputs: { name: string; reason: string }[];
   healthPath: string;
   checks: { name: string; path: string; contains: string }[];
+  /** Named volumes the application mounts, with what they hold. */
+  volumes?: {
+    name: string;
+    target: string;
+    kind: "files" | "database";
+    sqlite?: string;
+  }[];
+  /** Other services on the private network. */
+  services?: { name: string; image: string; command?: string[] }[];
   offer: { serverType: string; monthly: number; cores: number; memory: number };
   address: string;
   serverId: number;
@@ -200,26 +209,99 @@ export function liveDeployment(input: {
   summary: string;
   events: string[];
 }): DeploymentRecord {
-  return {
-    id: input.id,
-    applicationId: input.applicationId,
-    chatId: input.chatId,
-    status: "live",
-    repository: input.repository,
-    repositoryId: 4120,
-    recommendationId: `${input.id}-recommendation`,
-    revision: input.revision,
-    inspectedRevision: input.revision,
-    plan: {
-      summary: input.summary,
-      dockerfile: "Dockerfile",
-      generatedDockerfile: null,
-      context: ".",
-      port: input.port,
+  const project = `sg-${input.id.slice(0, 8)}`;
+  const labels = {
+    "server-guy.revision": input.revision,
+    "server-guy.deployment": input.id,
+  };
+  const services: ResolvedCompose["services"] = {
+    app: {
+      image: input.image,
       command: input.command,
-      environment: input.environment,
-      postgres: input.postgres,
-      missingInputs: input.missingInputs,
+      ports: [{ target: input.port, published: "80", protocol: "tcp" }],
+      environment: {
+        ...Object.fromEntries(
+          input.environment.map((item) => [item.name, item.value]),
+        ),
+        ...Object.fromEntries(
+          input.inputs.map((item) => [item.name, `\${${item.name}}`]),
+        ),
+      },
+      labels,
+      volumes: (input.volumes ?? []).map((volume) => ({
+        type: "volume",
+        source: volume.name,
+        target: volume.target,
+      })),
+      ...(input.postgres
+        ? { depends_on: { postgres: { condition: "service_healthy" } } }
+        : {}),
+    },
+    ...(input.postgres
+      ? {
+          postgres: {
+            image: `postgres:${input.postgres}`,
+            environment: {
+              POSTGRES_USER: "serverguy",
+              POSTGRES_DB: "application",
+              POSTGRES_PASSWORD: "${SERVER_GUY_DATABASE_PASSWORD}",
+            },
+            volumes: [
+              {
+                type: "volume",
+                source: "database",
+                target: "/var/lib/postgresql/data",
+              },
+            ],
+          },
+        }
+      : {}),
+    ...Object.fromEntries(
+      (input.services ?? []).map((service) => [
+        service.name,
+        { image: service.image, command: service.command ?? null, labels },
+      ]),
+    ),
+  };
+  const volumes = [
+    ...(input.postgres ? ["database"] : []),
+    ...(input.volumes ?? []).map((volume) => volume.name),
+  ];
+  const native: NativeConfiguration = {
+    format: 1,
+    resolver: "reference scenario",
+    compose: ["compose.yaml"],
+    files: [],
+    resolved: {
+      name: project,
+      services,
+      volumes: Object.fromEntries(
+        volumes.map((name) => [name, { name: `${project}_${name}` }]),
+      ),
+    },
+    inputs: input.inputs.map((item) => item.name).sort(),
+    ...(input.inputs.length
+      ? {
+          inputReasons: Object.fromEntries(
+            input.inputs.map((item) => [item.name, item.reason]),
+          ),
+        }
+      : {}),
+    data: [
+      ...(input.postgres
+        ? [{ volume: "database", kind: "database" as const, sqlite: null }]
+        : []),
+      ...(input.volumes ?? []).map((volume) => ({
+        volume: volume.name,
+        kind: volume.kind,
+        sqlite: volume.sqlite ?? null,
+      })),
+    ],
+    database: input.postgres
+      ? { service: "postgres", version: input.postgres }
+      : null,
+    httpAccess: "public",
+    criterion: {
       healthPath: input.healthPath,
       checks: input.checks.map((check) => ({
         name: check.name,
@@ -230,7 +312,20 @@ export function liveDeployment(input: {
         contains: check.contains,
         captureId: null,
       })),
+      services: [],
     },
+    summary: input.summary,
+  };
+  return {
+    id: input.id,
+    applicationId: input.applicationId,
+    chatId: input.chatId,
+    status: "live",
+    repository: input.repository,
+    repositoryId: 4120,
+    recommendationId: `${input.id}-recommendation`,
+    revision: input.revision,
+    native,
     offer: {
       serverType: input.offer.serverType,
       location: "fsn1",

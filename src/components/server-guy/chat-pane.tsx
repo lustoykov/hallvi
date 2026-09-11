@@ -28,7 +28,7 @@ import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
-import type { RecordReference, RecordSection } from "./record-references";
+import type { RecordReference } from "./record-references";
 
 /** The message a view or Overview asked to reveal; the nonce repeats it. */
 export interface MessageHighlight {
@@ -87,8 +87,8 @@ export function ChatPane({
   onNewChat: () => void;
   /** Records each reply produced, shown as a line under it. */
   references?: Map<string, RecordReference[]>;
-  /** Opens that record section beside the chat. */
-  onReveal?: (section: RecordSection) => void;
+  /** Opens the application's History, where saved records are listed. */
+  onReveal?: () => void;
   /** The application's operations; receipts render in their origin chat. */
   operations?: ApplicationOperation[];
   now?: number;
@@ -164,14 +164,8 @@ export function ChatPane({
       />
     ));
   const application = view.application;
-  const workspace = view.workspace;
   const archived = Boolean(activeChat?.archivedAt);
-  const completed = workspace?.status === "completed";
-  const paused = Boolean(workspace && !workspace.current && !completed);
-  const readOnly = archived || completed || paused;
-  const deliverable = workspace?.deliverable ?? "Launch Brief";
-  // The phase's state lives in the current-step bar above; this header only
-  // names the chat and says when it cannot accept new work.
+  const readOnly = archived;
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
   const requestPending = view.messages.some(
@@ -182,27 +176,23 @@ export function ChatPane({
     <section className="sg-chat-pane">
       <header className="sg-pane-title sg-chat-title">
         <div>
-          <strong>{activeChat?.title ?? deliverable}</strong>
+          <strong>{activeChat?.title ?? "Conversation"}</strong>
           <span>
-            {archived
-              ? "Archived · read-only"
-              : completed
-                ? `Phase ${workspace?.phaseNumber} is complete · read-only`
-                : activeChat?.isPrimary === false
-                  ? "A conversation about your application"
-                  : "Working with Server Guy"}
+            {archived ? "Archived · read-only" : "Working with Server Guy"}
           </span>
         </div>
-        {activeChat && !activeChat.isPrimary && !readOnly && (
-          <button
-            className="sg-text-button"
-            disabled={busy !== null}
-            onClick={onArchive}
-            type="button"
-          >
-            <Archive /> Archive chat
-          </button>
-        )}
+        {activeChat &&
+          !readOnly &&
+          view.chats.filter((chat) => !chat.archivedAt).length > 1 && (
+            <button
+              className="sg-text-button"
+              disabled={busy !== null}
+              onClick={onArchive}
+              type="button"
+            >
+              <Archive /> Archive chat
+            </button>
+          )}
       </header>
       {(busy !== null || requestPending) && (
         <div className="sg-busy-bar" aria-hidden="true" />
@@ -345,8 +335,8 @@ export function ChatPane({
                       <button
                         className={`sg-message-ref ${reference.tone}`}
                         key={reference.key}
-                        onClick={() => onReveal?.(reference.section)}
-                        title="Open in the Record"
+                        onClick={() => onReveal?.()}
+                        title="Open in History"
                         type="button"
                       >
                         {reference.label} <em>{reference.status}</em>
@@ -415,17 +405,6 @@ export function ChatPane({
             a new one.
           </p>
         )}
-        {paused && (
-          <p role="status">
-            This phase is paused while an earlier phase is reviewed.
-          </p>
-        )}
-        {!archived && completed && (
-          <p className="sg-archived-notice">
-            Phase {workspace?.phaseNumber} is complete and its chats are
-            read-only. Continue in the current phase.
-          </p>
-        )}
         {application && !piReady && (
           <div className="sg-pi-required">
             <WarningCircle weight="bold" />
@@ -457,13 +436,11 @@ export function ChatPane({
             placeholder={
               archived
                 ? "This chat is archived"
-                : completed
-                  ? `Phase ${workspace?.phaseNumber} is complete · read-only`
-                  : !piReady
-                    ? "Connect ChatGPT in Settings to chat"
-                    : application
-                      ? "Ask Server Guy, correct a decision, or add context…"
-                      : "Create the application workspace to start chatting"
+                : !piReady
+                  ? "Connect ChatGPT in Settings to chat"
+                  : application
+                    ? "Ask Server Guy, correct a decision, or add context…"
+                    : "Add an application to start chatting"
             }
             rows={2}
             value={composer}
