@@ -202,6 +202,14 @@ export function legacyReleaseId(repository, revision, plan) {
     .update(JSON.stringify(canonical({ repository, revision, plan })))
     .digest("hex");
 }
+// The seal of a converted configuration: its native content digest over
+// {repository, revision, native} without the seal itself, computed exactly
+// as the runtime computes native release identities.
+function releaseDigest(repository, revision, native) {
+  return createHash("sha256")
+    .update(JSON.stringify(canonical({ repository, revision, native })))
+    .digest("hex");
+}
 
 // A frozen port of the retired plan renderer. Private values render as
 // sentinels and become ${NAME} references, exactly as the retired
@@ -403,7 +411,7 @@ function referencePrivateValues(value, sentinels) {
 }
 
 /** The native configuration equivalent to a retired plan's rendering. */
-export function convertPlan(plan, deploymentId, revision) {
+export function convertPlan(plan, { deploymentId, repository, revision }) {
   const project = `sg-${deploymentId.slice(0, 8)}`;
   const inputs = (plan.missingInputs ?? []).map((input) => input.name);
   const nonce = randomUUID().replaceAll("-", "");
@@ -467,7 +475,7 @@ export function convertPlan(plan, deploymentId, revision) {
   const reasons = Object.fromEntries(
     (plan.missingInputs ?? []).map((input) => [input.name, input.reason]),
   );
-  return {
+  const native = {
     format: 1,
     resolver: "schema v14 conversion of a retired Server Guy plan",
     converted: { from: "deployment-plan", schema: 14 },
@@ -509,6 +517,9 @@ export function convertPlan(plan, deploymentId, revision) {
     },
     summary: plan.summary,
   };
+  // The historical release identity holds only while this seal still matches.
+  native.converted.digest = releaseDigest(repository, revision, native);
+  return native;
 }
 
 function describe(table, record, repository) {
@@ -1014,9 +1025,12 @@ function retire(database, now, alive) {
 function convertDeployment(body, now, archive, updateOperation) {
   let changed = false;
   const converted = new Map();
-  const convert = (releaseId, revision, plan) => {
+  const convert = (releaseId, repository, revision, plan) => {
     if (!converted.has(releaseId))
-      converted.set(releaseId, convertPlan(plan, body.id, revision));
+      converted.set(
+        releaseId,
+        convertPlan(plan, { deploymentId: body.id, repository, revision }),
+      );
     return structuredClone(converted.get(releaseId));
   };
   const archivePlan = (releaseId, revision, plan, at) =>
@@ -1061,7 +1075,12 @@ function convertDeployment(body, now, archive, updateOperation) {
       );
       archived.add(release.id);
     }
-    release.native = convert(release.id, release.revision, release.plan);
+    release.native = convert(
+      release.id,
+      release.repository,
+      release.revision,
+      release.plan,
+    );
     delete release.plan;
     changed = true;
   }
@@ -1083,7 +1102,12 @@ function convertDeployment(body, now, archive, updateOperation) {
       archivePlan(releaseId, body.revision, body.plan, body.updatedAt);
     const effect = Boolean(body.serverId || body.serverCreateAttempted);
     if (body.status === "live" || effect) {
-      body.native = convert(releaseId, body.revision, body.plan);
+      body.native = convert(
+        releaseId,
+        body.repository,
+        body.revision,
+        body.plan,
+      );
       body.releaseId = releaseId;
       body.events.push({
         at: now,

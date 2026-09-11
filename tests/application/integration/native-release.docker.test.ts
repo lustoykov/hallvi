@@ -589,7 +589,11 @@ it.skipIf(!proof)(
     Object.assign(record, {
       revision: A,
       releaseId,
-      native: convertPlan(plan, record.id, A),
+      native: convertPlan(plan, {
+        deploymentId: record.id,
+        repository: record.repository,
+        revision: A,
+      }),
     });
     saveDeployment(record);
     const v1 = releaseOf(record)!;
@@ -1187,7 +1191,11 @@ it.skipIf(!piProof)(
     Object.assign(record, {
       revision: A,
       releaseId,
-      native: convertPlan(plan, record.id, A),
+      native: convertPlan(plan, {
+        deploymentId: record.id,
+        repository: record.repository,
+        revision: A,
+      }),
     });
     saveDeployment(record);
     const v1 = releaseOf(record)!;

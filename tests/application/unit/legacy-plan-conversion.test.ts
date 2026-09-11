@@ -4,7 +4,16 @@ import {
   convertPlan,
   legacyReleaseId,
 } from "../../../scripts/retire-preparation.mjs";
-import type { NativeConfiguration } from "../../../src/server/deployment-release";
+import {
+  assertApprovedRelease,
+  releaseIdentityHolds,
+  releaseOf,
+  type DeploymentRelease,
+} from "../../../src/server/deployment-release";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import { beginDeploymentAttempt } from "../../../src/server/deployment-lifecycle";
+import { rollbackSelection } from "../../../src/server/rollback";
+import { nativeApp } from "../../fixtures/native";
 import { executableCompose } from "../../../src/server/native-compose";
 import { nativeFacts } from "../../../src/server/release-facts";
 
@@ -72,17 +81,21 @@ function asNative(compose: Compose) {
 }
 
 const convert = (plan: unknown) =>
-  convertPlan(
-    plan,
-    golden.deploymentId,
-    golden.revision,
-  ) as NativeConfiguration;
+  convertPlan(plan, {
+    deploymentId: golden.deploymentId,
+    repository: golden.repository,
+    revision: golden.revision,
+  });
 
 it.each(golden.cases.map((item) => [item.name, item] as const))(
   "converts the %s plan with its identity, facts and executable Compose",
   (_name, item) => {
     const native = convert(item.plan);
-    expect(native.converted).toEqual({ from: "deployment-plan", schema: 14 });
+    expect(native.converted).toEqual({
+      from: "deployment-plan",
+      schema: 14,
+      digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
     // The historical identity is validated from the plan, never recomputed
     // from the converted content.
     expect(legacyReleaseId(golden.repository, golden.revision, item.plan)).toBe(
@@ -155,4 +168,98 @@ it("refuses a plan whose private-input binding has no source", () => {
   ) as { inputBindings: { input?: string }[] };
   plan.inputBindings[0].input = "MISSING_INPUT";
   expect(() => convert(plan)).toThrow(/has no value source/);
+});
+
+const digest = (c: string) => `sha256:${c.repeat(64)}`;
+it("keeps a converted release's identity only while its configuration is the one the migration sealed", () => {
+  const item = golden.cases.find((entry) => entry.name === "postgres")!;
+  const record = {
+    id: golden.deploymentId,
+    applicationId: "app",
+    status: "live",
+    repository: golden.repository,
+    revision: golden.revision,
+    releaseId: item.releaseId,
+    native: convert(item.plan),
+    serverId: 7,
+    address: "203.0.113.7",
+    events: [],
+  } as unknown as DeploymentRecord;
+  const release = releaseOf(record)!;
+  // Unchanged, it is the release its approvals and receipts named.
+  expect(release.id).toBe(item.releaseId);
+  expect(releaseIdentityHolds(release)).toBe(true);
+  expect(() => assertApprovedRelease(record)).not.toThrow();
+
+  // Changing what would execute afterwards makes it other content, so the
+  // historical identity no longer authorizes a deployment attempt.
+  const changed = structuredClone(record);
+  changed.native!.resolved.services.app.command = ["sh", "-c", "exit 0"];
+  const tampered: DeploymentRelease = { ...release, native: changed.native! };
+  expect(releaseOf(changed)!.id).not.toBe(item.releaseId);
+  expect(releaseIdentityHolds(tampered)).toBe(false);
+  expect(() => assertApprovedRelease(changed)).toThrow("release changed");
+  expect(() => beginDeploymentAttempt(changed, "recreate", "op")).toThrow(
+    "release changed",
+  );
+
+  // Rollback selects a retained converted release only while it holds.
+  const current = releaseOf({
+    repository: golden.repository,
+    revision: "b".repeat(40),
+    native: nativeApp({
+      deploymentId: golden.deploymentId,
+      revision: "b".repeat(40),
+      port: 8000,
+      postgres: "16",
+      checks: [],
+    }),
+  })!;
+  const hostId = `host:${golden.deploymentId}`;
+  const withHistory = (retained: DeploymentRelease) =>
+    ({
+      ...record,
+      native: current.native,
+      revision: current.revision,
+      releaseId: current.id,
+      serviceImages: { app: digest("2"), postgres: digest("3") },
+      lifecycle: {
+        host: {
+          id: hostId,
+          provider: "hetzner",
+          connectionId: null,
+          serverId: 7,
+          address: "203.0.113.7",
+        },
+        releases: [retained, current],
+        attempts: [],
+        verifiedImages: [
+          {
+            attemptId: "attempt-1",
+            releaseId: retained.id,
+            hostId,
+            checkedAt: "2026-09-10T08:00:00Z",
+            images: { app: digest("1"), postgres: digest("3") },
+          },
+        ],
+        runtime: {
+          state: "verified",
+          lastVerified: {
+            attemptId: "attempt-2",
+            releaseId: current.id,
+            hostId,
+            revision: current.revision,
+            checkedAt: "2026-09-10T09:00:00Z",
+            images: { app: digest("2"), postgres: digest("3") },
+          },
+        },
+      },
+    }) as unknown as DeploymentRecord;
+  const evidence = "The earlier code reads and writes the same schema.";
+  expect(
+    rollbackSelection(withHistory(release), release.id, evidence).images,
+  ).toEqual({ app: digest("1"), postgres: digest("3") });
+  expect(() =>
+    rollbackSelection(withHistory(tampered), tampered.id, evidence),
+  ).toThrow("No previously verified images");
 });

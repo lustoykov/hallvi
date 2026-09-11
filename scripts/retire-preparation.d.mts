@@ -10,8 +10,7 @@ export function legacyReleaseId(
 ): string;
 export function convertPlan(
   plan: unknown,
-  deploymentId: string,
-  revision: string,
+  release: { deploymentId: string; repository: string; revision: string },
 ): NativeConfiguration;
 export function needsRetirement(database: BetterSqlite3.Database): boolean;
 export function retirePreparationWorkflow(

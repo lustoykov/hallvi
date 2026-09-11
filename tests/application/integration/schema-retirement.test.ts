@@ -1057,6 +1057,7 @@ it("retires the preparation workflow while keeping chats, history, holds and dep
   expect(legacy.native?.converted).toEqual({
     from: "deployment-plan",
     schema: 14,
+    digest: expect.stringMatching(/^[0-9a-f]{64}$/),
   });
   expect(releaseOf(legacy)?.id).toBe(bindings.releaseId);
   expect(legacy.releaseId).toBe(bindings.releaseId);

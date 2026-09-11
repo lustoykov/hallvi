@@ -60,9 +60,10 @@ export interface NativeConfiguration {
   /**
    * Set once by the schema v14 migration, which converted a retired Server
    * Guy plan into this configuration and validated the release's historical
-   * identity. Such a release is not content-addressed.
+   * identity. The release keeps that identity only while `digest` still
+   * matches its repository, revision and this configuration.
    */
-  converted?: { from: "deployment-plan"; schema: 14 };
+  converted?: { from: "deployment-plan"; schema: 14; digest: string };
   compose: string[];
   files: { path: string; mode: number; sha256: string; content: string }[];
   resolved: ResolvedCompose;
@@ -99,7 +100,11 @@ function canonical(value: unknown): unknown {
     );
   return value;
 }
-function contentIdentity(release: Omit<DeploymentRelease, "id">) {
+function contentIdentity(release: {
+  repository: string;
+  revision: string;
+  native: unknown;
+}) {
   return createHash("sha256")
     .update(
       JSON.stringify(
@@ -112,10 +117,22 @@ function contentIdentity(release: Omit<DeploymentRelease, "id">) {
     )
     .digest("hex");
 }
+/** Whether converted content is exactly what the migration sealed. */
+function sealed(content: Omit<DeploymentRelease, "id">) {
+  const { digest, ...marker } = content.native.converted!;
+  return (
+    digest ===
+    contentIdentity({
+      ...content,
+      native: { ...content.native, converted: marker },
+    })
+  );
+}
 /**
  * The release a record's selected configuration represents. Native content is
  * content-addressed; a converted configuration keeps the historical identity
- * the migration validated and recorded as the record's releaseId.
+ * the migration validated and recorded as the record's releaseId while its
+ * seal holds. Changed afterwards, it is new content with a new identity.
  */
 export function releaseOf(
   record: Pick<DeploymentRecord, "repository" | "revision" | "releaseId"> & {
@@ -128,15 +145,16 @@ export function releaseOf(
     revision: record.revision,
     native: record.native,
   };
-  const id = record.native.converted
-    ? record.releaseId
-    : contentIdentity(content);
+  const id =
+    record.native.converted && sealed(content)
+      ? record.releaseId
+      : contentIdentity(content);
   return id ? { id, ...content } : null;
 }
 /** Whether a recorded release object still carries its own identity. */
 export function releaseIdentityHolds(release: DeploymentRelease) {
   return release.native.converted
-    ? /^[0-9a-f]{64}$/.test(release.id)
+    ? /^[0-9a-f]{64}$/.test(release.id) && sealed(release)
     : contentIdentity(release) === release.id;
 }
 export function assertApprovedRelease(record: DeploymentRecord) {

@@ -109,6 +109,18 @@ function repositoryIdOf(observation: Observation | undefined) {
     : undefined;
 }
 
+/** The repository ID the latest successful access check recorded. */
+export function recordedRepositoryId(applicationId: string) {
+  return repositoryIdOf(
+    listObservations(applicationId).find(
+      (observation) =>
+        observation.kind === REPOSITORY_OBSERVATION &&
+        observation.status === "passed" &&
+        repositoryIdOf(observation) !== undefined,
+    ),
+  );
+}
+
 function connectionIdOf(observation: { raw: unknown }) {
   const raw = observation.raw;
   return raw &&
@@ -134,19 +146,13 @@ export async function observeRepository(
   )
     throw changed();
   const application = loadApplication(applicationId);
-  const recorded = listObservations(application.id).find(
-    (observation) =>
-      observation.kind === REPOSITORY_OBSERVATION &&
-      observation.status === "passed" &&
-      repositoryIdOf(observation) !== undefined,
-  );
   const result = await inspectGithubRepository(
     {
       owner: application.repositoryOwner,
       name: application.repositoryName,
       canonicalUrl: application.repositoryUrl,
     },
-    repositoryIdOf(recorded),
+    recordedRepositoryId(application.id),
   );
   if (
     loadApplication(applicationId).repositoryUrl !== application.repositoryUrl

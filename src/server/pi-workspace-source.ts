@@ -22,9 +22,9 @@ export async function applicationWorkspaceSource(
     };
   }
   // Before a deployment selects a revision, read the default branch as it is
-  // now, through the repository identity its access check recorded.
-  const { getApplication, latestObservation } = await import("./db");
-  const { REPOSITORY_OBSERVATION } = await import("./applications");
+  // now, through the repository identity a successful access check recorded.
+  const { getApplication } = await import("./db");
+  const { recordedRepositoryId } = await import("./applications");
   const { connectedGithubCredential } = await import("./github-connection");
   const { githubJson } = await import("./github-api");
   const application = getApplication(applicationId);
@@ -33,12 +33,10 @@ export async function applicationWorkspaceSource(
   const { token } = await connectedGithubCredential();
   const found = (await githubJson(`/repos/${repository}`, token, { signal }))
     .data as { id?: number; default_branch?: string };
-  const recorded = latestObservation(applicationId, REPOSITORY_OBSERVATION)
-    ?.raw as { repositoryId?: number } | undefined;
-  if (
-    recorded?.repositoryId !== undefined &&
-    found.id !== recorded.repositoryId
-  )
+  // A later failed or unavailable check records no identity; it does not
+  // release the one a successful check pinned.
+  const pinned = recordedRepositoryId(applicationId);
+  if (pinned !== undefined && found.id !== pinned)
     throw new Error(
       "The repository's identity changed since its access check. Check GitHub access before reading it.",
     );
