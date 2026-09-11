@@ -2053,16 +2053,44 @@ class ScheduledBackupTest(unittest.TestCase):
 
     def test_stack_capture_restarts_what_it_paused_after_a_failure_or_a_crash(self):
         def bad_dump(docker):
-            docker.exec_results["pg_dump"] = subprocess.CalledProcessError(1, "pg_dump")
+            docker.exec_results["pg_dump"] = subprocess.CalledProcessError(
+                1, "pg_dump", stderr=b"pg_dump: password " + SECRET.encode() + b" rejected"
+            )
+
+        def bad_verify(docker):
+            docker.exec_results["psql"] = subprocess.CalledProcessError(
+                2, "psql", stderr=b'ERROR:  relation "pages" does not exist'
+            )
 
         def killed_after_grace_period(docker):
             # SIGKILL: files may be mid-write, so there is no recovery point.
             docker.exit_codes[APP] = 137
 
+        # Why the owner's own procedure failed is recorded, with every value
+        # of its environment replaced by the variable's name.
         client = FakeClient()
-        for change, code in (
-            (bad_dump, "capture-failed"),
-            (killed_after_grace_period, "source-stop-failed"),
+        for change, code, detail in (
+            (
+                bad_dump,
+                "capture-failed",
+                {
+                    "step": "dump",
+                    "service": "postgres",
+                    "exitCode": 1,
+                    "output": "pg_dump: password $POSTGRES_PASSWORD rejected",
+                },
+            ),
+            (
+                bad_verify,
+                "capture-failed",
+                {
+                    "step": "verify",
+                    "service": "postgres",
+                    "exitCode": 2,
+                    "output": 'ERROR:  relation "pages" does not exist',
+                },
+            ),
+            (killed_after_grace_period, "source-stop-failed", None),
         ):
             with self.subTest(code):
                 config, docker = self.generic_stack()
@@ -2072,6 +2100,9 @@ class ScheduledBackupTest(unittest.TestCase):
                     config, state, storage_factory=self.storage(client), command=docker
                 )
                 self.assertEqual(failed["errorCode"], code)
+                self.assertEqual(failed["detail"], detail)
+                self.assertEqual(runner.sanitize_receipt(failed)["detail"], detail)
+                self.assertNotIn(SECRET, json.dumps(failed))
                 self.assertEqual(docker.started, [APP])
                 self.assertTrue(all(docker.containers.values()))
                 self.assertEqual(client.objects, {})
@@ -2277,6 +2308,33 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertEqual(changed["outcome"], "failed")
         self.assertEqual(changed["errorCode"], "database-check-failed")
         self.assertTrue(changed["cleanupComplete"])
+        self.assertEqual(
+            runner.sanitize_restore(changed)["detail"],
+            {
+                "step": "verify",
+                "service": "db",
+                "exitCode": None,
+                "output": "the restored fingerprint differs from the captured one",
+            },
+        )
+        # The owner's verify command itself failing is recorded the same way,
+        # without the private value its environment carries.
+        broken, _ = restore(
+            subprocess.CalledProcessError(
+                1, "mariadb", stderr=b"Access denied (using password: " + SECRET.encode() + b")"
+            )
+        )
+        self.assertEqual(broken["errorCode"], "database-check-failed")
+        self.assertEqual(
+            broken["detail"],
+            {
+                "step": "verify",
+                "service": "db",
+                "exitCode": 1,
+                "output": "Access denied (using password: $MARIADB_ROOT_PASSWORD)",
+            },
+        )
+        self.assertNotIn(SECRET, json.dumps(broken))
 
     def test_a_restored_project_is_isolated_from_the_live_application(self):
         config, docker = self.dump_stack()

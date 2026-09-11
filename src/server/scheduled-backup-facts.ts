@@ -5,8 +5,20 @@ import {
   scheduleLabel,
   type BackupPolicy,
   type BackupSnapshot,
+  type ProcedureDetail,
   type ScheduledRun,
 } from "./scheduled-backup-types";
+
+/** An owner's own dump, verify or restore command and what it printed. */
+function procedureFailure(detail: ProcedureDetail) {
+  const what =
+    detail.step === "start"
+      ? `starting ${detail.service} in isolation`
+      : `the ${detail.step} procedure declared for ${detail.service}`;
+  const result =
+    detail.exitCode === null ? "gave no result" : `exited ${detail.exitCode}`;
+  return `${what} ${result}${detail.output ? `: ${detail.output}` : ""}`;
+}
 
 export function backupFailure(run: ScheduledRun) {
   if (run.errorCode === "source-stop-failed")
@@ -17,6 +29,8 @@ export function backupFailure(run: ScheduledRun) {
     return "The backup was interrupted. Source recovery and cleanup are recorded separately.";
   if (run.errorCode === "source-identity-mismatch")
     return "The deployment no longer matches the recorded backup configuration. Reconfigure the schedule for the current deployment.";
+  if (run.detail)
+    return `A consistent copy could not be created: ${procedureFailure(run.detail)}.`;
   const labels: Record<string, string> = {
     credentials:
       "Backup storage access could not be verified. Reconnect the scoped storage credential.",
@@ -37,6 +51,8 @@ export function backupFailure(run: ScheduledRun) {
 }
 
 export function restoreFailure(run: ScheduledRun) {
+  if (run.restore?.detail)
+    return `The restored copy failed: ${procedureFailure(run.restore.detail)}.`;
   const reasons: Record<string, string> = {
     "restore-image-unavailable":
       "The isolated restore could not start because its database image is unavailable.",

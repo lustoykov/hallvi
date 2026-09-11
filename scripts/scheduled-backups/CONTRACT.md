@@ -89,6 +89,7 @@ written atomically. This is the exact shape the controller receives:
   "objectKey": "scheduled/<app>/<deployment>/<run>.tar.gz | null",
   "sourcePauseSeconds": 6.4,
   "errorCode": "string | null",
+  "detail": null,
   "expiredAt": "2026-09-16T03:00:12Z | null",
   "retention": { "deleted": 0, "failed": false },
   "restoreInProgress": false,
@@ -116,6 +117,14 @@ additions to the first contract and safe to ignore.
 sweep failed is still a successful backup, and the controller should surface the
 retention failure separately.
 
+`detail` stays `null` unless an owner's declared procedure caused the failure.
+Then it names the step (`dump` or `verify` during capture; `start`, `restore`
+or `verify` during a restore test), the owner service, the command's exit code
+(`null` for a timeout) and the last 1500 characters it printed, with every
+value of the owner's environment replaced by `$NAME`. It is the evidence a
+corrected declaration needs; `errorCode` stays a bounded code. The same field
+appears inside `restore`.
+
 `restore` is `null` until `--test-restore` runs, then:
 
 ```json
@@ -127,7 +136,8 @@ retention failure separately.
   "checks": ["archive-hash", "..."],
   "measurements": { "files": 128, "tables": 14, "rows": 20551 },
   "cleanupComplete": true,
-  "errorCode": "string | null"
+  "errorCode": "string | null",
+  "detail": null
 }
 ```
 

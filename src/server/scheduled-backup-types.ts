@@ -28,6 +28,15 @@ export const backupPolicySchema = z.object({
 });
 export type BackupPolicy = z.infer<typeof backupPolicySchema>;
 
+/** Why an owner's declared procedure failed; the host masks its values. */
+export const procedureDetailSchema = z.object({
+  step: z.enum(["dump", "verify", "start", "restore"]),
+  service: z.string().regex(/^[a-z0-9][a-z0-9_.-]{0,62}$/),
+  exitCode: z.number().int().nullable(),
+  output: z.string().max(2000),
+});
+export type ProcedureDetail = z.infer<typeof procedureDetailSchema>;
+
 export const scheduledRunSchema = z.object({
   version: z.literal(1),
   id: z.uuid(),
@@ -49,6 +58,7 @@ export const scheduledRunSchema = z.object({
     .default(null),
   sourcePauseSeconds: z.number().nonnegative().nullable().default(null),
   errorCode: z.string().max(80).nullable().default(null),
+  detail: procedureDetailSchema.nullable().optional(),
   retention: z.object({
     deleted: z.number().int().nonnegative(),
     failed: z.boolean(),
@@ -88,6 +98,7 @@ export const scheduledRunSchema = z.object({
       }),
       cleanupComplete: z.boolean(),
       errorCode: z.string().max(80).nullable().default(null),
+      detail: procedureDetailSchema.nullable().optional(),
       /** The restored application, booted in isolation on this host. */
       boot: z
         .object({

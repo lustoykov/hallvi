@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { scheduledProtection } from "../../../src/server/scheduled-backup-facts";
+import {
+  backupFailure,
+  restoreFailure,
+  scheduledProtection,
+} from "../../../src/server/scheduled-backup-facts";
 import {
   backupPolicySchema,
   backupSnapshotSchema,
@@ -316,6 +320,58 @@ describe("scheduled backup evidence", () => {
     expect(
       facts.history.find((item) => item.kind === "restore-test")?.outcome,
     ).toBe("failed");
+  });
+  it("records why an owner's declared procedure failed, as the host masked it", () => {
+    const failed = scheduledRunSchema.parse({
+      ...run,
+      outcome: "failed",
+      phase: "capture",
+      errorCode: "capture-failed",
+      bytes: null,
+      sha256: null,
+      detail: {
+        step: "verify",
+        service: "mariadb",
+        exitCode: 1,
+        output:
+          "ERROR 1146 (42S02): Table '$MARIADB_DATABASE.pages' doesn't exist",
+      },
+    });
+    expect(backupFailure(failed)).toContain(
+      "the verify procedure declared for mariadb exited 1: ERROR 1146",
+    );
+    // A receipt from an older runner keeps the generic reason.
+    expect(backupFailure({ ...failed, detail: null })).toContain(
+      "Check the source application",
+    );
+    const restored = scheduledRunSchema.parse({
+      ...run,
+      restore: {
+        at,
+        recoveryPointAt: at,
+        outcome: "failed",
+        scope: "isolated-application",
+        checks: ["archive-hash"],
+        measurements: {},
+        cleanupComplete: true,
+        errorCode: "restore-timeout",
+        detail: {
+          step: "restore",
+          service: "mariadb",
+          exitCode: null,
+          output: "no result within 600 seconds",
+        },
+      },
+    });
+    expect(restoreFailure(restored)).toBe(
+      "The restored copy failed: the restore procedure declared for mariadb gave no result: no result within 600 seconds.",
+    );
+    expect(
+      scheduledRunSchema.safeParse({
+        ...failed,
+        detail: { ...failed.detail, step: "shell" },
+      }).success,
+    ).toBe(false);
   });
   it("shows bounded restore failure reasons without exposing raw details", () => {
     const failed = scheduledRunSchema.parse({

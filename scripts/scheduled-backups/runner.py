@@ -38,6 +38,8 @@ MAX_LISTED = 1000
 COMMAND_TIMEOUT = 120
 CAPTURE_TIMEOUT = 900
 RESTORE_TIMEOUT = 600
+# The recorded tail of what a failed declared procedure printed.
+DETAIL_CHARACTERS = 1500
 RECOVERY_LOCK_WAIT = 15
 
 STATE_ROOT = Path(
@@ -150,10 +152,12 @@ ARCHIVE_ROOTS = {"manifest.json", "state", "configuration", "database"}
 class BackupError(Exception):
     """A failure already reduced to a phase and a bounded code."""
 
-    def __init__(self, phase, code):
+    def __init__(self, phase, code, detail=None):
         super().__init__(code)
         self.phase = phase
         self.code = code
+        # Why an owner's declared procedure failed, when that is the cause.
+        self.detail = detail
 
 
 def classify(error, phase):
@@ -193,6 +197,61 @@ def classify(error, phase):
                 return STORAGE_CODES[code]
         return "storage-error"
     return "unexpected-error"
+
+
+def procedure_detail(step, service, environment, error=None, reason=None):
+    """Why an owner's declared procedure failed, without its private values.
+
+    The dump, restore and verify commands are the plan's own, so their exit
+    status and the tail of what they printed are the evidence a correction
+    needs. Every value from the owner's environment is replaced by the
+    variable's name before anything is recorded.
+    """
+    exit_code = None
+    output = reason or ""
+    if isinstance(error, subprocess.CalledProcessError):
+        exit_code = error.returncode
+        output = error.stderr or b""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", "replace")
+    elif isinstance(error, subprocess.TimeoutExpired):
+        output = f"no result within {int(error.timeout)} seconds"
+    values = [str(entry).partition("=") for entry in environment or []]
+    for name, _, value in sorted(values, key=lambda item: -len(item[2])):
+        if len(value) >= 6:
+            output = output.replace(value, "$" + name)
+    return {
+        "step": step,
+        "service": service,
+        "exitCode": exit_code,
+        "output": output.strip()[-DETAIL_CHARACTERS:],
+    }
+
+
+def service_environment(service):
+    """A Compose service's environment as NAME=value entries."""
+    environment = service.get("environment") or {}
+    if isinstance(environment, dict):
+        return [f"{name}={value}" for name, value in environment.items() if value is not None]
+    return [str(entry) for entry in environment]
+
+
+def sanitize_detail(detail):
+    if not isinstance(detail, dict) or detail.get("step") not in PROCEDURE_STEPS:
+        return None
+    service = str(detail.get("service") or "")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}", service):
+        return None
+    exit_code = detail.get("exitCode")
+    return {
+        "step": detail["step"],
+        "service": service,
+        "exitCode": int(exit_code) if isinstance(exit_code, int) else None,
+        "output": str(detail.get("output") or "")[-DETAIL_CHARACTERS:],
+    }
+
+
+PROCEDURE_STEPS = {"dump", "verify", "start", "restore"}
 
 
 def now():
@@ -1366,6 +1425,13 @@ def capture_declared_dump(container, meta, dump, stage, command):
     """
     (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
     target = stage / "database" / (dump["volume"] + ".dump")
+
+    def failed(step, error=None, reason=None):
+        detail = procedure_detail(
+            step, meta["service"], meta["environment"], error, reason
+        )
+        return BackupError("capture", "capture-failed", detail)
+
     try:
         command(
             "docker",
@@ -1375,14 +1441,19 @@ def capture_declared_dump(container, meta, dump, stage, command):
             stdout=target,
             timeout=CAPTURE_TIMEOUT,
         )
-        os.chmod(target, 0o600)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise failed("dump", error) from error
+    os.chmod(target, 0o600)
+    if not target.stat().st_size:
+        raise failed("dump", reason="the dump wrote no bytes")
+    try:
         fingerprint = command(
             "docker", "exec", container, *dump["verify"], timeout=COMMAND_TIMEOUT
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        raise BackupError("capture", "capture-failed") from error
-    if not target.stat().st_size or len(fingerprint) > 64 * 1024:
-        raise BackupError("capture", "capture-failed")
+        raise failed("verify", error) from error
+    if len(fingerprint) > 64 * 1024:
+        raise failed("verify", reason="the fingerprint exceeds 64 KiB")
     return {
         "service": meta["service"],
         "image": meta["image"],
@@ -1509,6 +1580,13 @@ def restore_application(
             or declared.get("service") not in definition["services"]
         ):
             raise BackupError("restore", "manifest-mismatch")
+        owner = declared["service"]
+        environment = service_environment(definition["services"][owner])
+
+        def failed(code, step, error=None, reason=None):
+            detail = procedure_detail(step, owner, environment, error, reason)
+            return BackupError("restore", code, detail)
+
         try:
             command(
                 *compose,
@@ -1520,11 +1598,11 @@ def restore_application(
                 "--no-deps",
                 "--pull",
                 "never",
-                declared["service"],
+                owner,
                 timeout=RESTORE_TIMEOUT + 60,
             )
         except subprocess.CalledProcessError as error:
-            raise BackupError("restore", "restore-failed") from error
+            raise failed("restore-failed", "start", error) from error
         payload = dump.read_bytes()
         deadline = now() + RESTORE_TIMEOUT
         while True:
@@ -1533,19 +1611,19 @@ def restore_application(
                     *compose,
                     "exec",
                     "-T",
-                    declared["service"],
+                    owner,
                     *declared["restore"],
                     input=payload,
                     timeout=RESTORE_TIMEOUT,
                 )
                 break
             except subprocess.TimeoutExpired as error:
-                raise BackupError("restore", "restore-timeout") from error
+                raise failed("restore-timeout", "restore", error) from error
             except subprocess.CalledProcessError as error:
                 # A fresh server refuses connections while it initializes; a
                 # partial load is still caught by the fingerprint below.
                 if now() >= deadline:
-                    raise BackupError("restore", "restore-failed") from error
+                    raise failed("restore-failed", "restore", error) from error
                 time.sleep(2)
         restore["checks"].append("database-restored")
         try:
@@ -1553,14 +1631,18 @@ def restore_application(
                 *compose,
                 "exec",
                 "-T",
-                declared["service"],
+                owner,
                 *declared["verify"],
                 timeout=COMMAND_TIMEOUT,
             ).decode("utf-8", "replace")
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-            raise BackupError("restore", "database-check-failed") from error
+            raise failed("database-check-failed", "verify", error) from error
         if fingerprint != captured["fingerprint"]:
-            raise BackupError("restore", "database-check-failed")
+            raise failed(
+                "database-check-failed",
+                "verify",
+                reason="the restored fingerprint differs from the captured one",
+            )
         restore["checks"].append("database-content")
         restore["measurements"]["databases"] = (
             restore["measurements"].get("databases", 0) + 1
@@ -1779,6 +1861,7 @@ def new_receipt(config, run_id, started):
         "objectKey": None,
         "sourcePauseSeconds": None,
         "errorCode": None,
+        "detail": None,
         "retention": {"deleted": 0, "failed": False},
         "restore": None,
     }
@@ -1834,6 +1917,7 @@ def perform_run(
         receipt["outcome"] = "failed"
         receipt["phase"] = getattr(error, "phase", receipt["phase"])
         receipt["errorCode"] = classify(error, receipt["phase"])
+        receipt["detail"] = getattr(error, "detail", None)
     finally:
         if not remove_tree(staging):
             receipt["pendingCleanup"] = True
@@ -2046,6 +2130,7 @@ def sanitize_restore(restore):
         },
         "cleanupComplete": bool(restore.get("cleanupComplete")),
         "errorCode": code if code in ERROR_CODES else None,
+        "detail": sanitize_detail(restore.get("detail")),
         **({"boot": boot} if (boot := sanitize_boot(restore.get("boot"))) else {}),
     }
 
@@ -2092,6 +2177,7 @@ def sanitize_receipt(receipt):
         "failed": bool(retention.get("failed")),
     }
     result["restoreInProgress"] = bool(receipt.get("restoreInProgress"))
+    result["detail"] = sanitize_detail(receipt.get("detail"))
     result["restore"] = sanitize_restore(receipt.get("restore"))
     return result
 
@@ -2367,6 +2453,7 @@ def perform_test_restore(
         "measurements": {},
         "cleanupComplete": False,
         "errorCode": None,
+        "detail": None,
     }
     names = restore_names(run_id)
     journal = {
@@ -2451,6 +2538,7 @@ def perform_test_restore(
         restore["outcome"] = "verified"
     except Exception as error:  # noqa: BLE001 - every failure becomes a bounded code
         restore["errorCode"] = classify(error, "restore")
+        restore["detail"] = getattr(error, "detail", None)
     finally:
         # Cleanup is reported, not conflated with the restore verdict. A kept
         # copy stays up on purpose, and its open journal says so until the
