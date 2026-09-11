@@ -6,7 +6,8 @@
 // rule), with a rig CA that only the host's server-guy-* units trust through
 // a systemd drop-in: the stand-in for a public certificate authority. Test
 // credentials stay under ignored tests/results/rig/<container>/.
-// Usage: node tests/rig/host/start.mjs [container]
+// Usage: node tests/rig/host/start.mjs [container] [http-port]
+// A second host beside the first publishes its HTTP on another local port.
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const name = process.argv[2] ?? "sg-rig-host";
+const httpPort = Number(process.argv[3] ?? 80);
 const results = resolve(here, "../../results/rig", name);
 mkdirSync(results, { recursive: true });
 const docker = (...args) =>
@@ -58,7 +60,7 @@ if (!docker("ps", "-aq", "--filter", `name=^${name}$`))
     "--tmpfs",
     "/run/lock",
     "--publish",
-    "127.0.0.1:80:80",
+    `127.0.0.1:${httpPort}:80`,
     "sg-rig-host:2",
   );
 else docker("start", name);
@@ -134,7 +136,7 @@ host(`docker run --rm --network container:rig-minio --env-file /etc/rig-minio/en
 console.log(
   JSON.stringify({
     container: name,
-    http: "http://127.0.0.1:80",
+    http: `http://127.0.0.1:${httpPort}`,
     storage: {
       provider: "s3",
       endpoint: "https://s3.rig.amazonaws.com",
