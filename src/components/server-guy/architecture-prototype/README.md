@@ -76,6 +76,31 @@ History places finished work by its newest recorded step. The deployment
 operation's `updatedAt` is its record's and moves whenever the record is
 rewritten, which files an old deploy under Today in the shipped page.
 
+## Processes and Database: three directions (`stack-prototype/`)
+
+On `opus-ui-improvements`, not chosen yet. Each direction draws both pages
+from the same record: the stack derived from the deployment, the checks the
+deployment passed for each process, where the database lives, and the
+backup and restore operations on record. Nothing on these pages is observed
+live; each says when it was recorded. With nothing recorded, the shipped
+page's empty state stands in.
+
+- **A · Line.** Transit's language, as on Deployment and History. Processes:
+  now on the left, and on the right how a visit reaches them, from your
+  network through port 80 to the web app, with the private processes behind
+  a wall. Database: where your data goes, from the process that writes it to
+  the file, the schedule, the off-host copy and a tested restore.
+- **B · Machine.** The server drawn as its front panel, with Little Server
+  on top. Processes are modules with their port and a light for each check;
+  a cable from the web app's port carries a light while you point at it.
+  Database is the storage bay: the database's drive, a backup rack with a
+  slot for each copy the schedule keeps, and a restore lamp. Opening a
+  module pulls out its spec plate.
+- **C · Console.** The record read like a terminal listing, labelled as
+  recorded: one line per process with an inspect pane, and the database in
+  sections for where it lives, how it answered, what protects it and what
+  isn't measured.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,

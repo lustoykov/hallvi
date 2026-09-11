@@ -21,6 +21,7 @@ import { OverviewPrototype } from "./overview-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
+import { StackPrototype } from "./stack-prototype";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
 import { CdnView } from "./views/cdn-view";
@@ -362,6 +363,37 @@ export function ApplicationSectionView({
           decisionFor={decisionFor}
           chrome={{ bar, header, activity: null }}
           current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): directions for Processes and
+  // Database, beside the shipped view (direction 0).
+  if (section === "processes" || section === "database")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <StackPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
         />
       </div>
     );

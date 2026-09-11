@@ -1,0 +1,111 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction A for Processes and Database, Line. It borrows Transit's
+   classes (axm-) from Deployment; the additions are prefixed axsl-. */
+
+.axsl-code {
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+/* The inside of the server: a wall, drawn once, with its rule in words. */
+.axsl-wall {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0 6px;
+}
+.axsl-wall span {
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--ax-muted);
+}
+.axsl-wall i {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    #cfd6e2 0 26px,
+    #eef1f6 26px 28px
+  );
+}
+.axsl-private .axm-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border: 0;
+  background: var(--ax-ink-2);
+}
+.axsl-changes,
+.axsl-other {
+  display: grid;
+  gap: 8px;
+}
+.axsl-changes h3,
+.axsl-other h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axsl-changes ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axsl-changes li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.axsl-changes button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ax-link);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.axsl-changes button:hover {
+  text-decoration: underline;
+}
+.axsl-changes li[data-state="failed"] button {
+  color: var(--ax-failed);
+}
+.axsl-changes small {
+  flex: none;
+  font-size: 12px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axsl-other p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ax-ink-2);
+}
+.axsl-other code {
+  font-family: var(--ax-mono);
+  font-size: 12px;
+}
+.axsl-other .ax-textlink {
+  font-size: 12.5px;
+}
+.axsl-note {
+  max-width: 64ch;
+  margin: 8px 0 0 54px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+.axsl-empty {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--ax-muted);
+}

@@ -24,11 +24,17 @@
 
 /* ---------- Now ---------- */
 
+/* Sticky makes its own layer; raised, so a fact's popover opens over the
+   line beside it rather than under it. */
 .axm-now {
   position: sticky;
   top: 18px;
+  z-index: 3;
   display: grid;
   gap: 18px;
+}
+.axm-now .axm-pop {
+  width: 380px;
 }
 .axm-say {
   margin: 8px 0 0;

@@ -1,0 +1,311 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction C for Processes and Database, Console. Prefix: axcn-. A
+   terminal listing of the record, labelled as recorded; nothing in it
+   moves. */
+
+.axcn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 10px;
+}
+.axcn-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axcn-say {
+  margin: 6px 0 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.024em;
+  color: var(--ax-ink);
+}
+.axcn-sure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--ax-ink-2);
+}
+.axcn-ask {
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axcn-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The console ---------- */
+
+.axcn-stage {
+  position: relative;
+  padding-top: 38px;
+}
+.axcn-guy {
+  position: absolute;
+  top: 0;
+  right: 24px;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+}
+.axcn-console {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #1c2538 0%, #151c2c 100%);
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 10%),
+    0 24px 48px -30px rgb(23 34 56 / 55%);
+  color: #d9e1f2;
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.axcn-console ::selection {
+  background: #3a5bd0;
+  color: #ffffff;
+}
+.axcn-console > header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 10px 104px 10px 18px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  font-size: 11.5px;
+  color: #8391ad;
+}
+.axcn-body {
+  display: grid;
+  gap: 2px;
+  padding: 14px 18px 18px;
+}
+.axcn-comment {
+  margin: 10px 0 2px;
+  color: #6b7a96;
+  white-space: pre-wrap;
+}
+.axcn-comment:first-child {
+  margin-top: 0;
+}
+.axcn-table {
+  display: grid;
+  gap: 1px;
+}
+.axcn-row {
+  display: grid;
+  grid-template-columns:
+    minmax(9ch, 0.7fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.3fr)
+    minmax(11ch, 0.6fr);
+  gap: 16px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color var(--ax-fast);
+}
+.axcn-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axcn-row:hover {
+  background: rgb(255 255 255 / 5%);
+}
+.axcn-row[aria-selected="true"] {
+  background: rgb(159 180 245 / 14%);
+  box-shadow: inset 2px 0 0 #9fb4f5;
+}
+.axcn-row:focus-visible {
+  outline: 2px solid #9fb4f5;
+  outline-offset: 0;
+}
+.axcn-row.is-head {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #6b7a96;
+  cursor: default;
+}
+.axcn-row.is-head:hover {
+  background: none;
+}
+.axcn-name {
+  font-weight: 600;
+  color: #ffffff;
+}
+.axcn-image {
+  color: #aebbd6;
+}
+.axcn-checks {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.axcn-checks b {
+  font-weight: 600;
+  color: #7d8aa5;
+}
+.axcn-checks b[data-tone="pass"] {
+  color: #3fbf86;
+}
+.axcn-checks time {
+  margin-left: 6px;
+  color: #8391ad;
+  font-variant-numeric: tabular-nums;
+}
+.axcn-row > .axcn-comment,
+.axcn-table > .axcn-comment {
+  margin: 4px 0 0;
+  padding: 0 10px;
+}
+.axcn-inspect {
+  display: grid;
+  gap: 1px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgb(255 255 255 / 10%);
+}
+.axcn-kv {
+  display: grid;
+  grid-template-columns: 16ch minmax(0, 1fr);
+  gap: 16px;
+  padding: 0 10px;
+}
+.axcn-kv > span:first-child {
+  color: #8fa3c9;
+}
+.axcn-kv > span:last-child {
+  overflow-wrap: anywhere;
+}
+.axcn-kv[data-tone="strong"] > span:first-child {
+  font-weight: 600;
+  color: #ffffff;
+}
+.axcn-kv[data-tone="muted"] > span:last-child {
+  color: #6b7a96;
+}
+.axcn-lines {
+  display: grid;
+  margin-top: 4px;
+}
+.axcn-line {
+  display: grid;
+  grid-template-columns: 14px minmax(7ch, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 10px;
+}
+.axcn-line b {
+  font-weight: 600;
+  text-align: center;
+  color: #7d8aa5;
+}
+.axcn-line time {
+  color: #8391ad;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.axcn-line span {
+  overflow-wrap: anywhere;
+}
+.axcn-line em {
+  font-style: normal;
+  color: #8391ad;
+}
+.axcn-line[data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axcn-line[data-tone="fail"] b,
+.axcn-line[data-tone="fail"] span {
+  color: #ef8d86;
+}
+.axcn-line[data-tone="fail"] em {
+  color: #c98e89;
+}
+.axcn-link {
+  justify-self: start;
+  margin: 8px 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9fb4f5;
+  font: inherit;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.axcn-kv .axcn-link {
+  margin: 0;
+}
+.axcn-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Recent changes ---------- */
+
+.axcn-changes {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+}
+.axcn-changes h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axcn-changes ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axcn-changes li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.axcn-changes button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ax-link);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.axcn-changes button:hover {
+  text-decoration: underline;
+}
+.axcn-changes li[data-state="failed"] button {
+  color: var(--ax-failed);
+}
+.axcn-changes small {
+  flex: none;
+  font-size: 12px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .axcn-row {
+    grid-template-columns: minmax(9ch, 0.8fr) minmax(0, 1fr) minmax(11ch, 0.6fr);
+  }
+  .axcn-row > span:nth-child(3),
+  .axcn-row > span:nth-child(4) {
+    display: none;
+  }
+}
