@@ -1032,7 +1032,10 @@ export function buildModel({
     status !== "live"
       ? {
           certainty: "planned",
-          text: `Nothing runs yet. This is what Server Guy will build once you approve the plan.`,
+          text:
+            status === "none"
+              ? "Nothing is deployed yet. The map fills in as Server Guy deploys it."
+              : "Nothing runs yet. This is what Server Guy will build once you approve the plan.",
         }
       : failed
         ? {

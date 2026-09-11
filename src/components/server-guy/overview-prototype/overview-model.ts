@@ -243,7 +243,9 @@ export function buildOverview({
     "Three things need",
   ];
   const headline = planned
-    ? "Waiting for your approval."
+    ? model.status === "none"
+      ? "Nothing is deployed yet."
+      : "Waiting for your approval."
     : needs.length
       ? `${counts[needs.length] ?? `${needs.length} things need`} you.`
       : model.condition.certainty === "stale"

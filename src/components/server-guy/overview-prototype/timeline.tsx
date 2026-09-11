@@ -91,7 +91,9 @@ const since: Record<Lane["id"], string> = {
 
 function subline(model: HeroProps["model"], overview: Overview) {
   if (model.status !== "live")
-    return "Nothing runs yet. Once you approve, Server Guy builds it, checks it and starts copying its data off the server.";
+    return model.status === "none"
+      ? "Ask Server Guy in the conversation to deploy it; this fills in as it runs."
+      : "Nothing runs yet. Once you approve, Server Guy builds it, checks it and starts copying its data off the server.";
   if (overview.needs.length) return null;
   const app = model.byId.app;
   const host = model.byId.host;

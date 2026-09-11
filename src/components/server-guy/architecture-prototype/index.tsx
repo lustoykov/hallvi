@@ -4,9 +4,9 @@
 // The chosen Architecture design, Journeys, on the real route and inside the
 // real shell, beside the shipped canvas (?variant= and the prototype bar, ← →
 // keys). The record is read live and read-only from the app's own API; every
-// other "Record" choice is invented and labelled. The caller renders this
-// only when prototypes are switched on, and hands over the page's chrome (the
-// way back, the header, the activity line) so the design can draw its own.
+// other "Record" choice is invented and labelled. The caller renders this by
+// default and hands over the page's chrome (the way back, the header, the
+// activity line) so the design can draw its own.
 // The other directions explored live on claude/architecture-directions.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";

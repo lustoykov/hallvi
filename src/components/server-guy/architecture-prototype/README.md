@@ -1,15 +1,14 @@
 # Overview and Architecture redesign — prototype
 
 The designs the owner chose in `claude/architecture-directions`, rendered
-inside the real application shell on the real routes. They are opt-in:
-development only, and only with `NEXT_PUBLIC_SERVER_GUY_PROTOTYPES=1`, so CI,
-the browser tests and every other dev server keep the shipped pages. Nothing
-here is production code yet; it gets rewritten properly when it replaces the
-shipped pages.
+inside the real application shell on the real routes. They are the default
+Overview and Architecture; the bar at the bottom still switches to the
+shipped page for comparison. The code is still prototype code, and gets
+rewritten properly as it settles.
 
 ## Run
 
-- Start a dev server with `NEXT_PUBLIC_SERVER_GUY_PROTOTYPES=1 npm run dev`.
+- Start the app as usual (`npm run dev`).
 - Open `/applications/<id>?variant=A#overview` or `#architecture`. The bar at
   the bottom (or the ← → keys) switches between the design (A) and the
   shipped page (0), the record scenario, and a reduced-motion preview.

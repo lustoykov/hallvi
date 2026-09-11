@@ -68,13 +68,6 @@ const descriptions: Record<ApplicationSection, string> = {
  * the recorded stack and the facts each capability records; a resource the
  * application does not have never gets an empty control.
  */
-// The redesigned Overview and Architecture are opt-in: development only, and
-// only with NEXT_PUBLIC_SERVER_GUY_PROTOTYPES=1, so CI, the browser tests and
-// every other dev server keep the shipped pages.
-const prototypes =
-  process.env.NODE_ENV !== "production" &&
-  process.env.NEXT_PUBLIC_SERVER_GUY_PROTOTYPES === "1";
-
 export function ApplicationSectionView({
   section,
   view,
@@ -270,10 +263,10 @@ export function ApplicationSectionView({
       )}
     </header>
   );
-  // PROTOTYPE (claude/architecture-directions): the chosen Overview and
-  // Architecture designs, shown only when asked for. The prototype receives
-  // the page's chrome so it can draw its own header.
-  if (section === "overview" && prototypes)
+  // The Overview and Architecture chosen on claude/architecture-directions
+  // are the default experience; their bar still switches to the shipped
+  // page. They receive the page's chrome so they can draw their own header.
+  if (section === "overview")
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         <OverviewPrototype
@@ -290,7 +283,7 @@ export function ApplicationSectionView({
         />
       </div>
     );
-  if (section === "architecture" && prototypes)
+  if (section === "architecture")
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         <ArchitecturePrototype
@@ -325,23 +318,10 @@ export function ApplicationSectionView({
     <div className={`sg-section-page sg-section-${section}`}>
       {bar}
       {header}
-      {section === "architecture" ? (
-        <>
-          {activity && <div className="sg-section-activity">{activity}</div>}
-          <ArchitectureCanvas
-            application={app}
-            deployment={deployment}
-            stack={stack}
-            facts={facts}
-            onOpenDestination={onOpenDestination}
-          />
-        </>
-      ) : (
-        <div className="sg-section-content">
-          {activity}
-          {content}
-        </div>
-      )}
+      <div className="sg-section-content">
+        {activity}
+        {content}
+      </div>
     </div>
   );
 }
