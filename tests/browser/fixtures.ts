@@ -6,11 +6,13 @@ import { join } from "node:path";
 import { removeTemporaryRoot } from "../temporary-root.mjs";
 
 // One disposable app per worker; distinct repositories per test. Never port
-// 3000.
+// 3000. A spec that needs an application list nobody else has populated sets
+// `isolatedApp`: a different worker option gets a worker, and app, of its own.
 export const test = base.extend<
   Record<never, never>,
-  { fixture: { url: string; state: string } }
+  { fixture: { url: string; state: string }; isolatedApp: boolean }
 >({
+  isolatedApp: [false, { scope: "worker", option: true }],
   fixture: [
     async ({}, provide, workerInfo) => {
       const port = 3180 + workerInfo.workerIndex;

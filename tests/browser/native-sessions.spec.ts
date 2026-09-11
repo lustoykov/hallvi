@@ -1,4 +1,4 @@
-import { openConversation, openDashboard } from "./workspace-helpers";
+import { openConversation, openHistory } from "./workspace-helpers";
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
@@ -41,10 +41,9 @@ test(
   journey("native-history"),
   async ({ page, fixture }, testInfo) => {
     const first = await addApplication(page, "native-continuity");
-    await openDashboard(page);
-    await expect(
-      page.getByText("Saved requirements", { exact: true }),
-    ).toHaveCount(0);
+    // History lists saved requirements; none exist yet and none are asked for.
+    await openHistory(page);
+    await expect(page.locator("#history-requirements")).toHaveCount(0);
     await expect(
       page.getByText("No extra requirements.", { exact: false }),
     ).toHaveCount(0);
@@ -77,20 +76,10 @@ test(
     // tool; live evals separately verify whether a model should call it.
     await openConversation(page);
     await send(page, "priority: Customer data must stay in the EU");
-    await openDashboard(page);
-    await expect(page.locator(".sg-decision-list")).not.toBeVisible();
-    await openDashboard(page);
-    await page.getByText("Saved requirements (1)", { exact: true }).click();
-    await openDashboard(page);
-    await expect(page.locator(".sg-decision-list")).toBeVisible();
-    await openDashboard(page);
-    await expect(page.locator(".sg-decision-list")).toContainText(
-      "Customer data must stay in the EU",
-    );
-    await openDashboard(page);
-    await expect(page.locator(".sg-decision-list")).not.toContainText(
-      "launch priority",
-    );
+    await openHistory(page);
+    const saved = page.locator("#history-requirements");
+    await expect(saved).toContainText("Customer data must stay in the EU");
+    await expect(saved).not.toContainText("launch priority");
     await expect(
       page.getByText("No extra requirements.", { exact: false }),
     ).toHaveCount(0);
