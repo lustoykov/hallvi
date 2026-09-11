@@ -1,6 +1,6 @@
 import { rememberVerifiedImages, rollbackSelection } from "./rollback";
 import { reconcileRelease } from "./release-reconciliation";
-import { inspectRelease } from "./release-diagnostics";
+import { inspectRuntime } from "./release-diagnostics";
 import { getApplication } from "./db";
 import { randomUUID } from "node:crypto";
 import {
@@ -119,7 +119,7 @@ export async function proposeApplicationRelease(
       title: `${rollback ? "Roll back to" : "Release"} ${revision.slice(0, 12)}`,
       summary: rollback
         ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Preserve current data, private settings, database image and network exposure. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
-        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, the managed database and network exposure. No server purchase or resize. Destructive data migrations need a separate decision.`,
+        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Preserve existing data volumes, the managed database and network exposure. No server purchase or resize. Destructive data migrations need a separate decision. Task: ${requirements.slice(0, 1200)}`,
       destinations: ["deployment", "history", "processes"],
       command: {
         type: "release-deployment",
@@ -304,9 +304,9 @@ async function releaseLoop(input: {
       if (result.completed) evidence = result.message;
       return result;
     },
-    inspect: async () => {
+    inspect: async (options) => {
       assertOwned(record, tracked, scope, current(), false);
-      return inspectRelease(record, signal);
+      return inspectRuntime(record, signal, options);
     },
     apply: async (selection, artifacts) => {
       if (evidence) return { ok: true, message: evidence };

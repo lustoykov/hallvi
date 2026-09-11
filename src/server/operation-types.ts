@@ -9,7 +9,13 @@ export type OperationCommand =
       requirements: string;
     }
   | { type: "recreate-deployment"; deploymentId: string }
-  | { type: "collect-logs"; deploymentId: string }
+  /** A fresh, read-only runtime inspection: container state and logs. */
+  | {
+      type: "collect-logs";
+      deploymentId: string;
+      service?: string;
+      lines?: number;
+    }
   | { type: "run-backup" | "test-restore"; deploymentId: string }
   | {
       type: "configure-backups";

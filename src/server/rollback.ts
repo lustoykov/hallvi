@@ -1,4 +1,3 @@
-import { deniedPathReason, redactSecrets } from "./secrets";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
 import { releaseIdentityHolds, releaseOf } from "./deployment-release";
@@ -65,40 +64,5 @@ export function rollbackSelection(
     attemptId: verified.attemptId,
     images,
     compatibilityEvidence: evidence,
-  };
-}
-
-/** Read a recorded release revision without executing inspected text. */
-export async function readReleaseFile(
-  record: DeploymentRecord,
-  releaseId: string,
-  path: string,
-  signal: AbortSignal,
-) {
-  const release = record.lifecycle?.releases.find((r) => r.id === releaseId);
-  if (
-    !release ||
-    release.repository !== record.repository ||
-    !releaseIdentityHolds(release)
-  )
-    throw new Error("Select a recorded release of this application.");
-  if (deniedPathReason(path))
-    throw new Error("Credential-bearing paths are excluded.");
-  const { checkDeploymentSource } = await import("./deployment-source");
-  const { deploymentSourceFiles } = await import("./deployment-source-files");
-  const { token } = await checkDeploymentSource(record);
-  const source = await deploymentSourceFiles(
-    release.repository,
-    release.revision,
-    token,
-    signal,
-  );
-  const content = await source.read(path);
-  return {
-    repository: release.repository,
-    revision: release.revision,
-    path,
-    text: redactSecrets(content.slice(0, 18000)).text,
-    truncated: content.length > 18000,
   };
 }

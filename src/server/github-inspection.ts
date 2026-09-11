@@ -157,10 +157,16 @@ export async function fetchRepositoryFile(
     token,
     { signal: options.signal },
   );
+  return decodeRepositoryFile(data, path);
+}
+
+/** One file from a contents-API response: bounded, redacted text or binary. */
+export function decodeRepositoryFile(
+  data: unknown,
+  path: string,
+): RepositoryFileRead {
   if (Array.isArray(data))
-    throw new RepositoryPathError(
-      `${path} is a directory; list it with get_repository_inspection.`,
-    );
+    throw new RepositoryPathError(`${path} is a directory, not a file.`);
   const parsed = contentsSchema.safeParse(data);
   if (!parsed.success)
     throw new GithubAccessError("GitHub returned an unreadable file.");

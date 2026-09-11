@@ -39,21 +39,27 @@ async function dispatch(record: StoredOperation) {
     case "collect-logs": {
       const { getDeployment, runDeploymentAttempt } =
         await import("./deployment-store");
-      const executor = await import("./deployment-executor");
       const deployment = getDeployment(command.deploymentId);
       if (!deployment || deployment.applicationId !== id)
         throw new Error("Deployment no longer belongs to this application.");
       const signal = AbortSignal.timeout(10 * 60000);
-      if (command.type === "recreate-deployment")
-        return runDeploymentAttempt(deployment, "recreate", record.id, () =>
-          executor.recreateDeployment(deployment, signal),
-        );
-      await executor.collectDeploymentLogs(deployment, signal);
-      return {
-        evidence: `Collected host logs at ${deployment.logsCollectedAt}.`,
-        collectedAt: deployment.logsCollectedAt,
-      };
+      if (command.type === "collect-logs") {
+        // The inspection's content is its result, never only its time.
+        const { inspectRuntime } = await import("./release-diagnostics");
+        return inspectRuntime(deployment, signal, {
+          service: command.service,
+          lines: command.lines,
+        });
+      }
+      const executor = await import("./deployment-executor");
+      return runDeploymentAttempt(deployment, "recreate", record.id, () =>
+        executor.recreateDeployment(deployment, signal),
+      );
     }
+    default:
+      throw new Error(
+        "This operation's capability was retired; it cannot run again.",
+      );
   }
 }
 export async function runOperationWorker(signal: AbortSignal) {
