@@ -31,7 +31,7 @@ SG_RIG_PI_SETTINGS=/path/to/pi-settings.json node tests/rig/rig.mjs rigb 3397 --
 # The provider stand-in records 127.0.0.1 for every rig, so public checks reach
 # whichever host owns port 80: stop the first host's container, then forward.
 node tests/rig/host/start.mjs sg-rig-host-hc 8082
-docker stop sg-rig-host && node tests/rig/host/forward.mjs 80 8082 &
+docker stop sg-rig-host && node tests/rig/host/forward.mjs 8082   # sg-rig-forward container; `forward.mjs 8082 stop` removes it
 SG_RIG_WORKFLOW=tests/results/rig/workflow-hc SG_RIG_PI_SETTINGS=/path/to/pi-settings.json node tests/rig/rig.mjs rigb-hc 3399 --host-container sg-rig-host-hc
 ```
 
