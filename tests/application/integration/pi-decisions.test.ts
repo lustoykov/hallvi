@@ -35,14 +35,10 @@ function fixtureApplication(name: string) {
     repositoryUrl: `https://github.com/qa/${name}`,
     repositoryOwner: "qa",
     repositoryName: name,
-    environment: "production",
-    approvalMode: "pi-decides",
-    approvalScope: "Current application launch",
   });
-  const workspace = store.insertWorkspace(app.id);
-  const chat = store.insertChat(workspace.id, "Main", true);
+  const chat = store.insertChat(app.id, "Main");
   const source = store.insertMessage(chat.id, "user", "Priorities", "user");
-  return { app, workspace, chat, source };
+  return { app, chat, source };
 }
 
 function saved(
@@ -372,7 +368,7 @@ describe("Decision proposals and the final commit", () => {
     expect(run.id).toBe(accepted.run.id);
     const competing = saved("A newer saved priority");
     store.supersedeDecision(current.app.id, previous.id, competing.id);
-    const beforeActivity = store.listActivity(current.workspace.id);
+    const beforeActivity = store.listActivity(current.app.id);
     const beforeMessages = store.listMessages(current.chat.id);
     expect(() =>
       runs.completePiRun(run.id, {
@@ -381,7 +377,7 @@ describe("Decision proposals and the final commit", () => {
       }),
     ).toThrow("already replaced");
     expect(store.listActiveDecisions(current.app.id)).toEqual([competing]);
-    expect(store.listActivity(current.workspace.id)).toEqual(beforeActivity);
+    expect(store.listActivity(current.app.id)).toEqual(beforeActivity);
     expect(store.listMessages(current.chat.id)).toEqual(beforeMessages);
     expect(runs.getPiRun(run.id)?.status).toBe("running");
     runs.finishPiRun(run.id, "failed", "The Decisions could not be saved.");
@@ -425,7 +421,7 @@ describe("Decision proposals and the final commit", () => {
     // the reply itself adds nothing.
     expect(
       store
-        .listActivity(current.workspace.id)
+        .listActivity(current.app.id)
         .map((event) => [event.kind, event.summary, event.detail]),
     ).toEqual([
       ["decision-recorded", "Requirement saved", "Keep operations simple"],

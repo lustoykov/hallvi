@@ -73,7 +73,6 @@ function databasePassword(record: DeploymentRecord) {
     });
   return readFileSync(path, "utf8");
 }
-export { composeDefinition } from "./deployment-compose";
 
 async function command(
   file: string,

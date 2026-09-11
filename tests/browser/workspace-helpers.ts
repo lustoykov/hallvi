@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
-// The preparation Record lives with Deployment in the conversation-first
-// shell; opening it parks the conversation until openConversation.
+// Opens the Deployment destination; it parks the conversation until
+// openConversation.
 export async function openDashboard(page: Page) {
   const button = page.getByRole("button", { name: "Deployment", exact: true });
   if ((await button.getAttribute("aria-current")) !== "page")
@@ -28,9 +28,12 @@ export async function openConversation(page: Page) {
     .click();
   await expect(page.locator(".sg-chat-column")).toBeVisible();
 }
-export async function openPreparation(page: Page) {
-  await openConversation(page);
-  const details = page.locator("details.sg-legacy-preparation");
-  if ((await details.getAttribute("open")) === null)
-    await details.locator(":scope > summary").click();
+// Opens the History destination: operations, saved requirements and
+// application activity.
+export async function openHistory(page: Page) {
+  const button = page
+    .getByRole("navigation", { name: "Application workspace" })
+    .getByRole("button", { name: /^History/ });
+  if ((await button.getAttribute("aria-current")) !== "page")
+    await button.click();
 }

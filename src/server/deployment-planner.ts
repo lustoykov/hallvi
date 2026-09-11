@@ -82,7 +82,6 @@ export async function inspectDeployment(
         signal,
       }),
   });
-  record.plan = null;
   record.native = native;
   deploymentEvent(
     record,

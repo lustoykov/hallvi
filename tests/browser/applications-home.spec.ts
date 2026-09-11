@@ -1,6 +1,10 @@
 import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 
+// The journey starts from an empty application list, so it runs in its own
+// disposable app rather than one that earlier journeys have populated.
+test.use({ isolatedApp: true });
+
 test(
   "caretakers open the selected real application and search preserves navigation",
   journey("application-shell"),
@@ -20,7 +24,6 @@ test(
           repositoryUrl: `https://github.com/qa/${name.toLowerCase().replaceAll(" ", "-")}`,
           name,
           requestKey: crypto.randomUUID(),
-          approvalMode: "pi-decides",
         },
       });
       expect(response.status()).toBe(201);

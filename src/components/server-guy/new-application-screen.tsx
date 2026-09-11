@@ -5,15 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { APPROVAL_MODES } from "@/server/types";
-import type { ApprovalMode } from "@/server/types";
-
 import { api } from "./api";
 import s from "./applications.module.css";
-
-const permissionOptions = Object.entries(APPROVAL_MODES) as Array<
-  [ApprovalMode, (typeof APPROVAL_MODES)[ApprovalMode]]
->;
 
 export function NewApplicationScreen({
   githubLogin = null,
@@ -35,7 +28,6 @@ export function NewApplicationScreen({
   const creationRequest = useRef<{ key: string; settings: string } | null>(
     null,
   );
-  const [approvalMode, setApprovalMode] = useState<ApprovalMode>("pi-decides");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,15 +39,9 @@ export function NewApplicationScreen({
     // pasted repository text (which could contain credentials) into a URL.
     try {
       const draft = JSON.parse(sessionStorage.getItem(draftKey) ?? "null");
-      if (
-        draft &&
-        typeof draft.repositoryUrl === "string" &&
-        typeof draft.approvalMode === "string" &&
-        Object.hasOwn(APPROVAL_MODES, draft.approvalMode)
-      ) {
+      if (draft && typeof draft.repositoryUrl === "string") {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate an external, tab-local form draft once after mount.
         setRepositoryUrl(draft.repositoryUrl);
-        setApprovalMode(draft.approvalMode);
         setName(typeof draft.name === "string" ? draft.name : "");
         if (
           typeof draft.requestKey === "string" &&
@@ -83,7 +69,6 @@ export function NewApplicationScreen({
         draftKey,
         JSON.stringify({
           repositoryUrl,
-          approvalMode,
           name,
           requestKey: creationRequest.current?.key,
           settings: creationRequest.current?.settings,
@@ -105,7 +90,6 @@ export function NewApplicationScreen({
     try {
       const settings = JSON.stringify({
         repositoryUrl: repositoryUrl.trim(),
-        approvalMode,
         name: name.trim(),
       });
       if (creationRequest.current?.settings !== settings)
@@ -114,7 +98,6 @@ export function NewApplicationScreen({
       const view = await api.createApplication({
         requestKey: creationRequest.current.key,
         repositoryUrl,
-        approvalMode,
         ...(name.trim() ? { name: name.trim() } : {}),
       });
       // Leaving the form does not undo creation, but must stop its late
@@ -158,7 +141,7 @@ export function NewApplicationScreen({
             <p>
               {preview
                 ? "Prototype · invented data. Adding an application opens the scripted scenario."
-                : "Each application has its own chats, decisions, and checks."}
+                : "Each application has its own conversations, configuration and history."}
             </p>
           </div>
         </div>
@@ -228,27 +211,9 @@ export function NewApplicationScreen({
             The same repository can have several independently named
             applications.
           </p>
-          <fieldset disabled={!ready || busy} className={s.permissions}>
-            <legend>Permission policy</legend>
-            <div className={s.options}>
-              {permissionOptions.map(([value, option]) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="approvalMode"
-                    value={value}
-                    checked={approvalMode === value}
-                    onChange={() => setApprovalMode(value)}
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
-            <p className={s.helper}>{APPROVAL_MODES[approvalMode].hint}</p>
-          </fieldset>
           <p className={s.scope}>
-            Server Guy checks repository access first, then helps you prepare
-            and deploy the application.
+            Server Guy checks repository access first, then helps you deploy the
+            application. Every change asks for your approval.
           </p>
           {error && (
             <p role="alert" className={s.error}>

@@ -1,14 +1,5 @@
 import { z } from "zod";
-import {
-  imageReferenceSchema,
-  volumeMountSchema,
-  configMountSchema,
-  composeServiceSchema,
-  dependencySchema,
-  inputBindingSchema,
-} from "./compose-plan";
 
-const path = z.string().regex(/^(?!\/)(?!.*\.\.)(?!.*[\r\n])[A-Za-z0-9_./-]+$/);
 export const httpPathSchema = z
   .string()
   .regex(/^\/(?!\/)[^\s]*$/)
@@ -25,6 +16,19 @@ export const primaryCheckSchema = z.strictObject({
     .string()
     .regex(/^[a-zA-Z0-9_.]+$/)
     .nullable(),
+});
+/** A private HTTP check of one service on its container port. */
+export const serviceCheckSchema = z.strictObject({
+  path: z
+    .string()
+    .regex(/^\/(?!\/)[^\s]*$/)
+    .max(300),
+  contains: z.string().min(1).max(300),
+  jsonPath: z
+    .string()
+    .regex(/^[a-zA-Z0-9_.]+$/)
+    .nullable(),
+  equals: z.union([z.string(), z.number(), z.boolean()]).nullable(),
 });
 type PrimaryCheck = z.infer<typeof primaryCheckSchema>;
 /** A health route proves readiness, not behavior; created objects are owned. */
@@ -70,56 +74,6 @@ export function checkIssues(healthPath: string, checks: PrimaryCheck[]) {
   }
   return issues;
 }
-/**
- * Legacy plans, read for historical releases and rollback. New deployments
- * are native Compose; plans were validated when they were authored.
- */
-export const deploymentPlanSchema = z.strictObject({
-  image: imageReferenceSchema.optional(),
-  volumes: z.array(volumeMountSchema).max(8).optional(),
-  configs: z.array(configMountSchema).max(8).optional(),
-  services: z.array(composeServiceSchema).max(5).optional(),
-  dependencies: z.array(dependencySchema).max(30).optional(),
-  inputBindings: z.array(inputBindingSchema).max(60).optional(),
-  healthCommand: z.array(z.string().min(1).max(500)).min(1).max(20).optional(),
-  httpAccess: z.enum(["public", "controller"]).optional(),
-  summary: z.string().min(20).max(1500),
-  dockerfile: path,
-  // Only deployment packaging may be generated; never patch application code.
-  generatedDockerfile: z.string().max(12000).nullable(),
-  context: path,
-  port: z.number().int().min(1024).max(65535),
-  command: z.array(z.string().min(1).max(500)).max(20).nullable(),
-  environment: z
-    .array(
-      z.strictObject({
-        name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-        value: z.string().max(1000),
-      }),
-    )
-    .max(30),
-  postgres: z
-    .strictObject({
-      version: z.enum(["16", "17", "18"]),
-      variable: z
-        .string()
-        .regex(/^[A-Z_][A-Z0-9_]*$/)
-        .nullable(),
-      scheme: z.enum(["postgresql", "postgresql+psycopg", "postgres"]),
-    })
-    .nullable(),
-  missingInputs: z
-    .array(
-      z.strictObject({
-        name: z.string().regex(/^[A-Z_][A-Z0-9_]*$/),
-        reason: z.string().min(1).max(400),
-      }),
-    )
-    .max(20),
-  healthPath: httpPathSchema,
-  checks: z.array(primaryCheckSchema).min(1).max(8),
-});
-export type DeploymentPlan = z.infer<typeof deploymentPlanSchema>;
 export interface HostOffer {
   serverType: string;
   location: string;
@@ -140,7 +94,7 @@ export type DeploymentStatus =
 export interface DeploymentRecord {
   /** Later release work owns its own receipt. */
   releaseOperationId?: string;
-  /** Lifecycle history alongside the legacy executor workspace. */
+  /** Releases, attempts, host identity and runtime observations. */
   lifecycle?: import("./deployment-runtime").DeploymentLifecycle;
   operationId?: string;
   id: string;
@@ -157,12 +111,9 @@ export interface DeploymentRecord {
   verificationRecoveryId?: string | null;
   repositoryId?: number;
   githubConnectionId?: string;
-  inspectedRevision?: string | null;
   cleanup?: { path: string; expectedStatus: number; marker: string } | null;
   revision: string | null;
-  /** Legacy custom plan; null once a native release is selected. */
-  plan: DeploymentPlan | null;
-  /** The selected native release configuration, when not a legacy plan. */
+  /** The selected native release configuration. */
   native?: import("./deployment-release").NativeConfiguration | null;
   offer: HostOffer | null;
   authority: {
@@ -183,7 +134,7 @@ export interface DeploymentRecord {
     string,
     { checkedAt: string; kind: "command" | "http"; imageId: string | null }
   >;
-  /** Immutable recommendation identity; old records are projected on read. */
+  /** Identity of the selected configuration's release. */
   releaseId?: string;
   bundleHashes?: Record<string, string>;
   /** Public HTTP is limited to this controller address when requested. */
@@ -205,30 +156,12 @@ export interface DeploymentRecord {
   /** When application logs were last collected from the host. */
   logsCollectedAt?: string | null;
   /**
-   * Stack facts beyond the web process and PostgreSQL that the executor
-   * runs from the plan. Services in the plan are authoritative; this optional
-   * legacy projection also carries schedules and queue-library metadata.
+   * Schedules and queue-library metadata recorded beside the configuration.
    * Recording such metadata does not install a schedule or verify a job.
    */
   stack?: RecordedStack;
 }
 export interface RecordedStack {
-  processes?: {
-    name: string;
-    role: "web" | "worker";
-    command: string | null;
-    image?: string | null;
-    /** The queue or broker a worker consumes. */
-    consumes?: string | null;
-  }[];
-  databases?: { kind: "sqlite"; name: string; path: string }[];
-  services?: {
-    kind: "redis" | "valkey";
-    name: string;
-    version?: string | null;
-    role: "cache" | "broker" | "cache and broker";
-    persistence?: string | null;
-  }[];
   queues?: {
     library: string;
     backend: "postgres" | "redis";
@@ -249,11 +182,5 @@ export interface RecordedStack {
       durationSeconds?: number | null;
     } | null;
     paused?: boolean;
-  }[];
-  volumes?: {
-    name: string;
-    usedBy: string;
-    mount: string;
-    kind: "database" | "files";
   }[];
 }

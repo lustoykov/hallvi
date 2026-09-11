@@ -16,19 +16,13 @@ export type OperationCommand =
       deploymentId: string;
       schedule: "daily" | "six-hourly";
       keep: number;
-    }
-  | { type: "start-preparation" }
-  | { type: "publish-proposal"; proposalId: string }
-  | { type: "publish-checkpoint"; proposalId: string }
-  | { type: "refresh-preparation" }
-  | { type: "refresh-candidate" }
-  | { type: "return-change"; reference: string }
-  | { type: "grant-publication" };
+    };
 
 export interface StoredOperation extends ApplicationOperation {
   applicationId: string;
   target: string;
   preconditions: Record<string, string | null>;
+  /** Null for inspections and for work whose capability was retired. */
   command: OperationCommand | null;
   approvedAt: string | null;
   /** Execution ownership only; operation state owns mutual exclusion. */

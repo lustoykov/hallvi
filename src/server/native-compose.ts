@@ -3,10 +3,7 @@
 // cannot establish and for the records Server Guy owns. Compose owns syntax.
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { composeServiceSchema, imageReferenceSchema } from "./compose-plan";
-import { pinContainerImage } from "./container-images";
-import { composeDefinition } from "./deployment-compose";
-import { sourceBuilds } from "./deployment-layout";
+import { imageReferenceSchema, pinContainerImage } from "./container-images";
 import type {
   Criterion,
   DeploymentRelease,
@@ -17,7 +14,7 @@ import {
   checkIssues,
   httpPathSchema,
   primaryCheckSchema,
-  type DeploymentRecord,
+  serviceCheckSchema,
 } from "./deployment-types";
 import type { TreeFile } from "./execution-tree";
 import { runComposeResolver } from "./pi-workspace";
@@ -67,7 +64,7 @@ export const criterionSchema = z
           name: z.string().min(1).max(63),
           port: z.number().int().min(1).max(65535),
           healthPath: httpPathSchema,
-          checks: composeServiceSchema.shape.checks,
+          checks: z.array(serviceCheckSchema).max(5),
         }),
       )
       .max(8)
@@ -852,82 +849,23 @@ export async function prepareInitialRelease(input: {
  * cannot express. Evidence of what runs now, not instructions.
  */
 export function currentConfigurationFiles(
-  record: Pick<DeploymentRecord, "id">,
   release: DeploymentRelease,
 ): TreeFile[] {
   const root = ".server-guy/current";
-  const facts = releaseFacts(release, record.id);
-  const files: TreeFile[] = [];
-  let compose: unknown;
-  if (release.native) {
-    compose = release.native.resolved;
-    for (const file of release.native.files)
-      files.push({
-        path: `${root}/files/${file.path}`,
-        mode: file.mode,
-        content: Buffer.from(file.content, "base64"),
-      });
-  } else {
-    const plan = release.plan;
-    const nonce = randomBytes(8).toString("hex");
-    const names = [
-      ...plan.missingInputs.map((input) => input.name),
-      DATABASE_PASSWORD,
-    ];
-    const sentinels = new Map(
-      names.map((name, i) => [`sgp${nonce}i${i}e`, name]),
-    );
-    const value = (name: string) => `sgp${nonce}i${names.indexOf(name)}e`;
-    compose = referencePrivateValues(
-      composeDefinition(
-        plan,
-        release.revision,
-        record.id,
-        value(DATABASE_PASSWORD),
-        Object.fromEntries(
-          plan.missingInputs.map((input) => [input.name, value(input.name)]),
-        ),
-      ),
-      sentinels,
-      new Set(),
-    );
-    for (const service of [
-      { name: "app", configs: plan.configs ?? [] },
-      ...(plan.services ?? []),
-    ])
-      for (const config of service.configs)
-        files.push({
-          path: `${root}/files/configs/${service.name}-${config.name}`,
-          mode: 0o644,
-          content: Buffer.from(config.content),
-        });
-    for (const build of sourceBuilds(plan))
-      if (build.generatedDockerfile)
-        files.push({
-          path: `${root}/files/${build.dockerfile}`,
-          mode: 0o644,
-          content: Buffer.from(build.generatedDockerfile),
-        });
-  }
+  const facts = releaseFacts(release);
+  const { native } = release;
   // The database identity the configuration sets; the official image
   // defaults the database name to its user.
   const environment = facts.database
-    ? ((
-        compose as {
-          services: Record<
-            string,
-            { environment?: Record<string, string | null> }
-          >;
-        }
-      ).services[facts.database.service]?.environment ?? {})
+    ? (native.resolved.services[facts.database.service]?.environment ?? {})
     : {};
   const databaseUser = environment.POSTGRES_USER ?? "postgres";
   const records = {
     release: release.id,
     revision: release.revision,
-    format: release.native
-      ? `native Compose, resolved by ${release.native.resolver}`
-      : "legacy plan rendered by the compatibility renderer: build contexts under ./source/ and ./configs/ are host paths; yours are relative to the repository root in /workspace",
+    format: native.converted
+      ? "native Compose converted once from a retired Server Guy plan: build contexts are repository paths and mounted files live under ./configs/ on the host"
+      : `native Compose, resolved by ${native.resolver}`,
     httpAccess: facts.httpAccess,
     exposure: facts.exposure,
     volumes: facts.volumes.map(({ name, kind, sqlite, capture, mounts }) => ({
@@ -955,13 +893,17 @@ export function currentConfigurationFiles(
     {
       path: `${root}/compose.json`,
       mode: 0o644,
-      content: Buffer.from(JSON.stringify(compose, null, 2)),
+      content: Buffer.from(JSON.stringify(native.resolved, null, 2)),
     },
     {
       path: `${root}/release.json`,
       mode: 0o644,
       content: Buffer.from(JSON.stringify(records, null, 2)),
     },
-    ...files,
+    ...native.files.map((file) => ({
+      path: `${root}/files/${file.path}`,
+      mode: file.mode,
+      content: Buffer.from(file.content, "base64"),
+    })),
   ];
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import type { ApplicationOperation } from "@/server/operation-record";
+import type { ActivityEvent, Decision } from "@/server/types";
 import { OperationSteps, StateChip } from "../operation-receipt";
 import { LocalTime } from "../local-time";
 import { relativeTime, attentionItems, labelOf } from "../operation-model";
@@ -25,8 +26,14 @@ export function HistoryView({
   now,
   onOpenConversation,
   onOpenDestination,
+  decisions = [],
+  activity = [],
   decisionFor,
 }: ViewProps & {
+  /** Active saved requirements, with when each was saved. */
+  decisions?: Decision[];
+  /** Application events, including retained history of retired work. */
+  activity?: ActivityEvent[];
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
 }) {
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
@@ -206,6 +213,82 @@ export function HistoryView({
           <ol className="sg-operation-history">{group.items.map(row)}</ol>
         </div>
       ))}
+      {filter === "All" && (
+        <HistoryRecords decisions={decisions} activity={activity} />
+      )}
+    </>
+  );
+}
+
+/**
+ * The durable records beside the operations: saved requirements and
+ * application events. Operation filters do not apply to them, so pages show
+ * them only with every operation listed.
+ */
+export function HistoryRecords({
+  decisions,
+  activity,
+  className = "sg-band",
+}: {
+  /** Active saved requirements, with when each was saved. */
+  decisions: Decision[];
+  /** Application events, including retained history of retired work. */
+  activity: ActivityEvent[];
+  /** Each record group's class in the page that shows it. */
+  className?: string;
+}) {
+  const [allActivity, setAllActivity] = useState(false);
+  return (
+    <>
+      {decisions.length > 0 && (
+        <section
+          className={className}
+          id="history-requirements"
+          aria-labelledby="history-requirements-title"
+        >
+          <h2 id="history-requirements-title">Saved requirements</h2>
+          <ul className="sg-history-records">
+            {decisions.map((decision) => (
+              <li key={decision.id}>
+                <strong>{decision.value}</strong>
+                <small>
+                  Saved{" "}
+                  <LocalTime value={decision.createdAt} variant="compact" />
+                </small>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {activity.length > 0 && (
+        <section
+          className={className}
+          id="history-activity"
+          aria-labelledby="history-activity-title"
+        >
+          <h2 id="history-activity-title">Application activity</h2>
+          <ul className="sg-history-records">
+            {(allActivity ? activity : activity.slice(0, 12)).map((event) => (
+              <li key={event.id}>
+                <strong>{event.summary}</strong>
+                <small>
+                  <LocalTime value={event.createdAt} variant="compact" />
+                </small>
+                {event.detail && <p>{event.detail}</p>}
+              </li>
+            ))}
+          </ul>
+          {activity.length > 12 && !allActivity && (
+            <button
+              type="button"
+              className="sg-op-text-link"
+              onClick={() => setAllActivity(true)}
+            >
+              Show all {activity.length} events
+            </button>
+          )}
+        </section>
+      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { getChat, getConformanceProposal } from "./db";
+import { getChat } from "./db";
 import { requestDeployment, applicationDeployment } from "./deployment-store";
 import {
   claimOperation,
@@ -8,7 +8,6 @@ import {
   publicOperation,
   settleOperation,
 } from "./operation-store";
-import type { OperationCommand } from "./operation-types";
 import { proposeBackupOperation } from "./scheduled-backup-operations";
 
 export function operationContext(applicationId: string) {
@@ -36,14 +35,11 @@ export function proposeAgentChange(
   chatId: string,
   action:
     | "deployment"
-    | "start-preparation"
-    | "publish-proposal"
     | "recreate-deployment"
     | "collect-logs"
     | "configure-backups"
     | "run-backup"
     | "test-restore",
-  proposalId?: string,
   backupPolicy?: { schedule: "daily" | "six-hourly"; keep: number },
 ) {
   if (
@@ -56,7 +52,7 @@ export function proposeAgentChange(
     requestDeployment(applicationId, chatId, "server-guy");
     return operationContext(applicationId);
   }
-  if (action === "recreate-deployment" || action === "collect-logs") {
+  {
     const deployment = applicationDeployment(applicationId);
     if (!deployment || deployment.status !== "live")
       throw new Error("Deploy and verify this application first.");
@@ -81,38 +77,6 @@ export function proposeAgentChange(
       }),
     );
   }
-  let command: OperationCommand;
-  let title: string;
-  if (action === "publish-proposal") {
-    const proposal = proposalId ? getConformanceProposal(proposalId) : null;
-    if (
-      !proposal ||
-      proposal.applicationId !== applicationId ||
-      proposal.status !== "approved"
-    )
-      throw new Error(
-        "Choose this application's approved source proposal; operation approval cannot authorize new source changes.",
-      );
-    command = { type: action, proposalId: proposal.id };
-    title = "Publish the approved source proposal";
-  } else {
-    command = { type: action };
-    title = "Prepare a source branch";
-  }
-  const key = JSON.stringify(command);
-  return publicOperation(
-    proposeOperation({
-      applicationId,
-      chatId,
-      source: { type: "preparation", id: key },
-      target: key,
-      kind: "change",
-      title,
-      summary: `${title}. Existing source permissions and the selected revision are checked again before execution.`,
-      destinations: ["deployment", "history"],
-      command,
-    }),
-  );
 }
 export function recordLocalInspection(applicationId: string, chatId: string) {
   const facts = currentOperationFacts(applicationId);

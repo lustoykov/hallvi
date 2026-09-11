@@ -2,7 +2,7 @@ import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
 import { Type } from "typebox";
 
 import { db, getActiveDecision } from "./db";
-import { chats, decisions, messages, phaseWorkspaces } from "./db-schema";
+import { chats, decisions, messages } from "./db-schema";
 import type { Decision, PiDecision } from "./types";
 
 export const MAX_PI_DECISION_PROPOSALS = 20;
@@ -120,12 +120,11 @@ export function searchPiDecisions(
       // message ID. Do not return source text or follow unscoped references.
       sourceMessageId: sql<
         string | null
-      >`case when ${phaseWorkspaces.applicationId} = ${applicationId} then ${messages.id} else null end`,
+      >`case when ${chats.applicationId} = ${applicationId} then ${messages.id} else null end`,
     })
     .from(decisions)
     .leftJoin(messages, eq(messages.id, decisions.sourceMessageId))
     .leftJoin(chats, eq(chats.id, messages.chatId))
-    .leftJoin(phaseWorkspaces, eq(phaseWorkspaces.id, chats.workspaceId))
     .where(
       and(
         active,

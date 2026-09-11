@@ -1,6 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { executeOperation } from "./application-operations";
-import { getConformanceProposal } from "./db";
 import { pendingOperations, recoverDeadOperations } from "./operation-store";
 import type { StoredOperation } from "./operation-types";
 
@@ -9,8 +8,6 @@ async function dispatch(record: StoredOperation) {
   if (!command || command.type === "deployment")
     throw new Error("No generic executor for this operation.");
   const id = record.applicationId;
-  const phase = await import("./phase-three");
-  const preparation = await import("./preparation");
   switch (command.type) {
     case "release-deployment": {
       const { runApplicationRelease } = await import("./application-releases");
@@ -57,24 +54,6 @@ async function dispatch(record: StoredOperation) {
         collectedAt: deployment.logsCollectedAt,
       };
     }
-    case "start-preparation":
-      return preparation.startPreparation(id);
-    case "refresh-preparation":
-      return preparation.refreshPreparation(id);
-    case "publish-checkpoint": {
-      const proposal = getConformanceProposal(command.proposalId);
-      if (!proposal || proposal.applicationId !== id)
-        throw new Error("Proposal no longer belongs to this application.");
-      return preparation.publishPreparationCheckpoint(id, proposal);
-    }
-    case "publish-proposal":
-      return phase.publishProposal(id, command.proposalId);
-    case "refresh-candidate":
-      return phase.refreshCandidate(id);
-    case "return-change":
-      return phase.returnExternalChange(id, command.reference);
-    case "grant-publication":
-      return phase.grantPublication(id);
   }
 }
 export async function runOperationWorker(signal: AbortSignal) {

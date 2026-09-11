@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { createChat } from "@/server/applications";
 import { handle } from "@/server/http";
-import { createChat } from "@/server/phase-one";
+import { getOperatorView } from "@/server/operator-view";
 import { createChatRequestSchema, parseJsonRequest } from "@/server/schemas";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ export async function POST(
   return handle(async () => {
     const { applicationId } = await context.params;
     const body = await parseJsonRequest(request, createChatRequestSchema);
-    return NextResponse.json(createChat(applicationId, body.title), {
+    const chat = createChat(applicationId, body.title);
+    return NextResponse.json(getOperatorView(applicationId, chat.id), {
       status: 201,
     });
   });

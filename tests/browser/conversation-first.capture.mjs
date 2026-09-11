@@ -21,57 +21,117 @@ page.on("pageerror", (error) => errors.push(error.message));
 let record = null;
 const at = () => new Date().toISOString();
 const rich = scenario === "rich";
-const plan = {
-  summary: rich
-    ? "Deploy the document archive from its upstream image with a private PostgreSQL database, a Valkey broker for its Celery workers and persistent document storage on one server."
-    : "Deploy this static site from its Dockerfile on one small server. It keeps no data of its own.",
-  dockerfile: "Dockerfile",
-  generatedDockerfile: null,
-  context: ".",
-  port: rich ? 8000 : 8080,
-  command: rich ? ["gunicorn", "paperless.wsgi"] : null,
-  environment: [{ name: "PORT", value: rich ? "8000" : "8080" }],
-  postgres: rich
-    ? { version: "16", variable: "DATABASE_URL", scheme: "postgresql" }
-    : null,
-  missingInputs: [
-    { name: "SECRET_KEY", reason: "Signs session cookies at runtime" },
-  ],
-  healthPath: "/health",
-  checks: [
-    {
-      name: "Home page",
-      method: "GET",
-      path: "/",
-      body: null,
-      expectedStatus: 200,
-      contains: rich ? "Documents" : "Hello",
-      captureId: null,
+// The recommendation's configuration in the native shape the executor runs:
+// one web process, and for the rich application a managed PostgreSQL
+// database, a Valkey broker, a Celery worker and file storage.
+const project = "sg-capture";
+const image = "ghcr.io/paperless-ngx/paperless-ngx:2.13";
+const native = {
+  format: 1,
+  resolver: "docker compose 2.40.3",
+  compose: ["compose.yaml"],
+  files: [],
+  resolved: {
+    name: project,
+    services: {
+      app: {
+        ...(rich
+          ? { image }
+          : {
+              build: { context: ".", dockerfile: "Dockerfile" },
+              image: "static-site:capture",
+            }),
+        command: rich ? ["gunicorn", "paperless.wsgi"] : null,
+        ports: [
+          { target: rich ? 8000 : 8080, published: "80", protocol: "tcp" },
+        ],
+        environment: {
+          PORT: rich ? "8000" : "8080",
+          SECRET_KEY: "${SECRET_KEY}",
+          ...(rich
+            ? {
+                DATABASE_URL:
+                  "postgresql://serverguy:${SERVER_GUY_DATABASE_PASSWORD}@postgres:5432/application",
+              }
+            : {}),
+        },
+        volumes: rich
+          ? [
+              {
+                type: "volume",
+                source: "media",
+                target: "/usr/src/paperless/media",
+              },
+              {
+                type: "volume",
+                source: "consume",
+                target: "/usr/src/paperless/consume",
+              },
+            ]
+          : [],
+      },
+      ...(rich
+        ? {
+            worker: { image, command: ["celery", "-A", "paperless", "worker"] },
+            broker: {
+              image: "valkey/valkey:8",
+              volumes: [{ type: "volume", source: "broker", target: "/data" }],
+            },
+            postgres: {
+              image: "postgres:16",
+              volumes: [
+                {
+                  type: "volume",
+                  source: "database",
+                  target: "/var/lib/postgresql/data",
+                },
+              ],
+            },
+          }
+        : {}),
     },
-  ],
+    volumes: rich
+      ? Object.fromEntries(
+          ["media", "consume", "broker", "database"].map((name) => [
+            name,
+            { name: `${project}_${name}` },
+          ]),
+        )
+      : {},
+  },
+  inputs: ["SECRET_KEY"],
+  inputReasons: { SECRET_KEY: "Signs session cookies at runtime" },
+  data: rich
+    ? [
+        { volume: "database", kind: "database", sqlite: null },
+        { volume: "media", kind: "files", sqlite: null },
+        { volume: "consume", kind: "files", sqlite: null },
+        { volume: "broker", kind: "files", sqlite: null },
+      ]
+    : [],
+  database: rich ? { service: "postgres", version: "16" } : null,
+  httpAccess: "public",
+  criterion: {
+    healthPath: "/health",
+    checks: [
+      {
+        name: "Home page",
+        method: "GET",
+        path: "/",
+        body: null,
+        expectedStatus: 200,
+        contains: rich ? "Documents" : "Hello",
+        captureId: null,
+      },
+    ],
+    services: [],
+  },
+  summary: rich ? "" : "",
 };
-// Nothing records these yet: the executor runs one web process plus optional
-// PostgreSQL. This scripted record shows the richer stack the views are
-// built for; it never reaches a product route.
+// Queues and jobs are recorded beside the configuration. This scripted record
+// never reaches a product route.
 const recordedStack = rich
   ? {
-      processes: [
-        {
-          name: "worker",
-          role: "worker",
-          command: "celery -A paperless worker",
-          consumes: "Celery queue on Valkey",
-        },
-      ],
-      services: [
-        {
-          kind: "valkey",
-          name: "broker",
-          version: "8",
-          role: "broker",
-          persistence: "Append-only file · pending work survives a restart",
-        },
-      ],
       queues: [{ library: "Celery", backend: "redis", workers: ["worker"] }],
       jobs: [
         {
@@ -99,20 +159,6 @@ const recordedStack = rich
             outcome: "failed",
             durationSeconds: 3,
           },
-        },
-      ],
-      volumes: [
-        {
-          name: "media",
-          usedBy: "app",
-          mount: "/usr/src/paperless/media",
-          kind: "files",
-        },
-        {
-          name: "consume",
-          usedBy: "app",
-          mount: "/usr/src/paperless/consume",
-          kind: "files",
         },
       ],
     }
@@ -144,8 +190,7 @@ await page.route("**/api/applications/*/deployment", async (route) => {
       stack: recordedStack,
       recommendationId: randomUUID(),
       revision: "7f281ad255fc0c4b9d6a2e5f1b3c7d8e9a0b1c2d",
-      inspectedRevision: null,
-      plan,
+      native,
       offer,
       authority: null,
       serverId: null,

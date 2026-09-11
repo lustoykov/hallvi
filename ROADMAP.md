@@ -1,50 +1,46 @@
 # Implementation plan
 
-The only active delivery plan. [Product](PRODUCT.md) owns scope, [architecture](docs/architecture/agent-directed-operations.md) owns mechanisms and [journeys](docs/user-journeys/README.md) own user outcomes. Research, review snapshots and archived checklists do not create additional work commitments.
+The only active delivery plan. [Product](PRODUCT.md) owns scope, [architecture](docs/architecture.md) owns mechanisms and [journeys](docs/requirements.md) own user outcomes. Research, review snapshots and archived checklists do not create additional work commitments.
 
-## Current state — 9 September 2026
+## Current state
+
+Reviewed 11 September 2026 against merged main `0682ab2` (PR #45). These are implementation/evidence statements, not a claim that a particular local dashboard or remote application is currently running this revision.
 
 | Area | Evidence and remaining limit |
 | --- | --- |
-| First real deployment | The [8 September acceptance](docs/testing/2026-09-08-real-deployment-acceptance.md) records the product deploying `lustoykov/todo-fastapi` to Hetzner, generating its missing Dockerfile, preparing the host, using private persistent PostgreSQL and verifying external create/read/delete behavior at the selected revision. This is dated evidence, not a current uptime claim. |
-| Hardening | The [follow-up report](docs/testing/2026-09-08-deployment-hardening.md) records bounded fixes and test results. The [9 September integration report](docs/testing/2026-09-09-final-integration.md) records final local checks and an additional cross-conversation persistence fix. |
-| Conversation-first UI | Fable's [integration report](docs/design/2026-09-09-conversation-first-integration.md) describes real deployment receipts, shared views, cross-conversation references and preserved drafts. The [final integration acceptance](docs/testing/2026-09-09-final-integration.md) records local browser coverage and the retained legacy preparation boundary. |
-| Final screen reference | Fable’s finished views and replayable `/prototype` scenarios are integrated. Real application routes use recorded state and unavailable placeholders; simulation does not implement backups, monitoring, releases or other missing executors. See [combined acceptance](docs/testing/2026-09-09-final-ui-integration.md). |
-| Persistence | Schema v13 adds durable application operations, serialized changes, a queue with precondition rechecks and retained cancellation. Existing domain/deployment evidence and native conversations remain. History and the agent read the same operations; current executors remain source preparation/publication and first deployment. See [coordination acceptance](docs/testing/2026-09-09-operation-coordination.md). |
-| Runtime limit | The runtime now represents a source-built web service or pinned Docker Hub image, optional PostgreSQL, private image services, read-only configuration mounts and persistent volumes including SQLite. See the [dated runtime evidence](docs/testing/2026-09-09-single-instance-runtime.md); arbitrary Compose, BYOM, worker lifecycle and backups are not implied. |
-| Scheduled data protection | R2-backed host timers, retention and isolated database/file restores now run on the PostgreSQL, Kuma and Grafana/Prometheus test stacks. Failure, interruption and sleeping-worker evidence is recorded in the [scheduled-backup acceptance](docs/testing/2026-09-09-scheduled-backups.md). AWS S3 and replacement-host cutover remain open. |
-| Controller recovery | Encrypted manual checkpoints, isolated Linux UI/access restoration, and a real recovered Pi-worker request with clean rollback are verified in the [worker recovery proof](docs/testing/2026-09-09-controller-worker-recovery.md). Apple Passwords holds the recovery kit with iCloud sync enabled; second-device retrieval, credential rotation and full multi-loop takeover remain unproved. |
-| Lifecycle gaps | BYOM adoption, compatible rollback, full controller takeover, replacement-host restoration and ongoing care still need end-to-end implementation. The controller currently enforces local access; shared/separate remote hosting requires authenticated bootstrap. |
+| Native deployment | PRs #43–#44 let Pi author native Compose and use the same managed execution/feedback loop for first deployments and updates. Schema 14 converted retained custom primary/companion plans once into native Compose under their recorded release IDs; no plan reader remains. See [current deployment architecture](docs/architecture.md). |
+| Reuse proof | Real configured Pi installed and updated PostgreSQL/private-input notes and independently built web/worker services with shared files and SQLite. State survived; the first app demonstrated host-feedback correction. The [second proof](docs/testing/README.md#dated-evidence) needed no production changes. These were local Docker proofs with provider/SSH stand-ins. |
+| Verification limit | Initial intake still requires HTTP behavior checks and the primary host port 80. General private command checks and background-only application verification are not implemented. Worker processing in the second proof is harness evidence. |
+| Lifecycle and rollback | Immutable releases, separate attempts, known versus unknown runtime observations, lost-result reconciliation and [compatible rollback](docs/architecture.md) are implemented. Rollback needs retained verified images and a data-compatibility assessment; it does not undo migrations. |
+| Data protection | [Generalized capture](docs/architecture.md) uses data and writers for new schedules and has [Paperless/local restore evidence](docs/testing/README.md#dated-evidence). Legacy receipts remain readable. Backup `app`/`postgres` naming assumptions remain, and capture/restore of the second native topology is unproved. |
+| Live-host evidence | The [8 September deployment](docs/testing/README.md#dated-evidence) and [9 September scheduled-backup report](docs/testing/README.md#dated-evidence) retain dated Hetzner/R2 evidence. They do not certify all subsequent native deployment changes on a real provider. |
+| UI and persistence | Conversation-first receipts and stable views read shared operation records. Schema v14 retains serialized changes, queues, cancellation and native conversation history; releases have their own evidence. [UI integration](docs/testing/README.md#dated-evidence) is dated coverage, not a current browser acceptance claim. |
+| Controller recovery | [Isolated Linux recovery and a recovered Pi request](docs/testing/README.md#dated-evidence) passed. Second-device recovery access, credential rotation and full multi-loop takeover remain unproved. |
+| Broader gaps | BYOM adoption, additional public endpoints, authenticated controller bootstrap, migration orchestration, replacement-host cutover and broader ongoing care remain incomplete. A plugin runtime is not a prerequisite to finishing reusable core tools. |
 
 ## Integration acceptance and remaining reconciliation
 
-While Fable owns the UI, backend work should start from the actual supported-stack gaps and acceptance fixtures. Do not build a second shell or another competing plan.
+Conversation-first integration and its legacy acceptance reconciliation are complete in the [dated integration evidence](docs/testing/README.md#dated-evidence). Schema 14 removed the phase preparation, conformance and publication workflow and kept its records as read-only history; retired operations keep their unknown outcomes and queue holds until the owner records what they verified. Server Guy currently gives a coding-agent handoff for operability changes and does not author or publish pull requests; any operability-PR capability must be built anew within the [product boundary](PRODUCT.md#operating-boundary). Unreviewed model answers remain unreviewed.
 
-- [x] Verify the implemented conversation-first slice with persisted state and synthetic failure journeys: approvals, retries, multiple conversations, reload and drafts. The [acceptance report](docs/testing/2026-09-09-final-integration.md) distinguishes passing checks from unresolved-outcome and broader lifecycle gaps.
-- [ ] Remove remaining mandatory phase ceremony only after preserving prerequisite checks and evidence access. Enforce the narrow operability-PR boundary in all source-writing paths.
-- [x] Reconcile the [legacy acceptance](docs/archive/implementation/phase-one-acceptance.md), [retained checklist](docs/archive/previous-direction/docs/plans/implementation-history.md) and [merge review](docs/reviews/2026-09-08-fable-merge-readiness.md) against the current candidate. Record applicable fixes or deliberate retirement; do not treat archived work as silently waived. Dispositions are recorded in the [final integration report](docs/testing/2026-09-09-final-integration.md).
-- [x] Run the relevant local tests, build and browser journeys and get the [independent review](docs/reviews/2026-09-09-final-integration-review.md). The approval follow-up has a passing regression test. The owner explicitly deferred CI enforcement; let GitHub checks run without treating them as the current gate. Relevant local checks and real evidence still apply. PR #22 was merged after local validation; historical results and a prototype are insufficient for later slices.
-
-Retained checks and their [recorded disposition](docs/testing/2026-09-09-final-integration.md): unreviewed live-model semantic cases, source/connection provenance, owner-merged candidate verification, durable request cancellation/retry, populated database migration and history preservation. Earlier AWS labs, workflow-engine research and UI presentation cleanups are not merge requirements unless a concrete current defect requires them. The deployment spending card already supplies an explicit authority boundary; do not recreate a generic phase gate merely to satisfy an old checklist.
+The owner does not use CI as a merge gate; relevant local checks and concrete execution evidence still apply. Old completed checklists, AWS labs and UI explorations are not new requirements.
 
 ## Delivery sequence
 
 Each increment must connect conversation, durable state, execution and verification. These are engineering increments, never user-facing stages. Implement the smallest useful case within each; do not wait for every compatibility case to finish before exercising a working lifecycle.
 
-### Current priority: service-based deployment
+### Current priority: finish the reusable native path
 
-Direction agreed on 10 September 2026: follow the [core and Plugin boundary](docs/architecture/extensible-capabilities.md). The first implementation slice is [service-based deployment](docs/architecture/service-deployment.md): shared source images, explicit roles, dependencies, scoped private-input/managed-connection bindings, and readiness plus asynchronous behavior verification. A synthetic web + worker + Valkey stack exercises this without application-name branches. It does not complete the lifecycle or plugin runtime.
+The three-step native deployment delivery is complete and merged as PRs #43–#45. [Current architecture](docs/architecture.md) and [reuse evidence](docs/testing/README.md#dated-evidence) replace its completed handoff plans.
 
-- Reconcile the supported application requirements with the plan schema, executor, backup capture path and dashboard model. Separate configuration differences, missing core capabilities and justified specialised behavior.
-- Use that review to generalize recorded services, storage ownership, writers and consistency requirements. Preserve existing deployments, recovery points and evidence; replace application-name guards only when the replacement method has equivalent checks and meaningful restore proof.
-- Use Grafana's specialised verification as the first candidate bundled Plugin after separating generic capture from functional checks. Exercise a second, different integration before stabilizing the interface. Select one additional application to reveal remaining core gaps without expanding the product's one-instance boundary.
-- Define enforceable access, version identity, result contracts and activation behavior before loading generated code. Include inspection, export, recovery and optional contribution through a PR. Prefer existing views for plugin results; a marketplace and arbitrary custom UI are not initial gates.
+1. Give Pi a small managed private-check capability that records actual execution and results, so useful behavior is not restricted to the current HTTP check shape. Keep observed runtime distinct from verified behavior. Prove an application without a public HTTP endpoint through the same initial/update path.
+2. Finish backup integration around native data/mount/writer facts, removing remaining service-name assumptions. Prove capture and isolated restoration on the independently built shared-state topology; preserve legacy schedules and receipts.
+3. Extend compatible-rollback proof to the native path after those changes, retaining explicit limits around migrations, missing images and unknown outcomes. An image rollback is not data restoration.
 
-Acceptance for the first generalization slice: an additional in-scope application works through configuration and supported methods without new application-name branches in core execution; existing test stacks retain their verified behavior. Record any genuinely specialised requirement explicitly. The Docker proof covers initial startup, same-image recreation, a stopped worker, safe test-object cleanup and recovered job processing. It is a local Linux container proof, not a new Hetzner/BYOM or backup certification. The [deployment lifecycle slice](docs/architecture/deployment-lifecycle.md) now records retry/recreation attempts separately from releases and the stable host binding, retaining historical verification when the current runtime becomes unknown. The [scoped release executor](docs/architecture/agent-releases.md) now applies subsequent revisions on that host and returns failures to Pi for correction. Independent service builds and shared persistent mounts are implemented in the [next capability slice](docs/architecture/shared-storage-builds.md), with a local Docker update proof. BYOM adoption remains separate.
+Prefer existing native tools, records and execution rather than a new service schema or workflow engine. Fix concrete blockers; do not let speculative hardening displace these capabilities. Application-specific fixtures are evidence, not production dispatch rules. No plugin framework is needed for this sequence; [extension direction](docs/architecture.md) remains optional later work.
 
 ### 1. Complete the single-instance runtime
 
-Close the [reviewed recovery gaps](docs/reviews/2026-09-09-final-integration-review.md) before expanding the executor: provide evidence-backed resolution for an uncertain purchase with no recovered host and for an unknown verification object; clean private material for definitively abandoned setup. Do not clear uncertainty merely because the user retries. The [runtime acceptance report](docs/testing/2026-09-09-single-instance-runtime.md#recovery-gap-dispositions) records the implemented paths and the explicit limits of owner-attested purchase reconciliation.
+The [runtime acceptance report](docs/testing/README.md#dated-evidence) records purchase and verification uncertainty handling, including the limits of owner-attested purchase reconciliation. Do not clear an unknown outcome merely because the user retries.
 
 Reuse actual Dockerfiles/Compose and support upstream image intake, required services, configuration mounts, persistent files, private connections and explicit ports. Prepare repository and host without discarding existing workloads. Add BYOM through the same Linux-host lifecycle as Hetzner; record the observed prerequisites and unsupported cases.
 
@@ -62,7 +58,7 @@ Package authenticated Server Guy installation on the same host and on a separate
 
 ### 3. Protect and restore data
 
-**Delivered slice:** scheduled R2 backups and retention with isolated restore proofs for the three test stacks. See [dated evidence](docs/testing/2026-09-09-scheduled-backups.md). The broader acceptance below remains open.
+**Delivered slice:** scheduled R2 backups/retention and isolated restore proofs, followed by data/writer-based capture for new schedules. See [generalized protection](docs/architecture.md) and its dated evidence. Native consumer integration and the broader acceptance below remain open.
 
 Connect R2 and S3. Discover PostgreSQL, SQLite and other required persistent state; choose consistent backup methods, schedule, retention and off-host transfer. Verify an isolated restore with meaningful application data. Protect controller records, native sessions, configuration and recovery material separately.
 
@@ -70,7 +66,7 @@ Connect R2 and S3. Discover PostgreSQL, SQLite and other required persistent sta
 
 ### 4. Release updates and recover from failure
 
-**Delivered slice:** chat proposes an exact source revision on the existing host. One approved scope allows three execution attempts with agent-corrected configuration, retained named volumes and fresh verification. Native Compose failures return to Pi. [Release reconciliation](docs/architecture/release-reconciliation.md) checks a durable host result under the deployment lock and verifies completed replacements without restarting; unknown outcomes without sufficient evidence still stop repetition. The [architecture and evidence](docs/architecture/agent-releases.md) distinguish this from rollback, migration orchestration, recovery without a trustworthy host result and broad standing authorization, which remain unfinished.
+**Delivered slice:** chat proposes an exact source revision on the existing host. One approved scope allows three execution attempts with agent-corrected configuration, retained named volumes and fresh verification. Native Compose failures return to Pi. [Release reconciliation](docs/architecture.md) checks a durable host result under the deployment lock and verifies completed replacements without restarting; unknown outcomes without sufficient evidence still stop repetition. The [architecture and evidence](docs/architecture.md) distinguish this from migration orchestration, recovery without a trustworthy host result and broad standing authorization, which remain unfinished. [Compatible rollback](docs/architecture.md) is implemented within its recorded limits.
 
 Reuse existing GitHub Actions/checks or prepare a reviewed workflow when useful. Prebuilt images do not need a source build. A passing commit/image becomes a candidate; the user requests its release. Record distinct attempts and the actual serving revision rather than overwriting the initial-deployment record.
 
@@ -88,13 +84,13 @@ Configure existing scheduled commands with timezone, non-overlap, timeout, logs 
 
 ## Compatibility gates
 
-The [compatibility matrix](docs/testing/self-hosted-compatibility.md) supplies executable acceptance targets. Retain the source-app/PostgreSQL proof; start with Uptime Kuma and Grafana/Prometheus, then Forgejo/Vaultwarden, Paperless-ngx and finally Immich's heavier dependencies. This order is a working priority, not a promise of universal upstream support.
+The [compatibility matrix](docs/testing/README.md#dated-evidence) supplies executable acceptance targets. Retain the source-app/PostgreSQL proof; start with Uptime Kuma and Grafana/Prometheus, then Forgejo/Vaultwarden, Paperless-ngx and finally Immich's heavier dependencies. This order is a working priority, not a promise of universal upstream support.
 
 For each supported pinned version prove **deploy → meaningful work → recreate → update → restore → verify**, plus a controlled failure. Add its required machinery to the increments above. Installing all examples is not a gate for the current UI integration. WordPress and the earlier Coolify-as-a-workload experiment are not release requirements.
 
 ## Later and excluded
 
-External notification providers are an agreed expansion after in-app issues; choose providers when implementing delivery. Plugin boundary review and the first candidate extraction are covered above; a general marketplace and broad plugin/UI runtime remain unscheduled. Additional compute/storage providers, automatic-on-push releases, previews, dedicated build servers, richer teams and API/MCP integration have no committed implementation order.
+External notification providers are an agreed expansion after in-app issues; choose providers when implementing delivery. Plugin extraction, a general marketplace and a broad plugin/UI runtime remain unscheduled; current priority is the reusable native path above. Additional compute/storage providers, automatic-on-push releases, previews, dedicated build servers, richer teams and API/MCP integration have no committed implementation order.
 
 Multi-host application/database orchestration, clusters/replicas, automatic database failover and distributed job orchestration are outside the product direction. Manual recovery onto a replacement host maintains one active instance. Learning labs and competitor feature lists do not expand this boundary.
 

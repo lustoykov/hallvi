@@ -53,7 +53,6 @@ const deployment: DeploymentRecord = {
   status: "live",
   repository: "qa/kuma",
   revision: REVISION,
-  plan: null,
   offer: null,
   authority: null,
   serverId: 1,

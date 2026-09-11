@@ -65,7 +65,7 @@ export function DeploymentPanel({
     (release) => release.id === lastVerified?.releaseId,
   );
   const verifiedFacts = verifiedRelease
-    ? releaseFacts(verifiedRelease, record!.id)
+    ? releaseFacts(verifiedRelease)
     : currentFacts(record);
   const latestAttempt = record?.lifecycle?.attempts.at(-1);
   const working =

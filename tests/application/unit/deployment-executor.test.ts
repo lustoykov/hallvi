@@ -1,12 +1,11 @@
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { queueNative } from "../../fixtures/queue-worker/native";
+import { nativeApp } from "../../fixtures/native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type {
-  DeploymentPlan,
-  DeploymentRecord,
-} from "../../../src/server/deployment-types";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import type { Criterion } from "../../../src/server/deployment-release";
 
 vi.mock("../../../src/server/db", () => ({
   getApplication: () => ({ repositoryOwner: "qa", repositoryName: "todo" }),
@@ -29,48 +28,42 @@ vi.mock("../../../src/server/deployment-source", () => ({
 import { HetznerError, smallestHostOffer } from "../../../src/server/hetzner";
 import {
   provision,
-  composeDefinition,
   deploymentDirectory,
   executeDeployment,
   verifyDeployment,
 } from "../../../src/server/deployment-executor";
 
-const plan: DeploymentPlan = {
-  summary: "A synthetic application with private database",
-  dockerfile: "Dockerfile",
-  generatedDockerfile: null,
-  context: ".",
-  port: 8000,
-  command: null,
-  environment: [],
-  postgres: {
-    version: "16",
-    variable: "DATABASE_URL",
-    scheme: "postgresql+psycopg",
-  },
-  missingInputs: [],
-  healthPath: "/health",
-  checks: [
-    {
-      name: "Content",
-      method: "GET",
-      path: "/",
-      body: null,
-      expectedStatus: 200,
-      contains: "Todo",
-      captureId: null,
-    },
-  ],
-};
+const ID = "00000000-0000-4000-8000-000000000001";
+const native = () =>
+  nativeApp({
+    deploymentId: ID,
+    port: 8000,
+    postgres: "16",
+    checks: [
+      {
+        name: "Content",
+        method: "GET",
+        path: "/",
+        body: null,
+        expectedStatus: 200,
+        contains: "Todo",
+        captureId: null,
+      },
+    ],
+  });
+/** Replace the recorded behavior criterion's checks. */
+function withChecks(value: DeploymentRecord, checks: Criterion["checks"]) {
+  value.native!.criterion!.checks = checks;
+}
 function record(): DeploymentRecord {
   return {
-    id: "00000000-0000-4000-8000-000000000001",
+    id: ID,
     applicationId: "app",
     chatId: "chat",
     status: "deploy-queued",
     repository: "qa/todo",
     revision: "a".repeat(40),
-    plan,
+    native: native(),
     offer: {
       serverType: "cx23",
       location: "fsn1",
@@ -117,20 +110,17 @@ describe("real deployment boundary", () => {
   it("waits for the HTTP listener without retrying a mutating behavior check", async () => {
     const value = record();
     value.address = "203.0.113.10";
-    value.plan = {
-      ...plan,
-      checks: [
-        {
-          name: "Create",
-          method: "POST",
-          path: "/todos",
-          body: { title: "synthetic" },
-          expectedStatus: 201,
-          contains: "created",
-          captureId: null,
-        },
-      ],
-    };
+    withChecks(value, [
+      {
+        name: "Create",
+        method: "POST",
+        path: "/todos",
+        body: { title: "synthetic" },
+        expectedStatus: 201,
+        contains: "created",
+        captureId: null,
+      },
+    ]);
     const fetcher = vi
       .fn()
       .mockRejectedValueOnce(new TypeError("fetch failed"))
@@ -165,44 +155,20 @@ describe("real deployment boundary", () => {
     ).rejects.toThrow("access changed");
     expect(api).not.toHaveBeenCalled();
   });
-  it("keeps PostgreSQL private and persistent and preserves dollar characters in supplied values", () => {
-    const compose = composeDefinition(
-      plan,
-      "a".repeat(40),
-      "deployment",
-      "synthetic-password",
-      { API_KEY: "abc$ENV${OTHER}" },
-    );
-    expect(compose.services.postgres).not.toHaveProperty("ports");
-    expect(compose.services.postgres).toMatchObject({
-      volumes: ["database:/var/lib/postgresql/data"],
-    });
-    expect(compose.services.app).toMatchObject({
-      ports: ["80:8000"],
-      environment: {
-        API_KEY: "abc$$ENV$${OTHER}",
-        DATABASE_URL:
-          "postgresql+psycopg://serverguy:synthetic-password@postgres:5432/application",
-      },
-    });
-  });
   it("does not accept healthy HTTP when the application behavior is wrong", async () => {
     const value = record();
     value.address = "203.0.113.10";
-    value.plan = {
-      ...plan,
-      checks: [
-        {
-          name: "Actual content",
-          method: "GET",
-          path: "/",
-          body: null,
-          expectedStatus: 200,
-          contains: "Expected app",
-          captureId: null,
-        },
-      ],
-    };
+    withChecks(value, [
+      {
+        name: "Actual content",
+        method: "GET",
+        path: "/",
+        body: null,
+        expectedStatus: 200,
+        contains: "Expected app",
+        captureId: null,
+      },
+    ]);
     vi.stubGlobal(
       "fetch",
       vi
@@ -218,38 +184,35 @@ describe("real deployment boundary", () => {
   it("binds a read and cleanup to the object created by this verification", async () => {
     const value = record();
     value.address = "203.0.113.10";
-    value.plan = {
-      ...plan,
-      checks: [
-        {
-          name: "Create",
-          method: "POST",
-          path: "/todos",
-          body: { title: "SG_VERIFY_TOKEN" },
-          expectedStatus: 201,
-          contains: "SG_VERIFY_TOKEN",
-          captureId: "todo.id",
-        },
-        {
-          name: "Read",
-          method: "GET",
-          path: "/todos/{id}",
-          body: null,
-          expectedStatus: 200,
-          contains: "SG_VERIFY_TOKEN",
-          captureId: null,
-        },
-        {
-          name: "Delete",
-          method: "DELETE",
-          path: "/todos/{id}",
-          body: null,
-          expectedStatus: 204,
-          contains: "",
-          captureId: null,
-        },
-      ],
-    };
+    withChecks(value, [
+      {
+        name: "Create",
+        method: "POST",
+        path: "/todos",
+        body: { title: "SG_VERIFY_TOKEN" },
+        expectedStatus: 201,
+        contains: "SG_VERIFY_TOKEN",
+        captureId: "todo.id",
+      },
+      {
+        name: "Read",
+        method: "GET",
+        path: "/todos/{id}",
+        body: null,
+        expectedStatus: 200,
+        contains: "SG_VERIFY_TOKEN",
+        captureId: null,
+      },
+      {
+        name: "Delete",
+        method: "DELETE",
+        path: "/todos/{id}",
+        body: null,
+        expectedStatus: 204,
+        contains: "",
+        captureId: null,
+      },
+    ]);
     let title = "";
     const fetcher = vi.fn(async (url: URL, init: RequestInit) => {
       if (url.pathname === "/health") return new Response("healthy");
@@ -347,38 +310,35 @@ it("requires renewed approval when purchase-time pricing exceeds the cap", async
 it("cleans up the captured test object when a later read assertion fails", async () => {
   const value = record();
   value.address = "203.0.113.10";
-  value.plan = {
-    ...plan,
-    checks: [
-      {
-        name: "Create",
-        method: "POST",
-        path: "/todos",
-        body: { title: "SG_VERIFY_TOKEN" },
-        expectedStatus: 201,
-        contains: "SG_VERIFY_TOKEN",
-        captureId: "id",
-      },
-      {
-        name: "Read",
-        method: "GET",
-        path: "/todos/{id}",
-        body: null,
-        expectedStatus: 200,
-        contains: "SG_VERIFY_TOKEN",
-        captureId: null,
-      },
-      {
-        name: "Cleanup",
-        method: "DELETE",
-        path: "/todos/{id}",
-        body: null,
-        expectedStatus: 204,
-        contains: "",
-        captureId: null,
-      },
-    ],
-  };
+  withChecks(value, [
+    {
+      name: "Create",
+      method: "POST",
+      path: "/todos",
+      body: { title: "SG_VERIFY_TOKEN" },
+      expectedStatus: 201,
+      contains: "SG_VERIFY_TOKEN",
+      captureId: "id",
+    },
+    {
+      name: "Read",
+      method: "GET",
+      path: "/todos/{id}",
+      body: null,
+      expectedStatus: 200,
+      contains: "SG_VERIFY_TOKEN",
+      captureId: null,
+    },
+    {
+      name: "Cleanup",
+      method: "DELETE",
+      path: "/todos/{id}",
+      body: null,
+      expectedStatus: 204,
+      contains: "",
+      captureId: null,
+    },
+  ]);
   const fetcher = vi.fn(async (url: URL, init: RequestInit) => {
     if (url.pathname === "/health") return new Response("ok");
     if (init.method === "POST")
@@ -421,29 +381,26 @@ it.each([true, false])(
     value.address = "203.0.113.10";
     value.verificationPending = "sg-check-lost";
     value.verificationRecoveryId = "candidate";
-    value.plan = {
-      ...plan,
-      checks: [
-        {
-          name: "Read",
-          method: "GET",
-          path: "/todos/{id}",
-          body: null,
-          expectedStatus: 200,
-          contains: "SG_VERIFY_TOKEN",
-          captureId: null,
-        },
-        {
-          name: "Delete",
-          method: "DELETE",
-          path: "/todos/{id}",
-          body: null,
-          expectedStatus: 204,
-          contains: "",
-          captureId: null,
-        },
-      ],
-    };
+    withChecks(value, [
+      {
+        name: "Read",
+        method: "GET",
+        path: "/todos/{id}",
+        body: null,
+        expectedStatus: 200,
+        contains: "SG_VERIFY_TOKEN",
+        captureId: null,
+      },
+      {
+        name: "Delete",
+        method: "DELETE",
+        path: "/todos/{id}",
+        body: null,
+        expectedStatus: 204,
+        contains: "",
+        captureId: null,
+      },
+    ]);
     const fetcher = vi.fn(async (url: URL, init: RequestInit = {}) => {
       if (url.pathname === "/health") return new Response("ok");
       expect(url.pathname).toBe("/todos/candidate");
@@ -463,60 +420,6 @@ it.each([true, false])(
   },
 );
 
-it("reuses official images and preserves data/config mounts without publishing private services", () => {
-  const value: DeploymentPlan = {
-    ...plan,
-    postgres: null,
-    image: "grafana/grafana@sha256:" + "a".repeat(64),
-    volumes: [
-      {
-        name: "grafana-data",
-        target: "/var/lib/grafana",
-        kind: "database",
-        sqlite: "/var/lib/grafana/grafana.db",
-      },
-    ],
-    configs: [
-      {
-        name: "datasource",
-        target: "/etc/grafana/provisioning/datasources/prometheus.yaml",
-        content: "url: http://prometheus:9090",
-      },
-    ],
-    services: [
-      {
-        name: "prometheus",
-        image: "prom/prometheus@sha256:" + "b".repeat(64),
-        command: null,
-        environment: [],
-        volumes: [
-          {
-            name: "metrics",
-            target: "/prometheus",
-            kind: "files",
-            sqlite: null,
-          },
-        ],
-        configs: [],
-        port: 9090,
-        healthPath: "/-/ready",
-        checks: [],
-      },
-    ],
-  };
-  const compose = composeDefinition(value, "a".repeat(40), "id", "unused", {});
-  expect(compose.services.app).not.toHaveProperty("build");
-  expect(compose.services.app).toMatchObject({
-    image: value.image,
-    volumes: [
-      "grafana-data:/var/lib/grafana",
-      "./configs/app-datasource:/etc/grafana/provisioning/datasources/prometheus.yaml:ro",
-    ],
-  });
-  expect(compose.services.prometheus).not.toHaveProperty("ports");
-  expect(compose.volumes).toEqual({ "grafana-data": {}, metrics: {} });
-});
-
 it("verifies JSON content independently of formatting without changing values", async () => {
   const { responseContains } =
     await import("../../../src/server/deployment-executor");
@@ -535,7 +438,7 @@ it("verifies JSON content independently of formatting without changing values", 
 it("polls the declared result read while creating and deleting a marked job exactly once", async () => {
   const value = record();
   value.address = "203.0.113.10";
-  value.plan = queuePlan();
+  value.native = queueNative(value.id, value.revision!);
   let marker = "",
     reads = 0;
   const fetcher = vi.fn(async (url: URL, init: RequestInit) => {

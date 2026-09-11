@@ -6,19 +6,16 @@ import {
 } from "../../../src/server/release-scope";
 import {
   beginDeploymentAttempt,
-  ensureDeploymentLifecycle,
   finishDeploymentAttempt,
 } from "../../../src/server/deployment-lifecycle";
-import { nativeFacts, planFacts } from "../../../src/server/release-facts";
-import type {
-  NativeConfiguration,
-  ResolvedCompose,
+import { nativeFacts } from "../../../src/server/release-facts";
+import {
+  releaseOf,
+  type NativeConfiguration,
+  type ResolvedCompose,
 } from "../../../src/server/deployment-release";
-import type {
-  DeploymentPlan,
-  DeploymentRecord,
-} from "../../../src/server/deployment-types";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import { queueNative } from "../../fixtures/queue-worker/native";
 
 const id = "0a1b2c3d-0000-4000-8000-000000000001";
 const project = "sg-0a1b2c3d";
@@ -29,29 +26,57 @@ function fixture() {
     repository: "qa/example",
     repositoryId: 10,
     revision: "a".repeat(40),
-    plan: queuePlan(),
+    native: queueNative(id, "a".repeat(40)),
     serverId: 7,
     address: "203.0.113.7",
     verifiedAt: "2026-09-10T10:00:00Z",
     createdAt: "2026-09-10T09:00:00Z",
     events: [],
   } as unknown as DeploymentRecord;
-  const life = ensureDeploymentLifecycle(r);
+  const release = releaseOf(r)!;
+  const hostId = `host:${id}`;
+  r.lifecycle = {
+    host: {
+      id: hostId,
+      provider: "hetzner",
+      connectionId: null,
+      serverId: 7,
+      address: r.address,
+    },
+    releases: [release],
+    attempts: [],
+    runtime: {
+      state: "verified",
+      lastVerified: {
+        attemptId: "attempt-1",
+        releaseId: release.id,
+        hostId,
+        revision: r.revision!,
+        checkedAt: r.verifiedAt!,
+        images: {},
+      },
+    },
+  };
   const scope: ReleaseScope = {
     id: "scope",
     deploymentId: r.id,
-    hostId: life.host.id,
+    hostId,
     serverId: 7,
     address: r.address!,
     repository: r.repository,
     repositoryId: 10,
     revision: "b".repeat(40),
-    baselineReleaseId: life.releases[0].id,
+    baselineReleaseId: release.id,
     maxAttempts: 3,
   };
   return { r, scope };
 }
-const legacy = (plan: DeploymentPlan) => planFacts(plan, id, "b".repeat(40));
+/** The retained queue configuration, optionally changed. */
+function facts(change: (native: NativeConfiguration) => void = () => {}) {
+  const native = queueNative(id, "b".repeat(40));
+  change(native);
+  return nativeFacts(native);
+}
 /** The queue fixture as Pi could author it in native Compose. */
 function native(change: (resolved: ResolvedCompose) => void = () => {}) {
   const resolved: ResolvedCompose = {
@@ -88,19 +113,20 @@ function native(change: (resolved: ResolvedCompose) => void = () => {}) {
 
 it("permits corrections, new services and new data within the same authorization", () => {
   const { r, scope } = fixture();
-  const next = structuredClone(r.plan!);
-  next.command = ["python", "correct_entrypoint.py"];
-  next.environment.push({ name: "MODE", value: "production" });
-  next.dependencies = [
-    { service: "worker", needs: "queue", condition: "started" },
-  ];
-  expect(() => assertReleaseScope(r, scope, legacy(next))).not.toThrow();
+  const corrected = facts(({ resolved }) => {
+    resolved.services.app.command = ["python", "correct_entrypoint.py"];
+    resolved.services.app.environment!.MODE = "production";
+    resolved.services.worker.depends_on = {
+      queue: { condition: "service_started" },
+    };
+  });
+  expect(() => assertReleaseScope(r, scope, corrected)).not.toThrow();
   // Native Compose reaching the same effects needs no new decision, even
   // when it moves the container port or adds a service with its own data.
-  expect(scopeDifferences(legacy(r.plan!), native())).toEqual([]);
+  expect(scopeDifferences(facts(), native())).toEqual([]);
   expect(
     scopeDifferences(
-      legacy(r.plan!),
+      facts(),
       native((c) => {
         c.services.app.ports![0].target = 8000;
         c.services.indexer = {
@@ -114,7 +140,7 @@ it("permits corrections, new services and new data within the same authorization
 
 it("names every out-of-scope effect: exposure, data identity or access and the managed database", () => {
   const { r, scope } = fixture();
-  const baseline = legacy(r.plan!);
+  const baseline = facts();
   const differences = (change: (c: ResolvedCompose) => void) =>
     scopeDifferences(baseline, native(change)).join(" ");
   expect(
@@ -147,22 +173,28 @@ it("names every out-of-scope effect: exposure, data identity or access and the m
     assertReleaseScope(
       r,
       scope,
-      legacy({ ...r.plan!, httpAccess: "controller" }),
+      facts((native) => {
+        native.httpAccess = "controller";
+      }),
     ),
   ).toThrow("network exposure");
-  const database = structuredClone(r.plan!);
-  database.postgres = {
-    version: "17",
-    variable: "DATABASE_URL",
-    scheme: "postgres",
-  };
-  const upgraded = structuredClone(database);
-  upgraded.postgres!.version = "18";
-  expect(scopeDifferences(legacy(database), legacy(upgraded)).join()).toContain(
-    "managed database",
-  );
+  const withDatabase = (version: "17" | "18") =>
+    facts((native) => {
+      native.database = { service: "postgres", version };
+      native.resolved.services.postgres = {
+        image: `postgres:${version}`,
+        volumes: [
+          { type: "volume", source: "database", target: "/var/lib/data" },
+        ],
+      };
+      native.resolved.volumes!.database = { name: `${project}_database` };
+      native.data.push({ volume: "database", kind: "database", sqlite: null });
+    });
+  expect(
+    scopeDifferences(withDatabase("17"), withDatabase("18")).join(),
+  ).toContain("managed database");
   expect(() =>
-    assertReleaseScope({ ...r, serverId: 8 }, scope, legacy(r.plan!)),
+    assertReleaseScope({ ...r, serverId: 8 }, scope, facts()),
   ).toThrow("host changed");
 });
 
@@ -174,9 +206,9 @@ it("binds the established runtime: its own retries may supersede an observation,
   r.serviceImages = { app: "sha256:observed" };
   finishDeploymentAttempt(r, attempt.id, "failed", "Behavior failed", true);
   expect(r.lifecycle!.runtime.state).toBe("observed");
-  expect(() => assertReleaseScope(r, scope, legacy(r.plan!))).not.toThrow();
+  expect(() => assertReleaseScope(r, scope, facts())).not.toThrow();
   const other = { ...scope, id: "another-scope" };
-  expect(() => assertReleaseScope(r, other, legacy(r.plan!))).toThrow(
+  expect(() => assertReleaseScope(r, other, facts())).toThrow(
     "different release",
   );
 });

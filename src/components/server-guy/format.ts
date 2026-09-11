@@ -1,20 +1,3 @@
-import type { ContractProvenance, GateCheck } from "@/server/types";
-
-/** How a contract value was established, in plain words: its source. */
-export const SOURCE_LABELS: Record<ContractProvenance["kind"], string> = {
-  "repository-declared": "Declared in repository",
-  "profile-rule": "Profile rule",
-  "user-confirmed": "Your choice",
-  inferred: "Inferred",
-  unresolved: "Unresolved",
-};
-
-export function statusLabel(status: GateCheck["status"]) {
-  if (status === "passed") return "Passed";
-  if (status === "blocked") return "Blocked";
-  return "Not yet";
-}
-
 /**
  * Server-safe timestamp: identical on the server and in the browser, so it can
  * be rendered before hydration. The browser then switches to local time via

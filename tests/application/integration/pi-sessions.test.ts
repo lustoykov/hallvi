@@ -47,14 +47,10 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/test",
     repositoryOwner: "qa",
     repositoryName: "test",
-    environment: "production",
-    approvalMode: "pi-decides",
-    approvalScope: "test",
   });
   applicationId = application.id;
-  const workspace = store.insertWorkspace(applicationId);
-  chatId = store.insertChat(workspace.id, "Main", true).id;
-  otherChatId = store.insertChat(workspace.id, "Other", false).id;
+  chatId = store.insertChat(applicationId, "Main").id;
+  otherChatId = store.insertChat(applicationId, "Other").id;
 });
 afterAll(() => {
   globalThis.__serverGuyDb?.$client.close();
@@ -112,16 +108,14 @@ it("does not duplicate the accepted user message from the first queued Run", asy
     "user",
   );
   const answer = store.insertMessage(chatId, "assistant", "", "pi", "queued");
-  const chat = store.getChat(chatId)!;
   store
     .db()
     .$client.prepare(
-      "INSERT INTO pi_runs (id, application_id, workspace_id, chat_id, user_message_id, assistant_message_id, request_key, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO pi_runs (id, application_id, chat_id, user_message_id, assistant_message_id, request_key, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .run(
       "queued-run",
       applicationId,
-      chat.workspaceId,
       chatId,
       user.id,
       answer.id,

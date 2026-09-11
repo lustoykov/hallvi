@@ -106,7 +106,6 @@ export async function proposeApplicationRelease(
       scope,
       releaseFacts(
         lifecycle.releases.find((r) => r.id === rollback.releaseId)!,
-        record.id,
       ),
     );
   saveDeployment(record);
@@ -230,7 +229,7 @@ async function releaseLoop(input: {
   const current = () => currentFacts(record)!;
   let evidence: string | undefined;
   const execute = async (release: DeploymentRelease) => {
-    const facts = releaseFacts(release, record.id);
+    const facts = releaseFacts(release);
     // Operation and runtime must agree: without a behavior criterion a
     // release could only ever be observed, never verified.
     if (!facts.criterion)
@@ -293,7 +292,7 @@ async function releaseLoop(input: {
     runId: tracked.id,
     initial: scope.initial,
     context: `${input.task}${earlier ? `\nThe previous execution under this authorization failed. Its feedback: ${earlier.slice(-6000)}` : ""}`,
-    workspaceFiles: currentConfigurationFiles(record, input.current),
+    workspaceFiles: currentConfigurationFiles(input.current),
     reconcile: async () => {
       if (evidence) return { ok: true, completed: true, message: evidence };
       assertOwned(record, tracked, scope, current(), false);
@@ -329,7 +328,7 @@ async function releaseLoop(input: {
           inputs: Object.keys(secrets.supplied).filter((name) =>
             secrets.supplied[name]?.trim(),
           ),
-          baseline: releaseFacts(input.baseline, record.id),
+          baseline: releaseFacts(input.baseline),
           signal,
         });
         return await execute(
@@ -398,7 +397,7 @@ export async function runApplicationRelease(
       if (result.completed) return { evidence: result.message };
       if (!result.retryable) throw new ReleaseScopeError(result.message);
     }
-    assertOwned(record, tracked, scope, releaseFacts(selected, record.id));
+    assertOwned(record, tracked, scope, releaseFacts(selected));
     record.releaseOperationId = tracked.id;
     saveDeployment(record);
     return runDeploymentAttempt(

@@ -9,11 +9,13 @@ vi.mock("../../../src/server/pi-setup", () => ({
   piLoginCoordinator: { disconnect: mocks.disconnect },
   getPiSetupStatus: mocks.getPiSetupStatus,
 }));
-vi.mock("../../../src/server/phase-one", () => ({
+vi.mock("../../../src/server/applications", () => ({
   ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class extends Error {},
-  getPhaseOneOperatorView: vi.fn(),
   removeApplication: mocks.removeApplication,
+}));
+vi.mock("../../../src/server/operator-view", () => ({
+  getOperatorView: vi.fn(),
 }));
 import { DELETE as disconnect } from "../../../src/app/api/pi/setup/route";
 import { DELETE as remove } from "../../../src/app/api/applications/[applicationId]/route";

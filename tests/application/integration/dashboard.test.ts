@@ -15,7 +15,7 @@ import {
   writeJson,
   archiveRun,
 } from "../../dashboard/results";
-import { phaseOneCases } from "../../evals/phase-one-cases";
+import { evalCases } from "../../evals/cases";
 import { browserJourneys } from "../../browser/journeys";
 
 const cleanup: Array<() => Promise<void>> = [];
@@ -442,7 +442,7 @@ it("maps a closed set of suites to fixed arguments and requires explicit spend c
     PI_EVAL_REPEATS: "1",
     PI_EVAL_EXPECTED_MODEL: "gpt-5.6-sol",
     PI_EVAL_EXPECTED_EFFORT: "high",
-    PI_EVAL_CASES: phaseOneCases.map((item) => item.id).join(","),
+    PI_EVAL_CASES: evalCases.map((item) => item.id).join(","),
   });
 });
 it("runs a single eval case once without implicitly judging it", () => {

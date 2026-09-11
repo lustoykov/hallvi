@@ -8,9 +8,10 @@ import {
   invalidateDeploymentRuntime,
 } from "../../../src/server/deployment-lifecycle";
 import { stackOf } from "../../../src/server/application-stack";
+import { verifiedLifecycle } from "../../fixtures/native";
 
 it("shows failed recreation separately from historical verification", () => {
-  const record = richScenario.initial().deployment!;
+  const record = verifiedLifecycle(richScenario.initial().deployment!);
   const attempt = beginDeploymentAttempt(
     record,
     "recreate",

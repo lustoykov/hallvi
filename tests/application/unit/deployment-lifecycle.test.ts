@@ -9,21 +9,23 @@ import {
 import { deploymentRuntime } from "../../../src/server/deployment-runtime";
 import { releaseOf } from "../../../src/server/deployment-release";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { queueNative } from "../../fixtures/queue-worker/native";
 
+/** A verified first deployment, with the lifecycle its execution recorded. */
 export function fixture(): DeploymentRecord {
-  return {
+  const r: DeploymentRecord = {
     id: "deployment-1",
     applicationId: "app-1",
     chatId: "chat-1",
     repository: "qa/queue",
     revision: "a".repeat(40),
-    plan: queuePlan(),
+    native: queueNative("deployment-1", "a".repeat(40)),
     status: "live",
     serverId: 10,
     serverCreateAttempted: true,
     address: "203.0.113.10",
     imageId: "sha256:one",
+    serviceImages: { app: "sha256:one" },
     verifiedAt: "2026-09-10T08:00:00Z",
     createdAt: "2026-09-10T07:00:00Z",
     updatedAt: "2026-09-10T08:00:00Z",
@@ -38,6 +40,45 @@ export function fixture(): DeploymentRecord {
     events: [],
     logs: "",
   };
+  const release = releaseOf(r)!;
+  const hostId = "host:deployment-1";
+  r.lifecycle = {
+    host: {
+      id: hostId,
+      provider: "hetzner",
+      connectionId: "project-a",
+      serverId: 10,
+      address: "203.0.113.10",
+    },
+    releases: [release],
+    attempts: [
+      {
+        id: "attempt-1",
+        operationId: "deployment:deployment-1",
+        releaseId: release.id,
+        hostId,
+        kind: "deploy",
+        startedAt: "2026-09-10T07:00:00Z",
+        finishedAt: "2026-09-10T08:00:00Z",
+        outcome: "verified",
+        remoteStartedAt: "2026-09-10T07:30:00Z",
+        error: null,
+        eventOffset: 0,
+      },
+    ],
+    runtime: {
+      state: "verified",
+      lastVerified: {
+        attemptId: "attempt-1",
+        releaseId: release.id,
+        hostId,
+        revision: r.revision!,
+        checkedAt: "2026-09-10T08:00:00Z",
+        images: { app: "sha256:one" },
+      },
+    },
+  };
+  return r;
 }
 it("recreation makes a distinct attempt at the same release on the same host", () => {
   const r = fixture();
@@ -116,29 +157,31 @@ it("preflight failure keeps prior verification, while interrupted remote work do
   expect(r.lifecycle!.runtime).toEqual({ ...old, state: "unknown" });
   expect(blocked.error).toBe("Missing volume");
 });
-it("does not invent serving identity or attempt history for an ambiguous legacy failure", () => {
+it("does not invent serving identity or attempt history for a record that never executed", () => {
   const r = fixture();
   r.status = "failed";
+  delete r.lifecycle;
   const untouched = structuredClone(r);
   expect(deploymentRuntime(r).state).toBe("unknown");
   expect(r).toEqual(untouched);
   const life = ensureDeploymentLifecycle(r);
   expect(life.attempts).toEqual([]);
-  expect(life.runtime.lastVerified).toBeNull();
+  expect(life.releases).toEqual([]);
+  expect(life.runtime).toEqual({ state: "unknown", lastVerified: null });
   expect(r.verifiedAt).toBe(untouched.verifiedAt);
 });
 it("rejects another host, a changed approved release, and overlapping attempts", () => {
   const r = fixture();
-  ensureDeploymentLifecycle(r);
   r.serverId = 20;
   expect(() => syncDeploymentHost(r)).toThrow("host changed");
   r.serverId = 10;
   r.releaseId = releaseOf(r)!.id;
-  r.plan!.port += 1;
+  const summary = r.native!.summary;
+  r.native!.summary = `${summary} Changed after approval.`;
   expect(() => beginDeploymentAttempt(r, "deploy", "deploy-2")).toThrow(
     "release changed",
   );
-  r.plan!.port -= 1;
+  r.native!.summary = summary;
   beginDeploymentAttempt(r, "recreate", "recreate-1");
   expect(() => beginDeploymentAttempt(r, "recreate", "recreate-2")).toThrow(
     "unfinished",

@@ -10,7 +10,7 @@ import {
   loadReport,
   writeJson,
 } from "../dashboard/results";
-import { phaseOneCases } from "../evals/phase-one-cases";
+import { evalCases } from "../evals/cases";
 import { journey } from "./journeys";
 
 test(
@@ -54,7 +54,7 @@ test(
       );
     save(
       "original",
-      phaseOneCases
+      evalCases
         .filter((item) => item.category !== "GitHub access")
         .map((item) => item.id),
     );
@@ -76,7 +76,7 @@ test(
         .evaluateAll((inputs) =>
           inputs.map((input) => (input as HTMLInputElement).value),
         );
-    const githubIds = phaseOneCases
+    const githubIds = evalCases
       .filter((item) => item.category === "GitHub access")
       .map((item) => item.id);
     const category = (name: string) =>
@@ -207,7 +207,7 @@ test(
 
       save("finished", githubIds);
       // With nothing new, the button gives way to a status line.
-      const allSaved = `All ${phaseOneCases.length} cases have a saved answer`;
+      const allSaved = `All ${evalCases.length} cases have a saved answer`;
       await expect(page.locator("#new-evals-status")).toHaveText(allSaved);
       await expect(page.locator("#new-evals-status")).toBeVisible();
       await expect(
@@ -222,7 +222,7 @@ test(
       await expect.poll(selected).toEqual([]);
       await expect(page.locator("#run-evals")).toBeDisabled();
       // A collapsed category is picked in one click, without expanding it.
-      const decisionIds = phaseOneCases
+      const decisionIds = evalCases
         .filter((item) => item.category === "Decision handling")
         .map((item) => item.id);
       await expect(category("Decision handling")).not.toHaveAttribute(
@@ -255,7 +255,7 @@ test(
         .getByRole("button", { name: "Select all cases", exact: true })
         .click();
       await expect(page.locator("#eval-count")).toContainText(
-        `${phaseOneCases.length} planned answers`,
+        `${evalCases.length} planned answers`,
       );
       // History presets: nothing has failed yet, every saved rubric differs
       // from today's wording, and a later failure becomes selectable.
@@ -267,10 +267,10 @@ test(
         .click();
       await page
         .getByRole("button", {
-          name: `Select rubric changed (${phaseOneCases.length})`,
+          name: `Select rubric changed (${evalCases.length})`,
         })
         .click();
-      await expect.poll(selected).toEqual(phaseOneCases.map((item) => item.id));
+      await expect.poll(selected).toEqual(evalCases.map((item) => item.id));
       await expect(
         page.locator('.eval-option[data-case-id="greeting"] .case-history'),
       ).toHaveText(/^Not judged · .+ · rubric changed$/);

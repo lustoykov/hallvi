@@ -21,28 +21,37 @@ export async function applicationWorkspaceSource(
       ),
     };
   }
-  const { repositoryEvidence } = await import("./phase-two");
-  const evidence = repositoryEvidence(applicationId);
-  if (!evidence.current || !evidence.commitSha)
-    return {
-      description:
-        "No current repository revision has been selected. This is an empty scratch workspace; use repository inspection to select source.",
-      files: [],
-    };
+  // Before a deployment selects a revision, read the default branch as it is
+  // now, through the repository identity a successful access check recorded.
   const { getApplication } = await import("./db");
+  const { recordedRepositoryId } = await import("./applications");
   const { connectedGithubCredential } = await import("./github-connection");
+  const { githubJson } = await import("./github-api");
   const application = getApplication(applicationId);
-  const credential = await connectedGithubCredential();
-  if (!application || credential.connection.id !== evidence.connectionId)
-    throw new Error("Repository access changed since inspection.");
+  if (!application) throw new Error("Application not found.");
   const repository = `${application.repositoryOwner}/${application.repositoryName}`;
+  const { token } = await connectedGithubCredential();
+  const found = (await githubJson(`/repos/${repository}`, token, { signal }))
+    .data as { id?: number; default_branch?: string };
+  // A later failed or unavailable check records no identity; it does not
+  // release the one a successful check pinned.
+  const pinned = recordedRepositoryId(applicationId);
+  if (pinned !== undefined && found.id !== pinned)
+    throw new Error(
+      "The repository's identity changed since its access check. Check GitHub access before reading it.",
+    );
+  const branch = found.default_branch ?? "HEAD";
+  const commit = (
+    await githubJson(
+      `/repos/${repository}/commits/${encodeURIComponent(branch)}`,
+      token,
+      { signal },
+    )
+  ).data as { sha?: string };
+  if (!commit.sha || !/^[0-9a-f]{40}$/.test(commit.sha))
+    throw new Error("GitHub did not identify the default branch revision.");
   return {
-    description: `${repository}@${evidence.commitSha}`,
-    files: await fetchBaseTree(
-      repository,
-      evidence.commitSha,
-      credential.token,
-      signal,
-    ),
+    description: `${repository}@${commit.sha}, the ${branch} branch when this request started; no deployment has selected a revision yet`,
+    files: await fetchBaseTree(repository, commit.sha, token, signal),
   };
 }

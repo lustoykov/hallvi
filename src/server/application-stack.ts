@@ -1,9 +1,6 @@
-import { sharedVolumes, serviceImage } from "./deployment-layout";
 // The application's stack as recorded: what runs on the one instance, what
 // stores state, and what protects it. Derived from the deployment record so
-// the views, Overview, navigation and the architecture canvas agree. The
-// web process and PostgreSQL come from the plan the executor runs; the rest
-// comes from `record.stack` once a deployment records it.
+// the views, Overview, navigation and the architecture canvas agree.
 import { deploymentRuntime } from "./deployment-runtime";
 import { currentFacts } from "./release-facts";
 import type { DeploymentRecord } from "./deployment-types";
@@ -63,7 +60,7 @@ export interface StackVolume {
   state: StackState;
 }
 export interface ApplicationStack {
-  /** False until a deployment plan records what the application needs. */
+  /** False until a deployment configuration records what it needs. */
   recorded: boolean;
   processes: StackProcess[];
   databases: StackDatabase[];
@@ -168,166 +165,7 @@ function nativeStack(record: DeploymentRecord): ApplicationStack {
 }
 
 export function stackOf(record: DeploymentRecord | null): ApplicationStack {
-  if (record?.native) return nativeStack(record);
-  const plan = record?.plan;
-  if (!record || !plan) return emptyStack;
-  const runtime = deploymentRuntime(record);
-  const state: StackState =
-    runtime.state === "unknown"
-      ? "unknown"
-      : record.status === "live"
-        ? "running"
-        : "planned";
-  const extra = record.stack ?? {};
-  const imageServices = plan.services ?? [];
-  const plannedVolumes = sharedVolumes(plan).map((v) => ({
-    name: v.name,
-    usedBy: [...new Set(v.mounts.map((m) => m.service))].join(", "),
-    mount:
-      v.mounts.length === 1 && !v.mounts[0].readOnly
-        ? v.mounts[0].target
-        : v.mounts
-            .map(
-              (m) =>
-                `${m.service}: ${m.target} (${m.readOnly ? "read-only" : "read/write"})`,
-            )
-            .join(" · "),
-    kind: v.kind,
-    sqlite: v.mounts[0].sqlite,
-    mounts: v.mounts,
-  }));
-  const processes: StackProcess[] = [
-    {
-      name: "app",
-      role: "web",
-      command: plan.command?.join(" ") ?? null,
-      image: plan.image ?? record.imageId ?? null,
-      port: plan.port,
-      healthPath: plan.healthPath,
-      consumes: null,
-      dependsOn: [
-        ...(plan.postgres ? ["postgres"] : []),
-        ...(plan.dependencies ?? [])
-          .filter((d) => d.service === "app")
-          .map((d) => d.needs),
-      ],
-      ...(plan.healthCommand ? { healthCommand: plan.healthCommand } : {}),
-      ...(record.serviceReadiness?.app
-        ? { readiness: record.serviceReadiness.app }
-        : {}),
-      state,
-    },
-    ...imageServices.map((service) => ({
-      name: service.name,
-      role:
-        service.role ??
-        (service.port ? ("web" as const) : ("service" as const)),
-      command: service.command?.join(" ") ?? null,
-      image:
-        record.serviceImages?.[service.name] ??
-        serviceImage(
-          plan,
-          record.revision ?? "unbuilt",
-          record.id,
-          service.name,
-        ),
-      port: service.port,
-      private: true,
-      healthPath: service.healthPath,
-      healthCommand: service.healthCommand,
-      readiness: record.serviceReadiness?.[service.name],
-      dependsOn: plan.dependencies
-        ?.filter((d) => d.service === service.name)
-        .map((d) => d.needs),
-      consumes: null,
-      state,
-    })),
-    ...(extra.processes ?? [])
-      .filter(
-        (process) =>
-          process.name !== "app" &&
-          !imageServices.some((service) => service.name === process.name),
-      )
-      .map((process) => ({
-        name: process.name,
-        role: process.role,
-        command: process.command,
-        image: process.image ?? null,
-        port: null,
-        healthPath: null,
-        consumes: process.consumes ?? null,
-        state,
-      })),
-  ];
-  const databases: StackDatabase[] = [
-    ...(plan.postgres
-      ? [
-          {
-            kind: "postgres" as const,
-            name: "postgres",
-            version: plan.postgres.version,
-            location: "database volume",
-            state,
-          },
-        ]
-      : []),
-    ...plannedVolumes
-      .filter((v) => v.sqlite)
-      .map((v) => ({
-        kind: "sqlite" as const,
-        name: v.usedBy,
-        version: null,
-        location: v.sqlite!,
-        state,
-      })),
-    ...(extra.databases ?? []).map((database) => ({
-      kind: database.kind,
-      name: database.name,
-      version: null,
-      location: database.path,
-      state,
-    })),
-  ];
-  const volumes: StackVolume[] = [
-    ...(plan.postgres
-      ? [
-          {
-            name: "database",
-            usedBy: "postgres",
-            mount: `/var/lib/postgresql${plan.postgres.version === "18" ? "" : "/data"}`,
-            kind: "database" as const,
-            state,
-          },
-        ]
-      : []),
-    ...plannedVolumes.map((v) => ({
-      name: v.name,
-      usedBy: v.usedBy,
-      mount: v.mount,
-      ...(v.mounts.length > 1 || v.mounts.some((m) => m.readOnly)
-        ? { mounts: v.mounts }
-        : {}),
-      kind: v.kind,
-      state,
-    })),
-    ...(extra.volumes ?? []).map((volume) => ({ ...volume, state })),
-  ];
-  return {
-    recorded: true,
-    processes,
-    databases,
-    services: (extra.services ?? []).map((service) => ({
-      kind: service.kind,
-      name: service.name,
-      version: service.version ?? null,
-      role: service.role,
-      persistence: service.persistence ?? null,
-      state,
-    })),
-    queues: extra.queues ?? [],
-    jobs: extra.jobs ?? [],
-    volumes,
-  };
+  return record?.native ? nativeStack(record) : emptyStack;
 }
 
 /** Everything that holds state the application would lose with its host. */

@@ -8,6 +8,7 @@ import {
 import { protectionStatus } from "../../../src/components/server-guy/fact-status";
 import { deploymentLock } from "../../../src/server/deployment-ssh";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import { nativeApp } from "../../fixtures/native";
 
 const app = "00000000-0000-4000-8000-000000000001";
 const deploymentId = "00000000-0000-4000-8000-000000000002";
@@ -19,15 +20,13 @@ const deployment = {
   applicationId: app,
   status: "live",
   revision,
-  plan: {
-    postgres: { version: "16", variable: "DATABASE_URL", scheme: "postgresql" },
-    volumes: [],
-    services: [],
-    configs: [],
-    environment: [],
-    command: null,
+  native: nativeApp({
+    deploymentId,
+    revision,
     port: 8000,
-  },
+    postgres: "16",
+    checks: [],
+  }),
   stack: {},
 } as unknown as DeploymentRecord;
 const policy = backupPolicySchema.parse({

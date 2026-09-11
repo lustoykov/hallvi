@@ -1,67 +1,38 @@
 import Database from "better-sqlite3";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  notInArray,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
-  acceptanceChecks,
   activityEvents,
-  applicationContracts,
-  applicationPreviews,
-  preparationBranches,
   applications,
   chats,
-  conformanceProposals,
-  conformanceRuns,
+  chatSummaries,
   decisions,
   messages,
   observations,
-  phaseWorkspaces,
   piRuns,
-  publicationGrants,
-  chatSummaries,
 } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import { assertOutsideRecoveryQuarantine } from "./recovery-quarantine.mjs";
 import type {
-  AcceptanceChecksRecord,
   ActivityEvent,
-  ApplicationContractBody,
-  ApplicationContractRecord,
   ApplicationRecord,
-  ApplicationPreview,
   Chat,
   ChatMessage,
-  ConformanceProposalRecord,
-  ConformanceRunRecord,
   Decision,
   Observation,
-  PhaseKey,
-  PhaseWorkspaceRecord,
-  PublicationGrantRecord,
-  PreparationBranch,
 } from "./types";
 
 const schema = {
   activityEvents,
-  applicationContracts,
   applications,
   chats,
   decisions,
   messages,
   observations,
-  phaseWorkspaces,
   piRuns,
   chatSummaries,
 };
@@ -152,19 +123,8 @@ export function getApplication(id: string) {
 }
 
 export function deleteApplication(id: string) {
-  // Foreign keys remove only this application's workspace and dependent
-  // records.
+  // Foreign keys remove only this application's dependent records.
   db().delete(applications).where(eq(applications.id, id)).run();
-}
-
-export function getApplicationByRepository(repositoryUrl: string) {
-  return (
-    db()
-      .select()
-      .from(applications)
-      .where(eq(applications.repositoryUrl, repositoryUrl))
-      .get() ?? null
-  );
 }
 
 export function insertApplication(
@@ -182,117 +142,13 @@ export function insertApplication(
   return application;
 }
 
-// Phase workspaces
-
-export function insertWorkspace(
-  applicationId: string,
-  phaseKey: PhaseKey = "start",
-) {
-  const workspace: PhaseWorkspaceRecord = {
-    id: randomUUID(),
-    applicationId,
-    phaseKey,
-    createdAt: now(),
-    completedAt: null,
-    deliverableEvidence: null,
-  };
-  db().insert(phaseWorkspaces).values(workspace).run();
-  return workspace;
-}
-
-export function getWorkspace(
-  applicationId: string,
-  phaseKey: PhaseKey = "start",
-) {
-  return (
-    db()
-      .select()
-      .from(phaseWorkspaces)
-      .where(
-        and(
-          eq(phaseWorkspaces.applicationId, applicationId),
-          eq(phaseWorkspaces.phaseKey, phaseKey),
-        ),
-      )
-      .get() ?? null
-  );
-}
-
-export function getWorkspaceById(id: string) {
-  return (
-    db()
-      .select()
-      .from(phaseWorkspaces)
-      .where(eq(phaseWorkspaces.id, id))
-      .get() ?? null
-  );
-}
-
-// Workspaces are created in phase order, so creation order is phase order.
-export function listWorkspaces(applicationId: string) {
-  return db()
-    .select()
-    .from(phaseWorkspaces)
-    .where(eq(phaseWorkspaces.applicationId, applicationId))
-    .orderBy(asc(phaseWorkspaces.createdAt), asc(rowId))
-    .all();
-}
-
-/** Marks a workspace complete exactly once, retaining its deliverable
- * evidence. Returns false when it was already completed. */
-export function completeWorkspace(id: string, evidence: unknown) {
-  const completedAt = now();
-  return (
-    db()
-      .update(phaseWorkspaces)
-      .set({ completedAt, deliverableEvidence: evidence })
-      .where(
-        and(eq(phaseWorkspaces.id, id), isNull(phaseWorkspaces.completedAt)),
-      )
-      .run().changes > 0
-  );
-}
-
-/** Reopening retains the old deliverable as a historical Observation. */
-export function reopenWorkspace(id: string) {
-  const workspace = getWorkspaceById(id);
-  if (!workspace) throw new Error("Workspace not found.");
-  if (workspace.completedAt)
-    insertObservation({
-      applicationId: workspace.applicationId,
-      kind: "phase-completion-history",
-      status: "passed",
-      summary: `Retained ${workspace.phaseKey} completion before correction.`,
-      sourceLabel: "Earlier phase completion",
-      sourceUrl: null,
-      raw: {
-        workspaceId: id,
-        completedAt: workspace.completedAt,
-        evidence: workspace.deliverableEvidence,
-      },
-    });
-  db()
-    .update(phaseWorkspaces)
-    .set({ completedAt: null, deliverableEvidence: null })
-    .where(eq(phaseWorkspaces.id, id))
-    .run();
-}
-
 // Chats and messages
 
-export function insertChat(
-  workspaceId: string,
-  title: string,
-  isPrimary = false,
-) {
-  const workspace = getWorkspaceById(workspaceId);
-  if (!workspace) throw new Error("Workspace not found.");
+export function insertChat(applicationId: string, title: string) {
   const chat: Chat = {
     id: randomUUID(),
-    applicationId: workspace.applicationId,
-    workspaceId,
+    applicationId,
     title,
-    isPrimary,
     createdAt: now(),
     archivedAt: null,
   };
@@ -302,15 +158,6 @@ export function insertChat(
 
 export function getChat(id: string) {
   return db().select().from(chats).where(eq(chats.id, id)).get() ?? null;
-}
-
-export function listChats(workspaceId: string) {
-  return db()
-    .select()
-    .from(chats)
-    .where(eq(chats.workspaceId, workspaceId))
-    .orderBy(asc(chats.createdAt), asc(rowId))
-    .all();
 }
 
 export function listApplicationChats(applicationId: string) {
@@ -324,18 +171,6 @@ export function listApplicationChats(applicationId: string) {
 
 // The chat list shows when each chat was last active: its newest message, or
 // its creation when nothing has been sent yet.
-export function listChatSummaries(workspaceId: string) {
-  return listChats(workspaceId).map((chat) => ({
-    ...chat,
-    lastActivityAt:
-      db()
-        .select({ at: sql<string | null>`max(${messages.createdAt})` })
-        .from(messages)
-        .where(eq(messages.chatId, chat.id))
-        .get()?.at ?? chat.createdAt,
-  }));
-}
-
 export function listApplicationChatSummaries(applicationId: string) {
   return listApplicationChats(applicationId).map((chat) => ({
     ...chat,
@@ -379,40 +214,6 @@ export function insertMessage(
 
 export function getMessage(id: string) {
   return db().select().from(messages).where(eq(messages.id, id)).get() ?? null;
-}
-
-/** A message only when it belongs to one of this application's Chats. */
-export function getApplicationMessage(applicationId: string, id: string) {
-  return (
-    db()
-      .select({ message: messages })
-      .from(messages)
-      .innerJoin(chats, eq(chats.id, messages.chatId))
-      .innerJoin(phaseWorkspaces, eq(phaseWorkspaces.id, chats.workspaceId))
-      .where(
-        and(
-          eq(messages.id, id),
-          eq(phaseWorkspaces.applicationId, applicationId),
-        ),
-      )
-      .get()?.message ?? null
-  );
-}
-
-/** Whether any Pi Run for this application is queued or running. */
-export function hasPendingRuns(applicationId: string) {
-  return Boolean(
-    db()
-      .select({ id: piRuns.id })
-      .from(piRuns)
-      .where(
-        and(
-          eq(piRuns.applicationId, applicationId),
-          inArray(piRuns.status, ["queued", "running"]),
-        ),
-      )
-      .get(),
-  );
 }
 
 export function listMessages(chatId: string) {
@@ -553,482 +354,17 @@ export function listObservations(applicationId: string) {
     .all();
 }
 
-/** The saved read of one repository path at one commit, if any. Reads are
- * pinned to a commit, so a later connection cannot change their content. */
-export function findRepositoryFileObservation(
-  applicationId: string,
-  commitSha: string,
-  path: string,
-) {
-  return (
-    db()
-      .select()
-      .from(observations)
-      .where(
-        and(
-          eq(observations.applicationId, applicationId),
-          eq(observations.kind, "github-repository-file"),
-          sql`${observations.sourceUrl} LIKE (SELECT repository_url FROM applications WHERE id = ${applicationId}) || '/blob/%'`,
-          eq(observations.status, "passed"),
-          sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
-          sql`json_extract(${observations.raw}, '$.path') = ${path}`,
-        ),
-      )
-      .orderBy(desc(observations.observedAt), desc(rowId))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function listRepositoryFileObservations(
-  applicationId: string,
-  commitSha: string,
-) {
-  return db()
-    .select()
-    .from(observations)
-    .where(
-      and(
-        eq(observations.applicationId, applicationId),
-        eq(observations.kind, "github-repository-file"),
-        sql`${observations.sourceUrl} LIKE (SELECT repository_url FROM applications WHERE id = ${applicationId}) || '/blob/%'`,
-        eq(observations.status, "passed"),
-        sql`json_extract(${observations.raw}, '$.commitSha') = ${commitSha}`,
-      ),
-    )
-    .orderBy(asc(observations.observedAt), asc(rowId))
-    .all();
-}
-
-export function updateApplicationSetup(
-  applicationId: string,
-  input: Pick<
-    ApplicationRecord,
-    | "name"
-    | "repositoryUrl"
-    | "repositoryOwner"
-    | "repositoryName"
-    | "approvalMode"
-  >,
-) {
-  return db()
-    .update(applications)
-    .set({ ...input, updatedAt: now() })
-    .where(eq(applications.id, applicationId))
-    .returning()
-    .get()!;
-}
-
-// Application Contracts
-
-export function insertContract(input: {
-  applicationId: string;
-  workspaceId: string;
-  version: number;
-  sourceMessageId: string;
-  body: ApplicationContractBody;
-}) {
-  const contract: ApplicationContractRecord = {
-    id: randomUUID(),
-    applicationId: input.applicationId,
-    workspaceId: input.workspaceId,
-    version: input.version,
-    profileId: input.body.profileId,
-    profileVersion: input.body.profileVersion,
-    commitSha: input.body.commitSha,
-    sourceMessageId: input.sourceMessageId,
-    body: input.body,
-    supersededById: null,
-    createdAt: now(),
-  };
-  db().insert(applicationContracts).values(contract).run();
-  return contract;
-}
-
-export function getContract(id: string) {
-  return (
-    db()
-      .select()
-      .from(applicationContracts)
-      .where(eq(applicationContracts.id, id))
-      .get() ?? null
-  );
-}
-
-/** The application's active contract: the one no revision has superseded. */
-export function currentContract(applicationId: string) {
-  return (
-    db()
-      .select()
-      .from(applicationContracts)
-      .where(
-        and(
-          eq(applicationContracts.applicationId, applicationId),
-          isNull(applicationContracts.supersededById),
-        ),
-      )
-      .orderBy(desc(applicationContracts.version))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function listContracts(applicationId: string) {
-  return db()
-    .select()
-    .from(applicationContracts)
-    .where(eq(applicationContracts.applicationId, applicationId))
-    .orderBy(asc(applicationContracts.version))
-    .all();
-}
-
-/** Guarded like supersedeDecision: the previous contract must still be the
- * active one of this application. */
-export function supersedeContract(
-  applicationId: string,
-  previousId: string,
-  replacementId: string,
-) {
-  const result = db()
-    .update(applicationContracts)
-    .set({ supersededById: replacementId })
-    .where(
-      and(
-        eq(applicationContracts.id, previousId),
-        eq(applicationContracts.applicationId, applicationId),
-        isNull(applicationContracts.supersededById),
-        sql`${applicationContracts.id} <> ${replacementId}`,
-        sql`exists (select 1 from application_contracts as replacement where replacement.id = ${replacementId} and replacement.application_id = ${applicationId} and replacement.superseded_by_id is null)`,
-      ),
-    )
-    .returning()
-    .get();
-  if (!result) {
-    throw new Error(
-      "The Application Contract being revised is missing, already revised, or belongs to another application.",
-    );
-  }
-  return result;
-}
-
-// Conformance proposals (Phase 3)
-
-export function insertConformanceProposal(
-  input: Omit<ConformanceProposalRecord, "id" | "createdAt">,
-) {
-  const proposal: ConformanceProposalRecord = {
-    ...input,
-    id: randomUUID(),
-    createdAt: now(),
-  };
-  db().insert(conformanceProposals).values(proposal).run();
-  return proposal;
-}
-
-export function getConformanceProposal(id: string) {
-  return (
-    db()
-      .select()
-      .from(conformanceProposals)
-      .where(eq(conformanceProposals.id, id))
-      .get() ?? null
-  );
-}
-
-/** The workspace's active proposal: neither superseded nor withdrawn. */
-export function activeConformanceProposal(workspaceId: string) {
-  return (
-    db()
-      .select()
-      .from(conformanceProposals)
-      .where(
-        and(
-          eq(conformanceProposals.workspaceId, workspaceId),
-          isNull(conformanceProposals.supersededById),
-          notInArray(conformanceProposals.status, ["withdrawn", "superseded"]),
-        ),
-      )
-      .orderBy(desc(conformanceProposals.createdAt), desc(rowId))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function listConformanceProposals(applicationId: string) {
-  return db()
-    .select()
-    .from(conformanceProposals)
-    .where(eq(conformanceProposals.applicationId, applicationId))
-    .orderBy(asc(conformanceProposals.createdAt), asc(rowId))
-    .all();
-}
-
-/**
- * Guarded update of one proposal: the row must still be in one of the
- * expected states, so a lost receipt or a concurrent action cannot overwrite
- * a later outcome. Returns the updated row or null when the guard failed.
- */
-export function updateConformanceProposal(
-  id: string,
-  expectedStatuses: ConformanceProposalRecord["status"][],
-  patch: Partial<
-    Pick<
-      ConformanceProposalRecord,
-      | "status"
-      | "approval"
-      | "publication"
-      | "publicationError"
-      | "external"
-      | "candidate"
-      | "verification"
-      | "supersededById"
-    >
-  >,
-) {
-  return (
-    db()
-      .update(conformanceProposals)
-      .set(patch)
-      .where(
-        and(
-          eq(conformanceProposals.id, id),
-          inArray(conformanceProposals.status, expectedStatuses),
-        ),
-      )
-      .returning()
-      .get() ?? null
-  );
-}
-
-// Conformance runs (Phase 3)
-
-export function insertConformanceRun(
-  input: Omit<ConformanceRunRecord, "id" | "createdAt">,
-) {
-  const run: ConformanceRunRecord = {
-    ...input,
-    id: randomUUID(),
-    createdAt: now(),
-  };
-  db().insert(conformanceRuns).values(run).run();
-  return run;
-}
-
-export function getConformanceRun(id: string) {
-  return (
-    db()
-      .select()
-      .from(conformanceRuns)
-      .where(eq(conformanceRuns.id, id))
-      .get() ?? null
-  );
-}
-
-export function listConformanceRuns(applicationId: string) {
-  return db()
-    .select()
-    .from(conformanceRuns)
-    .where(eq(conformanceRuns.applicationId, applicationId))
-    .orderBy(desc(conformanceRuns.createdAt), desc(rowId))
-    .all();
-}
-
-export function listPendingConformanceRuns() {
-  return db()
-    .select()
-    .from(conformanceRuns)
-    .where(inArray(conformanceRuns.status, ["queued", "running"]))
-    .orderBy(asc(conformanceRuns.createdAt), asc(rowId))
-    .all();
-}
-
-/** Guarded status change; returns null when the run left the expected
- * states. */
-export function updateConformanceRun(
-  id: string,
-  expectedStatuses: ConformanceRunRecord["status"][],
-  patch: Partial<
-    Pick<
-      ConformanceRunRecord,
-      | "status"
-      | "results"
-      | "summary"
-      | "error"
-      | "imageDigest"
-      | "configuration"
-      | "startedAt"
-      | "finishedAt"
-      | "source"
-    >
-  >,
-) {
-  return (
-    db()
-      .update(conformanceRuns)
-      .set(patch)
-      .where(
-        and(
-          eq(conformanceRuns.id, id),
-          inArray(conformanceRuns.status, expectedStatuses),
-        ),
-      )
-      .returning()
-      .get() ?? null
-  );
-}
-
-// Acceptance checks (Phase 3)
-
-export function insertAcceptanceChecks(
-  input: Omit<AcceptanceChecksRecord, "id" | "createdAt">,
-) {
-  const record: AcceptanceChecksRecord = {
-    ...input,
-    id: randomUUID(),
-    createdAt: now(),
-  };
-  db().insert(acceptanceChecks).values(record).run();
-  return record;
-}
-
-export function getAcceptanceChecks(id: string) {
-  return (
-    db()
-      .select()
-      .from(acceptanceChecks)
-      .where(eq(acceptanceChecks.id, id))
-      .get() ?? null
-  );
-}
-
-export function listAcceptanceChecks(applicationId: string) {
-  return db()
-    .select()
-    .from(acceptanceChecks)
-    .where(eq(acceptanceChecks.applicationId, applicationId))
-    .orderBy(asc(acceptanceChecks.version))
-    .all();
-}
-
-/** The accepted definition the runner executes, if any. */
-export function acceptedAcceptanceChecks(applicationId: string) {
-  return (
-    db()
-      .select()
-      .from(acceptanceChecks)
-      .where(
-        and(
-          eq(acceptanceChecks.applicationId, applicationId),
-          eq(acceptanceChecks.status, "accepted"),
-          isNull(acceptanceChecks.supersededById),
-        ),
-      )
-      .orderBy(desc(acceptanceChecks.version))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-/** The newest proposed definition awaiting acceptance, if any. */
-export function proposedAcceptanceChecks(applicationId: string) {
-  return (
-    db()
-      .select()
-      .from(acceptanceChecks)
-      .where(
-        and(
-          eq(acceptanceChecks.applicationId, applicationId),
-          eq(acceptanceChecks.status, "proposed"),
-          isNull(acceptanceChecks.supersededById),
-        ),
-      )
-      .orderBy(desc(acceptanceChecks.version))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function updateAcceptanceChecks(
-  id: string,
-  expectedStatuses: AcceptanceChecksRecord["status"][],
-  patch: Partial<
-    Pick<
-      AcceptanceChecksRecord,
-      "status" | "acceptedAt" | "acceptedBy" | "supersededById"
-    >
-  >,
-) {
-  return (
-    db()
-      .update(acceptanceChecks)
-      .set(patch)
-      .where(
-        and(
-          eq(acceptanceChecks.id, id),
-          inArray(acceptanceChecks.status, expectedStatuses),
-        ),
-      )
-      .returning()
-      .get() ?? null
-  );
-}
-
-// Publication grants (Phase 3)
-
-export function insertPublicationGrant(
-  input: Omit<PublicationGrantRecord, "id" | "grantedAt" | "revokedAt">,
-) {
-  const grant: PublicationGrantRecord = {
-    ...input,
-    id: randomUUID(),
-    grantedAt: now(),
-    revokedAt: null,
-  };
-  db().insert(publicationGrants).values(grant).run();
-  return grant;
-}
-
-export function activePublicationGrant(applicationId: string) {
-  return (
-    db()
-      .select()
-      .from(publicationGrants)
-      .where(
-        and(
-          eq(publicationGrants.applicationId, applicationId),
-          isNull(publicationGrants.revokedAt),
-        ),
-      )
-      .orderBy(desc(publicationGrants.grantedAt), desc(rowId))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function revokePublicationGrants(applicationId: string) {
-  return db()
-    .update(publicationGrants)
-    .set({ revokedAt: now() })
-    .where(
-      and(
-        eq(publicationGrants.applicationId, applicationId),
-        isNull(publicationGrants.revokedAt),
-      ),
-    )
-    .run().changes;
-}
-
 // Activity
 
 export function insertActivity(
-  workspaceId: string,
+  applicationId: string,
   kind: string,
   summary: string,
   detail: string,
 ) {
   const activity: ActivityEvent = {
     id: randomUUID(),
-    workspaceId,
+    applicationId,
     kind,
     summary,
     detail,
@@ -1044,14 +380,14 @@ export function insertActivity(
  */
 export function recordActivityOnce(
   id: string,
-  workspaceId: string,
+  applicationId: string,
   kind: string,
   summary: string,
   detail: string,
 ) {
   const activity: ActivityEvent = {
     id,
-    workspaceId,
+    applicationId,
     kind,
     summary,
     detail,
@@ -1071,13 +407,13 @@ const EXCLUDED_ACTIVITY_KINDS = [
   "chat-archived",
 ];
 
-export function listActivity(workspaceId: string): ActivityEvent[] {
+export function listActivity(applicationId: string): ActivityEvent[] {
   return db()
     .select()
     .from(activityEvents)
     .where(
       and(
-        eq(activityEvents.workspaceId, workspaceId),
+        eq(activityEvents.applicationId, applicationId),
         notInArray(activityEvents.kind, EXCLUDED_ACTIVITY_KINDS),
       ),
     )
@@ -1113,42 +449,4 @@ export function withTransaction<T>(
   } finally {
     committedCallbacks = parent;
   }
-}
-
-export function saveApplicationPreview(record: ApplicationPreview) {
-  db()
-    .insert(applicationPreviews)
-    .values({ id: record.id, applicationId: record.applicationId, record })
-    .onConflictDoUpdate({ target: applicationPreviews.id, set: { record } })
-    .run();
-  return record;
-}
-export function listApplicationPreviews(applicationId?: string) {
-  const query = db().select().from(applicationPreviews);
-  const rows = applicationId
-    ? query.where(eq(applicationPreviews.applicationId, applicationId)).all()
-    : query.all();
-  return rows
-    .map((row) => row.record)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function savePreparationBranch(record: PreparationBranch) {
-  db()
-    .insert(preparationBranches)
-    .values({ id: record.id, applicationId: record.applicationId, record })
-    .onConflictDoUpdate({ target: preparationBranches.id, set: { record } })
-    .run();
-  return record;
-}
-export function latestPreparationBranch(applicationId: string) {
-  return (
-    db()
-      .select()
-      .from(preparationBranches)
-      .where(eq(preparationBranches.applicationId, applicationId))
-      .all()
-      .map((row) => row.record)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null
-  );
 }
