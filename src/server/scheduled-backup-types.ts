@@ -69,6 +69,7 @@ export const scheduledRunSchema = z.object({
             "database-schema",
             "database-rows",
             "database-restored",
+            "database-content",
             "database-tables",
             "database-empty",
           ]),

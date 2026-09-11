@@ -113,6 +113,7 @@ CHECK_LABELS = {
     "database-schema",
     "database-rows",
     "database-restored",
+    "database-content",
     "database-tables",
     "database-empty",
 }

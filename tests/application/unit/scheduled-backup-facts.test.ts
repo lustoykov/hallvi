@@ -412,6 +412,25 @@ describe("scheduled backup evidence", () => {
       scheduledProtection(deployment, fileOnly, hashed, now).restoreTest
         ?.verified,
     ).toContain("File-captured databases received file-hash checks only.");
+    // A declared dump is credited only with its recorded content check.
+    const dumped = backupPolicySchema.parse({
+      ...policy,
+      kind: "stack",
+      data: { postgres: false, sqlite: false, dumps: true },
+    });
+    const loaded = [...offline.slice(0, 3), "database-restored"];
+    expect(
+      scheduledProtection(deployment, dumped, restoredWith(...loaded), now)
+        .restoreTest,
+    ).toBeNull();
+    expect(
+      scheduledProtection(
+        deployment,
+        dumped,
+        restoredWith(...loaded, "database-content"),
+        now,
+      ).restoreTest?.verified,
+    ).toContain("matched its content fingerprint");
     // A service that did not stop cleanly leaves no new recovery point.
     const killed = {
       ...run,

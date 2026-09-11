@@ -94,6 +94,8 @@ export function scheduledProtection(
           run.restore.checks.includes("file-inventory") &&
           (!policy.data!.postgres ||
             run.restore.checks.includes("database-restored")) &&
+          (!policy.data!.dumps ||
+            run.restore.checks.includes("database-content")) &&
           (!policy.data!.sqlite ||
             (run.restore.checks.includes("database-integrity") &&
               run.restore.checks.includes("database-rows")))

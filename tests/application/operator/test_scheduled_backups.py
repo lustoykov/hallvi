@@ -2027,6 +2027,8 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertEqual(verified["outcome"], "verified", verified["errorCode"])
         for check in ("file-inventory", "database-restored", "database-content"):
             self.assertIn(check, verified["checks"])
+        # The controller reads the sanitized receipt: the content check survives.
+        self.assertIn("database-content", runner.sanitize_restore(verified)["checks"])
         # The dump captured with these files was loaded on standard input.
         self.assertEqual(
             restorer.stdin["mariadb"], [b"-- dump of shelf\nINSERT 42;\n"]
