@@ -775,5 +775,28 @@ it("a further correction continues the latest failed release, keeping its approv
     ["deploy", "failed"],
     ["deploy", "verified"],
   ]);
-  expect(operation(`deployment:${record.id}`)!.resolvedById).toBe(resumed.id);
+  expect(operation(`deployment:${record.id}`)).toMatchObject({
+    resolvedById: resumed.id,
+    blocksQueue: false,
+  });
+  // The superseded deployment operation holds nothing: the next change
+  // starts instead of queueing behind it.
+  const { proposeOperation } =
+    await import("../../../src/server/operation-store");
+  const next = proposeOperation({
+    applicationId: app,
+    source: { type: "backup", id: record.id },
+    target: "configure-backups:daily:7",
+    kind: "change",
+    title: "Configure scheduled backups",
+    summary: "Daily backups.",
+    destinations: ["backups", "history"],
+    command: {
+      type: "configure-backups",
+      deploymentId: record.id,
+      schedule: "daily",
+      keep: 7,
+    },
+  });
+  expect(startChange(next.id, next.updatedAt).state).toBe("working");
 });

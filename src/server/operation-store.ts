@@ -224,9 +224,12 @@ export function publicOperation(record: StoredOperation): ApplicationOperation {
   };
 }
 function blockedBy(applicationId: string, except: string[] = []) {
+  // A superseded operation holds nothing: its successor established what
+  // happened on the host.
   return rows(applicationId).find(
     (row) =>
       !except.includes(row.id) &&
+      !row.resolvedById &&
       row.kind === "change" &&
       (row.state === "working" || row.blocksQueue),
   );
@@ -651,7 +654,9 @@ export function resolveOperation(id: string, resolvedById: string) {
     const record = operation(id);
     if (!record || record.resolvedById || record.state !== "failed") return;
     record.resolvedById = resolvedById;
+    record.blocksQueue = false;
     put(record);
+    advanceQueue(record.applicationId);
   });
 }
 export function retryOperation(id: string, expectedUpdatedAt: string) {
