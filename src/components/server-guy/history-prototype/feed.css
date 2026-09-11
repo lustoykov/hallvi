@@ -1,0 +1,337 @@
+/* PROTOTYPE · claude/deployment-history · throwaway.
+   Direction A for History, Story. Prefix: axh-. A quiet rail of days; the
+   only motion is the landing flash when you follow a thread. */
+
+.axh {
+  /* The rail's geometry: the time, the dot on the rail, and the gaps. */
+  --axh-time: 50px;
+  --axh-dot: 22px;
+  --axh-gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 10px;
+}
+.axh-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+  margin-top: 4px;
+}
+.axh-sum {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+/* On a narrow screen the filter scrolls sideways, not the page. */
+.axh-filter {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.axh-group {
+  display: grid;
+  gap: 6px;
+}
+.axh-group h2 {
+  margin: 0 0 4px calc(var(--axh-time) + var(--axh-dot) + 2 * var(--axh-gap));
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ax-ink);
+}
+.axh-group.is-live h2 {
+  color: var(--ax-working-text);
+}
+.axh-list {
+  position: relative;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The rail the day hangs on, through the dots. */
+.axh-list::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: calc(var(--axh-time) + var(--axh-gap) + var(--axh-dot) / 2 - 0.5px);
+  width: 1px;
+  background: var(--ax-line-2);
+}
+.axh-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--axh-time) var(--axh-dot) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 var(--axh-gap);
+  padding: 12px 12px 12px 0;
+  border-radius: 14px;
+  transition: background-color var(--ax-base);
+}
+.axh-row:hover {
+  background: #f7f9fc;
+}
+.axh-row.is-flash {
+  animation: axh-flash 1700ms var(--ax-ease-out);
+}
+@keyframes axh-flash {
+  0%,
+  35% {
+    background: var(--ax-working-bg);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.axh-time {
+  padding-top: 3px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axh-dot {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin: 7px auto 0;
+  border-radius: 50%;
+  background: var(--ax-verified);
+  box-shadow: 0 0 0 3px #ffffff;
+}
+.axh-row:hover .axh-dot {
+  box-shadow: 0 0 0 3px #f7f9fc;
+}
+.axh-row[data-state="failed"] .axh-dot {
+  background: var(--ax-failed);
+}
+.axh-row[data-state="inspected"] .axh-dot {
+  background: #8b95a5;
+}
+.axh-row:is([data-state="working"], [data-state="queued"]) .axh-dot {
+  background: var(--ax-blue);
+}
+.axh-row[data-state="proposed"] .axh-dot {
+  background: var(--ax-amber);
+}
+.axh-row[data-state="cancelled"] .axh-dot {
+  border: 1.5px dashed #9aa6ba;
+  background: #ffffff;
+}
+.axh-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.axh-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.axh-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+}
+.axh-summary {
+  max-width: 78ch;
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.axh-row[data-state="failed"] .axh-summary {
+  color: var(--ax-failed);
+}
+.axh-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axh-thread {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--ax-verified-line);
+  border-radius: 999px;
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 560;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--ax-base);
+}
+.axh-thread:hover {
+  border-color: var(--ax-verified);
+}
+.axh-thread.is-back {
+  border-color: var(--ax-line-2);
+  background: #ffffff;
+  color: var(--ax-ink-2);
+}
+.axh-thread.is-back:hover {
+  border-color: #c3ccdb;
+}
+.axh-thread svg {
+  flex: none;
+  width: 11px;
+  height: 11px;
+}
+.axh-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.axh-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ax-link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axh-more:hover {
+  background: #eef2fb;
+}
+.axh-more svg {
+  width: 11px;
+  height: 11px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axh-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.axh-go {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ax-ink-2);
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base),
+    color var(--ax-base);
+}
+.axh-go:hover {
+  border-color: #c3ccdb;
+  color: var(--ax-blue);
+}
+.axh-go svg {
+  width: 14px;
+  height: 14px;
+}
+.axh-evidence {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 360ms var(--ax-ease-out);
+}
+.axh-evidence.is-open {
+  grid-template-rows: 1fr;
+}
+.axh-evidence > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.axh-evidence p {
+  max-width: 78ch;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+.axh-console {
+  display: grid;
+  margin-top: 8px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+}
+.axh-step {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d9e1f2;
+}
+.axh-step span {
+  overflow-wrap: anywhere;
+}
+.axh-step b {
+  font-weight: 600;
+  text-align: center;
+  color: #7d8aa5;
+}
+.axh-step[data-state="done"] b {
+  color: #3fbf86;
+}
+.axh-step[data-state="failed"] b,
+.axh-step[data-state="failed"] span {
+  color: #ef8d86;
+}
+.axh-step[data-state="active"] b,
+.axh-step[data-state="active"] span {
+  color: #9fb4f5;
+}
+.axh-empty {
+  margin: 0 0 0 calc(var(--axh-time) + var(--axh-dot) + 2 * var(--axh-gap));
+  font-size: 14px;
+  color: var(--ax-muted);
+}
+
+@media (max-width: 640px) {
+  .axh {
+    --axh-time: 40px;
+    --axh-dot: 12px;
+    --axh-gap: 8px;
+  }
+  .axh-row {
+    grid-template-columns: var(--axh-time) var(--axh-dot) minmax(0, 1fr);
+    padding-right: 6px;
+  }
+  .axh-actions {
+    grid-column: 3;
+    margin-top: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axh-row.is-flash {
+    animation: none;
+  }
+  .axh-evidence,
+  .axh-more svg {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axh-row.is-flash {
+  animation: none;
+}

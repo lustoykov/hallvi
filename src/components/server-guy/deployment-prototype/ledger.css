@@ -1,0 +1,163 @@
+/* PROTOTYPE · claude/deployment-history · throwaway.
+   Direction B, Ledger. Prefix: axl-. Typography only: sheets, tables and
+   plain text, set with care. */
+
+.axl {
+  display: grid;
+  gap: 10px;
+  max-width: 1000px;
+  padding-top: 10px;
+}
+.axl-say {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  color: var(--ax-ink);
+}
+.axl-note {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--ax-muted);
+}
+.axl-sheet {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--ax-line-2);
+}
+.axl-sheet > div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ax-line);
+  font-size: 13.5px;
+}
+.axl-sheet dt {
+  color: var(--ax-muted);
+}
+.axl-sheet dd {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--ax-ink);
+  overflow-wrap: anywhere;
+}
+.axl-sheet small {
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axl-sheet code,
+.axl-table code {
+  font-family: var(--ax-mono);
+  font-size: 12px;
+  color: var(--ax-ink-2);
+}
+.axl-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 22px 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+}
+.axl-h button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ax-link);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axl-h button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.axl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.axl-table th {
+  padding: 8px 14px 8px 0;
+  border-bottom: 1px solid var(--ax-line-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ax-muted);
+}
+.axl-table td {
+  padding: 9px 14px 9px 0;
+  border-bottom: 1px solid var(--ax-line);
+  vertical-align: top;
+  color: var(--ax-ink);
+}
+.axl-table b {
+  font-weight: 600;
+}
+.axl-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.axl-table tr[data-tone="fail"] td {
+  color: var(--ax-failed);
+}
+.axl-table tr[data-tone="wait"] td {
+  color: var(--ax-muted);
+}
+.axl-actions-table td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.axl-actions-table tr[data-tone="pass"] td:last-child {
+  color: var(--ax-verified-text);
+}
+.axl-when {
+  width: 1%;
+  white-space: nowrap;
+  color: var(--ax-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.axl-pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: #fafbfc;
+  color: var(--ax-ink-2);
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.axl-gaps {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: var(--ax-ink-2);
+}
+.axl-gaps li {
+  margin: 4px 0;
+}
+.axl-gaps span {
+  color: var(--ax-muted);
+}
+.axl-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 16px 0 0;
+}
