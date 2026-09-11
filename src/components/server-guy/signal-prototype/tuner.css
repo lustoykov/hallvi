@@ -1,0 +1,651 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction B for Logs and Monitoring, Tuner. Prefix: axtu-. A radio's
+   glass dial over a transcript. The needle glides when you tune; static
+   covers the transcript only while the needle is between stations. */
+
+.axtu {
+  --axtu-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.2 0 0 0 0 0.3 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 10px;
+}
+.axtu-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axtu-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axtu-say {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axtu-sure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  max-width: 88ch;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axtu-ask {
+  flex: none;
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axtu-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The radio ---------- */
+
+.axtu-radio {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #f8f9fb 0%, #eceff4 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 1px 2px rgb(23 34 56 / 5%),
+    0 26px 50px -38px rgb(23 34 56 / 40%);
+}
+.axtu-face {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 4px 8px;
+  text-align: center;
+}
+.axtu-guy {
+  width: 84px;
+  height: 84px;
+}
+.axtu-lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: #e2e7ef;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ax-muted);
+}
+.axtu-lamp i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #aab4c4;
+}
+.axtu-lamp[data-on] {
+  background: var(--ax-working-bg);
+  color: var(--ax-working-text);
+}
+.axtu-lamp[data-on] i {
+  background: var(--ax-blue);
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 18%);
+}
+.axtu-face small {
+  max-width: 22ch;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ax-muted);
+}
+
+.axtu-glass {
+  position: relative;
+  min-height: 132px;
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(159 180 245 / 10%), transparent),
+    linear-gradient(180deg, #1d2639 0%, #121826 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    inset 0 -24px 40px rgb(0 0 0 / 22%);
+  cursor: pointer;
+}
+.axtu-glass:has(:focus-visible) {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 3px;
+}
+.axtu-ticks {
+  position: absolute;
+  top: 12px;
+  right: 3%;
+  left: 3%;
+  height: 16px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgb(159 180 245 / 55%) 0 1.5px,
+      transparent 1.5px 56px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgb(159 180 245 / 24%) 0 1px,
+      transparent 1px 11.2px
+    );
+  mask: linear-gradient(180deg, #000 0 60%, transparent);
+  pointer-events: none;
+}
+.axtu-station {
+  position: absolute;
+  top: 38px;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 6px 10px 8px;
+  z-index: 3;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(24 31 47 / 94%);
+  color: #c5cfe3;
+  font: inherit;
+  transform: translateX(-50%);
+  cursor: pointer;
+  transition:
+    color var(--ax-fast),
+    background var(--ax-fast);
+}
+.axtu-station b {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.axtu-station small {
+  font-size: 11px;
+  font-weight: 560;
+  color: #7d8aa5;
+  white-space: nowrap;
+}
+.axtu-station:hover {
+  color: #ffffff;
+  background: #232d44;
+}
+.axtu-station[aria-checked="true"] {
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(159 180 245 / 45%);
+}
+.axtu-station[aria-checked="true"] b {
+  text-shadow: 0 0 14px rgb(159 180 245 / 70%);
+}
+.axtu-station:focus-visible {
+  outline: 2px solid #9fb4f5;
+  outline-offset: 2px;
+}
+.axtu-station[data-state="failing"] b,
+.axtu-station[data-state="failing"] small {
+  color: #f3a39c;
+}
+.axtu-station[data-alert="warn"] b::after,
+.axtu-station[data-alert="error"] b::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 0 2px 6px;
+  border-radius: 50%;
+  background: #f0c38a;
+  vertical-align: middle;
+}
+.axtu-station[data-alert="error"] b::after {
+  background: #f3a39c;
+}
+.axtu-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+.axtu-bars i {
+  width: 4px;
+  border-radius: 1px;
+  background: rgb(159 180 245 / 18%);
+}
+.axtu-bars i:nth-child(1) {
+  height: 6px;
+}
+.axtu-bars i:nth-child(2) {
+  height: 9px;
+}
+.axtu-bars i:nth-child(3) {
+  height: 12px;
+}
+.axtu-bars i:nth-child(4) {
+  height: 15px;
+}
+.axtu-bars i:nth-child(5) {
+  height: 18px;
+}
+.axtu-bars i[data-on] {
+  background: #9fb4f5;
+}
+.axtu-station[data-state="stale"] .axtu-bars i[data-on] {
+  background: #e3b67f;
+}
+.axtu-station[data-state="failing"] .axtu-bars i[data-on] {
+  background: #f3a39c;
+}
+.axtu-station[data-state="static"] .axtu-bars {
+  background: var(--axtu-noise);
+  border-radius: 3px;
+}
+.axtu-needle {
+  position: absolute;
+  top: 6px;
+  bottom: 8px;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, #dbe4ff, #9fb4f5 70%, #6f8ee8);
+  box-shadow: 0 0 14px rgb(159 180 245 / 75%);
+  transition: left 560ms var(--ax-spring);
+  pointer-events: none;
+}
+.axtu-needle[data-still] {
+  transition: none;
+}
+.axtu-needle i {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #b9c8f7 60%, #8aa2ee);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 40%),
+    0 0 0 3px rgb(159 180 245 / 22%);
+  cursor: grab;
+  pointer-events: auto;
+}
+.axtu-needle[data-still] i:active {
+  cursor: grabbing;
+}
+
+/* ---------- The transcript ---------- */
+
+.axtu-transcript {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+.axtu-tuned {
+  display: grid;
+  gap: 16px;
+  padding: 22px 24px 24px;
+}
+.axtu-tuned[data-fade] {
+  animation: axtu-in 260ms var(--ax-ease-out) both;
+}
+@keyframes axtu-in {
+  from {
+    opacity: 0.35;
+    filter: blur(2px);
+  }
+}
+.axtu-static {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: var(--axtu-noise), rgb(242 244 248 / 88%);
+  animation: axtu-hiss 240ms steps(3) infinite;
+}
+.axtu-static span {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ax-muted);
+  box-shadow: 0 2px 8px rgb(23 34 56 / 12%);
+}
+@keyframes axtu-hiss {
+  33% {
+    background-position:
+      37px 11px,
+      0 0;
+  }
+  66% {
+    background-position:
+      -21px 53px,
+      0 0;
+  }
+}
+.axtu-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 20px;
+}
+.axtu-head h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  color: var(--ax-ink);
+}
+.axtu-head p {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-muted);
+}
+.axtu-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.axtu-reads {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #f1f4f8;
+}
+.axtu-reads button {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ax-ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axtu-reads button small {
+  font-size: 11px;
+  color: var(--ax-muted);
+}
+.axtu-reads [aria-checked="true"] {
+  background: #ffffff;
+  color: var(--ax-ink);
+  box-shadow: 0 1px 2px rgb(23 34 56 / 14%);
+}
+.axtu-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 240px;
+  padding: 6px 10px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 10px;
+  background: #ffffff;
+}
+.axtu-filter svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ax-muted);
+}
+.axtu-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ax-ink);
+  font: inherit;
+  font-size: 13px;
+}
+.axtu-filter:focus-within {
+  border-color: var(--ax-blue);
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
+}
+
+/* Monitoring: what was heard, then the silence. */
+.axtu-heard {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axtu-heard li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--ax-line);
+}
+.axtu-heard time {
+  font-family: var(--ax-mono);
+  font-size: 12px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axtu-heard div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.axtu-heard b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axtu-heard span {
+  font-family: var(--ax-mono);
+  font-size: 12px;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axtu-heard small {
+  font-size: 12.5px;
+  color: var(--ax-failed);
+}
+.axtu-heard em {
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 650;
+  color: var(--ax-verified-text);
+}
+.axtu-heard [data-state="seen"] em {
+  color: var(--ax-working-text);
+}
+.axtu-heard [data-state="failing"] em {
+  color: var(--ax-failed);
+}
+.axtu-silence {
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--axtu-noise), #eef1f6;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--ax-ink-2);
+}
+.axtu-silence[data-live] {
+  background: var(--ax-working-bg);
+  color: var(--ax-working-text);
+}
+.axtu-nosignal {
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1.5px dashed #c9d1de;
+  border-radius: 14px;
+  background: var(--axtu-noise), #f7f8fb;
+}
+.axtu-nosignal b {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ax-ink);
+}
+.axtu-nosignal p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axtu-ask-small {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ax-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axtu-ask-small:hover {
+  border-color: var(--ax-blue);
+  color: var(--ax-blue);
+}
+.axtu-ask-small svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Logs: what each process said, as turns. */
+.axtu-lines {
+  display: grid;
+  gap: 14px;
+  max-height: 620px;
+  overflow: auto;
+  padding: 2px 6px 2px 2px;
+  scrollbar-color: #c9d1de transparent;
+}
+.axtu-lines:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 4px;
+}
+.axtu-turn {
+  display: grid;
+  gap: 4px;
+}
+.axtu-turn[data-all] {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+}
+.axtu-speaker {
+  padding-top: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ax-blue);
+}
+.axtu-speaker[data-who="1"] {
+  color: #5a6b86;
+}
+.axtu-turn p {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 1px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ax-ink);
+}
+.axtu-turn time {
+  padding-top: 2px;
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+  color: var(--ax-faint);
+  font-variant-numeric: tabular-nums;
+}
+.axtu-turn span {
+  overflow-wrap: anywhere;
+}
+.axtu-turn small {
+  display: block;
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+  color: var(--ax-muted);
+}
+.axtu-turn [data-milestone] span {
+  font-weight: 650;
+}
+.axtu-turn [data-milestone] span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 8px 2px 0;
+  border-radius: 50%;
+  background: var(--ax-blue);
+  vertical-align: middle;
+}
+.axtu-turn [data-level="warn"] span {
+  color: var(--ax-waiting-text);
+  text-decoration: underline wavy #e3b67f;
+  text-underline-offset: 4px;
+}
+.axtu-turn [data-level="error"] span {
+  color: var(--ax-failed);
+  text-decoration: underline wavy #efb3ad;
+  text-underline-offset: 4px;
+}
+.axtu-lines ::selection {
+  background: #dbe4ff;
+}
+.axtu-empty {
+  margin: 0;
+  color: var(--ax-muted);
+}
+
+@media (max-width: 900px) {
+  .axtu-radio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axtu-face {
+    grid-auto-flow: column;
+    justify-content: start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axtu-needle {
+    transition: none;
+  }
+  .axtu-static,
+  .axtu-tuned[data-fade] {
+    animation: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axtu-needle {
+  transition: none;
+}
+:root[data-ax-motion="reduced"] :is(.axtu-static, .axtu-tuned[data-fade]) {
+  animation: none;
+}

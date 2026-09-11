@@ -23,6 +23,7 @@ import { OverviewPrototype } from "./overview-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
+import { SignalPrototype } from "./signal-prototype";
 import { StackPrototype } from "./stack-prototype";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
@@ -383,6 +384,35 @@ export function ApplicationSectionView({
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         <BackupPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): directions for Logs and Monitoring,
+  // beside the shipped view (0).
+  if (section === "logs" || section === "monitoring")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <SignalPrototype
           page={section}
           record={deployment}
           stack={stack}

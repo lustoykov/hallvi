@@ -1,0 +1,830 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction A for Logs and Monitoring, Scope. Prefix: axsc-. Distance from
+   the centre is age. The only motion is a ping when you point, and the
+   sweep while an (invented) watcher runs. */
+
+.axsc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 10px;
+}
+.axsc-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axsc-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axsc-say {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axsc-sure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  max-width: 88ch;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axsc-ask {
+  flex: none;
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axsc-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The board ---------- */
+
+.axsc-board {
+  display: grid;
+  grid-template-columns: minmax(380px, 500px) minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
+  padding: 26px 26px 28px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+.axsc-left {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+/* ---------- The scope ---------- */
+
+.axsc-scope {
+  position: relative;
+  aspect-ratio: 1;
+  user-select: none;
+}
+.axsc-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.axsc-rim {
+  fill: none;
+  stroke: url(#axsc-hatch);
+}
+.axsc-hatch-ground {
+  fill: #f7f8fb;
+}
+.axsc-hatch-line {
+  stroke: #e0e5ed;
+  stroke-width: 3;
+}
+.axsc-old {
+  fill: #fdf9f3;
+}
+.axsc-fresh {
+  fill: #f0f9f4;
+}
+.axsc-ring {
+  fill: none;
+  stroke: #dfe4ec;
+  stroke-width: 1.5;
+}
+.axsc-spoke {
+  stroke: #dfe4ec;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 8;
+}
+.axsc-sector {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  fill: var(--ax-ink-2);
+}
+.axsc-sector[data-alert] {
+  fill: var(--ax-failed);
+}
+.axsc-ring-label {
+  font-size: 20px;
+  font-weight: 560;
+  fill: var(--ax-faint);
+}
+.axsc-parked line {
+  stroke: #9aa6ba;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 8;
+}
+.axsc-parked circle {
+  fill: #ffffff;
+  stroke: #9aa6ba;
+  stroke-width: 2.5;
+}
+.axsc-sweep {
+  transform-box: view-box;
+  transform-origin: 500px 500px;
+  animation: axsc-sweep 8s linear infinite;
+}
+.axsc-sweep line {
+  stroke: var(--ax-blue);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.axsc-wedge {
+  fill: rgb(40 90 216 / 9%);
+}
+@keyframes axsc-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.axsc-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  transform: translate(-50%, -56%);
+  pointer-events: none;
+}
+.axsc-guy {
+  width: 88px;
+  height: 88px;
+}
+.axsc-center small {
+  margin-top: -6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 85%);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axsc-caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 172px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px dashed #c9d1de;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.35;
+  color: var(--ax-muted);
+}
+.axsc-caption[data-watching] {
+  border-style: solid;
+  border-color: var(--ax-working-line);
+  background: var(--ax-working-bg);
+  color: var(--ax-working-text);
+}
+
+/* The marks on the scope: a look, an output read, or a gap. */
+.axsc-mark {
+  --mark: #9aa6ba;
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.axsc-mark i,
+.axsc-row i,
+.axsc-legend i {
+  --mark: #9aa6ba;
+  display: block;
+  border-radius: 50%;
+  background: var(--mark);
+}
+.axsc-mark i {
+  width: 13px;
+  height: 13px;
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 3px 8px -2px rgb(23 34 56 / 35%);
+  transition: transform 240ms var(--ax-spring);
+}
+:is(.axsc-mark, .axsc-row)[data-tone="verified"] i,
+.axsc-legend i[data-tone="verified"] {
+  --mark: var(--ax-verified);
+}
+:is(.axsc-mark, .axsc-row)[data-tone="stale"] i,
+.axsc-legend i[data-tone="stale"] {
+  --mark: var(--ax-amber);
+}
+:is(.axsc-mark, .axsc-row)[data-tone="failed"] i,
+.axsc-legend i[data-tone="failed"] {
+  --mark: var(--ax-failed);
+}
+:is(.axsc-mark, .axsc-row)[data-kind="output"] i {
+  background: #ffffff;
+  box-shadow:
+    inset 0 0 0 3.5px var(--mark),
+    0 0 0 3px #ffffff;
+}
+.axsc-legend i[data-kind="output"] {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 3px var(--ax-ink-2);
+}
+:is(.axsc-mark, .axsc-row)[data-tone="ghost"] i,
+.axsc-legend i[data-tone="ghost"] {
+  border: 2px dashed #9aa6ba;
+  background: #ffffff;
+  box-shadow: none;
+}
+.axsc-mark:is(:hover, :focus-visible, [data-hot], [aria-pressed="true"]) i {
+  transform: scale(1.35);
+}
+.axsc-mark[aria-pressed="true"] i {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 4px;
+}
+.axsc-mark:focus-visible {
+  outline: none;
+}
+.axsc-mark span {
+  position: absolute;
+  top: 50%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ax-ink);
+  font-size: 12px;
+  font-weight: 560;
+  color: #ffffff;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: opacity var(--ax-fast);
+}
+.axsc-mark[data-side="right"] span {
+  left: calc(100% + 4px);
+}
+.axsc-mark[data-side="left"] span {
+  right: calc(100% + 4px);
+}
+.axsc-mark:is(:hover, :focus-visible, [data-hot], [aria-pressed="true"]) span {
+  opacity: 1;
+}
+.axsc-mark[data-tone="failed"]::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid var(--ax-failed);
+  border-radius: 50%;
+  animation: axsc-alarm 1.8s var(--ax-ease-out) infinite;
+  pointer-events: none;
+}
+@keyframes axsc-alarm {
+  from {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+}
+
+/* A ping out from the centre to what you point at. */
+.axsc-ping line {
+  stroke: var(--ax-blue);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: axsc-ping-line 420ms var(--ax-ease-out) forwards;
+}
+.axsc-ping circle {
+  fill: none;
+  stroke: var(--ax-blue);
+  stroke-width: 2.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: axsc-ping-ring 640ms 320ms var(--ax-ease-out) both;
+}
+.axsc-ping[data-still] line {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+.axsc-ping[data-still] circle {
+  animation: none;
+}
+@keyframes axsc-ping-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes axsc-ping-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* Logs: each process's lines strung around the ring. */
+.axsc-string {
+  outline: none;
+  cursor: crosshair;
+}
+.axsc-thread {
+  fill: none;
+  stroke: #c9d2e0;
+  stroke-width: 2;
+}
+.axsc-torn {
+  fill: none;
+  stroke: #aab4c4;
+  stroke-width: 2.5;
+  stroke-dasharray: 3 5;
+}
+.axsc-string circle {
+  fill: #8f9bb0;
+  stroke: #ffffff;
+  stroke-width: 2;
+  transition: opacity var(--ax-fast);
+}
+.axsc-string circle[data-level="warn"] {
+  fill: var(--ax-amber);
+}
+.axsc-string circle[data-level="error"] {
+  fill: var(--ax-failed);
+}
+.axsc-string circle[data-milestone] {
+  fill: var(--ax-blue);
+}
+.axsc-string circle[data-dim] {
+  opacity: 0.2;
+}
+.axsc-string circle[data-hot] {
+  stroke: var(--ax-ink);
+  stroke-width: 3.5;
+}
+.axsc-string:focus-visible .axsc-thread {
+  stroke: var(--ax-blue);
+  stroke-width: 3.5;
+}
+.axsc-beam {
+  stroke: var(--ax-blue);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.axsc-wave {
+  fill: none;
+  stroke: var(--ax-blue);
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: axsc-wave 760ms var(--ax-ease-out) both;
+  pointer-events: none;
+}
+@keyframes axsc-wave {
+  from {
+    opacity: 0.7;
+    transform: scale(0.28);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.axsc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axsc-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.axsc-legend i {
+  width: 11px;
+  height: 11px;
+}
+.axsc-legend i[data-level="info"] {
+  --mark: #8f9bb0;
+}
+.axsc-legend i[data-level="milestone"] {
+  --mark: var(--ax-blue);
+}
+.axsc-legend i[data-level="warn"] {
+  --mark: var(--ax-amber);
+}
+.axsc-legend i[data-level="error"] {
+  --mark: var(--ax-failed);
+}
+.axsc-legend-note {
+  flex-basis: 100%;
+  line-height: 1.45;
+}
+
+/* ---------- Monitoring: the roster beside the scope ---------- */
+
+.axsc-roster {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
+}
+.axsc-watch {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px dashed #c9d1de;
+  border-radius: 14px;
+  background: #f7f8fb;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axsc-watch b {
+  font-weight: 650;
+  color: var(--ax-ink);
+}
+.axsc-watch[data-watching] {
+  border-style: solid;
+  border-color: var(--ax-working-line);
+  background: var(--ax-working-bg);
+}
+.axsc-part h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ax-ink);
+}
+.axsc-part h3 small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+.axsc-part ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axsc-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--ax-fast);
+}
+.axsc-row:is(:hover, [data-hot]) {
+  background: #f3f6fb;
+}
+.axsc-row[aria-expanded="true"] {
+  background: #edf2ff;
+}
+.axsc-row:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 1px;
+}
+.axsc-row i {
+  width: 11px;
+  height: 11px;
+}
+.axsc-row b {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--ax-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.axsc-row small {
+  font-size: 12px;
+  color: var(--ax-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.axsc-open {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 8px 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+.axsc-open dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.axsc-open dl > div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+}
+.axsc-open dt {
+  color: var(--ax-muted);
+}
+.axsc-open dd {
+  margin: 0;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axsc-evidence {
+  display: grid;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d9e1f2;
+}
+.axsc-evidence div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+}
+.axsc-evidence time {
+  color: #7d8aa5;
+  font-variant-numeric: tabular-nums;
+}
+.axsc-evidence span {
+  overflow-wrap: anywhere;
+}
+.axsc-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+.axsc-ask-small {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ax-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-fast),
+    color var(--ax-fast);
+}
+.axsc-ask-small:hover {
+  border-color: var(--ax-blue);
+  color: var(--ax-blue);
+}
+.axsc-ask-small svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- Logs: the reader beside the scope ---------- */
+
+.axsc-reader {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+.axsc-reader header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.axsc-reads,
+.axsc-who {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #f1f4f8;
+}
+.axsc-reads button,
+.axsc-who button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ax-ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+.axsc-reads button small,
+.axsc-who button small {
+  font-size: 11px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axsc-reads [aria-checked="true"],
+.axsc-who [aria-pressed="true"] {
+  background: #ffffff;
+  color: var(--ax-ink);
+  box-shadow: 0 1px 2px rgb(23 34 56 / 14%);
+}
+.axsc-filter {
+  display: inline-flex;
+  flex: 1 1 200px;
+  align-items: center;
+  gap: 7px;
+  min-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 10px;
+  background: #ffffff;
+}
+.axsc-filter svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ax-muted);
+}
+.axsc-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ax-ink);
+  font: inherit;
+  font-size: 13px;
+}
+.axsc-filter:focus-within {
+  border-color: var(--ax-blue);
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
+}
+.axsc-cut {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+.axsc-lines {
+  position: relative;
+  max-height: 560px;
+  overflow: auto;
+  padding: 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: #d9e1f2;
+  scrollbar-color: #3a4660 transparent;
+}
+.axsc-lines:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 2px;
+}
+.axsc-lines ::selection {
+  background: rgb(159 180 245 / 35%);
+}
+.axsc-line {
+  display: grid;
+  grid-template-columns: 92px 80px minmax(0, 1fr);
+  gap: 0 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.axsc-line time {
+  color: #7d8aa5;
+  font-variant-numeric: tabular-nums;
+}
+.axsc-line b {
+  overflow: hidden;
+  font-weight: 600;
+  color: #9fb4f5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.axsc-line b[data-who="1"] {
+  color: #c2cde0;
+}
+.axsc-line span {
+  overflow-wrap: anywhere;
+}
+.axsc-line small {
+  font-size: 11.5px;
+  color: #7d8aa5;
+}
+.axsc-line[data-level="warn"] span {
+  color: #f0c38a;
+}
+.axsc-line[data-level="error"] span {
+  color: #f3a39c;
+}
+.axsc-line[data-milestone] span {
+  font-weight: 600;
+  color: #ffffff;
+}
+.axsc-line[data-hot] {
+  background: rgb(159 180 245 / 16%);
+  box-shadow: inset 0 0 0 1px rgb(159 180 245 / 35%);
+}
+.axsc-empty {
+  margin: 0;
+  padding: 12px;
+  color: #9aa6ba;
+}
+
+@media (max-width: 1100px) {
+  .axsc-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axsc-left {
+    position: static;
+    justify-self: center;
+    width: min(100%, 560px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axsc-sweep,
+  .axsc-wave,
+  .axsc-mark[data-tone="failed"]::after,
+  .axsc-ping line,
+  .axsc-ping circle {
+    animation: none;
+  }
+  .axsc-ping line {
+    stroke-dashoffset: 0;
+  }
+}
+:root[data-ax-motion="reduced"]
+  :is(
+    .axsc-sweep,
+    .axsc-wave,
+    .axsc-mark[data-tone="failed"]::after,
+    .axsc-ping line,
+    .axsc-ping circle
+  ) {
+  animation: none;
+}
+:root[data-ax-motion="reduced"] .axsc-ping line {
+  stroke-dashoffset: 0;
+}

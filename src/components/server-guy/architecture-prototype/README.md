@@ -119,6 +119,34 @@ page stands in.
   piece of data and whether each copy holds it, and the restore tests. A
   day opens what is on record for it.
 
+## Logs and Monitoring: three directions (`signal-prototype/`)
+
+On `opus-ui-improvements`, not chosen yet. Each direction draws both pages
+from the same record: the output Server Guy read from each process (the
+last 100 lines of each, and only when asked; a process that had written
+more is marked cut), the checks the deployment ran and when, the backup
+checks, and what nothing watches (a health watch and restarts, CPU, memory
+and disk, alerts outside the app). Nothing reads logs or checks the server;
+asking goes to the conversation. Every direction keeps the element labelled
+"Collected application logs" and the "Filter collected logs…" input that
+the smoke journey uses.
+
+- **A · Scope.** A round scope with Little Server at the centre. A mark's
+  distance from him is how long ago it looked: fresh inside the green, old
+  drifting outward, never on the hatched rim. The sweep arm stays parked
+  while nothing watches. Logs strings each process's lines around its ring,
+  and pointing along a string reads it beside.
+- **B · Tuner.** A radio's glass dial with a station for each part and
+  signal bars for how recently anything heard from it. Tune by clicking,
+  dragging the needle or with the arrow keys; between stations there is
+  only static. Logs reads what the tuned process said as a transcript;
+  Monitoring lists what was heard, then the silence since.
+- **C · Paper.** No diagram. Logs is the read printed on continuous paper,
+  torn where the read stopped, with a highlighter per process and index
+  tabs for where a process said it was ready or warned. Monitoring is a
+  stack of inspection reports, one per run of checks, with blanks for what
+  nothing watches and a note on how old the newest report is.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
@@ -126,7 +154,8 @@ page stands in.
   _Before deploy_ (the plan with nothing running). The bar labels each one.
   Deployment offers Live record, 3 days later and Before deploy; History,
   Processes, Database, Storage and Backups offer Live record and 3 days
-  later.
+  later; Logs and Monitoring offer Live record, 3 days later and Prometheus
+  failing, where an invented collector finds a readiness check failing.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
