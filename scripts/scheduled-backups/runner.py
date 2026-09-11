@@ -2033,9 +2033,10 @@ def recover_restore(state, journal, command):
 def recover_run(state, receipt, storage):
     """Close a run that never finished, and clear what it left behind."""
     cleaned = remove_tree(state.staging / receipt["id"])
-    if receipt.get("objectKey"):
+    if receipt.get("objectKey") and receipt.get("outcome") != "succeeded":
         # A killed upload can leave parts billing away. Abandon this key's
-        # parts and nothing else.
+        # parts and nothing else. A verified archive is a completed object:
+        # it owns no parts, and closing it must not depend on storage.
         cleaned = (
             bool(storage and storage.abort_multipart(receipt["objectKey"])) and cleaned
         )

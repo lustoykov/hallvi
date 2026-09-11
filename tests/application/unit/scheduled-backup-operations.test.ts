@@ -115,7 +115,10 @@ it("refuses a new capture from a deployment that is not live but still proposes 
   expect(mocks.refresh).not.toHaveBeenCalled();
   expect(mocks.ssh).not.toHaveBeenCalled();
   const host = { reachable: true, cleanupPending: false, running: false };
-  const copy = { id: "11111111-1111-4111-8111-111111111111", outcome: "succeeded" };
+  const copy = {
+    id: "11111111-1111-4111-8111-111111111111",
+    outcome: "succeeded",
+  };
   // A legacy archive restored offline: nothing to boot, nothing to check.
   const restore = {
     at: "now",
@@ -200,7 +203,12 @@ it("runs the recorded and chosen checks inside the restored copy, never in the a
     at: "now",
     outcome: "verified",
     cleanupComplete: false,
-    checks: ["archive-hash", "file-inventory", "database-content", "application-boot"],
+    checks: [
+      "archive-hash",
+      "file-inventory",
+      "database-content",
+      "application-boot",
+    ],
     measurements: { files: 153 },
     recoveryPointAt: "2026-09-11T03:00:00Z",
     boot: {
@@ -285,6 +293,42 @@ it("says what capture stops and keeps running from the recorded plan while legac
   const legacy = propose("run-backup", { kind: "postgres" }).summary;
   expect(legacy).toContain("The PostgreSQL dump runs online.");
   expect(legacy).not.toContain("pause");
+});
+it("asks the host to recover pending cleanup once before refusing a run", async () => {
+  propose("run-backup", { kind: "stack" });
+  mocks.ssh.mockReset();
+  mocks.ssh.mockResolvedValue("");
+  const host = { reachable: true, running: false, runs: [] };
+  mocks.refresh.mockReset();
+  mocks.refresh
+    .mockResolvedValueOnce({ ...host, cleanupPending: true })
+    .mockResolvedValueOnce({ ...host, cleanupPending: true });
+  await expect(performBackupAction("app", "run-backup")).rejects.toThrow(
+    "Resolve the outstanding backup cleanup before starting another run.",
+  );
+  // Cleanup is the host's job, tried once through its own recovery command.
+  expect(mocks.ssh.mock.calls.map((call) => String(call[1]))).toEqual([
+    "py run cfg --recover",
+  ]);
+  // Once recovery clears it, the same request proceeds to the run.
+  mocks.ssh.mockReset();
+  mocks.ssh.mockResolvedValue("");
+  const stuck = {
+    id: "stuck",
+    outcome: "failed",
+    phase: "capture",
+    errorCode: "source-stop-failed",
+  };
+  mocks.refresh.mockReset();
+  mocks.refresh
+    .mockResolvedValueOnce({ ...host, cleanupPending: true })
+    .mockResolvedValueOnce({ ...host, cleanupPending: false })
+    .mockResolvedValueOnce({ ...host, cleanupPending: false, runs: [stuck] });
+  await expect(performBackupAction("app", "run-backup")).rejects.toThrow(
+    "failed to stop cleanly",
+  );
+  expect(String(mocks.ssh.mock.calls[0][1])).toBe("py run cfg --recover");
+  expect(mocks.ssh.mock.calls.length).toBeGreaterThan(1);
 });
 it("records why a backup failed, so Pi can read it before advising a retry", async () => {
   propose("run-backup", { kind: "stack" });

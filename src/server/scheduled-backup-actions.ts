@@ -73,6 +73,22 @@ function restorationSummary(run: ScheduledRun) {
   return parts.filter(Boolean).join(" ");
 }
 
+/** The host's own recovery: it closes interrupted runs and removes kept
+ * restore copies. Its outcome is read from the host's status, never from
+ * this call. */
+async function recoverBackupHost(record: DeploymentRecord) {
+  const paths = backupHostPaths(record.id);
+  try {
+    await deploymentSsh(
+      record,
+      `${shellQuote(paths.python)} ${shellQuote(paths.runner)} ${shellQuote(paths.config)} --recover`,
+      { timeout: 5 * 60_000 },
+    );
+  } catch {
+    /* Reported from the host's status, not from this call. */
+  }
+}
+
 export async function performBackupAction(
   applicationId: string,
   action: "run-backup" | "test-restore" | "configure-backups",
@@ -97,15 +113,20 @@ export async function performBackupAction(
         return installScheduledBackups(record, selection);
       if (!readBackupPolicy(record))
         throw new Error("Configure backup storage and a schedule first.");
-      const before = await refreshScheduledBackups(record);
+      let before = await refreshScheduledBackups(record);
       if (!before.reachable)
         throw new Error(
           "Current host backup status is unavailable. Reconnect before starting work.",
         );
-      if (before.cleanupPending)
-        throw new Error(
-          "Resolve the outstanding backup cleanup before starting another run.",
-        );
+      if (before.cleanupPending) {
+        // Cleanup is the host's own job: ask it once before refusing.
+        await recoverBackupHost(record);
+        before = await refreshScheduledBackups(record);
+        if (before.cleanupPending)
+          throw new Error(
+            "Resolve the outstanding backup cleanup before starting another run.",
+          );
+      }
       if (before.running)
         throw new Error(
           "A backup or restore test is already running on the host.",
@@ -226,7 +247,6 @@ async function restoredCopy(
   run: ScheduledRun,
   chosen: CommandCheck[],
 ) {
-  const paths = backupHostPaths(record.id);
   const restore = run.restore!;
   const recorded = currentFacts(record)?.criterion?.commands ?? [];
   const checks: CheckResult[] = [];
@@ -258,15 +278,7 @@ async function restoredCopy(
   } finally {
     // Whatever happened above, the copy comes down and its cleanup is
     // recorded on the host; the next backup's recovery is the safety net.
-    try {
-      await deploymentSsh(
-        record,
-        `${shellQuote(paths.python)} ${shellQuote(paths.runner)} ${shellQuote(paths.config)} --recover`,
-        { timeout: 5 * 60_000 },
-      );
-    } catch {
-      /* Reported below from the host's status, not from this call. */
-    }
+    await recoverBackupHost(record);
   }
   const after = await refreshScheduledBackups(record);
   const cleanup = after.cleanupPending

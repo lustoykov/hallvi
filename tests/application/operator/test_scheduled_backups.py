@@ -811,6 +811,41 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertTrue(state.load_receipt(stalled["id"])["pendingCleanup"])
         self.assertTrue(result["cleanupPending"])
 
+    def test_a_verified_run_owes_no_upload_cleanup_once_its_kept_copy_is_gone(self):
+        # A restore test kept its copy for the controller's checks and the
+        # copy is gone, but the receipt still says cleanup is pending. The
+        # verified archive is a completed object with no abandoned parts, so
+        # closing the run must not depend on reaching storage.
+        config = settings()
+        state = self.state(config)
+        verified = receipt(
+            1,
+            pendingCleanup=True,
+            restore={
+                "at": "2026-09-01T09:00:00Z",
+                "recoveryPointAt": "2026-09-01T03:00:05Z",
+                "outcome": "verified",
+                "scope": "isolated-application",
+                "checks": ["archive-hash", "application-boot"],
+                "measurements": {},
+                "cleanupComplete": True,
+                "errorCode": None,
+            },
+        )
+        state.save_receipt(verified)
+
+        def unreachable(config):
+            raise runner.BackupError("credentials", "credentials-unreadable")
+
+        result = runner.perform_recovery(
+            config, state, command=FakeDocker(), storage_factory=unreachable
+        )
+        self.assertEqual(
+            result["interrupted"], [{"runId": verified["id"], "cleanupComplete": True}]
+        )
+        self.assertFalse(state.load_receipt(verified["id"])["pendingCleanup"])
+        self.assertFalse(result["cleanupPending"])
+
     def test_recovery_removes_only_the_restore_resources_it_owns(self):
         config = settings()
         state = self.state(config)
