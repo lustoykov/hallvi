@@ -362,6 +362,26 @@ it("cleans up the captured test object when a later read assertion fails", async
     fetcher.mock.calls.filter((args) => args[1].method === "DELETE"),
   ).toHaveLength(1);
 });
+it("reports a redirecting health path with its status and target instead of waiting", async () => {
+  const value = record();
+  value.address = "203.0.113.10";
+  const fetcher = vi.fn(
+    async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: "/accounts/login/" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  await expect(
+    verifyDeployment(value, new AbortController().signal),
+  ).rejects.toThrow(
+    "Public application check rejected (HTTP 302 redirecting to /accounts/login/).",
+  );
+  // Reported, never followed: one request, no redirect handling by fetch.
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
+});
 it("does not repeat test creation after an unknown POST outcome", async () => {
   const value = record();
   value.address = "203.0.113.10";

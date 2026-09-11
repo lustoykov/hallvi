@@ -530,7 +530,8 @@ export async function verifyDeployment(
       throw new Error("Verification must stay on the application host.");
     return fetch(url, {
       ...init,
-      redirect: "error",
+      // A redirect is reported with its status and target, never followed.
+      redirect: "manual",
       signal: AbortSignal.any([
         signal,
         AbortSignal.timeout(20000),
@@ -541,6 +542,8 @@ export async function verifyDeployment(
   // A running container may still be initializing its HTTP listener. Retry
   // only the non-mutating readiness check; never blindly repeat a POST.
   let ready = false;
+  // What the last readiness request saw, so a failure names it.
+  let last = "no response";
   for (let attempt = 0; attempt < 30; attempt++) {
     signal.throwIfAborted();
     try {
@@ -549,10 +552,10 @@ export async function verifyDeployment(
         ready = true;
         break;
       }
+      const target = health.headers.get("location");
+      last = `HTTP ${health.status}${target ? ` redirecting to ${target}` : ""}`;
       if (health.status < 500)
-        throw new Error(
-          `Public application check rejected (HTTP ${health.status}).`,
-        );
+        throw new Error(`Public application check rejected (${last}).`);
     } catch (error) {
       signal.throwIfAborted();
       if (
@@ -560,12 +563,14 @@ export async function verifyDeployment(
         error.message.startsWith("Public application check rejected")
       )
         throw error;
+      const cause = error instanceof Error ? (error.cause ?? error) : error;
+      last = cause instanceof Error ? cause.message : String(cause);
     }
     await delay(2000, undefined, { signal });
   }
   if (!ready)
     throw new Error(
-      "The public application did not become ready within the verification window. The existing host is retained.",
+      `The public application did not become ready within the verification window (last response: ${last}). The existing host is retained.`,
     );
   record.serviceReadiness ??= {};
   record.serviceReadiness[primary] ??= {
