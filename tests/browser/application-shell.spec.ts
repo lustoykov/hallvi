@@ -369,6 +369,29 @@ test(
       record!.updatedAt = new Date().toISOString();
       return route.fulfill({ json: { deployment: record } });
     });
+    // The scripted deployment lives only in this test, not in the product's
+    // records, so the application view carries its operations the way the
+    // server records a real deployment's.
+    const { applicationOperations } =
+      await import("../../src/server/operation-record");
+    await page.route(
+      /\/api\/applications\/[\da-f-]{36}(\?.*)?$/,
+      async (route) => {
+        const current = record;
+        if (route.request().method() !== "GET" || !current)
+          return route.continue();
+        const response = await route.fetch();
+        const view = await response.json();
+        view.operations = [
+          ...view.operations.filter(
+            (operation: { source: { type: string } }) =>
+              operation.source.type !== "deployment",
+          ),
+          ...applicationOperations(current),
+        ];
+        await route.fulfill({ response, json: view });
+      },
+    );
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })

@@ -658,21 +658,20 @@ it.skipIf(!proof)(
     build: { context: ., dockerfile: Dockerfile }
     platform: linux/amd64
     restart: unless-stopped
-    ports: ["127.0.0.1::8080"]
+    ports: ["80:8080"]
     volumes: ["data:/data"]
     logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
 volumes:
   data: {}
 `;
-        expect(
-          await pi.apply(
-            {
-              compose: ["compose.yaml"],
-              summary: "The same release, authored as native Compose",
-            },
-            [file("compose.yaml", compose)],
-          ),
-        ).toMatchObject({ ok: true });
+        const applied = await pi.apply(
+          {
+            compose: ["compose.yaml"],
+            summary: "The same release, authored as native Compose",
+          },
+          [file("compose.yaml", compose)],
+        );
+        expect(applied, applied.message).toMatchObject({ ok: true });
       });
       expect(converted.state).toBe("verified");
       // Equivalent effects need no new decision, and the data stays put.
@@ -704,7 +703,7 @@ volumes:
     build: .
     platform: linux/amd64
     restart: unless-stopped
-    ports: ["127.0.0.1::8080"]
+    ports: ["80:8080"]
     volumes: ["${volumes}:/data"]${extra}
 volumes:
   ${volumes}: {}
