@@ -624,6 +624,11 @@ function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: capture "dump" names its owner service and a procedure of dump, restore and verify commands, each an argument list run in the owner's container.`,
       );
+    // One mechanism per state: the managed database has the controller's own.
+    if (record.capture === "dump" && record.owner === baseline.database?.service)
+      throw new NativeConfigurationError(
+        `Volume ${volume}: the controller dumps and restores the managed PostgreSQL service ${record.owner} itself. Record this volume as kind "database" owned by ${record.owner}, without capture or procedure.`,
+      );
     if (record.procedure && record.capture !== "dump")
       throw new NativeConfigurationError(
         `Volume ${volume}: a procedure applies only to capture "dump".`,

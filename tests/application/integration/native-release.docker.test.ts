@@ -1718,6 +1718,30 @@ it.skipIf(!proof)(
       const undeclared = JSON.parse(await call("recommend_deployment", intake));
       expect(undeclared).toMatchObject({ ok: false, retryable: true });
       expect(undeclared.message).toContain("APP_SECRET");
+      // The managed database has its own dump; a second one is feedback.
+      const duplicated = JSON.parse(
+        await call("recommend_deployment", {
+          ...intake,
+          inputs: [{ name: "APP_SECRET", reason: "Signs notes" }],
+          data: [
+            {
+              volume: "database",
+              kind: "database",
+              capture: "dump",
+              owner: "postgres",
+              procedure: {
+                dump: ["pg_dump"],
+                restore: ["psql"],
+                verify: ["psql"],
+              },
+            },
+          ],
+        }),
+      );
+      expect(duplicated).toMatchObject({ ok: false, retryable: true });
+      expect(duplicated.message).toContain(
+        "dumps and restores the managed PostgreSQL",
+      );
       expect(
         JSON.parse(
           await call("recommend_deployment", {
