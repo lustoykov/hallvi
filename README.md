@@ -38,7 +38,7 @@ Both processes must use the same database/configuration. The worker loads `.env`
 
 ### Data and migrations
 
-Stop the web process and worker before applying schema changes. Schema v13 upgrades known versions 6, 8, 9, 10, 11 and 12 with a private backup before migration; unknown versions require investigation. Keep the database, WAL/recovery material and native sessions rather than resetting an unexpected schema. `src/server/db-schema.ts` owns the schema.
+Stop the web process and worker before applying schema changes. Schema v14 upgrades known versions 6 and 8–13 with a private backup before migration; unknown versions require investigation. The v14 step retires the phase preparation workflow and legacy deployment plans, keeping their records as read-only history ([details](docs/architecture.md#schema-14-retired-preparation-and-deployment-plans)). Keep the database, WAL/recovery material and native sessions rather than resetting an unexpected schema. `src/server/db-schema.ts` owns the schema.
 
 Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>.jsonl`. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and recovery/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
 

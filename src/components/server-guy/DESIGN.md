@@ -248,7 +248,7 @@ is one place to switch application. `application-identity.tsx` also carries
 
 Blue accents sit on white work surfaces, a cool gray navigation surface, and a slightly tinted context pane. `ink`, `muted`, and `line` are the application shell's local overrides of global variables. Reuse those scoped values for secondary text and separators; global legacy palette comments do not describe this shell.
 
-**The Recorded State Rule.** Green accompanies the record's “Live · verified” state. Local preview readiness retains an explicit local description and does not produce a verified deployment label. Errors remain visible with alert semantics and red text.
+**The Recorded State Rule.** Green accompanies the record's “Live · verified” state. Readiness without a passing behavior check does not produce a verified deployment label. Errors remain visible with alert semantics and red text.
 
 ## Typography
 
@@ -485,8 +485,7 @@ attempt. Claude Opus 5 at maximum effort reviewed source and six screenshots.
   without assuming that every log collection is automatic or user-triggered.
 - Overview summarizes the primary destination; History holds the full list.
 - Verified Deployment shows its revision, runtime type, server and HTTP access.
-  The preparation record starts collapsed after success; explicit record
-  references still reveal it. Event logs retain all original evidence.
+  Event logs retain all original evidence.
 - Controller-restricted HTTP is labeled beside the application link and in
   Architecture and Overview. A timestamp is a recorded check, not monitoring.
 - Security stays in navigation while a provisioned host is available; opening

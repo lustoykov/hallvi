@@ -1,6 +1,6 @@
 # Architecture
 
-Current at main `0682ab2` (PR #45), 11 September 2026. Server Guy is a Next.js application with SQLite records and a Node worker running Pi. Pi investigates, authors configuration and chooses corrections; tools execute authorized effects and record actual outcomes. [Product](../PRODUCT.md) defines scope, [requirements](requirements.md) defines outcomes, and [Roadmap](../ROADMAP.md) owns what remains.
+Current at schema v14, 11 September 2026. Server Guy is a Next.js application with SQLite records and a Node worker running Pi. Pi investigates, authors configuration and chooses corrections; tools execute authorized effects and record actual outcomes. [Product](../PRODUCT.md) defines scope, [requirements](requirements.md) defines outcomes, and [Roadmap](../ROADMAP.md) owns what remains.
 
 ```mermaid
 flowchart TD
@@ -20,7 +20,7 @@ flowchart TD
 
 Pi reads the selected repository revision and application records, uses native tools in a disposable Docker workspace, and authors ordinary Compose, Dockerfiles and supporting configuration. The workspace does not receive controller/host credentials. Its bash tool is not unrestricted host access.
 
-For example, Pi can discover separate web/worker Dockerfiles and a shared documents directory, choose the appropriate mounts and build contexts, and author Compose directly. It need not squeeze the application into a custom primary-service/companion language. Application-code fixes still follow Product's owner-merged operability-PR boundary.
+For example, Pi can discover separate web/worker Dockerfiles and a shared documents directory, choose the appropriate mounts and build contexts, and author Compose directly. It need not squeeze the application into a custom primary-service/companion language. Server Guy does not change application code or open branches and pull requests: when an operability change is needed, Pi explains it and gives a copyable handoff for a coding agent, the owner merges it, and a release deploys the merged revision.
 
 The initial `recommend_deployment` tool selects Compose files in order, all needed supporting files, private-input names, data metadata and checks. A pinned Compose 2.40.3 resolver retains the resolved configuration and selected artifacts. Controller overrides pin image identities and preserve deployment attribution. Read-side facts provide the service/mount inventory that the UI, scope and backup consumers need; they do not become another authoring language.
 
@@ -43,12 +43,23 @@ A successful shell command is not a verified application. A lost SSH reply is an
 | Runtime observation | What execution or inspection established was running, including actual image identities and observation time. |
 | Last verified runtime | Retained successful verification evidence; historical success is not a claim of current health. |
 | Operation | Requested work and its origin, authority, progress, outcome and links to evidence; shared by chat receipts and views. |
+| Retired record | A read-only Observation holding a record of the retired preparation workflow under its original ID. |
 
-Release/attempt/host records live in the existing deployment aggregate, not separate tables for every concept. Operation records serialize conflicting application changes; queued work rechecks its assumptions before execution. Unknown external effects retain a hold even after the local worker dies. Pi does not manually release those locks.
+Release/attempt/host records live in the existing deployment aggregate, not separate tables for every concept. Operation records serialize conflicting application changes; queued work rechecks its assumptions before execution. Unknown external effects retain a hold even after the local worker dies. Pi does not manually release those locks; reconciliation does, or, for work whose capability was retired, an owner attestation the operation records with that consequence.
 
 Conversations retain separate native transcripts and drafts while sharing application facts. `list_operations`, `propose_change` and `record_inspection` expose recorded work; reading records does not establish fresh host health. Views render the same evidence, and proposals remain distinct from applied state. Keep the request, selected release, attempts and unresolved results durable so Pi can continue from records plus fresh inspection without prescribing every reasoning step.
 
-Historical plan/hash/receipt readers remain for existing deployments and recommendations. New intake uses native artifacts. Known runtime with failed behavior can support corrective updates without being called verified; an unknown runtime needs reconciliation first.
+Execution reads native configuration only. Known runtime with failed behavior can support corrective updates without being called verified; an unknown runtime needs reconciliation first.
+
+## Schema 14: retired preparation and deployment plans
+
+Schema 14 removes the phase workspaces, application contracts, conformance, preview, publication and process-guard tables. Chats, Pi runs and Activity belong to their application; messages, decisions, observations, deployments and operations keep their IDs. The [migration](../scripts/retire-preparation.mjs) runs in `npm run db:push`, is repeat-safe, and never re-executes retired work:
+
+- Every retired row becomes a `retired-record` Observation under its original ID, with its source links and a note when it left something open, such as a pull request, branch or preview.
+- Retired operations lose their command. Work that had definitely not started is cancelled. Completed receipts are untouched. Anything else is failed with its unknown outcome and change-queue hold preserved; a held operation ends only with an owner attestation ("What you verified"), which records that Server Guy did not verify it. A live process guard becomes such a held operation.
+- Each legacy deployment plan in a lifecycle or live record is converted once into native Compose (`native.converted`). The conversion is accepted only if the plan reproduces its recorded release ID, so approvals, receipts, Compose projects, volume names, private inputs and recorded images keep the identities they named. The plan stays as an Observation. A recommendation from the retired planner that was never approved or run is marked failed with a retry path instead of converted.
+
+The conversion is a one-time adapter inside the migration. No executor, rollback or view reads a plan afterwards, and new releases are never converted.
 
 ## Data protection and rollback
 
@@ -69,6 +80,6 @@ Compatible rollback selects a previously verified release's retained local image
 
 ## Source and proof
 
-Core source: [Pi runtime](../src/server/pi.ts), [workspace](../src/server/pi-workspace.ts), [planner](../src/server/deployment-planner.ts), [native preparation](../src/server/native-compose.ts), [shared release loop](../src/server/application-releases.ts), [executor](../src/server/release-executor.ts), [release facts](../src/server/release-facts.ts), [operation store](../src/server/operation-store.ts), [reconciliation](../src/server/release-reconciliation.ts), [backup runner](../scripts/scheduled-backups/runner.py) and [rollback](../src/server/rollback.ts).
+Core source: [Pi runtime](../src/server/pi.ts), [workspace](../src/server/pi-workspace.ts), [planner](../src/server/deployment-planner.ts), [native preparation](../src/server/native-compose.ts), [shared release loop](../src/server/application-releases.ts), [executor](../src/server/release-executor.ts), [release facts](../src/server/release-facts.ts), [operation store](../src/server/operation-store.ts), [reconciliation](../src/server/release-reconciliation.ts), [backup runner](../scripts/scheduled-backups/runner.py), [rollback](../src/server/rollback.ts) and the [schema 14 migration](../scripts/retire-preparation.mjs).
 
 [Evidence](testing/README.md) distinguishes actual model runs, scripted tests, local Docker and live-host observations. PRs #43–#45 established the native path and reuse across two application structures; that is demonstrated generalization, not universal compatibility. Preserve existing IDs, native sessions, history and pending-work evidence when changing legacy storage. Retire obsolete implementation only when its required behavior has an equivalent path.

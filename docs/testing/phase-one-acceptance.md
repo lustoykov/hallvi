@@ -17,7 +17,7 @@ These are support targets; [Roadmap](../../ROADMAP.md) records what is implement
 
 ## Regression and execution
 
-Preserve provenance, accepted source/connection identity, owner-merged candidate verification, cancellation/retry, known-schema migration and native history while replacing legacy phases. Each applicable old expectation needs preservation, replacement or explicit retirement. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
+Preserve provenance, accepted source/connection identity, cancellation/retry, known-schema migration and native history. Schema 14 retired the phase workflow; its records remain read-only history, and each applicable old expectation needs preservation, replacement or explicit retirement. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
 
 Use the dashboard suite picker or these local commands:
 

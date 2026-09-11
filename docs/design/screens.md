@@ -16,7 +16,7 @@ From the repository, run the documented [development setup](../../README.md#run)
 - `/prototype/app?scenario=simple|rich&step=N&section=<view>&chat=<id>` selects a replayable application scenario. The prototype bar advances or resets its invented state.
 - `/prototype/applications`, `/prototype/new` and `/prototype/settings/connections` show synthetic list, intake and connection states.
 - `/applications` and `/applications/[id]` use real application records.
-- `/setup/pi`, `/setup/github` and `/setup/execution` are real controller settings, not isolated demo accounts.
+- `/setup/pi` and `/setup/github` are real controller settings, not isolated demo accounts.
 
 The [reference shell](../../src/components/server-guy/reference/reference-shell.tsx) uses the product's components with replayed scenario state and an in-memory interaction overlay. Prototype commands do not establish real backups, monitoring, deployments or provider effects. Keep synthetic facts off real application routes.
 

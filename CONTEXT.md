@@ -32,6 +32,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Unknown remote outcome**: An attempted external action whose result has not been established. A stopped controller does not establish that the external action stopped.
 
+**Owner attestation**: The owner's recorded statement of what they verified, which releases the change-queue hold of an operation whose capability was retired. Server Guy records the statement without verifying it.
+_Avoid_: Acknowledgement
+
 **Observation**: A timestamped fact attributed to its source, such as a probe result, command output, metric sample or provider response.
 
 **Behavior criterion**: An observable outcome chosen to establish that an Application performs an intended task. An observation can satisfy or fail a criterion; a running process alone does not establish useful behavior.
@@ -56,6 +59,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Release**: A selected immutable source/image identity and deployment configuration intended to run for an Application.
 
+**Converted release**: A release recorded before schema 14 whose retired deployment plan was converted once into native Compose under its original release identity. Execution reads only its native configuration.
+_Avoid_: Legacy plan, DeploymentPlan
+
 **Deployment attempt**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same.
 
 **Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
@@ -64,7 +70,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Observed runtime**: The application configuration and running images established on a host at a recorded time, whether or not its intended behavior has been verified. A known running configuration and a working application are separate claims.
 
-**Operability change**: A change needed to run or check the application, such as its start entrypoint or environment-driven port. Application-code changes in this category require an owner-merged PR.
+**Operability change**: A change needed to run or check the application, such as a health endpoint, its start entrypoint or an environment-driven port. Server Guy hands application-code changes to the owner, who merges them before a release deploys them.
 
 **Service role**: The responsibility of a running component within a stack: serving HTTP, consuming background work, brokering work, or providing another private service. A role does not prove health or behavior.
 
@@ -88,8 +94,9 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Issue**: A persistent observed problem with evidence and a next action. A notification delivers attention to an issue; reading it does not resolve the problem.
 
-## Legacy and optional terms
+## Retired and optional terms
 
-**Phase Workspace / Gate Check / Application Contract / Conformance Result**: Existing preparation records and prerequisite checks retained during migration. They do not mandate user-facing stages or phase-owned conversations; detailed schemas remain in the archived implementation references.
+**Retired record**: A record of Server Guy's retired preparation workflow, kept read-only as an Observation under its original identity. It grants no authority and never runs again.
+_Avoid_: Phase Workspace, Gate Check, Application Contract, Conformance Result, Launch Brief
 
 **Plugin**: The reserved term for an optional future extension with UI and authorized behavior. Plugin implementation is deferred; built-in views do not depend on it.
