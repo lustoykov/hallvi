@@ -34,6 +34,17 @@ export interface StateProcedure {
   verify: string[];
 }
 
+/**
+ * A private value that only needs to be random: the controller generates it
+ * at approval and stores it with the owner's inputs. Pi and records see only
+ * its name.
+ */
+export interface InputGenerator {
+  bytes: number;
+  encoding: "hex" | "base64" | "base64url";
+  prefix?: string;
+}
+
 /** Normalized Compose fields the controller reads; others pass through. */
 export interface ResolvedService {
   image?: string;
@@ -86,6 +97,8 @@ export interface NativeConfiguration {
   inputs: string[];
   /** Why each private input declared at intake is needed, for the owner. */
   inputReasons?: Record<string, string>;
+  /** Inputs the controller generates at approval instead of asking. */
+  inputGenerators?: Record<string, InputGenerator>;
   data: {
     volume: string;
     kind: "database" | "files";

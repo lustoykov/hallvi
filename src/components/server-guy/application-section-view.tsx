@@ -216,7 +216,7 @@ export function ApplicationSectionView({
       content = <StorageView {...viewProps} />;
       break;
     case "backups":
-      content = <BackupsView {...viewProps} />;
+      content = <BackupsView {...viewProps} onRefresh={onRefresh} />;
       break;
     case "logs":
       content = (

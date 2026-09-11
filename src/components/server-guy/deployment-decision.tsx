@@ -83,6 +83,7 @@ export function DeploymentDecision({
   const facts = currentFacts(record);
   if (record.status === "awaiting-approval" && facts && record.offer) {
     const reasons: Record<string, string> = record.native?.inputReasons ?? {};
+    const generated = Object.keys(record.native?.inputGenerators ?? {});
     return (
       <form
         className="sg-op-approval"
@@ -111,7 +112,14 @@ export function DeploymentDecision({
           </strong>
           <small>Hourly billing · IPv4 included · no backup add-on</small>
         </div>
-        {facts.inputs.map((name) => (
+        {generated.length > 0 && (
+          <small>
+            Generated privately at approval, never shown: {generated.join(", ")}
+          </small>
+        )}
+        {facts.inputs
+          .filter((name) => !generated.includes(name))
+          .map((name) => (
           <label key={name}>
             {name}
             {reasons[name] && <small>{reasons[name]}</small>}

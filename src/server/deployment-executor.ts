@@ -36,14 +36,23 @@ export function saveDeploymentInputs(
   input: Record<string, string>,
 ) {
   const allowed = new Set(currentFacts(record)?.inputs);
+  const generators = record.native?.inputGenerators ?? {};
   for (const key of Object.keys(input))
-    if (!allowed.has(key)) throw new Error("Unexpected deployment input.");
+    if (!allowed.has(key) || generators[key])
+      throw new Error("Unexpected deployment input.");
+  // Values that only need to be random are generated here: never typed,
+  // shown to Pi or recorded outside the private inputs file.
+  const values = { ...input };
+  for (const [key, generator] of Object.entries(generators))
+    if (allowed.has(key))
+      values[key] =
+        `${generator.prefix ?? ""}${randomBytes(generator.bytes).toString(generator.encoding)}`;
   for (const key of allowed)
-    if (!input[key]?.trim())
+    if (!values[key]?.trim())
       throw new Error(`Provide ${key} before deploying.`);
   writeFileSync(
     join(deploymentDirectory(record), "inputs.json"),
-    JSON.stringify(input),
+    JSON.stringify(values),
     { mode: 0o600 },
   );
 }

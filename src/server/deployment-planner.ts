@@ -423,7 +423,7 @@ function selectionTool<T extends NativeSelection>(
 /** What the executor enforces for every native selection, with feedback. */
 const NATIVE_RULES = `Work natively: read the source, write Compose and packaging files in /workspace, and validate them yourself with docker-compose config, using placeholder values for private inputs.
 The executor enforces the following and returns specific feedback:
-- It resolves your selected files with Docker Compose 2.40.3 under this application's project name, pins public Docker Hub or GHCR image tags to digests, names built images and labels services with the revision. Name Compose files anything except compose.json at the root, which the host reserves.
+- It resolves your selected files with Docker Compose 2.40.3 under this application's project name, pins public image tags from any registry that serves them anonymously (Docker Hub, GHCR, lscr.io, Quay and similar) to their Linux amd64 digests, names built images and labels services with the revision. Name Compose files anything except compose.json at the root, which the host reserves.
 - It builds from the repository at the selected revision plus the new files you select. Never modify repository files: workspace edits to source are not deployed, and application code changes need an owner-merged revision. Author packaging (Compose files, Dockerfiles, configuration) as new files.
 - Private values appear only as \${NAME} references to recorded private inputs. Never write secret values.
 - Each service runs exactly one container. A one-shot service (a migration or initialization) is a dependency of the services that need it with condition service_completed_successfully: Compose starts them only after it exits 0, and verification requires that exit instead of a running process. Bind mounts must be read-only files you select. Host namespaces, privileged mode, added capabilities, devices, the Docker socket, host paths, external or driver-backed volumes/networks, remote build contexts and profiles are unsupported capability gaps.
@@ -467,7 +467,7 @@ Read the runtime entry point, dependency manifest, documentation and any Dockerf
 ${NATIVE_RULES}
 Records Compose cannot express, declared with your selection:
 - httpAccess: publish only the primary HTTP service, on host port 80 (for example "80:8080"); the host firewall opens nothing else and verification uses it. "controller" restricts HTTP to the controller's address for admin tools and install wizards until HTTPS is configured; "public" suits normal websites.
-- inputs: every secret the application needs, each with a short reason. The owner supplies values privately at approval. Admin credentials are private inputs; never use published default passwords. Disable open signup when the application supports that setting.
+- inputs: every secret the application needs, each with a short reason. The owner supplies values privately at approval; set generate for a value that only needs to be random, such as an encryption or session key, so no one has to invent it (Laravel's APP_KEY, for example, is {bytes: 32, encoding: "base64", prefix: "base64:"}). Admin credentials are private inputs; never use published default passwords. Disable open signup when the application supports that setting. Where the application needs its own address, such as a base URL setting, reference \${SERVER_GUY_PUBLIC_URL}: the controller supplies it once the server exists.
 - database: for PostgreSQL, run the official postgres:16, 17 or 18 image as a service named postgres, with a named volume at its data directory, POSTGRES_USER=serverguy, POSTGRES_DB=application and POSTGRES_PASSWORD=\${${DATABASE_PASSWORD}}, and declare {service, version}. The controller generates that password; reference it wherever the application needs it, such as a connection URL. Any other database server is an ordinary service: declare its volume's data with that service as owner and a dump procedure.
 - criterion (required): checks you derive from route code you read, in the JSON shape given below. Include a content assertion on an application route beyond the health endpoint. For CRUD, create one object marked with SG_VERIFY_TOKEN, capture its ID (captureId is a dot-separated JSON path), read it via {id}, and finally delete only that ID. waitSeconds (up to 30) lets a read poll for asynchronous work. services[] checks private HTTP services by container port. commands[] verify behavior HTTP cannot reach, such as that the administrator from private inputs can sign in and published default credentials cannot. Static sites may check recognizable content. Never manufacture an endpoint or claim a worker is verified without evidence; explain the limitation instead.
 Call recommend_deployment with compose (Compose files in -f order), files (every other file Compose or builds need), data, criterion, inputs, httpAccess, database and a short summary for the owner.`,
@@ -493,6 +493,20 @@ Call recommend_deployment with compose (Compose files in -f order), files (every
                   {
                     name: Type.String({ pattern: "^[A-Z_][A-Z0-9_]*$" }),
                     reason: Type.String({ minLength: 1, maxLength: 400 }),
+                    generate: Type.Optional(
+                      Type.Object(
+                        {
+                          bytes: Type.Integer({ minimum: 16, maximum: 64 }),
+                          encoding: Type.Union([
+                            Type.Literal("hex"),
+                            Type.Literal("base64"),
+                            Type.Literal("base64url"),
+                          ]),
+                          prefix: Type.Optional(Type.String({ maxLength: 32 })),
+                        },
+                        { additionalProperties: false },
+                      ),
+                    ),
                   },
                   { additionalProperties: false },
                 ),
@@ -605,7 +619,7 @@ export async function planRelease(
 /workspace/.server-guy/current/ describes ${current}: compose.json is its resolved configuration, with private values only as \${NAME} references; release.json holds records Compose cannot express (named-volume data kinds, the managed database, private input names, network exposure, behavior checks); files/ holds files it built or mounted. It is evidence of ${current}; the repository at the selected revision is what you deploy.
 ${NATIVE_RULES}
 Authority limits:
-- Private values: reference only the private inputs and database password named in release.json. New private inputs are unavailable in this scope; explain what is needed instead.
+- Private values: reference only the private inputs and database password named in release.json, plus \${SERVER_GUY_PUBLIC_URL} for the application's own address. New private inputs are unavailable in this scope; explain what is needed instead.
 - Keep every existing named-volume mount (service, target, read-only access) with its data kind and SQLite path, the managed database service and image, and network exposure: the same services publish the same host ports and addresses.
 - Omit criterion to keep release.json's; replace it (same JSON shape) when the revision legitimately changes responses. Never weaken it to pass.
 Call deploy_release with compose (Compose files in -f order), files (every other file Compose or builds need: env files, new Dockerfiles, mounted configuration), data, criterion and a short summary. After a runtime or behavior failure, collect evidence with inspect_runtime (container state and recent logs, optionally for one service) before correcting. read_repository and compare_repository read other revisions and public upstream repositories, such as the migrations of the software a packaging repository builds; read_operation returns an earlier operation's record and planning history. After a lost connection call reconcile_release before considering another execution; busy, missing or mismatched results stay blocked. ${options.context}`,

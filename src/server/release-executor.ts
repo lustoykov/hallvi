@@ -18,6 +18,7 @@ import { composeProject, currentFacts, releaseFacts } from "./release-facts";
 import {
   DATABASE_PASSWORD,
   executableCompose,
+  PUBLIC_URL,
   runtimeArtifacts,
 } from "./native-compose";
 
@@ -55,7 +56,12 @@ export function releaseSecrets(record: DeploymentRecord) {
     supplied,
     redact,
     /** Values for a native release's ${NAME} references. */
-    values: { ...supplied, [DATABASE_PASSWORD]: password },
+    values: {
+      ...supplied,
+      [DATABASE_PASSWORD]: password,
+      // Public and never redacted: the address the provider assigned.
+      ...(record.address ? { [PUBLIC_URL]: `http://${record.address}` } : {}),
+    },
   };
 }
 /** What the locked host script validates, builds, pulls and activates. */

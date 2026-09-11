@@ -7,6 +7,7 @@ import { imageReferenceSchema, pinContainerImage } from "./container-images";
 import type {
   Criterion,
   DeploymentRelease,
+  InputGenerator,
   NativeConfiguration,
   ResolvedCompose,
 } from "./deployment-release";
@@ -33,6 +34,11 @@ export class NativeConfigurationError extends Error {}
 
 /** The managed PostgreSQL password, available to Compose interpolation. */
 export const DATABASE_PASSWORD = "SERVER_GUY_DATABASE_PASSWORD";
+/**
+ * The application's own address, for settings such as APP_URL: the
+ * controller supplies http://<server address> once the server exists.
+ */
+export const PUBLIC_URL = "SERVER_GUY_PUBLIC_URL";
 /** Controller-generated Compose file, retained with every native release. */
 export const OVERRIDE_PATH = ".server-guy/override.compose.json";
 export const SELECTION_LIMITS = { files: 64, bytes: 512 * 1024 };
@@ -515,7 +521,7 @@ async function controllerOverride(
     ) {
       if (!imageReferenceSchema.safeParse(service.image).success)
         throw new NativeConfigurationError(
-          `Service ${name}: ${service.image} is not a public Docker Hub or GHCR reference with a tag; the controller pins public tags to digests.`,
+          `Service ${name}: ${service.image} is not a public registry reference with a tag or digest; the controller pins public tags to digests.`,
         );
       if (!service.image.includes("@sha256:"))
         try {
@@ -597,8 +603,9 @@ function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: owner ${record.owner} must be a service that mounts it read-write.`,
       );
-    const commands = record.procedure
-      ? [record.procedure.dump, record.procedure.restore, record.procedure.verify]
+    const procedure = record.procedure;
+    const commands = procedure
+      ? [procedure.dump, procedure.restore, procedure.verify]
       : [];
     if (
       record.capture === "dump" &&
@@ -742,6 +749,8 @@ export async function prepareNativeRelease(input: {
   const names = [
     ...input.inputs.filter((name) => !/^(COMPOSE|DOCKER)_/.test(name)),
     ...(baseline.database ? [DATABASE_PASSWORD] : []),
+    // Known once the server exists; a sentinel stands in until then.
+    PUBLIC_URL,
   ];
   const sentinels = new Map(
     names.map((name, index) => [`sgp${nonce}i${index}e`, name]),
@@ -819,7 +828,9 @@ export async function prepareNativeRelease(input: {
       content: file.content.toString("base64"),
     })),
     resolved,
-    inputs: [...referenced].filter((name) => name !== DATABASE_PASSWORD).sort(),
+    inputs: [...referenced]
+      .filter((name) => name !== DATABASE_PASSWORD && name !== PUBLIC_URL)
+      .sort(),
     data: dataRecords(resolved, selection.data ?? [], baseline),
     database: baseline.database
       ? {
@@ -845,8 +856,11 @@ export async function prepareNativeRelease(input: {
 
 /** A first deployment's selection: native files plus declared records. */
 export interface IntakeSelection extends NativeSelection {
-  /** Private inputs the owner supplies at approval. */
-  inputs?: { name: string; reason: string }[];
+  /**
+   * Private inputs: the owner supplies each value at approval, unless it
+   * only needs to be random and the controller generates it.
+   */
+  inputs?: { name: string; reason: string; generate?: InputGenerator }[];
   httpAccess: "public" | "controller";
   /** The managed PostgreSQL service; the controller generates its password. */
   database?: { service: string; version: "16" | "17" | "18" } | null;
@@ -871,14 +885,15 @@ export async function prepareInitialRelease(input: {
   const problems: string[] = [];
   if (new Set(names).size !== names.length)
     problems.push("Declare each private input once.");
-  for (const { name, reason } of declared)
+  for (const { name, reason, generate } of declared)
     if (
       !/^[A-Z_][A-Z0-9_]*$/.test(name) ||
       /^(COMPOSE|DOCKER)_/.test(name) ||
-      name === DATABASE_PASSWORD
+      name === DATABASE_PASSWORD ||
+      name === PUBLIC_URL
     )
       problems.push(
-        `${name}: use an upper-case environment name; ${DATABASE_PASSWORD} is generated for the managed database.`,
+        `${name}: use an upper-case environment name; the controller supplies ${DATABASE_PASSWORD} and ${PUBLIC_URL}.`,
       );
     else if (
       !reason.trim() ||
@@ -886,6 +901,17 @@ export async function prepareInitialRelease(input: {
       redactSecrets(reason).count
     )
       problems.push(`${name}: give a short reason without credentials.`);
+    else if (
+      generate &&
+      (!Number.isInteger(generate.bytes) ||
+        generate.bytes < 16 ||
+        generate.bytes > 64 ||
+        !["hex", "base64", "base64url"].includes(generate.encoding) ||
+        !/^[A-Za-z0-9:._-]{0,32}$/.test(generate.prefix ?? ""))
+    )
+      problems.push(
+        `${name}: generate takes 16 to 64 random bytes, a hex, base64 or base64url encoding and an optional short prefix.`,
+      );
   if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
   const database = selection.database ?? null;
   const native = await prepareNativeRelease({
@@ -929,12 +955,20 @@ export async function prepareInitialRelease(input: {
       `Publish only the primary HTTP listener, on host port 80/tcp; the host firewall opens nothing else (${unsupported.map((item) => `${item.service} ${item.published || "(any)"}/${item.protocol}`).join(", ")}).`,
     );
   if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
+  const generated = declared.filter((item) => item.generate);
   return declared.length
     ? {
         ...native,
         inputReasons: Object.fromEntries(
           declared.map((item) => [item.name, item.reason.trim()]),
         ),
+        ...(generated.length
+          ? {
+              inputGenerators: Object.fromEntries(
+                generated.map((item) => [item.name, item.generate!]),
+              ),
+            }
+          : {}),
       }
     : native;
 }
