@@ -25,7 +25,7 @@ export const scenarios: {
   {
     id: "live",
     label: "Live record",
-    note: "Read-only from the main dev server",
+    note: "The recorded state, as it is now",
     invented: false,
   },
   {
@@ -57,6 +57,7 @@ export function PrototypeBar({
   source,
   reduced,
   onReduced,
+  choices,
 }: {
   variants: VariantEntry[];
   variant: VariantEntry;
@@ -66,6 +67,8 @@ export function PrototypeBar({
   source: "live" | "local" | "loading";
   reduced: boolean;
   onReduced: (reduced: boolean) => void;
+  /** The record scenarios this page can show; all of them by default. */
+  choices?: ScenarioId[];
 }) {
   const index = variants.findIndex((item) => item.id === variant.id);
   const step = (delta: number) =>
@@ -78,7 +81,7 @@ export function PrototypeBar({
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable ||
-          target.closest("[role='radiogroup']"))
+          target.closest("[role='radiogroup'], [role='slider']"))
       )
         return;
       if (event.key === "ArrowLeft") step(-1);
@@ -112,18 +115,20 @@ export function PrototypeBar({
         </button>
       </div>
       <div className="ax-bar-scenarios" role="radiogroup" aria-label="Record">
-        {scenarios.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="radio"
-            aria-checked={item.id === scenario}
-            title={item.note}
-            onClick={() => onScenario(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+        {scenarios
+          .filter((item) => !choices || choices.includes(item.id))
+          .map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="radio"
+              aria-checked={item.id === scenario}
+              title={item.note}
+              onClick={() => onScenario(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
       </div>
       <span
         className={`ax-bar-source${current.invented ? " is-invented" : ""}`}

@@ -1,17 +1,19 @@
-# Overview and Architecture redesign — prototype
+# Dashboard redesign — prototype
 
-The designs the owner chose in `claude/architecture-directions`, rendered
-inside the real application shell on the real routes. They are the default
-Overview and Architecture; the bar at the bottom still switches to the
-shipped page for comparison. The code is still prototype code, and gets
-rewritten properly as it settles.
+The designs the owner chose, rendered inside the real application shell on
+the real routes: Overview and Architecture from
+`claude/architecture-directions`, Deployment and History from
+`claude/deployment-history`. They are the defaults; the bar at the bottom
+still switches to the shipped page for comparison. The code is still
+prototype code, and gets rewritten properly as it settles.
 
 ## Run
 
 - Start the app as usual (`npm run dev`).
-- Open `/applications/<id>?variant=A#overview` or `#architecture`. The bar at
-  the bottom (or the ← → keys) switches between the design (A) and the
-  shipped page (0), the record scenario, and a reduced-motion preview.
+- Open `/applications/<id>?variant=A#overview`, `#architecture`,
+  `#deployment` or `#history`. The bar at the bottom (or the ← → keys)
+  switches between the design (A) and the shipped page (0), the record
+  scenario, and a reduced-motion preview.
 - The live record is read from the app's own API with GET requests only; the
   firewall read is the same provider read the Security view makes.
 - Little Server in every mood, pointing included: `/prototype/little-server`.
@@ -44,11 +46,43 @@ something needs you, and with reduced motion he only says it. To review it,
 `&looked=never` replays the introduction and `&looked=20h` pretends you were
 away for 20 hours.
 
+## Deployment and History: Transit (`deployment-prototype/`, `history-prototype/`)
+
+Journeys' transit language, applied to time. Each page has one visual,
+plain words come first and exact values open on click, and nothing animates
+when a page opens; Architecture and Overview lost their entrance animations
+in the same round, and their flows and state changes still move.
+
+- **Deployment.** Now on the left: what is serving, how sure Server Guy is,
+  the one next step (which goes to the conversation), the facts with their
+  exact values, the checks it passes and the latest logs. On the right, the
+  way here as one line of stops: the recorded events grouped into plain
+  phases, the wait for your approval dashed and a failure in red. Pointing
+  at a stop lights the line up to it, stop by stop, and a stop opens the
+  lines recorded there. What isn't set up sits on the line as dashed ghosts
+  where it would go: deploying on push before the first stop, rolling back
+  after now. Little Server waits at now.
+- **History.** A line with a timetable. A sticky almanac says how the record
+  reads, filters it and lists its days. Each operation is a stop with its
+  time in a timetable column and its evidence opening in place. A thread in
+  the gutter ties each failure to the work that resolved it; pointing at
+  either sends a light along it, from the failure to the fix.
+
+When nothing is deployed, Deployment still shows the product's panel that
+connects Hetzner and starts the first deployment. Approval, retry and cancel
+stay in the conversation's receipts.
+
+History places finished work by its newest recorded step. The deployment
+operation's `updatedAt` is its record's and moves whenever the record is
+rewritten, which files an old deploy under Today in the shipped page.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
   clock moved), _Prometheus failing_ (an invented monitoring check) and
   _Before deploy_ (the plan with nothing running). The bar labels each one.
+  Deployment offers Live record, 3 days later and Before deploy; History
+  offers Live record and 3 days later.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -56,9 +90,9 @@ away for 20 hours.
 `model.ts` owns every fact and every certainty; the designs only render it.
 Verified green requires evidence under a day old.
 
-## What the owner validated (10 Sep 2026)
+## What the owner validated
 
-Journeys is the reference for every page designed from now on:
+Journeys is the reference for every page designed from now on (10 Sep 2026):
 
 - **Bird's-eye first, depth on demand.** The whole picture is visible at
   once; clicking a part opens plain words, evidence, facts, a link to its
@@ -71,9 +105,16 @@ Journeys is the reference for every page designed from now on:
 For Overview the owner chose the Timeline ("let's use the A Timeline now"),
 with the log from Little Server's note folded underneath.
 
+On 11 Sep the owner loved Architecture and its data flows but found the
+entrance animation too much, and asked for a balance so the app doesn't
+become all diagrams. For Deployment and History they chose Transit ("D is
+great, let's take it").
+
 ## Where the exploration lives
 
-Everything explored along the way stays on `claude/architecture-directions`,
-not here: Architecture's plain-sentence and exploded-server (Three.js)
-directions with their kits, Overview's note and console directions, and the
-mascot family.
+Everything explored along the way stays off main: on
+`claude/architecture-directions`, Architecture's plain-sentence and
+exploded-server (Three.js) directions with their kits, Overview's note and
+console directions, and the mascot family; on `claude/deployment-history`,
+Deployment and History's Story, Narrated and Replay directions and the first
+round's Ledger.

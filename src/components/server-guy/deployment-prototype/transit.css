@@ -1,0 +1,518 @@
+/* PROTOTYPE · claude/deployment-history · throwaway.
+   Direction D, Transit. Prefix: axm-. Each stop draws the rail to the next
+   one, so opening a stop keeps the line whole. Pointing lights the rail stop
+   by stop; nothing moves on arrival. */
+
+.axm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 10px;
+}
+.axm-none {
+  padding: 22px 24px;
+  border: 1px dashed #cfd6e2;
+  border-radius: 18px;
+  background: #fbfcfe;
+}
+.axm-body {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  align-items: start;
+  gap: 56px;
+}
+
+/* ---------- Now ---------- */
+
+.axm-now {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 18px;
+}
+.axm-say {
+  margin: 8px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axm-sure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: -6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axm-next {
+  justify-self: start;
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axm-next:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+.axm-facts {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--ax-line);
+}
+.axm-fact {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--ax-line);
+}
+.axm-fact dt {
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axm-fact dd {
+  margin: 0;
+}
+.axm-fact-open {
+  display: grid;
+  gap: 1px;
+  width: calc(100% + 12px);
+  margin: -3px -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ax-base);
+}
+.axm-fact-open:hover:not(:disabled),
+.axm-fact-open[aria-expanded="true"] {
+  background: #f4f6fa;
+}
+.axm-fact-open:disabled {
+  cursor: default;
+}
+.axm-fact-open b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axm-fact-open small {
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axm-pop {
+  position: absolute;
+  top: 4px;
+  left: calc(100% + 16px);
+  z-index: 20;
+  width: 300px;
+  padding: 12px 14px;
+  border: 1px solid rgb(23 34 56 / 10%);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow:
+    0 2px 4px rgb(23 34 56 / 6%),
+    0 24px 48px -24px rgb(23 34 56 / 34%);
+}
+.axm-pop dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.axm-pop dl > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 12.5px;
+}
+.axm-pop dt {
+  color: var(--ax-muted);
+}
+.axm-pop dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.axm-checks h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axm-checks ul {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axm-checks li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+}
+.axm-tick {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified);
+}
+.axm-tick svg {
+  width: 9px;
+  height: 9px;
+}
+.axm-checks li[data-passed="false"] .axm-tick {
+  border: 1.5px dashed #b9c2d0;
+  background: #ffffff;
+  color: transparent;
+}
+.axm-checks b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axm-checks small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ax-muted);
+}
+.axm-checks code {
+  font-family: var(--ax-mono);
+  font-size: 11.5px;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axm-note {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axm-logs summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+  cursor: pointer;
+}
+.axm-logs summary::-webkit-details-marker {
+  display: none;
+}
+.axm-logs summary small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+.axm-logs pre {
+  max-height: 240px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  color: #c9d3e6;
+  font-family: var(--ax-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- The line ---------- */
+
+.axm-map {
+  display: grid;
+  gap: 10px;
+}
+.axm-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+.axm-map-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ax-ink);
+}
+.axm-map-head small {
+  font-size: 12.5px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axm-line {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Every dot's centre sits 23px below its stop's top, so each stop's rail
+   runs from its own dot to the next one. */
+.axm-stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 14px;
+  padding: 12px 14px 12px 0;
+  border-radius: 14px;
+  transition: background-color var(--ax-base);
+}
+.axm-stop::before,
+.axm-stop::after {
+  content: "";
+  position: absolute;
+  top: 23px;
+  bottom: -23px;
+  left: 18.5px;
+  width: 3px;
+  border-radius: 2px;
+}
+.axm-stop::before {
+  background: #c3d1f7;
+}
+.axm-stop::after {
+  background: var(--ax-blue);
+  box-shadow: 0 0 10px rgb(40 90 216 / 45%);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 200ms var(--ax-ease-out);
+}
+.axm-stop[data-lit]::after {
+  transform: scaleY(1);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+.axm-stop:last-child::before,
+.axm-stop:last-child::after {
+  display: none;
+}
+.axm-stop[data-then="wait"]::before {
+  background: repeating-linear-gradient(
+    180deg,
+    #c3d1f7 0 5px,
+    transparent 5px 10px
+  );
+}
+.axm-stop.is-ghost::before,
+.axm-stop[data-then="ghost"]::before {
+  background: repeating-linear-gradient(
+    180deg,
+    #cfd6e2 0 4px,
+    transparent 4px 9px
+  );
+}
+.axm-stop.is-ghost::after,
+.axm-stop[data-then="ghost"]::after {
+  display: none;
+}
+.axm-stop:not(.is-ghost, .is-now):hover,
+.axm-stop.is-open {
+  background: #f7f9fc;
+}
+.axm-dot {
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 3px solid var(--ax-blue);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px #ffffff;
+}
+.axm-stop:not(.is-ghost, .is-now):hover .axm-dot,
+.axm-stop.is-open .axm-dot {
+  box-shadow: 0 0 0 4px #f7f9fc;
+}
+.axm-dot svg {
+  width: 11px;
+  height: 11px;
+}
+.axm-stop[data-tone="fail"] .axm-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border: 0;
+  background: var(--ax-failed);
+}
+.axm-stop[data-tone="wait"] .axm-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border: 2px solid var(--ax-line-2);
+  color: var(--ax-muted);
+}
+.axm-stop[data-tone="work"] .axm-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  border: 0;
+  background: var(--ax-blue);
+}
+.axm-stop.is-ghost .axm-dot {
+  border: 2px dashed #b9c2d0;
+}
+.axm-stop.is-now .axm-dot {
+  width: 28px;
+  height: 28px;
+  margin-top: -3px;
+  border: 7px solid var(--ax-verified);
+}
+.axm-stop.is-now[data-tone="stale"] .axm-dot {
+  border-color: var(--ax-amber);
+}
+.axm-stop.is-now[data-tone="failed"] .axm-dot {
+  border-color: var(--ax-failed);
+}
+.axm-stop.is-now:is([data-tone="planned"], [data-tone="checking"]) .axm-dot {
+  border-color: var(--ax-blue);
+}
+.axm-stop-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.axm-stop-main:disabled,
+.axm-stop.is-ghost .axm-stop-main,
+.axm-stop.is-now .axm-stop-main {
+  cursor: default;
+}
+.axm-stop-main b {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+}
+.axm-stop-main small {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-muted);
+  overflow-wrap: anywhere;
+}
+.axm-stop[data-tone="fail"] .axm-stop-main b {
+  color: var(--ax-failed);
+}
+.axm-stop.is-ghost .axm-stop-main b {
+  font-weight: 560;
+  color: var(--ax-muted);
+}
+.axm-when {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--ax-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.axm-when small {
+  font-size: 11.5px;
+  color: var(--ax-faint);
+}
+.axm-guy {
+  width: 76px;
+  height: 76px;
+  margin: -26px 0 -20px;
+}
+.axm-lines {
+  grid-column: 2 / -1;
+  display: grid;
+  margin-top: 10px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  color: #d9e1f2;
+  font-family: var(--ax-mono);
+}
+.axm-rec {
+  display: grid;
+  grid-template-columns: 64px 14px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.axm-rec time {
+  color: #56627a;
+  font-variant-numeric: tabular-nums;
+}
+.axm-rec b {
+  font-weight: 600;
+  text-align: center;
+  color: #7d8aa5;
+}
+.axm-rec span {
+  overflow-wrap: anywhere;
+}
+.axm-rec[data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axm-rec[data-tone="pass"] span {
+  color: #b9e8d0;
+}
+.axm-rec[data-tone="fail"] b,
+.axm-rec[data-tone="fail"] span {
+  color: #ef8d86;
+}
+.axm-rec[data-tone="work"] b,
+.axm-rec[data-tone="work"] span {
+  color: #9fb4f5;
+}
+
+@media (max-width: 1080px) {
+  .axm-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+  .axm-now {
+    position: static;
+  }
+  .axm-pop {
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(300px, calc(100vw - 48px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axm-stop::after {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axm-stop::after {
+  transition: none;
+}

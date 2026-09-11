@@ -318,7 +318,6 @@
     rgb(178 90 22 / 6%) 4px 8px
   );
   transform-origin: left center;
-  animation: axt-grow 900ms var(--ax-ease-out) 300ms both;
 }
 .axt-gap[data-c="unknown"] {
   background: repeating-linear-gradient(
@@ -341,12 +340,6 @@
 .axt-gap[data-c="unknown"] span {
   border-color: var(--ax-line-2);
   color: var(--ax-muted);
-}
-@keyframes axt-grow {
-  from {
-    transform: scaleX(0);
-    opacity: 0;
-  }
 }
 .axt-empty {
   position: absolute;
@@ -375,7 +368,6 @@
   box-shadow: 0 0 0 3px #ffffff;
   transform: translate(-50%, -50%);
   cursor: pointer;
-  animation: axt-ev-in 520ms var(--ax-spring) both;
   transition:
     transform 260ms var(--ax-spring),
     box-shadow 260ms;
@@ -427,6 +419,10 @@
 .axt-ev[data-tone="checking"] {
   background: var(--ax-blue);
   animation: axj2-breathe 900ms ease-in-out infinite;
+}
+/* A moment that lands while you watch pops in; the rest are simply there. */
+.axt-ev.is-new {
+  animation: axt-ev-in 520ms var(--ax-spring) both;
 }
 @keyframes axt-ev-in {
   from {

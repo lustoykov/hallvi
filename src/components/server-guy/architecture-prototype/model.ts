@@ -144,9 +144,11 @@ export function ago(at: string | null | undefined, now: number) {
 
 export function localTime(at: string, withDay = false) {
   const date = new Date(at);
+  // 24-hour, as the logs and consoles beside it are.
   const time = date.toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
   return withDay
     ? `${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })}, ${time}`
@@ -216,7 +218,7 @@ export function shortImage(image: string | null | undefined) {
   return digest ? `${name}@sha256:${digest.slice(0, 12)}` : image;
 }
 
-const CITIES: Record<string, [string, string]> = {
+export const CITIES: Record<string, [string, string]> = {
   fsn1: ["Falkenstein", "Germany"],
   nbg1: ["Nuremberg", "Germany"],
   hel1: ["Helsinki", "Finland"],

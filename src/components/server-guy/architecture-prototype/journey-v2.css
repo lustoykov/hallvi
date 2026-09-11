@@ -263,17 +263,6 @@
   overflow: visible;
   pointer-events: none;
 }
-.axj2-stage.is-entering .axj2-wires {
-  animation: axj2-unroll 1100ms var(--ax-ease-out) 200ms both;
-}
-@keyframes axj2-unroll {
-  from {
-    clip-path: inset(0 100% 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
 .axj2-wire {
   fill: none;
   stroke: #d3dbe7;
@@ -357,17 +346,6 @@
     border-color 480ms var(--ax-ease-out),
     opacity 480ms var(--ax-ease-out),
     filter 480ms var(--ax-ease-out);
-}
-.axj2-stage.is-entering .axj2-card {
-  animation: axj2-card-in 640ms var(--ax-ease-out) both;
-  animation-delay: calc(120ms + var(--i, 0) * 55ms);
-}
-@keyframes axj2-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.97);
-    filter: blur(3px);
-  }
 }
 .axj2-card:hover {
   transform: translateY(-2px);
@@ -933,8 +911,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .axj2-stage.is-entering .axj2-wires,
-  .axj2-stage.is-entering .axj2-card,
   .axj2-card[data-c="failed"] .axj2-icon,
   .axj2-card.is-checking::after,
   .axj2-server-head.is-checking::after,
@@ -942,8 +918,6 @@
     animation: none !important;
   }
 }
-:root[data-ax-motion="reduced"] .axj2-stage.is-entering .axj2-wires,
-:root[data-ax-motion="reduced"] .axj2-stage.is-entering .axj2-card,
 :root[data-ax-motion="reduced"] .axj2-card[data-c="failed"] .axj2-icon {
   animation: none !important;
 }
@@ -1095,9 +1069,10 @@
 }
 .axj3-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 10px 24px;
   margin-top: 6px;
 }
 .axj3-title h1 {
@@ -1109,8 +1084,13 @@
 }
 .axj3-open {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
+}
+/* On a narrow screen the pair moves under the title rather than folding. */
+.axj3-open > * {
+  white-space: nowrap;
 }
 .axj3-open small {
   display: inline-flex;
