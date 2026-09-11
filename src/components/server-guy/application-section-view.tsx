@@ -376,20 +376,18 @@ export function ApplicationSectionView({
         />
       </div>
     );
-  // PROTOTYPE (opus-ui-improvements): Processes in the Transit language, and
-  // directions for Database and Storage, beside the shipped view (0).
-  if (section === "database" || section === "storage")
+  // Processes in Transit's Line and Database in Overview's Timeline, chosen
+  // on opus-ui-improvements, are the default the same way.
+  if (section === "database")
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         <DataPrototype
-          page={section}
           record={deployment}
           stack={stack}
           facts={facts}
           operations={operations}
           now={now}
           onAsk={(draft) => onAsk(null, draft)}
-          onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
           chrome={{
             bar,

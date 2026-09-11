@@ -1,22 +1,18 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Direction B, Timeline: the data in time, in Overview's lanes. Quiet
-// stretches fold, so minutes of work and days of quiet share one line, and
-// "To scale" unfolds them. Database: its check, its copies off the server
-// and its restore tests. Storage: each volume's life, the copies, and the
-// disk, not measured yet. Little Server stands at now; the stretch since
-// the newest copy is shaded and named. Pointing at a moment lights it
-// across the lanes; a moment opens its record.
+// PROTOTYPE · opus-ui-improvements · chosen for Database.
+// Timeline: the database in time, in Overview's lanes: its check, its
+// copies off the server and its restore tests. Quiet stretches fold, so
+// minutes of work and days of quiet share one line, and "To scale" unfolds
+// them. Little Server stands at now; the stretch since the newest copy is
+// shaded and named. Pointing at a moment lights it across the lanes; a
+// moment opens its record.
 
 import {
   Archive,
   ArrowCounterClockwise,
   ArrowRight,
   ChatCircleText,
-  Database,
-  FolderSimple,
-  HardDrive,
   Heartbeat,
   X,
 } from "@phosphor-icons/react";
@@ -33,7 +29,7 @@ import { FRESH_MS } from "../architecture-prototype/model";
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { useDismiss } from "../overview-prototype/shared";
-import { ago, countWord, when } from "../stack-prototype/stack-model";
+import { ago, when } from "../stack-prototype/stack-model";
 import type { Mark } from "./data-model";
 import type { DataDirectionProps } from "./index";
 import "./timeline.css";
@@ -175,24 +171,17 @@ function buildAxis(times: number[], now: number, toScale: boolean): Axis {
 interface Lane {
   id: string;
   icon: ReactNode;
-  name: ReactNode;
+  name: string;
   status: string;
   c: "verified" | "stale" | "failed" | "absent" | "fact";
   marks: Mark[];
   /** The stretch since this last happened, once it is overdue. */
   gap: { from: string; words: string } | null;
-  /** A volume's life: solid as far as the record saw it, lighter after. */
-  life: {
-    from: string;
-    seen: string | null;
-    kind: "database" | "files";
-  } | null;
   ghost: string | null;
-  action: { label: string; run: () => void } | null;
+  action: { label: string; run: () => void };
 }
 
 export function TimelineDirection({
-  page,
   story,
   now,
   head,
@@ -211,7 +200,6 @@ export function TimelineDirection({
   const copyAt = story.newestCopyAt;
   const checked = store?.probe?.at ?? null;
   const owner = store?.owner ?? "The application";
-  const n = story.volumes.length;
   const overdue = (at: string) => now - Date.parse(at) >= FRESH_MS;
   const marksOf = (lane: Mark["lane"]) =>
     story.marks.filter((mark) => mark.lane === lane);
@@ -220,183 +208,90 @@ export function TimelineDirection({
     run: () => onOpenDestination("backups"),
   };
 
-  const copies: Lane = {
-    id: "copies",
-    icon: <Archive weight="bold" />,
-    name: "Copies off the server",
-    status: copyAt ? `Newest ${when(copyAt)}` : "None on record",
-    c: copyAt ? (overdue(copyAt) ? "stale" : "verified") : "absent",
-    marks: marksOf("copies"),
-    gap:
-      copyAt && overdue(copyAt)
-        ? {
-            from: copyAt,
-            words: `No copy on record for ${lasting(now - Date.parse(copyAt))}`,
-          }
-        : null,
-    life: null,
-    ghost: marksOf("copies").length ? null : "No copy on record",
-    action: toBackups,
-  };
-  const lanes: Lane[] =
-    page === "database"
-      ? [
-          {
-            id: "health",
-            icon: <Heartbeat weight="bold" />,
-            name: "Database check",
-            status: checked
-              ? `Passed ${when(checked)}`
-              : store?.firstFailure
-                ? "Failed"
-                : "No check reads it",
-            c: checked
-              ? overdue(checked)
-                ? "stale"
-                : "verified"
-              : store?.firstFailure
-                ? "failed"
-                : "absent",
-            marks: marksOf("health"),
-            gap:
-              checked && overdue(checked)
-                ? {
-                    from: checked,
-                    words: `No check for ${lasting(now - Date.parse(checked))}`,
-                  }
-                : null,
-            life: null,
-            ghost: marksOf("health").length
-              ? null
-              : "No check reads the database",
-            action: {
-              label: "Ask Server Guy to check it now",
-              run: () =>
-                onAsk(`Check that ${owner}'s database is healthy now.`),
-            },
-          },
-          copies,
-          {
-            id: "restores",
-            icon: <ArrowCounterClockwise weight="bold" />,
-            name: "Restore tests",
-            status: guard.restore
-              ? `Passed ${when(guard.restore.at)}`
-              : "Not run yet",
-            c: guard.restore ? "fact" : "absent",
-            marks: marksOf("restores"),
-            gap: null,
-            life: null,
-            ghost: guard.restore ? null : "No restore test yet",
-            action: toBackups,
-          },
-        ]
-      : [
-          ...story.volumes.map((volume): Lane => {
-            const own = marksOf(`volume:${volume.name}`);
-            return {
-              id: `volume:${volume.name}`,
-              icon:
-                volume.kind === "database" ? (
-                  <Database weight="bold" />
-                ) : (
-                  <FolderSimple weight="bold" />
-                ),
-              name: <code>{volume.name}</code>,
-              status: `${volume.owner} · ${volume.database ?? volume.note ?? "files"}`,
-              c: "fact",
-              marks: own,
-              gap: null,
-              life: story.createdAt
-                ? {
-                    from: story.createdAt,
-                    seen: own.at(-1)?.at ?? null,
-                    kind: volume.kind,
-                  }
-                : null,
-              ghost: null,
-              action: {
-                label: "Open History",
-                run: () => onOpenDestination("history"),
-              },
-            };
-          }),
-          copies,
-          {
-            id: "disk",
-            icon: <HardDrive weight="bold" />,
-            name: "Server disk",
-            status: story.disk
-              ? `${story.disk.usedGb} of ${story.disk.totalGb} GB used`
-              : "Not measured",
-            c: story.disk ? "fact" : "absent",
-            marks: [],
-            gap: null,
-            life: null,
-            ghost: story.disk ? null : "Disk use isn't measured yet",
-            action: null,
-          },
-        ];
+  const lanes: Lane[] = [
+    {
+      id: "health",
+      icon: <Heartbeat weight="bold" />,
+      name: "Database check",
+      status: checked
+        ? `Passed ${when(checked)}`
+        : store?.firstFailure
+          ? "Failed"
+          : "No check reads it",
+      c: checked
+        ? overdue(checked)
+          ? "stale"
+          : "verified"
+        : store?.firstFailure
+          ? "failed"
+          : "absent",
+      marks: marksOf("health"),
+      gap:
+        checked && overdue(checked)
+          ? {
+              from: checked,
+              words: `No check for ${lasting(now - Date.parse(checked))}`,
+            }
+          : null,
+      ghost: marksOf("health").length ? null : "No check reads the database",
+      action: {
+        label: "Ask Server Guy to check it now",
+        run: () => onAsk(`Check that ${owner}'s database is healthy now.`),
+      },
+    },
+    {
+      id: "copies",
+      icon: <Archive weight="bold" />,
+      name: "Copies off the server",
+      status: copyAt ? `Newest ${when(copyAt)}` : "None on record",
+      c: copyAt ? (overdue(copyAt) ? "stale" : "verified") : "absent",
+      marks: marksOf("copies"),
+      gap:
+        copyAt && overdue(copyAt)
+          ? {
+              from: copyAt,
+              words: `No copy on record for ${lasting(now - Date.parse(copyAt))}`,
+            }
+          : null,
+      ghost: marksOf("copies").length ? null : "No copy on record",
+      action: toBackups,
+    },
+    {
+      id: "restores",
+      icon: <ArrowCounterClockwise weight="bold" />,
+      name: "Restore tests",
+      status: guard.restore
+        ? `Passed ${when(guard.restore.at)}`
+        : "Not run yet",
+      c: guard.restore ? "fact" : "absent",
+      marks: marksOf("restores"),
+      gap: null,
+      ghost: guard.restore ? null : "No restore test yet",
+      action: toBackups,
+    },
+  ];
 
   const axis = buildAxis(
-    lanes.flatMap((lane) => [
-      ...lane.marks.map((mark) => Date.parse(mark.at)),
-      ...(lane.life ? [Date.parse(lane.life.from)] : []),
-    ]),
+    story.marks.map((mark) => Date.parse(mark.at)),
     now,
     toScale,
   );
   const nowX = axis.x(now);
 
-  const say =
-    page === "database"
-      ? copyAt
-        ? `${owner}'s database was last copied off the server on ${day(copyAt)}.`
-        : `${owner}'s database has no copy off the server on record.`
-      : story.createdAt
-        ? `${countWord(n)} ${n === 1 ? "volume has" : "volumes have"} kept the data since ${day(story.createdAt)}.`
-        : `${countWord(n)} ${n === 1 ? "volume keeps" : "volumes keep"} the data.`;
-  const sub =
-    page === "database"
-      ? [
-          checked && `It last passed its check ${when(checked)}`,
-          guard.restore && `a restore test passed ${when(guard.restore.at)}`,
-        ]
-          .filter(Boolean)
-          .join(", and ")
-          .concat(
-            checked || guard.restore ? ". Nothing newer is on record." : "",
-          )
-      : [
-          story.keptAt &&
-            `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`,
-          copyAt
-            ? `The newest copy off the server is from ${when(copyAt)}.`
-            : "No copy off the server is on record.",
-        ]
-          .filter(Boolean)
-          .join(" ");
-  const ask =
-    page === "database"
-      ? {
-          label: "Ask Server Guy to back it up now",
-          draft: `Back up ${owner}'s database now and verify the copy.`,
-        }
-      : {
-          label: "Ask Server Guy to measure them",
-          draft:
-            "Measure how much space each volume and the server's disk use.",
-        };
-  const note =
-    page === "database"
-      ? `As recorded: nothing here is observed live.${guard.schedule ? ` ${guard.schedule.words.split(",")[0]} are scheduled, so newer copies may exist; none is on record here.` : ""}`
-      : `As recorded: nothing here is observed live.${story.volumes.some((item) => item.sizeGb == null) ? " Sizes and disk use aren't measured yet." : ""}`;
+  const say = copyAt
+    ? `${owner}'s database was last copied off the server on ${day(copyAt)}.`
+    : `${owner}'s database has no copy off the server on record.`;
+  const sub = [
+    checked && `It last passed its check ${when(checked)}`,
+    guard.restore && `a restore test passed ${when(guard.restore.at)}`,
+  ]
+    .filter(Boolean)
+    .join(", and ")
+    .concat(checked || guard.restore ? ". Nothing newer is on record." : "");
+  const note = `As recorded: nothing here is observed live.${guard.schedule ? ` ${guard.schedule.words.split(",")[0]} are scheduled, so newer copies may exist; none is on record here.` : ""}`;
 
   return (
-    <section
-      className="axdt"
-      aria-label={page === "database" ? "Database" : "Storage"}
-    >
+    <section className="axdt" aria-label="Database">
       {head}
       {activity}
       <div className="axdt-lede">
@@ -407,10 +302,12 @@ export function TimelineDirection({
         <button
           type="button"
           className="ax-button axdt-ask"
-          onClick={() => onAsk(ask.draft)}
+          onClick={() =>
+            onAsk(`Back up ${owner}'s database now and verify the copy.`)
+          }
         >
           <ChatCircleText weight="bold" />
-          {ask.label}
+          Ask Server Guy to back it up now
         </button>
       </div>
 
@@ -458,10 +355,6 @@ export function TimelineDirection({
 
           {lanes.map((lane) => {
             const gapX = lane.gap ? axis.x(Date.parse(lane.gap.from)) : 0;
-            const lifeX = lane.life ? axis.x(Date.parse(lane.life.from)) : 0;
-            const seenX = lane.life?.seen
-              ? axis.x(Date.parse(lane.life.seen))
-              : lifeX;
             return (
               <div key={lane.id} className="axdt-lane" data-c={lane.c}>
                 <div className="axdt-lane-head">
@@ -477,20 +370,6 @@ export function TimelineDirection({
                   </span>
                 </div>
                 <div className="axdt-track">
-                  {lane.life && (
-                    <span
-                      className="axdt-life"
-                      data-kind={lane.life.kind}
-                      aria-hidden="true"
-                      style={
-                        {
-                          left: `${lifeX}%`,
-                          width: `${nowX - lifeX}%`,
-                          "--seen": `${((seenX - lifeX) / Math.max(nowX - lifeX, 0.01)) * 100}%`,
-                        } as CSSProperties
-                      }
-                    />
-                  )}
                   {axis.folds.map((fold) => (
                     <i
                       key={fold.id}
@@ -559,16 +438,14 @@ export function TimelineDirection({
                               </button>
                             </header>
                             <p>{mark.detail}</p>
-                            {lane.action && (
-                              <button
-                                type="button"
-                                className="ax-textlink"
-                                onClick={lane.action.run}
-                              >
-                                {lane.action.label}
-                                <ArrowRight weight="bold" />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="ax-textlink"
+                              onClick={lane.action.run}
+                            >
+                              {lane.action.label}
+                              <ArrowRight weight="bold" />
+                            </button>
                           </div>
                         )}
                       </Fragment>

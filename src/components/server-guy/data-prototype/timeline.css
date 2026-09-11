@@ -1,7 +1,7 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction B for Database and Storage, Timeline. Prefix: axdt-. Overview's
-   lanes, with the quiet stretches folded; "To scale" slides every moment to
-   its clock time, the one movement on the page. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Database.
+   Timeline. Prefix: axdt-. Overview's lanes, with the quiet stretches
+   folded; "To scale" slides every moment to its clock time, the one
+   movement on the page. */
 
 .axdt {
   display: grid;
@@ -218,11 +218,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.axdt-lane-text b code {
-  font-family: var(--ax-mono);
-  font-size: 12.5px;
-  letter-spacing: 0;
-}
 .axdt-lane-text small {
   display: inline-flex;
   align-items: center;
@@ -325,31 +320,6 @@
   right: 0;
 }
 
-/* A volume's life, from the deployment to now. */
-.axdt-life {
-  position: absolute;
-  top: 50%;
-  z-index: 1;
-  height: 12px;
-  margin-top: -6px;
-  border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    #bccdf6 0 var(--seen),
-    #e3e9fa var(--seen) 100%
-  );
-  transition:
-    left var(--axdt-move),
-    width var(--axdt-move);
-}
-.axdt-life[data-kind="files"] {
-  background: linear-gradient(
-    90deg,
-    #c9d1de 0 var(--seen),
-    #eceff4 var(--seen) 100%
-  );
-}
-
 /* The stretch since this last happened, named where it ends. */
 .axdt-gap {
   position: absolute;
@@ -433,10 +403,6 @@
   box-shadow:
     0 0 0 3px #ffffff,
     inset 0 0 0 2.5px var(--ax-blue);
-}
-.axdt-ev[data-tone="info"] {
-  width: 12px;
-  height: 12px;
 }
 .axdt-ev:hover,
 .axdt-ev[data-lit],

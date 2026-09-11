@@ -86,32 +86,17 @@ It reads the stack derived from the deployment and the checks the
 deployment passed for each process; nothing is observed live. With nothing
 recorded, the shipped page stands in.
 
-## Database and Storage: three directions (`data-prototype/`)
+## Database: Timeline (`data-prototype/`)
 
-On `opus-ui-improvements`, not chosen yet. The owner doubted Transit would
-carry these pages, so none of the three uses the line. Each draws both
-pages from the same record: where the data lives, the check that read the
-database, the volumes and the container replacement that kept them, the
-backup plan (`persistentState`) and the backup and restore operations on
-record. Sizes and disk use appear only once measured, and until then each
-page says so. With nothing recorded, the shipped page stands in.
-
-- **A · Cutaway.** The server opened up, in section: its processes above
-  the disk, a mount line from each into the volume it writes, `grafana.db`
-  inside its volume, and the copy off the server outside, joined by a
-  dashed arrow. Database brings the database forward and dims the rest;
-  Storage shows every volume and what survives a container replacement or
-  losing the server. Pointing at a process lights its mount; a part opens
-  its facts below.
-- **B · Timeline.** Overview's lanes. Database: the database check, copies
-  off the server and restore tests. Storage: each volume's life, the
-  copies, and the disk as a ghost. Quiet stretches longer than two hours
-  fold, so minutes of work and two quiet days share one line, and "To
-  scale" slides every moment to its clock time. The stretch since the
-  newest copy is shaded and named, and Little Server stands at now.
-- **C · Answers.** No diagram: the questions you come with, each answered
-  in a sentence, with its dated record under it and the exact values a
-  click away. Storage adds a grid of what survives what, volume by volume.
+Chosen from three directions that don't use Transit's line. Overview's
+lanes, for the database: the check that read it, its copies off the server
+and its restore tests. Quiet stretches longer than two hours fold, so
+minutes of work and two quiet days share one line, and "To scale" slides
+every moment to its clock time. The stretch since the newest copy is shaded
+and named, and Little Server stands at now. Nothing is observed live:
+scheduled backups may have run since the newest copy on record, and the page
+says so. With nothing recorded, the shipped page stands in. Storage still
+shows the shipped page.
 
 ## What is invented
 
@@ -146,7 +131,8 @@ On 11 Sep the owner loved Architecture and its data flows but found the
 entrance animation too much, and asked for a balance so the app doesn't
 become all diagrams. For Deployment and History they chose Transit ("D is
 great, let's take it"), and later its Line for Processes too. For Database
-and Storage they asked for new directions, doubting the line fits there.
+they asked for directions without the line and chose the Timeline; Storage
+goes on to a round of its own with Backups.
 
 ## Where the exploration lives
 
@@ -156,4 +142,6 @@ exploded-server (Three.js) directions with their kits, Overview's note and
 console directions, and the mascot family; on `claude/deployment-history`,
 Deployment and History's Story, Narrated and Replay directions and the first
 round's Ledger; on `claude/processes-database`, the Machine and Console
-directions for Processes and Database.
+directions for Processes and Database; on `claude/database-storage`, the
+Cutaway and Answers directions for Database and Storage, and the Timeline's
+Storage page.

@@ -1,4 +1,4 @@
-// PROTOTYPE · opus-ui-improvements · throwaway.
+// PROTOTYPE · opus-ui-improvements · chosen for Processes and Database.
 // What the Processes and Database pages say, from the deployment record, its
 // derived stack and the recorded operations: what runs, how a visit reaches
 // it, what each process was checked with and when, where the data lives and
@@ -82,12 +82,9 @@ export interface StackStory {
   from: string | null;
   processes: ProcessCard[];
   database: DataStore | null;
-  files: { name: string; owner: string; mount: string; note: string | null }[];
   protection: Protection;
   processChanges: Change[];
-  dataChanges: Change[];
   processGaps: Gap[];
-  dataGaps: Gap[];
 }
 
 const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -270,20 +267,6 @@ export function buildStackStory({
           : null,
       }
     : null;
-  const files = stack.volumes
-    .filter((item) => item.kind === "files")
-    .map((item) => {
-      const user = processes.find((process) => process.name === item.usedBy);
-      const retention = user?.command?.match(
-        /--storage\.tsdb\.retention\.time=(\d+)d\b/,
-      )?.[1];
-      return {
-        name: item.name,
-        owner: user?.product ?? item.usedBy,
-        mount: item.mount,
-        note: retention ? `keeps ${retention} days` : null,
-      };
-    });
 
   // ---- What protects it: the protection facts when a capability records
   // them, otherwise the backup operations on record.
@@ -371,15 +354,8 @@ export function buildStackStory({
     from: record?.httpSourceIp ?? null,
     processes,
     database,
-    files,
     protection,
     processChanges: changesFor((op) => op.destinations.includes("processes")),
-    dataChanges: changesFor(
-      (op) =>
-        op.destinations.includes("database") ||
-        op.source.type === "backup" ||
-        op.source.type === "restore",
-    ),
     processGaps: [
       {
         id: "watch",
@@ -397,33 +373,6 @@ export function buildStackStory({
                 "None declared. Server Guy adds them when the application declares background work.",
             },
           ]),
-    ],
-    dataGaps: [
-      ...(facts.database
-        ? []
-        : [
-            {
-              id: "size",
-              title: "Size and growth",
-              detail: "Not measured yet.",
-            },
-          ]),
-      ...(protection.schedule
-        ? []
-        : [
-            {
-              id: "backups",
-              title: "Scheduled backups",
-              detail:
-                "Not set up. Ask Server Guy in the conversation to set them up.",
-            },
-          ]),
-      {
-        id: "logs",
-        title: "Database logs",
-        detail:
-          "Not collected separately. The application's own logs are on the Logs page.",
-      },
     ],
   };
 }
