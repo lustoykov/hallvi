@@ -13,7 +13,20 @@ Runs Server Guy's own web app, worker, records, Pi runtime and executor against 
 | SSH | [`bin/ssh`](bin/ssh) runs each host command with the local shell and Docker engine, mapping `/opt/server-guy` and `/run/lock` into the rig directory. Cloud-init waiting and the metadata guard are skipped, so the event "Metadata access restricted" is not true in this rig. [`bin/flock`](bin/flock) emulates util-linux `flock`. |
 | Published HTTP | [`stand-ins/native-compose.ts`](stand-ins/native-compose.ts.txt) binds executed listeners to loopback; retained snapshots and facts keep what Pi authored. |
 
-On macOS with Docker Desktop, the shell transport cannot run the scheduled-backup installer (systemd) or the runner (it reads volume data from host paths). Backup proofs need a Linux host.
+On macOS with Docker Desktop, the shell transport cannot run the scheduled-backup installer (systemd) or the runner (it reads volume data from host paths). Backup proofs use Rig B.
+
+## Rig B: a Linux host container
+
+[`host/start.mjs`](host/start.mjs) runs [`host/Dockerfile`](host/Dockerfile): Ubuntu with systemd as PID 1, its own dockerd with Compose, and Python for the backup runner, publishing HTTP on 127.0.0.1:80. With `--host-container <name>`, `rig.mjs` sends every host command, unchanged, to `docker exec` in that container, where the product's real paths, systemd units and host-path volume reads apply. The native-compose stand-in is not used. Storage is MinIO inside the host as `https://s3.rig.amazonaws.com`, which satisfies the product's S3 endpoint rule. A rig CA is trusted only by the host's `server-guy-*` units, through a systemd drop-in that stands in for a public certificate authority. The bucket is created inside MinIO's own network namespace, because that name also resolves publicly.
+
+- The host masks `systemd-binfmt` and runs systemd in a private cgroup namespace. `binfmt_misc` is one table for the whole Docker Desktop VM: an unmasked systemd erased the engine's Rosetta handler for amd64, which broke every other amd64 container until it was restored (see the [follow-up plan](../../docs/testing/2026-09-11-bookstack-followups.md)).
+- Rig B and Rig A both need 127.0.0.1:80, so run one at a time.
+- Rerun `start.mjs` after the host container restarts: Docker rewrites `/etc/hosts`.
+
+```bash
+node tests/rig/host/start.mjs
+SG_RIG_PI_SETTINGS=/path/to/pi-settings.json node tests/rig/rig.mjs rigb 3397 --host-container sg-rig-host
+```
 
 ## Running
 

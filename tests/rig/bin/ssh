@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// Rig stand-in for SSH to the provider-created "server" (127.0.0.1): run the
-// host command with this machine's shell and Docker engine. Host paths under
-// /opt/server-guy and /run/lock map to SG_RIG_HOST_ROOT. Every invocation is
-// logged (command prefix, duration, exit) as transport evidence.
+// Rig stand-in for SSH to the provider-created "server" (127.0.0.1). Rig A
+// runs each host command with this machine's shell and Docker engine, with
+// host paths under /opt/server-guy and /run/lock mapped to SG_RIG_HOST_ROOT.
+// Rig B (SG_RIG_HOST_CONTAINER) runs it unchanged as root inside that Linux
+// host container (tests/rig/host), whose real paths, systemd and dockerd
+// the product uses. Every invocation is logged (command prefix, duration,
+// exit) as transport evidence.
 "use strict";
 const { appendFileSync } = require("node:fs");
 const { spawn } = require("node:child_process");
 const { join } = require("node:path");
 
 const root = process.env.SG_RIG_HOST_ROOT;
+const container = process.env.SG_RIG_HOST_CONTAINER;
 if (!root) {
   console.error("SG_RIG_HOST_ROOT is not set");
   process.exit(255);
@@ -16,13 +20,15 @@ if (!root) {
 const original = process.argv.at(-1) ?? "";
 // Only the host's per-deployment paths: a path inside a container, such as
 // /opt/server-guy/check.php in a check command, must pass through unchanged.
-let command = original
-  .replace(
-    /\/opt\/server-guy\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
-    `${root}/opt/server-guy/`,
-  )
-  .replaceAll("/run/lock/", `${root}/run/lock/`);
-let note = "";
+let command = container
+  ? original
+  : original
+      .replace(
+        /\/opt\/server-guy\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
+        `${root}/opt/server-guy/`,
+      )
+      .replaceAll("/run/lock/", `${root}/run/lock/`);
+let note = container ? `host container ${container}` : "";
 if (command.includes("server-guy-metadata-guard")) {
   // Cloud metadata firewalling has no equivalent on this machine.
   command = "true";
@@ -32,18 +38,35 @@ if (command.includes("server-guy-metadata-guard")) {
     /cloud-init status --wait\s*>\s*\/dev\/null\s*&&\s*/,
     "",
   );
-  note = "cloud-init wait skipped";
+  note = `${note ? `${note}; ` : ""}cloud-init wait skipped`;
 }
 const started = Date.now();
-const child = spawn("sh", ["-c", command], {
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    SSH_CONNECTION: "127.0.0.1 50000 127.0.0.1 22",
-    // The recommended host is x86; builds and pulls target it.
-    DOCKER_DEFAULT_PLATFORM: "linux/amd64",
-  },
-});
+// The recommended host is x86; builds and pulls target it.
+const child = container
+  ? spawn(
+      "docker",
+      [
+        "exec",
+        "-i",
+        "-e",
+        "DOCKER_DEFAULT_PLATFORM=linux/amd64",
+        "-e",
+        "SSH_CONNECTION=127.0.0.1 50000 127.0.0.1 22",
+        container,
+        "sh",
+        "-c",
+        command,
+      ],
+      { stdio: "inherit" },
+    )
+  : spawn("sh", ["-c", command], {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        SSH_CONNECTION: "127.0.0.1 50000 127.0.0.1 22",
+        DOCKER_DEFAULT_PLATFORM: "linux/amd64",
+      },
+    });
 child.on("exit", (code, signal) => {
   appendFileSync(
     join(root, "ssh.log"),

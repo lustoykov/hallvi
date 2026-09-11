@@ -24,7 +24,12 @@ if (deployment?.status !== "awaiting-approval")
   throw new Error(
     `Deployment is ${deployment?.status ?? "missing"}, not awaiting approval.`,
   );
-const names = deployment.native.inputs;
+// The controller generates declared random values itself; the card asks
+// only for the rest.
+const generated = Object.keys(deployment.native.inputGenerators ?? {});
+const names = deployment.native.inputs.filter(
+  (name) => !generated.includes(name),
+);
 const reasons = deployment.native.inputReasons ?? {};
 const value = (name) =>
   /APP_URL|PUBLIC_URL|BASE_URL/.test(name)

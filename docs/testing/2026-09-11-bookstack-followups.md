@@ -10,11 +10,17 @@ Principle: support applications through declared requirements with the smallest 
 | --- | --- | --- |
 | Preserve audit rig and evidence | done | `425e4e7`. Reproducible rig in `tests/rig/`; raw evidence under ignored `tests/results/bookstack-audit-2026-09-11/`. |
 | P1 Pi investigates from any conversation | done | `a7f5bee`. Accepted in the Rig A replay with real Pi (below). |
-| P2 Verification expresses behavior | in progress | Criterion commands run in the application's containers with private inputs on SSH stdin; results recorded per attempt; one-shot services through Compose's `service_completed_successfully`. |
-| P3 State protection beyond managed PostgreSQL | planned | Declared state owners and procedures; runner without service-name assumptions; isolated full-stack restore; destination connection. |
-| Enabling: generated secrets, public URL, registries | planned | |
-| UI correctness | planned | Recorded attempts for Deployment history; no simulated or invented states in production views. |
-| Proofs | in progress | Rig A replay for P1 done. P2 acceptance continues from Pi's proposed correction release. Rig B (Linux host container, MinIO) for P3. One generalization stack. |
+| P2 Verification expresses behavior | done | `66e30a6`. Accepted in Rig A: Pi's correction release proved the owner's login and rejected the defaults with a recorded command check. |
+| P3 State protection beyond managed PostgreSQL | code done, acceptance running | `8a912e4`: declared owners and dump procedures, unlabeled owners, owner-image scope and rollback, runner without `app`, isolated dump restore with content fingerprints. BookStack acceptance runs on Rig B. |
+| Enabling: generated secrets, public URL, registries, storage connection | done | `8381572`. |
+| UI correctness | done | `1db37f3`: Deployment history from recorded attempts; no exploration bar, invented scenarios or simulated Check now in production views; stale claims removed. |
+| Proofs | in progress | Rig A replay for P1 and P2 done. Rig B (Linux host container, TLS MinIO) runs the BookStack deployment, backup and isolated restore. One generalization stack to follow. |
+
+## Incident: Rig B erased the machine's amd64 emulation (15:45–16:02 UTC)
+
+The first Rig B host container ran systemd as PID 1, privileged, with the engine's cgroup namespace. At boot, `systemd-binfmt` cleared `binfmt_misc`, a single table for the whole Docker Desktop VM. This removed Docker Desktop's Rosetta handler for amd64 binaries. Every amd64 container on the machine could no longer start new processes. For about 17 minutes, other agents' `sg-fe64777e-*` containers failed their health checks with `exec /usr/bin/curl: exec format error`; their running processes were not restarted or touched. Rig B's own first intake also failed because Pi's amd64 workspace could not start.
+
+Remediation, nothing restarted: I stopped the rig host, then re-registered the VM's own Rosetta handler (`/run/rosetta/rosetta`, flags `OCF`) and the one other entry the VM declares in `/etc/binfmt.d`, from the VM's mount namespace. An amd64 container then ran `uname -m` as `x86_64`. The rig image now masks `systemd-binfmt` and the `binfmt_misc` mounts, and runs systemd in a private cgroup namespace. Rig B's first intake failure stays in its records as an environment failure.
 
 ## Current findings
 

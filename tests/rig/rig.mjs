@@ -6,19 +6,22 @@
 //     to GitHub read-only and unauthenticated.
 //   - Hetzner API (stand-ins/hetzner.ts): a provider that "creates" a server
 //     at 127.0.0.1 and keeps its state in the rig directory.
-//   - SSH (bin/ssh, first on PATH): runs each host command with this
+//   - SSH (bin/ssh, first on PATH). Rig A runs each host command with this
 //     machine's shell and Docker engine, mapping /opt/server-guy and
-//     /run/lock into the rig directory. bin/flock emulates util-linux flock.
-// Transport only: stand-ins/native-compose.ts binds published listeners to
-// loopback, the provider firewall's role. Retained snapshots, facts and scope
-// checks keep what Pi authored. The checkout itself is never modified; the
-// copy, records and host files live under tests/results/rig/<name>, which Git
-// ignores. Only the Pi settings file is copied; the credential it names is
-// read in place by Pi's runtime.
+//     /run/lock into the rig directory (bin/flock and bin/timeout emulate
+//     util-linux and coreutils), and stands-ins/native-compose.ts binds
+//     published listeners to loopback, the provider firewall's role. Rig B
+//     (--host-container) runs each command unchanged as root in a Linux host
+//     container with systemd and its own dockerd (tests/rig/host).
+// Retained snapshots, facts and scope checks keep what Pi authored. The
+// checkout itself is never modified; the copy, records and host files live
+// under tests/results/rig/<name>, which Git ignores. Only the Pi settings file
+// is copied; the credential it names is read in place by Pi's runtime.
 //
 // Usage:
 //   SG_RIG_PI_SETTINGS=<pi-settings.json> node tests/rig/rig.mjs <name> <port>
 //     [--state-from <another rig root>]   replay: copy records and host files
+//     [--host-container <container>]      Rig B: tests/rig/host/start.mjs
 import {
   cpSync,
   createWriteStream,
@@ -37,10 +40,15 @@ const source = resolve(rig, "../..");
 const [name, portText, ...rest] = process.argv.slice(2);
 if (!name || !/^[a-z0-9-]+$/.test(name) || !portText)
   throw new Error(
-    "Usage: node tests/rig/rig.mjs <name> <port> [--state-from <dir>]",
+    "Usage: node tests/rig/rig.mjs <name> <port> [--state-from <dir>] [--host-container <name>]",
   );
+const option = (flag) => {
+  const index = rest.indexOf(flag);
+  return index >= 0 ? rest[index + 1] : null;
+};
 const port = Number(portText);
-const from = rest[0] === "--state-from" ? resolve(rest[1]) : null;
+const from = option("--state-from") ? resolve(option("--state-from")) : null;
+const hostContainer = option("--host-container");
 const results = join(source, "tests/results/rig");
 const root = join(results, name);
 const app = join(root, "app");
@@ -80,14 +88,17 @@ if (fresh) {
     join(rig, "stand-ins/hetzner.ts.txt"),
     join(app, "src/server/hetzner.ts"),
   );
-  renameSync(
-    join(app, "src/server/native-compose.ts"),
-    join(app, "src/server/native-compose-real.ts"),
-  );
-  cpSync(
-    join(rig, "stand-ins/native-compose.ts.txt"),
-    join(app, "src/server/native-compose.ts"),
-  );
+  // A real host container publishes through its own port mapping instead.
+  if (!hostContainer) {
+    renameSync(
+      join(app, "src/server/native-compose.ts"),
+      join(app, "src/server/native-compose-real.ts"),
+    );
+    cpSync(
+      join(rig, "stand-ins/native-compose.ts.txt"),
+      join(app, "src/server/native-compose.ts"),
+    );
+  }
   writeFileSync(
     join(root, "manifest.json"),
     JSON.stringify(
@@ -96,12 +107,13 @@ if (fresh) {
         commit: git("rev-parse", "HEAD"),
         localChanges: git("status", "--porcelain") !== "",
         replayedFrom: from,
+        hostContainer,
         standIns: [
           "github-api.ts",
           "hetzner.ts",
-          "native-compose.ts",
-          "bin/ssh",
-          "bin/flock",
+          ...(hostContainer
+            ? [`bin/ssh → docker exec ${hostContainer}`]
+            : ["native-compose.ts", "bin/ssh", "bin/flock", "bin/timeout"]),
         ],
       },
       null,
@@ -143,6 +155,7 @@ const env = {
   SERVER_GUY_TRACING: "0",
   SG_RIG_MIRROR_DIR: join(results, "upstream"),
   SG_RIG_HOST_ROOT: host,
+  ...(hostContainer ? { SG_RIG_HOST_CONTAINER: hostContainer } : {}),
   PATH: `${join(rig, "bin")}:${process.env.PATH}`,
 };
 for (const key of Object.keys(env))
@@ -195,7 +208,9 @@ function shutdown(signal) {
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => shutdown(signal));
 
-console.log(JSON.stringify({ root, port, fresh, replayedFrom: from }));
+console.log(
+  JSON.stringify({ root, port, fresh, replayedFrom: from, hostContainer }),
+);
 launch("worker", ["--import", "tsx", "src/worker.ts"]);
 launch("next", [
   join(source, "node_modules/next/dist/bin/next"),
