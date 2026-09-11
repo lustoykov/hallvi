@@ -11,6 +11,7 @@ export type MascotMood =
   | "dancing"
   | "celebrating"
   | "waving"
+  | "pointing"
   | "resting";
 export type MascotDance =
   "shuffle" | "robot" | "floss" | "backflip" | "cartwheel";
@@ -75,8 +76,8 @@ export function MascotScene({
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
-    camera.position.set(0.8, 1.95, 6.25);
-    camera.lookAt(0, 1.05, 0);
+    camera.position.set(0.8, 2.0, 6.45);
+    camera.lookAt(0, 1.12, 0);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x647089, 2.2));
     const light = new THREE.DirectionalLight(0xffffff, 3.3);
     light.position.set(-3, 6, 4);
@@ -125,10 +126,27 @@ export function MascotScene({
     mesh(1.38, 0.72, 0.08, 0.12, 0x192338, 0, 1.4, 0.735);
     for (let i = 0; i < 6; i++)
       mesh(0.035, 0.28, 0.025, 0.013, 0x647089, -0.35 + i * 0.14, 0.61, 0.738);
-    mesh(0.38, 0.035, 0.32, 0.045, 0xd6e0f0, 0.32, 2.01, -0.15);
+    mesh(0.38, 0.035, 0.32, 0.045, 0xd6e0f0, 0, 2.01, 0.1);
     const feet = [-0.49, 0.49].map((x) =>
       mesh(0.32, 0.16, 0.82, 0.07, 0x3e4a60, x, 0.13, 0.02),
     );
+    // Two antennas that act like ears: they sway, perk up, droop and wiggle
+    // with the mood, and their tips glow.
+    const antennaTips: THREE.MeshStandardMaterial[] = [];
+    const antennas = [-1, 1].map((side) => {
+      const antenna = new THREE.Group();
+      antenna.position.set(side * 0.5, 2.0, -0.32);
+      body.add(antenna);
+      const base = mesh(0.2, 0.09, 0.2, 0.04, 0x3e4a60, 0, 0.03, 0);
+      const stalk = mesh(0.075, 0.5, 0.075, 0.035, 0x3e4a60, 0, 0.3, 0);
+      const tip = mesh(0.17, 0.17, 0.17, 0.075, 0xe4edff, 0, 0.6, 0);
+      const glow = tip.material as THREE.MeshStandardMaterial;
+      glow.emissive.set(0x9dbbff);
+      glow.emissiveIntensity = 0.35;
+      antennaTips.push(glow);
+      antenna.add(base, stalk, tip);
+      return antenna;
+    });
     const eyes = [-eyeGap, eyeGap].map((x) =>
       mesh(0.115, 0.25, 0.035, 0.05, 0xedf3ff, x, faceY, faceZ),
     );
@@ -232,6 +250,9 @@ export function MascotScene({
       wrist.add(palm, thumb);
       return { shoulder, elbow, wrist };
     });
+    // A finger stub turns a held-out mitten into a point.
+    const finger = mesh(0.085, 0.2, 0.085, 0.04, 0xedf3ff, 0, -0.2, 0.02);
+    arms[1].wrist.add(finger);
     const clipboard = new THREE.Group();
     arms[0].wrist.add(clipboard);
     clipboard.position.set(-0.06, 0.17, 0.16);
@@ -256,26 +277,36 @@ export function MascotScene({
         ),
       );
     }
+    // The wrench is held out from the body, head up, so its silhouette reads
+    // on its own: a steel shank and open jaw, a navy grip in the mitten.
     const wrench = new THREE.Group();
     arms[1].wrist.add(wrench);
-    wrench.position.set(0.025, 0.14, 0.15);
-    wrench.rotation.z = -0.2;
-    wrench.add(mesh(0.105, 0.58, 0.085, 0.04, 0x647089, 0, 0.12));
-    wrench.add(mesh(0.29, 0.14, 0.1, 0.045, 0x647089, 0, 0.44));
-    for (const side of [-1, 1]) {
-      const jaw = mesh(0.09, 0.2, 0.1, 0.025, 0x647089, side * 0.13, 0.55);
-      jaw.rotation.z = -side * 0.3;
-      wrench.add(jaw);
-    }
-    const ringGeo = new THREE.TorusGeometry(0.075, 0.028, 8, 20);
-    geometries.push(ringGeo);
-    const ring = new THREE.Mesh(
-      ringGeo,
-      new THREE.MeshStandardMaterial({ color: 0x647089 }),
+    wrench.position.set(0.02, -0.02, 0.14);
+    wrench.rotation.z = -1.25;
+    const steel = 0x8a97ad;
+    const shank = mesh(0.1, 0.66, 0.06, 0.03, steel, 0, 0.13);
+    const shankMaterial = shank.material as THREE.MeshStandardMaterial;
+    shankMaterial.metalness = 0.3;
+    shankMaterial.roughness = 0.34;
+    wrench.add(
+      shank,
+      mesh(0.13, 0.27, 0.085, 0.04, 0x192338, 0, -0.06),
+      mesh(0.14, 0.035, 0.09, 0.015, 0x285ad8, 0, 0.15),
     );
-    materials.push(ring.material);
-    ring.position.y = -0.21;
-    wrench.add(ring);
+    const jawGeo = new THREE.TorusGeometry(
+      0.125,
+      0.048,
+      10,
+      28,
+      Math.PI * 1.45,
+    );
+    geometries.push(jawGeo);
+    const jaw = new THREE.Mesh(jawGeo, shankMaterial);
+    jaw.castShadow = true;
+    jaw.position.y = 0.56;
+    // The gap of the open end faces up.
+    jaw.rotation.z = Math.PI * 0.775;
+    wrench.add(jaw);
     const floorGeo = new THREE.PlaneGeometry(200, 200);
     const floorMat = new THREE.ShadowMaterial({ opacity: 0.14 });
     geometries.push(floorGeo);
@@ -318,7 +349,8 @@ export function MascotScene({
       previousGesture = state.current.gesture,
       moodStart = performance.now(),
       previousDanceRequest = 0,
-      danceStart = -Infinity;
+      danceStart = -Infinity,
+      reach = 0;
     const render = (t: number) => {
       frame = requestAnimationFrame(render);
       if (document.hidden || !visible) return;
@@ -381,13 +413,26 @@ export function MascotScene({
         current === "celebrating" || current === "waving" || dancing;
       const celebrate = current === "celebrating";
       const waving = current === "waving";
+      const pointing = current === "pointing";
+      // One eased value carries the whole pose in and out, so the caller's
+      // timer decides the hold.
+      reach = still
+        ? pointing
+          ? 1
+          : 0
+        : THREE.MathUtils.lerp(reach, pointing ? 1 : 0, 0.14);
+      // Out first, then one tap down toward what he means; held after it lands.
+      const tap =
+        pointing && !still ? THREE.MathUtils.smoothstep(elapsed, 560, 820) : 1;
       const animatedGreeting = !still && elapsed < 2600;
       const blink = !still && t % 5700 > 5500;
+      // A point turns him toward what he means, below and to his right.
       body.rotation.y = still
         ? 0
         : THREE.MathUtils.lerp(
             body.rotation.y,
-            pointerX * 0.16 +
+            pointerX * 0.16 * (1 - reach) +
+              reach * 0.28 +
               (checking ? -0.08 : Math.sin(t * 0.00055) * 0.025),
             0.06,
           );
@@ -407,6 +452,11 @@ export function MascotScene({
           : checking
             ? 0.06
             : pointerY * 0.06;
+      // He looks down and leans in toward what he points at.
+      if (!still) {
+        body.rotation.x += reach * 0.09;
+        body.rotation.z -= reach * 0.05;
+      }
       body.position.y =
         celebrate && animatedGreeting
           ? Math.abs(Math.sin(elapsed * 0.007)) * 0.16 * (1 - elapsed / 2600)
@@ -467,23 +517,58 @@ export function MascotScene({
               : checking && i === 0
                 ? 0.7
                 : 1;
-        eye.position.x = (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0);
+        // When he points he glances down toward it, brows raised and level.
+        eye.position.x =
+          (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0) + reach * 0.06;
+        eye.position.y = faceY - reach * 0.04;
         eye.rotation.z = attention ? (i === 0 ? -0.12 : 0.12) : 0;
         (eye.material as THREE.MeshStandardMaterial).color.set(
           attention ? 0xf0c37b : 0xedf3ff,
         );
         happyEyes[i].visible = happy;
-        brows[i].visible = checking || attention;
+        brows[i].visible = checking || attention || reach > 0.3;
+        brows[i].position.y = faceY + 0.19 + reach * 0.035;
         brows[i].rotation.z = attention
           ? i === 0
             ? -0.22
             : 0.22
-          : i === 0
-            ? 0.15
-            : -0.08;
+          : (i === 0 ? 0.15 : -0.08) * (1 - reach);
       });
       clipboard.visible = checking;
       wrench.visible = working;
+      finger.visible = reach > 0.05;
+      antennas.forEach((antenna, i) => {
+        const side = i === 0 ? -1 : 1;
+        let outward = resting ? 0.62 : attention ? 0.02 : 0.12;
+        let lean = working ? 0.3 : checking ? 0.18 : 0;
+        if (checking && i === 1) outward = 0.3;
+        if (!still) {
+          if (dancing && danceActive) outward += danceStep * side * 0.3;
+          else if (happy && animatedGreeting)
+            outward += Math.sin(elapsed * 0.02 + i * 1.3) * 0.25;
+          else if (checking) outward += Math.sin(t * 0.006 + i) * 0.05;
+          else if (!resting && !attention)
+            outward += Math.sin(t * 0.0021 + i * 1.7) * 0.035;
+          if (working) lean += Math.sin(t * 0.007) * 0.06;
+        }
+        // When he points, both lean forward and toward what he means.
+        lean += reach * 0.15;
+        const tilt = -side * outward - reach * 0.22;
+        antenna.rotation.z = still
+          ? tilt
+          : THREE.MathUtils.lerp(antenna.rotation.z, tilt, 0.15);
+        antenna.rotation.x = still
+          ? lean
+          : THREE.MathUtils.lerp(antenna.rotation.x, lean, 0.12);
+        const glow = antennaTips[i];
+        glow.color.set(attention ? 0xf6d9a8 : 0xe4edff);
+        glow.emissive.set(attention ? 0xf0a64b : 0x9dbbff);
+        glow.emissiveIntensity = resting
+          ? 0.06
+          : (checking || working) && !still
+            ? 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.008 + i * Math.PI))
+            : 0.35;
+      });
       arms.forEach((arm, i) => {
         const side = i === 0 ? -1 : 1;
         let angle = side * 0.13,
@@ -507,7 +592,8 @@ export function MascotScene({
         arm.shoulder.rotation.x = 0;
         arm.shoulder.rotation.y = 0;
         arm.elbow.rotation.z = 0;
-        arm.wrist.rotation.z = 0;
+        arm.wrist.rotation.z =
+          working && i === 1 && !still ? Math.sin(t * 0.007) * 0.2 : 0;
         if (dancing) {
           if (routine === "floss") {
             // Both hands sweep together; the torso counter-swings.
@@ -532,9 +618,24 @@ export function MascotScene({
           }
         }
         if (attention && i === 0) angle = -0.7;
-        arm.shoulder.rotation.z = still
-          ? angle
-          : THREE.MathUtils.lerp(arm.shoulder.rotation.z, angle, 0.12);
+        // The right arm reaches out, then taps down toward the log below
+        // him, set directly so the tap lands at 820 ms, with the label.
+        const reaching = i === 1 && reach > 0.001;
+        if (reaching) {
+          angle = THREE.MathUtils.lerp(
+            angle,
+            THREE.MathUtils.lerp(1.15, 0.7, tap),
+            reach,
+          );
+          elbow = THREE.MathUtils.lerp(elbow, 0, reach);
+          arm.shoulder.rotation.x =
+            THREE.MathUtils.lerp(-0.4, -0.85, tap) * reach;
+          arm.wrist.rotation.z = THREE.MathUtils.lerp(0.1, 0.2, tap) * reach;
+        }
+        arm.shoulder.rotation.z =
+          still || reaching
+            ? angle
+            : THREE.MathUtils.lerp(arm.shoulder.rotation.z, angle, 0.12);
         arm.elbow.rotation.x = checking && i === 0 ? -0.25 : elbow;
       });
       // Rotate around the character's center, with a clean takeoff and landing.

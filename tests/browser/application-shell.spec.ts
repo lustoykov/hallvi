@@ -184,39 +184,26 @@ test(
     await expect(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
+    // Architecture is the journeys map: follow a journey, open a part.
     await nav
       .getByRole("button", { name: "Architecture", exact: true })
       .click();
-    const node = page.getByRole("button", {
-      name: /^Application: Application shell acceptance/,
+    const journeys = page.getByRole("radiogroup", {
+      name: "Follow a journey",
     });
-    await expect(node).toHaveAttribute("transform", "translate(365,224)");
-    await node.focus();
-    await node.press("ArrowRight");
-    await expect(node).toHaveAttribute("transform", "translate(381,224)");
-    const box = await node.boundingBox();
-    await page.mouse.move(box!.x + 50, box!.y + 40);
-    await page.mouse.down();
-    await page.mouse.move(box!.x + 100, box!.y + 80, { steps: 5 });
-    await page.mouse.up();
-    const moved = await node.getAttribute("transform");
-    expect(moved).not.toBe("translate(381,224)");
-    await page.reload();
-    await expect(node).toHaveAttribute("transform", moved!);
-    await page.getByRole("button", { name: "Pause motion" }).click();
-    await expect(page.locator(".sg-topology")).not.toHaveClass(
-      /sg-topology-motion/,
-    );
-    await page.getByRole("button", { name: "Reset layout" }).click();
-    await expect(node).toHaveAttribute("transform", "translate(365,224)");
+    await expect(journeys).toBeVisible();
+    const data = journeys.getByRole("radio", { name: "Your data" });
+    await data.click();
+    await expect(data).toHaveAttribute("aria-checked", "true");
+    await page
+      .getByRole("button", { name: /^Application shell acceptance, / })
+      .click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(
-      page.getByRole("button", { name: "Resume motion" }),
-    ).toBeInViewport();
-    await expect(
-      page.getByRole("button", { name: "Reset layout" }),
-    ).toBeInViewport();
+    await expect(journeys).toBeInViewport();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,

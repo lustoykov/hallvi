@@ -1,0 +1,469 @@
+/* PROTOTYPE · claude/architecture-directions · throwaway.
+   The Overview page around its top section: what needs you, the map in
+   miniature, recent work and ideas. Prefix: axo-. The top section, the
+   Timeline, has its own file. */
+
+.axo {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  padding-top: 10px;
+}
+.axo .axj3-head {
+  margin-bottom: 2px;
+}
+
+/* ---------- What needs you: only what is real, and unmistakable ---------- */
+
+.axo-needs {
+  display: grid;
+  gap: 10px;
+  margin: -4px 18px 18px 144px;
+}
+.axo-need {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px 13px 13px;
+  border: 1px solid var(--ax-failed-line);
+  border-radius: 14px;
+  background: var(--ax-failed-bg);
+  animation: axo-rise 420ms var(--ax-ease-out) both;
+}
+.axo-need[data-tone="waiting"] {
+  border-color: var(--ax-waiting-line);
+  background: var(--ax-waiting-bg);
+}
+.axo-need-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--ax-failed);
+  animation: axo-breathe 2.4s ease-in-out infinite;
+}
+.axo-need[data-tone="waiting"] .axo-need-icon {
+  color: var(--ax-amber);
+  animation: none;
+}
+.axo-need-icon svg {
+  width: 17px;
+  height: 17px;
+}
+.axo-need b {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-need p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axo-need-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+@keyframes axo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes axo-breathe {
+  0% {
+    box-shadow: 0 0 0 0 rgb(166 49 43 / 24%);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgb(166 49 43 / 0%);
+  }
+}
+
+/* ---------- Ideas: one quiet line, at the foot of the page ---------- */
+
+.axo-quiet-wrap {
+  display: grid;
+  gap: 10px;
+}
+.axo-quiet {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ax-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color var(--ax-base),
+    background-color var(--ax-base);
+}
+.axo-quiet:hover,
+.axo-quiet[aria-expanded="true"] {
+  color: var(--ax-ink-2);
+  background: #eef1f6;
+}
+.axo-quiet svg {
+  width: 15px;
+  height: 15px;
+}
+.axo-quiet .axo-caret {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axo-quiet[aria-expanded="true"] .axo-caret {
+  transform: rotate(180deg);
+}
+.axo-ideas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.axo-idea {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px dashed #c9d1de;
+  border-radius: 14px;
+  background: #fbfcfe;
+  animation: axo-rise 380ms var(--ax-ease-out) both;
+}
+.axo-idea:nth-child(2) {
+  animation-delay: 60ms;
+}
+.axo-idea:nth-child(3) {
+  animation-delay: 120ms;
+}
+.axo-idea b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-idea b svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ax-muted);
+}
+.axo-idea p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axo-idea .ax-textlink {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+/* ---------- The map in miniature, and recent work ---------- */
+
+.axo-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.axo-map {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 12px 12px 40px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f4f6fa 100%);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axo-map:hover {
+  border-color: var(--ax-working-line);
+  box-shadow: 0 18px 36px -28px rgb(23 34 56 / 40%);
+}
+.axo-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.axo-map-open {
+  position: absolute;
+  left: 18px;
+  bottom: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ax-link);
+}
+.axo-map-open svg {
+  width: 13px;
+  height: 13px;
+  transition: transform var(--ax-base) var(--ax-ease-out);
+}
+.axo-map:hover .axo-map-open svg {
+  transform: translateX(3px);
+}
+.axo-map-server {
+  fill: #ffffff;
+  stroke: #dfe5ee;
+  stroke-width: 2;
+}
+.axo-map-rule {
+  stroke: #e6ebf2;
+  stroke-width: 2;
+}
+.axo-map-title {
+  font-size: 25px;
+  font-weight: 600;
+  fill: var(--ax-ink);
+}
+.axo-map-private {
+  fill: rgb(238 243 255 / 80%);
+  stroke: #c3d3f3;
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+.axo-map-shelf {
+  fill: #eef2f7;
+  stroke: #e0e6ef;
+  stroke-width: 2;
+}
+.axo-map-wall {
+  fill: none;
+  stroke: #cdd5e1;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 9 12 15 12;
+}
+.axo-map-wire {
+  fill: none;
+  stroke: #d3dbe7;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.axo-map-wire.j-release {
+  stroke-dasharray: 2 9;
+}
+.axo-map-lit {
+  fill: none;
+  stroke: #6f8ff0;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.axo-map-dot {
+  fill: #ffffff;
+  stroke: #285ad8;
+  stroke-width: 3;
+}
+.axo-map-door rect {
+  fill: #ffffff;
+  stroke: #c9d2df;
+  stroke-width: 2;
+}
+.axo-map-door text {
+  font-size: 21px;
+  font-weight: 650;
+  fill: var(--ax-ink-2);
+}
+.axo-map-card rect {
+  fill: #ffffff;
+  stroke: #dfe5ee;
+  stroke-width: 2;
+}
+.axo-map-card text {
+  font-size: 23px;
+  font-weight: 600;
+  fill: var(--ax-ink);
+}
+.axo-map-card[data-c="planned"] rect,
+.axo-map.is-planned .axo-map-server {
+  stroke-dasharray: 8 6;
+}
+.axo-map-card[data-c="failed"] rect {
+  stroke: #e2aaa5;
+  fill: #fff6f5;
+}
+.axo-map-card.is-checking rect {
+  stroke: var(--ax-blue);
+  animation: axo-map-check 900ms ease-in-out infinite;
+}
+@keyframes axo-map-check {
+  50% {
+    stroke-width: 5;
+  }
+}
+.axo-map-ghost rect {
+  fill: none;
+  stroke: #c3ccda;
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+.axo-map-ghost text {
+  font-size: 22px;
+  font-weight: 600;
+  fill: var(--ax-faint);
+}
+.axo-recent {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+.axo-recent h2 {
+  margin: 0 0 6px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axo-recent-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ax-base);
+}
+.axo-recent-row:hover:not(:disabled) {
+  background: #f5f7fb;
+}
+.axo-recent-row:disabled {
+  cursor: default;
+}
+.axo-recent-row b {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axo-recent-row small {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axo-recent .ax-textlink {
+  justify-self: start;
+  margin: 6px 0 0 6px;
+}
+.axo-recent-empty {
+  margin: 4px 6px;
+  font-size: 13px;
+  color: var(--ax-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axo-need,
+  .axo-need-icon,
+  .axo-idea,
+  .axo-map-card.is-checking rect {
+    animation: none !important;
+  }
+}
+:root[data-ax-motion="reduced"] .axo-need,
+:root[data-ax-motion="reduced"] .axo-need-icon,
+:root[data-ax-motion="reduced"] .axo-idea,
+:root[data-ax-motion="reduced"] .axo-map-card.is-checking rect {
+  animation: none !important;
+}
+.axo-idea-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+/* Pointing at what needs you lights its part; what is wrong pings. */
+.axo-map-card rect,
+.axo-map-door rect {
+  transition:
+    stroke 260ms,
+    stroke-width 260ms,
+    fill 260ms;
+}
+.axo-map-card:hover > rect:not(.axo-map-halo),
+.axo-map-door:hover rect {
+  stroke: #9fb4f5;
+  stroke-width: 3;
+}
+.axo-map-card.is-highlight > rect:not(.axo-map-halo) {
+  stroke: var(--ax-blue);
+  stroke-width: 5;
+}
+.axo-map-card.is-highlight[data-c="failed"] > rect:not(.axo-map-halo) {
+  stroke: var(--ax-failed);
+  fill: #fdeceb;
+}
+.axo-map-card[data-c] .axo-map-halo {
+  fill: none;
+  stroke: #a6312b;
+  stroke-width: 4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: axo-map-ping 1.8s ease-out infinite;
+}
+.axo-map-card[data-c] .axo-map-halo.is-still {
+  animation: none;
+  opacity: 0.35;
+}
+@keyframes axo-map-ping {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+.axo-map[data-host="failed"] .axo-map-server {
+  stroke: #e2aaa5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .axo-map-card[data-c] .axo-map-halo {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
+/* Little Server, placed by each direction rather than pinned to a corner. */
+.axo-mascot.axj2-mascot {
+  position: relative;
+  left: auto;
+  top: auto;
+}
+.axo-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
