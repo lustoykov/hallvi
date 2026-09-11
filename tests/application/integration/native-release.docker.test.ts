@@ -204,6 +204,8 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => {
         ? {
             session: {
               prompt: () => host.session!(options.customTools),
+              // The planner journals session events; scripts emit none.
+              subscribe: () => () => {},
               waitForIdle: async () => {},
               getLastAssistantText: () => "",
               dispose: () => {},
@@ -1819,6 +1821,7 @@ it.skipIf(!proof)(
       expect(
         host.prepared.map((entry) => [entry.stage, entry.accepted]),
       ).toEqual([
+        ["intake", false],
         ["intake", false],
         ["intake", true],
         ["execution", true],
