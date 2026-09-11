@@ -27,6 +27,12 @@ On macOS with Docker Desktop, the shell transport cannot run the scheduled-backu
 ```bash
 node tests/rig/host/start.mjs
 SG_RIG_PI_SETTINGS=/path/to/pi-settings.json node tests/rig/rig.mjs rigb 3397 --host-container sg-rig-host
+# A second host beside the first, publishing its HTTP on another local port.
+# The provider stand-in records 127.0.0.1 for every rig, so public checks reach
+# whichever host owns port 80: stop the first host's container, then forward.
+node tests/rig/host/start.mjs sg-rig-host-hc 8082
+docker stop sg-rig-host && node tests/rig/host/forward.mjs 80 8082 &
+SG_RIG_WORKFLOW=tests/results/rig/workflow-hc SG_RIG_PI_SETTINGS=/path/to/pi-settings.json node tests/rig/rig.mjs rigb-hc 3399 --host-container sg-rig-host-hc
 ```
 
 ## Running
@@ -38,6 +44,6 @@ SG_RIG_PI_SETTINGS=/path/to/.server-guy/pi-settings.json node tests/rig/rig.mjs 
 
 `--state-from <rig root>` starts a new rig from another rig's records and host files, to replay an earlier state with changed code. Change a mirror's default branch by editing its `head.json`.
 
-Helpers: [`tools/watch.mjs`](tools/watch.mjs) streams record changes; [`tools/journal.mjs`](tools/journal.mjs) prints Pi workspace journals; [`tools/releases.mjs`](tools/releases.mjs) diffs recorded releases; [`tools/wait-op.mjs`](tools/wait-op.mjs) waits for an operation. The [BookStack scripts](bookstack/) are the owner's side of a trial: the card approval with generated private values, operation decisions, a credential probe, and a workflow that logs in through BookStack's forms and verifies content and upload hashes. Their per-run state, including the disposable instance's test credentials, stays in `tests/results/rig/workflow/` (override with `SG_RIG_WORKFLOW`).
+Helpers: [`tools/watch.mjs`](tools/watch.mjs) streams record changes; [`tools/journal.mjs`](tools/journal.mjs) prints Pi workspace journals; [`tools/releases.mjs`](tools/releases.mjs) diffs recorded releases; [`tools/wait-op.mjs`](tools/wait-op.mjs) waits for an operation. The [Healthchecks script](healthchecks/healthchecks.mjs) signs in through Healthchecks' own login form, adds a check with a marker name and pings it. The [BookStack scripts](bookstack/) are the owner's side of a trial: the card approval with generated private values, operation decisions, a credential probe, and a workflow that logs in through BookStack's forms and verifies content and upload hashes. Their per-run state, including the disposable instance's test credentials, stays in `tests/results/rig/workflow/` (override with `SG_RIG_WORKFLOW`).
 
 Evidence from the first trial: [BookStack audit](../../docs/testing/2026-09-11-bookstack-audit.md).
