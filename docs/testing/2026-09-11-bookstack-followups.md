@@ -11,10 +11,10 @@ Principle: support applications through declared requirements with the smallest 
 | Preserve audit rig and evidence | done | `425e4e7`. Reproducible rig in `tests/rig/`; raw evidence under ignored `tests/results/bookstack-audit-2026-09-11/`. |
 | P1 Pi investigates from any conversation | done | `a7f5bee`. Accepted in the Rig A replay with real Pi (below). |
 | P2 Verification expresses behavior | done | `66e30a6`. Accepted in Rig A: Pi's correction release proved the owner's login and rejected the defaults with a recorded command check. |
-| P3 State protection beyond managed PostgreSQL | code done, acceptance running | `8a912e4`: declared owners and dump procedures, unlabeled owners, owner-image scope and rollback, runner without `app`, isolated dump restore with content fingerprints. BookStack acceptance runs on Rig B. |
+| P3 State protection beyond managed PostgreSQL | done | `8a912e4`, `b69454e`, `cedbd23`: declared owners and dump procedures, unlabeled database owners, owner-image scope and rollback, runner without `app`, isolated dump restore with content fingerprints. Accepted on Rig B: MariaDB, uploads and config backed up through Pi; the product's restore test and an independent full-application restore both passed (below). |
 | Enabling: generated secrets, public URL, registries, storage connection | done | `8381572`. |
 | UI correctness | done | `1db37f3`: Deployment history from recorded attempts; no exploration bar, invented scenarios or simulated Check now in production views; stale claims removed. |
-| Proofs | in progress | Rig A replay for P1 and P2 done. Rig B (Linux host container, TLS MinIO) runs the BookStack deployment, backup and isolated restore. One generalization stack to follow. |
+| Proofs | done | Rig A replay for P1 and P2. Rig B (Linux host container, TLS MinIO) for BookStack: deployment, backup, the product's restore test and an independent full-application restore. Generalization with Healthchecks: deployment and behavior checks verified; its backup failed because its container ignores SIGTERM (below). |
 
 ## Incident: Rig B erased the machine's amd64 emulation (15:45–16:02 UTC)
 
@@ -49,6 +49,18 @@ Remediation, nothing restarted: I stopped the rig host, then re-registered the V
   - **Product restore test.** Pi proposed it after the backup. It verified the archive, all 153 files and the backup identity. It loaded the dump into a fresh instance with no network and required Pi's fingerprint to match the source's.
   - **Receipt bug.** The receipt the controller reads dropped `database-content`, because the runner's sanitized view did not list it. The runner, the receipt schema and the Backups fact now carry it. A dump restore is credited only when that check is recorded.
   - **Independent full-application restore (harness, `tests/rig/host/restore-check.py`).** It used only the downloaded archive: the inventory matched, and the dump loaded with the same fingerprint. The whole stack came up in 12 s as a separate project with no ports and internal networks. On that network, BookStack rejected the defaults and accepted the owner. It served the marker page and image, and the attachment and image bytes matched their original SHA-256.
+- **Generalization: Healthchecks (actual Pi, Rig B).** It is a different stack: Django, on the managed PostgreSQL slot. Given the same kind of plain request, Pi recommended:
+  - an owner-supplied superuser email and password, and a generated `SECRET_KEY` only;
+  - `SITE_ROOT` from `${SERVER_GUY_PUBLIC_URL}`, with registration closed and debug off;
+  - an HTTP check on the login page;
+  - two command checks: the owner's credentials authenticate, and an HTTP ping is recorded and the alert worker processes it.
+
+  It also declared its own dump procedure for the managed PostgreSQL volume, which the controller already dumps and restores. The product accepted both, so the same database would be captured twice. Since `d91ee27`, preparation returns that as retryable feedback; this run predates the fix. To free port 80 for this run, I stopped BookStack's containers once BookStack's evidence was complete.
+
+  The first attempt passed the login page and the owner's login. Pi's ping-and-worker check used a Django field that does not exist. Pi corrected that check under its name and kept its assertions. The second attempt verified all three checks: the superuser authenticates, and an HTTP ping is recorded and the alert worker marks an overdue check down.
+
+  The first Healthchecks backup failed with `source-stop-failed`. The container ignored SIGTERM for the whole 120-second grace period and was killed (exit 137), so the runner refused the copy and restarted the application. Asked to prove a restore, Pi advised retrying the backup. It had no way to know why the backup failed, because the operation recorded no reason. Since `99d490d`, the operation carries the recorded reason. The container's stop handling still needs a correction, such as a stop signal the image honours; Pi could propose one now that it can read the reason.
+- **Misleading read error (fixed).** While planning Healthchecks, Pi read upstream paths that do not exist. `read_repository` reported each one as "The repository is missing or this login cannot access it", although the repository and commit had resolved. It now returns `kind: "missing"` for such a path.
 - **P1 replay (actual Pi, local Docker, stand-in GitHub/Hetzner/SSH).** The replay rig copied the audit's final records and used its still-running containers. In a new conversation, given only the symptom, Pi called `inspect_runtime`, read the deployed bootstrap under `.server-guy/current/`, read LinuxServer's upstream `init-custom-files` runner with `read_repository` to confirm custom init files run under Bash, identified the PHP-under-Bash failure, and proposed a correction with `prepare_release` at the deployed revision, with instructions that require proving the owner's login works and the defaults fail. It did not propose recreation. One intervention recreated the symptom: `tests/rig/bookstack/bookstack.mjs reset-default` returned the administrator to BookStack's published defaults through its own forms (the rollback had already restored the broken bootstrap).
 - Compose 2.40.3 `up --wait` succeeds when a `service_completed_successfully` dependency exits 0 and fails when it exits non-zero, so the host script already distinguishes a completed one-shot from a crash; only verification wrongly required every container to keep running.
 - `docker compose exec -e NAME` takes the value from the calling environment, so check inputs travel on SSH standard input, never on a command line.
@@ -57,6 +69,4 @@ Remediation, nothing restarted: I stopped the rig host, then re-registered the V
 
 ## Next actions
 
-1. Rig B: deploy BookStack through the product, add content, back up through Pi, restore into an isolated target, and verify page content and attachment hashes.
-2. One small generalization stack.
-3. Final account in the PR description.
+The final account is in PR #49. The smallest next step: during the product's restore test, boot the restored stack in isolation and run the recorded command checks against it. [`restore-check.py`](../../tests/rig/host/restore-check.py) already shows the generic shape.
