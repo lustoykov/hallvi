@@ -730,23 +730,33 @@ def container_states(command, ids):
     }
 
 
-def verify_source_identity(config, states):
+def verify_source_identity(config, states, definition=None):
     """The running application must be the deployment this config protects.
 
     Without this a redeploy would be captured and then filed under the old
     revision, so it is checked before the source is touched at all. Every
     running container the controller labeled must carry this deployment and
-    revision, whatever its service is called; state owners run unlabeled so
-    a release never recreates them, and the configuration hash covers them.
+    revision, whatever its service is called. With the host's Compose
+    definition, whose hash the caller has matched, the labeled services are
+    exactly those it labels; state owners run unlabeled so a release never
+    recreates them, and the hash alone binds a stack that runs only them.
     """
-    labeled = [
-        value
-        for value in states.values()
-        if {"server-guy.deployment", "server-guy.revision"} & set(value["labels"])
-    ]
-    # Running containers the controller never labeled are not this deployment.
-    if not labeled:
-        raise BackupError("capture", "source-identity-mismatch")
+    if definition is not None:
+        expected = {
+            name
+            for name, service in definition["services"].items()
+            if "server-guy.revision" in (service.get("labels") or {})
+        }
+        labeled = [value for value in states.values() if value["service"] in expected]
+    else:
+        labeled = [
+            value
+            for value in states.values()
+            if {"server-guy.deployment", "server-guy.revision"} & set(value["labels"])
+        ]
+        # Running containers the controller never labeled are not this one.
+        if not labeled:
+            raise BackupError("capture", "source-identity-mismatch")
     for value in labeled:
         if (
             value["labels"].get("server-guy.deployment") != config["deploymentId"]
@@ -1101,7 +1111,7 @@ def capture_stack(config, state, run_id, command, staging):
         or not all(v["running"] for v in states.values())
     ):
         raise BackupError("capture", "source-not-running")
-    verify_source_identity(config, states)
+    verify_source_identity(config, states, definition)
     consumers = {v["service"]: (container, v) for container, v in states.items()}
     project = compose_project(config["deploymentId"])
     # A dumped volume is captured through its owner, never copied as files.

@@ -1879,14 +1879,17 @@ class ScheduledBackupTest(unittest.TestCase):
 
     # Declared owner dumps
 
-    def dump_stack(self):
+    def dump_stack(self, web_labels=None):
         """A web service writes files and a database it does not own; the
         owner dumps it with its recorded commands; a migration job has
         finished. No service is called app or postgres."""
         image = "mariadb:11.4@sha256:" + "e" * 64
         source = self.source_stack(
             {
-                "web": {"image": "example/shelf:2"},
+                "web": {
+                    "image": "example/shelf:2",
+                    **({"labels": web_labels} if web_labels else {}),
+                },
                 "db": {
                     "image": image,
                     "environment": {
@@ -2039,6 +2042,33 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertEqual(changed["outcome"], "failed")
         self.assertEqual(changed["errorCode"], "database-check-failed")
         self.assertTrue(changed["cleanupComplete"])
+
+    def test_stack_identity_follows_the_labels_its_definition_declares(self):
+        # A service the definition labels must run this revision.
+        config, docker = self.dump_stack(
+            web_labels={"server-guy.revision": "rev-9"}
+        )
+        docker.labels = {
+            "server-guy.deployment": DEPLOYMENT,
+            "server-guy.revision": "rev-10",
+        }
+        state = self.state(config)
+        run_id = str(uuid.uuid4())
+        with self.assertRaises(runner.BackupError) as raised:
+            runner.capture_stack(config, state, run_id, docker, state.stage(run_id))
+        self.assertEqual(raised.exception.code, "source-identity-mismatch")
+        self.assertEqual([call[:2] for call in docker.calls].count(("docker", "stop")), 0)
+        # Owners and writers the definition leaves unlabeled are bound by the
+        # configuration hash the run already matched.
+        config, docker = self.dump_stack()
+        docker.labels = {}
+        result = runner.perform_run(
+            config,
+            self.state(config),
+            storage_factory=self.storage(FakeClient()),
+            command=docker,
+        )
+        self.assertEqual(result["outcome"], "succeeded", result["errorCode"])
 
     def test_state_directories_are_private(self):
         state = self.state()

@@ -200,14 +200,18 @@ export function currentFacts(
 }
 
 /**
- * Services whose state outlives application releases: the managed database
- * and every declared owner. They keep their image unless the owner approves
- * a change, and releases leave them unlabeled so a label never recreates them.
+ * Services whose database state outlives application releases: the managed
+ * database and every declared owner of a database volume, whose on-disk
+ * format belongs to its version. They keep their image unless the owner
+ * approves a change, and releases leave them unlabeled so a label never
+ * recreates them. An owner of files is recorded but upgrades freely.
  */
 export function stateOwners(facts: Pick<ReleaseFacts, "database" | "volumes">) {
   return new Set([
     ...(facts.database ? [facts.database.service] : []),
-    ...facts.volumes.flatMap((volume) => (volume.owner ? [volume.owner] : [])),
+    ...facts.volumes.flatMap((volume) =>
+      volume.owner && volume.kind === "database" ? [volume.owner] : [],
+    ),
   ]);
 }
 

@@ -785,7 +785,8 @@ export async function prepareNativeRelease(input: {
           new Set([
             ...(baseline.database ? [baseline.database.service] : []),
             ...[...baseline.volumes, ...(selection.data ?? [])].flatMap(
-              (item) => (item.owner ? [item.owner] : []),
+              (item) =>
+                item.owner && item.kind === "database" ? [item.owner] : [],
             ),
           ]),
           signal,
