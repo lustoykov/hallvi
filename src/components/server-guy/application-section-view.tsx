@@ -16,6 +16,8 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
+import { ArchitecturePrototype } from "./architecture-prototype";
+import { OverviewPrototype } from "./overview-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
@@ -66,6 +68,13 @@ const descriptions: Record<ApplicationSection, string> = {
  * the recorded stack and the facts each capability records; a resource the
  * application does not have never gets an empty control.
  */
+// The redesigned Overview and Architecture are opt-in: development only, and
+// only with NEXT_PUBLIC_SERVER_GUY_PROTOTYPES=1, so CI, the browser tests and
+// every other dev server keep the shipped pages.
+const prototypes =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_SERVER_GUY_PROTOTYPES === "1";
+
 export function ApplicationSectionView({
   section,
   view,
@@ -236,32 +245,86 @@ export function ApplicationSectionView({
       content = null;
       break;
   }
+  const header = (
+    <header className="sg-section-header">
+      <div>
+        <h1>
+          {applicationSections.find((item) => item.id === section)?.label}
+        </h1>
+        <p>{descriptions[section]}</p>
+      </div>
+      {(live || facts.releases?.serving) && address && (
+        <div className="sg-open-application">
+          <a
+            className="sg-section-open-app"
+            href={address}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open application <ArrowSquareOut aria-hidden="true" />
+          </a>
+          {currentFacts(deployment ?? null)?.httpAccess === "controller" && (
+            <small>Restricted to the controller’s network</small>
+          )}
+        </div>
+      )}
+    </header>
+  );
+  // PROTOTYPE (claude/architecture-directions): the chosen Overview and
+  // Architecture designs, shown only when asked for. The prototype receives
+  // the page's chrome so it can draw its own header.
+  if (section === "overview" && prototypes)
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <OverviewPrototype
+          application={app}
+          deployment={deployment}
+          facts={facts}
+          operations={operations}
+          chats={view.chats}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{ bar, header, activity: null }}
+          current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
+  if (section === "architecture" && prototypes)
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <ArchitecturePrototype
+          application={app}
+          deployment={deployment}
+          facts={facts}
+          operations={operations}
+          chats={view.chats}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <ArchitectureCanvas
+              application={app}
+              deployment={deployment}
+              stack={stack}
+              facts={facts}
+              onOpenDestination={onOpenDestination}
+            />
+          }
+        />
+      </div>
+    );
   return (
     <div className={`sg-section-page sg-section-${section}`}>
       {bar}
-      <header className="sg-section-header">
-        <div>
-          <h1>
-            {applicationSections.find((item) => item.id === section)?.label}
-          </h1>
-          <p>{descriptions[section]}</p>
-        </div>
-        {(live || facts.releases?.serving) && address && (
-          <div className="sg-open-application">
-            <a
-              className="sg-section-open-app"
-              href={address}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open application <ArrowSquareOut aria-hidden="true" />
-            </a>
-            {currentFacts(deployment ?? null)?.httpAccess === "controller" && (
-              <small>Restricted to the controller’s network</small>
-            )}
-          </div>
-        )}
-      </header>
+      {header}
       {section === "architecture" ? (
         <>
           {activity && <div className="sg-section-activity">{activity}</div>}
