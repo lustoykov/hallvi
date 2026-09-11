@@ -66,13 +66,21 @@ export function proposeAgentChange(
     | "run-backup"
     | "test-restore",
   backupPolicy?: { schedule: "daily" | "six-hourly"; keep: number },
+  restoreChecks?: unknown[],
 ) {
   if (
     action === "configure-backups" ||
     action === "run-backup" ||
     action === "test-restore"
   )
-    return proposeBackupOperation(applicationId, action, backupPolicy, chatId);
+    return proposeBackupOperation(
+      applicationId,
+      action,
+      action === "test-restore" && restoreChecks
+        ? { ...backupPolicy, checks: restoreChecks }
+        : backupPolicy,
+      chatId,
+    );
   if (action === "deployment") {
     requestDeployment(applicationId, chatId, "server-guy");
     return operationContext(applicationId);

@@ -12,6 +12,8 @@ import { releaseOf } from "./deployment-release";
 import { verifyRelease, releaseSecrets } from "./release-executor";
 import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
 import { recordOperationRemoteEffect } from "./application-operations";
+import { recordCheck, resolvePendingCommand } from "./command-checks";
+import type { CheckResult } from "./deployment-runtime";
 
 const receiptSchema = z.strictObject({
   attemptId: z.uuid(),
@@ -107,6 +109,48 @@ export async function reconcileRelease(
         message: `The host command finished unsuccessfully during ${receipt.phase} (exit ${receipt.exitCode}). Inspect diagnostics and correct the configuration within the existing scope.`,
       };
     }
+    // A command check whose reply was lost may have changed data. The host's
+    // record of it decides: never started, still running, lost, or done.
+    let resolved: CheckResult | undefined;
+    if (record.commandPending) {
+      const pending = record.commandPending;
+      const outcome = await resolvePendingCommand(record, signal);
+      if (outcome.kind === "running")
+        return {
+          ok: false,
+          retryable: false,
+          message: `Command check ${pending.name} is still running on the host (started ${pending.startedAt}, limit ${pending.timeoutSeconds} s). Call reconcile_release again once that limit has passed; nothing runs again before then.`,
+        };
+      if (outcome.kind === "lost")
+        return {
+          ok: false,
+          retryable: false,
+          message: `Command check ${pending.name} started on the host at ${pending.startedAt}, but no result was recorded within its limit: whether it completed, and what it changed, is unknown. Inspect the container with inspect_runtime and report it; nothing runs again under this operation. Only the owner's retry of this work, or a new approval, accepts that the command may run again.`,
+        };
+      record.commandPending = null;
+      if (outcome.kind === "never-started") {
+        deploymentEvent(
+          record,
+          `Reconciled command check ${pending.name}: it never started on the host, so nothing changed.`,
+        );
+        return {
+          ok: true,
+          retryable: true,
+          message: `Command check ${pending.name} never started on the host, so nothing changed. Verification can run again under this scope.`,
+        };
+      }
+      resolved = outcome.result;
+      deploymentEvent(
+        record,
+        `Reconciled command check ${pending.name} from the host's record: exit ${resolved.status}, ${resolved.passed ? "passed" : "failed"}.`,
+      );
+      if (!resolved.passed)
+        return {
+          ok: true,
+          retryable: true,
+          message: `Command check ${pending.name} finished with exit ${resolved.status} (resolved from the host's record). Output: ${resolved.output?.slice(-1200) || "none"}. Correct the configuration within the existing scope.`,
+        };
+    }
     const result = await runDeploymentAttempt(
       record,
       "reconcile",
@@ -118,6 +162,7 @@ export async function reconcileRelease(
         recordOperationRemoteEffect();
         invalidateDeploymentRuntime(record);
         saveDeployment(record);
+        if (resolved) recordCheck(record, resolved);
         return verifyRelease(record, release, signal);
       },
       release,

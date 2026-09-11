@@ -33,6 +33,14 @@ vi.mock("../../../src/server/native-compose", async (original) => ({
 vi.mock("../../../src/server/deployment-source", () => ({
   checkDeploymentSource: async () => ({ token: "synthetic" }),
 }));
+vi.mock("../../../src/server/github-api", async (original) => ({
+  ...(await original<object>()),
+  githubJson: async () => ({ data: { sha: "a".repeat(40) } }),
+}));
+vi.mock("../../../src/server/container-images", () => ({
+  pinContainerImage: async (reference: string) =>
+    `${reference.split(":")[0]}@sha256:${"c".repeat(64)}`,
+}));
 vi.mock("../../../src/server/deployment-source-files", () => ({
   deploymentSourceFiles: async () => ({
     paths: ["Dockerfile", "app.py"],
@@ -73,8 +81,17 @@ import {
   requestDeployment,
   saveDeployment,
 } from "../../../src/server/deployment-store";
-import { claimOperation, operation } from "../../../src/server/operation-store";
-import { runInitialRelease } from "../../../src/server/application-releases";
+import {
+  claimOperation,
+  operation,
+  startChange,
+} from "../../../src/server/operation-store";
+import {
+  proposeApplicationRelease,
+  runApplicationRelease,
+  runInitialRelease,
+} from "../../../src/server/application-releases";
+import { executeOperation } from "../../../src/server/application-operations";
 import { invalidateDeploymentRuntime } from "../../../src/server/deployment-lifecycle";
 import { ReleaseExecutionError } from "../../../src/server/release-executor";
 import {
@@ -456,4 +473,201 @@ it("keeps a verified execution when Pi's session is interrupted afterwards", asy
   const saved = getDeployment(record.id)!;
   expect(saved.status).toBe("live");
   expect(saved.lifecycle!.runtime.state).toBe("verified");
+});
+
+/** The first execution fails and the session stops: the deployment stops. */
+async function stopped(change?: (native: NativeConfiguration) => void) {
+  const record = await approved();
+  if (change) {
+    const r = getDeployment(record.id)!;
+    change(r.native!);
+    r.releaseId = releaseOf(r)!.id;
+    r.authority!.releaseId = r.releaseId;
+    saveDeployment(r);
+  }
+  model.execute.mockImplementation(async (r, release) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 1,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "dependency failed to start: container mariadb is unhealthy",
+      true,
+      "replace",
+    );
+  });
+  model.plan.mockImplementationOnce(async () => {
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("stopped");
+  // The worker records the stop, as runDeploymentWorker does.
+  const failed = getDeployment(record.id)!;
+  failed.status = "failed";
+  failed.error = "The agent stopped without a completed release.";
+  saveDeployment(failed);
+  expect(operation(`deployment:${failed.id}`)).toMatchObject({
+    state: "failed",
+    blocksQueue: true,
+  });
+  return getDeployment(record.id)!;
+}
+const verified =
+  (image: string) =>
+  async (r: DeploymentRecord, release: DeploymentRelease) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    Object.assign(r, {
+      serviceImages: { app: image },
+      imageId: image,
+      verifiedAt: new Date().toISOString(),
+    });
+    return { behavior: "passed", evidence: "Verified the first deployment" };
+  };
+
+it("a stopped first deployment continues from a conversation under its approval: an ordinary correction resumes it with Pi's instructions", async () => {
+  const record = await stopped();
+  expect(record.status).toBe("failed");
+  // Pi found the cause in a conversation; no new approval is needed.
+  const resumed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "The initializer waits for a healthcheck the image does not define; add mariadb's documented healthcheck.",
+  );
+  expect(resumed).toMatchObject({
+    state: "working",
+    source: { type: "deployment" },
+  });
+  const continued = getDeployment(record.id)!;
+  expect(continued.status).toBe("deploy-queued");
+  expect(continued.operationId).toBe(resumed.id);
+  expect(continued.correction).toMatchObject({
+    chatId: chat,
+    instructions: expect.stringContaining("documented healthcheck"),
+  });
+  expect(
+    continued.events.some((e) =>
+      e.message.startsWith("Correction requested from a conversation"),
+    ),
+  ).toBe(true);
+  // The worker claims the retried operation and the session gets the
+  // correction, then finishes the same deployment on the same host.
+  expect(claimOperation(resumed.id)?.executorPid).toBe(process.pid);
+  const image = `sha256:${"e".repeat(64)}`;
+  model.prepare.mockImplementation(async ({ deploymentId }) =>
+    native(deploymentId, (service) => {
+      service.healthcheck = { test: ["CMD", "true"] };
+    }),
+  );
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.initial).toBe(true);
+    expect(options.context).toContain(
+      "Correction requested from the owner's conversation",
+    );
+    expect(options.context).toContain("documented healthcheck");
+    expect(options.context).toContain(
+      "previous execution under this authorization failed",
+    );
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  const claimed = getDeployment(record.id)!;
+  claimed.status = "deploying";
+  saveDeployment(claimed);
+  await expect(
+    runInitialRelease(claimed, new AbortController().signal),
+  ).resolves.toBe("Verified the first deployment");
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.serverId).toBe(7);
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(operation(resumed.id)!.state).toBe("verified");
+});
+
+it("a state owner's image change on a stopped first deployment is a release the owner approves, which finishes the deployment", async () => {
+  // The app owns its SQLite volume, so its image is protected.
+  const record = await stopped((native) => {
+    native.data[0].owner = "app";
+  });
+  const owned = getDeployment(record.id)!;
+  await expect(
+    proposeApplicationRelease(
+      app,
+      chat,
+      undefined,
+      "Switch the image",
+      undefined,
+      {
+        services: ["worker"],
+        evidence: "Same data format",
+      },
+    ),
+  ).rejects.toThrow("not a declared owner");
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Run the maintained image instead; it initializes the same data files.",
+    undefined,
+    { services: ["app"], evidence: "Both images read the same SQLite schema." },
+  );
+  expect(proposed.summary).toContain(
+    "Continue this application's first deployment on its prepared host",
+  );
+  expect(proposed.summary).toContain("Allow changing the image of app");
+  expect(proposed.summary).toContain(
+    "Both images read the same SQLite schema.",
+  );
+  const scope = (
+    operation(proposed.id)!.command as {
+      scope: { initial?: boolean; baselineReleaseId: string };
+    }
+  ).scope;
+  expect(scope.initial).toBe(true);
+  expect(scope.baselineReleaseId).toBe(owned.releaseId);
+  // The owner approves; the release changes the image and makes it live.
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.prepare.mockImplementation(async ({ deploymentId }) => {
+    const changed = native(deploymentId, (service) => {
+      delete service.build;
+      service.image = `ghcr.io/qa/notes@sha256:${"c".repeat(64)}`;
+    });
+    changed.data[0].owner = "app";
+    return changed;
+  });
+  const image = `sha256:${"f".repeat(64)}`;
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.initial).toBe(true);
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await executeOperation(started, () =>
+    runApplicationRelease(started, new AbortController().signal),
+  );
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.url).toBe("http://203.0.113.7");
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(live.lifecycle!.runtime.state).toBe("verified");
+  expect(operation(started.id)!.state).toBe("verified");
+  // The stopped deployment's own operation no longer needs a decision.
+  expect(operation(`deployment:${record.id}`)!.resolvedById).toBe(started.id);
+  expect(JSON.stringify(live)).not.toContain(SECRET);
 });

@@ -845,7 +845,8 @@ it.each<{ limit: string; v1: Change; v2: Change; reason: string }>([
       n.database!.version = "17";
       n.resolved.services.postgres.image = "postgres:17";
     },
-    reason: "database",
+    // The managed database is a state owner: its image stays as it runs.
+    reason: "postgres owns persistent data",
   },
   {
     limit: "network exposure",
@@ -1047,4 +1048,198 @@ it("a release that ran but failed its behavior stays observed; its retry fixes i
     state: "verified",
     lastVerified: { images: { app: digest("3") } },
   });
+});
+
+// A command check may change data. When its reply is lost, the release holds
+// under its authorization until the host's own record of the command says
+// what happened; a later approval that names the unknown may accept it.
+function heldCheck(r: DeploymentRecord, name = "Create the marked page") {
+  const attempt = r.lifecycle!.attempts.at(-1)!;
+  r.commandPending = {
+    attemptId: attempt.id,
+    operationId: attempt.operationId,
+    name,
+    service: "app",
+    token: "3f0c8a2e-5b7d-4e9f-8a1b-2c3d4e5f6a7b",
+    results: `/opt/server-guy/${r.id}/releases/${attempt.id}/checks`,
+    startedAt: new Date().toISOString(),
+    timeoutSeconds: 60,
+  };
+}
+function hostRecord(reply: () => string) {
+  model.ssh.mockImplementation(async (r, script: string) => {
+    if (script.includes("/result.json")) {
+      const prior = r.lifecycle.attempts.findLast(
+        (a: { kind: string }) => a.kind === "release",
+      );
+      return JSON.stringify({
+        attemptId: prior.id,
+        releaseId: prior.releaseId,
+        revision: r.revision,
+        phase: "replace",
+        exitCode: 0,
+      });
+    }
+    const marker = /printf '\\n(SG_CHECK_RECORD_[0-9a-f]+)%s/.exec(script)![1];
+    return `PAGE_CREATED\n${marker}${reply()}\n`;
+  });
+}
+it("holds a release whose command check has an unknown outcome until the host's record resolves it", async () => {
+  verifiedV1();
+  const proposed = await proposeApplicationRelease(app, chat);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementation(async (r, release) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    heldCheck(r);
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "Application command check failed: Create the marked page (outcome unknown)",
+      false,
+      "verification",
+      true,
+    );
+  });
+  let record = "started";
+  hostRecord(() => record);
+  model.verify.mockImplementation(async (r) => {
+    r.serviceImages = { app: "observed-new-image" };
+    r.imageId = "observed-new-image";
+    r.verifiedAt = new Date().toISOString();
+    return { behavior: "passed", evidence: "Verified after the record" };
+  });
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection(), [])).toMatchObject({
+      ok: false,
+      retryable: false,
+      kind: "verification",
+    });
+    // Nothing runs again under the same authorization.
+    const blocked = await options.apply(selection(), []);
+    expect(blocked).toMatchObject({ ok: false, kind: "authorization" });
+    expect(blocked.message).toContain("unknown outcome");
+    // Still running on the host: still blocked, no guess.
+    expect(await options.reconcile()).toMatchObject({
+      ok: false,
+      retryable: false,
+      message: expect.stringContaining("still running"),
+    });
+    expect(await options.apply(selection(), [])).toMatchObject({
+      kind: "authorization",
+    });
+    // The host recorded its exit: the hold lifts and verification resumes
+    // without another replacement.
+    record = JSON.stringify({ exitCode: 0, bounded: 1 });
+    expect(await options.reconcile()).toMatchObject({
+      ok: true,
+      completed: true,
+    });
+  });
+  await executeOperation(started, () =>
+    runApplicationRelease(started, new AbortController().signal),
+  );
+  const saved = applicationDeployment(app)!;
+  expect(saved.commandPending).toBeNull();
+  expect(model.execute).toHaveBeenCalledTimes(1);
+  expect(model.verify).toHaveBeenCalledTimes(1);
+  const reconciled = saved.lifecycle!.attempts.at(-1)!;
+  expect(reconciled).toMatchObject({ kind: "reconcile", outcome: "verified" });
+  expect(reconciled.checks![0]).toMatchObject({
+    name: "Create the marked page",
+    passed: true,
+    status: 0,
+    output: expect.stringContaining("resolved from the host's record"),
+  });
+  expect(operation(started.id)!.state).toBe("verified");
+});
+
+it("a held check that the host recorded as failed returns to Pi for correction, and a new approval accepts a lost one", async () => {
+  verifiedV1();
+  const proposed = await proposeApplicationRelease(app, chat);
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.execute.mockImplementation(async (r, release) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    if (model.execute.mock.calls.length === 1) {
+      heldCheck(r);
+      saveDeployment(r);
+      throw new ReleaseExecutionError("outcome unknown", false, "verification");
+    }
+    // The second execution, with the check known to have failed, runs the
+    // corrected configuration but this time its own reply is lost for good.
+    heldCheck(r, "Create the marked page again");
+    r.commandPending!.startedAt = new Date(Date.now() - 600_000).toISOString();
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "outcome unknown",
+      false,
+      "verification",
+      true,
+    );
+  });
+  let record = JSON.stringify({ exitCode: 1, bounded: 1 });
+  hostRecord(() => record);
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    await options.apply(selection(), []);
+    const known = await options.reconcile();
+    expect(known).toMatchObject({ ok: true, retryable: true });
+    expect(known.message).toContain("exit 1 (resolved from the host's record)");
+    expect(known.message).toContain("PAGE_CREATED");
+    // Known failure: the correction may execute again.
+    record = "started";
+    expect(await options.apply(selection(), [])).toMatchObject({
+      ok: false,
+      retryable: false,
+    });
+    const lost = await options.reconcile();
+    expect(lost).toMatchObject({ ok: false, retryable: false });
+    expect(lost.message).toContain("unknown");
+    throw new Error("Stopped with an unresolved command");
+  });
+  await expect(
+    executeOperation(started, () =>
+      runApplicationRelease(started, new AbortController().signal),
+    ),
+  ).rejects.toThrow("unresolved command");
+  expect(model.execute).toHaveBeenCalledTimes(2);
+  const held = applicationDeployment(app)!;
+  expect(held.commandPending).toMatchObject({
+    name: "Create the marked page again",
+    operationId: started.id,
+  });
+  const failed = operation(started.id)!;
+  expect(failed.blocksQueue).toBe(true);
+  // The owner's explicit retry is the decision: the host's record is read
+  // first, and only a record that is lost lets the command run again.
+  const { retryOperation } =
+    await import("../../../src/server/operation-store");
+  const retried = retryOperation(failed.id, failed.updatedAt);
+  model.execute.mockImplementation(replaced());
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection(), [])).toMatchObject({ ok: true });
+  });
+  await executeOperation(retried, () =>
+    runApplicationRelease(retried, new AbortController().signal),
+  );
+  const cleared = applicationDeployment(app)!;
+  expect(cleared.commandPending).toBeNull();
+  expect(
+    cleared.events.some((e) =>
+      e.message.includes("accepts the unknown outcome of command check"),
+    ),
+  ).toBe(true);
+  expect(model.execute).toHaveBeenCalledTimes(3);
+  expect(operation(retried.id)!.state).toBe("verified");
 });

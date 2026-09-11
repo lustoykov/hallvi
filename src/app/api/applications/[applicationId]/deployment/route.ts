@@ -2,7 +2,6 @@ import {
   operationsFor,
   syncDeploymentOperation,
   startChange,
-  retryOperation,
 } from "@/server/operation-store";
 import { randomUUID } from "node:crypto";
 import { db } from "@/server/db";
@@ -16,6 +15,7 @@ import {
   cancelDeployment,
   applicationDeployment,
   requestDeployment,
+  retryInitialDeployment,
   saveDeployment,
   deploymentMessage,
   deploymentEvent,
@@ -194,26 +194,9 @@ export function POST(request: Request, context: Context) {
       cancelDeployment(record);
       return { deployment: null };
     } else if (input.action === "retry") {
-      if (record.status !== "failed")
-        throw new Error("Only a stopped deployment can be retried.");
-      db().transaction(
-        () => {
-          const tracked = syncDeploymentOperation(record);
-          const retried = retryOperation(tracked.id, tracked.updatedAt);
-          record.operationId = retried.id;
-          if (input.verificationObjectId) {
-            if (!record.verificationPending || record.cleanup)
-              throw new Error(
-                "There is no unresolved test-object creation to recover.",
-              );
-            record.verificationRecoveryId = input.verificationObjectId;
-          }
-          record.status = record.authority ? "deploy-queued" : "queued";
-          record.error = null;
-          saveDeployment(record);
-        },
-        { behavior: "immediate" },
-      );
+      retryInitialDeployment(record, {
+        verificationObjectId: input.verificationObjectId,
+      });
     } else {
       if (record.status !== "live")
         throw new Error(

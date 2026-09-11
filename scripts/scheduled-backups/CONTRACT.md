@@ -11,7 +11,7 @@ else is an implementation detail.
 python3 runner.py <config-path>                     one scheduled run
 python3 runner.py <config-path> --recover           ExecStopPost recovery
 python3 runner.py <config-path> --status            sanitized snapshot
-python3 runner.py <config-path> --test-restore <run-id>
+python3 runner.py <config-path> --test-restore <run-id> [--keep]
 ```
 
 Every command prints exactly one JSON object on stdout and nothing else.
@@ -44,7 +44,7 @@ Root-owned, mode 0600, no symlink in the path.
   "applicationId": "UUID",
   "deploymentId": "UUID",
   "revision": "string",
-  "kind": "sqlite-stack | postgres",
+  "kind": "sqlite-stack | postgres | stack",
   "endpoint": "https://ACCOUNT.r2.cloudflarestorage.com",
   "region": "auto",
   "bucket": "string",
@@ -78,7 +78,7 @@ written atomically. This is the exact shape the controller receives:
   "applicationId": "UUID",
   "deploymentId": "UUID",
   "revision": "string",
-  "kind": "sqlite-stack | postgres",
+  "kind": "sqlite-stack | postgres | stack",
   "startedAt": "2026-09-09T03:00:00Z",
   "capturedAt": "2026-09-09T03:00:07Z | null",
   "finishedAt": "2026-09-09T03:00:31Z | null",
@@ -134,23 +134,40 @@ retention failure separately.
 `scope` is the honest limit of the exercise. `offline-database-and-files`
 compares a restored SQLite database and every captured file against the capture
 manifest; `offline-database` restores the dump into a disposable PostgreSQL
-container and measures it. For a `stack`, each declared owner's dump is also
-loaded into a fresh instance of the owner's recorded image and environment, on
-its own labeled volume with no network, and passes only when the owner's
-`verify` command prints exactly what it printed from the source at capture
-(`database-content`). None of them starts the application, serves traffic or
-verifies the product in a browser, and none touches the live deployment.
+container and measures it. `isolated-application` (a `stack` archive) goes
+further: the archived Compose configuration comes up as its own project on
+this host, `sg-restore-<first 8 of run id>`, with no published ports, internal
+networks, fresh volumes filled from `state/`, no controller labels and no
+restart policy. Each owner is started alone and loads its dump through the
+recorded `restore` command; the restore passes only when the owner's `verify`
+command prints exactly what it printed from the source at capture
+(`database-content`). Then the whole application starts (`application-boot`)
+and `boot` records the project and each service's state:
 
-`cleanupComplete` reports whether the disposable container, volume and
-directory were removed. It is deliberately separate from `outcome`: a verified
-restore with leftover resources reports `outcome: "verified"` and
-`cleanupComplete: false`, and the leftovers keep `cleanupPending` set.
+```json
+"boot": { "project": "sg-restore-403c1bf6", "seconds": 12.4,
+          "services": { "bookstack": { "state": "running", "exitCode": 0 } } }
+```
+
+Nothing here serves traffic or touches the live deployment. With `--keep` the
+booted copy stays up after the command returns, `cleanupComplete` is false and
+the restore journal stays open: the controller runs its checks inside that
+project, then `--recover` removes it. Without `--keep` the copy is removed
+before the receipt is written. A `stack` archive from the earlier runner, whose
+managed PostgreSQL dump lives in `database/dump.pgc`, is restored offline as
+before and its application is not booted.
+
+`cleanupComplete` reports whether the restored project, its labeled containers
+and volumes, its networks and its directory were removed. It is deliberately
+separate from `outcome`: a verified restore with leftover resources reports
+`outcome: "verified"` and `cleanupComplete: false`, and the leftovers keep
+`cleanupPending` set.
 
 `checks` are product labels, never messages:
 
 `archive-hash`, `archive-structure`, `backup-identity`, `file-inventory`,
 `database-integrity`, `database-schema`, `database-rows`, `database-restored`,
-`database-tables`, `database-empty`, `database-content`.
+`database-tables`, `database-empty`, `database-content`, `application-boot`.
 
 ## Status
 
@@ -204,10 +221,12 @@ It is idempotent, and covers three kinds of leftover:
   stopped them, so a container an operator had already stopped stays stopped,
   and removes the snapshot that capture staged outside the state directory. The
   staged path is regenerated from the run id, never read back from the record.
-- `restores` — removes the disposable container and volume an interrupted
-  `--test-restore` recorded, by exact generated name **and** only when that
-  resource carries this run's `sg-scheduled-restore` label. A name that belongs
-  to another run, or to the application, is never touched.
+- `restores` — brings down the restored project of an interrupted or kept
+  `--test-restore` (`docker compose down` on its own compose file), then
+  removes every container and volume carrying this run's
+  `sg-scheduled-restore` label, the project's networks, the names an older
+  restore used, and the restore's directory. A resource with another run's
+  label, or the application's own, is never touched.
 - `interrupted` — every run still marked `running`, including a `postgres`
   capture or a killed upload that never stopped a container. Each is closed as
   `failed` with `errorCode: "interrupted"`, its staging is removed, and any
@@ -227,7 +246,7 @@ Bounded and stable. No SDK text, no exception messages, no paths, no addresses.
 | upload      | `upload-failed`, `upload-timeout`, `storage-denied`, `storage-missing-bucket`, `storage-missing-object`, `storage-unavailable`, `storage-error` |
 | verify      | `download-failed`, `download-timeout`, `verify-mismatch`                                    |
 | retention   | reported as `retention.failed`, never as the run's `errorCode`                              |
-| restore     | `run-not-found`, `run-not-restorable`, `archive-unsafe`, `manifest-mismatch`, `database-check-failed`, `restore-image-unavailable`, `restore-failed`, `restore-timeout` |
+| restore     | `run-not-found`, `run-not-restorable`, `archive-unsafe`, `manifest-mismatch`, `database-check-failed`, `restore-image-unavailable`, `restore-failed`, `restore-timeout`, `boot-failed` |
 | any         | `interrupted`, `unexpected-error`                                                           |
 
 ## What a run does
@@ -244,12 +263,19 @@ Bounded and stable. No SDK text, no exception messages, no paths, no addresses.
    run as `source-identity-mismatch` before the source is touched, rather than
    filing a newer deployment's data under an older revision.
 4. Capture consistently.
-   - `stack`: stop every service in `pauseServices`, dependents first; copy
-     each recorded volume's files with ownership and take SQLite files through
-     SQLite's backup API; dump the managed PostgreSQL, and run each declared
-     owner's `dump` and `verify` commands inside its still-running container,
-     keeping the dump and the printed content fingerprint; restart what was
-     stopped. Finished one-shot services in `oneShot` stay stopped.
+   - `stack` (capture plan version 2): stop the services in `pauseServices`,
+     dependents first: those are the services that write captured files, as
+     the controller derived them from the recorded mounts; nothing else is
+     touched, and an empty list is valid. Read each recorded volume where
+     Docker keeps it, copy its files with ownership and take SQLite files
+     through SQLite's backup API; copy every file the definition binds into a
+     container. Run each owner's `dump` and `verify` commands inside its
+     still-running container, keeping the dump under `database/<volume>.dump`
+     and the printed content fingerprint; restart what was stopped. Before
+     touching anything, refuse a captured volume that any running container
+     outside the plan holds writable, a planned container whose volume mounts
+     the plan does not record, or an owner whose image differs from the
+     definition.
    - `sqlite-stack` (legacy): the proven quiesced helper — stop the source,
      copy every volume file with ownership, take the database through SQLite's
      backup API, verify the copy against the quiesced source, restart the
@@ -281,9 +307,11 @@ forget the paperwork.
 
 ### Scope limits
 
-- `postgres` protects the database plus recovery material. A deployment whose
-  application service also owns a volume is rejected as `source-unsupported`
-  rather than silently backed up without those files.
+- `postgres` (legacy) protects the database plus recovery material. A
+  deployment whose application service also owns a volume is rejected as
+  `source-unsupported` rather than silently backed up without those files.
+  New schedules record the managed PostgreSQL as an owner with a dump
+  procedure in the `stack` plan instead.
 - `sqlite-stack` supports the two inspected reference stacks only, enforced by
   the capture helper.
 - The runner never fails over, never promotes a restore and makes no

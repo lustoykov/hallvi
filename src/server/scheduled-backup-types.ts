@@ -9,7 +9,8 @@ export const backupPolicySchema = z.object({
   kind: z.enum(["sqlite-stack", "postgres", "stack"]),
   data: z
     .object({
-      postgres: z.boolean(),
+      /** Older schedules: the controller's own managed PostgreSQL dump. */
+      postgres: z.boolean().optional(),
       sqlite: z.boolean(),
       fileDatabases: z.boolean().optional(),
       /** Databases their declared owners dump by recorded commands. */
@@ -57,7 +58,11 @@ export const scheduledRunSchema = z.object({
       at: timestamp,
       recoveryPointAt: timestamp.nullable(),
       outcome: z.enum(["verified", "failed"]),
-      scope: z.enum(["offline-database-and-files", "offline-database"]),
+      scope: z.enum([
+        "offline-database-and-files",
+        "offline-database",
+        "isolated-application",
+      ]),
       checks: z
         .array(
           z.enum([
@@ -72,6 +77,7 @@ export const scheduledRunSchema = z.object({
             "database-content",
             "database-tables",
             "database-empty",
+            "application-boot",
           ]),
         )
         .max(20),
@@ -82,6 +88,20 @@ export const scheduledRunSchema = z.object({
       }),
       cleanupComplete: z.boolean(),
       errorCode: z.string().max(80).nullable().default(null),
+      /** The restored application, booted in isolation on this host. */
+      boot: z
+        .object({
+          project: z.string().regex(/^sg-restore-[0-9a-f]{8}$/),
+          seconds: z.number().nonnegative(),
+          services: z.record(
+            z.string().regex(/^[a-z0-9][a-z0-9_.-]{0,62}$/),
+            z.object({
+              state: z.string().max(20),
+              exitCode: z.number().int(),
+            }),
+          ),
+        })
+        .optional(),
     })
     .nullable()
     .default(null),

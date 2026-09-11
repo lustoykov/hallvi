@@ -12,6 +12,8 @@ import type {
 
 export interface ServiceFacts {
   name: string;
+  /** The resolved image reference: a pinned digest, a tag or a built name. */
+  image: string | null;
   /** Registry reference the runtime must match; builds are observed instead. */
   pinned: string | null;
   build: boolean;
@@ -73,10 +75,55 @@ export interface ReleaseFacts {
 export const composeProject = (deploymentId: string) =>
   `sg-${deploymentId.slice(0, 8)}`;
 
+/**
+ * The default procedure for the managed PostgreSQL service when a release
+ * declares its volume without one: a custom-format dump of the configured
+ * database, a restore from standard input into a fresh instance, and a
+ * fingerprint of every user table (row count and a hash of its rows) that
+ * must match between the source and the restored copy. Pi may declare its
+ * own procedure instead; nothing else about the slot is special to backups.
+ */
+export const managedDatabaseProcedure: StateProcedure = {
+  dump: [
+    "sh",
+    "-c",
+    'exec pg_dump --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --format=custom --no-owner --no-acl',
+  ],
+  restore: [
+    "sh",
+    "-c",
+    'exec pg_restore --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --no-owner --no-acl --exit-on-error',
+  ],
+  verify: [
+    "sh",
+    "-c",
+    "exec psql -X -A -t -v ON_ERROR_STOP=1 --username=\"$POSTGRES_USER\" --dbname=\"$POSTGRES_DB\" -c \"SELECT schemaname || '.' || tablename || '|' || (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', schemaname, tablename), false, true, '')))[1]::text || '|' || coalesce((xpath('/row/d/text()', query_to_xml(format('SELECT md5(string_agg(md5(t::text), %L ORDER BY md5(t::text))) AS d FROM %I.%I t', '', schemaname, tablename), false, true, '')))[1]::text, '') FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1\"",
+  ],
+};
+
 export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
   const { resolved } = native;
   const records = new Map(native.data.map((record) => [record.volume, record]));
   const database = native.database;
+  // Older releases recorded the managed database's volume without a capture,
+  // when the controller dumped it itself. They are read with the default
+  // procedure, so one mechanism serves every database.
+  const managed = database ? resolved.services[database.service] : undefined;
+  for (const mount of managed?.volumes ?? [])
+    if (mount.type === "volume" && mount.source && !mount.read_only) {
+      const declared = records.get(mount.source);
+      if (
+        declared?.kind === "database" &&
+        !declared.capture &&
+        !declared.sqlite
+      )
+        records.set(mount.source, {
+          ...declared,
+          capture: "dump",
+          owner: database!.service,
+          procedure: managedDatabaseProcedure,
+        });
+    }
   // Services configured with one image must run one image: its builder, or
   // else the first service naming it.
   const owner = new Map<string, string>();
@@ -125,10 +172,9 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
     const health = service.healthcheck;
     return {
       name,
+      image: service.image ?? null,
       pinned:
-        !service.build &&
-        name !== database?.service &&
-        /@sha256:[0-9a-f]{64}$/.test(service.image ?? "")
+        !service.build && /@sha256:[0-9a-f]{64}$/.test(service.image ?? "")
           ? service.image!
           : null,
       build: Boolean(service.build),
@@ -144,10 +190,8 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
       ),
       dependsOn: Object.keys(service.depends_on ?? {}),
       ...(completing.has(name) ? { completes: true as const } : {}),
-      // The managed database keeps running across releases unlabeled.
-      labeled:
-        name !== database?.service &&
-        Boolean(service.labels?.["server-guy.revision"]),
+      // State owners run unlabeled, so a revision never recreates them.
+      labeled: Boolean(service.labels?.["server-guy.revision"]),
     };
   });
   const databaseService = database
@@ -200,19 +244,18 @@ export function currentFacts(
 }
 
 /**
- * Services whose database state outlives application releases: the managed
- * database and every declared owner of a database volume, whose on-disk
- * format belongs to its version. They keep their image unless the owner
- * approves a change, and releases leave them unlabeled so a label never
- * recreates them. An owner of files is recorded but upgrades freely.
+ * Services whose database state outlives application releases: every
+ * declared owner of a database volume, the managed PostgreSQL included,
+ * whose on-disk format belongs to its version. They keep their image unless
+ * the owner approves a change, and releases leave them unlabeled so a label
+ * never recreates them. An owner of files is recorded but upgrades freely.
  */
-export function stateOwners(facts: Pick<ReleaseFacts, "database" | "volumes">) {
-  return new Set([
-    ...(facts.database ? [facts.database.service] : []),
-    ...facts.volumes.flatMap((volume) =>
+export function stateOwners(facts: Pick<ReleaseFacts, "volumes">) {
+  return new Set(
+    facts.volumes.flatMap((volume) =>
       volume.owner && volume.kind === "database" ? [volume.owner] : [],
     ),
-  ]);
+  );
 }
 
 /** The host port 80 listener, when the release serves primary HTTP. */

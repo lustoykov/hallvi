@@ -121,11 +121,22 @@ export interface DeploymentRecord {
   repository: string;
   /** The initiating user request, kept separate from repository evidence. */
   requirements?: string;
+  /**
+   * What Pi found in a conversation about a failed first deployment, for
+   * the release session that continues it under the same approval.
+   */
+  correction?: { instructions: string; chatId: string; at: string } | null;
   requestedRef?: string;
   recommendationId?: string;
   verificationPending?: string | null;
   /** Candidate ID is verified against the unique marker before deletion. */
   verificationRecoveryId?: string | null;
+  /**
+   * A command check whose outcome the host has not reported: the check may
+   * have changed data, so nothing executes or verifies again until the
+   * host's record of it is read, or a new approval accepts the unknown.
+   */
+  commandPending?: import("./command-checks").PendingCommand | null;
   repositoryId?: number;
   githubConnectionId?: string;
   cleanup?: { path: string; expectedStatus: number; marker: string } | null;

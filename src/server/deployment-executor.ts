@@ -478,6 +478,11 @@ export async function executeDeployment(
   );
   const { runInitialRelease } = await import("./application-releases");
   await runInitialRelease(record, signal);
+  completeInitialDeployment(record);
+}
+/** The first verified release makes the deployment live, once. */
+export function completeInitialDeployment(record: DeploymentRecord) {
+  if (record.url) return;
   const verified = currentFacts(record)!;
   record.status = "live";
   record.url = `http://${record.address}`;
@@ -854,9 +859,7 @@ export async function verifyPrivateServices(
       };
       continue;
     }
-    // The managed database's health already gates its dependents.
-    if (!service.healthcheck || service.name === facts.database?.service)
-      continue;
+    if (!service.healthcheck) continue;
     const output = await command(
       "ssh",
       [

@@ -197,7 +197,6 @@ export async function installScheduledBackups(
     revision: record.revision,
     kind,
     data: {
-      postgres: Boolean(facts.database),
       fileDatabases: capture.volumes.some(
         (v) =>
           v.kind === "database" && v.capture === "quiesced-files" && !v.sqlite,

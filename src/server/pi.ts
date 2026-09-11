@@ -64,7 +64,7 @@ When the engineer reports a problem, investigate before proposing a change. insp
 
 Server Guy changes what surrounds the application: its host, containers, configuration, data protection and releases. It does not change the application's own code, and it cannot open branches, commits or pull requests. When the application needs a code change, including a small operability change such as a health endpoint, an environment-driven port or a start entrypoint, explain the impact and give a copyable handoff for a coding agent: the application and revision, the affected behavior, timestamped evidence, and the check that should pass afterwards. The owner makes and merges the change; prepare_release then deploys the merged revision through the normal checks. Never describe a code change as made by you.
 
-When the engineer asks to deploy, call prepare_deployment: it queues a read-only inspection of an exact revision and an inline priced Hetzner recommendation. It records a request only and grants no spending authority. The engineer approves the price and supplies private values in the deployment card; the deployment then runs through the managed executor. Calling it again returns the existing request instead of starting another. For an application that is already deployed, use prepare_release to update it to a selected revision, and prepare_rollback only with an assessment that the earlier code can use the current data. Each requests one approval for its stated effects; its release session can correct configuration within that scope. Unknown remote outcomes, unavailable private inputs and destructive data migrations need resolution, not blind retries.
+When the engineer asks to deploy, call prepare_deployment: it queues a read-only inspection of an exact revision and an inline priced Hetzner recommendation. It records a request only and grants no spending authority. The engineer approves the price and supplies private values in the deployment card; the deployment then runs through the managed executor. Calling it again returns the existing request instead of starting another. For an application that is already deployed, use prepare_release to update it to a selected revision, and prepare_rollback only with an assessment that the earlier code can use the current data. Each requests one approval for its stated effects; its release session can correct configuration within that scope. When a first deployment stopped after its host was prepared, investigate it (read_operation, inspect_runtime, get_application_status) and continue it with prepare_release: an ordinary correction resumes it under the existing approval with your instructions; a state owner's image change needs stateChange with evidence, which the engineer approves. Unknown remote outcomes, unavailable private inputs and destructive data migrations need resolution, not blind retries.
 
 Every change to the application or its surroundings is an operation the engineer approves: deployments, releases, rollbacks, container recreation and backup configuration. Saving a requirement the engineer explicitly asked you to remember needs no separate confirmation.
 
@@ -394,7 +394,7 @@ export async function askPi(
         name: "prepare_release",
         label: "Prepare application update",
         description:
-          "Propose a release of an already deployed application on its existing host: a selected revision, or corrected configuration. Resolves ref once, defaulting to the default branch's latest commit; to correct configuration without changing code, pass the deployed revision. Requests task-scoped approval: preserve volumes/exposure, no spending, up to three agent-corrected attempts. State in instructions what the release session must achieve and the evidence for a correction; the owner reviews it in the approval. This tool does not execute or grant itself permission.",
+          "Propose a release of an already deployed application on its existing host: a selected revision, or corrected configuration. Resolves ref once, defaulting to the default branch's latest commit; to correct configuration without changing code, pass the deployed revision. Requests task-scoped approval: preserve volumes/exposure, no spending, up to three agent-corrected attempts. State in instructions what the release session must achieve and the evidence for a correction; the owner reviews it in the approval. For a first deployment that stopped after its host was prepared, this continues it under the approval it already has: an ordinary correction retries the deployment with your instructions and needs no new approval; name a state owner in stateChange (with compatibility evidence) when its image must change, which requests that specific authority. This tool does not execute or grant itself permission.",
         parameters: Type.Object(
           {
             ref: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
@@ -450,7 +450,7 @@ export async function askPi(
         name: "propose_change",
         label: "Propose an application change",
         description:
-          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Executors cover initial deployment, container recreation and scheduled backups of declared file volumes, SQLite files, the managed PostgreSQL database and databases whose owner declares a dump procedure; other data is refused with the reason. configure-backups uses already connected private R2/S3 access; specify backupPolicy. run-backup verifies an uploaded copy; test-restore checks an isolated restoration of the recorded databases and files (a declared dump loads into a fresh instance and must match its content fingerprint), not application boot or cutover. Every change asks approval. Never claim protection from a schedule alone.",
+          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Executors cover initial deployment, container recreation and scheduled backups of declared file volumes, SQLite files and databases whose owner has a dump procedure (the managed PostgreSQL has a default one); other data is refused with the reason. configure-backups uses already connected private R2/S3 access; specify backupPolicy. run-backup verifies an uploaded copy. test-restore downloads the latest verified backup, restores its files and databases into an isolated copy of the application on the host (no published ports, no outside network; each dump must match its content fingerprint), boots it, and runs the recorded command checks inside it plus any restoreChecks you choose: commands in the same shape as criterion commands, run in the copy's containers with named private inputs, to prove that meaningful content survived (a page, an upload's hash, a row). The copy is removed afterwards; production cutover is never performed. Every change asks approval. Never claim protection from a schedule alone.",
         parameters: Type.Object(
           {
             action: Type.Union([
@@ -472,6 +472,31 @@ export async function askPi(
                 { additionalProperties: false },
               ),
             ),
+            restoreChecks: Type.Optional(
+              Type.Array(
+                Type.Object(
+                  {
+                    name: Type.String({ minLength: 1, maxLength: 120 }),
+                    service: Type.String({ minLength: 1, maxLength: 63 }),
+                    run: Type.Array(
+                      Type.String({ minLength: 1, maxLength: 4000 }),
+                      { minItems: 1, maxItems: 40 },
+                    ),
+                    inputs: Type.Optional(
+                      Type.Array(Type.String({ pattern: "^[A-Z_][A-Z0-9_]*$" }), {
+                        maxItems: 10,
+                      }),
+                    ),
+                    contains: Type.Optional(Type.String({ maxLength: 300 })),
+                    timeoutSeconds: Type.Optional(
+                      Type.Integer({ minimum: 1, maximum: 300 }),
+                    ),
+                  },
+                  { additionalProperties: false },
+                ),
+                { maxItems: 8 },
+              ),
+            ),
           },
           { additionalProperties: false },
         ),
@@ -483,6 +508,7 @@ export async function askPi(
               input.run.chatId,
               params.action,
               params.backupPolicy,
+              params.restoreChecks,
             ),
           );
         },

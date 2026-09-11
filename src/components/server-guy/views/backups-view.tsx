@@ -166,7 +166,7 @@ export function BackupsView(
                 ],
                 [
                   "While it runs",
-                  "SQLite and file copies pause the application briefly; PostgreSQL stays online.",
+                  "Only the services that write captured files pause briefly; database owners keep running to dump.",
                 ],
               ]}
             />

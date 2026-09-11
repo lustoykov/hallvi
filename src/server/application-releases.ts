@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   applicationDeployment,
   getDeployment,
+  retryInitialDeployment,
   runDeploymentAttempt,
   saveDeployment,
   deploymentEvent,
@@ -22,6 +23,7 @@ import {
   operation,
   proposeOperation,
   publicOperation,
+  resolveOperation,
 } from "./operation-store";
 import type { StoredOperation } from "./operation-types";
 import { planRelease } from "./deployment-planner";
@@ -58,16 +60,35 @@ export async function proposeApplicationRelease(
 ) {
   const record = applicationDeployment(applicationId);
   const state = deploymentRuntime(record).state;
+  // A stopped first deployment whose host exists continues under the
+  // approval it has: the owner already accepted its price, inputs and
+  // effects, and a correction stays inside them.
+  const stoppedFirst = Boolean(
+    record?.status === "failed" &&
+    record.authority &&
+    record.serverId &&
+    !record.lifecycle?.runtime.lastVerified,
+  );
   // A known runtime, verified or merely observed, can baseline an update.
   if (
     !record ||
     !currentFacts(record) ||
     !record.serverId ||
     !record.address ||
-    (state !== "verified" && state !== "observed")
+    (state !== "verified" && state !== "observed" && !stoppedFirst)
   )
     throw new Error(
       "Verify or reconcile the existing deployment before proposing a new release.",
+    );
+  if (stoppedFirst && !rollbackRequest && !stateChangeRequest)
+    return publicOperation(
+      retryInitialDeployment(record, {
+        correction: { instructions: requirements.slice(0, 4000), chatId },
+      }),
+    );
+  if (stoppedFirst && rollbackRequest)
+    throw new Error(
+      "A first deployment that never verified has nothing to roll back to.",
     );
   const lifecycle = ensureDeploymentLifecycle(record);
   rememberVerifiedImages(record);
@@ -82,9 +103,7 @@ export async function proposeApplicationRelease(
   // Owners keep their image unless this approval names them.
   let stateChange: ReleaseScope["stateChange"];
   if (stateChangeRequest) {
-    const owners = [...stateOwners(facts)].filter(
-      (name) => name !== facts.database?.service,
-    );
+    const owners = [...stateOwners(facts)];
     const services = [...new Set(stateChangeRequest.services)];
     const unknown = services.filter((name) => !owners.includes(name));
     const evidence = releaseSecrets(record)
@@ -108,11 +127,7 @@ export async function proposeApplicationRelease(
       : null,
     ...[...stateOwners(facts)]
       .filter((name) => !stateChange?.services.includes(name))
-      .map((name) =>
-        name === facts.database?.service
-          ? "the managed PostgreSQL image"
-          : `the ${name} image`,
-      ),
+      .map((name) => `the ${name} image`),
     "network exposure",
   ].filter((item): item is string => Boolean(item));
   const keeps =
@@ -134,6 +149,7 @@ export async function proposeApplicationRelease(
     if (!revision || !/^[0-9a-f]{40}$/.test(revision))
       throw new Error("GitHub did not identify an exact revision.");
   }
+  const established = establishedRuntime(lifecycle.runtime);
   const scope: ReleaseScope = {
     id: randomUUID(),
     deploymentId: record.id,
@@ -143,11 +159,20 @@ export async function proposeApplicationRelease(
     repository: record.repository,
     repositoryId: record.repositoryId!,
     revision,
-    baselineReleaseId: establishedRuntime(lifecycle.runtime)!.releaseId,
+    // A stopped first deployment with nothing established binds the release
+    // it approved; the new host holds no runtime to compare against yet.
+    baselineReleaseId:
+      established?.releaseId ??
+      record.authority?.releaseId ??
+      releaseOf(record)!.id,
+    ...(established ? {} : { initial: true as const }),
     maxAttempts: 3,
     ...(rollback ? { rollback } : {}),
     ...(stateChange ? { stateChange } : {}),
   };
+  const hold = record.commandPending
+    ? ` Note: command check ${record.commandPending.name} from an earlier attempt has an unknown outcome on the host; approving accepts that it may run again.`
+    : "";
   if (rollback)
     assertReleaseScope(
       record,
@@ -167,7 +192,7 @@ export async function proposeApplicationRelease(
       title: `${rollback ? "Roll back to" : "Release"} ${revision.slice(0, 12)}`,
       summary: rollback
         ? `Return to previously verified application images for revision ${revision.slice(0, 12)} on this host. Keep private settings, ${keeps}. No builds or pulls. This does not undo migrations or restore older data. Compatibility assessment: ${rollback.compatibilityEvidence}`
-        : `Update this application to revision ${revision.slice(0, 12)} on its existing host with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Keep ${keeps}.${stateChange ? ` Allow changing the image of ${stateChange.services.join(", ")}, which own${stateChange.services.length === 1 ? "s" : ""} persistent data; the earlier version may not read that data afterwards, so take a verified backup first. Compatibility assessment: ${stateChange.evidence}` : ""} No server purchase or resize. Destructive data migrations need a separate decision. Task: ${requirements.slice(0, 1200)}`,
+        : `${stoppedFirst ? `Continue this application's first deployment on its prepared host with revision ${revision.slice(0, 12)}` : `Update this application to revision ${revision.slice(0, 12)} on its existing host`} with Pi-authored Docker Compose. Allow brief downtime and up to three execution attempts with agent-corrected configuration. Keep ${keeps}.${stateChange ? ` Allow changing the image of ${stateChange.services.join(", ")}, which own${stateChange.services.length === 1 ? "s" : ""} persistent data; the earlier version may not read that data afterwards${stoppedFirst ? "" : ", so take a verified backup first"}. Compatibility assessment: ${stateChange.evidence}` : ""} No server purchase or resize. Destructive data migrations need a separate decision.${hold} Task: ${requirements.slice(0, 1200)}`,
       destinations: ["deployment", "history", "processes"],
       command: {
         type: "release-deployment",
@@ -176,6 +201,24 @@ export async function proposeApplicationRelease(
       },
     }),
   );
+}
+
+/**
+ * The owner's explicit retry, or a new approval, is the decision that a
+ * command whose host record was lost may run again; the record says so.
+ */
+function acceptUnknownCommand(
+  record: DeploymentRecord,
+  tracked: StoredOperation,
+) {
+  const pending = record.commandPending;
+  if (!pending || pending.operationId === tracked.id) return;
+  deploymentEvent(
+    record,
+    `The owner's decision to continue (${tracked.title}) accepts the unknown outcome of command check ${pending.name} (attempt ${pending.attemptId}): it may run again.`,
+  );
+  record.commandPending = null;
+  saveDeployment(record);
 }
 
 function assertOwned(
@@ -218,6 +261,13 @@ function assertOwned(
     throw new ReleaseScopeError(
       "Reconcile the previous verification object's outcome before another release.",
     );
+  // A command whose outcome the host never reported may have changed data.
+  // Under the operation that ran it only the host's record resolves it.
+  if (record.commandPending?.operationId === tracked.id)
+    throw new ReleaseScopeError(
+      `Command check ${record.commandPending.name} from attempt ${record.commandPending.attemptId} has an unknown outcome. Call reconcile_release: it runs again only once the host's record resolves it.`,
+    );
+  acceptUnknownCommand(record, tracked);
   const attempts = record.lifecycle!.attempts.filter(
     (a) =>
       a.authorizationId === scope.id &&
@@ -288,6 +338,7 @@ async function releaseLoop(input: {
     const buildFiles = facts.services.some((service) => service.build)
       ? await sourceTree()
       : [];
+    const wasLive = record.status === "live";
     const result = await runDeploymentAttempt(
       record,
       scope.initial ? "deploy" : "release",
@@ -300,6 +351,18 @@ async function releaseLoop(input: {
       release,
     );
     evidence = result.evidence;
+    // A release that finishes a stopped first deployment makes it live and
+    // settles the deployment operation it continued.
+    if (!wasLive && result.behavior === "passed") {
+      const { completeInitialDeployment } =
+        await import("./deployment-executor");
+      completeInitialDeployment(record);
+      if (tracked.command?.type === "release-deployment")
+        resolveOperation(
+          record.operationId ?? `deployment:${record.id}`,
+          tracked.id,
+        );
+    }
     return { ok: true, message: evidence };
   };
   const feedback = (error: unknown) => {
@@ -543,11 +606,13 @@ export async function runInitialRelease(
   );
   const last = earlier.filter((a) => a.kind !== "reconcile").at(-1);
   let resume = earlier.at(-1)?.error ?? null;
-  // A lost outcome is established from the host receipt, never repeated.
+  // A lost outcome is established from the host receipt, never repeated;
+  // so is a command check whose result the host never reported.
   if (
-    last?.remoteStartedAt &&
-    !last.remoteResult &&
-    !lifecycle.reconciliations?.some((r) => r.attemptId === last.id)
+    (last?.remoteStartedAt &&
+      !last.remoteResult &&
+      !lifecycle.reconciliations?.some((r) => r.attemptId === last.id)) ||
+    record.commandPending
   ) {
     const result = await reconcileRelease(
       record,
@@ -555,7 +620,14 @@ export async function runInitialRelease(
       signal,
     );
     if (result.completed) return result.message;
-    if (!result.retryable) throw new ReleaseScopeError(result.message);
+    if (!result.retryable) {
+      // A lost record under the operation that ran it stays blocked; the
+      // owner's retry is the decision that the command may run again.
+      const pending = record.commandPending;
+      if (!pending || pending.operationId === tracked.id)
+        throw new ReleaseScopeError(result.message);
+      acceptUnknownCommand(record, tracked);
+    }
     resume = result.message;
   }
   return releaseLoop({
@@ -568,6 +640,6 @@ export async function runInitialRelease(
     signal,
     approved: earlier.length ? undefined : approved,
     earlier: resume,
-    task: `Approved task: the first deployment of ${record.repository}@${approved.revision} on its newly prepared host.${record.requirements ? ` Owner request: ${record.requirements.slice(0, 2000)}` : ""}\nAuthorization: ${JSON.stringify(scope)}\nThe owner approved this configuration's price, private inputs and effects: published listeners and HTTP access, the managed database, and named volumes with their data records. Correct ordinary configuration (commands, builds, packaging, environment, readiness, check paths) and deploy again within them; there is no per-attempt approval.`,
+    task: `Approved task: the first deployment of ${record.repository}@${approved.revision} on its newly prepared host.${record.requirements ? ` Owner request: ${record.requirements.slice(0, 2000)}` : ""}${record.correction ? `\nCorrection requested from the owner's conversation at ${record.correction.at}: ${record.correction.instructions.slice(0, 3000)}` : ""}\nAuthorization: ${JSON.stringify(scope)}\nThe owner approved this configuration's price, private inputs and effects: published listeners and HTTP access, the managed database, and named volumes with their data records. Correct ordinary configuration (commands, builds, packaging, environment, readiness, check paths) and deploy again within them; there is no per-attempt approval. A state owner's image change is outside them: stop and explain it, so the owner can approve it as a state change.`,
   });
 }

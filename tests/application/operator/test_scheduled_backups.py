@@ -32,6 +32,13 @@ PREFIX = f"scheduled/{APPLICATION}/{DEPLOYMENT}/"
 SECRET = "s3cret-access-key-value"
 APP, WORKER, JOBS, DATABASE = "a" * 64, "b" * 64, "c" * 64, "d" * 64
 DUMP = b"PGDMP" + b"captured rows" * 4
+FINGERPRINT = b"public.note|2|3f2a\n"
+# The controller's default for the managed PostgreSQL: its owner's commands.
+POSTGRES_PROCEDURE = {
+    "dump": ["sh", "-c", 'exec pg_dump --username="$POSTGRES_USER" --format=custom'],
+    "restore": ["sh", "-c", 'exec pg_restore --username="$POSTGRES_USER" --exit-on-error'],
+    "verify": ["sh", "-c", 'exec psql -X -A -t --username="$POSTGRES_USER" -c "SELECT 1"'],
+}
 
 
 def settings(**overrides):
@@ -149,6 +156,7 @@ class FakeDocker:
         exec_results=None,
         images=None,
         exit_codes=None,
+        mountpoints=None,
     ):
         self.containers = dict(containers or {})
         self.services = dict(services or {})
@@ -164,6 +172,9 @@ class FakeDocker:
         )
         self.named = dict(named or {})
         self.volumes = dict(volumes or {})
+        # Where Docker keeps each named volume's data; created volumes get a
+        # fresh directory of their own.
+        self.mountpoints = dict(mountpoints or {})
         self.helper = helper
         self.exec_results = dict(exec_results or {})
         self.images = dict(images or {})
@@ -176,23 +187,84 @@ class FakeDocker:
         self.started = []
         self.removed = []
         self.calls = []
+        # Restored applications: project -> the definition Compose was given
+        # and the services it brought up.
+        self.projects = {}
+        self.stdin = {}
+
+    def _labelled(self, entries, selector):
+        key, _, value = selector.removeprefix("label=").partition("=")
+        return [name for name, labels in entries.items() if labels.get(key) == value]
+
+    def _exec(self, args, input, stdout, target):
+        joined = " ".join(args)
+        for key in sorted(self.exec_results, key=len, reverse=True):
+            if key in joined:
+                result = self.exec_results[key]
+                break
+        else:
+            raise AssertionError(f"unexpected command {args}")
+        if input is not None:
+            self.stdin.setdefault(target, []).append(input)
+        self.exec_running[key] = sorted(
+            container for container, running in self.containers.items() if running
+        )
+        if isinstance(result, Exception):
+            raise result
+        if stdout is not None:
+            Path(stdout).write_bytes(result)
+            return b""
+        return result
+
+    def _compose(self, args, input, stdout):
+        project = args[args.index("-p") + 1]
+        if not project.startswith("sg-restore-"):
+            return " ".join(self.containers).encode()
+        verb = args[args.index("-f") + 2]
+        rest = list(args[args.index("-f") + 3 :])
+        if verb == "up":
+            definition = json.loads(Path(args[args.index("-f") + 1]).read_text())
+            wanted = [rest[-1]] if "--no-deps" in rest else list(definition["services"])
+            entry = self.projects.setdefault(project, {"definition": definition, "up": []})
+            for service in wanted:
+                if service not in entry["up"]:
+                    entry["up"].append(service)
+                    self.named[f"{project}-{service}-1"] = {
+                        runner.RESTORE_LABEL: definition["services"][service]["labels"][
+                            runner.RESTORE_LABEL
+                        ]
+                    }
+            return b""
+        if verb == "exec":
+            return self._exec(rest[2:], input, stdout, rest[1])
+        if verb == "ps":
+            return "\n".join(
+                json.dumps({"Service": service, "State": "running", "ExitCode": 0})
+                for service in self.projects.get(project, {}).get("up", [])
+            ).encode()
+        if verb == "down":
+            for service in self.projects.pop(project, {}).get("up", []):
+                self.named.pop(f"{project}-{service}-1", None)
+            return b""
+        raise AssertionError(f"unexpected command {args}")
 
     def __call__(self, *args, input=None, timeout=None, stdout=None):
         self.calls.append(args)
         # A command fed on standard input: record what it received.
         if args[:3] == ("docker", "exec", "--interactive"):
             args = ("docker", "exec", *args[3:])
-            if not hasattr(self, "stdin"):
-                self.stdin = {}
             self.stdin.setdefault(args[3], []).append(input)
         if self.helper and args[0] == sys.executable:
             return self.helper(args[-2], args[-1])
         if not self.available:
             raise subprocess.CalledProcessError(1, args)
         if args[1:2] == ("compose",):
-            return " ".join(self.containers).encode()
+            return self._compose(args, input, stdout)
         if args[:2] == ("docker", "ps") and "--filter" in args:
-            volume = args[-1].removeprefix("volume=")
+            selector = args[-1]
+            if selector.startswith("label="):
+                return "\n".join(self._labelled(self.named, selector)).encode()
+            volume = selector.removeprefix("volume=")
             return "\n".join(
                 container
                 for container in [*self.containers, *self.foreign]
@@ -203,6 +275,16 @@ class FakeDocker:
                 f"{container} {'running' if running else 'exited'}"
                 for container, running in self.containers.items()
             ).encode()
+        if args[:3] == ("docker", "volume", "ls"):
+            return "\n".join(self._labelled(self.volumes, args[-1])).encode()
+        if args[:3] == ("docker", "network", "ls"):
+            return b""
+        if args[:3] == ("docker", "network", "rm"):
+            return b""
+        if args[:5] == ("docker", "volume", "inspect", "--format", "{{.Mountpoint}}"):
+            if args[5] not in self.mountpoints:
+                raise subprocess.CalledProcessError(1, args, stderr=b"No such volume")
+            return str(self.mountpoints[args[5]]).encode()
         if args[:3] == ("docker", "volume", "inspect"):
             if args[3] not in self.volumes:
                 raise subprocess.CalledProcessError(1, args, stderr=b"No such volume")
@@ -212,6 +294,7 @@ class FakeDocker:
         if args[:4] == ("docker", "volume", "rm", "--force"):
             self.removed.append(args[4])
             self.volumes.pop(args[4], None)
+            self.mountpoints.pop(args[4], None)
             return b""
         if args[:2] == ("docker", "inspect"):
             requested = list(args[2:])
@@ -247,6 +330,9 @@ class FakeDocker:
             return b"[]"
         if args[:3] == ("docker", "volume", "create"):
             self.volumes[args[-1]] = dict([args[4].split("=", 1)])
+            created = Path(tempfile.mkdtemp(prefix="fake-volume-")) / args[-1]
+            created.mkdir()
+            self.mountpoints[args[-1]] = created
             return b""
         if args[:2] == ("docker", "run"):
             label = args[args.index("--label") + 1].split("=", 1)
@@ -255,19 +341,8 @@ class FakeDocker:
         if args[:2] == ("docker", "cp"):
             self.copied[args[3]] = Path(args[2]).read_bytes()
             return b""
-        if (
-            args[:2] == ("docker", "exec")
-            and args[3:4]
-            and args[3] in self.exec_results
-        ):
-            result = self.exec_results[args[3]]
-            self.exec_running[args[3]] = sorted(
-                container for container, running in self.containers.items() if running
-            )
-            if stdout is not None:
-                Path(stdout).write_bytes(result)
-                return b""
-            return result
+        if args[:2] == ("docker", "exec") and args[3:4]:
+            return self._exec(args[3:], input, stdout, args[2])
         raise AssertionError(f"unexpected command {args}")
 
     def describe(self, container):
@@ -1469,10 +1544,41 @@ class ScheduledBackupTest(unittest.TestCase):
         """App and a read-only worker share SQLite; jobs only uses PostgreSQL."""
         source = self.source_stack(
             {
-                "app": {"image": "sg-app:rev-9"},
-                "worker": {"image": "sg-app:rev-9"},
+                "app": {
+                    "image": "sg-app:rev-9",
+                    "volumes": [
+                        {"type": "volume", "source": "state", "target": "/srv/state"},
+                        {"type": "volume", "source": "uploads", "target": "/uploads"},
+                        {
+                            "type": "bind",
+                            "source": "./configs/app-settings",
+                            "target": "/etc/app/settings.toml",
+                            "read_only": True,
+                        },
+                    ],
+                },
+                "worker": {
+                    "image": "sg-app:rev-9",
+                    "volumes": [
+                        {
+                            "type": "volume",
+                            "source": "state",
+                            "target": "/mnt/state",
+                            "read_only": True,
+                        }
+                    ],
+                },
                 "jobs": {"image": "example/jobs:1"},
-                "postgres": {"image": "postgres:16"},
+                "postgres": {
+                    "image": "postgres:16",
+                    "volumes": [
+                        {
+                            "type": "volume",
+                            "source": "database",
+                            "target": "/var/lib/postgresql/data",
+                        }
+                    ],
+                },
             }
         )
         (source / "configs").mkdir(exist_ok=True)
@@ -1529,32 +1635,26 @@ class ScheduledBackupTest(unittest.TestCase):
                 WORKER: [volume("state", state, "/mnt/state", rw=False)],
                 DATABASE: [volume("database", volumes, "/var/lib/postgresql/data")],
             },
-            exec_results={"psql": b"160004\n", "pg_dump": DUMP},
+            exec_results={"psql": FINGERPRINT, "pg_dump": DUMP},
+            mountpoints={f"{project}_state": state, f"{project}_uploads": uploads},
         )
-        # The shape backupCapturePlan records when the app needs jobs: each
-        # dependent before what it needs, not the order Compose lists them in.
+        # The shape backupCapturePlan records: only app writes captured files,
+        # so only app pauses; the worker reads, jobs mounts nothing, and the
+        # managed PostgreSQL dumps through its default procedure.
         capture = {
-            "version": 1,
-            "pauseServices": ["worker", "app", "jobs"],
-            "postgres": "postgres",
+            "version": 2,
+            "pauseServices": ["app"],
             "volumes": [
+                {"name": "state", "kind": "database", "sqlite": "db/app.sqlite"},
+                {"name": "uploads", "kind": "files", "sqlite": None},
+            ],
+            "dumps": [
                 {
-                    "name": "state",
-                    "kind": "database",
-                    "sqlite": "db/app.sqlite",
-                    "mounts": [
-                        {"service": "app", "target": "/srv/state", "readOnly": False},
-                        {"service": "worker", "target": "/mnt/state", "readOnly": True},
-                    ],
-                },
-                {
-                    "name": "uploads",
-                    "kind": "files",
-                    "sqlite": None,
-                    "mounts": [
-                        {"service": "app", "target": "/uploads", "readOnly": False}
-                    ],
-                },
+                    "volume": "database",
+                    "service": "postgres",
+                    "target": "/var/lib/postgresql/data",
+                    **POSTGRES_PROCEDURE,
+                }
             ],
         }
         path = write_private(
@@ -1571,7 +1671,7 @@ class ScheduledBackupTest(unittest.TestCase):
     def storage(self, client):
         return lambda config: runner.Storage(client, config["bucket"], config["prefix"])
 
-    def test_stack_capture_quiesces_every_application_service_around_one_recovery_point(
+    def test_stack_capture_quiesces_the_writers_of_captured_files_around_one_recovery_point(
         self,
     ):
         config, docker = self.generic_stack()
@@ -1580,20 +1680,18 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertGreater(wal.stat().st_size, 0)
         # Exiting on SIGTERM (143) is a clean stop; a SIGKILL (137) or any
         # other exit code is not.
-        docker.exit_codes[JOBS] = 143
+        docker.exit_codes[APP] = 143
         client = FakeClient()
         result = runner.perform_run(
             config, state, storage_factory=self.storage(client), command=docker
         )
         self.assertEqual(result["outcome"], "succeeded", result["errorCode"])
         stops = [call[2:] for call in docker.calls if call[:2] == ("docker", "stop")]
-        # One container per call in the recorded order (a multi-ID stop is
-        # parallel). Includes the client that mounts nothing; never the managed
-        # database, which alone is still running when it is dumped.
-        self.assertEqual(stops, [("--time", "120", c) for c in (WORKER, APP, JOBS)])
-        self.assertEqual(docker.exec_running["pg_dump"], [DATABASE])
-        # Restarted in reverse: each dependency is running before its dependents.
-        self.assertEqual(docker.started, [JOBS, APP, WORKER])
+        # Only the writer of captured files stops. The reader, the client that
+        # mounts nothing and the database it dumps through keep running.
+        self.assertEqual(stops, [("--time", "120", APP)])
+        self.assertEqual(docker.exec_running["pg_dump"], [WORKER, JOBS, DATABASE])
+        self.assertEqual(docker.started, [APP])
         self.assertTrue(all(docker.containers.values()))
         self.assertTrue(state.journals()[0]["complete"])
         archive = self.directory / "stack.tar.gz"
@@ -1618,17 +1716,76 @@ class ScheduledBackupTest(unittest.TestCase):
             (extracted / "state/uploads/report.pdf").read_bytes(),
             b"%PDF quarterly report",
         )
-        self.assertEqual((extracted / "database/dump.pgc").read_bytes(), DUMP)
+        self.assertEqual((extracted / "database/database.dump").read_bytes(), DUMP)
         self.assertEqual(
             (extracted / "configuration/configs/app-settings").read_text(),
             "mode = production",
         )
         manifest = json.loads((extracted / "manifest.json").read_text())
         self.assertEqual(manifest["recoveryPointAt"], result["capturedAt"])
+        self.assertEqual(manifest["stoppedServices"], {"app": 143})
         self.assertEqual(
-            manifest["stoppedServices"], {"app": 0, "worker": 0, "jobs": 143}
+            manifest["dumps"]["database"]["fingerprint"], FINGERPRINT.decode()
         )
         self.assertNotIn(SECRET, json.dumps(manifest))
+
+    def test_a_stack_whose_only_state_is_dumped_pauses_nothing(self):
+        """A web service on the managed PostgreSQL: the dump is consistent by
+        itself, so no service stops and the pause list is empty."""
+        source = self.source_stack(
+            {"app": {"image": "sg-app:rev-9"}, "postgres": {"image": "postgres:17"}}
+        )
+        docker = FakeDocker(
+            containers={APP: True, DATABASE: True},
+            services={APP: "app", DATABASE: "postgres"},
+            images={APP: "sg-app:rev-9", DATABASE: "postgres:17"},
+            mounts={
+                DATABASE: [
+                    {
+                        "Type": "volume",
+                        "Name": runner.compose_project(DEPLOYMENT) + "_database",
+                        "Destination": "/var/lib/postgresql",
+                        "RW": True,
+                    }
+                ]
+            },
+            exec_results={"psql": FINGERPRINT, "pg_dump": DUMP},
+        )
+        capture = {
+            "version": 2,
+            "pauseServices": [],
+            "volumes": [],
+            "dumps": [
+                {
+                    "volume": "database",
+                    "service": "postgres",
+                    "target": "/var/lib/postgresql",
+                    **POSTGRES_PROCEDURE,
+                }
+            ],
+        }
+        config = runner.load_config(
+            write_private(
+                self.directory / "config.json",
+                settings(
+                    kind="stack",
+                    capture=capture,
+                    composeSha256=runner.sha256(source / "compose.json"),
+                ),
+            )
+        )
+        client = FakeClient()
+        result = runner.perform_run(
+            config, self.state(config), storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(result["outcome"], "succeeded", result["errorCode"])
+        self.assertNotIn(("docker", "stop"), [call[:2] for call in docker.calls])
+        self.assertEqual(docker.started, [])
+        archive = self.directory / "online.tar.gz"
+        archive.write_bytes(client.objects[result["objectKey"]])
+        manifest = runner.archive_manifest(archive)
+        self.assertEqual(manifest["stoppedServices"], {})
+        self.assertEqual(manifest["method"], "quiesced writers and volume files, owner dumps")
 
     def test_a_mixed_archive_restores_its_files_sqlite_and_captured_dump(self):
         config, docker = self.generic_stack()
@@ -1637,9 +1794,7 @@ class ScheduledBackupTest(unittest.TestCase):
         stored = runner.perform_run(
             config, state, storage_factory=self.storage(client), command=docker
         )
-        restorer = FakeDocker(
-            exec_results={"pg_isready": b"", "pg_restore": b"", "psql": b"2|7\n"}
-        )
+        restorer = FakeDocker(exec_results={"pg_restore": b"", "psql": FINGERPRINT})
         restore = runner.perform_test_restore(
             config,
             state,
@@ -1648,24 +1803,87 @@ class ScheduledBackupTest(unittest.TestCase):
             command=restorer,
         )["restore"]
         self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        self.assertEqual(restore["scope"], "isolated-application")
         self.assertEqual(restore["recoveryPointAt"], stored["capturedAt"])
         for check in (
             "file-inventory",
             "database-integrity",
             "database-rows",
             "database-restored",
+            "database-content",
+            "application-boot",
         ):
             self.assertIn(check, restore["checks"])
         names = runner.restore_names(stored["id"])
-        # PostgreSQL restores the dump captured with these files, not any dump.
-        self.assertEqual(restorer.copied[names["container"] + ":/tmp/dump.pgc"], DUMP)
-        self.assertEqual(restorer.removed, [names["container"], names["volume"]])
+        # The owner loads the dump captured with these files, on standard
+        # input, alone; then the whole application comes up on the copy.
+        self.assertEqual(restorer.stdin["postgres"], [DUMP])
+        self.assertEqual(
+            sorted(restore["boot"]["services"]), ["app", "jobs", "postgres", "worker"]
+        )
+        self.assertEqual(restore["boot"]["project"], names["project"])
+        # Everything the restore created went again: the project came down
+        # and its labeled volumes were removed.
+        self.assertEqual(restorer.projects, {})
+        self.assertEqual(restorer.mountpoints, {})
+        self.assertIn(names["project"] + "_state", restorer.removed)
+        self.assertIn(names["project"] + "_database", restorer.removed)
         self.assertTrue(restore["cleanupComplete"])
+        self.assertFalse(state.cleanup_pending())
+
+    def test_a_kept_restore_stays_up_for_checks_until_recovery_removes_it(self):
+        config, docker = self.generic_stack()
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        restorer = FakeDocker(exec_results={"pg_restore": b"", "psql": FINGERPRINT})
+        receipt = runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+            keep=True,
+        )
+        names = runner.restore_names(stored["id"])
+        restore = receipt["restore"]
+        self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        # Up, owed, and visible as such: the controller checks inside it now.
+        self.assertFalse(restore["cleanupComplete"])
+        self.assertTrue(receipt["pendingCleanup"])
+        self.assertFalse(receipt["restoreInProgress"])
+        self.assertIn(names["project"], restorer.projects)
+        self.assertTrue(state.cleanup_pending())
+        journal = next(j for j in state.journals() if j["kind"] == "restore")
+        self.assertEqual(journal["project"], names["project"])
+        self.assertTrue((state.staging / names["stage"] / "compose.json").is_file())
+        # The receipt the controller reads carries the booted copy.
+        status = runner.build_status(config, state)["runs"][0]["restore"]
+        self.assertEqual(status["boot"]["project"], names["project"])
+        self.assertIn("application-boot", status["checks"])
+        # Recovery removes the project by its label and keeps the verdict.
+        result = runner.perform_recovery(
+            config, state, command=restorer, storage_factory=self.storage(client)
+        )
+        self.assertEqual(restorer.projects, {})
+        self.assertFalse(result["cleanupPending"])
+        final = state.load_receipt(stored["id"])
+        self.assertEqual(final["restore"]["outcome"], "verified")
+        self.assertTrue(final["restore"]["cleanupComplete"])
+        self.assertFalse((state.staging / names["stage"]).exists())
 
     def test_a_file_captured_database_restores_by_file_hashes_alone(self):
         """A broker whose clean shutdown leaves all its state in files."""
         source = self.source_stack(
-            {"app": {"image": "sg-app:rev-9"}, "queue": {"image": "example/queue:1"}}
+            {
+                "app": {"image": "sg-app:rev-9"},
+                "queue": {
+                    "image": "example/queue:1",
+                    "volumes": [{"type": "volume", "source": "queue", "target": "/data"}],
+                },
+            }
         )
         data = Path(tempfile.mkdtemp(dir=self.directory))
         (data / "segments").mkdir()
@@ -1686,19 +1904,16 @@ class ScheduledBackupTest(unittest.TestCase):
                 ]
             },
         )
+        docker.mountpoints[runner.compose_project(DEPLOYMENT) + "_queue"] = data
         capture = {
-            "version": 1,
-            "pauseServices": ["app", "queue"],
-            "postgres": None,
+            "version": 2,
+            "pauseServices": ["queue"],
             "volumes": [
                 {
                     "name": "queue",
                     "kind": "database",
                     "sqlite": None,
                     "capture": "quiesced-files",
-                    "mounts": [
-                        {"service": "queue", "target": "/data", "readOnly": False}
-                    ],
                 }
             ],
         }
@@ -1736,8 +1951,9 @@ class ScheduledBackupTest(unittest.TestCase):
         self.assertIn("file-inventory", restore["checks"])
         self.assertEqual(restore["measurements"]["files"], 2)
         # Hashes prove the files, not database semantics: no database check
-        # is claimed and no disposable database is started.
+        # is claimed. The application still boots on the copied files.
         self.assertEqual([c for c in restore["checks"] if c.startswith("database")], [])
+        self.assertIn("application-boot", restore["checks"])
         self.assertNotIn(("docker", "run"), [call[:2] for call in restorer.calls])
 
     def test_a_legacy_postgres_archive_still_restores(self):
@@ -1778,7 +1994,8 @@ class ScheduledBackupTest(unittest.TestCase):
         compose = self.directory / "source" / DEPLOYMENT / "compose.json"
 
         def unrecorded_volume(docker, config):
-            docker.mounts[JOBS] = [
+            # A paused writer holding a volume the plan does not know.
+            docker.mounts[APP].append(
                 {
                     "Type": "volume",
                     "Name": "f" * 64,
@@ -1786,9 +2003,10 @@ class ScheduledBackupTest(unittest.TestCase):
                     "Destination": "/cache",
                     "RW": True,
                 }
-            ]
+            )
 
         def writable_reader(docker, config):
+            # A service the plan leaves running must not write a captured volume.
             docker.mounts[WORKER][0]["RW"] = True
 
         def outside_writer(docker, config):
@@ -1798,13 +2016,7 @@ class ScheduledBackupTest(unittest.TestCase):
             ]
 
         def rebuilt_image(docker, config):
-            docker.images[JOBS] = "example/jobs:2"
-
-        def unrecorded_service(docker, config):
-            services = json.loads(compose.read_text())["services"]
-            services["cache"] = {"image": "valkey/valkey:8"}
-            compose.write_text(json.dumps({"services": services}))
-            config["composeSha256"] = runner.sha256(compose)
+            docker.images[APP] = "sg-app:rev-10"
 
         def edited_compose(docker, config):
             compose.write_text(compose.read_text().replace("jobs:1", "jobs:2"))
@@ -1813,14 +2025,17 @@ class ScheduledBackupTest(unittest.TestCase):
             uploads = Path(docker.mounts[APP][1]["Source"])
             (uploads / "escape").symlink_to("/etc/passwd")
 
+        def missing_volume(docker, config):
+            del docker.mountpoints[project + "_uploads"]
+
         cases = {
             "unrecorded volume": (unrecorded_volume, "source-unsupported"),
             "writable reader": (writable_reader, "source-unsupported"),
             "outside writer": (outside_writer, "source-unsupported"),
-            "unrecorded service": (unrecorded_service, "source-unsupported"),
             "rebuilt image": (rebuilt_image, "source-identity-mismatch"),
             "edited compose": (edited_compose, "source-identity-mismatch"),
             "linked file": (linked_file, "source-unsupported"),
+            "missing volume": (missing_volume, "source-missing"),
         }
         for name, (change, code) in cases.items():
             with self.subTest(name):
@@ -1838,11 +2053,11 @@ class ScheduledBackupTest(unittest.TestCase):
 
     def test_stack_capture_restarts_what_it_paused_after_a_failure_or_a_crash(self):
         def bad_dump(docker):
-            docker.exec_results["pg_dump"] = b"not a dump"
+            docker.exec_results["pg_dump"] = subprocess.CalledProcessError(1, "pg_dump")
 
         def killed_after_grace_period(docker):
             # SIGKILL: files may be mid-write, so there is no recovery point.
-            docker.exit_codes[WORKER] = 137
+            docker.exit_codes[APP] = 137
 
         client = FakeClient()
         for change, code in (
@@ -1857,8 +2072,7 @@ class ScheduledBackupTest(unittest.TestCase):
                     config, state, storage_factory=self.storage(client), command=docker
                 )
                 self.assertEqual(failed["errorCode"], code)
-                # Dependencies first, as after a successful capture.
-                self.assertEqual(docker.started, [JOBS, APP, WORKER])
+                self.assertEqual(docker.started, [APP])
                 self.assertTrue(all(docker.containers.values()))
                 self.assertEqual(client.objects, {})
         # The daemon refuses the restart: the journal stays open, and recovery
@@ -1869,11 +2083,12 @@ class ScheduledBackupTest(unittest.TestCase):
             config, state, storage_factory=self.storage(client), command=docker
         )
         self.assertEqual(crashed["errorCode"], "source-restart-failed")
-        self.assertFalse(any(docker.containers[c] for c in (APP, WORKER, JOBS)))
+        self.assertFalse(docker.containers[APP])
+        self.assertTrue(all(docker.containers[c] for c in (WORKER, JOBS, DATABASE)))
         self.assertTrue(state.cleanup_pending())
         docker.refuse_start = False
         result = runner.perform_recovery(config, state, command=docker)
-        self.assertEqual(docker.started, [JOBS, APP, WORKER])
+        self.assertEqual(docker.started, [APP])
         self.assertTrue(all(docker.containers.values()))
         self.assertFalse(result["cleanupPending"])
 
@@ -1888,6 +2103,9 @@ class ScheduledBackupTest(unittest.TestCase):
             {
                 "web": {
                     "image": "example/shelf:2",
+                    "volumes": [
+                        {"type": "volume", "source": "files", "target": "/srv/files"}
+                    ],
                     **({"labels": web_labels} if web_labels else {}),
                 },
                 "db": {
@@ -1896,8 +2114,16 @@ class ScheduledBackupTest(unittest.TestCase):
                         "MARIADB_ROOT_PASSWORD": SECRET,
                         "MARIADB_DATABASE": "shelf",
                     },
+                    "volumes": [
+                        {"type": "volume", "source": "data", "target": "/var/lib/mysql"}
+                    ],
                 },
-                "migrate": {"image": "example/shelf:2"},
+                "migrate": {
+                    "image": "example/shelf:2",
+                    "volumes": [
+                        {"type": "volume", "source": "files", "target": "/srv/files"}
+                    ],
+                },
             }
         )
         files = Path(tempfile.mkdtemp(dir=self.directory))
@@ -1931,22 +2157,12 @@ class ScheduledBackupTest(unittest.TestCase):
                 "mariadb-dump": b"-- dump of shelf\nINSERT 42;\n",
                 "mariadb-fingerprint": b"pages 3 sha 9f\n",
             },
+            mountpoints={f"{project}_files": files},
         )
         capture = {
-            "version": 1,
+            "version": 2,
             "pauseServices": ["web"],
-            "postgres": None,
-            "volumes": [
-                {
-                    "name": "files",
-                    "kind": "files",
-                    "sqlite": None,
-                    "mounts": [
-                        {"service": "web", "target": "/srv/files", "readOnly": False},
-                        {"service": "migrate", "target": "/srv/files", "readOnly": False},
-                    ],
-                }
-            ],
+            "volumes": [{"name": "files", "kind": "files", "sqlite": None}],
             "dumps": [
                 {
                     "volume": "data",
@@ -1957,7 +2173,6 @@ class ScheduledBackupTest(unittest.TestCase):
                     "verify": ["mariadb-fingerprint"],
                 }
             ],
-            "oneShot": ["migrate"],
         }
         path = write_private(
             self.directory / "config.json",
@@ -2025,25 +2240,96 @@ class ScheduledBackupTest(unittest.TestCase):
 
         verified, restorer = restore(b"pages 3 sha 9f\n")
         self.assertEqual(verified["outcome"], "verified", verified["errorCode"])
-        for check in ("file-inventory", "database-restored", "database-content"):
+        for check in (
+            "file-inventory",
+            "database-restored",
+            "database-content",
+            "application-boot",
+        ):
             self.assertIn(check, verified["checks"])
-        # The controller reads the sanitized receipt: the content check survives.
+        # The controller reads the sanitized receipt: the checks survive.
         self.assertIn("database-content", runner.sanitize_restore(verified)["checks"])
-        # The dump captured with these files was loaded on standard input.
-        self.assertEqual(
-            restorer.stdin["mariadb"], [b"-- dump of shelf\nINSERT 42;\n"]
+        # The dump captured with these files was loaded on standard input,
+        # into the owner started alone in the restored project.
+        self.assertEqual(restorer.stdin["db"], [b"-- dump of shelf\nINSERT 42;\n"])
+        ups = [call for call in restorer.calls if call[1:2] == ("compose",) and "up" in call]
+        self.assertIn("--no-deps", ups[0])
+        self.assertEqual(ups[0][-1], "db")
+        self.assertNotIn("--no-deps", ups[1])
+        # The restored project is isolated: no published ports, internal
+        # networks, fresh labeled volumes, no controller labels or restart.
+        definition = next(iter(restorer.projects.values()))["definition"] if restorer.projects else None
+        self.assertIsNone(definition)  # removed again after the verdict
+        written = next(
+            call for call in restorer.calls if call[1:2] == ("compose",) and "up" in call
         )
-        run = next(call for call in restorer.calls if call[:2] == ("docker", "run"))
-        self.assertIn("--env-file", run)
-        self.assertEqual(run[run.index("--network") + 1], "none")
-        # Private values reach the instance through a file, never an argument.
+        self.assertEqual(written[2], "-p")
+        self.assertEqual(written[3], names["project"])
+        self.assertNotIn(("docker", "run"), [call[:2] for call in restorer.calls])
+        # Private values reach the instance through the compose file, never
+        # an argument.
         self.assertNotIn(SECRET, json.dumps(restorer.calls))
-        self.assertEqual(restorer.removed, [names["container"], names["volume"]])
+        self.assertIn(names["project"] + "_data", restorer.removed)
+        self.assertIn(names["project"] + "_files", restorer.removed)
+        self.assertEqual(restorer.projects, {})
         self.assertTrue(verified["cleanupComplete"])
         changed, _ = restore(b"pages 2 sha 01\n")
         self.assertEqual(changed["outcome"], "failed")
         self.assertEqual(changed["errorCode"], "database-check-failed")
         self.assertTrue(changed["cleanupComplete"])
+
+    def test_a_restored_project_is_isolated_from_the_live_application(self):
+        config, docker = self.dump_stack()
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        names = runner.restore_names(stored["id"])
+        captured = {}
+
+        class Recording(FakeDocker):
+            def _compose(self, args, input, stdout):
+                if "up" in args:
+                    path = Path(args[args.index("-f") + 1])
+                    captured["definition"] = json.loads(path.read_text())
+                    captured["mode"] = path.stat().st_mode & 0o777
+                return super()._compose(args, input, stdout)
+
+        restorer = Recording(
+            exec_results={"mariadb": b"", "mariadb-fingerprint": b"pages 3 sha 9f\n"}
+        )
+        runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+        )
+        definition = captured["definition"]
+        self.assertEqual(captured["mode"], 0o600)
+        self.assertEqual(definition["name"], names["project"])
+        for name, service in definition["services"].items():
+            self.assertNotIn("ports", service)
+            self.assertNotIn("restart", service)
+            self.assertEqual(service["labels"], {runner.RESTORE_LABEL: stored["id"]})
+        self.assertEqual(
+            definition["networks"],
+            {"default": {"name": names["project"] + "_default", "internal": True}},
+        )
+        self.assertEqual(
+            definition["volumes"],
+            {
+                name: {"name": f"{names['project']}_{name}", "external": True}
+                for name in ("files", "data")
+            },
+        )
+        # The owner's environment, private value included, travels only in
+        # that root-owned file.
+        self.assertEqual(
+            definition["services"]["db"]["environment"]["MARIADB_ROOT_PASSWORD"], SECRET
+        )
+        self.assertNotIn(SECRET, json.dumps(restorer.calls))
 
     def test_stack_identity_follows_the_labels_its_definition_declares(self):
         # A service the definition labels must run this revision.

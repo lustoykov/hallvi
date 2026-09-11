@@ -335,22 +335,34 @@ const selection = {
           kind: Type.Union([Type.Literal("files"), Type.Literal("database")]),
           sqlite: Type.Optional(Type.Union([Type.String(), Type.Null()])),
           capture: Type.Optional(
-            Type.Union([Type.Literal("quiesced-files"), Type.Literal("dump")]),
+            Type.Union([
+              Type.Literal("quiesced-files"),
+              Type.Literal("dump"),
+              Type.Null(),
+            ]),
           ),
-          owner: Type.Optional(Type.String({ minLength: 1, maxLength: 63 })),
+          owner: Type.Optional(
+            Type.Union([
+              Type.String({ minLength: 1, maxLength: 63 }),
+              Type.Null(),
+            ]),
+          ),
           procedure: Type.Optional(
-            Type.Object(
-              Object.fromEntries(
-                ["dump", "restore", "verify"].map((name) => [
-                  name,
-                  Type.Array(Type.String({ minLength: 1, maxLength: 4000 }), {
-                    minItems: 1,
-                    maxItems: 40,
-                  }),
-                ]),
+            Type.Union([
+              Type.Object(
+                Object.fromEntries(
+                  ["dump", "restore", "verify"].map((name) => [
+                    name,
+                    Type.Array(
+                      Type.String({ minLength: 1, maxLength: 4000 }),
+                      { minItems: 1, maxItems: 40 },
+                    ),
+                  ]),
+                ),
+                { additionalProperties: false },
               ),
-              { additionalProperties: false },
-            ),
+              Type.Null(),
+            ]),
           ),
         },
         { additionalProperties: false },
@@ -427,7 +439,7 @@ The executor enforces the following and returns specific feedback:
 - It builds from the repository at the selected revision plus the new files you select. Never modify repository files: workspace edits to source are not deployed, and application code changes need an owner-merged revision. Author packaging (Compose files, Dockerfiles, configuration) as new files.
 - Private values appear only as \${NAME} references to recorded private inputs. Never write secret values.
 - Each service runs exactly one container. A one-shot service (a migration or initialization) is a dependency of the services that need it with condition service_completed_successfully: Compose starts them only after it exits 0, and verification requires that exit instead of a running process. Bind mounts must be read-only files you select. Host namespaces, privileged mode, added capabilities, devices, the Docker socket, host paths, external or driver-backed volumes/networks, remote build contexts and profiles are unsupported capability gaps.
-- Declare data for each new named volume: kind "files" or "database", its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all its state consistent in it, or capture "dump" for a database server. Name its owner: the service that owns the state, not every service that mounts it. The owner of a database keeps its image across releases and rollbacks unless the owner approves a change; the owner of files is recorded and upgrades freely. A dump procedure is three argument lists run in the owner's container, chosen from the software's documentation: dump prints a consistent copy while the other services are stopped; restore loads that copy from standard input into a fresh instance started from the same image and environment; verify prints a content fingerprint, such as row counts and checksums of key tables, that must match between the source and the restored copy. Reach credentials through the owner's environment variables inside sh -c, never as written values.
+- Declare data for each new named volume: kind "files" or "database", its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all its state consistent in it, or capture "dump" for a database server. Name its owner: the service that owns the state, not every service that mounts it. The owner of a database keeps its image across releases and rollbacks unless the owner approves a change; the owner of files is recorded and upgrades freely. A dump procedure is three argument lists run in the owner's container, chosen from the software's documentation: dump prints a consistent copy while the services that write files are stopped; restore loads that copy from standard input into a fresh instance started from the same image and environment; verify prints a content fingerprint, such as row counts and checksums of key tables, that must match between the source and the restored copy. Reach credentials through the owner's environment variables inside sh -c, never as written values. A volume that release.json already records keeps its owner, capture and procedure unless you set them; changing or removing an owner is a state change the owner decides, never an ordinary correction. Backups stop only the services that write captured files, dependents first; dump owners and everything else keep running.
 - It verifies each service's exact image, readiness and the behavior criterion. Readiness is not behavior. Give workers and brokers a Compose healthcheck; a running process alone does not prove queued work is processed. HTTP checks see only unauthenticated responses. Criterion commands verify what they cannot, such as an administrator login, completed setup or a processed job: each runs with docker compose exec in a running service after the HTTP checks, and passes when it exits 0 and its output includes its contains text. Name recorded private inputs in its inputs to receive them as environment variables; never write their values. Commands may change data, so keep them idempotent and limited to marked test data. Keep recorded checks: correct one under its name when a revision changes its response, and never drop or weaken one to pass.
 Tool errors are actionable feedback: inspect evidence, correct the configuration and resubmit when retryable; ordinary corrections need no approval. Complete at most one successful call. If unsafe or unsupported, explain why instead.`;
 
@@ -468,7 +480,7 @@ ${NATIVE_RULES}
 Records Compose cannot express, declared with your selection:
 - httpAccess: publish only the primary HTTP service, on host port 80 (for example "80:8080"); the host firewall opens nothing else and verification uses it. "controller" restricts HTTP to the controller's address for admin tools and install wizards until HTTPS is configured; "public" suits normal websites.
 - inputs: every secret the application needs, each with a short reason. The owner supplies values privately at approval; set generate for a value that only needs to be random, such as an encryption or session key, so no one has to invent it (Laravel's APP_KEY, for example, is {bytes: 32, encoding: "base64", prefix: "base64:"}). Generated values are never shown to anyone, so never generate a value a person must know or type, such as a sign-in password. Admin credentials are private inputs the owner supplies; never use published default passwords. Disable open signup when the application supports that setting. Where the application needs its own address, such as a base URL setting, reference \${SERVER_GUY_PUBLIC_URL}: the controller supplies it once the server exists.
-- database: for PostgreSQL, run the official postgres:16, 17 or 18 image as a service named postgres, with a named volume at its data directory, POSTGRES_USER=serverguy, POSTGRES_DB=application and POSTGRES_PASSWORD=\${${DATABASE_PASSWORD}}, and declare {service, version}. The controller generates that password; reference it wherever the application needs it, such as a connection URL. The controller also dumps and restores that database itself: record its volume as kind "database" owned by postgres, without capture or procedure. Any other database server is an ordinary service: declare its volume's data with that service as owner and a dump procedure.
+- database: for PostgreSQL, run the official postgres:16, 17 or 18 image as a service named postgres, with a named volume at its data directory, POSTGRES_USER=serverguy, POSTGRES_DB=application and POSTGRES_PASSWORD=\${${DATABASE_PASSWORD}}, and declare {service, version}. The controller generates that password; reference it wherever the application needs it, such as a connection URL. Declare its volume's data as kind "database" owned by postgres: without a procedure the controller records its default one (pg_dump custom format, pg_restore, a per-table row-hash fingerprint); declare capture "dump" with your own procedure to replace it. Any other database server is an ordinary service: declare its volume's data with that service as owner and a dump procedure.
 - criterion (required): checks you derive from route code you read, in the JSON shape given below. Include a content assertion on an application route beyond the health endpoint. For CRUD, create one object marked with SG_VERIFY_TOKEN, capture its ID (captureId is a dot-separated JSON path), read it via {id}, and finally delete only that ID. waitSeconds (up to 30) lets a read poll for asynchronous work. services[] checks private HTTP services by container port. commands[] verify behavior HTTP cannot reach, such as that the administrator from private inputs can sign in and published default credentials cannot. Static sites may check recognizable content. Never manufacture an endpoint or claim a worker is verified without evidence; explain the limitation instead.
 Call recommend_deployment with compose (Compose files in -f order), files (every other file Compose or builds need), data, criterion, inputs, httpAccess, database and a short summary for the owner.`,
     tools: ["read_repository", "recommend_deployment"],

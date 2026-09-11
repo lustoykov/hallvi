@@ -41,6 +41,8 @@ export function restoreFailure(run: ScheduledRun) {
     "restore-image-unavailable":
       "The isolated restore could not start because its database image is unavailable.",
     "database-check-failed": "The isolated database checks failed.",
+    "boot-failed":
+      "The restored data loaded, but the application did not come up on it in isolation.",
     "manifest-mismatch":
       "The restored contents did not match the recorded capture manifest.",
     "verify-mismatch":
@@ -203,7 +205,7 @@ export function scheduledProtection(
           recoveryPointAt: restored.restore.recoveryPointAt!,
           verified:
             policy.kind === "stack"
-              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.dumps ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""} Application boot was not tested.`
+              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.dumps ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""}${restored.restore.checks.includes("application-boot") ? ` The restored application booted in isolation${restored.restore.boot ? ` in ${restored.restore.boot.seconds} s (${Object.keys(restored.restore.boot.services).length} services)` : ""}; its behavior checks are recorded on the restore operation.` : " Application boot was not tested."}`
               : policy.kind === "postgres"
                 ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
                 : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,

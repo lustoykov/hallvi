@@ -32,7 +32,9 @@ async function dispatch(record: StoredOperation) {
               keep: command.keep,
               operationId: record.id,
             }
-          : undefined,
+          : command.type === "test-restore" && command.checks
+            ? { schedule: "daily", keep: 7, checks: command.checks }
+            : undefined,
       );
     }
     case "recreate-deployment":

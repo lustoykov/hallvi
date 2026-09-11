@@ -16,7 +16,13 @@ export type OperationCommand =
       service?: string;
       lines?: number;
     }
-  | { type: "run-backup" | "test-restore"; deploymentId: string }
+  | { type: "run-backup"; deploymentId: string }
+  | {
+      type: "test-restore";
+      deploymentId: string;
+      /** Commands Pi chose to run inside the restored copy. */
+      checks?: import("./command-checks").CommandCheck[];
+    }
   | {
       type: "configure-backups";
       deploymentId: string;

@@ -1,5 +1,6 @@
 // Rig B: start the Linux host container and the S3-compatible storage its
-// backups upload to. Idempotent. The host publishes HTTP on 127.0.0.1:80, so
+// backups upload to. Idempotent. MinIO comes from its own registry (Quay);
+// Docker Hub no longer serves its latest tag. The host publishes HTTP on 127.0.0.1:80, so
 // Rig A's containers must not hold that port. MinIO runs inside the host's
 // own dockerd as https://s3.rig.amazonaws.com (the product's S3 endpoint
 // rule), with a rig CA that only the host's server-guy-* units trust through
@@ -118,7 +119,7 @@ if ! docker ps --format '{{.Names}}' | grep -qx rig-minio; then
     -p 127.0.0.1:443:9000 -v rig-minio-data:/data \\
     -v /etc/rig-minio/certs/public.crt:/root/.minio/certs/public.crt:ro \\
     -v /etc/rig-minio/certs/private.key:/root/.minio/certs/private.key:ro \\
-    --env-file /etc/rig-minio/env minio/minio server /data >/dev/null
+    --env-file /etc/rig-minio/env quay.io/minio/minio:latest server /data >/dev/null
 fi`);
 wait(
   "MinIO",
@@ -129,7 +130,7 @@ wait(
   120,
 );
 host(`docker run --rm --network container:rig-minio --env-file /etc/rig-minio/env \\
-  minio/mc --insecure mb --ignore-existing local/${keys.bucket}`);
+  quay.io/minio/mc:latest --insecure mb --ignore-existing local/${keys.bucket}`);
 console.log(
   JSON.stringify({
     container: name,

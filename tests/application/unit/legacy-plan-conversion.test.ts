@@ -15,7 +15,10 @@ import { beginDeploymentAttempt } from "../../../src/server/deployment-lifecycle
 import { rollbackSelection } from "../../../src/server/rollback";
 import { nativeApp } from "../../fixtures/native";
 import { executableCompose } from "../../../src/server/native-compose";
-import { nativeFacts } from "../../../src/server/release-facts";
+import {
+  managedDatabaseProcedure,
+  nativeFacts,
+} from "../../../src/server/release-facts";
 
 // The golden file was written by the retired renderer before its deletion:
 // what it rendered for representative plans, their release identities, and
@@ -107,8 +110,35 @@ it.each(golden.cases.map((item) => [item.name, item] as const))(
       variables: legacyVariables,
       inputs: legacyInputs,
       ...legacy
-    } = item.facts as typeof facts;
-    expect(rest).toEqual(legacy);
+    } = item.facts as unknown as typeof facts;
+    // Facts read today carry what the retired renderer never projected: each
+    // service's image reference, and the managed database's volume as a
+    // declared dump owned by its service, with the default procedure.
+    const without = <T extends object>(value: T, keys: string[]) =>
+      Object.fromEntries(
+        Object.entries(value).filter(([key]) => !keys.includes(key)),
+      );
+    const declaration = ["owner", "capture", "procedure"];
+    expect({
+      ...rest,
+      services: rest.services.map((service) => without(service, ["image"])),
+      volumes: rest.volumes.map((volume) => without(volume, declaration)),
+    }).toEqual({
+      ...legacy,
+      volumes: legacy.volumes.map((volume) => without(volume, declaration)),
+    });
+    for (const volume of facts.volumes)
+      if (volume.name === facts.database?.volume)
+        expect(volume).toMatchObject({
+          owner: facts.database.service,
+          capture: "dump",
+          procedure: managedDatabaseProcedure,
+        });
+      else
+        expect([volume.owner, volume.capture]).toEqual([
+          undefined,
+          legacy.volumes.find((v) => v.name === volume.name)?.capture,
+        ]);
     expect(inputs).toEqual([...legacyInputs].sort());
     // Native facts list every service's environment names, including the
     // managed database's own; the retired projection listed the plan's.

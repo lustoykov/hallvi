@@ -22,6 +22,7 @@ import type { TreeFile } from "./execution-tree";
 import { runComposeResolver } from "./pi-workspace";
 import {
   composeProject,
+  managedDatabaseProcedure,
   nativeFacts,
   primaryHttp,
   releaseFacts,
@@ -48,14 +49,18 @@ export interface NativeSelection {
   compose: string[];
   /** Other selected files Compose or builds need. */
   files?: string[];
-  /** Protection records for new named volumes. */
+  /**
+   * Protection records for named volumes. A volume the baseline already
+   * records keeps its owner, capture and procedure unless a field is set;
+   * null removes one explicitly.
+   */
   data?: {
     volume: string;
     kind: "database" | "files";
     sqlite?: string | null;
-    capture?: "quiesced-files" | "dump";
-    owner?: string;
-    procedure?: NativeConfiguration["data"][number]["procedure"];
+    capture?: "quiesced-files" | "dump" | null;
+    owner?: string | null;
+    procedure?: NativeConfiguration["data"][number]["procedure"] | null;
   }[];
   /** JSON criterion in the current criterion's shape; omit to keep it. */
   criterion?: string;
@@ -506,7 +511,7 @@ async function controllerOverride(
     const entry: { labels?: Record<string, string>; image?: string } = {};
     // State owners keep running across application releases: a changed
     // revision label alone would make Compose recreate them.
-    if (name !== database && !owners.has(name))
+    if (!owners.has(name))
       entry.labels = {
         "server-guy.revision": revision,
         "server-guy.deployment": deploymentId,
@@ -538,7 +543,13 @@ async function controllerOverride(
   return { services };
 }
 
-function dataRecords(
+/**
+ * The data records of a release: Pi's declarations over what the baseline
+ * already records. A correction that redeclares a volume keeps its owner,
+ * capture and procedure unless it sets them, so protection is never lost by
+ * omission; the scope rules decide whether a change needs the owner.
+ */
+export function dataRecords(
   resolved: ResolvedCompose,
   declarations: NonNullable<NativeSelection["data"]>,
   baseline: ReleaseFacts,
@@ -563,21 +574,24 @@ function dataRecords(
       (item) => item.dockerName === resolved.volumes?.[volume]?.name,
     );
     const declaration = declared.get(volume);
+    const inherited = previous && {
+      kind: previous.kind,
+      sqlite: previous.sqlite,
+      capture: previous.capture,
+      owner: previous.owner,
+      procedure: previous.procedure,
+    };
+    const set = <T>(value: T | null | undefined, kept: T | undefined) =>
+      value === undefined ? kept : (value ?? undefined);
     const record = declaration
       ? {
           kind: declaration.kind,
-          sqlite: declaration.sqlite ?? null,
-          capture: declaration.capture,
-          owner: declaration.owner,
-          procedure: declaration.procedure,
+          sqlite: set(declaration.sqlite, inherited?.sqlite) ?? null,
+          capture: set(declaration.capture, inherited?.capture),
+          owner: set(declaration.owner, inherited?.owner),
+          procedure: set(declaration.procedure, inherited?.procedure),
         }
-      : previous && {
-          kind: previous.kind,
-          sqlite: previous.sqlite,
-          capture: previous.capture,
-          owner: previous.owner,
-          procedure: previous.procedure,
-        };
+      : inherited;
     if (!record)
       throw new NativeConfigurationError(
         `Declare data for new volume ${volume}: kind "files" or "database", with its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all state consistent in it, or capture "dump" with its owner and procedure.`,
@@ -603,6 +617,18 @@ function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: owner ${record.owner} must be a service that mounts it read-write.`,
       );
+    // The managed PostgreSQL is a database owner like any other; without a
+    // declared procedure it dumps with the controller's default one.
+    if (
+      record.kind === "database" &&
+      !record.capture &&
+      !record.sqlite &&
+      record.owner &&
+      record.owner === baseline.database?.service
+    ) {
+      record.capture = "dump";
+      record.procedure = managedDatabaseProcedure;
+    }
     const procedure = record.procedure;
     const commands = procedure
       ? [procedure.dump, procedure.restore, procedure.verify]
@@ -623,11 +649,6 @@ function dataRecords(
     )
       throw new NativeConfigurationError(
         `Volume ${volume}: capture "dump" names its owner service and a procedure of dump, restore and verify commands, each an argument list run in the owner's container.`,
-      );
-    // One mechanism per state: the managed database has the controller's own.
-    if (record.capture === "dump" && record.owner === baseline.database?.service)
-      throw new NativeConfigurationError(
-        `Volume ${volume}: the controller dumps and restores the managed PostgreSQL service ${record.owner} itself. Record this volume as kind "database" owned by ${record.owner}, without capture or procedure.`,
       );
     if (record.procedure && record.capture !== "dump")
       throw new NativeConfigurationError(
@@ -711,6 +732,12 @@ function criterionOf(
 
 const sha256 = (content: Buffer) =>
   createHash("sha256").update(content).digest("hex");
+
+/** The major version an official postgres image reference names. */
+function managedDatabaseVersion(image: string | undefined) {
+  const match = /^postgres:(16|17|18)(?:[.-]|@|$)/.exec(image ?? "");
+  return match ? (match[1] as "16" | "17" | "18") : null;
+}
 
 /**
  * Resolve Pi's exact selection into a native release configuration. Private
@@ -841,7 +868,10 @@ export async function prepareNativeRelease(input: {
     database: baseline.database
       ? {
           service: baseline.database.service,
-          version: baseline.database.version as "16" | "17" | "18",
+          version:
+            managedDatabaseVersion(
+              resolved.services[baseline.database.service]?.image,
+            ) ?? (baseline.database.version as "16" | "17" | "18"),
         }
       : null,
     httpAccess: baseline.httpAccess,
@@ -1004,17 +1034,21 @@ export function currentConfigurationFiles(
       : `native Compose, resolved by ${native.resolver}`,
     httpAccess: facts.httpAccess,
     exposure: facts.exposure,
-    volumes: facts.volumes.map(({ name, kind, sqlite, capture, mounts }) => ({
-      name,
-      kind,
-      sqlite,
-      ...(capture ? { capture } : {}),
-      mounts: mounts.map(({ service, target, readOnly }) => ({
-        service,
-        target,
-        readOnly,
-      })),
-    })),
+    volumes: facts.volumes.map(
+      ({ name, kind, sqlite, capture, owner, procedure, mounts }) => ({
+        name,
+        kind,
+        sqlite,
+        ...(capture ? { capture } : {}),
+        ...(owner ? { owner } : {}),
+        ...(procedure ? { procedure } : {}),
+        mounts: mounts.map(({ service, target, readOnly }) => ({
+          service,
+          target,
+          readOnly,
+        })),
+      }),
+    ),
     managedDatabase: facts.database && {
       ...facts.database,
       user: databaseUser,

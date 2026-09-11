@@ -62,24 +62,19 @@ export function scopeDifferences(
       ].join("")}.`,
     );
   const database = baseline.database;
-  if (
-    database &&
-    (next.database?.service !== database.service ||
-      next.database.version !== database.version ||
-      next.database.image !== database.image)
-  )
+  if (database && next.database?.service !== database.service)
     problems.push(
-      `Removing or upgrading the managed database (${database.service}, ${database.image}) needs a separate data-change decision.`,
+      `Removing or renaming the managed database service ${database.service} needs a separate data-change decision.`,
     );
   // A declared owner keeps its image: the data it wrote may not be readable
   // by another version. An approved state change permits one.
   for (const owner of stateOwners(baseline)) {
-    if (owner === database?.service || allowed.includes(owner)) continue;
+    if (allowed.includes(owner)) continue;
     const was = baseline.services.find((service) => service.name === owner);
     const now = next.services.find((service) => service.name === owner);
-    if (was && (!now || now.pinned !== was.pinned || now.build !== was.build))
+    if (was && (!now || now.image !== was.image || now.build !== was.build))
       problems.push(
-        `Service ${owner} owns persistent data, so changing its image (${was.pinned ?? "built"} → ${now ? (now.pinned ?? "built") : "removed"}) needs the owner's decision: propose it as a state change with its compatibility evidence.`,
+        `Service ${owner} owns persistent data, so changing its image (${was.build ? "built" : was.image} → ${now ? (now.build ? "built" : now.image) : "removed"}) needs the owner's decision: propose it as a state change with its compatibility evidence.`,
       );
   }
   for (const volume of baseline.volumes) {
@@ -103,6 +98,18 @@ export function scopeDifferences(
     )
       problems.push(
         `Preserve volume ${volume.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
+      );
+    // Its declared owner and capture stay through ordinary corrections: an
+    // owner that vanished from the records would lose its image protection
+    // and its data would lose its capture on the next release.
+    if (
+      kept &&
+      volume.owner &&
+      !allowed.includes(volume.owner) &&
+      (kept.owner !== volume.owner || kept.capture !== volume.capture)
+    )
+      problems.push(
+        `Volume ${volume.name} is owned by ${volume.owner}${volume.capture ? ` with capture "${volume.capture}"` : ""}; a correction keeps that declaration. Changing or removing it needs the owner's decision: propose it as a state change for ${volume.owner}.`,
       );
   }
   return problems;

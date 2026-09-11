@@ -372,6 +372,7 @@ import {
 import { releaseOf } from "../../../src/server/deployment-release";
 import {
   currentFacts,
+  managedDatabaseProcedure,
   nativeFacts,
   type ReleaseFacts,
 } from "../../../src/server/release-facts";
@@ -1720,30 +1721,8 @@ it.skipIf(!proof)(
       const undeclared = JSON.parse(await call("recommend_deployment", intake));
       expect(undeclared).toMatchObject({ ok: false, retryable: true });
       expect(undeclared.message).toContain("APP_SECRET");
-      // The managed database has its own dump; a second one is feedback.
-      const duplicated = JSON.parse(
-        await call("recommend_deployment", {
-          ...intake,
-          inputs: [{ name: "APP_SECRET", reason: "Signs notes" }],
-          data: [
-            {
-              volume: "database",
-              kind: "database",
-              capture: "dump",
-              owner: "postgres",
-              procedure: {
-                dump: ["pg_dump"],
-                restore: ["psql"],
-                verify: ["psql"],
-              },
-            },
-          ],
-        }),
-      );
-      expect(duplicated).toMatchObject({ ok: false, retryable: true });
-      expect(duplicated.message).toContain(
-        "dumps and restores the managed PostgreSQL",
-      );
+      // The managed database is a database owner like any other: declared
+      // without a procedure, it gets the controller's default one.
       expect(
         JSON.parse(
           await call("recommend_deployment", {
@@ -1754,6 +1733,7 @@ it.skipIf(!proof)(
                 reason: "Signs the digest returned with notes",
               },
             ],
+            data: [{ volume: "database", kind: "database", owner: "postgres" }],
           }),
         ),
       ).toMatchObject({ ok: true });
@@ -1822,10 +1802,20 @@ it.skipIf(!proof)(
         host.prepared.map((entry) => [entry.stage, entry.accepted]),
       ).toEqual([
         ["intake", false],
-        ["intake", false],
         ["intake", true],
         ["execution", true],
         ["execution", true],
+      ]);
+      // The approved release records the managed database's default dump.
+      expect(live.lifecycle!.releases[0].native!.data).toEqual([
+        {
+          volume: "database",
+          kind: "database",
+          sqlite: null,
+          capture: "dump",
+          owner: "postgres",
+          procedure: managedDatabaseProcedure,
+        },
       ]);
       // One server, with the firewall the approval implies, and no private
       // value in the record.
