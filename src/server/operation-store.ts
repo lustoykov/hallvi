@@ -623,6 +623,28 @@ export function cancelOperation(
     return record;
   });
 }
+/**
+ * The latest release that continued a stopped first deployment and failed:
+ * a further correction retries it, not the deployment operation it already
+ * superseded, and keeps the authority the owner approved for it.
+ */
+export function stoppedContinuation(
+  applicationId: string,
+  deploymentId: string,
+) {
+  return (
+    rows(applicationId).find((row) => {
+      const command = row.command;
+      return (
+        command?.type === "release-deployment" &&
+        command.scope.initial === true &&
+        command.scope.deploymentId === deploymentId &&
+        row.state === "failed" &&
+        !row.resolvedById
+      );
+    }) ?? null
+  );
+}
 /** A failed operation another one superseded needs no decision of its own. */
 export function resolveOperation(id: string, resolvedById: string) {
   return transaction(() => {

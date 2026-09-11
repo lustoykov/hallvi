@@ -85,13 +85,13 @@ Reviewer priorities on head `e86ba9a`: unify managed PostgreSQL with declared ow
 
 | Work | State | Evidence |
 | --- | --- | --- |
-| Gap B: declarations survive corrections; owner changes need authority | pending | |
-| Priority 1: managed PostgreSQL through the declared mechanism; pause by evidence | pending | |
-| Gap A: unknown command outcome hold, durable host result, reconciliation, timeout | pending | |
-| Priority 2: recovery of a failed first deployment through Pi | pending | |
-| Priority 3: isolated boot and command checks in the restore test | pending | |
-| Priority 4: BookStack and Healthchecks proofs with real Pi on Rig B | pending | |
-| Docs: architecture, product, requirements, roadmap, testing index | pending | |
+| Gap B: declarations survive corrections; owner changes need authority | done | `7f8121f`: `dataRecords` inherits owner, capture and procedure; `scopeDifferences` refuses a changed or removed owner without that owner's state change and compares image references. Regressions: two-release case in `native-release.test.ts`, ownership and managed-image rules in `release-scope.test.ts`. |
+| Priority 1: managed PostgreSQL through the declared mechanism; pause by evidence | done | `7f8121f`: default procedure `managedDatabaseProcedure`, projected onto older records; capture plan v2 pauses writers of captured files only; the runner's PostgreSQL route, `oneShot`, `postgresVolume` and mount-list checks are gone. Python and unit tests cover an empty pause list, a paused writer beside a running reader, and foreign writers. Rig proof pending. |
+| Gap A: unknown command outcome hold, durable host result, reconciliation, timeout | done | `7f8121f`: detached check with start and exit records, `commandPending` hold, `resolvePendingCommand`, in-container `timeout`. Proofs: `command-check-hold.test.ts` (real shell, stub docker, lost session, one mutation, no replay; unbounded timeout stays unknown), unit cases, release-level hold and retry in `application-releases.test.ts`. |
+| Priority 2: recovery of a failed first deployment through Pi | done in code | `7f8121f`: `prepare_release` on a stopped first deployment retries it with a recorded correction or proposes a state-change release that finishes it; queue hold passed to the successor. `initial-release.test.ts` covers both. Real-Pi proof pending. |
+| Priority 3: isolated boot and command checks in the restore test | done in code | `7f8121f`: runner `--test-restore <run> --keep` boots the archived stack as `sg-restore-<run8>`; the controller runs recorded and chosen checks inside it and recovers; `restoreChecks` on `propose_change`. Python and unit tests. Rig proof pending. |
+| Priority 4: BookStack and Healthchecks proofs with real Pi on Rig B | in progress | Fresh Rig B host (MinIO now from Quay; Docker Hub dropped its `latest` tag) and rig `rigb2` on 3398. |
+| Docs: architecture, product, requirements, roadmap, testing index | in progress | architecture.md updated for the mechanisms; product, requirements, roadmap and the evidence index follow the proofs. |
 
 ### Remaining proof
 

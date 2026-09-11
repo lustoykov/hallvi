@@ -485,6 +485,7 @@ export function completeInitialDeployment(record: DeploymentRecord) {
   if (record.url) return;
   const verified = currentFacts(record)!;
   record.status = "live";
+  record.correction = null;
   record.url = `http://${record.address}`;
   deploymentEvent(
     record,

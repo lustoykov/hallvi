@@ -541,17 +541,37 @@ export async function runApplicationRelease(
   )!;
   record.releaseOperationId = tracked.id;
   saveDeployment(record);
-  const evidence = await releaseLoop({
-    record,
-    tracked,
-    scope,
-    baseline,
-    current: baseline,
-    token,
-    signal,
-    task: `Approved task: ${requirements}\nRelease scope: ${JSON.stringify(scope)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-attempt approval.`,
-  });
-  return { evidence };
+  // A release continuing a stopped first deployment starts from what the
+  // last execution left on the host, and carries the conversation's latest
+  // correction beside the task the owner approved.
+  const current = scope.initial ? (releaseOf(record) ?? baseline) : baseline;
+  const correction =
+    scope.initial && record.correction
+      ? `\nCorrection requested from the owner's conversation at ${record.correction.at}: ${record.correction.instructions.slice(0, 3000)}`
+      : "";
+  try {
+    const evidence = await releaseLoop({
+      record,
+      tracked,
+      scope,
+      baseline,
+      current,
+      token,
+      signal,
+      task: `Approved task: ${requirements}${correction}\nRelease scope: ${JSON.stringify(scope)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-attempt approval.`,
+    });
+    return { evidence };
+  } catch (error) {
+    // The deployment card shows why its continuation stopped, not the
+    // earlier failure's text.
+    if (scope.initial && record.status === "failed") {
+      record.error = redactSecrets(
+        error instanceof Error ? error.message : "The release failed.",
+      ).text.slice(0, 4000);
+      saveDeployment(record);
+    }
+    throw error;
+  }
 }
 
 /**

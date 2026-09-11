@@ -91,7 +91,10 @@ import {
   runApplicationRelease,
   runInitialRelease,
 } from "../../../src/server/application-releases";
-import { executeOperation } from "../../../src/server/application-operations";
+import {
+  executeOperation,
+  recordOperationRemoteEffect,
+} from "../../../src/server/application-operations";
 import { invalidateDeploymentRuntime } from "../../../src/server/deployment-lifecycle";
 import { ReleaseExecutionError } from "../../../src/server/release-executor";
 import {
@@ -670,4 +673,107 @@ it("a state owner's image change on a stopped first deployment is a release the 
   // The stopped deployment's own operation no longer needs a decision.
   expect(operation(`deployment:${record.id}`)!.resolvedById).toBe(started.id);
   expect(JSON.stringify(live)).not.toContain(SECRET);
+});
+
+it("a further correction continues the latest failed release, keeping its approved state change, rather than the deployment it superseded", async () => {
+  const record = await stopped((native) => {
+    native.data[0].owner = "app";
+  });
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Run the maintained image instead.",
+    undefined,
+    { services: ["app"], evidence: "Both images read the same SQLite schema." },
+  );
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.prepare.mockImplementation(async ({ deploymentId }) => {
+    const changed = native(deploymentId, (service) => {
+      delete service.build;
+      service.image = `ghcr.io/qa/notes@sha256:${"c".repeat(64)}`;
+    });
+    changed.data[0].owner = "app";
+    return changed;
+  });
+  // The approved image change executes but a second problem stops it.
+  model.execute.mockImplementation(async (r, release) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "Application behavior check failed: Home (HTTP 502).",
+      true,
+      "verification",
+      true,
+    );
+  });
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection, [])).toMatchObject({ ok: false });
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    executeOperation(started, () =>
+      runApplicationRelease(started, new AbortController().signal),
+    ),
+  ).rejects.toThrow("stopped");
+  const halted = getDeployment(record.id)!;
+  expect(halted.status).toBe("failed");
+  expect(halted.error).toContain("stopped without a completed release");
+  expect(operation(started.id)).toMatchObject({
+    state: "failed",
+    blocksQueue: true,
+  });
+  // Pi finds the second cause and continues: the same release, retried
+  // under its approval, with the new instructions; the deployment's own
+  // operation is not queued behind it.
+  const resumed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "The web service listens on 8000 in the maintained image; publish that port.",
+  );
+  expect(resumed).toMatchObject({
+    state: "working",
+    source: { type: "release" },
+  });
+  const command = operation(resumed.id)!.command as {
+    type: string;
+    scope: { initial?: boolean; stateChange?: { services: string[] } };
+  };
+  expect(command.type).toBe("release-deployment");
+  expect(command.scope.initial).toBe(true);
+  expect(command.scope.stateChange?.services).toEqual(["app"]);
+  expect(operation(started.id)!.resolvedById).toBe(resumed.id);
+  expect(getDeployment(record.id)!.correction?.instructions).toContain(
+    "publish that port",
+  );
+  const image = `sha256:${"f".repeat(64)}`;
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.context).toContain(
+      "Correction requested from the owner's conversation",
+    );
+    expect(options.context).toContain("publish that port");
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await executeOperation(operation(resumed.id)!, () =>
+    runApplicationRelease(operation(resumed.id)!, new AbortController().signal),
+  );
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.url).toBe("http://203.0.113.7");
+  expect(live.correction).toBeNull();
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(operation(`deployment:${record.id}`)!.resolvedById).toBe(resumed.id);
 });
