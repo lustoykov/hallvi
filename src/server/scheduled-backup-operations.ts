@@ -1,9 +1,37 @@
 import { z } from "zod";
+import { backupCapturePlan } from "./backup-capture-plan";
 import { applicationDeployment } from "./deployment-store";
+import type { DeploymentRecord } from "./deployment-types";
+import { currentFacts } from "./release-facts";
 import { proposeOperation, publicOperation } from "./operation-store";
 import { backupKind } from "./scheduled-backup-install";
 import { readBackupPolicy } from "./scheduled-backup-store";
 import { backupPolicySchema, scheduleLabel } from "./scheduled-backup-types";
+
+/** What capture stops and keeps running, from the recorded capture plan. */
+function capturePause(record: DeploymentRecord) {
+  const facts = currentFacts(record);
+  if (!facts)
+    return "Capture pauses the application's services. Pause duration depends on shutdown and data size.";
+  const plan = backupCapturePlan(facts);
+  const kept = [
+    ...new Set([
+      ...(plan.postgres ? [plan.postgres] : []),
+      ...(plan.dumps ?? []).map((dump) => dump.service),
+    ]),
+  ];
+  return [
+    plan.pauseServices.length
+      ? `Capture stops ${plan.pauseServices.join(", ")}.`
+      : "Capture stops no other service.",
+    ...(kept.length
+      ? [
+          `${kept.join(", ")} ${kept.length === 1 ? "keeps" : "keep"} running to dump ${kept.length === 1 ? "its" : "their"} data.`,
+        ]
+      : []),
+    "Pause duration depends on shutdown and data size.",
+  ].join(" ");
+}
 
 export const backupSelectionSchema = z.object({
   schedule: backupPolicySchema.shape.schedule.default("daily"),
@@ -26,7 +54,7 @@ export function proposeBackupOperation(
     throw new Error("A live deployment is required to capture a new backup.");
   const pause =
     action === "configure-backups" || installed?.kind === "stack"
-      ? "Capture pauses all application services; managed PostgreSQL stays running for its dump. Pause duration depends on shutdown and data size."
+      ? capturePause(record)
       : installed?.kind === "postgres"
         ? "The PostgreSQL dump runs online."
         : "SQLite/file capture pauses the application.";

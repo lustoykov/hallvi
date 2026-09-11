@@ -30,10 +30,6 @@ export async function runCommandCheck(
   record: DeploymentRecord,
   check: CommandCheck,
   signal: AbortSignal,
-  target = {
-    directory: `/opt/server-guy/${record.id}`,
-    project: composeProject(record.id),
-  },
 ): Promise<CheckResult> {
   const secrets = releaseSecrets(record);
   const available: Record<string, string> = secrets.values;
@@ -55,10 +51,10 @@ export async function runCommandCheck(
   const marker = `SG_CHECK_EXIT_${randomUUID().replaceAll("-", "")}`;
   const seconds = check.timeoutSeconds ?? 60;
   const script = [
-    `cd ${shellQuote(target.directory)} || exit 90`,
+    `cd ${shellQuote(`/opt/server-guy/${record.id}`)} || exit 90`,
     ...names.map((_, index) => `IFS= read -r SG_V${index} || exit 90`),
     'output=$(mktemp) || exit 90',
-    `env ${names.map((name, index) => `${name}="$SG_V${index}" `).join("")}timeout -k 5 ${seconds} docker compose -p ${target.project} -f compose.json exec -T ${names.map((name) => `-e ${name} `).join("")}${shellQuote(check.service)} ${check.run.map(shellQuote).join(" ")} >"$output" 2>&1 </dev/null`,
+    `env ${names.map((name, index) => `${name}="$SG_V${index}" `).join("")}timeout -k 5 ${seconds} docker compose -p ${composeProject(record.id)} -f compose.json exec -T ${names.map((name) => `-e ${name} `).join("")}${shellQuote(check.service)} ${check.run.map(shellQuote).join(" ")} >"$output" 2>&1 </dev/null`,
     "code=$?",
     `tail -c ${OUTPUT_CHARACTERS * 8} "$output"`,
     'rm -f "$output"',

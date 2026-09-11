@@ -450,7 +450,7 @@ export async function askPi(
         name: "propose_change",
         label: "Propose an application change",
         description:
-          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Executors cover initial deployment, container recreation and scheduled backups of declared file volumes, SQLite files and the managed PostgreSQL database; other data is refused with the reason. configure-backups uses already connected private R2/S3 access; specify backupPolicy. run-backup verifies an uploaded copy; test-restore checks an isolated database/file restoration, not application boot or cutover. Every change asks approval. Never claim protection from a schedule alone.",
+          "Propose a supported change or refer to the existing unresolved operation. No spending authority is granted. Executors cover initial deployment, container recreation and scheduled backups of declared file volumes, SQLite files, the managed PostgreSQL database and databases whose owner declares a dump procedure; other data is refused with the reason. configure-backups uses already connected private R2/S3 access; specify backupPolicy. run-backup verifies an uploaded copy; test-restore checks an isolated restoration of the recorded databases and files (a declared dump loads into a fresh instance and must match its content fingerprint), not application boot or cutover. Every change asks approval. Never claim protection from a schedule alone.",
         parameters: Type.Object(
           {
             action: Type.Union([

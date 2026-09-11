@@ -201,7 +201,7 @@ export function scheduledProtection(
           recoveryPointAt: restored.restore.recoveryPointAt!,
           verified:
             policy.kind === "stack"
-              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""} Application boot was not tested.`
+              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.dumps ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""} Application boot was not tested.`
               : policy.kind === "postgres"
                 ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
                 : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,

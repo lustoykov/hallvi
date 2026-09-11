@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   ssh: vi.fn(),
   delay: vi.fn(),
+  facts: vi.fn(),
 }));
 vi.mock("../../../src/server/deployment-store", () => ({
   applicationDeployment: mocks.deployment,
@@ -35,6 +36,10 @@ vi.mock("../../../src/server/application-operations", () => ({
   duringApplicationOperation: (_: string, work: () => unknown) => work(),
 }));
 vi.mock("node:timers/promises", () => ({ setTimeout: mocks.delay }));
+vi.mock(import("../../../src/server/release-facts"), async (original) => ({
+  ...(await original()),
+  currentFacts: mocks.facts,
+}));
 import { performBackupAction } from "../../../src/server/scheduled-backup-actions";
 import { proposeBackupOperation } from "../../../src/server/scheduled-backup-operations";
 
@@ -122,14 +127,43 @@ it("refuses a new capture from a deployment that is not live but still proposes 
   );
   expect(mocks.delay).toHaveBeenCalledWith(2000);
 });
-it("says generic capture pauses every application service while legacy PostgreSQL dumps stay online", () => {
-  const generic =
-    "pauses all application services; managed PostgreSQL stays running";
+it("says what capture stops and keeps running from the recorded plan while legacy PostgreSQL dumps stay online", () => {
+  mocks.facts.mockReturnValue(null);
   // Reconfiguring replaces a legacy policy with a generic one.
   expect(propose("configure-backups", { kind: "postgres" }).summary).toContain(
-    generic,
+    "Capture pauses the application's services.",
   );
-  expect(propose("run-backup", { kind: "stack" }).summary).toContain(generic);
+  // A web service with a finished initializer and a database owner that dumps.
+  mocks.facts.mockReturnValue({
+    database: null,
+    services: [
+      { name: "web", dependsOn: ["db", "init"] },
+      { name: "init", dependsOn: ["db"], completes: true },
+      { name: "db", dependsOn: [] },
+    ],
+    volumes: [
+      {
+        name: "config",
+        kind: "files",
+        capture: "quiesced-files",
+        owner: "web",
+        sqlite: null,
+        mounts: [{ service: "web", target: "/config", readOnly: false }],
+      },
+      {
+        name: "data",
+        kind: "database",
+        capture: "dump",
+        owner: "db",
+        sqlite: null,
+        mounts: [{ service: "db", target: "/var/lib/mysql", readOnly: false }],
+        procedure: { dump: ["dump"], restore: ["restore"], verify: ["verify"] },
+      },
+    ],
+  });
+  expect(propose("run-backup", { kind: "stack" }).summary).toContain(
+    "Capture stops web. db keeps running to dump its data.",
+  );
   const legacy = propose("run-backup", { kind: "postgres" }).summary;
   expect(legacy).toContain("The PostgreSQL dump runs online.");
   expect(legacy).not.toContain("pause");
