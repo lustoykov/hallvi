@@ -1,15 +1,9 @@
 "use client";
 
 import { ArrowLeft } from "@phosphor-icons/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
@@ -19,9 +13,7 @@ import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
   ApplicationRecord,
   ChatRunSnapshot,
-  GateCheck,
   OperatorView,
-  PhaseKey,
   PiRun,
   ChatMessage,
 } from "@/server/types";
@@ -56,16 +48,9 @@ import {
   stepDetail,
 } from "./operation-model";
 import { StateChip } from "./operation-receipt";
-import { CheckDrawer } from "./check-drawer";
 import { ConfirmActionDialog } from "./confirm-action-dialog";
-import type { ConformanceAction } from "./conformance-record";
-import { describeCurrentStep, type StepAction } from "./current-step";
-import { CurrentStepBar } from "./current-step-bar";
 import { DemoContext } from "./external-link";
-import { SetupDialog } from "./setup-dialog";
-import { RevisionDialog } from "./revision-dialog";
-import { Inspector } from "./inspector";
-import { recordReferences, type RecordSection } from "./record-references";
+import { recordReferences } from "./record-references";
 
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]) {
   const byId = new Map(current.map((message) => [message.id, message]));
@@ -118,6 +103,12 @@ function readSubmission(chatId: string) {
   } catch {
     return null;
   }
+}
+
+function focusComposer() {
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus(),
+  );
 }
 
 export function OperatorShell({
@@ -194,9 +185,9 @@ export function OperatorShell({
       window.history.pushState(null, "", url);
     }
   }
-  // The preparation Record lives with Deployment.
-  function setRecordVisible(visible: boolean) {
-    selectSection(visible ? "deployment" : null);
+  // Closing a destination returns to the conversation.
+  function closeSection() {
+    selectSection(null);
   }
   useEffect(() => {
     const restore = () =>
@@ -210,16 +201,7 @@ export function OperatorShell({
       window.removeEventListener("hashchange", restore);
     };
   }, []);
-  const [recordWide, setRecordWide] = useState(false);
-  const [preparationOpen, setPreparationOpen] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(false);
-  const [revisionOpen, setRevisionOpen] = useState(false);
   const [view, setView] = useState(initialView);
-  const [selectedCheckKey, setSelectedCheckKey] = useState<string | null>(null);
-  const [reveal, setReveal] = useState<{
-    section: RecordSection;
-    nonce: number;
-  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
@@ -233,23 +215,12 @@ export function OperatorShell({
   } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const focusComposerAfterClose = useRef(false);
   const submittingChat = useRef<string | null>(null);
 
   const application = view.application;
-  const checks = view.checks
-    .filter((check) => check.key !== "target-environment")
-    .map((check) =>
-      check.key === "application-identity"
-        ? { ...check, result: check.result.replace(" · Production", "") }
-        : check,
-    );
   const activeChat =
     view.chats.find((chat) => chat.id === view.selectedChatId) ?? null;
   const composer = activeChat ? (drafts[activeChat.id] ?? "") : "";
-  const selectedCheck =
-    checks.find((check) => check.key === selectedCheckKey) ?? null;
-  const closeCheck = useCallback(() => setSelectedCheckKey(null), []);
   const applicationId = application?.id;
   const selectedChatId = view.selectedChatId;
   const refreshDeployment = useCallback(async () => {
@@ -324,32 +295,6 @@ export function OperatorShell({
       clearInterval(timer);
     };
   }, [refreshDeployment]);
-  // The current-step bar, the Record and the reply references all read the
-  // same view, so a reload and a reply say the same thing.
-  const step = describeCurrentStep(view, { demo });
-  if (
-    view.workspace?.current &&
-    ["inspect-app", "make-launch-ready"].includes(view.workspace.phaseKey)
-  )
-    step.actions.push({
-      key: "change-revision",
-      label: "Change selected revision",
-      explanation: "Review the impact before adopting another commit.",
-      kind: "link",
-    });
-  if (
-    application &&
-    ["start", "inspect-app", "make-launch-ready"].includes(
-      view.workspaces.find((w) => w.current)?.phaseKey ?? "",
-    )
-  )
-    step.actions.push({
-      key: "edit-setup",
-      label: "Edit application setup",
-      explanation:
-        "Review the impact before changing the repository or permission policy.",
-      kind: "link",
-    });
   const references = recordReferences(view);
   const operations = useMemo(
     () => view.operations ?? applicationOperations(deployment),
@@ -372,11 +317,6 @@ export function OperatorShell({
     delete indicators[activeSection];
   const chatMarks = conversationMarks(operations, view.chats);
   const featured = featuredOperation(operations, activeSection, selectedChatId);
-
-  function revealSection(section: RecordSection) {
-    setRecordVisible(true);
-    setReveal((current) => ({ section, nonce: (current?.nonce ?? 0) + 1 }));
-  }
 
   useEffect(() => {
     if (!applicationId || !selectedChatId) return;
@@ -451,39 +391,6 @@ export function OperatorShell({
     };
   }, [applicationId, selectedChatId]);
 
-  const previewActive =
-    view.preview?.status === "starting" || view.preview?.status === "ready";
-  const conformancePending = view.conformance?.runs.some((item) =>
-    ["queued", "running"].includes(item.status),
-  );
-  useEffect(() => {
-    if (
-      !applicationId ||
-      !selectedChatId ||
-      (!previewActive && !conformancePending)
-    )
-      return;
-    let active = true;
-    const timer = setInterval(() => {
-      void api
-        .view(applicationId, selectedChatId)
-        .then((next) => {
-          if (active) setView(next);
-        })
-        .catch(() => {});
-    }, 2000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [applicationId, selectedChatId, previewActive, conformancePending]);
-
-  useLayoutEffect(() => {
-    if (selectedCheckKey !== null || !focusComposerAfterClose.current) return;
-    focusComposerAfterClose.current = false;
-    document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus();
-  }, [selectedCheckKey]);
-
   function setComposer(value: string) {
     if (!activeChat) return;
     setDrafts((current) => ({ ...current, [activeChat.id]: value }));
@@ -552,75 +459,26 @@ export function OperatorShell({
   }
 
   function selectChat(chatId: string) {
-    setRecordVisible(false);
+    closeSection();
     if (!application || chatId === view.selectedChatId) return;
     void run("chat", () => api.view(application.id, chatId));
   }
 
-  // The phase strip switches the viewed phase; a completed phase opens its
-  // read-only chats and retained evidence, never a re-evaluation.
-  function selectPhase(phaseKey: PhaseKey) {
-    if (!application || view.workspace?.phaseKey === phaseKey) return;
-    void run("chat", () => api.viewPhase(application.id, phaseKey));
-  }
-
-  // The explicit Continue from a ready deliverable into the next phase.
-  function continueToNextPhase() {
-    if (!application) return;
-    const phase = view.workspace?.phaseKey;
-    void run("continue", () =>
-      phase === "inspect-app"
-        ? api.continueToMakeLaunchReady(application.id)
-        : api.continueToInspectApp(application.id),
-    );
-  }
-
-  // Phase 3 actions: every one asks the server for the whole view again. A
-  // returned view for the phase's primary chat replaces the current selection
-  // only when the current chat belongs to that phase.
-  function conformanceAction(action: ConformanceAction) {
-    if (!application) return;
-    const conformance = api.conformance(application.id);
-    const work = () => {
-      switch (action.type) {
-        case "continue":
-          return conformance.continueWithServerGuy();
-        case "return":
-          return conformance.returnChange(action.reference);
-        case "select-current":
-          return conformance.selectCurrentRevision();
-        case "refresh":
-          return conformance.refresh();
-        case "verify":
-          return conformance.verify();
-        case "approve":
-          return conformance.approve(action.proposalId);
-        case "publish":
-          return conformance.publish(action.proposalId);
-        case "withdraw":
-          return conformance.withdraw(action.proposalId);
-        case "accept-checks":
-          return conformance.acceptChecks(action.acceptanceId);
-        case "cancel-run":
-          return conformance.cancelRun(action.runId);
-        case "grant":
-          return conformance.grant();
-        case "revoke":
-          return conformance.revoke();
-      }
-    };
-    void run(action.type, async () => {
-      const next = await work();
-      return activeChat && next.selectedChatId !== activeChat.id
-        ? api.view(application.id, activeChat.id)
-        : next;
-    });
-  }
-
   function createChat() {
-    setRecordVisible(false);
+    closeSection();
     if (!application) return;
     void run("new-chat", () => api.createChat(application.id));
+  }
+
+  // Checks the repository again after the owner changed GitHub access, and
+  // keeps the conversation that is open.
+  function checkRepository() {
+    if (!application) return;
+    const chatId = view.selectedChatId;
+    void run("repository", async () => {
+      const next = await api.checkRepository(application.id);
+      return chatId ? api.view(application.id, chatId) : next;
+    });
   }
 
   // A receipt link, an origin line or an Overview item opens the conversation
@@ -633,7 +491,7 @@ export function OperatorShell({
           nonce: (current?.nonce ?? 0) + 1,
         }));
     };
-    setRecordVisible(false);
+    closeSection();
     if (!application || chatId === view.selectedChatId) {
       reveal();
       return;
@@ -646,86 +504,14 @@ export function OperatorShell({
     const target = chatId ?? view.selectedChatId;
     if (!target) return;
     setDrafts((current) => ({ ...current, [target]: draft }));
-    focusComposerAfterClose.current = true;
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));
-    setRecordVisible(false);
-    setSelectedCheckKey(null);
-  }
-
-  // Every current-step action is one of the existing operations; nothing here
-  // keeps state of its own.
-  function stepAction(action: StepAction) {
-    const [kind, id = ""] = action.key.split(":");
-    switch (kind) {
-      case "preparation-start":
-        return setPreparationOpen(true);
-      case "preparation-refresh":
-        return (
-          applicationId &&
-          void run("preparation-refresh", () =>
-            api.preparation(applicationId, "refresh"),
-          )
-        );
-      case "preview-start":
-        return (
-          applicationId &&
-          void run("preview-start", () => api.preview(applicationId, "start"))
-        );
-      case "preview-stop":
-        return (
-          applicationId &&
-          void run("preview-stop", () => api.preview(applicationId, "stop", id))
-        );
-      case "preview-confirm":
-        return (
-          applicationId &&
-          void run("preview-confirm", () =>
-            api.preview(applicationId, "confirm", id),
-          )
-        );
-      case "edit-setup":
-        setSetupOpen(true);
-        return;
-      case "change-revision":
-        return setRevisionOpen(true);
-      case "continue":
-        return continueToNextPhase();
-      case "rerun":
-        return rerunCheck(id as NonNullable<GateCheck["rerun"]>["key"]);
-      case "phase":
-        return selectPhase(id as PhaseKey);
-      case "reveal":
-        return revealSection(id as RecordSection);
-      case "ask":
-        return document
-          .querySelector<HTMLTextAreaElement>("#pi-composer")
-          ?.focus();
-      case "continue-with-server-guy":
-        return conformanceAction({ type: "continue" });
-      case "select-current":
-        return conformanceAction({ type: "select-current" });
-      case "accept-checks":
-        return conformanceAction({ type: "accept-checks", acceptanceId: id });
-      case "approve":
-        return conformanceAction({ type: "approve", proposalId: id });
-      case "publish":
-        return conformanceAction({ type: "publish", proposalId: id });
-      case "withdraw":
-        return conformanceAction({ type: "withdraw", proposalId: id });
-      case "grant":
-        return conformanceAction({ type: "grant" });
-      case "refresh":
-        return conformanceAction({ type: "refresh" });
-      case "verify":
-        return conformanceAction({ type: "verify" });
-      case "cancel-run":
-        return conformanceAction({ type: "cancel-run", runId: id });
-    }
+    closeSection();
+    focusComposer();
   }
 
   function archiveActiveChat() {
-    if (!application || !activeChat || activeChat.isPrimary) return;
+    if (!application || !activeChat) return;
     void run("archive", () => api.archiveChat(application.id, activeChat.id));
   }
 
@@ -790,72 +576,6 @@ export function OperatorShell({
       await api.runAction(application.id, activeChat.id, runId, action);
       return api.view(application.id, activeChat.id);
     });
-  }
-
-  function rerunCheck(key: NonNullable<GateCheck["rerun"]>["key"]) {
-    if (!application) return;
-    void run("rerun", async () => {
-      const next = await api.rerunCheck(application.id, key);
-      setSelectedCheckKey(
-        key === "repository-readable"
-          ? "repository-readable"
-          : key === "repository-inspection"
-            ? "profile-resolved"
-            : key === "conformance-refresh"
-              ? "candidate-identified"
-              : "conformance-passed",
-      );
-      return activeChat && next.selectedChatId !== activeChat.id
-        ? api.view(application.id, activeChat.id)
-        : next;
-    });
-  }
-
-  // A conformance run progresses in the worker; while one is queued or
-  // running, the view is refreshed so its progress and outcome appear.
-  const runInProgress = Boolean(
-    view.conformance?.runs.some(
-      (item) => item.status === "queued" || item.status === "running",
-    ),
-  );
-  useEffect(() => {
-    if (!runInProgress || !applicationId || !selectedChatId) return;
-    const timer = window.setInterval(() => {
-      void api
-        .view(applicationId, selectedChatId)
-        .then((next) => applyView(next))
-        .catch(() => undefined);
-    }, 3_000);
-    return () => window.clearInterval(timer);
-    // applyView is stable enough for a poll; the interval is short-lived.
-  }, [runInProgress, applicationId, selectedChatId]);
-
-  async function askAboutCheck(check: GateCheck) {
-    const question = `Explain “${check.label}”, its current result, and what I can verify myself.`;
-    const readOnly =
-      activeChat?.archivedAt || view.workspace?.status === "completed";
-    if (application && readOnly) {
-      // From read-only history, ask in the current phase's main chat.
-      const current = view.workspaces.find((item) => item.current);
-      const primary =
-        current && current.id === view.workspace?.id
-          ? view.chats.find((chat) => chat.isPrimary && !chat.archivedAt)
-          : null;
-      await run("chat", async () => {
-        const next = primary
-          ? await api.view(application.id, primary.id)
-          : await api.viewPhase(application.id, current?.phaseKey ?? "start");
-        const target = primary?.id ?? next.selectedChatId;
-        if (target)
-          setDrafts((current) => ({ ...current, [target]: question }));
-        return next;
-      });
-    } else {
-      setComposer(question);
-    }
-    setRecordVisible(false);
-    focusComposerAfterClose.current = true;
-    setSelectedCheckKey(null);
   }
 
   const identity = (
@@ -989,7 +709,7 @@ export function OperatorShell({
                   <button
                     type="button"
                     className="sg-view-back"
-                    onClick={() => setRecordVisible(false)}
+                    onClick={closeSection}
                   >
                     <ArrowLeft aria-hidden="true" />
                     Back to {activeChat?.title ?? "the conversation"}
@@ -1045,56 +765,26 @@ export function OperatorShell({
             className={`sg-chat-column${recordVisible ? " sg-chat-parked" : ""}`}
             inert={recordVisible || undefined}
           >
-            <details className="sg-legacy-preparation">
-              <summary>Repository preparation details</summary>
-              <CurrentStepBar
-                busy={busy}
-                demo={demo}
-                onAction={stepAction}
-                repository={
-                  application
-                    ? `${application.repositoryOwner}/${application.repositoryName}`
-                    : null
-                }
-                step={step}
-              />
-            </details>
-            {preparationOpen && applicationId && (
-              <ConfirmActionDialog
-                title="Work on a shared GitHub branch?"
-                destructive={false}
-                description="Server Guy may create a preparation branch and publish source checkpoints to a draft PR for the current contract. You can follow along and commit there too. You review and merge the PR on GitHub when ready."
-                action="Start shared preparation"
-                busy={busy !== null}
-                error={error}
-                onCancel={() => setPreparationOpen(false)}
-                onConfirm={() =>
-                  void run("preparation-start", async () => {
-                    const next = await api.preparation(applicationId, "start");
-                    setPreparationOpen(false);
-                    return next;
-                  })
-                }
-              />
-            )}
-            {setupOpen && application && (
-              <SetupDialog
-                application={application}
-                onClose={() => setSetupOpen(false)}
-                onApplied={async (phase) =>
-                  applyView(await api.viewPhase(application.id, phase))
-                }
-              />
-            )}
-            {revisionOpen && applicationId && (
-              <RevisionDialog
-                applicationId={applicationId}
-                onClose={() => setRevisionOpen(false)}
-                onApplied={async () =>
-                  applyView(await api.viewPhase(applicationId, "inspect-app"))
-                }
-              />
-            )}
+            {application &&
+              view.repository &&
+              view.repository.status !== "passed" && (
+                <div className="sg-repository-notice" role="status">
+                  <p>
+                    <strong>Repository access:</strong> {view.repository.result}
+                  </p>
+                  {view.repository.connected ? (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={checkRepository}
+                    >
+                      {busy === "repository" ? "Checking…" : "Check again"}
+                    </button>
+                  ) : (
+                    <Link href="/setup/github">Connect GitHub</Link>
+                  )}
+                </div>
+              )}
             <ChatPane
               activeChat={activeChat}
               busy={busy}
@@ -1109,7 +799,7 @@ export function OperatorShell({
               reconnecting={reconnecting}
               onRunAction={runAction}
               onNewChat={createChat}
-              onReveal={revealSection}
+              onReveal={() => selectSection("history")}
               references={references}
               view={view}
               operations={operations}
@@ -1145,42 +835,8 @@ export function OperatorShell({
               }
             />
           </div>
-          <details
-            className="sg-dashboard-record"
-            hidden={activeSection !== "deployment"}
-            open={deployment?.status !== "live" || Boolean(reveal)}
-          >
-            <summary className="sg-preparation-toggle">
-              Preparation record
-            </summary>
-            <Inspector
-              key={view.workspace?.id ?? "record"}
-              hidden={activeSection !== "deployment"}
-              wide={recordWide}
-              onToggleWidth={() => setRecordWide((wide) => !wide)}
-              onHide={() => {
-                setRecordVisible(false);
-              }}
-              busy={busy}
-              checks={checks}
-              offerGrant={step.actions.some((action) => action.key === "grant")}
-              onConformance={conformanceAction}
-              onSelectCheck={setSelectedCheckKey}
-              reveal={reveal}
-              view={view}
-            />
-          </details>
         </section>
 
-        {selectedCheck && (
-          <CheckDrawer
-            busy={busy !== null}
-            check={selectedCheck}
-            onAsk={askAboutCheck}
-            onClose={closeCheck}
-            onRerun={rerunCheck}
-          />
-        )}
         {confirmRemove && application && (
           <ConfirmActionDialog
             title={`Remove ${application.name}?`}

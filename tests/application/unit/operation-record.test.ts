@@ -12,6 +12,7 @@ import {
   navigationIndicators,
 } from "../../../src/components/server-guy/operation-model";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import { nativeApp } from "../../fixtures/native";
 
 const record: DeploymentRecord = {
   id: "dep-1",
@@ -20,7 +21,6 @@ const record: DeploymentRecord = {
   status: "queued",
   repository: "qa/todo",
   revision: "a".repeat(40),
-  plan: null,
   offer: null,
   authority: null,
   serverId: null,
@@ -39,17 +39,12 @@ const record: DeploymentRecord = {
     { chatId: "chat-b", messageId: "msg-b", at: "2026-09-09T08:00:00.000Z" },
   ],
 };
-const plan: NonNullable<DeploymentRecord["plan"]> = {
+const native = nativeApp({
+  deploymentId: "00000000-0000-4000-8000-000000000001",
   summary: "Deploy the todo application with a private database.",
-  dockerfile: "Dockerfile",
-  generatedDockerfile: null,
-  context: ".",
   port: 8000,
-  command: null,
-  environment: [],
-  postgres: { version: "16", variable: "DATABASE_URL", scheme: "postgresql" },
-  missingInputs: [{ name: "SECRET_KEY", reason: "Signs sessions" }],
-  healthPath: "/health",
+  postgres: "16",
+  inputs: [{ name: "SECRET_KEY", reason: "Signs sessions" }],
   checks: [
     {
       name: "Home page",
@@ -61,7 +56,7 @@ const plan: NonNullable<DeploymentRecord["plan"]> = {
       captureId: null,
     },
   ],
-};
+});
 const offer = {
   serverType: "cx23",
   location: "fsn1",
@@ -89,7 +84,7 @@ describe("deployment operation", () => {
     const operation = deploymentOperation({
       ...record,
       status: "awaiting-approval",
-      plan,
+      native,
       offer,
     });
     expect(operation.state).toBe("proposed");
@@ -117,7 +112,7 @@ describe("deployment operation", () => {
     const operation = deploymentOperation({
       ...record,
       status: "live",
-      plan,
+      native,
       offer,
       url: "http://203.0.113.10",
       verifiedAt: "2026-09-08T19:33:41.000Z",
@@ -164,7 +159,7 @@ describe("marks", () => {
     const proposed = deploymentOperation({
       ...record,
       status: "awaiting-approval",
-      plan,
+      native,
       offer,
     });
     const marks = navigationIndicators([proposed], {});
@@ -172,7 +167,7 @@ describe("marks", () => {
     const verified = deploymentOperation({
       ...record,
       status: "live",
-      plan,
+      native,
       offer,
       verifiedAt: record.updatedAt,
     });
@@ -190,9 +185,7 @@ describe("marks", () => {
           {
             id: "chat-a",
             applicationId: "app",
-            workspaceId: "ws",
             title: "Deploy",
-            isPrimary: true,
             createdAt: record.createdAt,
             archivedAt: null,
             lastActivityAt: record.createdAt,

@@ -1,5 +1,16 @@
 import { createHash } from "node:crypto";
-import { imageReferenceSchema } from "./compose-plan";
+import { z } from "zod";
+
+const imageName = "[a-z0-9]+(?:[._-][a-z0-9]+)*";
+const hubNamespace = "[a-z0-9]+(?:[_-][a-z0-9]+)*";
+/** A public Docker Hub or GHCR reference with a tag or digest. */
+export const imageReferenceSchema = z
+  .string()
+  .regex(
+    new RegExp(
+      `^(?!localhost/)(?:(?:docker\\.io/)?(?:${hubNamespace}/)?${imageName}|ghcr\\.io/${imageName}(?:/${imageName})+)(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[0-9a-f]{64})$`,
+    ),
+  );
 
 /** Resolve public registry tags to the host's immutable Linux amd64 image. */
 export async function pinContainerImage(

@@ -2,8 +2,11 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const effects = vi.hoisted(() => ({
-  createPhaseOneApplication: vi.fn(() => ({ created: true, view: {} })),
-  createChat: vi.fn(() => ({})),
+  createApplication: vi.fn(() => ({
+    created: true,
+    application: { id: "app" },
+  })),
+  createChat: vi.fn(() => ({ id: "chat" })),
   sendChatMessage: vi.fn(() => ({})),
   archiveChat: vi.fn(() => ({})),
   observeRepository: vi.fn(() => ({})),
@@ -14,11 +17,13 @@ const effects = vi.hoisted(() => ({
   cancel: vi.fn(() => ({ id: "attempt" })),
   disconnect: vi.fn(),
 }));
-vi.mock("../../../src/server/phase-one", () => ({
+vi.mock("../../../src/server/applications", () => ({
   ...effects,
-  getPhaseOneOperatorView: () => ({}),
   ExistingApplicationConflictError: class extends Error {},
   NotFoundError: class extends Error {},
+}));
+vi.mock("../../../src/server/operator-view", () => ({
+  getOperatorView: () => ({}),
 }));
 vi.mock("../../../src/server/pi-configuration", async (original) => ({
   ...(await original<object>()),
@@ -38,7 +43,7 @@ import { DELETE as remove } from "../../../src/app/api/applications/[application
 import { POST as chat } from "../../../src/app/api/applications/[applicationId]/chats/route";
 import { POST as message } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/messages/route";
 import { POST as archive } from "../../../src/app/api/applications/[applicationId]/chats/[chatId]/archive/route";
-import { POST as rerun } from "../../../src/app/api/applications/[applicationId]/checks/repository-readable/rerun/route";
+import { POST as repositoryCheck } from "../../../src/app/api/applications/[applicationId]/repository-check/route";
 import {
   POST as setup,
   PATCH as preferences,
@@ -63,7 +68,6 @@ const routes = [
     body: {
       repositoryUrl: "https://github.com/qa/example",
       requestKey: "00000000-0000-4000-8000-000000000099",
-      approvalMode: "pi-decides",
     },
   },
   { name: "chat", method: "POST", handler: chat, body: {} },
@@ -77,7 +81,7 @@ const routes = [
     },
   },
   { name: "archive", method: "POST", handler: archive },
-  { name: "rerun", method: "POST", handler: rerun },
+  { name: "repository check", method: "POST", handler: repositoryCheck },
   { name: "setup", method: "POST", handler: setup, body: { mode: "separate" } },
   { name: "preferences", method: "PATCH", handler: preferences, body: model },
   { name: "login", method: "POST", handler: login, body: model },

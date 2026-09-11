@@ -1,5 +1,5 @@
 import type { DeploymentRecord } from "./deployment-types";
-import { releaseOf } from "./deployment-release";
+import { releaseIdentityHolds } from "./deployment-release";
 import { establishedRuntime } from "./deployment-runtime";
 import { releaseFacts, type ReleaseFacts } from "./release-facts";
 
@@ -121,13 +121,10 @@ export function assertReleaseScope(
   const baseline = record.lifecycle.releases.find(
     (r) => r.id === scope.baselineReleaseId,
   );
-  if (!baseline || releaseOf(baseline)?.id !== baseline.id)
+  if (!baseline || !releaseIdentityHolds(baseline))
     throw new ReleaseScopeError(
       "The baseline release is unavailable. Reconcile its identity first.",
     );
-  const problems = scopeDifferences(
-    releaseFacts(baseline, record.id),
-    candidate,
-  );
+  const problems = scopeDifferences(releaseFacts(baseline), candidate);
   if (problems.length) throw new ReleaseScopeError(problems.join(" "));
 }

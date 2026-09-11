@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { handle } from "@/server/http";
-import { recheckGithubRepositories } from "@/server/phase-one";
+import { recheckGithubRepositories } from "@/server/applications";
 import { parseJsonRequest } from "@/server/schemas";
 
 export const runtime = "nodejs";

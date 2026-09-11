@@ -1,14 +1,12 @@
-import { sourceBuilds } from "./deployment-layout";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { z } from "zod";
 import { deploymentSsh, deploymentLock, shellQuote } from "./deployment-ssh";
 import { deploymentPath } from "./deployment-files";
-import { composeDefinition } from "./deployment-compose";
 import { writeTar } from "./tar";
 import type { TreeFile } from "./execution-tree";
-import type { DeploymentRecord, DeploymentPlan } from "./deployment-types";
+import type { DeploymentRecord } from "./deployment-types";
 import type { DeploymentRelease } from "./deployment-release";
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { invalidateDeploymentRuntime } from "./deployment-lifecycle";
@@ -60,67 +58,6 @@ export function releaseSecrets(record: DeploymentRecord) {
     values: { ...supplied, [DATABASE_PASSWORD]: password },
   };
 }
-export function releaseBundle(
-  plan: DeploymentPlan,
-  revision: string,
-  id: string,
-  files: TreeFile[],
-  password: string,
-  supplied: Record<string, string>,
-  rollbackImages?: Record<string, string>,
-) {
-  const source =
-    rollbackImages || !sourceBuilds(plan).length
-      ? []
-      : files.filter((file) => !deniedPathReason(file.path));
-  const compose = composeDefinition(plan, revision, id, password, supplied);
-  if (rollbackImages) {
-    if (
-      Object.keys(compose.services).length !==
-      Object.keys(rollbackImages).length
-    )
-      throw new Error("Rollback needs a verified image for every service.");
-    for (const [name, service] of Object.entries(compose.services)) {
-      const image = rollbackImages[name];
-      z.string()
-        .regex(/^sha256:[0-9a-f]{64}$/)
-        .parse(image);
-      const definition = service as { image: string; build?: unknown };
-      definition.image = image;
-      delete definition.build;
-    }
-  }
-  return [
-    ...source.map((file) => ({ ...file, path: `source/${file.path}` })),
-    ...[
-      ...new Map(
-        (rollbackImages ? [] : sourceBuilds(plan))
-          .filter((b) => b.generatedDockerfile)
-          .map((b) => [b.dockerfile, b]),
-      ).values(),
-    ].map((b) => ({
-      path: `source/${b.dockerfile}`,
-      content: Buffer.from(b.generatedDockerfile!),
-      mode: 0o644,
-    })),
-    ...[
-      { name: "app", configs: plan.configs ?? [] },
-      ...(plan.services ?? []),
-    ].flatMap((service) =>
-      service.configs.map((config) => ({
-        path: `configs/${service.name}-${config.name}`,
-        content: Buffer.from(config.content),
-        mode: 0o600,
-      })),
-    ),
-    {
-      path: "compose.json",
-      content: Buffer.from(JSON.stringify(compose)),
-      mode: 0o600,
-    },
-  ];
-}
-
 /** What the locked host script validates, builds, pulls and activates. */
 export interface ReleaseExecution {
   /** Build-time project directory inside the stage; runtime uses the root. */
@@ -132,39 +69,9 @@ export interface ReleaseExecution {
   retainedVolumes: string[];
   rollbackImages?: Record<string, string>;
 }
-export function legacyExecution(
-  plan: DeploymentPlan,
-  retainedVolumes: string[],
-  newManagedDatabase: boolean,
-  rollbackImages?: Record<string, string>,
-): ReleaseExecution {
-  return {
-    projectDirectory: null,
-    builds: rollbackImages ? [] : sourceBuilds(plan).map((b) => b.name),
-    pulls: rollbackImages
-      ? []
-      : [
-          ...(newManagedDatabase ? ["postgres"] : []),
-          ...(plan.image ? ["app"] : []),
-          ...(plan.services ?? []).filter((s) => s.image).map((s) => s.name),
-        ],
-    activate: [
-      { name: "app", configs: plan.configs ?? [] },
-      ...(plan.services ?? []),
-    ].flatMap((s) =>
-      s.configs.map((c) => ({
-        from: `configs/${s.name}-${c.name}`,
-        to: `configs/${s.name}-${c.name}`,
-      })),
-    ),
-    retainedVolumes,
-    rollbackImages,
-  };
-}
 /** The retained snapshot, its selected files and, to build, the source. */
 export function nativeBundle(
   release: DeploymentRelease,
-  id: string,
   source: TreeFile[],
   values: Record<string, string>,
   retainedVolumes: string[],
@@ -172,7 +79,7 @@ export function nativeBundle(
   rollbackImages?: Record<string, string>,
 ) {
   const native = release.native!;
-  const facts = releaseFacts(release, id);
+  const facts = releaseFacts(release);
   const builds = rollbackImages
     ? []
     : facts.services.filter((s) => s.build).map((s) => s.name);
@@ -295,48 +202,23 @@ export async function executeRelease(
   const priorRelease = lifecycle.releases.find(
     (r) => r.id === establishedRuntime(lifecycle.runtime)?.releaseId,
   );
-  const prior = priorRelease ? releaseFacts(priorRelease, record.id) : null;
+  const prior = priorRelease ? releaseFacts(priorRelease) : null;
   const retainedVolumes = prior?.volumes.map((v) => v.dockerName) ?? [];
   const newManagedDatabase = Boolean(
-    releaseFacts(release, record.id).database && !prior?.database,
+    releaseFacts(release).database && !prior?.database,
   );
-  const { files: bundle, execution } = release.native
-    ? nativeBundle(
-        release,
-        record.id,
-        files,
-        secrets.values,
-        retainedVolumes,
-        newManagedDatabase,
-        rollbackImages,
-      )
-    : {
-        files: releaseBundle(
-          release.plan,
-          release.revision,
-          record.id,
-          files,
-          secrets.password,
-          secrets.supplied,
-          rollbackImages,
-        ),
-        execution: legacyExecution(
-          release.plan,
-          retainedVolumes,
-          newManagedDatabase,
-          rollbackImages,
-        ),
-      };
+  const { files: bundle, execution } = nativeBundle(
+    release,
+    files,
+    secrets.values,
+    retainedVolumes,
+    newManagedDatabase,
+    rollbackImages,
+  );
   const archive = writeTar(bundle, { mtime: Math.floor(Date.now() / 1000) });
   recordOperationRemoteEffect();
   invalidateDeploymentRuntime(record);
-  if (release.native) {
-    record.native = release.native;
-    record.plan = null;
-  } else {
-    record.plan = release.plan;
-    delete record.native;
-  }
+  record.native = release.native;
   record.revision = release.revision;
   record.releaseId = release.id;
   record.imageId = null;

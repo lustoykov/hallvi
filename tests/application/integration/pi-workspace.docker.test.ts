@@ -12,7 +12,7 @@ import {
 } from "../../temporary-root.mjs";
 import {
   DockerClient,
-  discoverExecutionEnvironment,
+  resolveDockerEndpoint,
 } from "../../../src/server/docker";
 import {
   cleanupPiWorkspaces,
@@ -46,11 +46,10 @@ describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
     it(
       "runs Pi's own tools on the seeded snapshot, never the controller, and removes the container on cancellation",
       async () => {
-        const environment = await discoverExecutionEnvironment();
-        expect(environment.ready, environment.summary).toBe(true);
-        const docker = new DockerClient(
-          environment.endpoint!.slice("unix://".length),
-        );
+        const endpoint = resolveDockerEndpoint();
+        if (endpoint?.kind !== "unix")
+          throw new Error("A local Docker Engine socket is required.");
+        const docker = new DockerClient(endpoint.path);
         const controllerFile = join(root, "controller-only.txt");
         writeFileSync(controllerFile, "controller data\n");
         const file = (path: string, content: string) => ({
@@ -201,12 +200,12 @@ describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
           cancel.abort();
           expect(await long).toMatch(/^Error/);
           await expect(
-            docker.inspectContainer(container),
+            docker.json(`/containers/${container}/json`),
           ).rejects.toMatchObject({ status: 404 });
           // Nothing is replayed or silently recreated.
           expect(await run("ls", { path: "." })).toMatch(/^Error/);
           await expect(
-            docker.inspectContainer(container),
+            docker.json(`/containers/${container}/json`),
           ).rejects.toMatchObject({ status: 404 });
         } finally {
           await workspace.dispose();

@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { OperatorShell } from "@/components/server-guy/operator-shell";
+import { NotFoundError } from "@/server/applications";
 import { listApplications } from "@/server/db";
-import { getOperatorView, NotFoundError } from "@/server/phase-one";
+import { getOperatorView } from "@/server/operator-view";
 import { getPiSetupStatus } from "@/server/pi-setup";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +13,9 @@ export default async function ApplicationPage({
   searchParams,
 }: {
   params: Promise<{ applicationId: string }>;
-  searchParams: Promise<{
-    chat?: string | string[];
-    phase?: string | string[];
-  }>;
+  searchParams: Promise<{ chat?: string | string[] }>;
 }) {
-  const [{ applicationId }, { chat, phase }] = await Promise.all([
+  const [{ applicationId }, { chat }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -26,11 +24,6 @@ export default async function ApplicationPage({
     view = getOperatorView(
       applicationId,
       typeof chat === "string" ? chat : undefined,
-      phase === "start" ||
-        phase === "inspect-app" ||
-        phase === "make-launch-ready"
-        ? phase
-        : undefined,
     );
   } catch (error) {
     if (error instanceof NotFoundError) notFound();

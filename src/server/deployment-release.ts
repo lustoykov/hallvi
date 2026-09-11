@@ -1,19 +1,20 @@
 import { createHash } from "node:crypto";
-import type { DeploymentPlan, DeploymentRecord } from "./deployment-types";
+import type { z } from "zod";
+import type {
+  DeploymentRecord,
+  primaryCheckSchema,
+  serviceCheckSchema,
+} from "./deployment-types";
 
-type PrimaryCheck = DeploymentPlan["checks"][number];
-type ServiceCheck = NonNullable<
-  DeploymentPlan["services"]
->[number]["checks"][number];
 /** A recorded behavior criterion, in the existing check dialects. */
 export interface Criterion {
   healthPath: string;
-  checks: PrimaryCheck[];
+  checks: z.infer<typeof primaryCheckSchema>[];
   services: {
     name: string;
     port: number;
     healthPath: string;
-    checks: ServiceCheck[];
+    checks: z.infer<typeof serviceCheckSchema>[];
   }[];
 }
 
@@ -56,6 +57,13 @@ export interface ResolvedCompose {
 export interface NativeConfiguration {
   format: 1;
   resolver: string;
+  /**
+   * Set once by the schema v14 migration, which converted a retired Server
+   * Guy plan into this configuration and validated the release's historical
+   * identity. The release keeps that identity only while `digest` still
+   * matches its repository, revision and this configuration.
+   */
+  converted?: { from: "deployment-plan"; schema: 14; digest: string };
   compose: string[];
   files: { path: string; mode: number; sha256: string; content: string }[];
   resolved: ResolvedCompose;
@@ -75,14 +83,12 @@ export interface NativeConfiguration {
 }
 
 /** Approved source/configuration, independent of host and attempt outcome. */
-export type DeploymentRelease = {
+export interface DeploymentRelease {
   id: string;
   repository: string;
   revision: string;
-} & (
-  | { plan: DeploymentPlan; native?: undefined }
-  | { native: NativeConfiguration; plan?: undefined }
-);
+  native: NativeConfiguration;
+}
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object")
@@ -94,33 +100,62 @@ function canonical(value: unknown): unknown {
     );
   return value;
 }
-/** Project old releases from saved data without rewriting legacy rows. */
+function contentIdentity(release: {
+  repository: string;
+  revision: string;
+  native: unknown;
+}) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        canonical({
+          repository: release.repository,
+          revision: release.revision,
+          native: release.native,
+        }),
+      ),
+    )
+    .digest("hex");
+}
+/** Whether converted content is exactly what the migration sealed. */
+function sealed(content: Omit<DeploymentRelease, "id">) {
+  const { digest, ...marker } = content.native.converted!;
+  return (
+    digest ===
+    contentIdentity({
+      ...content,
+      native: { ...content.native, converted: marker },
+    })
+  );
+}
+/**
+ * The release a record's selected configuration represents. Native content is
+ * content-addressed; a converted configuration keeps the historical identity
+ * the migration validated and recorded as the record's releaseId while its
+ * seal holds. Changed afterwards, it is new content with a new identity.
+ */
 export function releaseOf(
-  record: Pick<DeploymentRecord, "repository" | "revision"> & {
-    plan?: DeploymentPlan | null;
+  record: Pick<DeploymentRecord, "repository" | "revision" | "releaseId"> & {
     native?: NativeConfiguration | null;
   },
 ): DeploymentRelease | null {
-  if (!record.revision) return null;
-  // Legacy identities keep their exact {repository, revision, plan} content.
-  const content = record.native
-    ? {
-        repository: record.repository,
-        revision: record.revision,
-        native: record.native,
-      }
-    : record.plan
-      ? {
-          repository: record.repository,
-          revision: record.revision,
-          plan: record.plan,
-        }
-      : null;
-  if (!content) return null;
-  const id = createHash("sha256")
-    .update(JSON.stringify(canonical(content)))
-    .digest("hex");
-  return { id, ...content };
+  if (!record.revision || !record.native) return null;
+  const content = {
+    repository: record.repository,
+    revision: record.revision,
+    native: record.native,
+  };
+  const id =
+    record.native.converted && sealed(content)
+      ? record.releaseId
+      : contentIdentity(content);
+  return id ? { id, ...content } : null;
+}
+/** Whether a recorded release object still carries its own identity. */
+export function releaseIdentityHolds(release: DeploymentRelease) {
+  return release.native.converted
+    ? /^[0-9a-f]{64}$/.test(release.id) && sealed(release)
+    : contentIdentity(release) === release.id;
 }
 export function assertApprovedRelease(record: DeploymentRecord) {
   if (record.releaseId && record.releaseId !== releaseOf(record)?.id)

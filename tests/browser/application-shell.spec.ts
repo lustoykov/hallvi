@@ -276,29 +276,43 @@ test(
           repositoryId: 41,
           recommendationId: randomUUID(),
           revision: "a".repeat(40),
-          inspectedRevision: "b".repeat(40),
-          plan: {
-            summary: "Deploy this static application on your own server.",
-            dockerfile: "Dockerfile",
-            generatedDockerfile: null,
-            context: ".",
-            port: 8080,
-            command: null,
-            environment: [],
-            postgres: null,
-            missingInputs: [{ name: "API_KEY", reason: "Needed at runtime" }],
-            healthPath: "/health",
-            checks: [
-              {
-                name: "Application content",
-                method: "GET",
-                path: "/",
-                body: null,
-                expectedStatus: 200,
-                contains: "My application",
-                captureId: null,
+          native: {
+            format: 1,
+            resolver: "docker compose 2.40.3",
+            compose: ["compose.yaml"],
+            files: [],
+            resolved: {
+              name: "sg-fixture",
+              services: {
+                app: {
+                  build: { context: ".", dockerfile: "Dockerfile" },
+                  image: "deployment-browser:fixture",
+                  ports: [{ target: 8080, published: "80", protocol: "tcp" }],
+                  environment: { API_KEY: "${API_KEY}" },
+                },
               },
-            ],
+            },
+            inputs: ["API_KEY"],
+            inputReasons: { API_KEY: "Needed at runtime" },
+            data: [],
+            database: null,
+            httpAccess: "public",
+            criterion: {
+              healthPath: "/health",
+              checks: [
+                {
+                  name: "Application content",
+                  method: "GET",
+                  path: "/",
+                  body: null,
+                  expectedStatus: 200,
+                  contains: "My application",
+                  captureId: null,
+                },
+              ],
+              services: [],
+            },
+            summary: "Deploy this static application on your own server.",
           },
           offer: {
             serverType: "cx23",
@@ -355,6 +369,29 @@ test(
       record!.updatedAt = new Date().toISOString();
       return route.fulfill({ json: { deployment: record } });
     });
+    // The scripted deployment lives only in this test, not in the product's
+    // records, so the application view carries its operations the way the
+    // server records a real deployment's.
+    const { applicationOperations } =
+      await import("../../src/server/operation-record");
+    await page.route(
+      /\/api\/applications\/[\da-f-]{36}(\?.*)?$/,
+      async (route) => {
+        const current = record;
+        if (route.request().method() !== "GET" || !current)
+          return route.continue();
+        const response = await route.fetch();
+        const view = await response.json();
+        view.operations = [
+          ...view.operations.filter(
+            (operation: { source: { type: string } }) =>
+              operation.source.type !== "deployment",
+          ),
+          ...applicationOperations(current),
+        ];
+        await route.fulfill({ response, json: view });
+      },
+    );
     await page.goto("/applications/new");
     await page
       .getByLabel("GitHub repository", { exact: true })
@@ -392,9 +429,6 @@ test(
       .filter({ hasText: "Review deployment configuration" })
       .click();
     await expect(receipt).toContainText("GET / → HTTP 200");
-    await expect(receipt).toContainText(
-      "differs from the earlier repository inspection",
-    );
     await receipt.getByLabel("API_KEY").fill("synthetic-input");
     await receipt
       .getByRole("button", { name: "Create server and deploy" })

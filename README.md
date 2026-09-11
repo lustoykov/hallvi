@@ -1,52 +1,20 @@
 # Server Guy
 
+[Documentation map](docs/README.md) · [Current deployment architecture](docs/architecture.md)
+
 **The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
 The target is Docker Compose on one instance, with PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled commands and persistent files. Compute starts with Hetzner + BYOM; backups with R2 + S3. **Coolify is a reference, not a parity requirement.**
 
 ## Documentation
 
-Start with **Product → Roadmap → Architecture**.
+Start with [Product](PRODUCT.md), [Roadmap](ROADMAP.md) and [Architecture](docs/architecture.md). The [documentation map](docs/README.md) links requirements, UI, setup and evidence; [CONTEXT.md](CONTEXT.md) owns terminology, the [component design reference](src/components/server-guy/DESIGN.md) owns visual language, and [tests/README.md](tests/README.md) owns test commands.
 
-| Read | Answers |
-| --- | --- |
-| [Product](PRODUCT.md) | Who it serves, what we support and where we stop. |
-| [Roadmap](ROADMAP.md) | What works, what remains and the only implementation sequence. |
-| [Architecture](docs/architecture/agent-directed-operations.md) | How conversation, records, the agent and execution fit together. |
-
-### Supporting references
-
-| Document | Responsibility |
-| --- | --- |
-| [Capability spec](docs/specs/self-hosting-capabilities.md) | Supported behavior and reusable interaction requirements. |
-| [Journeys](docs/user-journeys/README.md) | Concrete user goals, success and failure outcomes. |
-| [Compatibility tests](docs/testing/self-hosted-compatibility.md) | Representative software and the evidence required for support. |
-| [Testing](docs/testing/README.md) | Acceptance navigation and dated results; [runner instructions](tests/README.md) own commands. |
-| [Design](src/components/server-guy/DESIGN.md) | Fable's current visual language and interaction rules. |
-| [UI integration](docs/design/2026-09-09-conversation-first-integration.md) | What the conversation-first shell actually binds to. |
-| [Final screen reference](docs/design/2026-09-09-final-ui-screens-reference.md) | Reusable views and replayable development-only scenarios; [combined acceptance](docs/testing/2026-09-09-final-ui-integration.md) records integration checks. |
-| [Supported-stack brief](docs/design/2026-09-09-fable-supported-stack-brief.md) | Current handoff to Fable, leaving layout decisions to the designer. |
-| [Terminology](CONTEXT.md) | Domain glossary, not another specification. |
-| [Architecture decisions](docs/architecture/README.md) | Accepted boundaries and historical PR diagrams. |
-| [GitHub setup](docs/integrations/github.md) | Existing connection and credential setup. |
-
-### Historical and educational references
-
-[Archive](docs/archive/README.md) contains superseded plans, phase specifications, workshops and explorations. Preserve evidence and unresolved regression checks when replacing legacy code; do not implement their abandoned product/UI instructions.
-
-[Research](docs/research/README.md) contains dated findings and proposals. Coolify comparisons do not impose parity; pricing/provider facts require a fresh check before use. The [learning guide](docs/learning/stack-with-server-guy.md) is educational material, not a product backlog. [Reviews](docs/reviews/2026-09-08-fable-merge-readiness.md) and dated test reports apply to the candidate they inspected.
-
-### Maintaining the docs
-
-- Put a decision in its owning document once; link to it elsewhere.
-- Replace superseded wording instead of appending another clarification.
-- Keep status and implementation order in Roadmap; link evidence with date and candidate.
-- Put abandoned explorations in the archive. Do not promote a research suggestion into scope without a product decision.
-- Preserve runbooks and regression evidence. A documentation cleanup never proves a feature, retires a table or waives a failing test.
+Keep each decision or requirement in its owning document. Update current wording and delete obsolete handoffs; Git retains development history. Documentation cleanup does not waive tests, drop runtime records or establish new support.
 
 ## Implementation status
 
-A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/2026-09-08-real-deployment-acceptance.md), followed by [hardening](docs/testing/2026-09-08-deployment-hardening.md). Fable's [conversation-first integration](docs/design/2026-09-09-conversation-first-integration.md) uses the real deployment record and conversations.
+A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/README.md#dated-evidence), followed by [hardening](docs/testing/README.md#dated-evidence). The [UI reference](docs/design/screens.md) distinguishes real records from simulated scenarios.
 
 The executor is still narrower than the target: first deployments and releases run Pi-authored native Compose on one Hetzner host, HTTP only, verified by a behavior criterion over public HTTP. Applications without a public endpoint, BYOM, ongoing monitoring and broad compatibility evidence need implementation. Historical results do not prove the current branch is ready to merge or that the deployed host is still online.
 
@@ -70,13 +38,13 @@ Both processes must use the same database/configuration. The worker loads `.env`
 
 ### Data and migrations
 
-Stop the web process and worker before applying schema changes. Schema v13 upgrades known versions 6, 8, 9, 10, 11 and 12 with a private backup before migration; unknown versions require investigation. Keep the database, WAL/recovery material and native sessions rather than resetting an unexpected schema. `src/server/db-schema.ts` owns the schema.
+Stop the web process and worker before applying schema changes. Schema v14 upgrades known versions 6 and 8–13 with a private backup before migration; unknown versions require investigation. The v14 step retires the phase preparation workflow and legacy deployment plans, keeping their records as read-only history ([details](docs/architecture.md#schema-14-retired-preparation-and-deployment-plans)). Keep the database, WAL/recovery material and native sessions rather than resetting an unexpected schema. `src/server/db-schema.ts` owns the schema.
 
 Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>.jsonl`. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and recovery/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
 
 ### Diagnostics
 
-Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `SERVER_GUY_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Detailed configuration and privacy behavior are in the [implementation reference](docs/archive/implementation/action-history-and-tracing.md).
+Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `SERVER_GUY_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](src/server/diagnostics.ts) and [trace configuration](src/server/tracing-config.ts).
 
 ## Verify
 

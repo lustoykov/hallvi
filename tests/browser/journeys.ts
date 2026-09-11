@@ -99,20 +99,6 @@ export const browserJourneys = [
     smoke: false,
   },
   {
-    id: "phase-two-contract",
-    name: "Continue to Inspect app and establish the Application Contract",
-    description:
-      "Continue from a ready Launch Brief, watch the auto-started inspection propose a sourced contract, revise it from a correction, reject an invented source, re-inspect, and read Phase 1 as completed history.",
-    smoke: false,
-  },
-  {
-    id: "phase-three-conformance",
-    name: "Make the repository launch-ready and verify the exact candidate",
-    description:
-      "Continue from a ready contract, let Server Guy stage and preview a change, approve and publish it, merge on GitHub, verify the merged candidate in the runner, and recover from a missing engine.",
-    smoke: false,
-  },
-  {
     id: "dashboard",
     name: "Testing dashboard and saved reviews",
     description:

@@ -1,12 +1,7 @@
-import type { RevisionImpact } from "@/server/revision-correction";
-import type { ContractHistoryEntry } from "@/server/contract-history";
-import type { ExecutionSetupStatus } from "@/server/execution-setup";
 import type {
   AcceptedPiRun,
-  ApprovalMode,
   ChatRunSnapshot,
   OperatorView,
-  PhaseKey,
 } from "@/server/types";
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -41,50 +36,10 @@ function post(url: string, body: unknown) {
 }
 
 /**
- * Workspace reads/edits return the whole view; removal returns the removed
+ * Application reads/edits return the whole view; removal returns the removed
  * identity.
  */
 export const api = {
-  setupImpact(
-    applicationId: string,
-    input: { name: string; repositoryUrl: string; approvalMode: ApprovalMode },
-  ) {
-    return jsonRequest<import("@/server/setup-correction").SetupImpact>(
-      `/api/applications/${applicationId}/setup/impact`,
-      { method: "POST", body: JSON.stringify(input) },
-    );
-  },
-  applySetup(applicationId: string, impactId: string) {
-    return jsonRequest<{ phaseKey: PhaseKey }>(
-      `/api/applications/${applicationId}/setup/apply`,
-      { method: "POST", body: JSON.stringify({ impactId }) },
-    );
-  },
-  preparation(applicationId: string, action: "start" | "refresh") {
-    return post(`/api/applications/${applicationId}/preparation`, { action });
-  },
-  preview(
-    applicationId: string,
-    action: "start" | "stop" | "confirm",
-    previewId?: string,
-  ) {
-    return post(`/api/applications/${applicationId}/preview`, {
-      action,
-      ...(previewId ? { previewId } : {}),
-    });
-  },
-  revisionImpact(applicationId: string, reference: string) {
-    return jsonRequest<RevisionImpact>(
-      `/api/applications/${applicationId}/revision/impact`,
-      { method: "POST", body: JSON.stringify({ reference }) },
-    );
-  },
-  applyRevision(applicationId: string, impactId: string) {
-    return jsonRequest(`/api/applications/${applicationId}/revision/apply`, {
-      method: "POST",
-      body: JSON.stringify({ impactId }),
-    });
-  },
   runSnapshot(applicationId: string, chatId: string) {
     return jsonRequest<ChatRunSnapshot>(
       `/api/applications/${applicationId}/chats/${chatId}/messages`,
@@ -103,7 +58,6 @@ export const api = {
     requestKey: string;
     name?: string;
     repositoryUrl: string;
-    approvalMode: ApprovalMode;
   }) {
     return post("/api/applications", input);
   },
@@ -112,20 +66,11 @@ export const api = {
       `/api/applications/${applicationId}?chat=${encodeURIComponent(chatId)}`,
     );
   },
-  /** Every saved Application Contract version, newest first. */
-  contractHistory(applicationId: string) {
-    return jsonRequest<{ versions: ContractHistoryEntry[] }>(
-      `/api/applications/${applicationId}/contracts`,
-    );
-  },
-  /** A phase's primary chat: how the phase strip switches the viewed phase. */
-  viewPhase(applicationId: string, phaseKey: PhaseKey) {
-    return jsonRequest<OperatorView>(
-      `/api/applications/${applicationId}?phase=${encodeURIComponent(phaseKey)}`,
-    );
-  },
   createChat(applicationId: string) {
     return post(`/api/applications/${applicationId}/chats`, {});
+  },
+  checkRepository(applicationId: string) {
+    return post(`/api/applications/${applicationId}/repository-check`, {});
   },
   archiveChat(applicationId: string, chatId: string) {
     return post(
@@ -157,63 +102,5 @@ export const api = {
       `/api/applications/${applicationId}/chats/${chatId}/runs/${runId}/${action}`,
       { method: "POST" },
     );
-  },
-  rerunCheck(
-    applicationId: string,
-    check:
-      | "repository-readable"
-      | "repository-inspection"
-      | "conformance-refresh"
-      | "conformance-verify",
-  ) {
-    return post(`/api/applications/${applicationId}/checks/${check}/rerun`, {});
-  },
-  /** The explicit Continue from a ready Launch Brief into Inspect app. */
-  continueToInspectApp(applicationId: string) {
-    return post(`/api/applications/${applicationId}/phases/inspect-app`, {});
-  },
-  /** The explicit Continue from a ready Application Contract into Phase 3. */
-  continueToMakeLaunchReady(applicationId: string) {
-    return post(
-      `/api/applications/${applicationId}/phases/make-launch-ready`,
-      {},
-    );
-  },
-  /** Phase 3 actions; every one returns the Make launch-ready view. */
-  conformance(applicationId: string) {
-    const root = `/api/applications/${applicationId}/conformance`;
-    return {
-      continueWithServerGuy: () => post(`${root}/continue`, {}),
-      exportBrief: () =>
-        jsonRequest<{ text: string }>(`${root}/brief`, {
-          method: "POST",
-          body: "{}",
-        }),
-      returnChange: (reference: string) =>
-        post(`${root}/return`, { reference }),
-      selectCurrentRevision: () => post(`${root}/select-current`, {}),
-      refresh: () => post(`${root}/refresh`, {}),
-      verify: () => post(`${root}/verify`, {}),
-      approve: (proposalId: string) =>
-        post(`${root}/proposals/${proposalId}/approve`, {}),
-      publish: (proposalId: string) =>
-        post(`${root}/proposals/${proposalId}/publish`, {}),
-      withdraw: (proposalId: string) =>
-        post(`${root}/proposals/${proposalId}/withdraw`, {}),
-      acceptChecks: (acceptanceId: string) =>
-        post(`${root}/acceptance/${acceptanceId}/accept`, {}),
-      cancelRun: (runId: string) => post(`${root}/runs/${runId}/cancel`, {}),
-      grant: () => post(`${root}/grant`, {}),
-      revoke: () =>
-        jsonRequest<OperatorView>(`${root}/grant`, { method: "DELETE" }),
-    };
-  },
-  executionSetup(action?: "check" | "prepare") {
-    return action
-      ? jsonRequest<ExecutionSetupStatus>("/api/execution/setup", {
-          method: "POST",
-          body: JSON.stringify({ action }),
-        })
-      : jsonRequest<ExecutionSetupStatus>("/api/execution/setup");
   },
 };

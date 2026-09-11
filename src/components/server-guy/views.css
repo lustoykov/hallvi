@@ -18,8 +18,6 @@
   --view-meta: 13px;
 }
 
-/* ---------- Section rhythm ---------- */
-
 /* A view is a sequence of bands, not a stack of cards. One measure for
    prose, a wider one for evidence, and a single vertical rhythm. */
 .sg-section-content {
@@ -86,8 +84,6 @@
   color: var(--muted);
   max-width: 74ch;
 }
-
-/* ---------- Facts ---------- */
 
 /* Two columns on a wide screen: a fact and its value stay close together
    instead of stretching a label across a metre of empty page. */
@@ -196,8 +192,6 @@
 .sg-condition-aside .sg-op-links {
   margin: 0;
 }
-
-/* ---------- A band that needs attention ---------- */
 
 /* Some work is outstanding without changing the verdict above it: failed
    cleanup is not a failed restore. Such a band keeps its own border and
@@ -732,8 +726,6 @@
   }
 }
 
-/* ---------- Tables ---------- */
-
 /* Every recorded list shares one table: a quiet header, tight rows, and
    a tinted row only when something is wrong. */
 .sg-rows {
@@ -810,8 +802,6 @@
   padding-bottom: 7px;
   border-bottom: 1px solid var(--hairline);
 }
-
-/* ---------- Restore evidence ---------- */
 
 /* The disclosure under a verified restore holds several groups of evidence;
    they need air between them and a heading needs more above than below. */
@@ -892,8 +882,6 @@
   font-size: var(--view-meta);
   white-space: nowrap;
 }
-
-/* ---------- Stack items ---------- */
 
 /* A process, a database or a service: a titled group, not a card. */
 .sg-stack-item {
@@ -1066,7 +1054,6 @@
   background: #4a7ad8;
 }
 
-/* What is running: a grid of small facts, not a column of rows. */
 /* Separators live on the cells, so a row that does not fill the grid
    leaves white space rather than a block of background. */
 .sg-runlist {
@@ -1787,22 +1774,9 @@
   margin-top: 6px;
 }
 
-.sg-preparation-toggle {
-  padding: 20px 36px;
-  border-top: 1px solid var(--line);
-  font-size: var(--view-body);
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-}
 .sg-deployment-summary > p {
   font-size: var(--view-meta);
   color: var(--muted);
-}
-@media (max-width: 640px) {
-  .sg-preparation-toggle {
-    padding: 18px;
-  }
 }
 
 .sg-open-application {

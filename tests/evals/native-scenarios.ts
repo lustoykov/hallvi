@@ -6,10 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as database from "../../src/server/db";
 import { decisions } from "../../src/server/db-schema";
-import {
-  getApplicationStatus,
-  getPhaseOneOperatorView,
-} from "../../src/server/phase-one";
+import { readPiApplicationStatus } from "../../src/server/pi-status";
 import {
   collectPiDecisionProposal,
   searchPiDecisions,
@@ -20,12 +17,11 @@ import {
   sendChatMessage,
 } from "../../src/server/pi-runs";
 import { openNativeChatSession } from "../../src/server/pi-sessions";
-import type {
-  ApplicationStatus,
-  PhaseOneOperatorView,
-  PiDecision,
-} from "../../src/server/types";
-import type { PhaseOneEvalCase } from "./phase-one-cases";
+import type { PiDecision } from "../../src/server/types";
+import type { EvalCase } from "./cases";
+import { evalView, type EvalView } from "./seed";
+
+type Status = ReturnType<typeof readPiApplicationStatus>["status"];
 
 // Eval fixture only: real native JSONL and SDK compaction, with synthetic prior
 // history/usage. A reduced keepRecentTokens setting makes the behavioral gate
@@ -86,8 +82,8 @@ function nativeWriter(
 }
 
 export async function seedNativeScenario(
-  scenario: PhaseOneEvalCase,
-  before: PhaseOneOperatorView,
+  scenario: EvalCase,
+  before: EvalView,
   model: { modelId: string; providerId: string },
 ) {
   const applicationId = before.application!.id;
@@ -124,7 +120,7 @@ export async function seedNativeScenario(
     }
     if (scenario.nativeScenario === "cross-chat-revision") {
       const other = database.insertChat(
-        before.workspace!.id,
+        applicationId,
         "Change in another chat",
       );
       const source = database.insertMessage(
@@ -225,76 +221,40 @@ export async function seedNativeScenario(
   } finally {
     native.release();
   }
-  return getPhaseOneOperatorView(applicationId, chatId);
+  return evalView(applicationId, chatId);
 }
 
-// The earlier exchange was truthful when it happened; saved records changed
-// afterwards. Built from the current projection so only the changed facts
-// differ.
+// The earlier exchange was truthful when it happened: an older check passed.
+// Built from the current projection so only the changed facts differ.
 function staleStatusExchange(
-  kind: NonNullable<PhaseOneEvalCase["staleHistory"]>,
-  current: ApplicationStatus,
-  before: PhaseOneOperatorView,
-): { question: string; status: ApplicationStatus; answer: string } {
-  if (kind === "approval-mode") {
-    return {
-      question: "When will you ask me before changing anything?",
-      status: {
-        ...current,
-        retrievedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
-        application: {
-          ...current.application,
-          approvalMode: { key: "pi-decides", label: "Let Server Guy decide" },
-        },
-        checks: current.checks.map((check) =>
-          check.key === "approval-authority"
-            ? {
-                ...check,
-                result: "Let Server Guy decide · Current application launch",
-              }
-            : check,
-        ),
-      },
-      answer:
-        "Your saved setting is Let Server Guy decide: I ask only when the consequence warrants it.",
-    };
-  }
+  current: Status,
+  before: EvalView,
+): { question: string; status: Status; answer: string } {
   const passed = before.observations.find(
     (observation) => observation.status === "passed",
   );
   if (!passed)
     throw new Error(
-      "A stale checks-passed history needs an older passing repository check.",
+      "A stale access-passed history needs an older passing repository check.",
     );
+  const raw = passed.raw as { commitSha?: string; defaultBranch?: string };
   return {
-    question: "Are all four Launch Brief checks passing?",
+    question: "Is the repository check passing?",
     status: {
       ...current,
       retrievedAt: new Date(
         Date.parse(passed.observedAt) + 60_000,
       ).toISOString(),
-      workspace: { ...current.workspace, status: "ready" },
-      checks: current.checks.map((check) =>
-        check.key === "repository-readable"
-          ? {
-              ...check,
-              status: "passed",
-              result: passed.summary,
-              evidence: [
-                {
-                  recordType: "observation",
-                  recordId: passed.id,
-                  label: passed.sourceLabel,
-                  href: `/api/observations/${passed.id}`,
-                  observedAt: passed.observedAt,
-                },
-              ],
-            }
-          : check,
-      ),
+      repositoryAccess: {
+        status: "passed",
+        result: passed.summary,
+        checkedAt: passed.observedAt,
+        commitSha: raw.commitSha ?? null,
+        defaultBranch: raw.defaultBranch ?? null,
+      },
     },
     answer:
-      "Yes. All four Launch Brief checks pass, including GitHub repository access, so the Launch Brief is ready.",
+      "Yes. The repository check passed, so I can read the repository at main · abcdef12.",
   };
 }
 
@@ -303,8 +263,8 @@ function staleStatusExchange(
  * now contradict. The live turn must read again instead of trusting history.
  */
 export async function seedStaleStatusHistory(
-  scenario: PhaseOneEvalCase,
-  before: PhaseOneOperatorView,
+  scenario: EvalCase,
+  before: EvalView,
   model: { modelId: string; providerId: string },
 ) {
   if (!scenario.staleHistory)
@@ -312,8 +272,7 @@ export async function seedStaleStatusHistory(
   const applicationId = before.application!.id;
   const chatId = before.selectedChatId!;
   const stale = staleStatusExchange(
-    scenario.staleHistory,
-    getApplicationStatus(applicationId, chatId),
+    readPiApplicationStatus(applicationId, chatId).status,
     before,
   );
   const native = await openNativeChatSession(applicationId, chatId);
@@ -335,7 +294,7 @@ export async function seedStaleStatusHistory(
   } finally {
     native.release();
   }
-  return getPhaseOneOperatorView(applicationId, chatId);
+  return evalView(applicationId, chatId);
 }
 
 export function nativeEvalEvidence(

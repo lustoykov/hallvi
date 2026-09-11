@@ -8,7 +8,7 @@
 import type { DeploymentRecord } from "@/server/deployment-types";
 import { deploymentRuntime } from "@/server/deployment-runtime";
 import type { ApplicationOperation } from "@/server/operation-record";
-import { currentFacts } from "@/server/release-facts";
+import { currentFacts, primaryHttp } from "@/server/release-facts";
 
 import {
   ago,
@@ -155,6 +155,23 @@ function cleanLogs(logs: string) {
     .slice(-40);
 }
 
+/**
+ * The selected configuration's services, the one people open first. A
+ * service built from the repository has no image to name it by.
+ */
+export function configuredServices(record: DeploymentRecord | null) {
+  const services = Object.entries(record?.native?.resolved.services ?? {}).map(
+    ([name, service]) => ({
+      name,
+      image: service.build ? null : (service.image ?? null),
+    }),
+  );
+  const opened = primaryHttp(currentFacts(record))?.service;
+  return services.toSorted(
+    (a, b) => Number(b.name === opened) - Number(a.name === opened),
+  );
+}
+
 export function buildStory({
   record,
   operations,
@@ -167,9 +184,9 @@ export function buildStory({
   /** The conversation the plan was approved in. */
   approvedIn: string | null;
 }): DeploymentStory {
-  const plan = record?.plan ?? null;
   const facts = currentFacts(record);
-  const name = productName(plan?.image, "the application");
+  const [app, ...beside] = configuredServices(record);
+  const name = productName(app?.image, "the application");
   const revision = record?.revision ?? null;
   const short = revision?.slice(0, 7) ?? "the selected revision";
   const offer = record?.offer ?? null;
@@ -229,9 +246,7 @@ export function buildStory({
   );
   const services = [
     name,
-    ...(plan?.services ?? []).map((service) =>
-      productName(service.image, service.name),
-    ),
+    ...beside.map((service) => productName(service.image, service.name)),
   ];
   const phases: Phase[] = [];
   const add = (
@@ -364,7 +379,7 @@ export function buildStory({
   // ---- The checks it passes, public first, then inside the server.
   const lastSaid = (text: string) =>
     events.findLast((event) => event.message === text)?.at ?? null;
-  const checks: Check[] = (plan?.checks ?? []).map((check) => ({
+  const checks: Check[] = (facts?.criterion?.checks ?? []).map((check) => ({
     name: check.name,
     probe: `${check.method} ${check.path} → ${check.expectedStatus}${check.contains ? ` · contains ${check.contains}` : ""}`,
     inside: false,
@@ -374,7 +389,7 @@ export function buildStory({
   for (const event of events) {
     const match = /^Verified private (\S+): (\S+)$/.exec(event.message);
     if (!match) continue;
-    const service = plan?.services?.find((item) => item.name === match[1]);
+    const service = beside.find((item) => item.name === match[1]);
     const label = productName(service?.image, cap(match[1]));
     privately.set(`${match[1]} ${match[2]}`, {
       name: /ready/.test(match[2])
@@ -389,8 +404,8 @@ export function buildStory({
 
   // ---- What is live, plain first and exact on demand.
   const images = [
-    plan?.image && { name, ref: plan.image },
-    ...(plan?.services ?? []).map((service) => ({
+    app?.image && { name, ref: app.image },
+    ...beside.map((service) => ({
       name: productName(service.image, service.name),
       ref: service.image ?? "built from the repository",
     })),

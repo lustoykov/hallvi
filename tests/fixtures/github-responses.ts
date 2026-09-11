@@ -1,6 +1,6 @@
-// Synthetic GitHub tree and contents responses for the fixture repositories.
-// Shared by deterministic tests, the disposable browser app and eval seeds.
-// Imports only the sibling fixture module so it can be copied verbatim.
+// Synthetic GitHub tree and contents responses for the fixture repositories,
+// served by the disposable browser app. Imports only the sibling fixture
+// module so it can be copied verbatim.
 import {
   fixtureForRepositoryName,
   fixtureTree,

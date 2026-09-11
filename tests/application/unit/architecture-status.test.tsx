@@ -17,7 +17,9 @@ it("does not label an unobserved node verified just because deployment is live",
     />,
   );
   expect(html).toContain("PostgreSQL");
-  expect(html).toContain("Valkey");
+  // The worker and broker are native private services on the same host.
+  expect(html).toContain("Private services");
+  expect(html).toContain("2 private processes");
   expect(html).not.toContain('fill="#267c58"');
 });
 

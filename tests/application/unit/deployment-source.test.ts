@@ -6,7 +6,6 @@ const mock = vi.hoisted(() => ({
   connection: "github-a",
 }));
 vi.mock("../../../src/server/db", () => ({
-  currentContract: () => ({ commitSha: "b".repeat(40) }),
   listObservations: mock.observation,
 }));
 vi.mock("../../../src/server/github-api", () => ({ githubJson: mock.api }));
@@ -33,7 +32,7 @@ beforeEach(() => {
       : { id: 41, full_name: "qa/todo" },
   }));
 });
-it("binds numeric repository identity and selected revision while recording an older inspection", async () => {
+it("binds numeric repository identity and the selected revision", async () => {
   const record = {
     applicationId: "app",
     repository: "qa/todo",
@@ -43,8 +42,8 @@ it("binds numeric repository identity and selected revision while recording an o
   expect(record).toMatchObject({
     repositoryId: 41,
     githubConnectionId: "github-a",
-    inspectedRevision: "b".repeat(40),
   });
+  expect(record).not.toHaveProperty("inspectedRevision");
   await checkDeploymentSource(record);
   mock.connection = "github-b";
   await expect(checkDeploymentSource(record)).rejects.toThrow(

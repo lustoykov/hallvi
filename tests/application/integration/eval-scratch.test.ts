@@ -23,9 +23,6 @@ it("closes the scratch SQLite handle and deletes the scratch directory once a li
     repositoryUrl: "https://github.com/qa/scratch",
     repositoryOwner: "qa",
     repositoryName: "scratch",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Current application launch",
   });
   expect(application.id).toBeTruthy();
   expect(existsSync(path)).toBe(true);

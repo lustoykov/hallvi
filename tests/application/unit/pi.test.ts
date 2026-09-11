@@ -113,7 +113,6 @@ const model = {
 const run: PiRun = {
   id: "run-a",
   applicationId: "app-a",
-  workspaceId: "workspace-a",
   chatId: "chat-a",
   userMessageId: "user-a",
   assistantMessageId: "answer-a",
@@ -249,7 +248,7 @@ describe("assistant output and errors", () => {
     expect(SYSTEM_PROMPT).toContain("They are optional");
     expect(SYSTEM_PROMPT).toContain("Recommend one sensible course of action");
     expect(SYSTEM_PROMPT).toContain(
-      "Do not turn onboarding into a questionnaire",
+      "Do not turn the conversation into a questionnaire",
     );
     expect(SYSTEM_PROMPT).toContain("Do not save the default goals themselves");
     expect(SYSTEM_PROMPT).toContain("at most €30/month");
@@ -279,33 +278,55 @@ describe("assistant output and errors", () => {
   it("reads current application state through the scoped tool instead of an injected summary", () => {
     expect(SYSTEM_PROMPT).toContain("it carries no application state");
     expect(SYSTEM_PROMPT).toContain(
-      "call get_application_status in the current request",
+      "read it in the current request: get_application_status",
     );
+    expect(SYSTEM_PROMPT).toContain("list_operations for recorded work");
     expect(SYSTEM_PROMPT).toContain("historical and may be outdated");
-    expect(SYSTEM_PROMPT).toContain("need no status lookup");
-    expect(SYSTEM_PROMPT).toContain("some questions need both");
+    expect(SYSTEM_PROMPT).toContain("need no lookup");
     expect(SYSTEM_PROMPT).toContain(
       "say that current status could not be retrieved",
     );
     expect(SYSTEM_PROMPT).not.toContain("supplies current application checks");
   });
 
-  it("separates reading records from observing GitHub and readiness from deployment", () => {
-    expect(SYSTEM_PROMPT).toContain("reads local records at retrievedAt");
-    expect(SYSTEM_PROMPT).toContain("observed at its own observedAt");
+  it("separates recorded evidence from current verification", () => {
     expect(SYSTEM_PROMPT).toContain(
-      "Reading does not recheck GitHub, renew evidence or verify anything",
-    );
-    expect(SYSTEM_PROMPT).toContain("Re-run repository check");
-    expect(SYSTEM_PROMPT).toContain(
-      "not code review, passing tests, deployability or continuing access",
+      "A recorded result is evidence from its own time.",
     );
     expect(SYSTEM_PROMPT).toContain(
-      "say deployment has not been verified here",
+      "Reading records does not recheck GitHub, probe the host or verify anything.",
     );
     expect(SYSTEM_PROMPT).toContain(
-      "product rules for later phases, not observations",
+      "not that the code builds, passes tests or deploys",
     );
+    expect(SYSTEM_PROMPT).toContain(
+      "A successful command is not a verified application",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "an earlier verification does not establish current health",
+    );
+  });
+
+  it("hands application code changes to the owner instead of claiming to make them", () => {
+    expect(SYSTEM_PROMPT).toContain(
+      "It does not change the application's own code, and it cannot open branches, commits or pull requests.",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "give a copyable handoff for a coding agent",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "The owner makes and merges the change; prepare_release then deploys the merged revision",
+    );
+    expect(SYSTEM_PROMPT).toContain(
+      "Never describe a code change as made by you.",
+    );
+    for (const retired of [
+      "propose_application_contract",
+      "conformance",
+      "preview",
+      "phase",
+    ])
+      expect(SYSTEM_PROMPT.toLowerCase()).not.toContain(retired);
   });
 
   it("normalizes conversational text and rejects empty or oversized output", () => {
@@ -651,51 +672,48 @@ describe("native Pi adapter", () => {
       session.dispose.mock.invocationCallOrder[0],
     );
   });
-  it.each(["start", "inspect-app", "make-launch-ready"] as const)(
-    "offers Pi's native tools in the %s phase only through the Run's workspace, never the controller",
-    async (phaseKey) => {
-      const answer = {
-        content: [{ type: "text", text: "workspace result" }],
-        details: {},
-      };
-      mocks.execute.mockResolvedValue(answer);
-      const cancel = new AbortController();
-      let native:
-        Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
-      session.prompt.mockImplementation(async () => {
-        native = await callNativeToolsThroughSdk(
-          mocks.create.mock.calls[0][0] as Options,
-          cancel.signal,
-        );
-        session.finish();
-      });
-      await askPi({ ...input, phaseKey });
-      expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          applicationId: run.applicationId,
-          runId: run.id,
-        }),
+  it("offers Pi's native tools only through the Run's workspace, never the controller", async () => {
+    const answer = {
+      content: [{ type: "text", text: "workspace result" }],
+      details: {},
+    };
+    mocks.execute.mockResolvedValue(answer);
+    const cancel = new AbortController();
+    let native:
+      Awaited<ReturnType<typeof callNativeToolsThroughSdk>> | undefined;
+    session.prompt.mockImplementation(async () => {
+      native = await callNativeToolsThroughSdk(
+        mocks.create.mock.calls[0][0] as Options,
+        cancel.signal,
       );
-      // Each call, with its cancellation signal, reached the Run's workspace.
-      expect(mocks.execute.mock.calls).toEqual(
-        PI_BUILTIN_TOOLS.map((name) => [
-          name,
-          `call-${name}`,
-          nativeToolCalls[name],
-          cancel.signal,
-        ]),
-      );
-      expect(Object.values(native!.results)).toEqual(
-        PI_BUILTIN_TOOLS.map(() => answer),
-      );
-      expect(native!.controllerFiles).toEqual([]);
-      // The Run's namespace ends with its session.
-      expect(mocks.dispose).toHaveBeenCalledOnce();
-      expect(mocks.dispose.mock.invocationCallOrder[0]).toBeGreaterThan(
-        session.dispose.mock.invocationCallOrder[0],
-      );
-    },
-  );
+      session.finish();
+    });
+    await askPi(input);
+    expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        applicationId: run.applicationId,
+        runId: run.id,
+      }),
+    );
+    // Each call, with its cancellation signal, reached the Run's workspace.
+    expect(mocks.execute.mock.calls).toEqual(
+      PI_BUILTIN_TOOLS.map((name) => [
+        name,
+        `call-${name}`,
+        nativeToolCalls[name],
+        cancel.signal,
+      ]),
+    );
+    expect(Object.values(native!.results)).toEqual(
+      PI_BUILTIN_TOOLS.map(() => answer),
+    );
+    expect(native!.controllerFiles).toEqual([]);
+    // The Run's namespace ends with its session.
+    expect(mocks.dispose).toHaveBeenCalledOnce();
+    expect(mocks.dispose.mock.invocationCallOrder[0]).toBeGreaterThan(
+      session.dispose.mock.invocationCallOrder[0],
+    );
+  });
   it("opens distinct Chat handles and applies new preferences only to later sessions", async () => {
     const first = fakeSession();
     const pending = deferred();
@@ -767,9 +785,6 @@ describe("native Pi adapter", () => {
       decisionProposals: [
         { kind: "launch-priority", value: "Recover quickly" },
       ],
-      contractProposal: null,
-      sourceProposal: null,
-      acceptanceProposal: null,
     });
     expect(registered("propose_decision").constrainedSampling).toEqual({
       type: "json_schema",

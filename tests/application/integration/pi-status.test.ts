@@ -25,16 +25,14 @@ import {
 } from "vitest";
 
 import * as store from "../../../src/server/db";
+import { NotFoundError } from "../../../src/server/applications";
+import { requestDeployment } from "../../../src/server/deployment-store";
 import { diagnosticLogPath } from "../../../src/server/diagnostics";
 import * as github from "../../../src/server/github";
 import {
   saveGithubConnection,
   type GithubConnection,
 } from "../../../src/server/github-connection";
-import {
-  getApplicationStatus,
-  NotFoundError,
-} from "../../../src/server/phase-one";
 import * as runs from "../../../src/server/pi-runs";
 import {
   applicationStatusParameters,
@@ -42,7 +40,6 @@ import {
   readPiApplicationStatus,
 } from "../../../src/server/pi-status";
 import { executePiRun } from "../../../src/server/pi-worker";
-import type { ApplicationStatus } from "../../../src/server/types";
 import { pushTestDatabase } from "../../test-database";
 
 const mocks = vi.hoisted(() => ({ configure: vi.fn() }));
@@ -72,6 +69,7 @@ vi.mock("../../../src/server/pi-configuration", async (original) => ({
 const FIRST = "00000000-0000-4000-8000-000000000001";
 const SECOND = "00000000-0000-4000-8000-000000000002";
 const OLD = "2026-09-01T10:00:00.000Z";
+const SHA = "abcdef12".repeat(5);
 function login(id: string): GithubConnection {
   return {
     id,
@@ -84,22 +82,15 @@ function login(id: string): GithubConnection {
     expiresAt: null,
   };
 }
-function fixtureApplication(
-  name = "status",
-  approvalMode: "pi-decides" | "always-ask" = "pi-decides",
-) {
+function fixtureApplication(name = "status") {
   const application = store.insertApplication({
     name,
     repositoryUrl: `https://github.com/qa/${name}`,
     repositoryOwner: "qa",
     repositoryName: name,
-    environment: "production",
-    approvalMode,
-    approvalScope: "Current application launch",
   });
-  const workspace = store.insertWorkspace(application.id);
-  const chat = store.insertChat(workspace.id, "Launch Brief", true);
-  return { application, workspace, chat };
+  const chat = store.insertChat(application.id, "Deploy application");
+  return { application, chat };
 }
 function observe(
   applicationId: string,
@@ -124,8 +115,8 @@ function observe(
       connectionId,
       repository: "qa/status",
       authenticatedAs: "raw-account-login",
-      commitSha: "abcdef12".repeat(5),
       error: "raw-provider-detail",
+      ...(status === "passed" ? { defaultBranch: "main", commitSha: SHA } : {}),
     },
   });
   if (!observedAt) return observation;
@@ -135,8 +126,16 @@ function observe(
     .run(observedAt, observation.id);
   return { ...observation, observedAt };
 }
-const repositoryCheck = (status: ApplicationStatus) =>
-  status.checks.find((check) => check.key === "repository-readable")!;
+const getStatus = (applicationId: string, chatId: string) =>
+  readPiApplicationStatus(applicationId, chatId).status;
+type Status = ReturnType<typeof getStatus>;
+const notChecked = (result: string) => ({
+  status: "not-yet",
+  result,
+  checkedAt: null,
+  commitSha: null,
+  defaultBranch: null,
+});
 
 let directory: string;
 let app: ReturnType<typeof fixtureApplication>;
@@ -150,7 +149,8 @@ beforeAll(() => {
 });
 beforeEach(() => {
   saveGithubConnection(null);
-  store.db().$client.exec("DELETE FROM applications");
+  // Deployment records are retained history: they never cascade.
+  store.db().$client.exec("DELETE FROM deployments; DELETE FROM applications");
   app = fixtureApplication();
   mocks.configure.mockReset();
 });
@@ -162,135 +162,69 @@ afterAll(() => {
 });
 
 describe("scoped application status projection", () => {
-  it("projects saved configuration, current checks, applicable evidence and catalog requirements without writing", () => {
+  it("projects saved identity, current repository access and the recorded deployment without writing", () => {
     saveGithubConnection(login(FIRST));
     const observation = observe(app.application.id, "passed", FIRST, OLD);
     const changes = () =>
       store.db().$client.prepare("SELECT total_changes() AS count").get();
     const before = changes();
     const started = Date.now();
-    const status = getApplicationStatus(app.application.id, app.chat.id);
-    const applicationEvidence = {
-      recordType: "application",
-      recordId: app.application.id,
-      label: "Application record",
-      href: `/api/applications/${app.application.id}`,
-      observedAt: app.application.updatedAt,
-    };
+    const status = getStatus(app.application.id, app.chat.id);
     expect(status).toEqual({
       retrievedAt: expect.any(String),
       application: {
         id: app.application.id,
         name: "status",
         repositoryUrl: "https://github.com/qa/status",
-        environment: "production",
-        approvalMode: { key: "pi-decides", label: "Let Server Guy decide" },
         updatedAt: app.application.updatedAt,
       },
-      workspace: {
-        phaseKey: "start",
-        phaseNumber: 1,
-        deliverable: "Launch Brief",
-        status: "ready",
+      repositoryAccess: {
+        status: "passed",
+        result: "qa/status is readable at main · abcdef12.",
+        checkedAt: OLD,
+        commitSha: SHA,
+        defaultBranch: "main",
       },
-      checks: [
-        {
-          key: "application-identity",
-          label: "Application details",
-          status: "passed",
-          result: "status · qa/status · Production",
-          evidence: [applicationEvidence],
-        },
-        {
-          key: "repository-readable",
-          label: "GitHub repository access",
-          status: "passed",
-          result: "qa/status is readable at main · abcdef12.",
-          evidence: [
-            {
-              recordType: "observation",
-              recordId: observation.id,
-              label: "GitHub commit",
-              href: `/api/observations/${observation.id}`,
-              observedAt: OLD,
-            },
-          ],
-        },
-        {
-          key: "target-environment",
-          label: "Deployment environment",
-          status: "passed",
-          result: "Production",
-          evidence: [applicationEvidence],
-        },
-        {
-          key: "approval-authority",
-          label: "When Server Guy asks for approval",
-          status: "passed",
-          result: "Let Server Guy decide · Current application launch",
-          evidence: [applicationEvidence],
-        },
-      ],
-      upcomingRequirements: [
-        {
-          key: "hetzner-access",
-          label: "Hetzner access",
-          requiredBeforePhase: 5,
-          resolutionPath: "Connect or verify Hetzner before Set up server.",
-        },
-        {
-          key: "cloudflare-access",
-          label: "Cloudflare access",
-          requiredBeforePhase: 6,
-          resolutionPath: "Connect or verify Cloudflare before Connect domain.",
-        },
-        {
-          key: "domain-starting-state",
-          label: "Domain starting state",
-          requiredBeforePhase: 6,
-          resolutionPath:
-            "Tell Server Guy whether the domain is already owned before Connect domain.",
-        },
-      ],
+      deployment: null,
     });
     // Reading is not observing: the snapshot time is now; the repository
-    // evidence keeps the time its check actually ran.
+    // result keeps the time its check actually ran.
     expect(Date.parse(status.retrievedAt)).toBeGreaterThanOrEqual(
       Math.floor(started / 1000) * 1000,
     );
     expect(Date.parse(status.retrievedAt)).toBeGreaterThan(Date.parse(OLD));
     expect(changes()).toEqual(before);
-    expect(store.listActivity(app.workspace.id)).toEqual([]);
+    expect(store.listActivity(app.application.id)).toEqual([]);
     expect(store.listObservations(app.application.id)).toHaveLength(1);
     expect(github.inspectGithubRepository).not.toHaveBeenCalled();
     const { text } = readPiApplicationStatus(app.application.id, app.chat.id);
     expect(JSON.parse(text)).toEqual(
       expect.objectContaining({ retrievedAt: expect.any(String) }),
     );
-    for (const secret of [
+    for (const hidden of [
       "ghu_",
       "raw-account-login",
       "raw-provider-detail",
-      "abcdef12abcdef12",
       "connectionId",
+      observation.id,
     ])
-      expect(text).not.toContain(secret);
+      expect(text).not.toContain(hidden);
   });
 
   it("binds scope to the accepted Run's application and Chat and fails for mismatched or deleted records", () => {
     const other = fixtureApplication("other");
-    expect(() =>
-      getApplicationStatus(app.application.id, other.chat.id),
-    ).toThrow(NotFoundError);
-    expect(() =>
-      getApplicationStatus(other.application.id, app.chat.id),
-    ).toThrow("Chat not found.");
-    expect(() => getApplicationStatus("missing", app.chat.id)).toThrow(
+    expect(() => getStatus(app.application.id, other.chat.id)).toThrow(
+      NotFoundError,
+    );
+    expect(() => getStatus(other.application.id, app.chat.id)).toThrow(
+      "Chat not found.",
+    );
+    expect(() => getStatus("missing", app.chat.id)).toThrow(
       "Application not found.",
     );
-    expect(
-      getApplicationStatus(other.application.id, other.chat.id).application.id,
-    ).toBe(other.application.id);
+    expect(getStatus(other.application.id, other.chat.id).application.id).toBe(
+      other.application.id,
+    );
     store.deleteApplication(app.application.id);
     expect(() =>
       readPiApplicationStatus(app.application.id, app.chat.id),
@@ -308,98 +242,72 @@ describe("scoped application status projection", () => {
 
   it("reports the latest failed check and never substitutes an older passing Observation", () => {
     saveGithubConnection(login(FIRST));
-    const passed = observe(app.application.id, "passed", FIRST, OLD);
+    observe(app.application.id, "passed", FIRST, OLD);
     const failed = observe(app.application.id, "failed", FIRST);
-    const status = getApplicationStatus(app.application.id, app.chat.id);
-    expect(repositoryCheck(status)).toEqual({
-      key: "repository-readable",
-      label: "GitHub repository access",
+    const status = getStatus(app.application.id, app.chat.id);
+    expect(status.repositoryAccess).toEqual({
       status: "blocked",
       result: failed.summary,
-      evidence: [
-        {
-          recordType: "observation",
-          recordId: failed.id,
-          label: "GitHub repository check",
-          href: `/api/observations/${failed.id}`,
-          observedAt: failed.observedAt,
-        },
-      ],
+      checkedAt: failed.observedAt,
+      commitSha: null,
+      defaultBranch: null,
     });
-    expect(status.workspace.status).toBe("in-progress");
     const text = JSON.stringify(status);
-    expect(text).not.toContain(passed.id);
     expect(text).not.toContain("readable at main");
+    expect(text).not.toContain(SHA);
   });
 
   it("withholds a passing check's evidence once the GitHub login was replaced or removed", () => {
     saveGithubConnection(login(FIRST));
-    const passed = observe(app.application.id, "passed", FIRST);
+    observe(app.application.id, "passed", FIRST);
     expect(
-      repositoryCheck(getApplicationStatus(app.application.id, app.chat.id)),
-    ).toMatchObject({ status: "passed", evidence: [{ recordId: passed.id }] });
+      getStatus(app.application.id, app.chat.id).repositoryAccess,
+    ).toMatchObject({ status: "passed", commitSha: SHA });
     saveGithubConnection(login(SECOND));
-    const replaced = getApplicationStatus(app.application.id, app.chat.id);
-    expect(repositoryCheck(replaced)).toEqual({
-      key: "repository-readable",
-      label: "GitHub repository access",
-      status: "not-yet",
-      result: "Run the repository check with your current GitHub connection.",
-      evidence: [],
-    });
-    expect(replaced.workspace.status).toBe("in-progress");
-    expect(JSON.stringify(replaced)).not.toContain(passed.id);
+    const replaced = getStatus(app.application.id, app.chat.id);
+    expect(replaced.repositoryAccess).toEqual(
+      notChecked(
+        "Run the repository check with your current GitHub connection.",
+      ),
+    );
+    expect(JSON.stringify(replaced)).not.toContain(SHA);
     saveGithubConnection(null);
-    expect(
-      repositoryCheck(getApplicationStatus(app.application.id, app.chat.id)),
-    ).toEqual({
-      key: "repository-readable",
-      label: "GitHub repository access",
-      status: "not-yet",
-      result: "Connect GitHub, then run the repository check.",
-      evidence: [],
-    });
+    expect(getStatus(app.application.id, app.chat.id).repositoryAccess).toEqual(
+      notChecked("Connect GitHub, then run the repository check."),
+    );
   });
 
-  it("keeps an unavailable result as applicable evidence and manufactures none when no check exists", () => {
+  it("keeps an unavailable result as the current outcome and manufactures none when no check exists", () => {
     saveGithubConnection(login(FIRST));
-    expect(
-      repositoryCheck(getApplicationStatus(app.application.id, app.chat.id)),
-    ).toMatchObject({
-      status: "not-yet",
-      result: "Run the repository check with your current GitHub connection.",
-      evidence: [],
-    });
+    expect(getStatus(app.application.id, app.chat.id).repositoryAccess).toEqual(
+      notChecked(
+        "Run the repository check with your current GitHub connection.",
+      ),
+    );
     const unavailable = observe(app.application.id, "unavailable", FIRST);
-    expect(
-      repositoryCheck(getApplicationStatus(app.application.id, app.chat.id)),
-    ).toMatchObject({
-      status: "not-yet",
-      result: unavailable.summary,
-      evidence: [
-        { recordId: unavailable.id, label: "GitHub repository check" },
-      ],
-    });
+    expect(getStatus(app.application.id, app.chat.id).repositoryAccess).toEqual(
+      {
+        status: "not-yet",
+        result: unavailable.summary,
+        checkedAt: unavailable.observedAt,
+        commitSha: null,
+        defaultBranch: null,
+      },
+    );
   });
 
-  it("reads the saved Approval Mode again on every call", () => {
-    const first = getApplicationStatus(app.application.id, app.chat.id);
-    expect(first.application.approvalMode).toEqual({
-      key: "pi-decides",
-      label: "Let Server Guy decide",
+  it("reads the recorded deployment again on every call", () => {
+    const first = getStatus(app.application.id, app.chat.id);
+    expect(first.deployment).toBeNull();
+    const record = requestDeployment(app.application.id, app.chat.id);
+    const second = getStatus(app.application.id, app.chat.id);
+    expect(second.deployment).toMatchObject({
+      status: record.status,
+      revision: record.revision,
+      serverId: null,
+      verifiedAt: null,
+      runtime: { state: "not-observed", lastVerified: null },
     });
-    store
-      .db()
-      .$client.prepare("UPDATE applications SET approval_mode = ? WHERE id = ?")
-      .run("always-ask", app.application.id);
-    const second = getApplicationStatus(app.application.id, app.chat.id);
-    expect(second.application.approvalMode).toEqual({
-      key: "always-ask",
-      label: "Always ask",
-    });
-    expect(
-      second.checks.find((check) => check.key === "approval-authority")?.result,
-    ).toBe("Always ask · Current application launch");
     expect(Date.parse(second.retrievedAt)).toBeGreaterThanOrEqual(
       Date.parse(first.retrievedAt),
     );
@@ -572,18 +480,17 @@ describe("status lookup through the actual SDK tool loop", () => {
 
   it("hands the model the current projection with no injected summary and records only reply details", async () => {
     saveGithubConnection(login(FIRST));
-    const observation = observe(app.application.id, "passed", FIRST, OLD);
+    observe(app.application.id, "passed", FIRST, OLD);
     const observationsBefore = store.listObservations(app.application.id);
     const { run, reply, steps } = await turn("status");
     expect(run.status).toBe("succeeded");
     const seen = JSON.parse(reply.body) as { isError: boolean; text: string };
     expect(seen.isError).toBe(false);
-    const status = JSON.parse(seen.text) as ApplicationStatus;
+    const status = JSON.parse(seen.text) as Status;
     expect(status.application.id).toBe(app.application.id);
-    expect(status.workspace.status).toBe("ready");
-    expect(repositoryCheck(status)).toMatchObject({
+    expect(status.repositoryAccess).toMatchObject({
       status: "passed",
-      evidence: [{ recordId: observation.id, observedAt: OLD }],
+      checkedAt: OLD,
     });
     expect(Date.parse(status.retrievedAt)).toBeGreaterThan(Date.parse(OLD));
     // The context message identifies the Run; it carries no checks or mode.
@@ -610,14 +517,11 @@ describe("status lookup through the actual SDK tool loop", () => {
       "createdAt",
       "previousAttempt",
       "runId",
-      "userMessageId",
     ]);
     expect(JSON.stringify(requests[0].messages)).not.toContain(
-      "GitHub repository access",
+      "repositoryAccess",
     );
-    expect(JSON.stringify(requests[1].messages)).toContain(
-      "GitHub repository access",
-    );
+    expect(JSON.stringify(requests[1].messages)).toContain("repositoryAccess");
     expect(steps.map((row) => [row.stepId, row.step, row.outcome])).toEqual([
       ["context", "context", "completed"],
       ["session", "session", "completed"],
@@ -626,7 +530,7 @@ describe("status lookup through the actual SDK tool loop", () => {
       ["model:2", "model", "completed"],
       ["save", "save", "completed"],
     ]);
-    expect(store.listActivity(app.workspace.id)).toEqual([]);
+    expect(store.listActivity(app.application.id)).toEqual([]);
     expect(store.listObservations(app.application.id)).toEqual(
       observationsBefore,
     );
@@ -659,13 +563,13 @@ describe("status lookup through the actual SDK tool loop", () => {
       const seen = JSON.parse(failed.reply.body);
       expect(seen.isError).toBe(true);
       expect(seen.text).toContain("Status storage unavailable");
-      expect(seen.text).not.toContain('"checks"');
+      expect(seen.text).not.toContain('"repositoryAccess"');
       expect(failed.steps.find((row) => row.stepId === "tool:1")).toMatchObject(
         { step: "get_application_status", outcome: "failed" },
       );
     } finally {
       failing.mockRestore();
     }
-    expect(store.listActivity(app.workspace.id)).toEqual([]);
+    expect(store.listActivity(app.application.id)).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { migrateChatOwnership } from "./migrate-chat-ownership.mjs";
+import { retirePreparationWorkflow } from "./retire-preparation.mjs";
 
 const path =
   process.env.SERVER_GUY_DB_PATH ??
@@ -17,7 +18,7 @@ const { version } = JSON.parse(
     "utf8",
   ),
 );
-const UPGRADABLE_VERSIONS = [6, 8, 9, 10, 11, 12];
+const UPGRADABLE_VERSIONS = [6, 8, 9, 10, 11, 12, 13];
 mkdirSync(dirname(path), { recursive: true });
 const database = new Database(path);
 try {
@@ -43,11 +44,12 @@ try {
           .prepare("PRAGMA table_info(phase_workspaces)")
           .all()
           .map((column) => column.name);
-        if (!columns.includes("completed_at"))
+        // A rerun after v14 retirement no longer has phase workspaces.
+        if (columns.length && !columns.includes("completed_at"))
           database.exec(
             "ALTER TABLE phase_workspaces ADD COLUMN completed_at text",
           );
-        if (!columns.includes("deliverable_evidence"))
+        if (columns.length && !columns.includes("deliverable_evidence"))
           database.exec(
             "ALTER TABLE phase_workspaces ADD COLUMN deliverable_evidence text",
           );
@@ -66,6 +68,11 @@ try {
     // Drizzle v10 used a separate index, so removing source uniqueness needs
     // no application-table rebuild and cannot cascade into dependent records.
     database.exec("DROP INDEX IF EXISTS applications_repository_url_unique");
+    const retirement = retirePreparationWorkflow(database);
+    if (retirement.changed)
+      console.log(
+        `Retired preparation workflow: ${retirement.archived} records kept as history, ${retirement.heldOperations} held operations.`,
+      );
     if (database.pragma("foreign_key_check").length)
       throw new Error(
         "Database has invalid references. Stop and inspect the backup before continuing.",

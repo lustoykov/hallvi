@@ -217,7 +217,6 @@ export function requestDeployment(
     requirements: requirements?.slice(0, 5000),
     requestedRef,
     revision: null,
-    plan: null,
     offer: null,
     authority: null,
     serverId: null,

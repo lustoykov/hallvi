@@ -11,6 +11,7 @@ import {
   visibleSections,
 } from "../../../src/components/server-guy/application-sections";
 import type { DeploymentRecord } from "../../../src/server/deployment-types";
+import { nativeApp } from "../../fixtures/native";
 
 const base: DeploymentRecord = {
   id: "dep-1",
@@ -19,17 +20,11 @@ const base: DeploymentRecord = {
   status: "live",
   repository: "qa/todo",
   revision: "a".repeat(40),
-  plan: {
+  native: nativeApp({
     summary: "Deploy the todo application with a private database.",
-    dockerfile: "Dockerfile",
-    generatedDockerfile: null,
-    context: ".",
     port: 8000,
     command: ["uvicorn", "app:app"],
-    environment: [],
-    postgres: { version: "16", variable: "DATABASE_URL", scheme: "postgresql" },
-    missingInputs: [],
-    healthPath: "/health",
+    postgres: "16",
     checks: [
       {
         name: "Home",
@@ -41,7 +36,7 @@ const base: DeploymentRecord = {
         captureId: null,
       },
     ],
-  },
+  }),
   offer: null,
   authority: null,
   serverId: 1,
@@ -58,8 +53,8 @@ const base: DeploymentRecord = {
 };
 
 describe("stackOf", () => {
-  it("is unrecorded before a plan exists, so the stack group stays hidden", () => {
-    const stack = stackOf({ ...base, plan: null });
+  it("is unrecorded before a configuration exists, so the stack group stays hidden", () => {
+    const stack = stackOf({ ...base, native: undefined });
     expect(stack.recorded).toBe(false);
     expect(visibleSections(stack, null).map((section) => section.id)).toEqual([
       "overview",
@@ -74,7 +69,7 @@ describe("stackOf", () => {
     ]);
   });
 
-  it("derives the web process, PostgreSQL and its volume from the plan", () => {
+  it("derives the web process, PostgreSQL and its volume from the configuration", () => {
     const stack = stackOf(base);
     expect(stack.processes).toEqual([
       expect.objectContaining({
@@ -105,14 +100,25 @@ describe("stackOf", () => {
     ]);
   });
 
-  it("adds recorded workers, services, queues, jobs and file volumes", () => {
+  it("adds services and file volumes from the configuration and recorded queues and jobs", () => {
     const stack = stackOf({
       ...base,
-      stack: {
-        processes: [
-          { name: "worker", role: "worker", command: "celery worker" },
+      native: nativeApp({
+        port: 8000,
+        command: ["uvicorn", "app:app"],
+        postgres: "16",
+        volumes: [{ name: "media", target: "/data/media", kind: "files" }],
+        services: [
+          {
+            name: "worker",
+            sharesAppImage: true,
+            command: ["celery", "worker"],
+          },
+          { name: "broker", image: "valkey/valkey:8.1.3-alpine" },
         ],
-        services: [{ kind: "valkey", name: "broker", role: "broker" }],
+        checks: [],
+      }),
+      stack: {
         queues: [{ library: "Celery", backend: "redis", workers: ["worker"] }],
         jobs: [
           {
@@ -123,14 +129,18 @@ describe("stackOf", () => {
             runsIn: "app",
           },
         ],
-        volumes: [
-          { name: "media", usedBy: "app", mount: "/data/media", kind: "files" },
-        ],
       },
     });
-    expect(stack.processes.map((process) => process.role)).toEqual([
-      "web",
-      "worker",
+    expect(
+      stack.processes.map((process) => [
+        process.name,
+        process.role,
+        process.private,
+      ]),
+    ).toEqual([
+      ["app", "web", false],
+      ["worker", "service", true],
+      ["broker", "service", true],
     ]);
     const ids = visibleSections(stack, null).map((section) => section.id);
     expect(ids).toEqual(

@@ -2,6 +2,7 @@ import { rememberVerifiedImages } from "./rollback";
 import { randomUUID } from "node:crypto";
 import {
   assertApprovedRelease,
+  releaseIdentityHolds,
   releaseOf,
   type DeploymentRelease,
 } from "./deployment-release";
@@ -11,16 +12,11 @@ import type {
   DeploymentAttempt,
 } from "./deployment-runtime";
 
-/** Import saved evidence without inventing earlier retries. */
+/** The lifecycle of a record, created before its first execution. */
 export function ensureDeploymentLifecycle(
   record: DeploymentRecord,
 ): DeploymentLifecycle {
-  if (record.lifecycle) return record.lifecycle;
-  const release = releaseOf(record);
-  const verified =
-    record.status === "live" && record.verifiedAt && release && record.serverId;
-  const attemptId = `legacy:${record.id}`;
-  record.lifecycle = {
+  return (record.lifecycle ??= {
     host: {
       id: `host:${record.id}`,
       provider: "hetzner",
@@ -28,46 +24,16 @@ export function ensureDeploymentLifecycle(
       serverId: record.serverId,
       address: record.address,
     },
-    releases: release ? [structuredClone(release)] : [],
-    attempts: verified
-      ? [
-          {
-            id: attemptId,
-            operationId: record.operationId ?? `deployment:${record.id}`,
-            releaseId: release.id,
-            hostId: `host:${record.id}`,
-            kind: "legacy",
-            startedAt: record.createdAt,
-            finishedAt: record.verifiedAt,
-            outcome: "verified",
-            remoteStartedAt: null,
-            error: null,
-            eventOffset: 0,
-          },
-        ]
-      : [],
+    releases: [],
+    attempts: [],
     runtime: {
-      state: verified
-        ? "verified"
-        : record.serverId || record.serverCreateAttempted
+      state:
+        record.serverId || record.serverCreateAttempted
           ? "unknown"
           : "not-observed",
-      lastVerified: verified
-        ? {
-            attemptId,
-            releaseId: release.id,
-            hostId: `host:${record.id}`,
-            revision: release.revision,
-            checkedAt: record.verifiedAt!,
-            images: structuredClone(
-              record.serviceImages ??
-                (record.imageId ? { app: record.imageId } : {}),
-            ),
-          }
-        : null,
+      lastVerified: null,
     },
-  };
-  return record.lifecycle;
+  });
 }
 
 /** Retrying cannot reassign an established host. */
@@ -98,7 +64,7 @@ export function beginDeploymentAttempt(
 ): DeploymentAttempt {
   assertApprovedRelease(record);
   const release = selectedRelease ?? releaseOf(record);
-  if (release && releaseOf(release)?.id !== release.id)
+  if (release && !releaseIdentityHolds(release))
     throw new Error("Release content does not match its identity.");
   if (!release)
     throw new Error("A selected release is required before execution.");

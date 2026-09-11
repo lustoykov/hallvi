@@ -37,7 +37,7 @@ const stepGlyph: Record<OperationStep["state"], string> = {
 /** The whole record in one sentence. */
 export function sentenceOf(history: HistoryRecord) {
   if (!history.total)
-    return "Nothing recorded yet. Work appears here as it happens.";
+    return "No operations recorded yet. Work appears here as it happens.";
   const since = history.since
     ? new Date(history.since).toLocaleDateString(undefined, {
         day: "numeric",

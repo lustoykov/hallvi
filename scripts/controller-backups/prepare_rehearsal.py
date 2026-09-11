@@ -25,7 +25,6 @@ def prepare(payload, target, revision, original_stopped, runtime_target=None):
         for table, column, allowed in [
             ('pi_runs', 'status', ('succeeded', 'failed', 'cancelled', 'interrupted', 'timed-out')),
             ('application_operations', 'state', ('verified', 'failed', 'inspected', 'cancelled', 'proposed')),
-            ('conformance_runs', 'status', ('passed', 'failed', 'cancelled', 'interrupted', 'timed-out', 'unavailable')),
             ('deployments', 'status', ('live', 'failed', 'awaiting-approval')),
         ]:
             marks = ','.join('?' for _ in allowed)

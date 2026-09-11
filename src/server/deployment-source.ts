@@ -1,4 +1,4 @@
-import { currentContract, listObservations } from "./db";
+import { listObservations } from "./db";
 import {
   connectedGithubCredential,
   currentGithubConnectionId,
@@ -51,8 +51,6 @@ export async function checkDeploymentSource(
   if (bind) {
     record.repositoryId = repository.id;
     record.githubConnectionId = connection.id;
-    record.inspectedRevision =
-      currentContract(record.applicationId)?.commitSha ?? null;
   }
   if (record.revision) {
     const { data: commit } = await githubJson(

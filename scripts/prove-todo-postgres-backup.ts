@@ -18,7 +18,8 @@ import { isIP } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import Database from "better-sqlite3";
-import { deploymentPlanSchema } from "../src/server/deployment-types";
+import type { NativeConfiguration } from "../src/server/deployment-release";
+import { currentFacts } from "../src/server/release-facts";
 import {
   backupSha256,
   verifyPostgresArchive,
@@ -108,25 +109,24 @@ async function main() {
       status: z.string(),
       address: z.string().nullable(),
       revision: z.string().nullable(),
-      plan: deploymentPlanSchema.nullable(),
+      native: z.custom<NativeConfiguration>().nullable().optional(),
     })
     .parse(JSON.parse(body));
+  const facts = currentFacts({ native: deployment.native ?? null });
   if (
     !deployment ||
     deployment.status !== "live" ||
-    !deployment.plan?.postgres ||
+    !facts?.database ||
     !deployment.address ||
     isIP(deployment.address) !== 4 ||
-    deployment.plan.volumes?.length ||
-    deployment.plan.services?.length
+    facts.services.length !== 2 ||
+    facts.volumes.some((volume) => volume.name !== facts.database!.volume)
   )
     throw new Error(
       "This proof requires a live PostgreSQL-only application stack.",
     );
   z.uuid().parse(deployment.id);
-  const version = z
-    .enum(["16", "17", "18"])
-    .parse(deployment.plan.postgres.version);
+  const version = z.enum(["16", "17", "18"]).parse(facts.database.version);
   process.env.CLOUDFLARE_ACCOUNT_ID = account;
   // Database backups and receipts stay in ignored, private controller storage.
   const proofId = randomUUID();

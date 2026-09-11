@@ -4,13 +4,13 @@ import { ProcessesView } from "../../../src/components/server-guy/views/processe
 import { ArchitectureCanvas } from "../../../src/components/server-guy/architecture-canvas";
 import { richScenario } from "../../../src/components/server-guy/reference/scenario-rich";
 import { stackOf } from "../../../src/server/application-stack";
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { queueNative } from "../../fixtures/queue-worker/native";
 
-it("shows a broker and a worker with historical readiness, without claiming all processes are healthy", () => {
+it("shows private services with historical readiness, without claiming all processes are healthy", () => {
   const state = richScenario.initial();
   const deployment = {
     ...state.deployment!,
-    plan: queuePlan(),
+    native: queueNative(state.deployment!.id, state.deployment!.revision!),
     stack: undefined,
     serviceReadiness: {
       worker: {
@@ -41,9 +41,10 @@ it("shows a broker and a worker with historical readiness, without claiming all 
       onAsk={() => {}}
     />,
   );
-  expect(html).toContain("Broker");
+  expect(html).toContain("<code>queue</code>");
   expect(stack.processes).toHaveLength(3);
-  expect(html).toContain("Worker");
+  expect(html).toContain("<code>worker</code>");
+  expect(html).toContain("Private service");
   expect(html).toContain("Passed readiness command at");
   expect(html).toContain("Some process checks are unavailable");
   expect(html).not.toContain("3 processes healthy");
@@ -53,7 +54,7 @@ it("does not let a passing first companion hide a failing later companion in Arc
   const state = richScenario.initial();
   const deployment = {
     ...state.deployment!,
-    plan: queuePlan(),
+    native: queueNative(state.deployment!.id, state.deployment!.revision!),
     stack: undefined,
   };
   const monitoring = {

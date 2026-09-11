@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { reducedMotion } from "../architecture-prototype/motion";
+import { HistoryRecords } from "../views/history-view";
 import { FeedRow, sentenceOf, useJump } from "./feed";
 import { dayName, FILTERS, type Entry } from "./history-model";
 import type { HistoryDirectionProps } from "./index";
@@ -33,6 +34,8 @@ export function TransitHistory({
   onFilter,
   now,
   head,
+  decisions,
+  activity,
   decisionFor,
   onOpenConversation,
   onOpenDestination,
@@ -128,6 +131,10 @@ export function TransitHistory({
     );
   };
 
+  // The durable records sit below the line, with every operation listed.
+  const records =
+    filter === "All" && (decisions.length > 0 || activity.length > 0);
+
   return (
     <section className="axh axhm" aria-label="History">
       {head}
@@ -152,7 +159,7 @@ export function TransitHistory({
               </button>
             ))}
           </div>
-          {(history.open.length > 0 || history.days.length > 0) && (
+          {(history.open.length > 0 || history.days.length > 0 || records) && (
             <nav className="axhm-index" aria-label="Days">
               <ol>
                 {history.open.length > 0 && (
@@ -182,6 +189,26 @@ export function TransitHistory({
                     </button>
                   </li>
                 ))}
+                {filter === "All" && decisions.length > 0 && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => goTo("history-requirements")}
+                    >
+                      <span>Saved requirements</span>
+                    </button>
+                  </li>
+                )}
+                {filter === "All" && activity.length > 0 && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => goTo("history-activity")}
+                    >
+                      <span>Application activity</span>
+                    </button>
+                  </li>
+                )}
               </ol>
             </nav>
           )}
@@ -224,6 +251,13 @@ export function TransitHistory({
           ))}
           {!entries.length && history.total > 0 && (
             <p className="axh-empty">Nothing matches this filter.</p>
+          )}
+          {records && (
+            <HistoryRecords
+              decisions={decisions}
+              activity={activity}
+              className="axh-group axhm-records"
+            />
           )}
         </div>
       </div>

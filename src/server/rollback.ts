@@ -1,7 +1,7 @@
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
-import { releaseOf } from "./deployment-release";
+import { releaseIdentityHolds, releaseOf } from "./deployment-release";
 import { establishedRuntime } from "./deployment-runtime";
 import { releaseFacts } from "./release-facts";
 import type { ReleaseScope } from "./release-scope";
@@ -40,14 +40,14 @@ export function rollbackSelection(
   const verified = record.lifecycle?.verifiedImages?.findLast(
     (a) => a.releaseId === releaseId && a.hostId === record.lifecycle!.host.id,
   );
-  if (!release || releaseOf(release)?.id !== releaseId || !verified)
+  if (!release || !releaseIdentityHolds(release) || !verified)
     throw new Error(
       "No previously verified images are recorded for this release on this host.",
     );
   // An observed-but-broken current release may return to verified images.
   if (releaseId === establishedRuntime(record.lifecycle!.runtime)?.releaseId)
     throw new Error("This release is already the current runtime.");
-  const facts = releaseFacts(release, record.id);
+  const facts = releaseFacts(release);
   const images = Object.fromEntries(
     facts.services.map(({ name }) => {
       // Application rollback never downgrades the running database image.
@@ -79,7 +79,7 @@ export async function readReleaseFile(
   if (
     !release ||
     release.repository !== record.repository ||
-    releaseOf(release)?.id !== releaseId
+    !releaseIdentityHolds(release)
   )
     throw new Error("Select a recorded release of this application.");
   if (deniedPathReason(path))

@@ -12,7 +12,7 @@ import type { ApplicationFacts } from "@/server/application-facts";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import { currentFacts } from "@/server/release-facts";
-import type { ChatSummary } from "@/server/types";
+import type { ActivityEvent, ChatSummary, Decision } from "@/server/types";
 
 import type { ApplicationSection } from "../application-sections";
 import type { PageChrome } from "../architecture-prototype";
@@ -22,6 +22,7 @@ import {
   PrototypeBar,
   type VariantEntry,
 } from "../architecture-prototype/prototype-bar";
+import { configuredServices } from "../deployment-prototype/deployment-model";
 import { PageHead } from "../deployment-prototype/page-head";
 import { buildHistory, type Filter, type HistoryRecord } from "./history-model";
 import { TransitHistory } from "./transit";
@@ -34,6 +35,9 @@ export interface HistoryDirectionProps {
   onFilter: (filter: Filter) => void;
   now: number;
   head: ReactNode;
+  /** Saved requirements and application events, beside the operations. */
+  decisions: Decision[];
+  activity: ActivityEvent[];
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -66,6 +70,8 @@ export function HistoryPrototype({
   onOpenConversation,
   onOpenDestination,
   decisionFor,
+  decisions,
+  activity,
   chrome,
   current,
 }: {
@@ -77,6 +83,9 @@ export function HistoryPrototype({
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
+  /** Saved requirements and application events, beside the operations. */
+  decisions: Decision[];
+  activity: ActivityEvent[];
   chrome: PageChrome;
   /** The shipped view, kept as direction 0 for comparison. */
   current: ReactNode;
@@ -122,11 +131,16 @@ export function HistoryPrototype({
       <PageHead
         bar={chrome.bar}
         title="History"
-        name={productName(record?.plan?.image, "the application")}
+        name={productName(
+          configuredServices(record)[0]?.image,
+          "the application",
+        )}
         openUrl={live ? (facts.domains?.address ?? record?.url ?? null) : null}
         restricted={currentFacts(record)?.httpAccess === "controller"}
       />
     ),
+    decisions,
+    activity,
     decisionFor,
     onOpenConversation,
     onOpenDestination,

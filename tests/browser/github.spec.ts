@@ -1,4 +1,4 @@
-import { openDashboard } from "./workspace-helpers";
+import { openConversation } from "./workspace-helpers";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
@@ -29,7 +29,6 @@ test(
     await page
       .getByLabel("GitHub repository", { exact: true })
       .fill("https://github.com/qa/github-consent");
-    await page.getByRole("radio", { name: "Always ask", exact: true }).check();
     await expect(
       page.getByRole("button", { name: "Add application", exact: true }),
     ).toBeDisabled();
@@ -53,9 +52,6 @@ test(
     await expect(
       page.getByLabel("GitHub repository", { exact: true }),
     ).toHaveValue("https://github.com/qa/github-consent");
-    await expect(
-      page.getByRole("radio", { name: "Always ask", exact: true }),
-    ).toBeChecked();
     await page
       .getByRole("button", { name: "Add application", exact: true })
       .click();
@@ -64,18 +60,10 @@ test(
     });
     const path = new URL(page.url()).pathname;
     const before = await (await page.request.get(`/api${path}`)).json();
-    expect(before.observations[0].raw).toMatchObject({
-      accountId: 42,
-      repositoryId: 99,
-      credentialSource: "Server Guy GitHub App",
-      accountRepositoryPermissions: { pull: true },
-      connectionId: expect.any(String),
+    expect(before.repository).toMatchObject({
+      status: "passed",
+      connected: true,
     });
-    expect(
-      before.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("passed");
     await page.goto("/setup/github");
     await page.getByRole("button", { name: "Storage & privacy" }).click();
     await expect(
@@ -91,23 +79,19 @@ test(
       page.getByRole("button", { name: "Connect GitHub" }),
     ).toBeVisible();
     const disconnected = await (await page.request.get(`/api${path}`)).json();
-    expect(
-      disconnected.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("not-yet");
+    expect(disconnected.repository).toMatchObject({
+      status: "not-yet",
+      connected: false,
+    });
     expect(disconnected.messages).toEqual(before.messages);
     await page.goto(path);
-    await openDashboard(page);
-    await page
-      .getByRole("button", { name: /Check 2 GitHub repository access/ })
-      .click();
-    const summary = page.getByRole("dialog").locator(".sg-drawer-summary");
-    await expect(summary).toContainText(
+    await openConversation(page);
+    const notice = page.locator(".sg-repository-notice");
+    await expect(notice).toContainText(
       "Connect GitHub, then run the repository check.",
     );
-    const settings = summary.getByRole("link", {
-      name: "Open GitHub settings",
+    const settings = notice.getByRole("link", {
+      name: "Connect GitHub",
       exact: true,
     });
     await expect(settings).toHaveAttribute("href", "/setup/github");
@@ -131,11 +115,7 @@ test(
       page.getByRole("status").filter({ hasText: "Checking repository…" }),
     ).toBeVisible();
     const reconnected = await (await page.request.get(`/api${path}`)).json();
-    expect(
-      reconnected.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("not-yet");
+    expect(reconnected.repository.status).toBe("not-yet");
     await page.screenshot({
       path: testInfo.outputPath("github-checking-repository.png"),
       fullPage: true,
@@ -149,23 +129,15 @@ test(
       fullPage: true,
     });
     const refreshed = await (await page.request.get(`/api${path}`)).json();
-    expect(
-      refreshed.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("passed");
+    expect(refreshed.repository.status).toBe("passed");
     expect(refreshed.messages).toEqual(before.messages);
     await page.reload();
     expect(
-      (await (await page.request.get(`/api${path}`)).json()).observations,
-    ).toEqual(refreshed.observations);
+      (await (await page.request.get(`/api${path}`)).json()).repository,
+    ).toEqual(refreshed.repository);
     await page.goto(path);
-    await openDashboard(page);
-    await expect(
-      page.getByRole("button", {
-        name: /Check 2 GitHub repository access.*Passed/,
-      }),
-    ).toBeVisible();
+    await openConversation(page);
+    await expect(page.locator(".sg-repository-notice")).toHaveCount(0);
   },
 );
 
@@ -183,7 +155,6 @@ test(
         data: {
           repositoryUrl: "https://github.com/qa/device-reconnect",
           requestKey: crypto.randomUUID(),
-          approvalMode: "pi-decides",
         },
       })
     ).json();
@@ -236,13 +207,10 @@ test(
     const rechecked = await (
       await page.request.get(`/api/applications/${application.application.id}`)
     ).json();
-    expect(
-      rechecked.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("passed");
-    expect(rechecked.observations[0].raw.connectionId).not.toBe(
-      application.observations[0].raw.connectionId,
+    expect(rechecked.repository.status).toBe("passed");
+    // The new login checked the repository again.
+    expect(Date.parse(rechecked.repository.checkedAt)).toBeGreaterThan(
+      Date.parse(application.repository.checkedAt),
     );
     const after = (await (await page.request.get("/api/github/setup")).json())
       .connection;
@@ -286,12 +254,8 @@ test(
     await expect(page).toHaveURL(/\/applications\/[\da-f-]{36}$/);
     const path = new URL(page.url()).pathname;
     const failed = await (await page.request.get(`/api${path}`)).json();
-    expect(
-      failed.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("blocked");
-    expect(failed.observations[0].summary).toContain("read access");
+    expect(failed.repository.status).toBe("blocked");
+    expect(failed.repository.result).toContain("read access");
     await page.goto("/setup/github");
     await page.getByRole("button", { name: "Change", exact: true }).click();
     await page.getByRole("button", { name: "Connect GitHub" }).click();
@@ -309,23 +273,24 @@ test(
     await expect(repositoryResult).toContainText(
       "Grant Server Guy read access",
     );
-    await expect(repositoryResult).toContainText("retry Check 2");
+    await expect(repositoryResult).toContainText("choose Check again");
     const afterReconnect = await (await page.request.get(`/api${path}`)).json();
     await page.reload();
     expect(
-      (await (await page.request.get(`/api${path}`)).json()).observations,
-    ).toEqual(afterReconnect.observations);
+      (await (await page.request.get(`/api${path}`)).json()).repository,
+    ).toEqual(afterReconnect.repository);
+    // After the owner grants access, the application checks again.
     writeFileSync(join(fixture.state, "github-scenario.json"), "{}");
-    await page.request.post(`/api${path}/checks/repository-readable/rerun`, {
-      data: {},
-    });
+    await page.goto(path);
+    await openConversation(page);
+    const notice = page.locator(".sg-repository-notice");
+    await expect(notice).toContainText("read access");
+    await notice
+      .getByRole("button", { name: "Check again", exact: true })
+      .click();
+    await expect(notice).toHaveCount(0);
     const passed = await (await page.request.get(`/api${path}`)).json();
-    expect(
-      passed.checks.find(
-        (check: { key: string }) => check.key === "repository-readable",
-      ).status,
-    ).toBe("passed");
-    expect(passed.observations[0].raw.installationId).toBe(7);
+    expect(passed.repository.status).toBe("passed");
   },
 );
 
@@ -357,24 +322,20 @@ test(
       timeout: 30_000,
     });
     const appUrl = page.url();
+    const appPath = new URL(appUrl).pathname;
+    // The application's own check, as its Check again button runs it.
+    const checkAgain = () =>
+      page.request.post(`/api${appPath}/repository-check`, { data: {} });
     const old = expireAccess();
     await page.reload();
-    await openDashboard(page);
-    await expect(
-      page.getByRole("button", {
-        name: /Check 2 GitHub repository access.*Passed/,
-      }),
-    ).toBeVisible();
-    await openDashboard(page);
-    await page
-      .getByRole("button", { name: /Check 2 GitHub repository access/ })
-      .click();
-    await page
-      .getByRole("button", { name: "Re-run repository check", exact: true })
-      .click();
-    await expect(
-      page.getByRole("dialog").locator(".sg-drawer-summary"),
-    ).toContainText("Passed");
+    await openConversation(page);
+    await expect(page.locator(".sg-repository-notice")).toHaveCount(0);
+    // Checking again renews the expired access without another login.
+    expect((await checkAgain()).status()).toBe(200);
+    expect(
+      (await (await page.request.get(`/api${appPath}`)).json()).repository
+        .status,
+    ).toBe("passed");
     await expect
       .poll(() => JSON.parse(readFileSync(connectionPath, "utf8")).token)
       .toBe("ghu_QA-RENEWED");
@@ -398,21 +359,11 @@ test(
       join(fixture.state, "github-scenario.json"),
       JSON.stringify({ refresh: "revoked" }),
     );
+    await checkAgain();
     await page.goto(appUrl);
-    await openDashboard(page);
-    await page
-      .getByRole("button", { name: /Check 2 GitHub repository access/ })
-      .click();
-    await page
-      .getByRole("button", { name: "Re-run repository check", exact: true })
-      .click();
-    await expect(
-      page.getByRole("dialog").locator(".sg-drawer-summary"),
-    ).toContainText("Not yet");
-    await page
-      .getByRole("dialog")
-      .getByRole("link", { name: "Open GitHub settings", exact: true })
-      .click();
+    await openConversation(page);
+    await expect(page.locator(".sg-repository-notice")).toBeVisible();
+    await page.goto("/setup/github");
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "Sign in again",
     );

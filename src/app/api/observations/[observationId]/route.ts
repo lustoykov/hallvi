@@ -1,6 +1,6 @@
 import { getObservation } from "@/server/db";
 import { handle } from "@/server/http";
-import { NotFoundError } from "@/server/phase-one";
+import { NotFoundError } from "@/server/applications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

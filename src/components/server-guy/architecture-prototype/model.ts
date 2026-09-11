@@ -10,6 +10,7 @@ import type {
   SecurityFacts,
 } from "@/server/application-facts";
 import { stackOf } from "@/server/application-stack";
+import { nativeFacts, primaryHttp } from "@/server/release-facts";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import type { ApplicationRecord } from "@/server/types";
@@ -261,6 +262,55 @@ function latest(values: (string | null | undefined)[]) {
   return sorted.length ? sorted[sorted.length - 1] : null;
 }
 
+/**
+ * What the prototype shows about the selected native configuration: the
+ * service people open, its checks, and the private services beside it.
+ */
+function configurationShape(deployment: DeploymentRecord | null) {
+  const native = deployment?.native;
+  if (!native) return null;
+  const facts = nativeFacts(native);
+  const primary = primaryHttp(facts);
+  const app = primary?.service ?? Object.keys(native.resolved.services)[0];
+  const service = (name: string) => native.resolved.services[name];
+  const imageOf = (name: string) =>
+    service(name)?.build ? undefined : service(name)?.image;
+  const environment = service(app)?.environment ?? {};
+  return {
+    image: imageOf(app),
+    port: primary?.target ?? null,
+    healthPath: native.criterion?.healthPath ?? null,
+    checks: native.criterion?.checks ?? [],
+    inputs: native.inputs,
+    variables: Object.keys(environment),
+    httpAccess: native.httpAccess,
+    /** Whether the application's settings or files name this address. */
+    mentions: (text: string) =>
+      Object.values(environment).some((value) => value?.includes(text)) ||
+      native.files.some((file) => atob(file.content).includes(text)),
+    services: facts.services
+      .filter(
+        (item) => item.name !== app && item.name !== native.database?.service,
+      )
+      .map((item) => {
+        const check = native.criterion?.services.find(
+          (candidate) => candidate.name === item.name,
+        );
+        return {
+          name: item.name,
+          image: imageOf(item.name),
+          port: check?.port ?? null,
+          healthPath: check?.healthPath ?? null,
+          checks: check?.checks ?? [],
+          command: service(item.name)?.command ?? null,
+          mounts: (service(item.name)?.volumes ?? [])
+            .filter((mount) => mount.type === "bind")
+            .map((mount) => mount.target),
+        };
+      }),
+  };
+}
+
 /** The failing scenario's monitoring. Invented, and labelled as such. */
 function inventedMonitoring(
   deployment: DeploymentRecord | null,
@@ -268,11 +318,9 @@ function inventedMonitoring(
   now: number,
 ): MonitoringFacts {
   const at = new Date(now - 4 * MINUTE).toISOString();
-  const service = deployment?.plan?.services?.[0]?.name ?? "worker";
-  const serviceName = productName(
-    deployment?.plan?.services?.[0]?.image,
-    service,
-  );
+  const shape = configurationShape(deployment);
+  const service = shape?.services[0]?.name ?? "worker";
+  const serviceName = productName(shape?.services[0]?.image, service);
   return {
     collector: {
       state: "running",
@@ -285,7 +333,7 @@ function inventedMonitoring(
         id: "web",
         name: `${headline} responds`,
         kind: "http",
-        target: deployment?.plan?.healthPath ?? "/",
+        target: shape?.healthPath ?? "/",
         state: "passing",
         lastAt: at,
         detail: "200 in 41 ms",
@@ -323,7 +371,7 @@ export function buildModel({
   const now = scenario === "later" ? clockNow + 3 * DAY : clockNow;
   const isPlanned = scenario === "planned";
   const deployment = record.deployment;
-  const plan = deployment?.plan ?? null;
+  const plan = configurationShape(deployment);
   const application = record.application;
   const repo = `${application.repositoryOwner}/${application.repositoryName}`;
   const headline = productName(plan?.image, application.name);
@@ -657,7 +705,7 @@ export function buildModel({
       null)
     : null;
   const http = monitorCheck("http");
-  const secretCount = plan?.missingInputs.length ?? 0;
+  const secretCount = plan?.inputs.length ?? 0;
   parts.push({
     id: "app",
     kind: "web",
@@ -676,7 +724,7 @@ export function buildModel({
       plan
         ? {
             label: "Settings",
-            value: `${plan.environment.length} recorded${secretCount ? `, ${secretCount} secret kept private` : ""}`,
+            value: `${plan.variables.length} recorded${secretCount ? `, ${secretCount} secret kept private` : ""}`,
           }
         : null,
     ].filter(isFact),
@@ -710,16 +758,10 @@ export function buildModel({
   });
 
   // ---- Private services beside it.
-  const configs = [
-    ...(plan?.configs ?? []),
-    ...(plan?.services ?? []).flatMap((service) => service.configs ?? []),
-  ];
   for (const service of plan?.services ?? []) {
     const name = productName(service.image, service.name);
     const address = service.port ? `${service.name}:${service.port}` : null;
-    const called = Boolean(
-      address && configs.some((config) => config.content.includes(address)),
-    );
+    const called = Boolean(address && plan?.mentions(address));
     const paths = [
       service.healthPath,
       ...(service.checks ?? []).map((item) => item.path),
@@ -761,9 +803,9 @@ export function buildModel({
         retention
           ? { label: "Keeps samples for", value: humanDuration(retention) }
           : null,
-        ...(service.configs ?? []).map((config) => ({
+        ...service.mounts.map((target) => ({
           label: "Read-only file",
-          value: config.target,
+          value: target,
           mono: true,
         })),
       ].filter(isFact),

@@ -2,11 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ChatPane } from "../../../src/components/server-guy/chat-pane";
-import type {
-  Chat,
-  PhaseOneOperatorView,
-  PiRun,
-} from "../../../src/server/types";
+import type { Chat, OperatorView, PiRun } from "../../../src/server/types";
 
 const failedAt = "2026-09-05T10:00:00.000Z";
 const historyError =
@@ -14,16 +10,13 @@ const historyError =
 const chat: Chat = {
   id: "chat-one",
   applicationId: "app-one",
-  workspaceId: "workspace-one",
-  title: "Launch Brief",
-  isPrimary: true,
+  title: "Deploy application",
   createdAt: failedAt,
   archivedAt: null,
 };
 const run: PiRun = {
   id: "failed-run",
   applicationId: "app-one",
-  workspaceId: chat.workspaceId,
   chatId: chat.id,
   userMessageId: "user-message",
   assistantMessageId: "assistant-message",
@@ -47,40 +40,20 @@ function render({
 }: {
   error?: string;
   archived?: boolean;
-  activity?: PhaseOneOperatorView["activity"];
+  activity?: OperatorView["activity"];
   status?: "queued" | "running" | "failed" | "cancelled";
   body?: string;
 } = {}) {
-  const view: PhaseOneOperatorView = {
+  const view: OperatorView = {
     application: {
       id: "app-one",
       name: "app",
       repositoryOwner: "qa",
       repositoryName: "app",
       repositoryUrl: "https://github.com/qa/app",
-      environment: "production",
-      approvalMode: "pi-decides",
-      approvalScope: "Current application launch",
       createdAt: failedAt,
       updatedAt: failedAt,
     },
-    workspace: {
-      id: chat.workspaceId,
-      applicationId: "app-one",
-      phaseKey: "start",
-      createdAt: failedAt,
-      completedAt: null,
-      deliverableEvidence: null,
-      phaseNumber: 1,
-      name: "Start",
-      deliverable: "Launch Brief",
-      status: "in-progress",
-      current: true,
-    },
-    workspaces: [],
-    inspection: null,
-    contract: null,
-    conformance: null,
     chats: [{ ...chat, lastActivityAt: failedAt }],
     selectedChatId: chat.id,
     messages: [
@@ -95,10 +68,7 @@ function render({
         revision: 2,
       },
     ],
-    checks: [],
     decisions: [],
-    observations: [],
-    upcomingRequirements: [],
     activity,
   };
   return renderToStaticMarkup(

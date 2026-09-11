@@ -1,4 +1,4 @@
-import { queuePlan } from "../../fixtures/queue-worker/plan";
+import { queueNative } from "../../fixtures/queue-worker/native";
 import {
   beginDeploymentAttempt,
   invalidateDeploymentRuntime,
@@ -52,9 +52,7 @@ vi.mock("../../../src/server/http", () => ({
   },
 }));
 import {
-  getChat,
   insertApplication,
-  insertWorkspace,
   insertChat,
   listMessages,
 } from "../../../src/server/db";
@@ -94,11 +92,8 @@ beforeEach(() => {
     repositoryUrl: "https://github.com/qa/todo",
     repositoryOwner: "qa",
     repositoryName: "todo",
-    environment: "production",
-    approvalMode: "always-ask",
-    approvalScope: "Test",
   }).id;
-  chat = insertChat(insertWorkspace(app).id, "Conversation", true).id;
+  chat = insertChat(app, "Conversation").id;
   vi.clearAllMocks();
   external.provider.mockResolvedValue({ servers: [] });
   external.source.mockResolvedValue({});
@@ -182,11 +177,7 @@ it("keeps worker progress and references when another conversation follows activ
   const worker = requestDeployment(app, chat);
   worker.status = "deploying";
   saveDeployment(worker);
-  const otherChat = insertChat(
-    getChat(chat)!.workspaceId,
-    "Follow deployment",
-    false,
-  ).id;
+  const otherChat = insertChat(app, "Follow deployment").id;
   const followed = requestDeployment(app, otherChat, "server-guy");
   expect(followed.mentions).toHaveLength(1);
 
@@ -279,11 +270,7 @@ it("rejects cross-origin and rebinding-host requests before preparing work", asy
 
 it("approves unchanged execution state when another chat follows during pricing", async () => {
   const r = recommendation();
-  const other = insertChat(
-    getChat(chat)!.workspaceId,
-    "Follow deployment",
-    false,
-  ).id;
+  const other = insertChat(app, "Follow deployment").id;
   external.price.mockImplementationOnce(async () => {
     requestDeployment(app, other, "server-guy");
     return r.offer;
@@ -328,11 +315,7 @@ it("records the announcing reply and refers a second conversation to the same de
   const r = requestDeployment(app, chat, "server-guy");
   const announced = listMessages(chat).at(-1)!;
   expect(getDeployment(r.id)?.originMessageId).toBe(announced.id);
-  const other = insertChat(
-    getChat(chat)!.workspaceId,
-    "Later question",
-    false,
-  ).id;
+  const other = insertChat(app, "Later question").id;
   const same = requestDeployment(app, other, "server-guy");
   expect(same.id).toBe(r.id);
   const reply = listMessages(other);
@@ -398,7 +381,7 @@ it("requires owner-confirmed provider evidence and clears spending authority aft
 function executable() {
   const r = recommendation();
   r.revision = "a".repeat(40);
-  r.plan = queuePlan();
+  r.native = queueNative(r.id, "a".repeat(40));
   r.authority = {
     connectionId: "hetzner-a",
     acceptedAt: new Date().toISOString(),
@@ -436,11 +419,12 @@ it("persists retries, immutable release snapshots, and the verified runtime thro
   expect(saved.lifecycle!.runtime.lastVerified!.images.app).toBe(
     "sha256:synthetic",
   );
-  saved.lifecycle!.releases[0].plan!.port += 1;
+  const release = structuredClone(saved.lifecycle!.releases[0]);
+  saved.lifecycle!.releases[0].native.resolved.services.app.command = [
+    "changed",
+  ];
   expect(() => saveDeployment(saved)).toThrow("cannot be rewritten");
-  expect(getDeployment(r.id)!.lifecycle!.releases[0].plan!.port).toBe(
-    queuePlan().port,
-  );
+  expect(getDeployment(r.id)!.lifecycle!.releases[0]).toEqual(release);
 });
 it("records an interrupted attempt before another worker can retry", () => {
   const r = executable();

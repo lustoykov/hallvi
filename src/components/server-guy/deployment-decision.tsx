@@ -12,28 +12,11 @@ const decode = (base64: string) =>
     Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)),
   );
 
-/** The packaging the owner approves: Pi's files, or a legacy plan's. */
+/** The packaging files Pi authored, which the owner approves. */
 function packaging(record: DeploymentRecord) {
-  if (record.native)
-    return record.native.files
-      .filter((file) => !file.path.startsWith(".server-guy/"))
-      .map((file) => ({ path: file.path, content: decode(file.content) }));
-  const plan = record.plan;
-  if (!plan) return [];
-  return [
-    ...(plan.generatedDockerfile
-      ? [{ path: plan.dockerfile, content: plan.generatedDockerfile }]
-      : []),
-    ...[
-      { name: "app", configs: plan.configs ?? [] },
-      ...(plan.services ?? []),
-    ].flatMap((service) =>
-      service.configs.map((config) => ({
-        path: `${service.name} ${config.target}`,
-        content: config.content,
-      })),
-    ),
-  ];
+  return (record.native?.files ?? [])
+    .filter((file) => !file.path.startsWith(".server-guy/"))
+    .map((file) => ({ path: file.path, content: decode(file.content) }));
 }
 
 /**
@@ -99,14 +82,7 @@ export function DeploymentDecision({
   }
   const facts = currentFacts(record);
   if (record.status === "awaiting-approval" && facts && record.offer) {
-    const reasons: Record<string, string> =
-      record.native?.inputReasons ??
-      Object.fromEntries(
-        (record.plan?.missingInputs ?? []).map((input) => [
-          input.name,
-          input.reason,
-        ]),
-      );
+    const reasons: Record<string, string> = record.native?.inputReasons ?? {};
     return (
       <form
         className="sg-op-approval"
@@ -183,14 +159,6 @@ export function DeploymentDecision({
               <pre>{file.content}</pre>
             </details>
           ))}
-          {record.inspectedRevision &&
-            record.inspectedRevision !== record.revision && (
-              <p>
-                This revision differs from the earlier repository inspection (
-                {record.inspectedRevision.slice(0, 12)}). This deployment uses
-                the revision shown above.
-              </p>
-            )}
           <p>
             Repository: {record.repository} · ID {record.repositoryId}
           </p>

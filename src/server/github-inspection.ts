@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { GithubAccessError, githubJson } from "./github-api";
-import type { InspectedTreeEntry } from "./application-profile";
 import { deniedPathReason, redactSecrets } from "./secrets";
 
 /**
@@ -55,6 +54,13 @@ const treeSchema = z.object({
     }),
   ),
 });
+
+export interface InspectedTreeEntry {
+  path: string;
+  type: "blob" | "tree";
+  size?: number;
+  sha?: string;
+}
 
 export interface RepositoryTree {
   entries: InspectedTreeEntry[];

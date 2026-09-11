@@ -1,13 +1,6 @@
 import { isControllerHost } from "./controller-origin";
 import { z } from "zod";
 
-import { isApprovalMode } from "./types";
-import type { ApprovalMode } from "./types";
-
-const approvalModeSchema = z.custom<ApprovalMode>(isApprovalMode, {
-  error: "Choose a valid permission policy.",
-});
-
 export const createApplicationRequestSchema = z.strictObject({
   requestKey: z.uuid({ error: "A unique creation request key is required." }),
   name: z.string().trim().min(1).max(120).optional(),
@@ -16,7 +9,6 @@ export const createApplicationRequestSchema = z.strictObject({
     .trim()
     .min(1, "Enter a GitHub repository URL.")
     .max(2_048, "Keep the GitHub repository URL under 2,048 characters."),
-  approvalMode: approvalModeSchema,
 });
 
 export const createChatRequestSchema = z.strictObject({

@@ -20,20 +20,16 @@ import { searchPiDecisions } from "../../../src/server/pi-decisions";
 import { buildPiRunContext } from "../../../src/server/pi-run-context";
 import * as runs from "../../../src/server/pi-runs";
 import { openNativeChatSession } from "../../../src/server/pi-sessions";
-import type { PhaseOneOperatorView } from "../../../src/server/types";
 import {
   nativeEvalCompaction,
   nativeEvalEvidence,
   seedNativeScenario,
 } from "../../evals/native-scenarios";
-import {
-  phaseOneCases,
-  type PhaseOneEvalCase,
-} from "../../evals/phase-one-cases";
-import { seedPhaseOneEvalCase } from "../../evals/seed-phase-one";
+import { evalCases, type EvalCase } from "../../evals/cases";
+import { seedEvalCase, type EvalView } from "../../evals/seed";
 import { pushTestDatabase } from "../../test-database";
 
-const scenarios = phaseOneCases.filter((scenario) => scenario.nativeScenario);
+const scenarios = evalCases.filter((scenario) => scenario.nativeScenario);
 const syntheticModel = {
   providerId: "synthetic-no-network",
   modelId: "never-requested",
@@ -73,11 +69,11 @@ afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function scenario(kind: PhaseOneEvalCase["nativeScenario"]) {
+function scenario(kind: EvalCase["nativeScenario"]) {
   return scenarios.find((item) => item.nativeScenario === kind)!;
 }
-async function seed(item: PhaseOneEvalCase) {
-  const before = seedPhaseOneEvalCase(item, 1);
+async function seed(item: EvalCase) {
+  const before = seedEvalCase(item, 1);
   const after = await seedNativeScenario(item, before, syntheticModel);
   const native = await openNativeChatSession(
     after.application!.id,
@@ -154,7 +150,7 @@ function lookupResult(manager: SessionManager, id: string, isError = false) {
     timestamp: Date.now(),
   });
 }
-function acceptedRun(view: PhaseOneOperatorView, message: string) {
+function acceptedRun(view: EvalView, message: string) {
   const accepted = runs.sendChatMessage(
     view.application!.id,
     view.selectedChatId!,
@@ -205,7 +201,6 @@ describe("the seven native eval scenarios use real local data and explicitly syn
       );
       expect(after.application).toEqual(before.application);
       expect(after.observations).toEqual(before.observations);
-      expect(after.checks).toEqual(before.checks);
       expect(after.messages.slice(0, before.messages.length)).toEqual(
         before.messages,
       );
