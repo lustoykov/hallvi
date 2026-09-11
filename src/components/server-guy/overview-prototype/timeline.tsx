@@ -14,7 +14,6 @@
 
 import {
   ArrowRight,
-  ArrowsClockwise,
   CaretDown,
   ChatCircleText,
   X,
@@ -627,25 +626,6 @@ export function TimelineHero({
           </h2>
           {sub && <p className="axt-sub">{sub}</p>}
         </div>
-        {!planned && (
-          <div className="axt-check">
-            <button
-              type="button"
-              className="ax-button"
-              disabled={guy.running}
-              onClick={() => {
-                setSeconds(0);
-                setLogOpen(true);
-                guy.run();
-              }}
-            >
-              {/* One working indicator at a time: the log's label. */}
-              <ArrowsClockwise weight="bold" />
-              {guy.running ? "Checking…" : "Check now"}
-            </button>
-            <small>Simulated · nothing is contacted</small>
-          </div>
-        )}
       </div>
 
       {overview.needs.length > 0 && (
