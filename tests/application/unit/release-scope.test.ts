@@ -278,6 +278,18 @@ it("keeps a volume's declared owner and capture through corrections unless the o
   expect(scopeDifferences(plain, relabeled).join()).toContain(
     "recorded kind and data path",
   );
+  // Retiring an owned volume (no service mounts it any more; the named
+  // volume stays on the host) is that owner's state change as well.
+  const detached = native((c) => {
+    c.services.queue.volumes = [];
+  });
+  expect(scopeDifferences(baseline, detached).join()).toContain(
+    "Preserve volume queue-data, its existing consumers, access and mount. Moving existing data needs a separate decision: propose it as a state change for queue",
+  );
+  expect(scopeDifferences(baseline, detached, ["queue"])).toEqual([]);
+  expect(scopeDifferences(plain, detached).join()).toContain(
+    "Preserve volume queue-data",
+  );
 });
 
 it("binds the established runtime: its own retries may supersede an observation, another authorization's may not", () => {

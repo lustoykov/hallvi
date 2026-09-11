@@ -93,9 +93,13 @@ export function scopeDifferences(
           ),
       )
     ) {
-      problems.push(
-        `Preserve volume ${volume.name}, its existing consumers, access and mount. Moving existing data needs a separate decision.`,
-      );
+      // Where an owned volume is mounted, or whether it stays mounted, is
+      // its owner's decision: the approved state change covers retiring it.
+      // The named volume itself stays on the host; nothing deletes data.
+      if (!volume.owner || !allowed.includes(volume.owner))
+        problems.push(
+          `Preserve volume ${volume.name}, its existing consumers, access and mount. Moving existing data needs a separate decision${volume.owner ? `: propose it as a state change for ${volume.owner}` : ""}.`,
+        );
       continue;
     }
     // What a volume is recorded as, who owns it and how it is captured stay

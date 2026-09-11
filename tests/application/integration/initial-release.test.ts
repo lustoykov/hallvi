@@ -631,7 +631,9 @@ it("a state owner's image change on a stopped first deployment is a release the 
   expect(proposed.summary).toContain(
     "Continue this application's first deployment on its prepared host",
   );
-  expect(proposed.summary).toContain("Allow changing the image of app");
+  expect(proposed.summary).toContain(
+    "Allow changing the image, data declarations and mounts of app",
+  );
   expect(proposed.summary).toContain(
     "Both images read the same SQLite schema.",
   );
