@@ -133,13 +133,20 @@ export async function readRepository(
   const { data } = await githubJson(
     `/repos/${source.repository}/contents${path ? `/${encoded}` : ""}?ref=${commit}`,
     source.token,
-    { signal },
+    { signal, allowNotFound: true },
   );
   const read = {
     repository: source.repository,
     revision: commit,
     path: path || "/",
   };
+  // The repository and commit resolved, so a 404 is this path, not access.
+  if (data === null)
+    return {
+      ...read,
+      kind: "missing",
+      note: "No file or directory exists at this path in this revision.",
+    };
   if (Array.isArray(data)) {
     const entries = (
       data as { name?: string; path?: string; type?: string; size?: number }[]

@@ -65,6 +65,9 @@ beforeEach(() => {
           size: 34,
           path: "Dockerfile",
         },
+      // githubJson returns null for a 404 when asked to allow it.
+      [`/repos/linuxserver/docker-bookstack/contents/nginx.conf?ref=${deployed}`]:
+        null,
       "/repos/BookStackApp/BookStack": {
         id: 1,
         full_name: "BookStackApp/BookStack",
@@ -121,6 +124,15 @@ it("reads this application's pinned repository and public upstream projects at e
     kind: "file",
     text: "FROM ghcr.io/linuxserver/baseimage",
   });
+  // A path absent at a resolved commit is reported as such, not as lost access.
+  await expect(
+    readRepository("app-a", { path: "nginx.conf" }, signal),
+  ).resolves.toMatchObject({ revision: deployed, kind: "missing" });
+  expect(mocks.github).toHaveBeenLastCalledWith(
+    expect.stringContaining("/contents/nginx.conf"),
+    expect.anything(),
+    expect.objectContaining({ allowNotFound: true }),
+  );
   await expect(
     readRepository(
       "app-a",
