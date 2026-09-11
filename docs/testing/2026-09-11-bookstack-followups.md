@@ -68,6 +68,35 @@ Remediation, nothing restarted: I stopped the rig host, then re-registered the V
 - Rig B is required for backups: the installer uses systemd and the runner copies volume data from host paths, neither of which the macOS-shell transport provides.
 - The existing S3 hostname rule accepts `s3.<name>.amazonaws.com`; Rig B serves MinIO under such a name inside the host container only, so no destination exception is needed.
 
+## Second pass: one protection mechanism, recovery and full restoration
+
+Reviewer priorities on head `e86ba9a`: unify managed PostgreSQL with declared owners, let Pi recover a failed first deployment on the same Application and host, restore and boot the whole application through the product, prove both with BookStack and Healthchecks, and close two correctness gaps (unknown command outcomes; ownership lost through corrections). Governing question: can Pi manage different applications through the same small set of useful tools?
+
+### Decisions
+
+- **One database mechanism.** A database volume is protected by its declared owner's dump procedure; the managed PostgreSQL slot keeps only what it uniquely provides (a generated password, the official image, image continuity) and gets a default procedure (`pg_dump` custom, `pg_restore`, a per-table row-hash fingerprint) when Pi declares none. The runner's PostgreSQL capture route and the standalone dump-restore container go; legacy `postgres` archives keep their restore reader. Facts project the default onto older records, so existing schedules and receipts stay readable.
+- **Writers pause by evidence, not by assumption.** Capture stops the services that mount a captured volume read-write, dependents first; dump owners keep running; everything else is untouched. An empty pause list is valid. The runner reads volume paths from Docker, copies bound configuration from the definition, and refuses a foreign read-write attachment.
+- **Corrections keep declarations.** A redeclared volume inherits owner, capture and procedure unless the declaration sets them; removing or moving an owner is a state change that needs the owner's decision for that service. The owner-image rule compares the image reference, so an unpinned managed image is covered too.
+- **Unknown command outcomes hold.** A check runs detached on the host and writes its exit status and output beside the attempt's host result. Transport loss, a missing status or a client-side timeout leaves a durable hold on the deployment; nothing executes or verifies again until `reconcile_release` reads the host record, which turns it into a known pass, a known failure for correction, or an explicit unresolved hold. Commands run under the container's own `timeout` when it has one, so a timeout stops the command rather than orphaning it.
+- **Failed first deployment, same host.** `prepare_release` on a failed first deployment continues it under the deployment's approval: an ordinary correction retries the deployment operation with Pi's instructions (no new approval); a state owner's image change proposes a release whose approval names that authority. Both finish the deployment as live on the same Application and host.
+- **Restore boots the application.** The restore test loads files and dumps into an isolated Compose project on the host (no published ports, internal networks, fresh labeled volumes, no controller labels), brings the whole stack up, and the controller runs the recorded command checks plus any checks Pi chose for the restore inside the restored containers. Targets are derived by the controller, never read from a receipt. The host's own recovery tears the copy down. `restore-check.py` is retired.
+
+### Status
+
+| Work | State | Evidence |
+| --- | --- | --- |
+| Gap B: declarations survive corrections; owner changes need authority | pending | |
+| Priority 1: managed PostgreSQL through the declared mechanism; pause by evidence | pending | |
+| Gap A: unknown command outcome hold, durable host result, reconciliation, timeout | pending | |
+| Priority 2: recovery of a failed first deployment through Pi | pending | |
+| Priority 3: isolated boot and command checks in the restore test | pending | |
+| Priority 4: BookStack and Healthchecks proofs with real Pi on Rig B | pending | |
+| Docs: architecture, product, requirements, roadmap, testing index | pending | |
+
+### Remaining proof
+
+Focused regressions for both gaps; the existing suites; the opt-in Docker proof on the final candidate; on Rig B with real Pi: BookStack deploy (recovering if the first deployment fails), content, backup, restore with page/attachment/image checks; Healthchecks deploy, its backup failure investigated by Pi from product evidence and corrected, backup, restore with its own checks.
+
 ## Next actions
 
 The final account is in PR #49. The smallest next step: during the product's restore test, boot the restored stack in isolation and run the recorded command checks against it. [`restore-check.py`](../../tests/rig/host/restore-check.py) already shows the generic shape.
