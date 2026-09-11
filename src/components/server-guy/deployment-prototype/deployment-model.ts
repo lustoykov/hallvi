@@ -472,8 +472,8 @@ export function buildStory({
           : state === "failed"
             ? "The latest deployment stopped."
             : state === "unknown"
-              ? `${name} may have changed on the server.`
-              : `${name} is serving revision ${short}.`;
+              ? `${cap(name)} may have changed on the server.`
+              : `${cap(name)} is serving revision ${short}.`;
   const tone: Tone =
     state === "live"
       ? fresh

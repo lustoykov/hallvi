@@ -316,8 +316,8 @@ export function ApplicationSectionView({
         />
       </div>
     );
-  // PROTOTYPE (claude/deployment-history): directions for Deployment, beside
-  // the shipped view (direction 0). The product's panel still handles the
+  // Deployment and History chosen on claude/deployment-history (Transit)
+  // are the default the same way. The product's panel still handles the
   // actions it owns.
   if (section === "deployment")
     return (

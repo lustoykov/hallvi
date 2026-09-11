@@ -1,18 +1,18 @@
 # Dashboard redesign — prototype
 
-The designs the owner chose in `claude/architecture-directions`, rendered
-inside the real application shell on the real routes. They are the default
-Overview and Architecture; the bar at the bottom still switches to the
-shipped page for comparison. Deployment and History carry Story and three
-takes on it on `claude/deployment-history`, not chosen yet. The code is
-still prototype code, and gets rewritten properly as it settles.
+The designs the owner chose, rendered inside the real application shell on
+the real routes: Overview and Architecture from
+`claude/architecture-directions`, Deployment and History from
+`claude/deployment-history`. They are the defaults; the bar at the bottom
+still switches to the shipped page for comparison. The code is still
+prototype code, and gets rewritten properly as it settles.
 
 ## Run
 
 - Start the app as usual (`npm run dev`).
 - Open `/applications/<id>?variant=A#overview`, `#architecture`,
   `#deployment` or `#history`. The bar at the bottom (or the ← → keys)
-  switches between the designs and the shipped page (0), the record
+  switches between the design (A) and the shipped page (0), the record
   scenario, and a reduced-motion preview.
 - The live record is read from the app's own API with GET requests only; the
   firewall read is the same provider read the Security view makes.
@@ -46,52 +46,35 @@ something needs you, and with reduced motion he only says it. To review it,
 `&looked=never` replays the introduction and `&looked=20h` pretends you were
 away for 20 hours.
 
-## Deployment and History (`deployment-prototype/`, `history-prototype/`)
+## Deployment and History: Transit (`deployment-prototype/`, `history-prototype/`)
 
-After the owner's note that the app should not become all diagrams, each
-page has at most one visual, plain words come first and exact values open
-on click, and nothing animates when a page opens. Architecture and Overview
-lose their entrance animations on this branch too; the flows and state
-changes still move. The owner found Story a good start, so B, C and D are
-three takes on it that disagree about structure. Each applies to both
-pages.
+Journeys' transit language, applied to time. Each page has one visual,
+plain words come first and exact values open on click, and nothing animates
+when a page opens; Architecture and Overview lost their entrance animations
+in the same round, and their flows and state changes still move.
 
-- **A · Story.** Deployment: a release card, one band of plain phases that
-  open their recorded lines, then the checks, ghosts for what isn't set up
-  and the logs. History: a calm feed on a rail of days, where a failure
-  links to the work that resolved it.
-- **B · Narrated.** Words first. Deployment is Server Guy's own account, in
-  the first person: each sentence opens the lines recorded behind it, and a
-  thin ribbon under the words lights with them. The facts, checks and gaps
-  sit in a margin. History is his diary: a few sentences a day, one for each
-  stretch of work. Everything he did is a link that opens its record under
-  the words, and a failure is told with the retry that fixed it.
-- **C · Replay.** Time first. The page opens still, at now. On Deployment
-  the band becomes a recording: drag the playhead or press Replay, and the
-  card, the recorded lines and the checks show the deployment as it was at
-  that moment, while Little Server walks the track. On History a ruler runs
-  over the whole record with quiet stretches folded and labelled; scrubbing
-  it dims everything after the playhead, and the ruler stays in view while
-  the record scrolls under it.
-- **D · Transit.** Space first, in Journeys' transit language. Deployment
-  puts now on the left and the way here as one line of stops on the right.
-  Pointing at a stop lights the line up to it, stop by stop, and what isn't
-  set up sits on the line as dashed ghosts where it would go. History is a
-  line with a timetable: a sticky almanac filters the record and lists its
-  days, and a thread in the gutter ties each failure to its fix, with a
-  light that runs along it when you point at either.
-
-The first round's Ledger is gone; it stays in this branch's history.
+- **Deployment.** Now on the left: what is serving, how sure Server Guy is,
+  the one next step (which goes to the conversation), the facts with their
+  exact values, the checks it passes and the latest logs. On the right, the
+  way here as one line of stops: the recorded events grouped into plain
+  phases, the wait for your approval dashed and a failure in red. Pointing
+  at a stop lights the line up to it, stop by stop, and a stop opens the
+  lines recorded there. What isn't set up sits on the line as dashed ghosts
+  where it would go: deploying on push before the first stop, rolling back
+  after now. Little Server waits at now.
+- **History.** A line with a timetable. A sticky almanac says how the record
+  reads, filters it and lists its days. Each operation is a stop with its
+  time in a timetable column and its evidence opening in place. A thread in
+  the gutter ties each failure to the work that resolved it; pointing at
+  either sends a light along it, from the failure to the fix.
 
 When nothing is deployed, Deployment still shows the product's panel that
 connects Hetzner and starts the first deployment. Approval, retry and cancel
 stay in the conversation's receipts.
 
-Found on the way: History places each operation by its `updatedAt`, and the
-deployment's is its record's, which moves whenever the record is rewritten.
-In this copy the verified deploy reads this morning although its last event
-was on Sep 9, so the shipped History files it under Today. The prototype
-places finished work by its newest recorded step instead.
+History places finished work by its newest recorded step. The deployment
+operation's `updatedAt` is its record's and moves whenever the record is
+rewritten, which files an old deploy under Today in the shipped page.
 
 ## What is invented
 
@@ -103,14 +86,13 @@ places finished work by its newest recorded step instead.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
-- Replay replays the recorded events only; it contacts nothing.
 
 `model.ts` owns every fact and every certainty; the designs only render it.
 Verified green requires evidence under a day old.
 
-## What the owner validated (10 Sep 2026)
+## What the owner validated
 
-Journeys is the reference for every page designed from now on:
+Journeys is the reference for every page designed from now on (10 Sep 2026):
 
 - **Bird's-eye first, depth on demand.** The whole picture is visible at
   once; clicking a part opens plain words, evidence, facts, a link to its
@@ -125,12 +107,14 @@ with the log from Little Server's note folded underneath.
 
 On 11 Sep the owner loved Architecture and its data flows but found the
 entrance animation too much, and asked for a balance so the app doesn't
-become all diagrams. Of the first Deployment and History round, Story was
-"a good start", with three more versions to follow.
+become all diagrams. For Deployment and History they chose Transit ("D is
+great, let's take it").
 
 ## Where the exploration lives
 
-Everything explored along the way stays on `claude/architecture-directions`,
-not here: Architecture's plain-sentence and exploded-server (Three.js)
-directions with their kits, Overview's note and console directions, and the
-mascot family.
+Everything explored along the way stays off main: on
+`claude/architecture-directions`, Architecture's plain-sentence and
+exploded-server (Three.js) directions with their kits, Overview's note and
+console directions, and the mascot family; on `claude/deployment-history`,
+Deployment and History's Story, Narrated and Replay directions and the first
+round's Ledger.

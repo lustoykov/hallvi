@@ -1,11 +1,9 @@
 "use client";
 
-// PROTOTYPE · claude/deployment-history · throwaway.
-// Direction A, Story: History as a calm feed. One sentence says how the
-// record reads and a tactile filter narrows it. Each entry says what happened
-// in plain words without a click, on a quiet rail of days; a failure points
-// to the work that resolved it, and its evidence opens in place. The row,
-// the thread jump and the sentence are shared with C and D.
+// PROTOTYPE · chosen on claude/deployment-history.
+// One operation on History's line: what happened in plain words, the thread
+// to the work that resolved it, and its evidence opening in place. Also the
+// thread jump and the record's one sentence.
 
 import { ArrowRight, CaretDown, ChatCircleText } from "@phosphor-icons/react";
 import { useCallback, useState, type ReactNode } from "react";
@@ -18,19 +16,15 @@ import type {
 import type { ApplicationSection } from "../application-sections";
 import { labelOf } from "../operation-model";
 import { reducedMotion } from "../architecture-prototype/motion";
-import { TactileSlider } from "../architecture-prototype/tactile-slider";
 import { OpChip } from "../overview-prototype/shared";
 import {
   clockOf,
-  dayName,
-  FILTERS,
   later,
   settledAt,
   type Entry,
   type Filter,
   type HistoryRecord,
 } from "./history-model";
-import type { HistoryDirectionProps } from "./index";
 import "./feed.css";
 
 const stepGlyph: Record<OperationStep["state"], string> = {
@@ -103,7 +97,7 @@ export function FeedRow({
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
-  /** A direction's own state for the row, such as "is-later". */
+  /** The line's own state for the row, such as "is-linked". */
   className?: string;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -239,70 +233,5 @@ export function FeedRow({
         )}
       </div>
     </li>
-  );
-}
-
-export function FeedDirection({
-  history,
-  filter,
-  onFilter,
-  now,
-  head,
-  decisionFor,
-  onOpenConversation,
-  onOpenDestination,
-}: HistoryDirectionProps) {
-  const [open, setOpen] = useState<string | null>(null);
-  const { flash, jump } = useJump(onFilter);
-  const row = (entry: Entry) => (
-    <FeedRow
-      key={entry.op.id}
-      entry={entry}
-      expanded={open === entry.op.id}
-      onToggle={() =>
-        setOpen((current) => (current === entry.op.id ? null : entry.op.id))
-      }
-      flash={flash === entry.op.id}
-      onJump={jump}
-      decisionFor={decisionFor}
-      onOpenConversation={onOpenConversation}
-      onOpenDestination={onOpenDestination}
-    />
-  );
-
-  return (
-    <section className="axh" aria-label="History">
-      {head}
-      <div className="axh-top">
-        <p className="axh-sum">{sentenceOf(history)}</p>
-        <div className="axh-filter">
-          <TactileSlider
-            label="Show"
-            size="sm"
-            options={FILTERS.map((value) => ({
-              id: value,
-              label: `${value} ${history.counts[value]}`,
-            }))}
-            value={filter}
-            onChange={onFilter}
-          />
-        </div>
-      </div>
-      {history.open.length > 0 && (
-        <section className="axh-group is-live" aria-label="Open now">
-          <h2>Open now</h2>
-          <ol className="axh-list">{history.open.map(row)}</ol>
-        </section>
-      )}
-      {history.days.map((day) => (
-        <section key={day.key} className="axh-group" aria-label={day.key}>
-          <h2>{dayName(day.at, now)}</h2>
-          <ol className="axh-list">{day.entries.map(row)}</ol>
-        </section>
-      ))}
-      {!history.open.length && !history.days.length && history.total > 0 && (
-        <p className="axh-empty">Nothing matches this filter.</p>
-      )}
-    </section>
   );
 }

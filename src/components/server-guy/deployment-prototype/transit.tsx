@@ -1,12 +1,12 @@
 "use client";
 
-// PROTOTYPE · claude/deployment-history · throwaway.
-// Direction D, Transit: now on the left, and the way here as one line of
-// stops on the right, in Journeys' transit language. Pointing at a stop
-// lights the line up to it, stop by stop from the first; a stop opens the
-// lines recorded there. What isn't set up sits on the line as dashed ghosts
-// where it would go: deploying on push before the first stop, rolling back
-// after now. Little Server waits at now. Nothing moves on arrival.
+// PROTOTYPE · chosen on claude/deployment-history.
+// Transit: now on the left, and the way here as one line of stops on the
+// right, in Journeys' transit language. Pointing at a stop lights the line
+// up to it, stop by stop from the first; a stop opens the lines recorded
+// there. What isn't set up sits on the line as dashed ghosts where it would
+// go: deploying on push before the first stop, rolling back after now.
+// Little Server waits at now. Nothing moves on arrival.
 
 import {
   ArrowRight,
@@ -25,7 +25,7 @@ import { took, type Phase, type Tone } from "./deployment-model";
 import type { DirectionProps } from "./index";
 import { LittleServer } from "./little-server";
 import { nextStep } from "./next-step";
-import { Tag } from "./story";
+import { Tag } from "./tag";
 import "./transit.css";
 
 const glyph = { pass: "✓", fail: "✗", work: "›", info: "·" } as const;
@@ -82,13 +82,15 @@ export function TransitDirection({
     onBlur: () => setLit(null),
   });
 
+  // Nothing deployed: the product's panel is the Deployment region, with its
+  // actions, so the page doesn't name a second one around it.
   if (story.state === "none")
     return (
-      <section className="axm" aria-label="Deployment">
+      <div className="axm">
         {head}
         {activity}
         <div className="axm-none">{panel}</div>
-      </section>
+      </div>
     );
 
   return (

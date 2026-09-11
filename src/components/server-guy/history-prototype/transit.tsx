@@ -1,7 +1,7 @@
 "use client";
 
-// PROTOTYPE · claude/deployment-history · throwaway.
-// Direction D, Transit: History as a line with a timetable. A sticky
+// PROTOTYPE · chosen on claude/deployment-history.
+// Transit: History as a line with a timetable. A sticky
 // almanac on the left says how the record reads, filters it and lists its
 // days. On the right every operation is a stop on the line, its time in a
 // timetable column, and a failure is tied to the work that resolved it by
