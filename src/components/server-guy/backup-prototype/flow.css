@@ -1,6 +1,6 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction A for Storage and Backups, Flow. Prefix: axbf-. The data drawn
-   as it travels; light runs along a wire only while you point at it. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Storage.
+   Flow. Prefix: axbf-. The data drawn as it travels; light runs along a
+   wire only while you point at it. */
 
 .axbf {
   display: grid;
@@ -62,9 +62,6 @@
   box-shadow:
     0 1px 2px rgb(23 34 56 / 4%),
     0 30px 60px -44px rgb(23 34 56 / 34%);
-}
-.axbf-board[data-page="backups"] {
-  --server: 260px;
 }
 .axbf-wires {
   position: absolute;
@@ -362,32 +359,6 @@
   border: 0;
   background: var(--ax-verified);
   box-shadow: inset 0 -3px 0 rgb(0 0 0 / 12%);
-}
-.axbf-restore ul {
-  display: grid;
-  gap: 4px;
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.axbf-restore li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ax-ink-2);
-}
-.axbf-restore li svg {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  color: var(--ax-verified);
-}
-.axbf-restore li[data-state="untested"] {
-  color: var(--ax-waiting-text);
-}
-.axbf-restore li[data-state="untested"] svg {
-  color: var(--ax-amber);
 }
 .axbf-restore[data-none] {
   border-style: dashed;

@@ -1,13 +1,12 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Direction B, Calendar: one column a day, from the day before the first
-// thing on record to a week ahead. Backups: a row for the copies off the
-// server, a row for each piece of data saying whether each copy holds it,
-// and a row for restore tests. A day the schedule should have copied but
-// the record doesn't show is dashed, never green. Storage: each volume's
-// days on the server, the copies that read it, and the disk as a ghost.
-// Little Server stands over today; a day opens what is on record for it.
+// PROTOTYPE · opus-ui-improvements · chosen for Backups.
+// Calendar: one column a day, from the day before the first thing on record
+// to a week ahead. A row for the copies off the server, a row for each piece
+// of data saying whether each copy holds it, and a row for restore tests. A
+// day the schedule should have copied but the record doesn't show is dashed,
+// never green. Little Server stands over today; a day opens what is on
+// record for it.
 
 import {
   Archive,
@@ -16,9 +15,7 @@ import {
   Check,
   Database,
   FolderSimple,
-  HardDrive,
   Minus,
-  Plus,
   X,
 } from "@phosphor-icons/react";
 import {
@@ -40,22 +37,10 @@ import { dayOf, listed } from "./model";
 import "./calendar.css";
 
 type State =
-  | "none"
-  | "copy"
-  | "held"
-  | "unknown"
-  | "planned"
-  | "out"
-  | "passed"
-  | "created"
-  | "present"
-  | "unseen"
-  | "ghost";
+  "none" | "copy" | "held" | "unknown" | "planned" | "out" | "passed";
 interface Cell {
   state: State;
   mark?: ReactNode;
-  /** A copy that read the volume that day: all of it, part, or maybe. */
-  dot?: "full" | "part" | "maybe";
   title: string;
   lines: string[];
 }
@@ -86,26 +71,16 @@ const weekday = (at: number) =>
 const month = (at: number) =>
   new Date(at).toLocaleDateString(undefined, { month: "long" });
 
-const legends: Record<"storage" | "backups", [State | "dot", string][]> = {
-  backups: [
-    ["copy", "Copy on record"],
-    ["held", "In that copy, per the plan"],
-    ["unknown", "Scheduled, not on record here"],
-    ["planned", "Scheduled"],
-    ["out", "Left out of the plan"],
-    ["passed", "Restore test passed"],
-  ],
-  storage: [
-    ["created", "Created"],
-    ["present", "On the server, as recorded"],
-    ["unseen", "Not observed since"],
-    ["dot", "A copy read it that day"],
-    ["ghost", "Not measured"],
-  ],
-};
+const legend: [State, string][] = [
+  ["copy", "Copy on record"],
+  ["held", "In that copy, per the plan"],
+  ["unknown", "Scheduled, not on record here"],
+  ["planned", "Scheduled"],
+  ["out", "Left out of the plan"],
+  ["passed", "Restore test passed"],
+];
 
 export function CalendarDirection({
-  page,
   story,
   now,
   head,
@@ -262,151 +237,23 @@ export function CalendarDirection({
     }),
   };
 
-  // ---------- Storage: each volume's days ----------
-  const createdDay = story.createdAt
-    ? startOf(Date.parse(story.createdAt))
-    : null;
-  const seen = [story.createdAt, story.keptAt, copy?.at]
-    .filter((at): at is string => Boolean(at))
-    .map((at) => startOf(Date.parse(at)));
-  const seenDay = seen.length ? Math.max(...seen) : null;
-  const volumeRows: Row[] = story.volumes.map((volume) => {
-    const covered = volume.pieces.filter((piece) => piece.method);
-    const dotOf = (day: number): Cell["dot"] => {
-      if (!covered.length) return undefined;
-      const state = copyState(day);
-      if (state === "copy")
-        return covered.length === volume.pieces.length ? "full" : "part";
-      return state === "unknown" ? "maybe" : undefined;
-    };
-    const dotLine = (dot: Cell["dot"]) =>
-      dot === "full"
-        ? "That day's copy holds all of it, per the plan."
-        : dot === "part"
-          ? `That day's copy holds only ${listed(covered.map((piece) => piece.label))}, per the plan.`
-          : dot === "maybe"
-            ? "A scheduled copy may have read it; none is on record here."
-            : null;
-    return {
-      id: volume.name,
-      icon:
-        volume.kind === "database" ? (
-          <Database weight="bold" />
-        ) : (
-          <FolderSimple weight="bold" />
-        ),
-      name: <code>{volume.name}</code>,
-      status: `${volume.owner} · ${volume.database ?? volume.note ?? "files"}`,
-      c: "fact",
-      cells: days.map((day): Cell => {
-        if (createdDay === null || day < createdDay || day > today)
-          return empty;
-        const dot = dotOf(day);
-        const extra = dotLine(dot);
-        if (day === createdDay)
-          return {
-            state: "created",
-            mark: <Plus weight="bold" />,
-            dot,
-            title: "Created with the deployment",
-            lines: [
-              `Mounted into ${volume.owner} at ${volume.mount}.`,
-              ...(story.keptAt && startOf(Date.parse(story.keptAt)) === day
-                ? [
-                    `${clock(story.keptAt)} · Kept through a container replacement.`,
-                  ]
-                : []),
-              ...(extra ? [extra] : []),
-            ],
-          };
-        if (seenDay !== null && day <= seenDay)
-          return {
-            state: "present",
-            dot,
-            title: "On the server, as recorded",
-            lines: extra ? [extra] : [],
-          };
-        return {
-          state: "unseen",
-          dot,
-          title: "Not observed since",
-          lines: [
-            `Nothing on record looked at it after ${dayOf(seenDay ?? createdDay)}.`,
-            ...(extra ? [extra] : []),
-          ],
-        };
-      }),
-    };
-  });
-  const diskRow: Row = {
-    id: "disk",
-    icon: <HardDrive weight="bold" />,
-    name: "Server disk",
-    status: story.disk
-      ? `${story.disk.usedGb} of ${story.disk.totalGb} GB used`
-      : "Not measured",
-    c: story.disk ? "fact" : "absent",
-    cells: days.map((day): Cell =>
-      day <= today && (createdDay === null || day >= createdDay)
-        ? {
-            state: "ghost",
-            title: "Not measured",
-            lines: ["Nothing measures the disk yet."],
-          }
-        : empty,
-    ),
-  };
-
-  const rows =
-    page === "backups"
-      ? [copiesRow, ...pieceRows, restoreRow]
-      : [...volumeRows, copiesRow, diskRow];
+  const rows = [copiesRow, ...pieceRows, restoreRow];
 
   // ---------- What it says ----------
-  const n = story.volumes.length;
   const unknownDays = days.filter((day) => copyState(day) === "unknown");
-  const say =
-    page === "backups"
-      ? copy
-        ? `${story.copies.length === 1 ? "One copy" : `${countWord(story.copies.length)} copies`} off the server ${story.copies.length === 1 ? "is" : "are"} on record${keep ? `; the schedule keeps ${keep}` : ""}.`
-        : "No copy off the server is on record."
-      : story.createdAt
-        ? `${n === 1 ? "The volume has" : n === 2 ? "Both volumes have" : `All ${n} volumes have`} been on the server since ${dayOf(story.createdAt)}.`
-        : `${countWord(n)} ${n === 1 ? "volume is" : "volumes are"} on the server.`;
-  const sub =
-    page === "backups"
-      ? [
-          unknownDays.length > 0 &&
-            `The scheduled ${unknownDays.length === 1 ? "copy" : "copies"} for ${listed(unknownDays.map(dayOf))} ${unknownDays.length === 1 ? "isn't" : "aren't"} on record here.`,
-          restore && `A restore test passed ${when(restore.at)}.`,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      : [
-          story.keptAt &&
-            `${n === 1 ? "It" : "They"} came through a container replacement ${when(story.keptAt)}.`,
-          story.disk ? "" : "Their size and the server's disk aren't measured.",
-        ]
-          .filter(Boolean)
-          .join(" ");
-  const ask =
-    page === "backups"
-      ? {
-          label: "Ask Server Guy to list the copies",
-          draft:
-            "List the backup copies kept off the server, with their dates and sizes.",
-        }
-      : {
-          label: "Ask Server Guy to measure them",
-          draft:
-            "Measure how much space each volume and the server's disk use.",
-        };
+  const say = copy
+    ? `${story.copies.length === 1 ? "One copy" : `${countWord(story.copies.length)} copies`} off the server ${story.copies.length === 1 ? "is" : "are"} on record${keep ? `; the schedule keeps ${keep}` : ""}.`
+    : "No copy off the server is on record.";
+  const sub = [
+    unknownDays.length > 0 &&
+      `The scheduled ${unknownDays.length === 1 ? "copy" : "copies"} for ${listed(unknownDays.map(dayOf))} ${unknownDays.length === 1 ? "isn't" : "aren't"} on record here.`,
+    restore && `A restore test passed ${when(restore.at)}.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <section
-      className="axbc"
-      aria-label={page === "storage" ? "Storage" : "Backups"}
-    >
+    <section className="axbc" aria-label="Backups">
       {head}
       {activity}
       <div className="axbc-lede">
@@ -417,10 +264,14 @@ export function CalendarDirection({
         <button
           type="button"
           className="ax-button axbc-ask"
-          onClick={() => onAsk(ask.draft)}
+          onClick={() =>
+            onAsk(
+              "List the backup copies kept off the server, with their dates and sizes.",
+            )
+          }
         >
           <ChatCircleText weight="bold" />
-          {ask.label}
+          Ask Server Guy to list the copies
         </button>
       </div>
 
@@ -499,9 +350,6 @@ export function CalendarDirection({
                         }
                       >
                         {cell.mark}
-                        {cell.dot && (
-                          <i className="axbc-dot" data-dot={cell.dot} />
-                        )}
                       </button>
                     )}
                     {open === id && (
@@ -536,15 +384,9 @@ export function CalendarDirection({
           ))}
         </div>
         <ul className="axbc-legend">
-          {legends[page].map(([state, words]) => (
+          {legend.map(([state, words]) => (
             <li key={state}>
-              {state === "dot" ? (
-                <i className="axbc-swatch" data-state="present">
-                  <i className="axbc-dot" data-dot="full" />
-                </i>
-              ) : (
-                <i className="axbc-swatch" data-state={state} />
-              )}
+              <i className="axbc-swatch" data-state={state} />
               {words}
             </li>
           ))}

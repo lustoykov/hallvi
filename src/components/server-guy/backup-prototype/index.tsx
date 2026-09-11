@@ -1,13 +1,13 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Directions for the Storage and Backups destinations, on the real routes
-// and inside the real shell, switchable with ?variant= and the prototype bar
-// (← → keys). Each direction draws both pages: A Flow follows the data from
-// the server to the copies and the restore, B Calendar lays the days out in
-// columns, and C Drill answers "what if" for the mishaps that matter. 0 is
-// the shipped view, which also stands in while nothing is recorded. Nothing
-// here runs a backup or a restore; asking goes to the conversation.
+// PROTOTYPE · opus-ui-improvements · chosen for Storage and Backups.
+// Storage in Flow (flow.tsx), following the data from the server to the
+// copies and the restore, and Backups in Calendar (calendar.tsx), the days
+// in columns, on the real routes and inside the real shell. The owner chose
+// them from three directions, which stay on claude/storage-backups. The bar
+// at the bottom switches to the shipped view (0), which also stands in while
+// nothing is recorded. Nothing here runs a backup or a restore; asking goes
+// to the conversation.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -16,7 +16,6 @@ import type { ApplicationStack } from "@/server/application-stack";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 
-import type { ApplicationSection } from "../application-sections";
 import { operationsFor, unresolved } from "../operation-model";
 import type { PageChrome } from "../architecture-prototype";
 import { CITIES, type ScenarioId } from "../architecture-prototype/model";
@@ -27,7 +26,6 @@ import {
 } from "../architecture-prototype/prototype-bar";
 import { PageHead } from "../deployment-prototype/page-head";
 import { CalendarDirection } from "./calendar";
-import { DrillDirection } from "./drill";
 import { FlowDirection } from "./flow";
 import { buildProtectStory, type ProtectStory } from "./model";
 import "../architecture-prototype/prototype.css";
@@ -35,7 +33,6 @@ import "../architecture-prototype/journey-v2.css";
 
 export type ProtectPage = "storage" | "backups";
 export interface ProtectDirectionProps {
-  page: ProtectPage;
   story: ProtectStory;
   now: number;
   head: ReactNode;
@@ -44,30 +41,24 @@ export interface ProtectDirectionProps {
   /** The server it all lives on. */
   server: { label: string; city: string | null } | null;
   onAsk: (draft: string) => void;
-  onOpenDestination: (destination: ApplicationSection) => void;
 }
 
-const variants: VariantEntry[] = [
-  { key: "A", id: "flow", name: "Flow" },
-  { key: "B", id: "calendar", name: "Calendar" },
-  { key: "C", id: "drill", name: "Drill" },
-  { key: "0", id: "current", name: "Current page" },
-];
-const directions: Record<string, (props: ProtectDirectionProps) => ReactNode> =
-  {
-    flow: FlowDirection,
-    calendar: CalendarDirection,
-    drill: DrillDirection,
-  };
+const variants: Record<ProtectPage, VariantEntry[]> = {
+  storage: [
+    { key: "A", id: "flow", name: "Flow" },
+    { key: "0", id: "current", name: "Current page" },
+  ],
+  backups: [
+    { key: "A", id: "calendar", name: "Calendar" },
+    { key: "0", id: "current", name: "Current page" },
+  ],
+};
 const choices: ScenarioId[] = ["live", "later"];
 const DAY = 86_400_000;
 
-function writeUrl(variant: string, scenario: ScenarioId) {
+function writeUrl(key: string, scenario: ScenarioId) {
   const url = new URL(window.location.href);
-  url.searchParams.set(
-    "variant",
-    variants.find((item) => item.id === variant)?.key ?? variant,
-  );
+  url.searchParams.set("variant", key);
   if (scenario === "live") url.searchParams.delete("record");
   else url.searchParams.set("record", scenario);
   window.history.replaceState(window.history.state, "", url);
@@ -81,7 +72,6 @@ export function BackupPrototype({
   operations,
   now: clock,
   onAsk,
-  onOpenDestination,
   chrome,
   current,
 }: {
@@ -92,13 +82,13 @@ export function BackupPrototype({
   operations: ApplicationOperation[];
   now: number;
   onAsk: (draft: string) => void;
-  onOpenDestination: (destination: ApplicationSection) => void;
   chrome: PageChrome;
   /** The shipped view, kept as direction 0 for comparison. */
   current: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
-  const [variantId, setVariantId] = useState("flow");
+  // Whether the shipped view is showing; it carries across the two pages.
+  const [showCurrent, setShowCurrent] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>("live");
   const [reduced, setReduced] = useState(false);
 
@@ -108,10 +98,7 @@ export function BackupPrototype({
     const start = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const wanted = params.get("variant")?.toLowerCase();
-      const found = variants.find(
-        (item) => item.id === wanted || item.key.toLowerCase() === wanted,
-      );
-      if (found) setVariantId(found.id);
+      if (wanted === "0" || wanted === "current") setShowCurrent(true);
       const wantedRecord = params.get("record") as ScenarioId | null;
       if (wantedRecord && choices.includes(wantedRecord))
         setScenario(wantedRecord);
@@ -133,16 +120,15 @@ export function BackupPrototype({
       operation.state === "proposed" ||
       (operation.state === "failed" && unresolved(operation, operations)),
   );
-  const variant = variants.find((item) => item.id === variantId) ?? variants[0];
+  const variant = variants[page][showCurrent ? 1 : 0];
   // With nothing recorded, the shipped page's honest empty state stands in.
   const shipped =
-    variant.id === "current" ||
+    showCurrent ||
     story.state === "none" ||
     (!story.volumes.length && !story.copies.length);
-  const Direction = directions[variant.id] ?? FlowDirection;
+  const Direction = page === "storage" ? FlowDirection : CalendarDirection;
   const offer = record?.offer ?? null;
   const props: ProtectDirectionProps = {
-    page,
     story,
     now,
     head: (
@@ -166,7 +152,6 @@ export function BackupPrototype({
         }
       : null,
     onAsk,
-    onOpenDestination,
   };
 
   return (
@@ -191,16 +176,17 @@ export function BackupPrototype({
           <Direction key={page} {...props} />
         )}
         <PrototypeBar
-          variants={variants}
+          variants={variants[page]}
           variant={variant}
           onVariant={(id) => {
-            setVariantId(id);
-            writeUrl(id, scenario);
+            const next = id === "current";
+            setShowCurrent(next);
+            writeUrl(next ? "0" : "A", scenario);
           }}
           scenario={scenario}
           onScenario={(id) => {
             setScenario(id);
-            writeUrl(variant.id, id);
+            writeUrl(variant.key, id);
           }}
           source="live"
           reduced={reduced}

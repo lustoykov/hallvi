@@ -21,26 +21,20 @@ import {
   type StackStory,
 } from "../stack-prototype/stack-model";
 
-export const DAY = 86_400_000;
-
 /** One piece of the application's data, and how the backup plan copies it. */
 export interface Piece {
   key: string;
   label: string;
   volume: string;
-  owner: string;
   /** How the plan copies it; null when the plan leaves it out. */
   method: string | null;
 }
 export interface Vol {
   name: string;
-  kind: "database" | "files";
   owner: string;
   ownerName: string;
   mount: string;
   docker: string | null;
-  /** The SQLite file it holds, when it holds one. */
-  database: string | null;
   note: string | null;
   sizeGb: number | null;
   measuredAt: string | null;
@@ -61,7 +55,6 @@ export interface ProtectStory extends StackStory {
   createdAt: string | null;
   /** When the containers were replaced and the volumes kept. */
   keptAt: string | null;
-  keptDetail: string | null;
   disk: { usedGb: number; totalGb: number; measuredAt: string } | null;
   /** Copies off the server on record, newest first. */
   copies: Dated[];
@@ -155,7 +148,6 @@ export function buildProtectStory(input: {
       key: `${volume.name}:${key}`,
       label,
       volume: volume.name,
-      owner,
       method,
     });
     const pieces: Piece[] = whole
@@ -176,12 +168,10 @@ export function buildProtectStory(input: {
         : [piece("all", `${owner}'s files`, null)];
     return {
       name: volume.name,
-      kind: volume.kind,
       owner,
       ownerName: volume.usedBy,
       mount: volume.mount,
       docker: recorded?.dockerName ?? null,
-      database: sqlite,
       note: retention ? `keeps ${retention} days` : null,
       sizeGb: measured?.sizeGb ?? null,
       measuredAt: measured?.measuredAt ?? null,
@@ -262,7 +252,6 @@ export function buildProtectStory(input: {
     pieces: volumes.flatMap((volume) => volume.pieces),
     createdAt: created,
     keptAt: recreated ? settledAt(recreated) : null,
-    keptDetail: recreated?.summary ?? null,
     disk: facts.storage?.hostDisk ?? null,
     copies:
       copies.length || !base.protection.backup

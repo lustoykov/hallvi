@@ -98,31 +98,26 @@ scheduled backups may have run since the newest copy on record, and the page
 says so. With nothing recorded, the shipped page stands in. Storage gets
 its own round with Backups, below.
 
-## Storage and Backups: three directions (`backup-prototype/`)
+## Storage: Flow, and Backups: Calendar (`backup-prototype/`)
 
-On `opus-ui-improvements`, not chosen yet. Each direction draws both pages
-from the same record: the volumes and what each holds, what the backup plan
-copies from them (`persistentState`: a SQLite volume through its database
-file alone, a files volume whole), the copies and restore tests on record,
-and the container replacement that kept the volumes. Nothing runs a backup
-or a restore; asking goes to the conversation. Scheduled copies the record
-doesn't show are unknown, never green.
+Chosen from three directions that each drew both pages from the same
+record: the volumes and what each holds, what the backup plan copies from
+them (`persistentState`: a SQLite volume through its database file alone, a
+files volume whole), the copies and restore tests on record, and the
+container replacement that kept the volumes. Nothing runs a backup or a
+restore; asking goes to the conversation. Scheduled copies the record
+doesn't show are unknown, never green. With nothing recorded, the shipped
+page stands in.
 
-- **A · Flow.** The data drawn as it travels: each piece of a volume wired
-  into the daily copy, off the server and down to the tested restore. A
-  piece the plan leaves out ends at a wall, and the way back into
+- **Storage · Flow.** The data drawn as it travels: each piece of a volume
+  wired into the daily copy, off the server and down to the tested restore.
+  A piece the plan leaves out ends at a wall, and the way back into
   production is dashed because nobody has tried it. Pointing at a part
   sends light along its wires; a part opens its facts below.
-- **B · Calendar.** One column a day, from the day before the first record
-  to a week ahead, with Little Server over today. Backups: the copies, each
-  piece of data and whether each copy holds it, and the restore tests.
-  Storage: each volume's days on the server, the copies that read it, and
-  the disk as a ghost. A day opens what is on record for it.
-- **C · Drill.** No diagram: pick a mishap (a release replacing the
-  containers, losing the server, a corrupted database, needing an older
-  copy, a full disk) and the answer comes from the record: what comes back
-  and from where, how much you would lose, and which recovery steps anyone
-  has tried.
+- **Backups · Calendar.** One column a day, from the day before the first
+  record to a week ahead, with Little Server over today: the copies, each
+  piece of data and whether each copy holds it, and the restore tests. A
+  day opens what is on record for it.
 
 ## What is invented
 
@@ -158,8 +153,8 @@ On 11 Sep the owner loved Architecture and its data flows but found the
 entrance animation too much, and asked for a balance so the app doesn't
 become all diagrams. For Deployment and History they chose Transit ("D is
 great, let's take it"), and later its Line for Processes too. For Database
-they asked for directions without the line and chose the Timeline; Storage
-goes on to a round of its own with Backups.
+they asked for directions without the line and chose the Timeline. From a
+round of its own with Backups, Storage took Flow and Backups the Calendar.
 
 ## Where the exploration lives
 
@@ -171,4 +166,5 @@ Deployment and History's Story, Narrated and Replay directions and the first
 round's Ledger; on `claude/processes-database`, the Machine and Console
 directions for Processes and Database; on `claude/database-storage`, the
 Cutaway and Answers directions for Database and Storage, and the Timeline's
-Storage page.
+Storage page; on `claude/storage-backups`, the Drill direction, Flow's
+Backups page and the Calendar's Storage page.

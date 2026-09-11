@@ -1,21 +1,19 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Direction A, Flow: where the data goes, drawn as it travels. The server on
-// the left holds each volume, piece by piece. A wire carries every piece the
-// backup plan copies into the daily copy and off the server; a piece the
-// plan leaves out ends at a wall. From the copies a line drops to the
-// restore that was tested, and the way back into production is dashed,
-// because nobody has tried it. Pointing at a part sends light along its
-// wires; any part opens its facts below. Storage widens the server, Backups
-// the copies. Nothing moves on arrival.
+// PROTOTYPE · opus-ui-improvements · chosen for Storage.
+// Flow: where the data goes, drawn as it travels. The server on the left
+// holds each volume, piece by piece. A wire carries every piece the backup
+// plan copies into the daily copy and off the server; a piece the plan
+// leaves out ends at a wall. From the copies a line drops to the restore
+// that was tested, and the way back into production is dashed, because
+// nobody has tried it. Pointing at a part sends light along its wires; any
+// part opens its facts below. Nothing moves on arrival.
 
 import {
   Archive,
   ArrowCounterClockwise,
   CalendarCheck,
   ChatCircleText,
-  Check,
   Database,
   FolderSimple,
   Minus,
@@ -27,7 +25,7 @@ import { FRESH_MS } from "../architecture-prototype/model";
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import { ago, clock, countWord, when } from "../stack-prototype/stack-model";
+import { ago, countWord, when } from "../stack-prototype/stack-model";
 import type { ProtectDirectionProps } from "./index";
 import { lasting, listed, soft, type Piece } from "./model";
 import "./flow.css";
@@ -62,7 +60,6 @@ function curve(x1: number, y1: number, x2: number, y2: number) {
 }
 
 export function FlowDirection({
-  page,
   story,
   now,
   head,
@@ -72,9 +69,7 @@ export function FlowDirection({
 }: ProtectDirectionProps) {
   const board = useRef<HTMLDivElement>(null);
   const [geo, setGeo] = useState<Geo | null>(null);
-  const [selected, setSelected] = useState(
-    page === "storage" ? (story.pieces[0]?.key ?? "copy") : "copy",
-  );
+  const [selected, setSelected] = useState(story.pieces[0]?.key ?? "copy");
   const [hot, setHot] = useState<string | null>(null);
 
   // Wires are drawn between the parts where the layout put them (each part
@@ -104,7 +99,7 @@ export function FlowDirection({
       window.cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [keys, page]);
+  }, [keys]);
 
   const copy = story.copies[0] ?? null;
   const restore = story.restores[0] ?? null;
@@ -132,43 +127,16 @@ export function FlowDirection({
   });
 
   const [cadence, keeping] = (guard.schedule?.words ?? "").split(", ");
-  const say =
-    page === "storage"
-      ? `${countWord(n)} ${n === 1 ? "volume holds" : "volumes hold"} the application's data on the server.`
-      : copy
-        ? `The newest copy off the server on record is from ${when(copy.at)}.`
-        : "No copy off the server is on record.";
-  const sub =
-    page === "storage"
-      ? [
-          story.keptAt &&
-            `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`,
-          covered.length
-            ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
-            : "Nothing on the server is in a backup plan.",
-        ]
-          .filter(Boolean)
-          .join(" ")
-      : [
-          guard.schedule
-            ? `${cadence} are set up${keeping ? `, ${keeping}` : ""}. Newer copies may exist; none is on record here.`
-            : "No backup schedule is on record.",
-          restore
-            ? `A restore into an isolated place passed its checks ${when(restore.at)}${story.checks.some((check) => check.state === "untested") ? "; starting the application on it wasn't tested" : ""}.`
-            : "No restore has been tested.",
-        ].join(" ");
-  const ask =
-    page === "storage"
-      ? {
-          label: "Ask Server Guy to measure them",
-          draft:
-            "Measure how much space each volume and the server's disk use.",
-        }
-      : {
-          label: "Ask Server Guy to check the copies",
-          draft:
-            "Check the backup timer on the host and list the copies it has kept off the server.",
-        };
+  const say = `${countWord(n)} ${n === 1 ? "volume holds" : "volumes hold"} the application's data on the server.`;
+  const sub = [
+    story.keptAt &&
+      `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`,
+    covered.length
+      ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
+      : "Nothing on the server is in a backup plan.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   // ---------- The facts of the part that is open ----------
   const rows: { label: string; value: string; mono?: boolean }[] = [];
@@ -358,43 +326,36 @@ export function FlowDirection({
   })();
 
   return (
-    <section
-      className="axbf"
-      aria-label={page === "storage" ? "Storage" : "Backups"}
-    >
+    <section className="axbf" aria-label="Storage">
       {head}
       {activity}
       <div className="axbf-lede">
         <div>
           <h2 className="axbf-say">{say}</h2>
           <p className="axbf-sure">
-            {page === "storage" ? (
-              <Tag tone={story.keptAt ? toneOf(story.keptAt) : "planned"}>
-                {story.keptAt
-                  ? `Kept through a replacement ${ago(story.keptAt, now)}`
-                  : "Not replaced yet"}
-              </Tag>
-            ) : (
-              <Tag tone={copy ? toneOf(copy.at) : "planned"}>
-                {copy
-                  ? `Newest copy ${ago(copy.at, now)}`
-                  : "No copy on record"}
-              </Tag>
-            )}
+            <Tag tone={story.keptAt ? toneOf(story.keptAt) : "planned"}>
+              {story.keptAt
+                ? `Kept through a replacement ${ago(story.keptAt, now)}`
+                : "Not replaced yet"}
+            </Tag>
             <span>{sub}</span>
           </p>
         </div>
         <button
           type="button"
           className="ax-button axbf-ask"
-          onClick={() => onAsk(ask.draft)}
+          onClick={() =>
+            onAsk(
+              "Measure how much space each volume and the server's disk use.",
+            )
+          }
         >
           <ChatCircleText weight="bold" />
-          {ask.label}
+          Ask Server Guy to measure them
         </button>
       </div>
 
-      <div className="axbf-board" data-page={page} ref={board}>
+      <div className="axbf-board" ref={board}>
         {wires}
         <div className="axbf-server" data-part="server">
           <header>
@@ -407,8 +368,7 @@ export function FlowDirection({
               <div className="axbf-vol-head">
                 <code>{item.name}</code>
                 <small>
-                  {item.owner}
-                  {page === "storage" ? ` · ${item.mount}` : ""}
+                  {item.owner} · {item.mount}
                 </small>
               </div>
               {item.pieces.map((entry) => (
@@ -435,32 +395,24 @@ export function FlowDirection({
                   <b>{entry.label}</b>
                   <small>
                     {entry.method
-                      ? page === "storage"
-                        ? `copied daily as a ${entry.method}`
-                        : "in every copy"
+                      ? `copied daily as a ${entry.method}`
                       : "not in the backup plan"}
                   </small>
                 </button>
               ))}
-              {page === "storage" && (
-                <p className="axbf-vol-foot">
-                  {item.sizeGb != null
-                    ? size(item.sizeGb)
-                    : "Size not measured"}
-                  {item.note ? ` · ${item.note}` : ""}
-                  {story.keptAt ? ` · kept ${when(story.keptAt)}` : ""}
-                </p>
-              )}
+              <p className="axbf-vol-foot">
+                {item.sizeGb != null ? size(item.sizeGb) : "Size not measured"}
+                {item.note ? ` · ${item.note}` : ""}
+                {story.keptAt ? ` · kept ${when(story.keptAt)}` : ""}
+              </p>
             </div>
           ))}
-          {page === "storage" && (
-            <p className="axbf-disk">
-              <span aria-hidden="true" />
-              {story.disk
-                ? `Disk: ${story.disk.usedGb} of ${story.disk.totalGb} GB used`
-                : "The server's disk isn't measured yet"}
-            </p>
-          )}
+          <p className="axbf-disk">
+            <span aria-hidden="true" />
+            {story.disk
+              ? `Disk: ${story.disk.usedGb} of ${story.disk.totalGb} GB used`
+              : "The server's disk isn't measured yet"}
+          </p>
         </div>
 
         <button
@@ -475,9 +427,6 @@ export function FlowDirection({
           <CalendarCheck weight="bold" />
           <b>{cadence || "No schedule"}</b>
           {keeping && <small>{keeping}</small>}
-          {page === "backups" && guard.schedule && (
-            <small>set up {when(guard.schedule.at)}</small>
-          )}
         </button>
 
         <div className="axbf-right">
@@ -517,9 +466,6 @@ export function FlowDirection({
             <small>
               {story.copies.length} on record
               {keep ? ` · keeps ${keep}` : ""}
-              {page === "backups" && copy
-                ? ` · checked by size and SHA-256 at ${clock(copy.at)}`
-                : ""}
             </small>
           </button>
           <button
@@ -537,20 +483,6 @@ export function FlowDirection({
               <b>{restore ? "Restore tested" : "No restore tested"}</b>
             </span>
             {restore && <span>{when(restore.at)}</span>}
-            {page === "backups" && (
-              <ul>
-                {story.checks.map((check) => (
-                  <li key={check.label} data-state={check.state}>
-                    {check.state === "pass" ? (
-                      <Check weight="bold" />
-                    ) : (
-                      <Minus weight="bold" />
-                    )}
-                    {check.label}
-                  </li>
-                ))}
-              </ul>
-            )}
           </button>
         </div>
       </div>

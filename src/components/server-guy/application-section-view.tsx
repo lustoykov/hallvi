@@ -377,8 +377,8 @@ export function ApplicationSectionView({
         />
       </div>
     );
-  // PROTOTYPE (opus-ui-improvements): directions for Storage and Backups,
-  // beside the shipped view (0).
+  // Storage in Flow and Backups in Calendar, chosen on opus-ui-improvements,
+  // are the default the same way.
   if (section === "storage" || section === "backups")
     return (
       <div className={`sg-section-page sg-section-${section}`}>
@@ -390,7 +390,6 @@ export function ApplicationSectionView({
           operations={operations}
           now={now}
           onAsk={(draft) => onAsk(null, draft)}
-          onOpenDestination={onOpenDestination}
           chrome={{
             bar,
             header,

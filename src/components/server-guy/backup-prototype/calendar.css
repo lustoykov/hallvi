@@ -1,6 +1,6 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction B for Storage and Backups, Calendar. Prefix: axbc-. Days in
-   columns; a dashed day is one the record can't vouch for. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Backups.
+   Calendar. Prefix: axbc-. Days in columns; a dashed day is one the record
+   can't vouch for. */
 
 .axbc {
   display: grid;
@@ -262,38 +262,6 @@
   background: #ffffff;
   color: var(--ax-blue);
 }
-:is(.axbc-cell, .axbc-swatch)[data-state="created"] {
-  background: #c9d7fb;
-  color: var(--ax-blue);
-}
-:is(.axbc-cell, .axbc-swatch)[data-state="present"] {
-  background: #dfe7fb;
-}
-:is(.axbc-cell, .axbc-swatch)[data-state="unseen"] {
-  border: 1px dashed #d3dcf0;
-  background: repeating-linear-gradient(90deg, #eef2fb 0 6px, #f7f9fd 6px 12px);
-}
-:is(.axbc-cell, .axbc-swatch)[data-state="ghost"] {
-  border: 1px dashed #d5dce7;
-  background: #ffffff;
-}
-.axbc-dot {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ax-verified);
-}
-.axbc-dot[data-dot="part"] {
-  background: linear-gradient(90deg, var(--ax-verified) 50%, #ffffff 50%);
-  box-shadow: 0 0 0 1px var(--ax-verified);
-}
-.axbc-dot[data-dot="maybe"] {
-  background: #ffffff;
-  box-shadow: inset 0 0 0 1.5px #e3b67f;
-}
 
 /* ---------- A day's record ---------- */
 
@@ -378,10 +346,4 @@
   width: 18px;
   height: 18px;
   border-radius: 5px;
-}
-.axbc-legend .axbc-dot {
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
 }
