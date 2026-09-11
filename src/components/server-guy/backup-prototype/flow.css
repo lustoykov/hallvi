@@ -1,0 +1,515 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction A for Storage and Backups, Flow. Prefix: axbf-. The data drawn
+   as it travels; light runs along a wire only while you point at it. */
+
+.axbf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 10px;
+}
+.axbf-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axbf-say {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axbf-sure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  max-width: 88ch;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+}
+.axbf-ask {
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axbf-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The board ---------- */
+
+.axbf-board {
+  --server: 340px;
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--server) minmax(96px, 1fr) 190px minmax(72px, 0.6fr)
+    270px;
+  align-items: center;
+  padding: 26px 28px 30px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+.axbf-board[data-page="backups"] {
+  --server: 260px;
+}
+.axbf-wires {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.axbf-wires path {
+  fill: none;
+  stroke-linecap: round;
+}
+.axbf-in path {
+  stroke: #c3cfe8;
+  stroke-width: 2;
+  transition: stroke var(--ax-base);
+}
+.axbf-in[data-lit] path {
+  stroke: #9fb4f5;
+}
+.axbf-in .axbf-light {
+  stroke: var(--ax-blue);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 11;
+  animation: axbf-flow 1s linear infinite;
+}
+@keyframes axbf-flow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+.axbf-out path {
+  stroke: #dcc9ad;
+  stroke-width: 2;
+  stroke-dasharray: 2 5;
+  transition: stroke var(--ax-base);
+}
+.axbf-out .axbf-wall {
+  stroke: var(--ax-amber);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+.axbf-out[data-lit] path {
+  stroke: var(--ax-amber);
+}
+.axbf-wires text {
+  font-size: 11px;
+  font-weight: 560;
+  fill: var(--ax-waiting-text);
+}
+.axbf-untested path {
+  stroke: #b9c3d3;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 6;
+}
+.axbf-untested circle {
+  fill: #ffffff;
+  stroke: #b9c3d3;
+  stroke-width: 1.5;
+}
+.axbf-untested text {
+  fill: var(--ax-muted);
+}
+.axbf-untested[data-lit] path,
+.axbf-untested[data-lit] circle {
+  stroke: var(--ax-amber);
+}
+
+/* The server, and each volume piece by piece. */
+.axbf-server {
+  grid-column: 1;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  padding: 14px 14px 16px;
+  border: 1.5px solid #cdd4df;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f2f5f9 100%);
+}
+.axbf-server > header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ax-muted);
+}
+.axbf-vol {
+  display: grid;
+  gap: 6px;
+}
+.axbf-vol-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+}
+.axbf-vol-head code {
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbf-vol-head small {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--ax-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.axbf-vol-foot {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11.5px;
+  color: var(--ax-muted);
+}
+.axbf-piece {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 1px 9px;
+  padding: 9px 11px;
+  border: 1px solid #d5dce7;
+  border-radius: 11px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axbf-piece svg {
+  grid-row: span 2;
+  width: 16px;
+  height: 16px;
+  color: var(--ax-muted);
+}
+.axbf-piece b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+  overflow-wrap: anywhere;
+}
+.axbf-piece small {
+  font-size: 11.5px;
+  color: var(--ax-muted);
+}
+.axbf-piece[data-covered] {
+  border-color: #c5d3f4;
+  background: linear-gradient(180deg, #f5f8ff 0%, #ffffff 100%);
+}
+.axbf-piece[data-covered] svg {
+  color: var(--ax-blue);
+}
+.axbf-piece:not([data-covered]) {
+  border-style: dashed;
+  border-color: #dcc9ad;
+  background: repeating-linear-gradient(
+    -45deg,
+    #fbf7f1 0 6px,
+    #ffffff 6px 12px
+  );
+}
+.axbf-piece:not([data-covered]) small {
+  color: var(--ax-waiting-text);
+}
+.axbf-piece:hover,
+.axbf-piece[data-hot] {
+  border-color: #9fb4f5;
+}
+.axbf-piece:not([data-covered]):is(:hover, [data-hot]) {
+  border-color: var(--ax-amber);
+}
+.axbf-piece[aria-pressed="true"] {
+  border-color: var(--ax-blue);
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
+}
+.axbf-disk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axbf-disk span {
+  flex: none;
+  width: 54px;
+  height: 8px;
+  border: 1px dashed #c3ccda;
+  border-radius: 4px;
+}
+
+/* The daily copy, the copies off the server and the restore. */
+.axbf-copy,
+.axbf-vault,
+.axbf-restore {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--ax-line-2);
+  background: #ffffff;
+  box-shadow: 0 16px 30px -24px rgb(23 34 56 / 30%);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base),
+    box-shadow var(--ax-base);
+}
+.axbf-copy {
+  grid-column: 3;
+  justify-items: center;
+  padding: 16px 12px 14px;
+  border-radius: 18px;
+  text-align: center;
+}
+.axbf-copy svg {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 2px;
+  color: var(--ax-blue);
+}
+.axbf-copy b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbf-copy small {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ax-muted);
+}
+.axbf-right {
+  grid-column: 5;
+  display: grid;
+  gap: 40px;
+  padding-top: 62px;
+}
+.axbf-vault,
+.axbf-restore {
+  justify-items: start;
+  padding: 14px 16px;
+  border-radius: 16px;
+  text-align: left;
+}
+.axbf-vault-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axbf-vault-head svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ax-ink-2);
+}
+.axbf-vault-head b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbf-vault > span:not([class]),
+.axbf-restore > span:not([class]) {
+  font-size: 13px;
+  color: var(--ax-ink-2);
+}
+.axbf-vault small {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ax-muted);
+}
+.axbf-guy {
+  position: absolute;
+  top: -62px;
+  right: 12px;
+  width: 64px;
+  height: 64px;
+}
+.axbf-tiles {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+.axbf-tiles i {
+  width: 14px;
+  height: 20px;
+  border: 1.5px dashed #c9d1de;
+  border-radius: 4px;
+}
+.axbf-tiles i[data-on] {
+  border: 0;
+  background: var(--ax-verified);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 12%);
+}
+.axbf-restore ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.axbf-restore li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ax-ink-2);
+}
+.axbf-restore li svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--ax-verified);
+}
+.axbf-restore li[data-state="untested"] {
+  color: var(--ax-waiting-text);
+}
+.axbf-restore li[data-state="untested"] svg {
+  color: var(--ax-amber);
+}
+.axbf-restore[data-none] {
+  border-style: dashed;
+  box-shadow: none;
+}
+.axbf-copy:is(:hover, [data-hot]),
+.axbf-vault:is(:hover, [data-hot]),
+.axbf-restore:is(:hover, [data-hot]) {
+  border-color: #9fb4f5;
+}
+.axbf-copy[aria-pressed="true"],
+.axbf-vault[aria-pressed="true"],
+.axbf-restore[aria-pressed="true"] {
+  border-color: var(--ax-blue);
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
+}
+.axbf-piece:focus-visible,
+.axbf-copy:focus-visible,
+.axbf-vault:focus-visible,
+.axbf-restore:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 3px;
+}
+
+/* ---------- The open part's facts ---------- */
+
+.axbf-details {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  border: 1px solid var(--ax-line);
+  border-radius: 16px;
+  background: #fbfcfe;
+}
+.axbf-details header b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbf-details header small {
+  margin-left: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ax-muted);
+}
+.axbf-details header code {
+  font-family: var(--ax-mono);
+}
+.axbf-details dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.axbf-details dl > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 14px;
+  font-size: 13px;
+}
+.axbf-details dt {
+  color: var(--ax-muted);
+}
+.axbf-details dd {
+  margin: 0;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axbf-lines {
+  display: grid;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c2538 0%, #171f30 100%);
+  font-family: var(--ax-mono);
+}
+.axbf-lines div {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d9e1f2;
+}
+.axbf-lines b {
+  font-weight: 600;
+  text-align: center;
+  color: #7d8aa5;
+}
+.axbf-lines span {
+  overflow-wrap: anywhere;
+}
+.axbf-lines [data-tone="pass"] b {
+  color: #3fbf86;
+}
+.axbf-lines [data-tone="untested"] b,
+.axbf-lines [data-tone="untested"] span {
+  color: #f0c38a;
+}
+.axbf-note {
+  margin: 0;
+  max-width: 80ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+
+@media (max-width: 1180px) {
+  .axbf-board {
+    --server: 280px;
+    grid-template-columns:
+      var(--server) minmax(60px, 1fr) 170px minmax(40px, 0.5fr)
+      240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axbf-in .axbf-light {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axbf-in .axbf-light {
+  animation: none;
+  stroke-dasharray: none;
+}

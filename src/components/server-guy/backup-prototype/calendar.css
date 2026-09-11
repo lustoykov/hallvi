@@ -1,0 +1,387 @@
+/* PROTOTYPE · opus-ui-improvements · throwaway.
+   Direction B for Storage and Backups, Calendar. Prefix: axbc-. Days in
+   columns; a dashed day is one the record can't vouch for. */
+
+.axbc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 10px;
+}
+.axbc-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axbc-say {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axbc-sub {
+  margin: 8px 0 0;
+  max-width: 70ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.axbc-ask {
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axbc-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The board ---------- */
+
+.axbc-board {
+  padding: 92px 22px 16px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+.axbc-grid {
+  --head: 250px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--head) repeat(var(--cols), minmax(0, 1fr));
+  row-gap: 4px;
+}
+.axbc-corner {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  padding: 0 0 10px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbc-today {
+  grid-row: 1 / -1;
+  margin: -12px 1px -6px;
+  border-radius: 14px;
+  background: rgb(40 90 216 / 5%);
+  box-shadow: inset 0 0 0 1px rgb(40 90 216 / 12%);
+}
+.axbc-day {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 1px;
+  padding-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.axbc-day small {
+  font-size: 11px;
+  color: var(--ax-muted);
+}
+.axbc-day b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbc-day[data-today] small,
+.axbc-day[data-today] b {
+  color: var(--ax-blue);
+}
+.axbc-guy {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  width: 70px;
+  height: 70px;
+  transform: translateX(-50%);
+}
+
+/* The lane heads, in Overview's voice. */
+.axbc-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 14px;
+}
+.axbc-head-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #f4f6fa, #e8ecf3);
+  color: var(--ax-ink-2);
+  box-shadow: inset 0 0 0 1px rgb(23 34 56 / 7%);
+}
+.axbc-head-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.axbc-head-text {
+  display: grid;
+  min-width: 0;
+}
+.axbc-head-text b {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.axbc-head-text b code {
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  letter-spacing: 0;
+}
+.axbc-head-text small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ax-muted);
+}
+.axbc-head-text small i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aab4c4;
+}
+.axbc-head[data-c="verified"] small {
+  color: var(--ax-verified-text);
+}
+.axbc-head[data-c="verified"] small i {
+  background: var(--ax-verified);
+}
+.axbc-head:is([data-c="stale"], [data-c="gap"]) small {
+  color: var(--ax-waiting-text);
+}
+.axbc-head:is([data-c="stale"], [data-c="gap"]) small i {
+  background: var(--ax-amber);
+}
+.axbc-head[data-c="absent"] small i {
+  border: 1.5px dashed #9aa6ba;
+  background: transparent;
+}
+
+/* ---------- The days themselves ---------- */
+
+.axbc-slot {
+  position: relative;
+  display: grid;
+  padding: 5px 4px;
+}
+.axbc-slot:has(.axbc-pop) {
+  z-index: 30;
+}
+.axbc-cell,
+.axbc-swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f3f5f8;
+  color: #ffffff;
+}
+.axbc-cell {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 220ms var(--ax-spring),
+    box-shadow var(--ax-base);
+}
+.axbc-cell svg {
+  width: 15px;
+  height: 15px;
+}
+.axbc-cell b {
+  font-size: 12px;
+  font-weight: 700;
+}
+.axbc-cell:hover {
+  transform: scale(1.06);
+}
+.axbc-cell[aria-expanded="true"] {
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 5px rgb(40 90 216 / 35%);
+}
+.axbc-cell:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 2px;
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="copy"] {
+  background: var(--ax-verified);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 12%);
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="held"] {
+  border-color: #b6e0cb;
+  background: #d9f1e5;
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="unknown"] {
+  border: 1.5px dashed #e3b67f;
+  background: #fff8ef;
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="planned"] {
+  border: 1.5px dashed #cfd8e6;
+  background: #ffffff;
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="out"] {
+  border-color: #efd6d1;
+  background: repeating-linear-gradient(
+    -45deg,
+    #f8ece9 0 5px,
+    #ffffff 5px 10px
+  );
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="passed"] {
+  border: 2px solid var(--ax-blue);
+  background: #ffffff;
+  color: var(--ax-blue);
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="created"] {
+  background: #c9d7fb;
+  color: var(--ax-blue);
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="present"] {
+  background: #dfe7fb;
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="unseen"] {
+  border: 1px dashed #d3dcf0;
+  background: repeating-linear-gradient(90deg, #eef2fb 0 6px, #f7f9fd 6px 12px);
+}
+:is(.axbc-cell, .axbc-swatch)[data-state="ghost"] {
+  border: 1px dashed #d5dce7;
+  background: #ffffff;
+}
+.axbc-dot {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ax-verified);
+}
+.axbc-dot[data-dot="part"] {
+  background: linear-gradient(90deg, var(--ax-verified) 50%, #ffffff 50%);
+  box-shadow: 0 0 0 1px var(--ax-verified);
+}
+.axbc-dot[data-dot="maybe"] {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1.5px #e3b67f;
+}
+
+/* ---------- A day's record ---------- */
+
+.axbc-pop {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 4px;
+  z-index: 20;
+  width: 300px;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 6%),
+    0 24px 44px -20px rgb(23 34 56 / 34%);
+}
+.axbc-pop[data-align="end"] {
+  right: 4px;
+  left: auto;
+}
+.axbc-pop header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.axbc-pop header div {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+}
+.axbc-pop header b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axbc-pop header small {
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axbc-pop header button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: var(--ax-muted);
+  cursor: pointer;
+}
+.axbc-pop header button svg {
+  width: 11px;
+  height: 11px;
+}
+.axbc-pop p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.axbc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 18px 0 0;
+  padding: 12px 4px 0;
+  border-top: 1px dashed #dbe1ea;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axbc-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.axbc-legend .axbc-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+.axbc-legend .axbc-dot {
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+}

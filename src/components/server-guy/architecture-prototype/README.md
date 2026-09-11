@@ -95,8 +95,34 @@ minutes of work and two quiet days share one line, and "To scale" slides
 every moment to its clock time. The stretch since the newest copy is shaded
 and named, and Little Server stands at now. Nothing is observed live:
 scheduled backups may have run since the newest copy on record, and the page
-says so. With nothing recorded, the shipped page stands in. Storage still
-shows the shipped page.
+says so. With nothing recorded, the shipped page stands in. Storage gets
+its own round with Backups, below.
+
+## Storage and Backups: three directions (`backup-prototype/`)
+
+On `opus-ui-improvements`, not chosen yet. Each direction draws both pages
+from the same record: the volumes and what each holds, what the backup plan
+copies from them (`persistentState`: a SQLite volume through its database
+file alone, a files volume whole), the copies and restore tests on record,
+and the container replacement that kept the volumes. Nothing runs a backup
+or a restore; asking goes to the conversation. Scheduled copies the record
+doesn't show are unknown, never green.
+
+- **A · Flow.** The data drawn as it travels: each piece of a volume wired
+  into the daily copy, off the server and down to the tested restore. A
+  piece the plan leaves out ends at a wall, and the way back into
+  production is dashed because nobody has tried it. Pointing at a part
+  sends light along its wires; a part opens its facts below.
+- **B · Calendar.** One column a day, from the day before the first record
+  to a week ahead, with Little Server over today. Backups: the copies, each
+  piece of data and whether each copy holds it, and the restore tests.
+  Storage: each volume's days on the server, the copies that read it, and
+  the disk as a ghost. A day opens what is on record for it.
+- **C · Drill.** No diagram: pick a mishap (a release replacing the
+  containers, losing the server, a corrupted database, needing an older
+  copy, a full disk) and the answer comes from the record: what comes back
+  and from where, how much you would lose, and which recovery steps anyone
+  has tried.
 
 ## What is invented
 
@@ -104,7 +130,8 @@ shows the shipped page.
   clock moved), _Prometheus failing_ (an invented monitoring check) and
   _Before deploy_ (the plan with nothing running). The bar labels each one.
   Deployment offers Live record, 3 days later and Before deploy; History,
-  Processes, Database and Storage offer Live record and 3 days later.
+  Processes, Database, Storage and Backups offer Live record and 3 days
+  later.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
