@@ -1,0 +1,240 @@
+// Rig stand-in for the GitHub API boundary, copied into a rig's app copy only.
+// Mirrored repositories (tests/rig/mirror.mjs) are served from exact file
+// copies at pinned commits, every file verified against its Git blob hash,
+// with GitHub's own tree listings. A mirror's default branch is its
+// `head.json`, so a new upstream release can be "pushed" by changing it. Any
+// other public repository is read from GitHub unauthenticated and read-only.
+// Writes always fail.
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
+import { writeTar } from "./tar";
+
+export class GithubAccessError extends Error {
+  constructor(
+    message: string,
+    public readonly kind: "auth" | "access" | "unavailable" = "unavailable",
+  ) {
+    super(message);
+  }
+}
+export type GithubCliSource = "GH_TOKEN" | "GITHUB_TOKEN" | "gh";
+
+type MirrorFile = { path: string; mode: string; sha: string; size: number };
+type Mirror = {
+  repository: { id: number; full_name: string; default_branch: string };
+  tags: Record<string, string>;
+};
+const MISSING =
+  "The repository is missing or this login cannot access it. Check its URL and repository access on GitHub.";
+const root = () => process.env.SG_RIG_MIRROR_DIR!;
+const config = () => process.env.SERVER_GUY_CONFIG_DIR!;
+
+function log(entry: Record<string, unknown>) {
+  appendFileSync(
+    join(config(), "rig-github.log"),
+    JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n",
+  );
+}
+function mirrorOf(fullName: string) {
+  const directory = join(root(), fullName.toLowerCase());
+  if (!existsSync(join(directory, "mirror.json"))) return null;
+  const mirror = JSON.parse(
+    readFileSync(join(directory, "mirror.json"), "utf8"),
+  ) as Mirror;
+  const head = JSON.parse(readFileSync(join(directory, "head.json"), "utf8"))
+    .head as string;
+  return { directory, mirror, head };
+}
+type Served = NonNullable<ReturnType<typeof mirrorOf>>;
+function resolveRef(served: Served, ref: string): string {
+  const value = decodeURIComponent(ref);
+  if (["HEAD", served.mirror.repository.default_branch].includes(value))
+    return served.head;
+  if (value.startsWith("refs/heads/")) return served.head;
+  if (served.mirror.tags[value]) return served.mirror.tags[value];
+  const known = Object.values(served.mirror.tags).concat(served.head);
+  const matches =
+    value.length >= 7
+      ? [...new Set(known)].filter((sha) => sha.startsWith(value.toLowerCase()))
+      : [];
+  if (matches.length === 1) return matches[0];
+  throw new GithubAccessError(
+    "GitHub rejected the request as invalid for this repository's current state.",
+    "access",
+  );
+}
+function files(served: Served, sha: string): {
+  date: string;
+  message: string;
+  files: MirrorFile[];
+} {
+  return JSON.parse(readFileSync(join(served.directory, sha, "files.json"), "utf8"));
+}
+function content(served: Served, sha: string, path: string) {
+  return readFileSync(join(served.directory, sha, "tree", path));
+}
+
+async function passthrough(path: string, allowNotFound?: boolean) {
+  const response = await fetch(`https://api.${"git"}hub.com${path}`, {
+    headers: { Accept: "application/vnd.github+json", "User-Agent": "server-guy-rig" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  log({ passthrough: path, status: response.status });
+  if (response.status === 404 && allowNotFound) return { data: null, scopes: [] };
+  if (response.status === 404 || response.status === 422)
+    throw new GithubAccessError(MISSING, "access");
+  if (!response.ok) throw new GithubAccessError("GitHub is unavailable. Try again later.");
+  return { data: await response.json(), scopes: [] as string[] };
+}
+
+export async function githubJson(
+  path: string,
+  _token: string,
+  options: {
+    signal?: AbortSignal;
+    method?: "POST" | "PATCH";
+    body?: unknown;
+    allowNotFound?: boolean;
+  } = {},
+): Promise<{ data: unknown; scopes: string[] }> {
+  const url = new URL(path, "https://api.invalid");
+  log({ method: options.method ?? "GET", path });
+  if (options.method)
+    throw new GithubAccessError(
+      "GitHub denied access. Check repository permissions and organization approval.",
+      "access",
+    );
+  const route = url.pathname;
+  const ok = (data: unknown) => ({ data, scopes: [] as string[] });
+  if (route === "/user") return ok({ id: 42, login: "rig-owner" });
+  if (route === "/user/installations") return ok({ total_count: 0, installations: [] });
+  if (route.startsWith("/user/installations/"))
+    return ok({ total_count: 0, repositories: [] });
+  const match = /^\/repos\/([^/]+)\/([^/]+)(?:\/(.*))?$/.exec(route);
+  if (!match) throw new GithubAccessError(MISSING, "access");
+  const served = mirrorOf(`${match[1]}/${match[2]}`);
+  if (!served) return passthrough(path, options.allowNotFound);
+  const rest = match[3] ?? "";
+  const repository = served.mirror.repository;
+  if (!rest)
+    return ok({
+      ...repository,
+      visibility: "public",
+      private: false,
+      permissions: { admin: false, maintain: false, push: false, triage: false, pull: true },
+    });
+  if (rest.startsWith("commits/")) {
+    const sha = resolveRef(served, rest.slice("commits/".length));
+    const { date, message } = files(served, sha);
+    return ok({ sha, commit: { message, committer: { date } } });
+  }
+  if (rest.startsWith("compare/")) {
+    const [base, head] = decodeURIComponent(rest.slice("compare/".length))
+      .split("...")
+      .map((ref) => resolveRef(served, ref));
+    const before = new Map(files(served, base).files.map((f) => [f.path, f.sha]));
+    const after = new Map(files(served, head).files.map((f) => [f.path, f.sha]));
+    const changed = [
+      ...[...after].filter(([p, s]) => before.get(p) !== s).map(([p]) => ({
+        filename: p,
+        status: before.has(p) ? "modified" : "added",
+      })),
+      ...[...before.keys()].filter((p) => !after.has(p)).map((p) => ({
+        filename: p,
+        status: "removed",
+      })),
+    ];
+    return ok({ status: "ahead", files: changed, total_commits: changed.length ? 1 : 0 });
+  }
+  if (rest.startsWith("git/trees/")) {
+    const sha = resolveRef(served, rest.slice("git/trees/".length));
+    const tree = JSON.parse(
+      readFileSync(join(served.directory, sha, "tree.json"), "utf8"),
+    ) as { tree: { path: string }[] };
+    return ok(
+      url.searchParams.get("recursive")
+        ? tree
+        : { ...tree, tree: tree.tree.filter((e) => !e.path.includes("/")) },
+    );
+  }
+  if (rest.startsWith("contents/")) {
+    const sha = resolveRef(served, url.searchParams.get("ref") ?? "HEAD");
+    const filePath = decodeURIComponent(rest.slice("contents/".length));
+    const listed = files(served, sha).files;
+    const file = listed.find((item) => item.path === filePath);
+    if (file) {
+      const bytes = content(served, sha, filePath);
+      return ok({
+        type: "file",
+        encoding: "base64",
+        size: bytes.length,
+        name: filePath.split("/").at(-1),
+        path: filePath,
+        sha: file.sha,
+        content: bytes.toString("base64"),
+      });
+    }
+    const children = listed.filter((item) => item.path.startsWith(`${filePath}/`));
+    if (children.length)
+      return ok(
+        children.map((item) => ({
+          type: "file",
+          name: item.path.split("/").at(-1),
+          path: item.path,
+          sha: item.sha,
+          size: item.size,
+        })),
+      );
+    if (options.allowNotFound) return { data: null, scopes: [] };
+    throw new GithubAccessError(MISSING, "access");
+  }
+  log({ unsupported: path });
+  throw new GithubAccessError("GitHub is unavailable. Try again later.");
+}
+
+export async function githubArchive(
+  fullName: string,
+  sha: string,
+  _token: string,
+  options: { signal?: AbortSignal; maxBytes: number },
+): Promise<Buffer> {
+  log({ method: "GET", path: `/repos/${fullName}/tarball/${sha}` });
+  const served = mirrorOf(fullName);
+  if (!served)
+    throw new GithubAccessError(
+      "The repository archive could not be read with this login. Check repository access on GitHub.",
+      "access",
+    );
+  const exact = resolveRef(served, sha);
+  const prefix = `${fullName.replace("/", "-")}-${exact.slice(0, 7)}`;
+  const archive = gzipSync(
+    writeTar(
+      files(served, exact).files.map((file) => ({
+        path: `${prefix}/${file.path}`,
+        content: content(served, exact, file.path),
+        mode: file.mode === "100755" ? 0o755 : 0o644,
+      })),
+    ),
+  );
+  if (archive.length > options.maxBytes)
+    throw new GithubAccessError(
+      `The repository archive is larger than the supported ${options.maxBytes} bytes.`,
+      "access",
+    );
+  return archive;
+}
+
+export async function githubDeviceRequest(
+  _path: "/login/device/code" | "/login/oauth/access_token",
+  _body: Record<string, string>,
+): Promise<unknown> {
+  throw new GithubAccessError("Could not contact GitHub to sign in. Try again.");
+}
+
+export async function readGithubCliCredential(): Promise<{
+  token: string;
+  source: GithubCliSource;
+} | null> {
+  return null;
+}

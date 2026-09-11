@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+// Rig stand-in for SSH to the provider-created "server" (127.0.0.1): run the
+// host command with this machine's shell and Docker engine. Host paths under
+// /opt/server-guy and /run/lock map to SG_RIG_HOST_ROOT. Every invocation is
+// logged (command prefix, duration, exit) as transport evidence.
+"use strict";
+const { appendFileSync } = require("node:fs");
+const { spawn } = require("node:child_process");
+const { join } = require("node:path");
+
+const root = process.env.SG_RIG_HOST_ROOT;
+if (!root) {
+  console.error("SG_RIG_HOST_ROOT is not set");
+  process.exit(255);
+}
+const original = process.argv.at(-1) ?? "";
+let command = original
+  .replaceAll("/opt/server-guy/", `${root}/opt/server-guy/`)
+  .replaceAll("/run/lock/", `${root}/run/lock/`);
+let note = "";
+if (command.includes("server-guy-metadata-guard")) {
+  // Cloud metadata firewalling has no equivalent on this machine.
+  command = "true";
+  note = "metadata guard skipped";
+} else if (command.includes("cloud-init status --wait")) {
+  command = command.replace(
+    /cloud-init status --wait\s*>\s*\/dev\/null\s*&&\s*/,
+    "",
+  );
+  note = "cloud-init wait skipped";
+}
+const started = Date.now();
+const child = spawn("sh", ["-c", command], {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    SSH_CONNECTION: "127.0.0.1 50000 127.0.0.1 22",
+    // The recommended host is x86; builds and pulls target it.
+    DOCKER_DEFAULT_PLATFORM: "linux/amd64",
+  },
+});
+child.on("exit", (code, signal) => {
+  appendFileSync(
+    join(root, "ssh.log"),
+    JSON.stringify({
+      at: new Date(started).toISOString(),
+      ms: Date.now() - started,
+      exit: code,
+      signal,
+      note,
+      command: original.slice(0, 600),
+    }) + "\n",
+  );
+  process.exit(code ?? 255);
+});

@@ -1,0 +1,22 @@
+// Rig transport stand-in: the local "host" is this machine, so the executed
+// host compose binds published listeners to loopback, the role the provider
+// firewall plays on a real host. Everything else is the real module; retained
+// release snapshots, facts and scope checks keep the configuration Pi authored.
+import { executableCompose as executableHostCompose } from "./native-compose-real";
+
+export * from "./native-compose-real";
+
+export function executableCompose(
+  ...args: Parameters<typeof executableHostCompose>
+) {
+  const compose = JSON.parse(executableHostCompose(...args)) as {
+    services: Record<
+      string,
+      { ports?: { published?: string; host_ip?: string }[] }
+    >;
+  };
+  for (const service of Object.values(compose.services))
+    for (const port of service.ports ?? [])
+      if (port.published && !port.host_ip) port.host_ip = "127.0.0.1";
+  return JSON.stringify(compose);
+}

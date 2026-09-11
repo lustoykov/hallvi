@@ -1,0 +1,157 @@
+// Rig stand-in for the Hetzner Cloud API, copied into the rig's app copy
+// only. It prices one fixed small x86 offer (the value the existing Docker
+// proof harness uses) and "creates" this machine at 127.0.0.1, reached through
+// the rig's local SSH stand-in. State persists in <config>/rig-cloud.json so
+// the web and worker processes agree. Request bodies are not logged: server
+// creation carries the host's private SSH key in user_data.
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
+import type { HostOffer } from "./deployment-types";
+
+type Labelled = { id: number; labels?: Record<string, string> } & Record<
+  string,
+  unknown
+>;
+type Cloud = {
+  next: number;
+  servers: Labelled[];
+  sshKeys: Labelled[];
+  firewalls: Labelled[];
+};
+
+const file = () =>
+  join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.json");
+function load(): Cloud {
+  return existsSync(file())
+    ? JSON.parse(readFileSync(file(), "utf8"))
+    : { next: 4200, servers: [], sshKeys: [], firewalls: [] };
+}
+function save(cloud: Cloud) {
+  const temporary = `${file()}.tmp`;
+  writeFileSync(temporary, JSON.stringify(cloud, null, 2));
+  renameSync(temporary, file());
+}
+function log(entry: Record<string, unknown>) {
+  appendFileSync(
+    join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.log"),
+    JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n",
+  );
+}
+
+export function hetznerConnectionId() {
+  return "audit-local-provider";
+}
+// Only documented rejection outcomes prove that a create request had no effect.
+export class HetznerError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+  ) {
+    super(
+      `Hetzner rejected the request (HTTP ${status}, ${code}). Check access, capacity and the recorded operation before retrying.`,
+    );
+  }
+  get definitelyNotCreated() {
+    return this.status >= 400 && this.status < 500;
+  }
+}
+export async function connectHetzner(_token: string): Promise<void> {
+  throw new Error(
+    "This audit uses a local provider stand-in; no Hetzner account is connected.",
+  );
+}
+export async function smallestHostOffer(
+  _selected?: Pick<HostOffer, "serverType" | "location">,
+): Promise<HostOffer> {
+  return {
+    serverType: "cx23",
+    location: "fsn1",
+    cores: 2,
+    memory: 4,
+    monthly: 4.99,
+    hourly: 0.008,
+    currency: "EUR",
+  };
+}
+function labelled(items: Labelled[], search: URLSearchParams) {
+  const selector = search.get("label_selector");
+  if (!selector) return items;
+  const [key, value] = selector.split("=");
+  return items.filter((item) => item.labels?.[key] === value);
+}
+export async function hetzner<T>(
+  path: string,
+  body?: unknown,
+  _token?: string,
+): Promise<T> {
+  const url = new URL(path, "https://provider.invalid");
+  const method = body === undefined ? "GET" : "POST";
+  const input = (body ?? {}) as Record<string, unknown>;
+  log({ method, path, bodyKeys: Object.keys(input) });
+  const cloud = load();
+  const route = url.pathname;
+  const byId = (items: Labelled[]) => {
+    const item = items.find((x) => x.id === Number(route.split("/")[2]));
+    if (!item) throw new HetznerError(404, "not_found");
+    return item;
+  };
+  let result: unknown;
+  if (route === "/servers" && method === "POST") {
+    const server: Labelled = {
+      id: cloud.next++,
+      name: input.name,
+      status: "running",
+      labels: input.labels as Record<string, string>,
+      server_type: { name: input.server_type },
+      datacenter: { location: { name: input.location } },
+      public_net: {
+        ipv4: { ip: "127.0.0.1" },
+        firewalls: ((input.firewalls ?? []) as { firewall: number }[]).map(
+          (item) => ({ id: item.firewall, status: "applied" }),
+        ),
+      },
+    };
+    cloud.servers.push(server);
+    result = { server };
+  } else if (route === "/servers")
+    result = { servers: labelled(cloud.servers, url.searchParams) };
+  else if (/^\/servers\/\d+$/.test(route))
+    result = { server: byId(cloud.servers) };
+  else if (route === "/ssh_keys" && method === "POST") {
+    const key: Labelled = {
+      id: cloud.next++,
+      name: input.name,
+      labels: input.labels as Record<string, string>,
+    };
+    cloud.sshKeys.push(key);
+    result = { ssh_key: key };
+  } else if (route === "/ssh_keys")
+    result = { ssh_keys: labelled(cloud.sshKeys, url.searchParams) };
+  else if (route === "/firewalls" && method === "POST") {
+    const firewall: Labelled = {
+      id: cloud.next++,
+      name: input.name,
+      labels: input.labels as Record<string, string>,
+      rules: input.rules ?? [],
+    };
+    cloud.firewalls.push(firewall);
+    result = { firewall };
+  } else if (route === "/firewalls")
+    result = { firewalls: labelled(cloud.firewalls, url.searchParams) };
+  else if (/^\/firewalls\/\d+$/.test(route))
+    result = { firewall: byId(cloud.firewalls) };
+  else if (/^\/firewalls\/\d+\/actions\/set_rules$/.test(route)) {
+    byId(cloud.firewalls).rules = input.rules;
+    result = { actions: [{ id: cloud.next++, status: "success" }] };
+  } else if (/^\/actions\/\d+$/.test(route))
+    result = { action: { id: Number(route.split("/")[2]), status: "success" } };
+  else throw new Error(`Unexpected provider request ${path}`);
+  save(cloud);
+  return result as T;
+}

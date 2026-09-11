@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Rig stand-in for util-linux flock on macOS: flock [-n] FILE COMMAND..."""
+import fcntl
+import os
+import subprocess
+import sys
+
+args = sys.argv[1:]
+nonblocking = False
+while args and args[0].startswith("-"):
+    if args[0] == "-n":
+        nonblocking = True
+    args.pop(0)
+path, command = args[0], args[1:]
+os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+handle = open(path, "a")
+try:
+    fcntl.flock(handle, fcntl.LOCK_EX | (fcntl.LOCK_NB if nonblocking else 0))
+except BlockingIOError:
+    sys.exit(1)
+sys.exit(subprocess.call(command))
