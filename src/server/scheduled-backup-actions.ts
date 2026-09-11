@@ -7,6 +7,7 @@ import {
   refreshScheduledBackups,
 } from "./scheduled-backup-host";
 import { installScheduledBackups } from "./scheduled-backup-install";
+import { backupFailure, restoreFailure } from "./scheduled-backup-facts";
 import { readBackupPolicy } from "./scheduled-backup-store";
 import type { BackupPolicy } from "./scheduled-backup-types";
 
@@ -94,9 +95,10 @@ export async function performBackupAction(
         if (action === "run-backup") {
           const run = current.runs.find((run) => !ids.has(run.id));
           if (run && run.outcome !== "running" && !current.running) {
+            // The recorded reason reaches the operation, and so Pi.
             if (run.outcome !== "succeeded")
               throw new Error(
-                "The host recorded a failed backup. Its earlier successful copies remain recorded in Backups.",
+                `The host recorded a failed backup: ${backupFailure(run)} Earlier successful copies remain recorded in Backups.`,
               );
             return {
               evidence: run.retention.failed
@@ -114,7 +116,7 @@ export async function performBackupAction(
           ) {
             if (run.restore.outcome !== "verified")
               throw new Error(
-                "The isolated restore test failed. Review the recorded backup evidence.",
+                `The isolated restore test failed: ${restoreFailure(run)}`,
               );
             return {
               evidence: run.restore.cleanupComplete

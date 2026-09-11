@@ -168,3 +168,19 @@ it("says what capture stops and keeps running from the recorded plan while legac
   expect(legacy).toContain("The PostgreSQL dump runs online.");
   expect(legacy).not.toContain("pause");
 });
+it("records why a backup failed, so Pi can read it before advising a retry", async () => {
+  propose("run-backup", { kind: "stack" });
+  const host = { reachable: true, cleanupPending: false, running: false };
+  const stuck = {
+    id: "stuck",
+    outcome: "failed",
+    phase: "capture",
+    errorCode: "source-stop-failed",
+  };
+  mocks.refresh
+    .mockResolvedValueOnce({ ...host, runs: [] })
+    .mockResolvedValueOnce({ ...host, runs: [stuck] });
+  await expect(performBackupAction("app", "run-backup")).rejects.toThrow(
+    "failed to stop cleanly",
+  );
+});

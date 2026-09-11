@@ -36,7 +36,7 @@ export function backupFailure(run: ScheduledRun) {
   );
 }
 
-function restoreFailure(run: ScheduledRun) {
+export function restoreFailure(run: ScheduledRun) {
   const reasons: Record<string, string> = {
     "restore-image-unavailable":
       "The isolated restore could not start because its database image is unavailable.",
