@@ -21,6 +21,7 @@ On macOS with Docker Desktop, the shell transport cannot run the scheduled-backu
 
 - The host masks `systemd-binfmt` and runs systemd in a private cgroup namespace. `binfmt_misc` is one table for the whole Docker Desktop VM: an unmasked systemd erased the engine's Rosetta handler for amd64, which broke every other amd64 container until it was restored (see the [follow-up plan](../../docs/testing/2026-09-11-bookstack-followups.md)).
 - Rig B and Rig A both need 127.0.0.1:80, so run one at a time.
+- [`host/restore-check.py`](host/restore-check.py) is harness evidence, independent of the product's restore test. It downloads one archive and checks every file against its inventory. It then brings the archived configuration up as a separate project, with no published ports and internal networks, loads each dump through its recorded procedure, and runs a check command on the restored network, such as `bookstack.mjs verify`.
 - Rerun `start.mjs` after the host container restarts: Docker rewrites `/etc/hosts`.
 
 ```bash
