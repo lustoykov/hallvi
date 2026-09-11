@@ -18,7 +18,9 @@ import {
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { OverviewPrototype } from "./overview-prototype";
+import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
+import { HistoryPrototype } from "./history-prototype";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
 import { CdnView } from "./views/cdn-view";
@@ -311,6 +313,55 @@ export function ApplicationSectionView({
               onOpenDestination={onOpenDestination}
             />
           }
+        />
+      </div>
+    );
+  // Deployment and History chosen on claude/deployment-history (Transit)
+  // are the default the same way. The product's panel still handles the
+  // actions it owns.
+  if (section === "deployment")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <DeploymentPrototype
+          record={deployment}
+          operations={operations}
+          facts={facts}
+          chats={view.chats}
+          now={now}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          panel={children}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  if (section === "history")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <HistoryPrototype
+          record={deployment}
+          facts={facts}
+          operations={operations}
+          chats={view.chats}
+          now={now}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          decisionFor={decisionFor}
+          chrome={{ bar, header, activity: null }}
+          current={<div className="sg-section-content">{content}</div>}
         />
       </div>
     );

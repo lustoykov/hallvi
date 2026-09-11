@@ -439,7 +439,9 @@ test(
     await verified
       .getByRole("button", { name: "Open Deployment", exact: true })
       .click();
-    await expect(panel).toContainText("Deployment verified");
+    // Transit says what is serving, and how sure Server Guy is.
+    await expect(panel).toContainText("is serving revision");
+    await expect(panel).toContainText("Verified");
     await expect(page.getByRole("button", { name: /^Back to / })).toBeVisible();
     await expect(deploymentRow).not.toHaveAccessibleDescription(
       /Updated since/,

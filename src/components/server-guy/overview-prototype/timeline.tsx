@@ -764,7 +764,7 @@ export function TimelineHero({
                     <div key={event.id}>
                       <button
                         type="button"
-                        className={`axt-ev${open === id ? " is-open" : ""}${lit === event.id ? " is-lit" : ""}`}
+                        className={`axt-ev${open === id ? " is-open" : ""}${lit === event.id ? " is-lit" : ""}${event.lines.some((line) => line.id.startsWith("live:")) ? " is-new" : ""}`}
                         data-tone={event.tone}
                         style={{ left: `${at}%` }}
                         aria-label={`${event.title}, ${whenWords(event.at, now)}`}

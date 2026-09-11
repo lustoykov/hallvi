@@ -528,18 +528,12 @@ export function JourneyDirection({
   const [arriving, setArriving] = useState<Set<string>>(() => new Set());
   const [popped, setPopped] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [entering, setEntering] = useState(true);
   const [shift, setShift] = useState<Certainty | null>(null);
   const section = useRef<HTMLElement>(null);
   const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
   const comets = useRef<(SVGGElement | null)[]>([]);
   const tourId = useRef(0);
   const firstTour = useRef(true);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setEntering(false), 1500);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   // Arrived from Overview to see where something is: open that part.
   useEffect(() => {
@@ -821,7 +815,7 @@ export function JourneyDirection({
       </div>
 
       <div
-        className={`axj2-stage${entering ? " is-entering" : ""}${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
+        className={`axj2-stage${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
         data-journey={journey}
         data-shift={shift ?? undefined}
         onClick={() => setSelected(null)}
