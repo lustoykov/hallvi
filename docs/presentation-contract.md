@@ -135,7 +135,7 @@ fresh(x, record) = record.establishedAt !== null
                    && age(record) < (x.freshFor ?? expiry[x.claim])
 ```
 
-**A check, drawn on its own** (Deployment's "Checks it passes", a station log row, an Overview lane mark):
+**A check, read as evidence about now** (for example, an Overview lane status). Historical check lists retain the recorded outcome, as specified below:
 
 | `check.status` | fresh | not fresh |
 | --- | --- | --- |
@@ -153,14 +153,16 @@ tag(record, shown)     = record.status === "verified"
 
 `failed` and `warning` pass through unaged; `info` renders as recorded. A card showing only `identity` facts never goes stale; the same record in Overview's Server lane, where the `reachability` check is what the lane draws, goes stale in twelve hours.
 
-**Ageing applies to claims about now, not to what happened.** This falls out of the `about`/`states` split rather than adding a rule:
+**Ageing depends on the reading the component presents.** `about` and `states` determine relationships and current-state assembly; they do not choose whether a particular rendering is historical or about now. The same event check can be read both ways:
 
-| The record | How its checks are read | Ages |
+| Reading | Example | Do its checks age? |
 | --- | --- | --- |
-| has `states` — it speaks for a subject | as of now | yes |
-| an event — it says what happened | as of the record | no |
+| Historical outcome, as of the record | Deployment's check list; History's recorded result | no; retain passed, failed or noted and show the observation time |
+| Evidence about now | Overview's lane status, including checks sourced from a deployment event; Architecture's current part tag | yes; apply the claim's freshness rule |
 
-So Deployment's "Checks it passes" shows the three checks that deployment ran, plainly, under "They ran when it deploys" — a liveness check that passed at 16:05 is not redrawn as doubtful an hour later, because the page is a record of an event. The same `liveness` check reaching Overview's Checks lane is a claim about the application now, and there it ages in fifteen minutes. The event record's own headline tag ages either way, which is why the reference's Deployment page says "Verified 3 days ago" above a check list that is not itself greyed.
+So Deployment's "Checks it passes" shows the three checks that deployment ran, plainly, under "They ran when it deploys". A liveness check that passed at 16:05 retains that historical result an hour later. The same check in Overview's Checks lane is evidence about the application now and becomes stale after fifteen minutes. Neither rendering changes the stored outcome.
+
+The deployment card's headline tag is a freshness summary of the claims it shows and follows `tag(record, shown)` above, even though its check list is historical. When stale it must communicate "last verified" with the observation time, rather than imply the deployment failed. A historical result label in History retains the recorded outcome. This choice belongs to the component, not a new Pi-authored field.
 
 Freshness is computed **per claim, and a component asks for the freshness of the claim it is drawing.** The same host record therefore reads differently in different places, correctly:
 
@@ -710,7 +712,7 @@ Backups stays empty, and Overview reads "Backups · Not assessed". Under the pre
 
 The deployment's own `public-refused` check (§9.3) is the third row: it is a `reachability` check about `access:app-dgs` that establishes the public address does not answer **from this PC**, which is what the reference's Domains window says and no more.
 
-**F · A check's tone, one hour after deployment.** All three checks are on an event record, read as of the record:
+**F · A check's tone, one hour after deployment.** All three checks come from the same event. Deployment reads their historical outcomes; Overview reads their freshness as evidence about now:
 
 | Check | Claim | Expiry | On Deployment | In Overview's Checks lane |
 | --- | --- | --- | --- | --- |
@@ -718,7 +720,7 @@ The deployment's own `public-refused` check (§9.3) is the third row: it is a `r
 | `restart-persistence` | contents | 3 d | passed, plain | verified |
 | `reboot-recovery` | liveness | 15 min | passed, plain | **stale** |
 
-Deployment does not grey a check that passed an hour ago, because the page is the record of an event. Overview's lane is a claim about the application now, so the liveness mark goes stale after fifteen minutes while the other two stand. The deployment card's own tag reads verified for twelve hours and stale after — `record.status` aged by the soonest claim it shows.
+Deployment does not grey a check that passed an hour ago, because the page is the record of an event. Overview's lane is a claim about the application now, so the liveness mark goes stale after fifteen minutes while the other two stand. When it shows all three claims, the deployment card's own tag reads verified for fifteen minutes and stale after — `record.status` aged by the soonest claim it shows. At the one-hour point in this table, the card's tag is therefore stale while its historical check list still records three passes.
 
 ---
 
@@ -736,7 +738,7 @@ What the deployment we already have needs to run **its existing screens** — ch
 
 1. `about[]` and `states {ref, presence}`. Records are append-only in content; `retiredAt` stays the one write-once visibility flag.
 2. `key` on every check and fact, and key-by-key assembly within a presence epoch (§2.1, proofs A–C). This is what makes a partial observation safe to write.
-3. `claim` and `basis` on checks and facts, the expiry table in the component layer, `stale` owned by the UI, and the two readings — as of now for a record that `states`, as of the record for an event (§3.1, proof F).
+3. `claim` and `basis` on checks and facts, the expiry table in the component layer, `stale` owned by the UI, and the two component-selected readings — evidence about now versus historical outcome, independent of whether the source record has `states` (§3.1, proof F).
 4. `presence: "absent"`, and the two empty states everywhere a design says "there is none".
 5. `topology` content with `from`, `loopback` edges, part states resolved from records, and `absent[]`.
 6. `check.about` and lane derivation (§4.1, proof D), retiring `check.subject`.
