@@ -6,7 +6,6 @@ import {
   PaperPlaneRight,
   SpinnerGap,
   WarningCircle,
-  X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
@@ -49,6 +48,15 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   "timed-out": "Timed out",
   interrupted: "Interrupted",
 };
+
+/** "Working for 1m 12s" — Pi is busy, and for how long. */
+function working(run: PiRun | undefined, now: number) {
+  const started = run?.startedAt ? Date.parse(run.startedAt) : null;
+  if (!started || !now || now < started) return "Working";
+  const seconds = Math.floor((now - started) / 1000);
+  if (seconds < 60) return `Working for ${seconds}s`;
+  return `Working for ${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
 
 export function ChatPane({
   view,
@@ -282,19 +290,26 @@ export function ChatPane({
                 <MessageContent>
                   {provisional ? (
                     <div className="sg-run-progress">
-                      {message.body && inProgress && (
-                        <MessageResponse>
-                          <Markdown source={message.body} />
-                        </MessageResponse>
-                      )}
+                      {/* With a transcript the draft is drawn inside it, at
+                          the end, so it is not also repeated up here. */}
+                      {message.body &&
+                        inProgress &&
+                        !(
+                          view.piActivity &&
+                          hasActivity(view.piActivity, message.id)
+                        ) && (
+                          <MessageResponse>
+                            <Markdown source={message.body} />
+                          </MessageResponse>
+                        )}
                       <p className="sg-run-status" role="status">
                         {inProgress && (
                           <SpinnerGap className="spin" aria-hidden="true" />
                         )}
                         {message.status === "queued"
-                          ? "Waiting to reply…"
+                          ? "Waiting to reply"
                           : message.status === "running"
-                            ? "Replying…"
+                            ? working(run, now)
                             : run?.error?.startsWith(
                                   "Conversation history unavailable.",
                                 )
@@ -313,7 +328,11 @@ export function ChatPane({
                       )}
                       {run && !readOnly && !retried && (
                         <button
-                          className={`sg-run-action ${inProgress ? "sg-secondary-button" : "sg-primary-button"}`}
+                          className={
+                            inProgress
+                              ? "sg-run-stop"
+                              : "sg-run-action sg-primary-button"
+                          }
                           disabled={busy !== null}
                           onClick={() => {
                             if (historyUnavailable) onNewChat();
@@ -325,13 +344,11 @@ export function ChatPane({
                           }}
                           type="button"
                         >
-                          {inProgress ? (
-                            <X aria-hidden="true" weight="bold" />
-                          ) : (
+                          {!inProgress && (
                             <ArrowClockwise aria-hidden="true" weight="bold" />
                           )}
                           {inProgress
-                            ? "Cancel request"
+                            ? "Stop"
                             : historyUnavailable
                               ? "Start a new chat"
                               : "Retry reply"}
@@ -350,6 +367,7 @@ export function ChatPane({
                 {message.role === "assistant" && view.piActivity && (
                   <PiActivity
                     records={view.piActivity}
+                    executions={view.executions}
                     runId={message.id}
                     live={message.status === "running" ? message.body : null}
                     renderExecution={(executionId) =>

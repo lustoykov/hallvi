@@ -232,9 +232,17 @@ export function endActivity(input: {
   write(path, {
     ...record,
     result: result.text,
-    status: input.isError ? "failed" : "succeeded",
+    // A call already settled knows something the runtime does not: a declined
+    // command returns an ordinary result, and the end event would otherwise
+    // call it a success a moment after we recorded the refusal.
+    status:
+      record.status !== "running"
+        ? record.status
+        : input.isError
+          ? "failed"
+          : "succeeded",
     truncated: record.truncated || result.truncated,
-    finishedAt: new Date().toISOString(),
+    finishedAt: record.finishedAt ?? new Date().toISOString(),
   });
 }
 

@@ -93,8 +93,10 @@ function render({
 
 describe("conversation recovery and assistant branding", () => {
   it.each([
-    ["queued", "Waiting to reply…"],
-    ["running", "Replying…"],
+    // The status line now reads like a status rather than an announcement,
+    // and says how long Pi has been at it when there is a start time.
+    ["queued", "Waiting to reply"],
+    ["running", "Working"],
     ["failed", "Something went wrong. Please retry."],
     ["cancelled", "Reply cancelled."],
   ] as const)("keeps %s status user-facing", (status, expected) => {
