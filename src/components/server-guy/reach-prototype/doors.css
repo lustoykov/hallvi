@@ -1,0 +1,534 @@
+/* PROTOTYPE · opus-ui-improvements · Security, direction A (Doors). */
+
+.axdo {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Lede ---------- */
+
+.axdo-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.axdo-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axdo-lede h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+.axdo-lede p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.axdo-lede p > span {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+/* ---------- The place ---------- */
+
+.axdo-place {
+  position: relative;
+  padding-bottom: 10px;
+}
+.axdo-floor {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ax-line-2) 12%,
+    var(--ax-line-2) 88%,
+    transparent
+  );
+}
+
+/* Behind the wall: what has no door to the outside at all. */
+.axdo-inside {
+  position: relative;
+  margin: 0 18px -14px;
+  padding: 12px 16px 26px;
+  border: 1px dashed #cdd6e4;
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: repeating-linear-gradient(
+    135deg,
+    #f7f9fd 0 8px,
+    #f2f5fb 8px 16px
+  );
+}
+.axdo-inside-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ax-faint);
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.axdo-inside-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.axdo-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border: 1px solid #d3dcea;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ax-base) var(--ax-ease-out),
+    transform var(--ax-base) var(--ax-ease-out);
+}
+.axdo-inner:hover {
+  transform: translateY(-2px);
+}
+.axdo-inner[data-open] {
+  border-color: var(--ax-blue);
+  box-shadow: inset 0 0 0 1px var(--ax-blue);
+}
+.axdo-inner b {
+  font-size: 13px;
+  font-weight: 620;
+}
+.axdo-inner i {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  color: var(--ax-failed);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 620;
+}
+.axdo-inner small {
+  color: var(--ax-muted);
+  font-size: 11px;
+}
+
+/* The face the server presents. */
+.axdo-wall {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 22px;
+  padding: 26px 24px 0;
+  border: 1px solid var(--ax-line);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(180deg, #fdfdfe 0%, #f4f6fa 78%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 27px,
+      rgb(32 40 56 / 3%) 27px 28px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 63px,
+      rgb(32 40 56 / 3%) 63px 64px
+    );
+}
+.axdo-bay {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: clamp(132px, 15vw, 172px);
+}
+.axdo-lamp {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #d9dfe9;
+  box-shadow: 0 0 0 3px rgb(217 223 233 / 35%);
+  transition:
+    background-color var(--ax-slow) var(--ax-ease-out),
+    box-shadow var(--ax-slow) var(--ax-ease-out);
+}
+.axdo-bay[data-lamp="on"] .axdo-lamp {
+  background: var(--ax-verified);
+  box-shadow: 0 0 0 4px rgb(20 148 95 / 16%);
+}
+.axdo-bay[data-lamp="warn"] .axdo-lamp {
+  background: var(--ax-amber);
+  box-shadow: 0 0 0 4px rgb(178 90 22 / 16%);
+}
+.axdo-bay[data-lamp="inside"] .axdo-lamp {
+  background: var(--ax-blue);
+  box-shadow: 0 0 0 4px rgb(40 90 216 / 14%);
+}
+.axdo-sign {
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ax-ink-2);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.35;
+  text-align: center;
+}
+.axdo-bay[data-lamp="warn"] .axdo-sign {
+  border-color: var(--ax-waiting-line);
+  background: var(--ax-waiting-bg);
+  color: var(--ax-waiting-text);
+}
+
+/* The door itself, which swings when it is opened. */
+.axdo-door {
+  position: relative;
+  width: 100%;
+  height: 210px;
+  padding: 0;
+  border: 0;
+  background: none;
+  perspective: 900px;
+  cursor: pointer;
+}
+.axdo-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 10px 16px;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, #171f2e, #2b3548);
+  overflow: hidden;
+}
+.axdo-behind {
+  color: #9fb0cc;
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--ax-base) var(--ax-ease-out) 160ms,
+    transform var(--ax-base) var(--ax-ease-out) 160ms;
+}
+.axdo-bay[data-open] .axdo-behind {
+  opacity: 1;
+  transform: none;
+}
+.axdo-leaf {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--ax-line-2);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background:
+    linear-gradient(180deg, #ffffff, #eef1f7),
+    linear-gradient(90deg, #f7f9fc, #eef1f7);
+  box-shadow: inset -6px 0 12px -10px rgb(32 40 56 / 40%);
+  transform-origin: left center;
+  transform: rotateY(0deg);
+  transition: transform 560ms var(--ax-ease-out);
+  backface-visibility: hidden;
+}
+.axdo-bay[data-open] {
+  z-index: 3;
+}
+.axdo-bay[data-open] .axdo-leaf {
+  transform: rotateY(-66deg);
+  box-shadow: 12px 0 26px -18px rgb(32 40 56 / 55%);
+}
+.axdo-plate,
+.axdo-title,
+.axdo-handle,
+.axdo-keyhole,
+.axdo-flag {
+  transition: opacity var(--ax-fast) var(--ax-ease-out);
+}
+.axdo-bay[data-open] :is(.axdo-plate, .axdo-title, .axdo-handle) {
+  opacity: 0;
+}
+.axdo-bay[data-open] :is(.axdo-keyhole, .axdo-flag) {
+  opacity: 0;
+}
+.axdo-plate {
+  padding: 2px 12px;
+  border: 1px solid #c9d2e0;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #fafbfd, #e9edf4);
+  color: var(--ax-ink);
+  font-family: var(--ax-mono);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.axdo-title {
+  padding: 0 10px;
+  color: var(--ax-ink-2);
+  font-size: 12.5px;
+  font-weight: 620;
+  line-height: 1.35;
+  text-align: center;
+}
+.axdo-handle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 9px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #c3ccda, #9daabd);
+}
+.axdo-keyhole {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: #2b3548;
+  color: #e7ecf6;
+  font-size: 12px;
+}
+.axdo-flag {
+  position: absolute;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ax-failed-bg);
+  color: var(--ax-failed);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.axdo-bricks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  width: clamp(110px, 12vw, 150px);
+  height: 132px;
+  padding-bottom: 14px;
+  border-radius: 10px 10px 0 0;
+  background:
+    repeating-linear-gradient(0deg, #e9edf4 0 15px, #dfe4ed 15px 16px),
+    repeating-linear-gradient(90deg, transparent 0 39px, #dfe4ed 39px 40px);
+}
+.axdo-bricks span {
+  color: var(--ax-muted);
+  font-size: 11.5px;
+  font-weight: 620;
+}
+.axdo-bricks small {
+  color: var(--ax-faint);
+  font-size: 11px;
+}
+/* No firewall attached: there is no wall to brick up. */
+.axdo-gap {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 1 1 260px;
+  max-width: 420px;
+  height: 132px;
+  padding: 14px 16px;
+  border: 1px dashed var(--ax-waiting-line);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--ax-waiting-bg);
+}
+.axdo-gap b {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ax-waiting-text);
+  font-size: 13px;
+  font-weight: 620;
+}
+.axdo-gap span {
+  color: var(--ax-waiting-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.axdo-guy {
+  align-self: flex-end;
+  width: 62px;
+  margin: 0 4px 6px auto;
+}
+
+/* ---------- The opened door ---------- */
+
+.axdo-read {
+  padding: 18px 20px;
+  border: 1px solid var(--ax-line);
+  border-radius: 14px;
+  background: var(--ax-context);
+}
+.axdo-read-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+}
+.axdo-read-head h3 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 620;
+  letter-spacing: -0.008em;
+}
+.axdo-read p {
+  margin: 0 0 12px;
+  color: var(--ax-ink-2);
+  font-size: 13.5px;
+  line-height: 1.62;
+  max-width: 82ch;
+}
+.axdo-concern {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--ax-amber);
+  border-radius: 0 8px 8px 0;
+  background: var(--ax-waiting-bg);
+  color: var(--ax-waiting-text) !important;
+}
+.axdo-concern svg {
+  flex: none;
+  margin-top: 2px;
+}
+.axdo-read code {
+  display: inline-block;
+  margin-right: 6px;
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+}
+
+/* ---------- What else the record says ---------- */
+
+.axdo-below {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px 34px;
+}
+.axdo-below h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ax-muted);
+}
+.axdo-guards,
+.axdo-holes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.axdo-guards li,
+.axdo-holes li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: #fff;
+}
+.axdo-holes li {
+  border-style: dashed;
+  background: transparent;
+}
+.axdo-guards b,
+.axdo-holes b {
+  font-size: 13px;
+  font-weight: 620;
+}
+.axdo-guards span,
+.axdo-holes span {
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.axdo-guards small {
+  color: var(--ax-faint);
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axdo-plate,
+  .axdo-title,
+  .axdo-handle,
+  .axdo-keyhole,
+  .axdo-flag,
+  .axdo-leaf,
+  .axdo-behind,
+  .axdo-inner,
+  .axdo-lamp {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axdo-plate,
+:root[data-ax-motion="reduced"] .axdo-title,
+:root[data-ax-motion="reduced"] .axdo-handle,
+:root[data-ax-motion="reduced"] .axdo-keyhole,
+:root[data-ax-motion="reduced"] .axdo-flag,
+:root[data-ax-motion="reduced"] .axdo-leaf,
+:root[data-ax-motion="reduced"] .axdo-behind,
+:root[data-ax-motion="reduced"] .axdo-inner,
+:root[data-ax-motion="reduced"] .axdo-lamp {
+  transition: none;
+}
+
+.axdo-acts {
+  display: flex;
+  flex-wrap: wrap;
+  flex: none;
+  gap: 8px;
+}
+
+.axdo > .ax-invented {
+  align-self: flex-start;
+}

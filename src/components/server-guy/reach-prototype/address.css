@@ -1,0 +1,418 @@
+/* PROTOTYPE · opus-ui-improvements · Domains, direction A (Address). */
+
+.axad {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Lede ---------- */
+
+.axad-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.axad-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axad-lede h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+.axad-lede p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.axad-lede p > span {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+.axad-ask {
+  flex: none;
+}
+
+/* ---------- The address, life-size ---------- */
+
+.axad-rail {
+  position: relative;
+  padding: 30px 28px 26px;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, #fff, var(--ax-context)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 23px,
+      rgb(40 90 216 / 3.5%) 23px 24px
+    );
+  overflow: hidden;
+}
+.axad-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--ax-mono);
+  font-size: clamp(24px, 4.4vw, 44px);
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+.axad-punct {
+  color: var(--ax-faint);
+}
+.axad-seg button {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--ax-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.axad-seg button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--ax-blue);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--ax-base) var(--ax-spring);
+}
+.axad-seg button:hover::after {
+  transform: scaleX(0.32);
+}
+.axad-rail[data-lit="https"] [data-seg="https"] button::after,
+.axad-rail[data-lit="name"] [data-seg="name"] button::after,
+.axad-rail[data-lit="serves"] [data-seg="serves"] button::after {
+  transform: scaleX(1);
+}
+.axad-seg[data-on="false"] button {
+  color: var(--ax-ink-2);
+}
+.axad-port button {
+  color: var(--ax-faint);
+  font-size: 0.62em;
+}
+.axad-seg b {
+  color: var(--ax-verified);
+}
+/* The missing certificate is one empty letter, drawn where it would go. */
+.axad-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.72em;
+  margin: 0 0.03em;
+  border: 2px dashed #c0cadb;
+  border-radius: 0.16em;
+  color: #c0cadb;
+  font-style: normal;
+}
+.axad-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 10px;
+  border-radius: 50%;
+  border: 1px dashed #ccd4e1;
+  color: var(--ax-faint);
+  font-size: 17px;
+  transition:
+    color var(--ax-slow) var(--ax-ease-out),
+    border-color var(--ax-slow) var(--ax-ease-out),
+    background-color var(--ax-slow) var(--ax-ease-out);
+}
+.axad-lock[data-on="true"] {
+  border-style: solid;
+  border-color: var(--ax-verified-line);
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified);
+}
+
+/* ---------- Try a name ---------- */
+
+.axad-try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 26px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--ax-line-2);
+}
+.axad-try label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 300px;
+}
+.axad-try label span {
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+.axad-try input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ax-ink);
+  font-family: var(--ax-mono);
+  font-size: 14px;
+}
+.axad-try input::placeholder {
+  color: #b3bccb;
+}
+.axad-ghost {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+  flex: 1 1 320px;
+  margin: 0 0 4px;
+  font-family: var(--ax-mono);
+  font-size: clamp(15px, 2vw, 20px);
+  letter-spacing: -0.02em;
+  color: #a9b4c6;
+  transition: color var(--ax-base) var(--ax-ease-out);
+}
+.axad-ghost b {
+  font-weight: 500;
+  color: #b6c0d1;
+  border-bottom: 2px dashed #cfd7e3;
+  transition:
+    color var(--ax-base) var(--ax-ease-out),
+    border-color var(--ax-base) var(--ax-ease-out);
+}
+.axad-ghost[data-filled="true"] {
+  color: #6d86c4;
+}
+.axad-ghost[data-filled="true"] b {
+  color: var(--ax-blue);
+  border-bottom-color: var(--ax-blue);
+}
+
+/* ---------- What would have to be true ---------- */
+
+.axad-order {
+  counter-reset: axad;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.axad-order li {
+  counter-increment: axad;
+  position: relative;
+  padding-left: 34px;
+  color: var(--ax-ink-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.axad-order li::before {
+  content: counter(axad);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--ax-line-2);
+  background: #fff;
+  color: var(--ax-muted);
+  font-size: 11.5px;
+  font-weight: 620;
+}
+.axad-order li:first-child::before {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+  color: #fff;
+}
+.axad-order b {
+  font-weight: 620;
+  color: var(--ax-ink);
+}
+.axad-order i {
+  font-style: normal;
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  color: var(--ax-blue);
+}
+.axad-order code {
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  color: var(--ax-ink);
+}
+
+/* ---------- The four parts ---------- */
+
+.axad-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(216px, 1fr));
+  gap: 12px;
+}
+.axad-part {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px 15px;
+  border: 1px solid var(--ax-line);
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--ax-base) var(--ax-ease-out),
+    border-color var(--ax-base) var(--ax-ease-out),
+    box-shadow var(--ax-base) var(--ax-ease-out);
+}
+.axad-part:hover {
+  transform: translateY(-2px);
+  border-color: var(--ax-line-2);
+  box-shadow: 0 8px 22px -18px rgb(32 40 56 / 45%);
+}
+.axad-part[data-open] {
+  border-color: var(--ax-blue);
+  box-shadow: inset 0 0 0 1px var(--ax-blue);
+}
+.axad-part[data-state="absent"],
+.axad-part[data-state="skipped"] {
+  border-style: dashed;
+  background: transparent;
+}
+.axad-part-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.axad-part-head small {
+  color: var(--ax-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.axad-part strong {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+.axad-part-detail {
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.axad-who {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 620;
+}
+.axad-who[data-who="you"] {
+  background: var(--ax-working-bg);
+  color: var(--ax-working-text);
+}
+.axad-who[data-who="server-guy"] {
+  background: var(--ax-unknown-bg);
+  color: var(--ax-muted);
+}
+
+/* ---------- The opened part ---------- */
+
+.axad-open {
+  padding: 16px 18px;
+  border-left: 2px solid var(--ax-blue);
+  border-radius: 0 12px 12px 0;
+  background: var(--ax-context);
+}
+.axad-open h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 620;
+}
+.axad-open p {
+  margin: 0 0 8px;
+  color: var(--ax-ink-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: 76ch;
+}
+.axad-note {
+  color: var(--ax-muted) !important;
+  font-size: 12.5px !important;
+}
+.axad-routes {
+  margin-top: 10px;
+}
+.axad-routes code {
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+}
+
+/* ---------- Foot ---------- */
+
+.axad-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ax-line);
+}
+.axad-guy {
+  flex: none;
+  width: 46px;
+}
+.axad-foot p {
+  margin: 0 0 6px;
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+  max-width: 78ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .axad-seg button::after,
+  .axad-part,
+  .axad-ghost,
+  .axad-ghost b,
+  .axad-lock {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axad-seg button::after,
+:root[data-ax-motion="reduced"] .axad-part,
+:root[data-ax-motion="reduced"] .axad-ghost,
+:root[data-ax-motion="reduced"] .axad-ghost b,
+:root[data-ax-motion="reduced"] .axad-lock {
+  transition: none;
+}
+
+.axad > .ax-invented {
+  align-self: flex-start;
+}
