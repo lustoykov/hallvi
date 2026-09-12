@@ -343,6 +343,53 @@ captured — never re-run to fill the panel.
 
 ---
 
+## 8. History and Logs
+
+Both are mostly **controller evidence**, which is why they came last and
+cost least: the controller already records what ran, and Pi never re-types
+what a command proves.
+
+### History
+
+| Field | Source |
+| --- | --- |
+| an event | every record with an `establishedAt`, and every execution |
+| its kind | `change` for a release or an access record and for commands that alter; `inspection` for everything else |
+| its state | the record's status, or the execution's |
+| where it came from | the record's cited message, or the execution's conversation |
+| what it touched | the record's `views` |
+| its words | the record's title and body, or the command and its exit |
+| a withdrawal | a retired record stays visible and says Pi took it back |
+
+A record with no `establishedAt` is left out: it would be dated to the
+moment somebody wrote it rather than to an event.
+
+**`resolves` stays deferred.** Nothing Pi writes says which later work
+addressed an earlier failure, and inferring it from adjacency would put a
+claim on the page nobody made. The consequence is named rather than hidden:
+every failure reads as still wanting you, which is true and coarse.
+
+### Logs
+
+| Field | Source |
+| --- | --- |
+| a captured run | an execution with output |
+| its place | the server, the repository copy, the provider, or Server Guy — from the tool |
+| when it was captured | `finishedAt`, else `createdAt` |
+| its outcome | the exit code, where there is one |
+| streams | those places, with line counts and the newest capture |
+
+**Logs collects nothing.** Re-running a command to fill a panel would make
+the page a cause of work rather than a record of it, and this page gets
+Navigate and Ask only. Asking is a message; the next captured output is what
+changes the page.
+
+Streams are places, not services, because a line's meaning depends on where
+it was read — a port bound on the server is not the same claim as a port
+bound in a throwaway copy of the repository.
+
+---
+
 ## 6. Refused at the door
 
 `src/server/record-contract.ts` runs at save. Zod settles shape; this settles
