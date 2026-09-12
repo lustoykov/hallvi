@@ -5,8 +5,18 @@
 
 .sg-did {
   display: grid;
+  /* A one-line command is wide and must not be wrapped, so the track has to
+     be told it may be narrower than its contents; without minmax(0, …) the
+     grid grows to the widest command and takes the conversation's prose with
+     it, scrolling the whole transcript sideways. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   margin: 2px 0 6px;
+}
+.sg-did-quiet,
+.sg-did-rows,
+.sg-did-item {
+  min-width: 0;
 }
 .sg-did-said {
   margin: 6px 0;
@@ -60,6 +70,28 @@
   color: var(--faint, #8b95a5);
   font-style: normal;
   font-variant-numeric: tabular-nums;
+}
+
+/* Which machine this was. Two of these look the same on a row — a command in
+   the repository copy and a command on the deployed host — so the group says
+   it once, plainly, rather than leaving it to the command's contents. */
+.sg-did-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint, #8b95a5);
+}
+.sg-did-where code {
+  margin-left: 5px;
+  font-family: var(--mono), ui-monospace, monospace;
+  font-size: 11.5px;
+}
+.sg-did-where::before,
+.sg-did-head em::before {
+  margin-right: 5px;
+  color: var(--line-2, #d8dee8);
+  content: "\00b7";
 }
 
 /* ---------- A call ---------- */

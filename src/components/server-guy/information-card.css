@@ -130,6 +130,53 @@
 
 /* ---------- What was actually checked ---------- */
 
+/* The values the record is about, in the reading shape the destination
+   views already use: a label column, the value beside it, a hairline between
+   rows. A number is never coloured and never ranked here — how certain the
+   whole record is was said once, in the header. */
+.sg-info-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 0 24px;
+  max-width: 68ch;
+  margin: 14px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.sg-info-facts > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 14px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sg-info-facts > div[data-wide] {
+  grid-column: 1 / -1;
+}
+.sg-info-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sg-info-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  /* A value that is a phrase should not end on a line holding one word. */
+  text-wrap: pretty;
+}
+/* How we know, said once under the strip rather than beside every value. */
+.sg-info-basis {
+  max-width: 68ch;
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .sg-info-checks {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

@@ -51,6 +51,13 @@ function GenericInformationCard({
   );
   const established = record.establishedAt ?? record.updatedAt;
   const recommendation = presentation.role === "recommendation";
+  // Records written before facts existed have none: the presentation column
+  // is JSON read back by cast, not by parse.
+  const facts = presentation.facts ?? [];
+  const labels = (basis: string) =>
+    facts.filter((fact) => fact.basis === basis).map((fact) => fact.label);
+  const told = labels("reported");
+  const intended = labels("planned");
 
   return (
     <article
@@ -69,6 +76,33 @@ function GenericInformationCard({
       </header>
 
       <InformationBody source={record.body} />
+
+      {facts.length > 0 && (
+        <>
+          <dl className="sg-info-facts">
+            {facts.map((fact, index) => (
+              // A value too long for a column takes the whole row rather
+              // than breaking an identifier across two lines.
+              <div key={index} data-wide={fact.value.length > 26 || undefined}>
+                <dt>{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {/* Said once for the whole card. Repeating it under every value
+              turns one honest qualification into five lines of noise. */}
+          {told.length > 0 && (
+            <p className="sg-info-basis">
+              As reported, not measured here: {told.join(", ")}.
+            </p>
+          )}
+          {intended.length > 0 && (
+            <p className="sg-info-basis">
+              Planned, not in place yet: {intended.join(", ")}.
+            </p>
+          )}
+        </>
+      )}
 
       {presentation.checks.length > 0 && (
         <ul className="sg-info-checks">

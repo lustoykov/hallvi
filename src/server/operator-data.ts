@@ -91,6 +91,29 @@ export const informationInputSchema = z.object({
           }),
         )
         .default([]),
+      /**
+       * The values a design lays out: a place, a size, a price, an identity.
+       * Prose cannot be laid out, so anything a reader would scan — and
+       * anything a destination view needs to draw — belongs here rather than
+       * inside the body. A value is printed, never computed, and never
+       * coloured: the card's one certainty is in its header, and these are
+       * the facts that certainty is about.
+       */
+      facts: z
+        .array(
+          z.object({
+            label: z.string().trim().min(1).max(40),
+            value: z.string().trim().min(1).max(160),
+            /** How we know: watched it, were told it, or only intend it. */
+            basis: z.enum(["observed", "reported", "planned"]).optional(),
+          }),
+        )
+        .max(10)
+        // Optional, not defaulted: the presentation column is stored as JSON
+        // and read back by cast rather than parse, so every record written
+        // before this field existed has no facts at all. A reader must cope
+        // with that, and the type should say so.
+        .optional(),
       nextStep: z.string().optional(),
       content: informationContentSchema.optional(),
       url: z
