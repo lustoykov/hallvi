@@ -28,6 +28,7 @@ import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
+import { PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
@@ -343,6 +344,9 @@ export function ChatPane({
                     </MessageResponse>
                   )}
                 </MessageContent>
+                {message.role === "assistant" && view.piActivity && (
+                  <PiActivity records={view.piActivity} runId={message.id} />
+                )}
                 {message.blocks?.map((block, index) => {
                   if (block.type === "text")
                     return <Markdown key={index} source={block.text} />;

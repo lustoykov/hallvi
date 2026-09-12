@@ -1,3 +1,4 @@
+import { listActivity } from "./pi-activity";
 import { listExecutions } from "./operator-execution";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -62,6 +63,7 @@ export function chatRunSnapshot(
     messages: listMessages(chatId),
     runs: listMessages(chatId).flatMap((m) => responseRun(m) ?? []),
     executions: listExecutions(applicationId),
+    piActivity: listActivity(applicationId),
     operations: [],
     activity: [],
     information: listInformation(applicationId, "", true).filter(

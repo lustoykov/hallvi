@@ -1,0 +1,126 @@
+/* Pi's tool calls, under the reply they belong to: quiet rows that hold their
+   detail until asked, in the same certainty language as everything else. */
+
+.sg-activity {
+  display: grid;
+  gap: 1px;
+  margin: 8px 0 10px;
+  padding: 0 0 0 11px;
+  border-left: 2px solid var(--line, #e7e9ee);
+  list-style: none;
+}
+.sg-activity-item[data-status="failed"] {
+  --activity-mark: var(--failed, #a6312b);
+}
+.sg-activity-item[data-status="succeeded"] {
+  --activity-mark: var(--verified-text, #0f7a4e);
+}
+.sg-activity-item[data-status="running"] {
+  --activity-mark: var(--working-text, #2852a6);
+}
+
+.sg-activity-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px 3px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2, #3e4a60);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.7;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.sg-activity-row:hover {
+  background: var(--context, #fafbfc);
+}
+.sg-activity-caret {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--faint, #8b95a5);
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sg-activity-row[aria-expanded="true"] .sg-activity-caret {
+  transform: rotate(90deg);
+}
+.sg-activity-what {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sg-activity-what code {
+  margin-left: 7px;
+  font-family: var(--mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink, #202838);
+}
+.sg-activity-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  color: var(--activity-mark, var(--muted, #687183));
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.sg-activity-state em {
+  color: var(--faint, #8b95a5);
+  font-style: normal;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sg-activity-spin {
+  animation: sg-activity-spin 0.9s linear infinite;
+}
+@keyframes sg-activity-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sg-activity-detail {
+  padding: 4px 0 10px 20px;
+}
+.sg-activity-detail h4 {
+  margin: 8px 0 4px;
+  color: var(--faint, #8b95a5);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sg-activity-detail pre {
+  margin: 0;
+  padding: 9px 11px;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 7px;
+  background: var(--ink, #202838);
+  color: #f7f8fa;
+  font-family: var(--mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sg-activity-cut {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--waiting-text, #9a4b10);
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-activity-caret {
+    transition-duration: 1ms;
+  }
+  .sg-activity-spin {
+    animation-duration: 2.4s;
+  }
+}

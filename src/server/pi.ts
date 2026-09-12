@@ -112,9 +112,23 @@ export function describePiFailure(error: unknown): string {
   return "Server Guy could not reach the selected model. Check Settings or retry.";
 }
 
+/** One tool call, as the runtime reports it, before anything interprets it. */
+export type PiToolEvent =
+  | {
+      type: "start";
+      id: string;
+      sequence: number;
+      tool: string;
+      args: unknown;
+    }
+  | { type: "update"; id: string; partial: unknown }
+  | { type: "end"; id: string; result: unknown; isError: boolean };
+
 export interface PiExecutionOptions {
   signal?: AbortSignal;
   onText?: (text: string) => void;
+  /** Every tool call, in order, with what went in and what came back. */
+  onTool?: (event: PiToolEvent) => void;
   onModelCall?: () => void;
   onActivity?: (event: ExecutionSignal) => void;
 }
@@ -526,12 +540,31 @@ export async function askPi(
           key,
           kind: toolStepKind(event.toolName),
         });
+        options.onTool?.({
+          type: "start",
+          id: event.toolCallId,
+          sequence: toolSequence,
+          tool: event.toolName,
+          args: event.args,
+        });
       }
+      if (event.type === "tool_execution_update")
+        options.onTool?.({
+          type: "update",
+          id: event.toolCallId,
+          partial: event.partialResult,
+        });
       if (event.type === "tool_execution_end") {
         const key = toolKeys.get(event.toolCallId);
         if (key)
           options.onActivity?.({ type: "end", key, failed: event.isError });
         toolKeys.delete(event.toolCallId);
+        options.onTool?.({
+          type: "end",
+          id: event.toolCallId,
+          result: event.result,
+          isError: event.isError,
+        });
       }
       if (event.type === "compaction_start")
         options.onActivity?.({
