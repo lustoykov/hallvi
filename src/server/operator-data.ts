@@ -11,6 +11,7 @@ export const operatorSettingsSchema = z.object({
       knownHostsPath: z.string().startsWith("/"),
       provider: z.string().optional(),
       serverId: z.string().optional(),
+      providerConnectionId: z.string().optional(),
     })
     .nullable(),
 });

@@ -318,3 +318,12 @@ Messages support a small product-owned block vocabulary, not arbitrary generated
 Ordinary knowledge can update in place. Historical outcomes remain separate records for separate events; no universal superseding/version-history mechanism. Controller-managed secrets are named and application-scoped; database records hold references. Secret-generation and injection tools arrive with the deployment need.
 
 Delete decisions, observations, activity events, deployment/operation records and chat-summary storage as their callers are replaced. Detailed vertical design and hardening follow the working deployment journey.
+
+
+## Provisioning checkpoint — 12 September 2026
+
+After the owner accepted the storage UI, PR #55 was merged as `95b3829`. The separate provisioning implementation follows the existing model-owned judgment and permission rules: a general Hetzner REST tool, an application public-key tool, and a connection tool that resolves the provider address, verifies SSH and saves controller credential references. Pi chooses server type, location and image from current evidence and saves its recommendation or preparation outcome through the existing cards.
+
+Bring-your-own-machine setup stays in the conversation. The owner installs the controller-generated public key through their trusted terminal and supplies public connection details plus an ED25519 host-key fingerprint. No secret is pasted into chat and no standalone file-path form returns. Hetzner can pin the host key on first use at the provider-reported address; a supplied fingerprint is checked when available. This limit is explicit in the [checkpoint evidence](testing/2026-09-12-hetzner-provisioning.md).
+
+Provisioning stops at an SSH-verified host for review. Software installation, application deployment and its reachable URL belong to the next increment. No generic monitoring or recovery machinery is required first.

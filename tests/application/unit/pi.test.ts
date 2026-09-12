@@ -10,6 +10,17 @@ const mocks = vi.hoisted(() => ({
   host: vi.fn(),
   release: vi.fn(),
   dispose: vi.fn(),
+  provider: vi.fn(),
+  publicKey: vi.fn(),
+  connect: vi.fn(),
+}));
+vi.mock("../../../src/server/hetzner", () => ({
+  hetzner: mocks.provider,
+  hetznerConnectionId: () => "configured",
+}));
+vi.mock("../../../src/server/server-access", () => ({
+  serverPublicKey: mocks.publicKey,
+  connectServer: mocks.connect,
 }));
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   ...Object.fromEntries(
@@ -166,4 +177,35 @@ it("does not treat an incomplete model turn as success and releases the session"
   expect(describePiFailure(new Error("Secret bearer token"))).not.toContain(
     "token",
   );
+});
+
+it("provider and connection tools use the same permission boundary, including decline", async () => {
+  mocks.provider.mockResolvedValue({ server: { id: 123 } });
+  mocks.publicKey.mockResolvedValue({ publicKey: "ssh-ed25519 public" });
+  mocks.connect.mockResolvedValue({ sshVerified: true });
+  await askPi(input);
+  await tool("hetzner_request").execute("api", {
+    method: "POST",
+    path: "/servers",
+    body: { name: "example", ssh_keys: [1] },
+  });
+  await tool("server_public_key").execute("key", {});
+  await tool("connect_server").execute("connect", { serverId: 123 });
+  expect(mocks.execute.mock.calls.map((call) => call[0])).toEqual([
+    "hetzner_request",
+    "server_public_key",
+    "connect_server",
+  ]);
+  expect(mocks.provider).toHaveBeenCalledOnce();
+  expect(mocks.publicKey).toHaveBeenCalledOnce();
+  expect(mocks.connect).toHaveBeenCalledOnce();
+  mocks.execute.mockResolvedValue({ declined: true });
+  await tool("hetzner_request").execute("api", {
+    method: "POST",
+    path: "/servers",
+    body: {},
+  });
+  await tool("connect_server").execute("connect", { serverId: 456 });
+  expect(mocks.provider).toHaveBeenCalledOnce();
+  expect(mocks.connect).toHaveBeenCalledOnce();
 });
