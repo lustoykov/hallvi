@@ -20,7 +20,7 @@ Deleted the old deployment/operation stores and executors, decision and observat
 - Browser smoke: all five journeys verified (four passed in the suite; the navigation journey passed its targeted rerun after replacing obsolete panel assertions). Rich verified/failed cards in chat and Deployment survive refresh. Fixture data lives only in a disposable browser-test database. Screenshots are generated under `tests/results/operator-information-*.png`.
 - Real Pi: one isolated request used `save_information`, saved an outcome and attached its card reference. The response succeeded in two model calls. No host commands, provisioning or deployment occurred; the fixture database was deleted afterward.
 
-The normal local application database was reset to the four tables and contains no test applications. `.env.local` and existing account/credential configuration were checked unchanged. App and worker restarted successfully.
+The normal local application database was reset to the four tables, removing the old fake fixture. Afterward, the owner added `docker/getting-started-app`, tested the UI and reported “it works perfectly.” This user-created application remains in the local database. `.env.local` and existing account/credential configuration were checked unchanged. App and worker restarted successfully.
 
 ## Try it
 
