@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "@phosphor-icons/react";
+import { ArrowLeft, TerminalWindow } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,6 +36,7 @@ import type { DeploymentRecord } from "@/server/deployment-types";
 import "./application-shell.css";
 import "./views.css";
 import { OperatorConsole } from "./operator-console";
+import { TerminalPanel } from "./terminal/terminal-panel";
 import { ChatPane, type MessageHighlight } from "./chat-pane";
 import {
   conversationMarks,
@@ -199,6 +200,11 @@ export function OperatorShell({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
+  const [terminal, setTerminal] = useState({
+    open: false,
+    expanded: false,
+    minimized: false,
+  });
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -457,6 +463,22 @@ export function OperatorShell({
     focusComposer();
   }
 
+  /** Appends terminal text to the main conversation's draft. Never sends. */
+  function askAboutTerminalText(block: string) {
+    const target = view.chats[0]?.id ?? view.selectedChatId;
+    if (!target) return;
+    setDrafts((current) => {
+      const existing = current[target] ?? "";
+      return {
+        ...current,
+        [target]: existing.trim() ? `${existing.trimEnd()}\n\n${block}` : block,
+      };
+    });
+    if (application && target !== view.selectedChatId)
+      void run("chat", () => api.view(application.id, target));
+    focusComposer();
+  }
+
   function archiveActiveChat() {
     if (!application || !activeChat) return;
     void run("archive", () => api.archiveChat(application.id, activeChat.id));
@@ -550,7 +572,10 @@ export function OperatorShell({
       };
   return (
     <DemoContext.Provider value={demo}>
-      <main className="sg-shell sg-adaptive-shell">
+      <main
+        className="sg-shell sg-adaptive-shell"
+        data-terminal={terminal.open ? "open" : undefined}
+      >
         <header className="sg-topbar">
           {identityVariant !== "navigation" && identity}
           <div className="sg-topbar-where">
@@ -573,6 +598,23 @@ export function OperatorShell({
             >
               <StateChip state={featured.state} detail={stepDetail(featured)} />
               <span>{featured.title}</span>
+            </button>
+          )}
+          {applicationId && (
+            <button
+              type="button"
+              className="sg-topbar-terminal"
+              aria-pressed={terminal.open}
+              onClick={() =>
+                setTerminal((current) =>
+                  current.open
+                    ? { open: false, expanded: false, minimized: false }
+                    : { open: true, expanded: false, minimized: false },
+                )
+              }
+            >
+              <TerminalWindow weight="bold" aria-hidden="true" />
+              Terminal
             </button>
           )}
         </header>
@@ -724,6 +766,31 @@ export function OperatorShell({
               );
             }}
             onConfirm={() => void removeApplication()}
+          />
+        )}
+        {applicationId && (
+          <TerminalPanel
+            applicationId={applicationId}
+            open={terminal.open}
+            expanded={terminal.expanded}
+            minimized={terminal.minimized}
+            piBusy={runs.some((item) => item.status === "running")}
+            onClose={() =>
+              setTerminal({ open: false, expanded: false, minimized: false })
+            }
+            onToggleExpanded={() =>
+              setTerminal((current) => ({
+                ...current,
+                expanded: !current.expanded,
+              }))
+            }
+            onToggleMinimized={() =>
+              setTerminal((current) => ({
+                ...current,
+                minimized: !current.minimized,
+              }))
+            }
+            onAskAboutSelection={askAboutTerminalText}
           />
         )}
       </main>
