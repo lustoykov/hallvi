@@ -26,7 +26,7 @@ The old deployment/operation workers, mutation endpoints and approval cards have
 
 ## Run
 
-Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](docs/integrations/github.md).
+Use Node.js 22, the checked-in CI baseline, with the locked dependencies. Pi is bundled; a separate Pi CLI installation is unnecessary. By default, Pi login and model preferences live in `~/.config/server-guy/pi`, so checkouts and preview ports on this machine reuse the connection. Application databases, executions and provider connections remain local to each controller. Set `SERVER_GUY_PI_CONFIG_DIR` to choose another Pi account directory. An explicit `SERVER_GUY_CONFIG_DIR` isolates Pi too unless `SERVER_GUY_PI_CONFIG_DIR` is also supplied. Disconnecting or changing the Pi account/preferences affects all previews using that account directory. Configure the supported ChatGPT subscription in Settings and connect GitHub explicitly through the [GitHub App setup](docs/integrations/github.md).
 
 ```sh
 npm install

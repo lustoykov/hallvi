@@ -8,7 +8,7 @@ import {
   detectPiSetup,
   forgetPiConfiguration,
   loadPiSdk,
-  piConfigDir,
+  piAccountDir,
   readPiConfiguration,
   readPiCredential,
   savePiConfiguration,
@@ -72,7 +72,7 @@ function baseStatus(): PiSetupStatus {
     detected: null,
     hasSavedConfiguration: false,
     models: [],
-    separateAuthPath: join(piConfigDir(), "pi-auth.json"),
+    separateAuthPath: join(piAccountDir(), "pi-auth.json"),
     diagnosticLogPath: resolve(diagnosticLogPath()),
     localTracePath: resolve(diagnosticLogPath("spans.ndjson")),
     traceExport: traceExportConfiguration(),
@@ -83,7 +83,7 @@ function baseStatus(): PiSetupStatus {
     authentication: {
       configured: false,
       label: "Not connected",
-      source: join(piConfigDir(), "pi-auth.json"),
+      source: join(piAccountDir(), "pi-auth.json"),
     },
     selection: {
       ...defaultPiSelection,
@@ -267,7 +267,7 @@ export class PiLoginCoordinator {
         message: "Requesting a one-time code from OpenAI…",
         expiresAt: null,
         selection: { ...preferences, providerId: PI_PROVIDER_ID },
-        authPath: join(piConfigDir(), `pi-auth-${id}.json`),
+        authPath: join(piAccountDir(), `pi-auth-${id}.json`),
       },
       controller: new AbortController(),
       updatedAt: Date.now(),
@@ -328,7 +328,7 @@ export class PiLoginCoordinator {
       });
       validatePiSelection(modelRuntime, selection);
       record.controller.signal.throwIfAborted();
-      mkdirSync(piConfigDir(), { recursive: true, mode: 0o700 });
+      mkdirSync(piAccountDir(), { recursive: true, mode: 0o700 });
       let synchronizationWarning = false;
       try {
         await modelRuntime.login(PI_PROVIDER_ID, "oauth", {

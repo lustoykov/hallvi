@@ -20,7 +20,7 @@ Permissions govern execution independently of workflows: **Always ask** requires
 
 The product's differentiation is the experience around that operator: understandable work, carefully designed interactions and animations, ongoing care and useful recommendations. Improved models should improve the operator without requiring more application-specific rules. Always-on care and access for other agents are directions; automated application-error detection is deferred.
 
-[Application operator design](docs/operator-design.md) owns the agreed redesign and unresolved details. [Current architecture](docs/architecture.md) documents the implementation being replaced; the redesign is not shipped yet.
+[Application operator design](docs/operator-design.md) owns the agreed redesign and unresolved details. [Current architecture](docs/architecture.md) documents implementation; the [roadmap](ROADMAP.md) distinguishes merged checkpoints from remaining work.
 
 ## Supported scope
 
@@ -59,6 +59,8 @@ Preserve the existing sidebar as the starting structure: it guides users on what
 An Application has its own identity, connected resources and history. One main conversation owns changes; read-only side conversations share relevant evidence and retain separate drafts/history. Users can queue a follow-up, steer active work or discuss it in a side chat. A second independent deployment of the same source is another Application; there is no mandatory Production/Staging hierarchy.
 
 Pi decides what matters and what to surface within a stable, carefully designed experience. Views share records and execution evidence; the database does not mirror the sidebar. Use one saved-knowledge mechanism with optional presentation, rather than separate memory and UI stores. Pi searches, saves, updates and retires records and assigns presentation to relevant views. The UI loads saved information immediately without a model call on every visit. Exact fields and presentation roles remain design proposals.
+
+The presentation architecture connects persisted observations and execution evidence to shared view models, then to deliberately designed components. Pi supplies structured facts and evidence; components own layout, hierarchy and interaction. The [presentation contract](docs/presentation-contract.md) defines the mapping needed by the reference designs. A successful deployment also needs a coherent experience: the user can understand what is happening, handle any decision, open the result, and return to consistent information after a refresh. Judge visual quality against the reference designs using real application data. The roadmap places acceptance of this simple journey before expansion to more complicated applications.
 
 Recommend one sensible path and let the user override it. Ask for missing access, private inputs or consequential decisions, not a mandatory setup questionnaire. Chat explains work, logs expose execution details and selected records make outcomes discoverable. A view without evidence should say it has not been assessed rather than imply health or absence of infrastructure.
 

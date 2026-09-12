@@ -1,8 +1,8 @@
 # Application operator design
 
-Design discussion started 12 September 2026. This is the living record of the agreed direction and remaining questions. The current priority is to get the design right, not to start implementation.
+Design discussion started 12 September 2026. This is the living record of the agreed direction and remaining questions. Delivery status and the active UI/UX checkpoint are maintained in the [roadmap](../ROADMAP.md).
 
-This document describes the intended architecture. [Architecture](architecture.md) describes the shipped implementation at schema 14; its fixed workflows and effect-specific approval rules are not requirements for this redesign. No runtime or schema changes have been made as part of this discussion.
+This document describes the intended architecture. [Architecture](architecture.md) describes implementation, and the roadmap records the merged execution, storage, provisioning, terminal and transcript checkpoints. Historical fixed workflows and effect-specific approval rules are not requirements for the operator.
 
 ## Documentation alignment
 
@@ -31,7 +31,9 @@ Applications are private by default: bind application ports and reverse proxies 
 
 ### Current focus: the main deployment journey
 
-Get the main deployment journey right before expanding ongoing care across all sidebar views. Continue designing first; this priority does not authorize starting implementation yet. Walk through the happy path from the user's deployment request to a working application, deciding how Pi acts, what the user sees and which information is saved and resurfaced.
+The owner confirmed on 12 September that application deployment has been demonstrated. The next stage, being worked on by Opus according to the owner, is the presentation architecture and a delightful simple-app happy path. Connect real database records and execution evidence to the reference UI through the [presentation contract](presentation-contract.md): Pi produces structured observations, shared projections assemble the information each view needs, and components own its visual presentation.
+
+Walk the entire path from adding the repository to opening the verified application from the user's PC. Refine the explanations, permission decisions, live progress, saved result and return visits together. Use the existing deployment to inspect the mapping, then a fresh real deployment to verify that Pi produces records the same UI can render. Owner acceptance of both the appearance and interaction is the gate before the medium and more complicated scenarios; deployment capability alone does not close this checkpoint.
 
 UI changes are welcome wherever this journey reveals a need. Preserve the sidebar's guiding purpose and use its existing structure as the starting point; do not freeze view interiors or interactions to match the old implementation.
 
@@ -39,10 +41,10 @@ Application-error detection is explicitly deferred. Interpreting arbitrary appli
 
 ### Sequencing boundary and working plan
 
-1. **Design the main deployment happy path.** Work from a concrete deployment request through a verified, usable application. Settle the interactions and minimum architecture needed for that journey before implementation.
-2. **Implement and prove that journey once its design is agreed.** Adapt the UI wherever the main path needs it. Verify real behavior throughout development and remove obsolete machinery as its replacement works.
-4. **Then review every sidebar view individually.** Decide what each view can usefully show and do from the experience of a working deployment path. Define its capabilities and care practices at that point rather than committing to all verticals in advance.
-5. **Broaden hardening after the architecture and journey are established.** Let actual use and community feedback inform additional cases and refinements.
+1. **Connect data to the designed views.** Implement the agreed presentation-contract slice against real deployment records, preserving evidence, freshness and honest empty states.
+2. **Polish and accept the simple deployment experience.** Verify a fresh real happy path, coherent chat and views, a usable application link, and persistence through refresh. Review visual and interaction quality with the owner.
+3. **Then increase application complexity.** Use the medium and more complicated examples to discover concrete missing capabilities; keep the same operator and presentation architecture.
+4. **Review further sidebar capabilities and broaden care after that foundation works.** Let actual use establish the need for additional actions, monitoring and hardening.
 
 This is a sequencing boundary, not a promise to implement every example elsewhere in this document. Broader monitoring, per-view actions, detailed care policies and speculative extensibility are not prerequisites for the deployment path. Add supporting capability only when the main journey demonstrates a concrete need.
 
@@ -72,7 +74,7 @@ Validate the same deployment journey progressively against three representative 
 | Medium | A web application with a database, migrations, private configuration and persistent data. | Pi can establish dependencies and configuration and verify a meaningful write/read interaction, including persistence across an ordinary application restart. |
 | More complicated | A multi-service application with a web/API service, background worker, database, queue or cache where needed, and persistent uploads. | Pi can discover service relationships, start the stack and verify one useful end-to-end behavior involving background work and stored data. |
 
-Start with one concrete application per tier. Prove the lightweight path first, then use the medium and more complicated examples to expose necessary generalization. The same operator, general tools and presentation primitives should serve all three. Do not build three deployment engines or expand this into an exhaustive feature matrix. Exact repositories remain to be selected; backup automation and ongoing error detection are not added to deployment scope by these tiers.
+Start with one concrete application per tier. Complete and obtain owner acceptance of the lightweight UI/UX checkpoint first, then use the medium and more complicated examples to expose necessary generalization. The same operator, general tools and presentation primitives should serve all three. Do not build three deployment engines or expand this into an exhaustive feature matrix. Exact repositories remain to be selected; backup automation and ongoing error detection are not added to deployment scope by these tiers.
 
 ## Draft deployment happy path
 
@@ -83,7 +85,7 @@ The architectural direction is sufficiently clear to begin bounded implementatio
 1. **Main operator, execution and permissions — first slice implemented.** One conversation owns changes and has general host commands, the three permission modes and execution history. This proved execution; it did not complete the new database model or deployment onboarding.
 2. **Four-table storage and presentation references.** Implement the agreed storage checkpoint below, remove replaced workflow code and reset disposable application data. Verify refresh, approvals, native conversation continuity and rich saved-information cards. Review separately.
 3. **Hetzner provisioning.** Pi inspects a real repository and arranges a host within the deployment journey. Save its identity and connection using the new application model; review the interaction before deployment.
-4. **Complete the lightweight deployment journey.** Deploy one selected lightweight application through the main operator's general tools, verify useful behavior, and surface the result using minimum shared-record and presentation capabilities. Adapt the UI to this journey and remove replaced planning/workflow code and tests.
+4. **Complete the lightweight deployment UI/UX checkpoint — current focus.** Deployment has been demonstrated. Implement the data-to-view mapping and polish the complete journey against the reference designs. Prove it with fresh Pi output and obtain owner acceptance before expanding complexity.
 5. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then the more complicated example. Add capabilities those deployments actually need. These remain separate reviewable increments.
 
 **Queue, steer and side-chat work is deferred to a later milestone.** Get the core deployment experience right first. Existing read-only tool restrictions remain in effect; native queue/steer, contextual side-chat opening and concurrent side explanations are not part of the provisioning milestone.

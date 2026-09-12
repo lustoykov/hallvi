@@ -142,9 +142,7 @@ test(
     ).toHaveCount(1);
     await openConversation(page);
     await expect(
-      page
-        .locator(".sg-messages strong:visible")
-        .filter({ hasText: /^me$/ }),
+      page.locator(".sg-messages strong:visible").filter({ hasText: /^me$/ }),
     ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();
     expect(saved.runs.map((run: { status: string }) => run.status)).toEqual([

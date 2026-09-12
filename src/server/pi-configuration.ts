@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { z } from "zod";
 
 import {
@@ -64,6 +65,18 @@ export function piConfigDir() {
   );
 }
 
+/** Account settings travel across checkouts; application state never does.
+ * An explicit controller config directory remains isolated unless its owner
+ * explicitly selects a shared Pi directory too (including browser fixtures).
+ */
+export function piAccountDir() {
+  return resolve(
+    /* turbopackIgnore: true */ process.env.SERVER_GUY_PI_CONFIG_DIR?.trim() ||
+      process.env.SERVER_GUY_CONFIG_DIR ||
+      join(homedir(), ".config", "server-guy", "pi"),
+  );
+}
+
 function readJsonFile(path: string): unknown {
   try {
     return JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
@@ -77,7 +90,7 @@ function readJsonFile(path: string): unknown {
 }
 
 export function readPiConfiguration(): PiConfiguration | null {
-  const value = readJsonFile(join(piConfigDir(), "pi-settings.json"));
+  const value = readJsonFile(join(piAccountDir(), "pi-settings.json"));
   if (value === undefined) return null;
   const result = configurationSchema.safeParse(value);
   if (!result.success)
@@ -88,7 +101,7 @@ export function readPiConfiguration(): PiConfiguration | null {
 }
 
 export function savePiConfiguration(configuration: PiConfiguration) {
-  const directory = piConfigDir();
+  const directory = piAccountDir();
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const temporary = join(directory, `pi-settings-${randomUUID()}.tmp`);
   writeFileSync(temporary, JSON.stringify(configuration, null, 2), {
@@ -102,7 +115,7 @@ export function savePiConfiguration(configuration: PiConfiguration) {
  * credential file.
  */
 export function forgetPiConfiguration() {
-  rmSync(join(piConfigDir(), "pi-settings.json"), { force: true });
+  rmSync(join(piAccountDir(), "pi-settings.json"), { force: true });
 }
 
 const credentialSchema = z.discriminatedUnion("type", [
@@ -281,7 +294,7 @@ export async function choosePiSetup(
       ...defaultPiSelection,
       mode: "separate",
       credentialType: "oauth",
-      authPath: join(piConfigDir(), "pi-auth.json"),
+      authPath: join(piAccountDir(), "pi-auth.json"),
     });
     return;
   }

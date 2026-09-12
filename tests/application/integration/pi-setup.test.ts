@@ -5,7 +5,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,9 @@ import {
   configuredPiRuntime,
   detectPiSetup,
   readPiConfiguration,
+  piAccountDir,
+  piConfigDir,
+  readPiCredential,
   updatePiPreferences,
 } from "../../../src/server/pi-configuration";
 import {
@@ -751,5 +754,59 @@ describe("separate Pi device-code login", () => {
     );
     expect(runtime.login).not.toHaveBeenCalled();
     expect(readPiConfiguration()).toBeNull();
+  });
+});
+
+describe("Pi login across development previews", () => {
+  it("uses a machine location by default, independent of the checkout", () => {
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", "");
+    const cwd = vi.spyOn(process, "cwd");
+    try {
+      cwd.mockReturnValue(join(directory, "preview-one"));
+      const first = piAccountDir();
+      cwd.mockReturnValue(join(directory, "preview-two"));
+      expect(piAccountDir()).toBe(first);
+      expect(first).toBe(join(homedir(), ".config", "server-guy", "pi"));
+    } finally {
+      cwd.mockRestore();
+    }
+  });
+
+  it("keeps explicitly isolated controllers isolated", () => {
+    const first = piAccountDir();
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(directory, "other-controller"));
+    expect(piAccountDir()).not.toBe(first);
+    expect(piAccountDir()).toBe(piConfigDir());
+  });
+
+  it("shares login and refreshed credentials without sharing application state", async () => {
+    vi.stubEnv("SERVER_GUY_PI_CONFIG_DIR", join(directory, "account"));
+    const firstState = piConfigDir();
+    await choosePiSetup({ mode: "separate" }, sdkLoader);
+    const authPath = readPiConfiguration()!.authPath;
+    writeFileSync(authPath, JSON.stringify({ [model.provider]: oauth }));
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(directory, "preview-two"));
+    expect(piConfigDir()).not.toBe(firstState);
+    expect(readPiConfiguration()!.authPath).toBe(authPath);
+    expect(await getPiSetupStatus(sdkLoader)).toMatchObject({ ready: true });
+    await configuredPiRuntime(await sdkLoader());
+    expect(createRuntime).toHaveBeenLastCalledWith({
+      authPath,
+      modelsPath: null,
+      refreshOnCreate: false,
+    });
+    // Simulate the SDK persisting a refresh; both previews read the same file.
+    const refreshed = { ...oauth, access: "refreshed-access" };
+    writeFileSync(authPath, JSON.stringify({ [model.provider]: refreshed }));
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", firstState);
+    expect(
+      readPiCredential(readPiConfiguration()!.authPath, model.provider),
+    ).toEqual(refreshed);
+    expect(existsSync(join(firstState, "pi-settings.json"))).toBe(false);
+    const coordinator = new PiLoginCoordinator(sdkLoader);
+    coordinator.disconnect();
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(directory, "preview-two"));
+    expect(readPiConfiguration()).toBeNull();
+    expect(existsSync(authPath)).toBe(true);
   });
 });
