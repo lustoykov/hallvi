@@ -2,7 +2,6 @@ import {
   operationsFor,
   syncDeploymentOperation,
   startChange,
-  retryOperation,
 } from "@/server/operation-store";
 import { randomUUID } from "node:crypto";
 import { db } from "@/server/db";
@@ -16,6 +15,7 @@ import {
   cancelDeployment,
   applicationDeployment,
   requestDeployment,
+  retryInitialDeployment,
   saveDeployment,
   deploymentMessage,
   deploymentEvent,
@@ -29,6 +29,7 @@ import {
   saveDeploymentInputs,
   collectDeploymentLogs,
 } from "@/server/deployment-executor";
+import { acceptUnknownCommand } from "@/server/command-checks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -194,26 +195,15 @@ export function POST(request: Request, context: Context) {
       cancelDeployment(record);
       return { deployment: null };
     } else if (input.action === "retry") {
-      if (record.status !== "failed")
-        throw new Error("Only a stopped deployment can be retried.");
-      db().transaction(
-        () => {
-          const tracked = syncDeploymentOperation(record);
-          const retried = retryOperation(tracked.id, tracked.updatedAt);
-          record.operationId = retried.id;
-          if (input.verificationObjectId) {
-            if (!record.verificationPending || record.cleanup)
-              throw new Error(
-                "There is no unresolved test-object creation to recover.",
-              );
-            record.verificationRecoveryId = input.verificationObjectId;
-          }
-          record.status = record.authority ? "deploy-queued" : "queued";
-          record.error = null;
-          saveDeployment(record);
-        },
-        { behavior: "immediate" },
-      );
+      // The owner's Retry is the decision that may accept a held command's
+      // unknown outcome; a continuation Pi prepares is not.
+      const retried = retryInitialDeployment(record, {
+        verificationObjectId: input.verificationObjectId,
+      });
+      acceptUnknownCommand(record, {
+        title: "Retry the deployment",
+        operationId: retried.id,
+      });
     } else {
       if (record.status !== "live")
         throw new Error(

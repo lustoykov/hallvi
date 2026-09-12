@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { scheduledProtection } from "../../../src/server/scheduled-backup-facts";
+import {
+  backupFailure,
+  restoreFailure,
+  scheduledProtection,
+} from "../../../src/server/scheduled-backup-facts";
 import {
   backupPolicySchema,
   backupSnapshotSchema,
@@ -317,6 +321,73 @@ describe("scheduled backup evidence", () => {
       facts.history.find((item) => item.kind === "restore-test")?.outcome,
     ).toBe("failed");
   });
+  it("records why an owner's declared procedure failed, as the host masked it", () => {
+    const failed = scheduledRunSchema.parse({
+      ...run,
+      outcome: "failed",
+      phase: "capture",
+      errorCode: "capture-failed",
+      bytes: null,
+      sha256: null,
+      detail: {
+        step: "verify",
+        service: "mariadb",
+        exitCode: 1,
+        output:
+          "ERROR 1146 (42S02): Table '$MARIADB_DATABASE.pages' doesn't exist",
+      },
+    });
+    expect(backupFailure(failed)).toContain(
+      "the verify procedure declared for mariadb exited 1: ERROR 1146",
+    );
+    // A service that ignored the stop signal is named with how it ended.
+    expect(
+      backupFailure({
+        ...failed,
+        errorCode: "source-stop-failed",
+        detail: {
+          step: "stop",
+          service: "healthchecks",
+          exitCode: 137,
+          output: "exited 137 after the 120-second stop grace period (killed)",
+        },
+      }),
+    ).toContain(
+      "Service healthchecks exited 137 after the 120-second stop grace period (killed). Check its exit status",
+    );
+    // A receipt from an older runner keeps the generic reason.
+    expect(backupFailure({ ...failed, detail: null })).toContain(
+      "Check the source application",
+    );
+    const restored = scheduledRunSchema.parse({
+      ...run,
+      restore: {
+        at,
+        recoveryPointAt: at,
+        outcome: "failed",
+        scope: "isolated-application",
+        checks: ["archive-hash"],
+        measurements: {},
+        cleanupComplete: true,
+        errorCode: "restore-timeout",
+        detail: {
+          step: "restore",
+          service: "mariadb",
+          exitCode: null,
+          output: "no result within 600 seconds",
+        },
+      },
+    });
+    expect(restoreFailure(restored)).toBe(
+      "The restored copy failed: the restore procedure declared for mariadb gave no result: no result within 600 seconds.",
+    );
+    expect(
+      scheduledRunSchema.safeParse({
+        ...failed,
+        detail: { ...failed.detail, step: "shell" },
+      }).success,
+    ).toBe(false);
+  });
   it("shows bounded restore failure reasons without exposing raw details", () => {
     const failed = scheduledRunSchema.parse({
       ...run,
@@ -351,6 +422,74 @@ describe("scheduled backup evidence", () => {
         ),
       ),
     ).not.toContain("private-host-password");
+  });
+  it("recognizes an online dump's restore by its loading, and a compared dump's only by its match", () => {
+    const stackWith = (data: Record<string, boolean>) =>
+      backupPolicySchema.parse({ ...policy, kind: "stack", data });
+    const restoredWith = (...checks: string[]) => ({
+      ...snapshot,
+      runs: [
+        scheduledRunSchema.parse({
+          ...run,
+          restore: {
+            at,
+            recoveryPointAt: at,
+            outcome: "verified",
+            scope: "isolated-application",
+            checks,
+            measurements: { files: 7 },
+            cleanupComplete: true,
+            errorCode: null,
+          },
+        }),
+      ],
+    });
+    const loaded = [
+      "archive-hash",
+      "backup-identity",
+      "file-inventory",
+      "database-restored",
+      "application-boot",
+    ];
+    // Online: the runner took no live fingerprint, so loading is the claim.
+    const online = scheduledProtection(
+      deployment,
+      stackWith({ sqlite: false, dumps: true, comparedDumps: false }),
+      restoredWith(...loaded),
+      now,
+    );
+    expect(online.restoreTest?.verified).toContain(
+      "proven by that loading, not by a live comparison",
+    );
+    expect(online.restoreTest?.verified).not.toContain("matched its content");
+    // Quiescent: the same receipt is not a recognized restore until the
+    // fingerprint matched, and then the wording says so.
+    const compared = stackWith({
+      sqlite: false,
+      dumps: true,
+      comparedDumps: true,
+    });
+    expect(
+      scheduledProtection(deployment, compared, restoredWith(...loaded), now)
+        .restoreTest,
+    ).toBeNull();
+    expect(
+      scheduledProtection(
+        deployment,
+        compared,
+        restoredWith(...loaded, "database-content"),
+        now,
+      ).restoreTest?.verified,
+    ).toContain("matched its content fingerprint");
+    // A schedule from before the distinction compared every dump.
+    expect(
+      scheduledProtection(
+        deployment,
+        stackWith({ sqlite: false, dumps: true }),
+        restoredWith(...loaded),
+        now,
+      ).restoreTest,
+    ).toBeNull();
   });
   it("credits a stack restore test only when every recorded kind of data was restored", () => {
     const stack = backupPolicySchema.parse({
@@ -412,6 +551,25 @@ describe("scheduled backup evidence", () => {
       scheduledProtection(deployment, fileOnly, hashed, now).restoreTest
         ?.verified,
     ).toContain("File-captured databases received file-hash checks only.");
+    // A declared dump is credited only with its recorded content check.
+    const dumped = backupPolicySchema.parse({
+      ...policy,
+      kind: "stack",
+      data: { postgres: false, sqlite: false, dumps: true },
+    });
+    const loaded = [...offline.slice(0, 3), "database-restored"];
+    expect(
+      scheduledProtection(deployment, dumped, restoredWith(...loaded), now)
+        .restoreTest,
+    ).toBeNull();
+    expect(
+      scheduledProtection(
+        deployment,
+        dumped,
+        restoredWith(...loaded, "database-content"),
+        now,
+      ).restoreTest?.verified,
+    ).toContain("matched its content fingerprint");
     // A service that did not stop cleanly leaves no new recovery point.
     const killed = {
       ...run,

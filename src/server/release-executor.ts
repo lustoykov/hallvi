@@ -14,10 +14,12 @@ import { establishedRuntime } from "./deployment-runtime";
 import { deploymentEvent, saveDeployment } from "./deployment-store";
 import { recordOperationRemoteEffect } from "./application-operations";
 import { verifyRuntime } from "./deployment-executor";
+import type { VerificationResume } from "./command-checks";
 import { composeProject, currentFacts, releaseFacts } from "./release-facts";
 import {
   DATABASE_PASSWORD,
   executableCompose,
+  PUBLIC_URL,
   runtimeArtifacts,
 } from "./native-compose";
 
@@ -55,7 +57,12 @@ export function releaseSecrets(record: DeploymentRecord) {
     supplied,
     redact,
     /** Values for a native release's ${NAME} references. */
-    values: { ...supplied, [DATABASE_PASSWORD]: password },
+    values: {
+      ...supplied,
+      [DATABASE_PASSWORD]: password,
+      // Public and never redacted: the address the provider assigned.
+      ...(record.address ? { [PUBLIC_URL]: `http://${record.address}` } : {}),
+    },
   };
 }
 /** What the locked host script validates, builds, pulls and activates. */
@@ -75,7 +82,8 @@ export function nativeBundle(
   source: TreeFile[],
   values: Record<string, string>,
   retainedVolumes: string[],
-  newManagedDatabase: boolean,
+  /** The managed database runs an unpinned tag: pulled only when changed. */
+  pullDatabase: boolean,
   rollbackImages?: Record<string, string>,
 ) {
   const native = release.native!;
@@ -83,10 +91,8 @@ export function nativeBundle(
   const builds = rollbackImages
     ? []
     : facts.services.filter((s) => s.build).map((s) => s.name);
-  // An existing managed database keeps its image; a new one is pulled once.
   const pulls = facts.services.filter(
-    (s) =>
-      s.pinned || (newManagedDatabase && s.name === facts.database?.service),
+    (s) => s.pinned || (pullDatabase && s.name === facts.database?.service),
   );
   const artifacts = native.files.map((file) => ({
     path: file.path,
@@ -204,15 +210,22 @@ export async function executeRelease(
   );
   const prior = priorRelease ? releaseFacts(priorRelease) : null;
   const retainedVolumes = prior?.volumes.map((v) => v.dockerName) ?? [];
-  const newManagedDatabase = Boolean(
-    releaseFacts(release).database && !prior?.database,
-  );
+  // The managed database keeps the image it runs, without an incidental
+  // pull or upgrade, unless this release changes its reference: a first
+  // deployment pulls it once, an approved state change pulls the new one.
+  const next = releaseFacts(release);
+  const databaseKept =
+    prior?.database &&
+    next.database?.service === prior.database.service &&
+    next.database.image === prior.database.image
+      ? prior.database.service
+      : null;
   const { files: bundle, execution } = nativeBundle(
     release,
     files,
     secrets.values,
     retainedVolumes,
-    newManagedDatabase,
+    Boolean(next.database) && !databaseKept,
     rollbackImages,
   );
   const archive = writeTar(bundle, { mtime: Math.floor(Date.now() / 1000) });
@@ -222,12 +235,10 @@ export async function executeRelease(
   record.revision = release.revision;
   record.releaseId = release.id;
   record.imageId = null;
-  // Reuse the managed database image without an incidental pull or upgrade.
-  const database = prior?.database?.service;
   record.serviceImages = rollbackImages
     ? structuredClone(rollbackImages)
-    : database && record.serviceImages?.[database]
-      ? { [database]: record.serviceImages[database] }
+    : databaseKept && record.serviceImages?.[databaseKept]
+      ? { [databaseKept]: record.serviceImages[databaseKept] }
       : {};
   record.serviceReadiness = {};
   const hosted = new Map([
@@ -285,26 +296,35 @@ export async function executeRelease(
   return verifyRelease(record, release, signal);
 }
 
-/** Verify an existing replacement without building or restarting containers. */
+/**
+ * Verify an existing replacement without building or restarting containers.
+ * A reconciliation passes what the reconciled attempt already established.
+ */
 export async function verifyRelease(
   record: DeploymentRecord,
   release: DeploymentRelease,
   signal: AbortSignal,
+  resume?: VerificationResume,
 ) {
   const secrets = releaseSecrets(record);
   let established = false;
   let behavior: "passed" | "unverified";
   try {
-    behavior = await verifyRuntime(record, signal, () => {
-      established = true;
-    });
+    behavior = await verifyRuntime(
+      record,
+      signal,
+      () => {
+        established = true;
+      },
+      resume,
+    );
   } catch (error) {
     const detail = secrets.redact(
       error instanceof Error ? error.message : "Release verification failed.",
     );
     throw new ReleaseExecutionError(
       detail,
-      !record.verificationPending && !record.cleanup,
+      !record.verificationPending && !record.cleanup && !record.commandPending,
       "verification",
       established,
     );

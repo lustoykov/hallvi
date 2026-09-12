@@ -1,7 +1,14 @@
 import { currentFacts } from "./release-facts";
 import { backupCapturePlan } from "./backup-capture-plan";
 import { randomUUID } from "node:crypto";
-import { readFileSync, readdirSync, lstatSync } from "node:fs";
+import {
+  chmodSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { DeploymentRecord } from "./deployment-types";
@@ -93,6 +100,61 @@ export function backupSetupFor(record: DeploymentRecord | null) {
   }
   return { connected };
 }
+/**
+ * Connect the off-host destination backups upload to: one R2 or S3 bucket
+ * with an access key scoped to it, stored privately beside the controller's
+ * settings. Neither Pi nor any record sees the key.
+ */
+export function saveBackupDestination(input: {
+  provider: "r2" | "s3";
+  endpoint: string;
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}) {
+  const destination = destinationSchema.parse({
+    provider: input.provider,
+    endpoint: input.endpoint,
+    bucket: input.bucket,
+    region: input.region,
+    credentialFile: "default-credentials.json",
+  });
+  const credentials = credentialSchema.parse({
+    accessKeyId: input.accessKeyId,
+    secretAccessKey: input.secretAccessKey,
+  });
+  const root = join(piConfigDir(), "backup-destinations");
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  for (const [file, value] of [
+    [destination.credentialFile, credentials],
+    ["default.json", destination],
+  ] as const) {
+    writeFileSync(join(root, file), JSON.stringify(value), { mode: 0o600 });
+    chmodSync(join(root, file), 0o600);
+  }
+  return backupDestination();
+}
+
+/** What Settings may show about the destination; never its key. */
+export function backupDestination() {
+  try {
+    const root = join(piConfigDir(), "backup-destinations");
+    const destination = destinationSchema.parse(
+      privateJson(join(root, "default.json")),
+    );
+    credentialSchema.parse(privateJson(join(root, destination.credentialFile)));
+    return {
+      connected: true as const,
+      provider: destination.provider,
+      bucket: destination.bucket,
+      host: new URL(destination.endpoint).hostname,
+    };
+  } catch {
+    return { connected: false as const };
+  }
+}
+
 export function backupUnits(policy: BackupPolicy) {
   const p = backupHostPaths(policy.deploymentId);
   return {
@@ -135,12 +197,13 @@ export async function installScheduledBackups(
     revision: record.revision,
     kind,
     data: {
-      postgres: Boolean(facts.database),
       fileDatabases: capture.volumes.some(
         (v) =>
           v.kind === "database" && v.capture === "quiesced-files" && !v.sqlite,
       ),
       sqlite: capture.volumes.some((v) => v.sqlite !== null),
+      dumps: Boolean(capture.dumps?.length),
+      comparedDumps: Boolean(capture.dumps?.some((dump) => dump.quiescent)),
     },
     provider: destination.provider,
     bucket: destination.bucket,

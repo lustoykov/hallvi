@@ -395,7 +395,7 @@ it("rejects stale and cross-application decisions and retains queued deployment 
 });
 
 it("the persistent worker claims queued commands and drains them in order", async () => {
-  const executor = await import("../../../src/server/deployment-executor");
+  const diagnostics = await import("../../../src/server/release-diagnostics");
   const { runOperationWorker } =
     await import("../../../src/server/operation-worker");
   const deployment = requestDeployment(app, firstChat);
@@ -414,16 +414,20 @@ it("the persistent worker claims queued commands and drains them in order", asyn
   });
   const calls: string[] = [];
   const at = "2026-09-11T10:00:00.000Z";
-  vi.spyOn(executor, "collectDeploymentLogs").mockImplementation(
-    async (record) => {
-      const executing = operationsFor(app).find(
-        (item) => item.state === "working" && item.kind === "change",
-      )!;
-      calls.push(executing.id);
-      if (executing.id === first.id) await hold;
-      record.logsCollectedAt = at;
-    },
-  );
+  vi.spyOn(diagnostics, "inspectRuntime").mockImplementation(async () => {
+    const executing = operationsFor(app).find(
+      (item) => item.state === "working" && item.kind === "change",
+    )!;
+    calls.push(executing.id);
+    if (executing.id === first.id) await hold;
+    return {
+      observedAt: at,
+      scope: "every container of this application",
+      containers: [],
+      evidence: `Observed at ${at}.`,
+      note: "",
+    };
+  });
   const controller = new AbortController();
   const worker = runOperationWorker(controller.signal);
   try {
@@ -435,9 +439,10 @@ it("the persistent worker claims queued commands and drains them in order", asyn
       expect(operation(second.id)?.state).toBe("verified"),
     );
     expect(calls).toEqual([first.id, second.id]);
-    expect(operation(second.id)?.result).toEqual({
-      evidence: `Collected host logs at ${at}.`,
-      collectedAt: at,
+    // The inspection's content, not only its time, is the result.
+    expect(operation(second.id)?.result).toMatchObject({
+      observedAt: at,
+      evidence: `Observed at ${at}.`,
     });
   } finally {
     release();

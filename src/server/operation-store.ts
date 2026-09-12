@@ -223,13 +223,34 @@ export function publicOperation(record: StoredOperation): ApplicationOperation {
     preconditions: record.preconditions,
   };
 }
-function blockedBy(applicationId: string, except?: string) {
+function blockedBy(applicationId: string, except: string[] = []) {
+  // A superseded operation holds nothing: its successor established what
+  // happened on the host.
   return rows(applicationId).find(
     (row) =>
-      row.id !== except &&
+      !except.includes(row.id) &&
+      !row.resolvedById &&
       row.kind === "change" &&
       (row.state === "working" || row.blocksQueue),
   );
+}
+/**
+ * A release that continues a stopped first deployment is that deployment's
+ * successor: the hold its stopped operation keeps for unknown remote effects
+ * does not queue the very work that resolves them.
+ */
+function continues(record: StoredOperation) {
+  const command = record.command;
+  if (command?.type !== "release-deployment" || !command.scope.initial)
+    return [];
+  const deployment = db()
+    .select()
+    .from(deployments)
+    .where(eq(deployments.id, command.scope.deploymentId))
+    .get()?.body;
+  return deployment
+    ? [deployment.operationId ?? `deployment:${deployment.id}`]
+    : [];
 }
 export function applicationChangeActive(applicationId: string) {
   return Boolean(blockedBy(applicationId));
@@ -397,7 +418,10 @@ function start(record: StoredOperation) {
   }
   const keys = changedFacts(record);
   if (keys.length) return resetApproval(record, keys);
-  const blocker = blockedBy(record.applicationId, record.id);
+  const blocker = blockedBy(record.applicationId, [
+    record.id,
+    ...continues(record),
+  ]);
   if (blocker) {
     record.state = "queued";
     record.waitingForId = blocker.id;
@@ -600,6 +624,39 @@ export function cancelOperation(
       );
     advanceQueue(record.applicationId);
     return record;
+  });
+}
+/**
+ * The latest release that continued a stopped first deployment and failed:
+ * a further correction retries it, not the deployment operation it already
+ * superseded, and keeps the authority the owner approved for it.
+ */
+export function stoppedContinuation(
+  applicationId: string,
+  deploymentId: string,
+) {
+  return (
+    rows(applicationId).find((row) => {
+      const command = row.command;
+      return (
+        command?.type === "release-deployment" &&
+        command.scope.initial === true &&
+        command.scope.deploymentId === deploymentId &&
+        row.state === "failed" &&
+        !row.resolvedById
+      );
+    }) ?? null
+  );
+}
+/** A failed operation another one superseded needs no decision of its own. */
+export function resolveOperation(id: string, resolvedById: string) {
+  return transaction(() => {
+    const record = operation(id);
+    if (!record || record.resolvedById || record.state !== "failed") return;
+    record.resolvedById = resolvedById;
+    record.blocksQueue = false;
+    put(record);
+    advanceQueue(record.applicationId);
   });
 }
 export function retryOperation(id: string, expectedUpdatedAt: string) {

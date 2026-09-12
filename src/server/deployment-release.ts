@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
 import type {
+  commandCheckSchema,
   DeploymentRecord,
   primaryCheckSchema,
   serviceCheckSchema,
@@ -16,6 +17,32 @@ export interface Criterion {
     healthPath: string;
     checks: z.infer<typeof serviceCheckSchema>[];
   }[];
+  /** Commands in the application's containers; absent in older releases. */
+  commands?: z.infer<typeof commandCheckSchema>[];
+}
+
+/**
+ * Commands, chosen from the application's documentation, that protect state
+ * the core cannot copy as files: `dump` prints a consistent copy while the
+ * state's writers are stopped, `restore` loads that copy from standard input
+ * into a fresh instance, and `verify` prints a content fingerprint that must
+ * be identical for the source and the restored copy.
+ */
+export interface StateProcedure {
+  dump: string[];
+  restore: string[];
+  verify: string[];
+}
+
+/**
+ * A private value that only needs to be random: the controller generates it
+ * at approval and stores it with the owner's inputs. Pi and records see only
+ * its name.
+ */
+export interface InputGenerator {
+  bytes: number;
+  encoding: "hex" | "base64" | "base64url";
+  prefix?: string;
 }
 
 /** Normalized Compose fields the controller reads; others pass through. */
@@ -70,11 +97,22 @@ export interface NativeConfiguration {
   inputs: string[];
   /** Why each private input declared at intake is needed, for the owner. */
   inputReasons?: Record<string, string>;
+  /** Inputs the controller generates at approval instead of asking. */
+  inputGenerators?: Record<string, InputGenerator>;
   data: {
     volume: string;
     kind: "database" | "files";
     sqlite: string | null;
-    capture?: "quiesced-files";
+    capture?: "quiesced-files" | "dump";
+    /**
+     * The service that owns this state: it keeps its image across
+     * application releases and rollbacks, and its procedure runs in it.
+     */
+    owner?: string;
+    /** For capture "dump": commands run in the owner's container. */
+    procedure?: StateProcedure;
+    /** Services that change this data without mounting it; they pause. */
+    writers?: string[];
   }[];
   database: { service: string; version: "16" | "17" | "18" } | null;
   httpAccess: "public" | "controller";

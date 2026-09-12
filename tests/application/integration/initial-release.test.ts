@@ -33,6 +33,14 @@ vi.mock("../../../src/server/native-compose", async (original) => ({
 vi.mock("../../../src/server/deployment-source", () => ({
   checkDeploymentSource: async () => ({ token: "synthetic" }),
 }));
+vi.mock("../../../src/server/github-api", async (original) => ({
+  ...(await original<object>()),
+  githubJson: async () => ({ data: { sha: "a".repeat(40) } }),
+}));
+vi.mock("../../../src/server/container-images", () => ({
+  pinContainerImage: async (reference: string) =>
+    `${reference.split(":")[0]}@sha256:${"c".repeat(64)}`,
+}));
 vi.mock("../../../src/server/deployment-source-files", () => ({
   deploymentSourceFiles: async () => ({
     paths: ["Dockerfile", "app.py"],
@@ -73,8 +81,20 @@ import {
   requestDeployment,
   saveDeployment,
 } from "../../../src/server/deployment-store";
-import { claimOperation, operation } from "../../../src/server/operation-store";
-import { runInitialRelease } from "../../../src/server/application-releases";
+import {
+  claimOperation,
+  operation,
+  startChange,
+} from "../../../src/server/operation-store";
+import {
+  proposeApplicationRelease,
+  runApplicationRelease,
+  runInitialRelease,
+} from "../../../src/server/application-releases";
+import {
+  executeOperation,
+  recordOperationRemoteEffect,
+} from "../../../src/server/application-operations";
 import { invalidateDeploymentRuntime } from "../../../src/server/deployment-lifecycle";
 import { ReleaseExecutionError } from "../../../src/server/release-executor";
 import {
@@ -456,4 +476,487 @@ it("keeps a verified execution when Pi's session is interrupted afterwards", asy
   const saved = getDeployment(record.id)!;
   expect(saved.status).toBe("live");
   expect(saved.lifecycle!.runtime.state).toBe("verified");
+});
+
+/** The first execution fails and the session stops: the deployment stops. */
+async function stopped(change?: (native: NativeConfiguration) => void) {
+  const record = await approved();
+  if (change) {
+    const r = getDeployment(record.id)!;
+    change(r.native!);
+    r.releaseId = releaseOf(r)!.id;
+    r.authority!.releaseId = r.releaseId;
+    saveDeployment(r);
+  }
+  model.execute.mockImplementation(async (r, release) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 1,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "dependency failed to start: container mariadb is unhealthy",
+      true,
+      "replace",
+    );
+  });
+  model.plan.mockImplementationOnce(async () => {
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("stopped");
+  // The worker records the stop, as runDeploymentWorker does.
+  const failed = getDeployment(record.id)!;
+  failed.status = "failed";
+  failed.error = "The agent stopped without a completed release.";
+  saveDeployment(failed);
+  expect(operation(`deployment:${failed.id}`)).toMatchObject({
+    state: "failed",
+    blocksQueue: true,
+  });
+  return getDeployment(record.id)!;
+}
+const verified =
+  (image: string) =>
+  async (r: DeploymentRecord, release: DeploymentRelease) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    Object.assign(r, {
+      serviceImages: { app: image },
+      imageId: image,
+      verifiedAt: new Date().toISOString(),
+    });
+    return { behavior: "passed", evidence: "Verified the first deployment" };
+  };
+
+it("a stopped first deployment continues from a conversation under its approval: an ordinary correction resumes it with Pi's instructions", async () => {
+  const record = await stopped();
+  expect(record.status).toBe("failed");
+  // Pi found the cause in a conversation; no new approval is needed.
+  const resumed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "The initializer waits for a healthcheck the image does not define; add mariadb's documented healthcheck.",
+  );
+  expect(resumed).toMatchObject({
+    state: "working",
+    source: { type: "deployment" },
+  });
+  const continued = getDeployment(record.id)!;
+  expect(continued.status).toBe("deploy-queued");
+  expect(continued.operationId).toBe(resumed.id);
+  expect(continued.correction).toMatchObject({
+    chatId: chat,
+    instructions: expect.stringContaining("documented healthcheck"),
+  });
+  expect(
+    continued.events.some((e) =>
+      e.message.startsWith("Correction requested from a conversation"),
+    ),
+  ).toBe(true);
+  // The worker claims the retried operation and the session gets the
+  // correction, then finishes the same deployment on the same host.
+  expect(claimOperation(resumed.id)?.executorPid).toBe(process.pid);
+  const image = `sha256:${"e".repeat(64)}`;
+  model.prepare.mockImplementation(async ({ deploymentId }) =>
+    native(deploymentId, (service) => {
+      service.healthcheck = { test: ["CMD", "true"] };
+    }),
+  );
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.initial).toBe(true);
+    expect(options.context).toContain(
+      "Correction requested from the owner's conversation",
+    );
+    expect(options.context).toContain("documented healthcheck");
+    expect(options.context).toContain(
+      "previous execution under this authorization failed",
+    );
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  const claimed = getDeployment(record.id)!;
+  claimed.status = "deploying";
+  saveDeployment(claimed);
+  await expect(
+    runInitialRelease(claimed, new AbortController().signal),
+  ).resolves.toBe("Verified the first deployment");
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.serverId).toBe(7);
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(operation(resumed.id)!.state).toBe("verified");
+});
+
+it("an owner of files can be named in a state change, so its declaration or mount can change with a decision", async () => {
+  const record = await stopped((native) => {
+    native.data[0] = {
+      volume: "data",
+      kind: "files",
+      sqlite: null,
+      capture: "quiesced-files",
+      owner: "app",
+    };
+  });
+  expect(getDeployment(record.id)!.status).toBe("failed");
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Stop capturing the config volume; the application's state is in its database.",
+    undefined,
+    {
+      services: ["app"],
+      evidence:
+        "The volume holds generated settings only; the database keeps every record.",
+    },
+  );
+  expect(proposed.summary).toContain(
+    "Allow changing the image, data declarations and mounts of app",
+  );
+  expect(proposed.summary).toContain("generated settings only");
+  await expect(
+    proposeApplicationRelease(app, chat, undefined, "Switch it", undefined, {
+      services: ["worker"],
+      evidence: "Same data format",
+    }),
+  ).rejects.toThrow(
+    "not a declared owner of persistent data. Declared owners: app.",
+  );
+});
+it("a state owner's image change on a stopped first deployment is a release the owner approves, which finishes the deployment", async () => {
+  // The app owns its SQLite volume, so its image is protected.
+  const record = await stopped((native) => {
+    native.data[0].owner = "app";
+  });
+  const owned = getDeployment(record.id)!;
+  await expect(
+    proposeApplicationRelease(
+      app,
+      chat,
+      undefined,
+      "Switch the image",
+      undefined,
+      {
+        services: ["worker"],
+        evidence: "Same data format",
+      },
+    ),
+  ).rejects.toThrow("not a declared owner");
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Run the maintained image instead; it initializes the same data files.",
+    undefined,
+    { services: ["app"], evidence: "Both images read the same SQLite schema." },
+  );
+  expect(proposed.summary).toContain(
+    "Continue this application's first deployment on its prepared host",
+  );
+  expect(proposed.summary).toContain(
+    "Allow changing the image, data declarations and mounts of app",
+  );
+  expect(proposed.summary).toContain(
+    "Both images read the same SQLite schema.",
+  );
+  const scope = (
+    operation(proposed.id)!.command as {
+      scope: { initial?: boolean; baselineReleaseId: string };
+    }
+  ).scope;
+  expect(scope.initial).toBe(true);
+  expect(scope.baselineReleaseId).toBe(owned.releaseId);
+  // The owner approves; the release changes the image and makes it live.
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.prepare.mockImplementation(async ({ deploymentId }) => {
+    const changed = native(deploymentId, (service) => {
+      delete service.build;
+      service.image = `ghcr.io/qa/notes@sha256:${"c".repeat(64)}`;
+    });
+    changed.data[0].owner = "app";
+    return changed;
+  });
+  const image = `sha256:${"f".repeat(64)}`;
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.initial).toBe(true);
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await executeOperation(started, () =>
+    runApplicationRelease(started, new AbortController().signal),
+  );
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.url).toBe("http://203.0.113.7");
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(live.lifecycle!.runtime.state).toBe("verified");
+  expect(operation(started.id)!.state).toBe("verified");
+  // The stopped deployment's own operation no longer needs a decision.
+  expect(operation(`deployment:${record.id}`)!.resolvedById).toBe(started.id);
+  expect(JSON.stringify(live)).not.toContain(SECRET);
+});
+
+it("a further correction continues the latest failed release, keeping its approved state change, rather than the deployment it superseded", async () => {
+  const record = await stopped((native) => {
+    native.data[0].owner = "app";
+  });
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Run the maintained image instead.",
+    undefined,
+    { services: ["app"], evidence: "Both images read the same SQLite schema." },
+  );
+  const started = startChange(proposed.id, proposed.updatedAt);
+  model.prepare.mockImplementation(async ({ deploymentId }) => {
+    const changed = native(deploymentId, (service) => {
+      delete service.build;
+      service.image = `ghcr.io/qa/notes@sha256:${"c".repeat(64)}`;
+    });
+    changed.data[0].owner = "app";
+    return changed;
+  });
+  // The approved image change executes but a second problem stops it.
+  model.execute.mockImplementation(async (r, release) => {
+    recordOperationRemoteEffect();
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    r.lifecycle!.attempts.at(-1)!.remoteResult = {
+      phase: "replace",
+      exitCode: 0,
+      at: new Date().toISOString(),
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "Application behavior check failed: Home (HTTP 502).",
+      true,
+      "verification",
+      true,
+    );
+  });
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(await options.apply(selection, [])).toMatchObject({ ok: false });
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    executeOperation(started, () =>
+      runApplicationRelease(started, new AbortController().signal),
+    ),
+  ).rejects.toThrow("stopped");
+  const halted = getDeployment(record.id)!;
+  expect(halted.status).toBe("failed");
+  expect(halted.error).toContain("stopped without a completed release");
+  expect(operation(started.id)).toMatchObject({
+    state: "failed",
+    blocksQueue: true,
+  });
+  // Pi finds the second cause and continues: the same release, retried
+  // under its approval, with the new instructions; the deployment's own
+  // operation is not queued behind it.
+  const resumed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "The web service listens on 8000 in the maintained image; publish that port.",
+  );
+  expect(resumed).toMatchObject({
+    state: "working",
+    source: { type: "release" },
+  });
+  const command = operation(resumed.id)!.command as {
+    type: string;
+    scope: { initial?: boolean; stateChange?: { services: string[] } };
+  };
+  expect(command.type).toBe("release-deployment");
+  expect(command.scope.initial).toBe(true);
+  expect(command.scope.stateChange?.services).toEqual(["app"]);
+  expect(operation(started.id)!.resolvedById).toBe(resumed.id);
+  expect(getDeployment(record.id)!.correction?.instructions).toContain(
+    "publish that port",
+  );
+  const image = `sha256:${"f".repeat(64)}`;
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.context).toContain(
+      "Correction requested from the owner's conversation",
+    );
+    expect(options.context).toContain("publish that port");
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await executeOperation(operation(resumed.id)!, () =>
+    runApplicationRelease(operation(resumed.id)!, new AbortController().signal),
+  );
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.url).toBe("http://203.0.113.7");
+  expect(live.correction).toBeNull();
+  expect(live.lifecycle!.attempts.map((a) => [a.kind, a.outcome])).toEqual([
+    ["deploy", "failed"],
+    ["deploy", "failed"],
+    ["deploy", "verified"],
+  ]);
+  expect(operation(`deployment:${record.id}`)).toMatchObject({
+    resolvedById: resumed.id,
+    blocksQueue: false,
+  });
+  // The superseded deployment operation holds nothing: the next change
+  // starts instead of queueing behind it.
+  const { proposeOperation } =
+    await import("../../../src/server/operation-store");
+  const next = proposeOperation({
+    applicationId: app,
+    source: { type: "backup", id: record.id },
+    target: "configure-backups:daily:7",
+    kind: "change",
+    title: "Configure scheduled backups",
+    summary: "Daily backups.",
+    destinations: ["backups", "history"],
+    command: {
+      type: "configure-backups",
+      deploymentId: record.id,
+      schedule: "daily",
+      keep: 7,
+    },
+  });
+  expect(startChange(next.id, next.updatedAt).state).toBe("working");
+});
+
+it("a continuation Pi prepares keeps a held command's hold; only the owner's Retry accepts a lost record, and a running command holds regardless", async () => {
+  const record = await approved();
+  // The first attempt replaces the containers, then loses the reply of a
+  // mutating command check during verification, and the agent stops.
+  model.execute.mockImplementation(async (r, release) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    const attempt = r.lifecycle!.attempts.at(-1)!;
+    const at = new Date().toISOString();
+    attempt.remoteStartedAt ??= at;
+    attempt.remoteResult = { phase: "replace", exitCode: 0, at };
+    r.commandPending = {
+      attemptId: attempt.id,
+      operationId: attempt.operationId,
+      name: "Create the marked page",
+      service: "app",
+      token: "3f0c8a2e-5b7d-4e9f-8a1b-2c3d4e5f6a7b",
+      results: `/opt/server-guy/${r.id}/releases/${attempt.id}/checks`,
+      startedAt: at,
+      timeoutSeconds: 60,
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "Application command check failed: Create the marked page (outcome unknown)",
+      false,
+      "verification",
+      true,
+    );
+  });
+  model.plan.mockImplementationOnce(async () => {
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("stopped");
+  const held = getDeployment(record.id)!;
+  held.status = "failed";
+  held.error = "The agent stopped without a completed release.";
+  saveDeployment(held);
+  const attempt = held.lifecycle!.attempts.at(-1)!;
+  expect(held.commandPending).toMatchObject({ attemptId: attempt.id });
+  const hostRecord = "started";
+  model.ssh.mockImplementation(async (r: DeploymentRecord, script: string) => {
+    if (script.includes("/result.json"))
+      return JSON.stringify({
+        attemptId: attempt.id,
+        releaseId: attempt.releaseId,
+        revision: r.revision,
+        phase: "replace",
+        exitCode: 0,
+      });
+    const marker = /printf '\\n(SG_CHECK_RECORD_[0-9a-f]+)%s/.exec(script)![1];
+    return `PAGE_CREATED\n${marker}${hostRecord}\n`;
+  });
+  const executions = model.execute.mock.calls.length;
+  // Pi continues the deployment from a conversation under its authority.
+  // That is not the owner's decision: the hold stays and nothing runs.
+  const continued = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Correct the check's path.",
+  );
+  expect(claimOperation(continued.id)?.executorPid).toBe(process.pid);
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("still running");
+  const afterPi = getDeployment(record.id)!;
+  expect(afterPi.commandPending).toMatchObject({
+    name: "Create the marked page",
+  });
+  expect(afterPi.commandPending!.acceptedAt).toBeUndefined();
+  expect(model.execute.mock.calls.length).toBe(executions);
+  expect(
+    afterPi.events.some((e) => e.message.includes("accepts the unknown")),
+  ).toBe(false);
+  afterPi.status = "failed";
+  saveDeployment(afterPi);
+  // The owner's Retry through the deployment card records the decision,
+  // but the host's record still says the command is running: held.
+  await post({ action: "retry", deploymentId: record.id });
+  expect(getDeployment(record.id)!.commandPending!.acceptedAt).toBeTruthy();
+  const ownerRetry = operation(getDeployment(record.id)!.operationId!)!;
+  expect(claimOperation(ownerRetry.id)?.executorPid).toBe(process.pid);
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("still running");
+  expect(model.execute.mock.calls.length).toBe(executions);
+  // The limit passes with no result recorded: the record is lost, and the
+  // owner's decision lets the command run again, once.
+  const stale = getDeployment(record.id)!;
+  stale.commandPending!.startedAt = new Date(
+    Date.now() - 600_000,
+  ).toISOString();
+  stale.status = "failed";
+  saveDeployment(stale);
+  await post({ action: "retry", deploymentId: record.id });
+  const again = operation(getDeployment(record.id)!.operationId!)!;
+  expect(claimOperation(again.id)?.executorPid).toBe(process.pid);
+  const image = `sha256:${"d".repeat(64)}`;
+  model.prepare.mockImplementation(async ({ deploymentId }) =>
+    native(deploymentId, () => {}),
+  );
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.context).toContain("accepted that it may run again");
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).resolves.toBe("Verified the first deployment");
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.commandPending).toBeNull();
+  expect(model.execute.mock.calls.length).toBe(executions + 1);
+  expect(
+    live.events.filter((e) =>
+      e.message.includes("accepted that it may run again"),
+    ),
+  ).toHaveLength(1);
 });

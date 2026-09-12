@@ -7,6 +7,7 @@ const mock = vi.hoisted(() => ({
   execute: vi.fn(),
   exportFiles: vi.fn(),
   dispose: vi.fn(),
+  note: vi.fn(),
 }));
 vi.mock("../../../src/server/deployment-store", () => ({
   deploymentEvent: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
     execute = mock.execute;
     exportFiles = mock.exportFiles;
     dispose = mock.dispose;
+    note = mock.note;
   },
 }));
 import {
@@ -61,14 +63,22 @@ const selection = {
   summary: "Release the corrected worker entry point",
 };
 const source = { paths: ["compose.yaml"], read: async () => "" };
-const session = (prompt: () => Promise<void>) => ({
-  session: {
-    prompt,
-    waitForIdle: async () => {},
-    dispose: vi.fn(),
-    abort: vi.fn(),
-  },
-});
+type Listener = (event: unknown) => void;
+const session = (prompt: (emit: Listener) => Promise<void>) => {
+  const listeners: Listener[] = [];
+  return {
+    session: {
+      prompt: () => prompt((event) => listeners.forEach((l) => l(event))),
+      subscribe: (listener: Listener) => {
+        listeners.push(listener);
+        return () => {};
+      },
+      waitForIdle: async () => {},
+      dispose: vi.fn(),
+      abort: vi.fn(),
+    },
+  };
+};
 type Tool = {
   name: string;
   execute: (...args: unknown[]) => Promise<{ content: { text: string }[] }>;
@@ -91,6 +101,9 @@ it("returns selection, execution and inspection feedback to the same Pi session,
       message: "python: can't open file wrong.py",
     })
     .mockResolvedValueOnce({ ok: true, message: "Verified" });
+  const inspect = vi.fn(async () => ({
+    evidence: "Container exited: wrong.py missing",
+  }));
   mock.create.mockImplementation(async (options) =>
     session(async () => {
       const send = async (args: unknown) => {
@@ -112,7 +125,11 @@ it("returns selection, execution and inspection feedback to the same Pi session,
       expect(mock.exportFiles).not.toHaveBeenCalled();
       expect((await send(selection)).message).toContain("wrong.py");
       expect(
-        (await tool(options, "inspect_release").execute()).content[0].text,
+        (
+          await tool(options, "inspect_runtime").execute("call", {
+            service: "worker",
+          })
+        ).content[0].text,
       ).toContain("wrong.py");
       expect((await send(selection)).ok).toBe(true);
       // A repeated call after success cannot redeploy.
@@ -128,11 +145,12 @@ it("returns selection, execution and inspection feedback to the same Pi session,
       context: "",
       workspaceFiles: [],
       apply,
-      inspect: async () => ({ evidence: "Container exited: wrong.py missing" }),
+      inspect,
       reconcile: vi.fn(),
     },
   );
   expect(apply).toHaveBeenCalledTimes(2);
+  expect(inspect).toHaveBeenCalledWith({ service: "worker" });
   // The exact exported bytes and normalized Compose order reach execution.
   expect(apply.mock.calls[0][0].compose).toEqual(["compose.yaml"]);
   expect(apply.mock.calls[0][1]).toBe(files);
@@ -142,6 +160,67 @@ it("returns selection, execution and inspection feedback to the same Pi session,
   );
   expect(mock.create).toHaveBeenCalledTimes(1);
   expect(seen).toHaveLength(3);
+});
+
+it("journals custom tool results and the model's stop, and names that stop when no release completed", async () => {
+  mock.note.mockClear();
+  mock.create.mockImplementation(async (options) =>
+    session(async (emit) => {
+      emit({
+        type: "tool_execution_start",
+        toolCallId: "t1",
+        toolName: "inspect_runtime",
+        args: {},
+      });
+      const result = await tool(options, "inspect_runtime").execute("t1", {});
+      emit({
+        type: "tool_execution_end",
+        toolCallId: "t1",
+        toolName: "inspect_runtime",
+        result,
+        isError: false,
+      });
+      // Native workspace tools journal themselves; the session skips them.
+      emit({
+        type: "tool_execution_start",
+        toolCallId: "t2",
+        toolName: "read",
+        args: { path: "compose.yaml" },
+      });
+      emit({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          stopReason: "error",
+          errorMessage: "503 upstream overloaded",
+          content: [],
+        },
+      });
+    }),
+  );
+  await expect(
+    planRelease(
+      source,
+      { repository: "qa/example" } as DeploymentRecord,
+      new AbortController().signal,
+      {
+        revision: "a".repeat(40),
+        context: "",
+        workspaceFiles: [],
+        apply: vi.fn(),
+        inspect: async () => ({ evidence: "init script failed: <?php" }),
+        reconcile: vi.fn(),
+      },
+    ),
+  ).rejects.toThrow("The model request failed: 503 upstream overloaded");
+  const notes = mock.note.mock.calls.map(([event]) => event);
+  expect(notes.map((event) => event.type)).toEqual([
+    "tool-start",
+    "tool-end",
+    "model-stop",
+    "session-end",
+  ]);
+  expect(JSON.stringify(notes[1])).toContain("init script failed");
 });
 
 it("accepts a completed reconciliation without another deploy tool call", async () => {

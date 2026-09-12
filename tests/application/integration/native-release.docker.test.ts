@@ -204,6 +204,8 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => {
         ? {
             session: {
               prompt: () => host.session!(options.customTools),
+              // The planner journals session events; scripts emit none.
+              subscribe: () => () => {},
               waitForIdle: async () => {},
               getLastAssistantText: () => "",
               dispose: () => {},
@@ -370,6 +372,7 @@ import {
 import { releaseOf } from "../../../src/server/deployment-release";
 import {
   currentFacts,
+  managedDatabaseProcedure,
   nativeFacts,
   type ReleaseFacts,
 } from "../../../src/server/release-facts";
@@ -1718,6 +1721,8 @@ it.skipIf(!proof)(
       const undeclared = JSON.parse(await call("recommend_deployment", intake));
       expect(undeclared).toMatchObject({ ok: false, retryable: true });
       expect(undeclared.message).toContain("APP_SECRET");
+      // The managed database is a database owner like any other: declared
+      // without a procedure, it gets the controller's default one.
       expect(
         JSON.parse(
           await call("recommend_deployment", {
@@ -1728,6 +1733,7 @@ it.skipIf(!proof)(
                 reason: "Signs the digest returned with notes",
               },
             ],
+            data: [{ volume: "database", kind: "database", owner: "postgres" }],
           }),
         ),
       ).toMatchObject({ ok: true });
@@ -1799,6 +1805,17 @@ it.skipIf(!proof)(
         ["intake", true],
         ["execution", true],
         ["execution", true],
+      ]);
+      // The approved release records the managed database's default dump.
+      expect(live.lifecycle!.releases[0].native!.data).toEqual([
+        {
+          volume: "database",
+          kind: "database",
+          sqlite: null,
+          capture: "dump",
+          owner: "postgres",
+          procedure: managedDatabaseProcedure,
+        },
       ]);
       // One server, with the firewall the approval implies, and no private
       // value in the record.

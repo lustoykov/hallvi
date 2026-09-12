@@ -9,6 +9,8 @@ import {
   syncDeploymentOperation,
   operation,
   cancelOperation,
+  retryOperation,
+  stoppedContinuation,
 } from "./operation-store";
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -263,6 +265,58 @@ export function requestDeployment(
       remember(record);
       syncDeploymentOperation(record);
       return record;
+    },
+    { behavior: "immediate" },
+  );
+}
+/**
+ * Continue a stopped first deployment under its existing approval: the
+ * owner's Retry, or a correction Pi found in a conversation. The retried
+ * operation carries the approval; nothing widens it, and a new server is
+ * never bought blindly.
+ */
+export function retryInitialDeployment(
+  record: DeploymentRecord,
+  options: {
+    verificationObjectId?: string;
+    correction?: { instructions: string; chatId: string };
+  } = {},
+) {
+  if (record.status !== "failed")
+    throw new Error("Only a stopped deployment can be retried.");
+  return db().transaction(
+    () => {
+      const at = new Date().toISOString();
+      if (options.verificationObjectId) {
+        if (!record.verificationPending || record.cleanup)
+          throw new Error(
+            "There is no unresolved test-object creation to recover.",
+          );
+        record.verificationRecoveryId = options.verificationObjectId;
+      }
+      if (options.correction) {
+        record.correction = { ...options.correction, at };
+        record.events.push({
+          at,
+          message: `Correction requested from a conversation: ${options.correction.instructions.slice(0, 600)}`,
+        });
+      }
+      // A release that already continues this deployment, under the
+      // authority the owner approved for it, is what a retry continues.
+      const continuing = stoppedContinuation(record.applicationId, record.id);
+      if (continuing) {
+        const retried = retryOperation(continuing.id, continuing.updatedAt);
+        record.error = null;
+        saveDeployment(record);
+        return retried;
+      }
+      const tracked = syncDeploymentOperation(record);
+      const retried = retryOperation(tracked.id, tracked.updatedAt);
+      record.operationId = retried.id;
+      record.status = record.authority ? "deploy-queued" : "queued";
+      record.error = null;
+      saveDeployment(record);
+      return retried;
     },
     { behavior: "immediate" },
   );

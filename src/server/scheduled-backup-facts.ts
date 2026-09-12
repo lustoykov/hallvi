@@ -5,18 +5,32 @@ import {
   scheduleLabel,
   type BackupPolicy,
   type BackupSnapshot,
+  type ProcedureDetail,
   type ScheduledRun,
 } from "./scheduled-backup-types";
 
+/** An owner's own dump, verify or restore command and what it printed. */
+function procedureFailure(detail: ProcedureDetail) {
+  const what =
+    detail.step === "start"
+      ? `starting ${detail.service} in isolation`
+      : `the ${detail.step} procedure declared for ${detail.service}`;
+  const result =
+    detail.exitCode === null ? "gave no result" : `exited ${detail.exitCode}`;
+  return `${what} ${result}${detail.output ? `: ${detail.output}` : ""}`;
+}
+
 export function backupFailure(run: ScheduledRun) {
   if (run.errorCode === "source-stop-failed")
-    return "A service failed to stop cleanly or exceeded the two-minute grace period. Check its exit status and shutdown handling before retrying; source restart is recorded separately.";
+    return `${run.detail ? `Service ${run.detail.service} ${run.detail.output}` : "A service failed to stop cleanly or exceeded the two-minute grace period"}. Check its exit status and shutdown handling before retrying; source restart is recorded separately.`;
   if (run.errorCode === "credentials-rejected")
     return "Backup storage rejected the credential. Reconnect storage access, then retry.";
   if (run.errorCode === "interrupted")
     return "The backup was interrupted. Source recovery and cleanup are recorded separately.";
   if (run.errorCode === "source-identity-mismatch")
     return "The deployment no longer matches the recorded backup configuration. Reconfigure the schedule for the current deployment.";
+  if (run.detail)
+    return `A consistent copy could not be created: ${procedureFailure(run.detail)}.`;
   const labels: Record<string, string> = {
     credentials:
       "Backup storage access could not be verified. Reconnect the scoped storage credential.",
@@ -36,11 +50,15 @@ export function backupFailure(run: ScheduledRun) {
   );
 }
 
-function restoreFailure(run: ScheduledRun) {
+export function restoreFailure(run: ScheduledRun) {
+  if (run.restore?.detail)
+    return `The restored copy failed: ${procedureFailure(run.restore.detail)}.`;
   const reasons: Record<string, string> = {
     "restore-image-unavailable":
       "The isolated restore could not start because its database image is unavailable.",
     "database-check-failed": "The isolated database checks failed.",
+    "boot-failed":
+      "The restored data loaded, but the application did not come up on it in isolation.",
     "manifest-mismatch":
       "The restored contents did not match the recorded capture manifest.",
     "verify-mismatch":
@@ -94,6 +112,11 @@ export function scheduledProtection(
           run.restore.checks.includes("file-inventory") &&
           (!policy.data!.postgres ||
             run.restore.checks.includes("database-restored")) &&
+          // Every dump must load; only a compared one must also match.
+          (!policy.data!.dumps ||
+            run.restore.checks.includes("database-restored")) &&
+          (!(policy.data!.comparedDumps ?? policy.data!.dumps) ||
+            run.restore.checks.includes("database-content")) &&
           (!policy.data!.sqlite ||
             (run.restore.checks.includes("database-integrity") &&
               run.restore.checks.includes("database-rows")))
@@ -201,7 +224,7 @@ export function scheduledProtection(
           recoveryPointAt: restored.restore.recoveryPointAt!,
           verified:
             policy.kind === "stack"
-              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""} Application boot was not tested.`
+              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${restored.restore.checks.includes("database-content") ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : restored.restore.checks.includes("database-restored") ? " Each database dump loaded into a fresh isolated instance; taken online, its content is proven by that loading, not by a live comparison." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""}${restored.restore.checks.includes("application-boot") ? ` The restored application booted in isolation${restored.restore.boot ? ` in ${restored.restore.boot.seconds} s (${Object.keys(restored.restore.boot.services).length} services)` : ""}; its behavior checks are recorded on the restore operation.` : " Application boot was not tested."}`
               : policy.kind === "postgres"
                 ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
                 : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,

@@ -1,7 +1,7 @@
 import type { DeploymentRecord } from "./deployment-types";
 import { releaseIdentityHolds } from "./deployment-release";
 import { establishedRuntime } from "./deployment-runtime";
-import { releaseFacts, type ReleaseFacts } from "./release-facts";
+import { releaseFacts, stateOwners, type ReleaseFacts } from "./release-facts";
 
 /** One task, one existing host, one selected revision, no new spending. */
 export interface ReleaseScope {
@@ -26,6 +26,11 @@ export interface ReleaseScope {
     images: Record<string, string>;
     compatibilityEvidence: string;
   };
+  /**
+   * Image changes the owner approved for services that own persistent
+   * data, with the compatibility assessment shown in that approval.
+   */
+  stateChange?: { services: string[]; evidence: string };
 }
 export class ReleaseScopeError extends Error {}
 
@@ -33,7 +38,12 @@ export class ReleaseScopeError extends Error {}
  * Effects a release may not change without a separate decision. Ordinary
  * configuration, commands, builds and service additions are corrections.
  */
-export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
+export function scopeDifferences(
+  baseline: ReleaseFacts,
+  next: ReleaseFacts,
+  /** State owners whose image change the owner approved. */
+  allowed: string[] = [],
+) {
   const problems: string[] = [];
   const listener = (item: ReleaseFacts["exposure"][number]) =>
     `${item.service} ${item.hostIp || "*"}:${item.published || "(any)"}/${item.protocol}`;
@@ -52,21 +62,24 @@ export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
       ].join("")}.`,
     );
   const database = baseline.database;
-  if (
-    database &&
-    (next.database?.service !== database.service ||
-      next.database.version !== database.version ||
-      next.database.image !== database.image)
-  )
+  if (database && next.database?.service !== database.service)
     problems.push(
-      `Removing or upgrading the managed database (${database.service}, ${database.image}) needs a separate data-change decision.`,
+      `Removing or renaming the managed database service ${database.service} needs a separate data-change decision.`,
     );
+  // A declared owner keeps its image: the data it wrote may not be readable
+  // by another version. An approved state change permits one.
+  for (const owner of stateOwners(baseline)) {
+    if (allowed.includes(owner)) continue;
+    const was = baseline.services.find((service) => service.name === owner);
+    const now = next.services.find((service) => service.name === owner);
+    if (was && (!now || now.image !== was.image || now.build !== was.build))
+      problems.push(
+        `Service ${owner} owns persistent data, so changing its image (${was.build ? "built" : was.image} → ${now ? (now.build ? "built" : now.image) : "removed"}) needs the owner's decision: propose it as a state change with its compatibility evidence.`,
+      );
+  }
   for (const volume of baseline.volumes) {
     const kept = next.volumes.find(
-      (item) =>
-        item.dockerName === volume.dockerName &&
-        item.kind === volume.kind &&
-        item.sqlite === volume.sqlite,
+      (item) => item.dockerName === volume.dockerName,
     );
     if (
       !kept ||
@@ -79,9 +92,33 @@ export function scopeDifferences(baseline: ReleaseFacts, next: ReleaseFacts) {
               item.readOnly === mount.readOnly,
           ),
       )
-    )
+    ) {
+      // Where an owned volume is mounted, or whether it stays mounted, is
+      // its owner's decision: the approved state change covers retiring it.
+      // The named volume itself stays on the host; nothing deletes data.
+      if (!volume.owner || !allowed.includes(volume.owner))
+        problems.push(
+          `Preserve volume ${volume.name}, its existing consumers, access and mount. Moving existing data needs a separate decision${volume.owner ? `: propose it as a state change for ${volume.owner}` : ""}.`,
+        );
+      continue;
+    }
+    // What a volume is recorded as, who owns it and how it is captured stay
+    // through ordinary corrections: a declaration that quietly changed would
+    // lose image protection or capture on the next release. Its owner's
+    // approved state change covers its declaration.
+    const identity = kept.kind !== volume.kind || kept.sqlite !== volume.sqlite;
+    const declaration =
+      kept.owner !== volume.owner || kept.capture !== volume.capture;
+    if (volume.owner) {
+      if ((identity || declaration) && !allowed.includes(volume.owner))
+        problems.push(
+          `Volume ${volume.name} is owned by ${volume.owner}${volume.capture ? ` with capture "${volume.capture}"` : ""} as ${volume.kind}; a correction keeps that declaration. Changing or removing it needs the owner's decision: propose it as a state change for ${volume.owner}.`,
+        );
+    } else if (identity)
+      // Adding an owner or a capture to unowned data is a correction;
+      // recording it as another kind of data is not.
       problems.push(
-        `Preserve volume ${volume.name}, its existing consumers, access, mount and recorded data path. Moving existing data needs a separate decision.`,
+        `Preserve volume ${volume.name}'s recorded kind and data path. Changing how existing data is recorded needs a separate decision.`,
       );
   }
   return problems;
@@ -125,6 +162,10 @@ export function assertReleaseScope(
     throw new ReleaseScopeError(
       "The baseline release is unavailable. Reconcile its identity first.",
     );
-  const problems = scopeDifferences(releaseFacts(baseline), candidate);
+  const problems = scopeDifferences(
+    releaseFacts(baseline),
+    candidate,
+    scope.stateChange?.services,
+  );
   if (problems.length) throw new ReleaseScopeError(problems.join(" "));
 }

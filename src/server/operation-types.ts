@@ -9,8 +9,20 @@ export type OperationCommand =
       requirements: string;
     }
   | { type: "recreate-deployment"; deploymentId: string }
-  | { type: "collect-logs"; deploymentId: string }
-  | { type: "run-backup" | "test-restore"; deploymentId: string }
+  /** A fresh, read-only runtime inspection: container state and logs. */
+  | {
+      type: "collect-logs";
+      deploymentId: string;
+      service?: string;
+      lines?: number;
+    }
+  | { type: "run-backup"; deploymentId: string }
+  | {
+      type: "test-restore";
+      deploymentId: string;
+      /** Commands Pi chose to run inside the restored copy. */
+      checks?: import("./command-checks").CommandCheck[];
+    }
   | {
       type: "configure-backups";
       deploymentId: string;

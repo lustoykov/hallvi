@@ -8,7 +8,10 @@ import {
   beginDeploymentAttempt,
   finishDeploymentAttempt,
 } from "../../../src/server/deployment-lifecycle";
-import { nativeFacts } from "../../../src/server/release-facts";
+import {
+  nativeFacts,
+  type VolumeFacts,
+} from "../../../src/server/release-facts";
 import {
   releaseOf,
   type NativeConfiguration,
@@ -190,12 +193,103 @@ it("names every out-of-scope effect: exposure, data identity or access and the m
       native.resolved.volumes!.database = { name: `${project}_database` };
       native.data.push({ volume: "database", kind: "database", sqlite: null });
     });
+  // The managed database is a state owner like any other: its image change
+  // needs the owner's decision for that service, and only its removal is a
+  // separate data-change decision.
   expect(
     scopeDifferences(withDatabase("17"), withDatabase("18")).join(),
-  ).toContain("managed database");
+  ).toContain("Service postgres owns persistent data");
+  expect(
+    scopeDifferences(withDatabase("17"), withDatabase("18"), ["postgres"]),
+  ).toEqual([]);
+  expect(
+    scopeDifferences(
+      withDatabase("17"),
+      facts((native) => {
+        native.database = null;
+      }),
+    ).join(),
+  ).toContain("Removing or renaming the managed database service postgres");
   expect(() =>
     assertReleaseScope({ ...r, serverId: 8 }, scope, facts()),
   ).toThrow("host changed");
+});
+
+it("keeps a declared state owner's image unless the owner approved changing it", () => {
+  const owned = (image: string) => {
+    const facts = native((c) => {
+      c.services.queue.image = image;
+    });
+    facts.volumes[0].owner = "queue";
+    return facts;
+  };
+  const pinned = (digit: string) =>
+    `valkey/valkey:8.1.3-alpine@sha256:${digit.repeat(64)}`;
+  const baseline = owned(pinned("a"));
+  expect(scopeDifferences(baseline, owned(pinned("a")))).toEqual([]);
+  expect(scopeDifferences(baseline, owned(pinned("b"))).join()).toContain(
+    "Service queue owns persistent data",
+  );
+  expect(scopeDifferences(baseline, owned(pinned("b")), ["queue"])).toEqual([]);
+});
+
+it("keeps a volume's declared owner and capture through corrections unless the owner decides otherwise", () => {
+  const owned = (change: (volume: VolumeFacts) => void = () => {}) => {
+    const facts = native((c) => {
+      c.services.queue.image = `valkey/valkey:8.1.3-alpine@sha256:${"a".repeat(64)}`;
+    });
+    Object.assign(facts.volumes[0], { owner: "queue", capture: "dump" });
+    change(facts.volumes[0]);
+    return facts;
+  };
+  const baseline = owned();
+  // A correction that redeclares the volume without its owner would strip
+  // its image protection and its capture on the next release.
+  const unowned = owned((volume) => {
+    delete volume.owner;
+    delete volume.capture;
+  });
+  expect(scopeDifferences(baseline, unowned).join()).toContain(
+    'Volume queue-data is owned by queue with capture "dump" as database; a correction keeps that declaration',
+  );
+  const recaptured = owned((volume) => {
+    delete volume.capture;
+  });
+  expect(scopeDifferences(baseline, recaptured).join()).toContain(
+    "propose it as a state change for queue",
+  );
+  // Adding protection to an unowned volume is an ordinary correction;
+  // removing it is that owner's state change, and so is recording the
+  // owned volume as something else.
+  expect(scopeDifferences(unowned, baseline)).toEqual([]);
+  expect(scopeDifferences(baseline, unowned, ["queue"])).toEqual([]);
+  const asFiles = owned((volume) => {
+    volume.kind = "files";
+    volume.capture = "quiesced-files";
+  });
+  expect(scopeDifferences(baseline, asFiles).join()).toContain(
+    "propose it as a state change for queue",
+  );
+  expect(scopeDifferences(baseline, asFiles, ["queue"])).toEqual([]);
+  // An unowned volume's recorded kind still needs a separate decision.
+  const plain = native();
+  const relabeled = native();
+  relabeled.volumes[0].kind = "files";
+  expect(scopeDifferences(plain, relabeled).join()).toContain(
+    "recorded kind and data path",
+  );
+  // Retiring an owned volume (no service mounts it any more; the named
+  // volume stays on the host) is that owner's state change as well.
+  const detached = native((c) => {
+    c.services.queue.volumes = [];
+  });
+  expect(scopeDifferences(baseline, detached).join()).toContain(
+    "Preserve volume queue-data, its existing consumers, access and mount. Moving existing data needs a separate decision: propose it as a state change for queue",
+  );
+  expect(scopeDifferences(baseline, detached, ["queue"])).toEqual([]);
+  expect(scopeDifferences(plain, detached).join()).toContain(
+    "Preserve volume queue-data",
+  );
 });
 
 it("binds the established runtime: its own retries may supersede an observation, another authorization's may not", () => {

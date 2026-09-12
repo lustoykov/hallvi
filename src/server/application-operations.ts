@@ -10,6 +10,7 @@ import {
   retryOperation,
   startChange,
 } from "./operation-store";
+import type { ApplicationOperation } from "./operation-record";
 import type { OperationCommand, StoredOperation } from "./operation-types";
 import { redactSecrets } from "./secrets";
 
@@ -59,6 +60,11 @@ async function runClaimedOperation<T>(
   });
 }
 
+/** The operation this asynchronous context executes, if any. */
+export function activeOperationId() {
+  return executing.getStore()?.id ?? null;
+}
+
 /** Existing source operations retain their own authority and result checks. */
 export async function duringApplicationOperation<T>(
   applicationId: string,
@@ -67,18 +73,24 @@ export async function duringApplicationOperation<T>(
     command: OperationCommand;
     kind: "change" | "inspection";
     title: string;
+    source?: ApplicationOperation["source"];
+    summary?: string;
+    destinations?: ApplicationOperation["destinations"];
   },
 ): Promise<T> {
   const active = executing.getStore();
   if (active?.applicationId === applicationId) return work();
   const intent = proposeOperation({
     applicationId,
-    source: { type: "preparation", id: JSON.stringify(specification.command) },
+    source: specification.source ?? {
+      type: "preparation",
+      id: JSON.stringify(specification.command),
+    },
     target: JSON.stringify(specification.command),
     kind: specification.kind,
     title: specification.title,
-    summary: specification.title,
-    destinations: ["deployment", "history"],
+    summary: specification.summary ?? specification.title,
+    destinations: specification.destinations ?? ["deployment", "history"],
     command: specification.command,
   });
   const started =

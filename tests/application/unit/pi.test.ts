@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
   status: vi.fn(),
   propose: vi.fn(),
   deployment: vi.fn(),
-  read: vi.fn(),
   workspace: vi.fn(),
   execute: vi.fn(),
   dispose: vi.fn(),
@@ -34,10 +33,6 @@ vi.mock("../../../src/server/application-releases", () => ({
 vi.mock("../../../src/server/deployment-store", async (original) => ({
   ...(await original<typeof import("../../../src/server/deployment-store")>()),
   applicationDeployment: mocks.deployment,
-}));
-vi.mock("../../../src/server/rollback", async (original) => ({
-  ...(await original<typeof import("../../../src/server/rollback")>()),
-  readReleaseFile: mocks.read,
 }));
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   // Pi's own native tool schemas and descriptions; execution is replaced.
@@ -68,8 +63,10 @@ vi.mock("../../../src/server/pi-workspace", async (original) => ({
   },
 }));
 vi.mock("../../../src/server/operation-tools", () => ({
+  inspectRuntimeNow: vi.fn(),
   operationContext: () => [],
   proposeAgentChange: vi.fn(),
+  recentOperations: () => [],
   recordLocalInspection: vi.fn(),
 }));
 vi.mock("../../../src/server/pi-configuration", () => ({
@@ -623,7 +620,10 @@ describe("native Pi adapter", () => {
       "search_decisions",
       "get_application_status",
       "prepare_deployment",
-      "read_release_file",
+      "inspect_runtime",
+      "read_repository",
+      "compare_repository",
+      "read_operation",
       "list_releases",
       "prepare_rollback",
       "prepare_release",
@@ -852,44 +852,6 @@ describe("native Pi adapter", () => {
       input.userMessage,
       params,
     );
-  });
-  it("read_release_file reads the Run application's recorded releases within a per-request budget", async () => {
-    const record = { id: "deployment-a" };
-    const evidence = { path: "migrations/0002.sql", text: "ALTER TABLE a;" };
-    mocks.deployment.mockReturnValue(record);
-    mocks.read.mockResolvedValue(evidence);
-    const params = { releaseId: "a".repeat(64), path: evidence.path };
-    let tool: Tool | undefined;
-    let result: unknown;
-    session.prompt.mockImplementation(async () => {
-      tool = (mocks.create.mock.calls[0][0] as Options).customTools.find(
-        (t) => t.name === "read_release_file",
-      );
-      result = await tool!.execute("read-1", params);
-      for (let i = 2; i <= 25; i++) await tool!.execute(`read-${i}`, params);
-      await expect(tool!.execute("read-26", params)).rejects.toThrow("budget");
-      session.finish();
-    });
-    await askPi(input);
-    expect(mocks.deployment).toHaveBeenCalledWith(run.applicationId);
-    expect(mocks.read).toHaveBeenCalledTimes(25);
-    expect(mocks.read).toHaveBeenCalledWith(
-      record,
-      params.releaseId,
-      params.path,
-      expect.any(AbortSignal),
-    );
-    expect(result).toMatchObject({
-      content: [{ type: "text", text: JSON.stringify(evidence) }],
-    });
-    // The model names a recorded release, never a repository or revision.
-    for (const invalid of [
-      { ...params, releaseId: "v1" },
-      { ...params, path: "" },
-      { ...params, revision: "b".repeat(40) },
-      { releaseId: params.releaseId },
-    ])
-      expect(Value.Check(tool!.parameters as TSchema, invalid)).toBe(false);
   });
   it("returns a failed status lookup to the tool loop as an error, never as an empty result", async () => {
     mocks.status.mockImplementationOnce(() => {

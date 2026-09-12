@@ -1,8 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   appendFileSync,
+  closeSync,
   mkdirSync,
+  openSync,
+  readdirSync,
   readFileSync,
+  readSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -161,6 +165,14 @@ export class PiWorkspace {
     },
   ) {
     this.directory = join(dirname(databasePath()), "pi-workspaces", this.id);
+  }
+
+  /**
+   * Append to this run's journal: the inspectable, redacted history of tool
+   * calls and the session's end that planners and reviewers read later.
+   */
+  note(event: Record<string, unknown>) {
+    this.record(event);
   }
 
   private record(event: Record<string, unknown>) {
@@ -537,6 +549,104 @@ export class PiWorkspace {
       }
       this.record({ type: "removed", container });
     }
+  }
+}
+
+/**
+ * What a run's sessions did, from their journals: tool calls with bounded
+ * arguments and results, errors, model retries and stops, and each session's
+ * end, oldest first. Stored history; reading it starts nothing. When long,
+ * the latest entries are kept: a run's end explains its outcome.
+ */
+export function runJournal(runId: string, limit = 9_000) {
+  const root = join(dirname(databasePath()), "pi-workspaces");
+  let directories: string[];
+  try {
+    directories = readdirSync(root);
+  } catch {
+    return null;
+  }
+  const needle = `"runId":${JSON.stringify(runId)}`;
+  const events: Record<string, unknown>[] = [];
+  for (const directory of directories) {
+    const file = join(root, directory, "events.jsonl");
+    try {
+      // Every entry names its run; the first identifies the journal.
+      const head = Buffer.alloc(1024);
+      const descriptor = openSync(file, "r");
+      let size = 0;
+      try {
+        size = readSync(descriptor, head, 0, head.length, 0);
+      } finally {
+        closeSync(descriptor);
+      }
+      if (!head.subarray(0, size).toString("utf8").split("\n")[0].includes(needle))
+        continue;
+      for (const line of readFileSync(file, "utf8").split("\n"))
+        if (line)
+          try {
+            events.push(JSON.parse(line));
+          } catch {
+            // A torn final line from an interrupted write.
+          }
+    } catch {
+      continue;
+    }
+  }
+  if (!events.length) return null;
+  events.sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const lines = events
+    .map(journalLine)
+    .filter((line): line is string => line !== null);
+  const kept: string[] = [];
+  let length = 0;
+  for (const line of [...lines].reverse()) {
+    if (length + line.length > limit) break;
+    kept.unshift(line);
+    length += line.length + 1;
+  }
+  return {
+    sessions: new Set(events.map((event) => event.workspaceId)).size,
+    omittedEarlierEntries: lines.length - kept.length,
+    entries: kept.join("\n"),
+  };
+}
+
+function clip(value: unknown, size: number) {
+  const text =
+    typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return text.length > size ? `${text.slice(0, size)}…` : text;
+}
+
+function journalLine(event: Record<string, unknown>) {
+  const at = String(event.at ?? "").slice(0, 19);
+  const output = (value: unknown) =>
+    (
+      (value as { content?: { type?: string; text?: string }[] } | undefined)
+        ?.content ?? []
+    )
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("");
+  switch (event.type) {
+    case "source":
+      return `${at} workspace: ${clip(event.description, 300)}`;
+    case "tool-start":
+      return `${at} call ${event.name} ${clip(event.args, 400)}`;
+    case "tool-end":
+      return `${at} result ${event.name}: ${clip(output(event.result), 800)}`;
+    case "tool-error":
+      return `${at} error ${event.name}: ${clip(event.error, 1200)}`;
+    case "model-retry":
+      return `${at} model retry ${event.attempt}: ${clip(event.error, 400)}`;
+    case "model-stop":
+      return `${at} model stopped: ${event.stopReason}${event.error ? ` (${clip(event.error, 600)})` : ""}${event.reply ? `\n  reply: ${clip(event.reply, 1500)}` : ""}`;
+    case "session-end":
+      return `${at} session ended: ${event.outcome}${event.error ? ` (${clip(event.error, 800)})` : ""}`;
+    case "interrupted":
+      return `${at} workspace interrupted: ${clip(event.reason, 300)}`;
+    default:
+      return null;
   }
 }
 

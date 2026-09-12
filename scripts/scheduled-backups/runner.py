@@ -8,7 +8,7 @@ receipt, status and error contract the controller integrates against.
     python3 runner.py <config-path>                  one scheduled run
     python3 runner.py <config-path> --recover        ExecStopPost recovery
     python3 runner.py <config-path> --status         sanitized JSON snapshot
-    python3 runner.py <config-path> --test-restore <run-id>
+    python3 runner.py <config-path> --test-restore <run-id> [--keep]
 
 Receipts and stdout never carry credentials, configuration, host paths,
 addresses or application data. Failures are a bounded phase and error code.
@@ -38,6 +38,8 @@ MAX_LISTED = 1000
 COMMAND_TIMEOUT = 120
 CAPTURE_TIMEOUT = 900
 RESTORE_TIMEOUT = 600
+# The recorded tail of what a failed declared procedure printed.
+DETAIL_CHARACTERS = 1500
 RECOVERY_LOCK_WAIT = 15
 
 STATE_ROOT = Path(
@@ -100,6 +102,7 @@ ERROR_CODES = {
     "restore-image-unavailable",
     "restore-failed",
     "restore-timeout",
+    "boot-failed",
     "interrupted",
     "unexpected-error",
 }
@@ -113,8 +116,10 @@ CHECK_LABELS = {
     "database-schema",
     "database-rows",
     "database-restored",
+    "database-content",
     "database-tables",
     "database-empty",
+    "application-boot",
 }
 
 # Bounded translation of storage failures. The SDK's own text never leaves the
@@ -147,10 +152,12 @@ ARCHIVE_ROOTS = {"manifest.json", "state", "configuration", "database"}
 class BackupError(Exception):
     """A failure already reduced to a phase and a bounded code."""
 
-    def __init__(self, phase, code):
+    def __init__(self, phase, code, detail=None):
         super().__init__(code)
         self.phase = phase
         self.code = code
+        # Why an owner's declared procedure failed, when that is the cause.
+        self.detail = detail
 
 
 def classify(error, phase):
@@ -190,6 +197,61 @@ def classify(error, phase):
                 return STORAGE_CODES[code]
         return "storage-error"
     return "unexpected-error"
+
+
+def procedure_detail(step, service, environment, error=None, reason=None):
+    """Why an owner's declared procedure failed, without its private values.
+
+    The dump, restore and verify commands are the plan's own, so their exit
+    status and the tail of what they printed are the evidence a correction
+    needs. Every value from the owner's environment is replaced by the
+    variable's name before anything is recorded.
+    """
+    exit_code = None
+    output = reason or ""
+    if isinstance(error, subprocess.CalledProcessError):
+        exit_code = error.returncode
+        output = error.stderr or b""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", "replace")
+    elif isinstance(error, subprocess.TimeoutExpired):
+        output = f"no result within {int(error.timeout)} seconds"
+    values = [str(entry).partition("=") for entry in environment or []]
+    for name, _, value in sorted(values, key=lambda item: -len(item[2])):
+        if len(value) >= 6:
+            output = output.replace(value, "$" + name)
+    return {
+        "step": step,
+        "service": service,
+        "exitCode": exit_code,
+        "output": output.strip()[-DETAIL_CHARACTERS:],
+    }
+
+
+def service_environment(service):
+    """A Compose service's environment as NAME=value entries."""
+    environment = service.get("environment") or {}
+    if isinstance(environment, dict):
+        return [f"{name}={value}" for name, value in environment.items() if value is not None]
+    return [str(entry) for entry in environment]
+
+
+def sanitize_detail(detail):
+    if not isinstance(detail, dict) or detail.get("step") not in PROCEDURE_STEPS:
+        return None
+    service = str(detail.get("service") or "")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}", service):
+        return None
+    exit_code = detail.get("exitCode")
+    return {
+        "step": detail["step"],
+        "service": service,
+        "exitCode": int(exit_code) if isinstance(exit_code, int) else None,
+        "output": str(detail.get("output") or "")[-DETAIL_CHARACTERS:],
+    }
+
+
+PROCEDURE_STEPS = {"stop", "dump", "verify", "start", "restore"}
 
 
 def now():
@@ -356,10 +418,16 @@ def helper_stage(run_id):
 
 
 def restore_names(run_id):
-    """The disposable resources one restore may own, all derived from its id."""
+    """The disposable resources one restore may own, all derived from its id.
+
+    A restored application runs as its own Compose project; every container
+    and volume it creates also carries the restore label with this run id.
+    The container and volume names are what older restores used.
+    """
     return {
         "container": "sg-restore-" + run_id,
         "volume": "sg-restore-" + run_id + "-data",
+        "project": "sg-restore-" + run_id[:8],
         "stage": "restore-" + run_id,
     }
 
@@ -730,23 +798,39 @@ def container_states(command, ids):
     }
 
 
-def verify_source_identity(config, states):
+def verify_source_identity(config, states, definition=None):
     """The running application must be the deployment this config protects.
 
     Without this a redeploy would be captured and then filed under the old
-    revision, so it is checked before the source is touched at all.
+    revision, so it is checked before the source is touched at all. Every
+    running container the controller labeled must carry this deployment and
+    revision, whatever its service is called. With the host's Compose
+    definition, whose hash the caller has matched, the labeled services are
+    exactly those it labels; state owners run unlabeled so a release never
+    recreates them, and the hash alone binds a stack that runs only them.
     """
-    app = next(
-        (value for value in states.values() if value["service"] == "app"),
-        None,
-    )
-    if app is None:
-        raise BackupError("capture", "source-not-running")
-    if (
-        app["labels"].get("server-guy.deployment") != config["deploymentId"]
-        or app["labels"].get("server-guy.revision") != config["revision"]
-    ):
-        raise BackupError("capture", "source-identity-mismatch")
+    if definition is not None:
+        expected = {
+            name
+            for name, service in definition["services"].items()
+            if "server-guy.revision" in (service.get("labels") or {})
+        }
+        labeled = [value for value in states.values() if value["service"] in expected]
+    else:
+        labeled = [
+            value
+            for value in states.values()
+            if {"server-guy.deployment", "server-guy.revision"} & set(value["labels"])
+        ]
+        # Running containers the controller never labeled are not this one.
+        if not labeled:
+            raise BackupError("capture", "source-identity-mismatch")
+    for value in labeled:
+        if (
+            value["labels"].get("server-guy.deployment") != config["deploymentId"]
+            or value["labels"].get("server-guy.revision") != config["revision"]
+        ):
+            raise BackupError("capture", "source-identity-mismatch")
 
 
 HELPER_MODULE = []
@@ -1041,41 +1125,121 @@ def capture_postgres(config, state, run_id, command, staging):
     }
 
 
+def bound_configuration(root, definition):
+    """Every file the definition binds into a container, under the root.
+
+    Bind sources are read-only files the release staged beside compose.json;
+    configs and secrets with a file are the same thing by another name.
+    """
+    bindings = {}
+
+    def bind(source):
+        raw = str(source or "")
+        path = Path(raw) if raw.startswith("/") else root / raw
+        try:
+            relative = path.resolve().relative_to(root)
+        except ValueError as error:
+            raise BackupError("capture", "source-unsupported") from error
+        if path.is_symlink() or not path.is_file():
+            raise BackupError("capture", "source-unsupported")
+        bindings[str(relative)] = root / relative
+
+    for service in definition["services"].values():
+        for mount in service.get("volumes") or []:
+            if isinstance(mount, dict) and mount.get("type") == "bind":
+                if not mount.get("read_only"):
+                    raise BackupError("capture", "source-unsupported")
+                bind(mount.get("source"))
+    for kind in ("configs", "secrets"):
+        for item in (definition.get(kind) or {}).values():
+            if isinstance(item, dict) and item.get("file"):
+                bind(item["file"])
+    return bindings
+
+
+def volume_path(command, full_name, phase="capture"):
+    """Where Docker keeps a named volume's data, for the runner to read."""
+    try:
+        mountpoint = (
+            command(
+                "docker", "volume", "inspect", "--format", "{{.Mountpoint}}", full_name
+            )
+            .decode()
+            .strip()
+        )
+    except subprocess.CalledProcessError as error:
+        raise BackupError(phase, "source-missing") from error
+    path = Path(mountpoint)
+    if not mountpoint or not path.is_absolute() or path.is_symlink() or not path.is_dir():
+        raise BackupError(phase, "source-unsupported")
+    return path
+
+
 def capture_stack(config, state, run_id, command, staging):
-    """One quiesced recovery point for recorded volumes and managed PostgreSQL."""
+    """One quiesced recovery point for the recorded volumes and dumps.
+
+    The plan says which services write captured files (they pause, dependents
+    first) and which owners dump their database while still running. Any
+    other service is left alone. Volume data is read where Docker keeps it,
+    and no container outside the plan may hold a captured volume writable.
+    """
     root, definition = source_definition(config)
     plan = config.get("capture") or {}
     if config.get("composeSha256") != sha256(root / "compose.json"):
         raise BackupError("capture", "source-identity-mismatch")
     pause_services = plan.get("pauseServices")
     volumes = plan.get("volumes")
-    postgres = plan.get("postgres")
+    dumps = plan.get("dumps") or []
+    service_name = r"[a-z0-9][a-z0-9_.-]{0,62}"
     if (
-        plan.get("version") != 1
+        plan.get("version") != 2
         or not isinstance(pause_services, list)
         or not isinstance(volumes, list)
+        or not isinstance(dumps, list)
+        or not all(
+            isinstance(name, str) and re.fullmatch(service_name, name)
+            for name in pause_services
+        )
+        or len(set(pause_services)) != len(pause_services)
     ):
         raise BackupError("capture", "source-unsupported")
-    expected_services = set(pause_services) | (
-        {"postgres"} if postgres == "postgres" else set()
-    )
-    if (
-        set(definition["services"]) != expected_services
-        or not pause_services
-        or postgres not in {None, "postgres"}
-    ):
+    for dump in dumps:
+        if (
+            not isinstance(dump, dict)
+            or not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", str(dump.get("volume")))
+            or not re.fullmatch(service_name, str(dump.get("service")))
+            or not isinstance(dump.get("target"), str)
+            or not isinstance(dump.get("quiescent", True), bool)
+            or not all(
+                isinstance(dump.get(step), list)
+                and dump[step]
+                and all(isinstance(part, str) and part for part in dump[step])
+                for step in ("dump", "restore", "verify")
+            )
+        ):
+            raise BackupError("capture", "source-unsupported")
+    owners = {dump["service"] for dump in dumps}
+    planned = set(pause_services) | owners
+    if owners & set(pause_services) or not planned <= set(definition["services"]):
         raise BackupError("capture", "source-unsupported")
     ids = source_containers(command, root, config)
     states = container_states(command, ids)
-    if (
-        {v["service"] for v in states.values()} != expected_services
-        or len(states) != len(expected_services)
-        or not all(v["running"] for v in states.values())
+    by_service = {}
+    for container, value in states.items():
+        if value["service"] in planned:
+            if value["service"] in by_service:
+                raise BackupError("capture", "source-not-running")
+            by_service[value["service"]] = (container, value)
+    if set(by_service) != planned or not all(
+        value["running"] for _, value in by_service.values()
     ):
         raise BackupError("capture", "source-not-running")
-    verify_source_identity(config, states)
-    consumers = {v["service"]: (container, v) for container, v in states.items()}
-    expected_mounts = {}
+    verify_source_identity(config, states, definition)
+    for service, (_, meta) in by_service.items():
+        if meta["image"] != definition["services"][service].get("image"):
+            raise BackupError("capture", "source-identity-mismatch")
+    project = compose_project(config["deploymentId"])
+    dumped = {project + "_" + dump["volume"]: dump for dump in dumps}
     sources = {}
     for volume in volumes:
         name = volume.get("name", "")
@@ -1095,93 +1259,46 @@ def capture_stack(config, state, run_id, command, staging):
             and volume.get("capture") != "quiesced-files"
         ):
             raise BackupError("capture", "source-unsupported")
-        for mount in volume.get("mounts", []):
-            service = mount.get("service")
-            if service not in pause_services:
-                raise BackupError("capture", "source-unsupported")
-            key = (service, mount.get("target"))
-            if key in expected_mounts:
-                raise BackupError("capture", "source-unsupported")
-            expected_mounts[key] = (name, bool(mount.get("readOnly")))
-        sources[name] = None
-    bindings = {}
-    seen = set()
-    for service, (_, meta) in consumers.items():
-        if meta["image"] != definition["services"][service].get("image"):
-            raise BackupError("capture", "source-identity-mismatch")
-        for mount in meta["mounts"]:
-            if mount["Type"] == "volume":
-                if service == postgres:
-                    if (
-                        mount["Name"]
-                        != compose_project(config["deploymentId"]) + "_database"
-                    ):
-                        raise BackupError("capture", "source-unsupported")
-                    continue
-                key = (service, mount["Destination"])
-                wanted = expected_mounts.get(key)
-                if (
-                    not wanted
-                    or mount["Name"]
-                    != compose_project(config["deploymentId"]) + "_" + wanted[0]
-                    or bool(mount.get("RW")) == wanted[1]
-                ):
-                    raise BackupError("capture", "source-unsupported")
-                seen.add(key)
-                source = Path(mount["Source"])
-                if sources[wanted[0]] not in {None, source}:
-                    raise BackupError("capture", "source-unsupported")
-                sources[wanted[0]] = source
-            elif mount["Type"] == "bind":
-                path = Path(mount["Source"])
-                if (
-                    mount.get("RW")
-                    or not path.is_relative_to(root)
-                    or path.is_symlink()
-                    or not path.is_file()
-                ):
-                    raise BackupError("capture", "source-unsupported")
-                bindings[str(path.relative_to(root))] = path
-            else:
-                raise BackupError("capture", "source-unsupported")
-    if seen != set(expected_mounts) or any(
-        source is None for source in sources.values()
-    ):
-        raise BackupError("capture", "source-unsupported")
-    module = helper_module()
-    # Inventory before following paths; reject links and unsupported special files.
-    for source in sources.values():
-        if source.is_symlink() or not source.is_dir():
+        if project + "_" + name in dumped:
             raise BackupError("capture", "source-unsupported")
-        try:
-            module.inventory(source)
-        except RuntimeError as error:
-            raise BackupError("capture", "source-unsupported") from error
-    # A service outside this application must not keep writing a captured volume.
-    for name in sources:
-        full_name = compose_project(config["deploymentId"]) + "_" + name
+        sources[name] = volume_path(command, project + "_" + name)
+    paused = [by_service[name][0] for name in pause_services]
+    # A planned container running with a volume the plan never recorded was
+    # not started from the definition this plan describes.
+    recorded = {project + "_" + name for name in sources} | set(dumped)
+    for _, meta in by_service.values():
+        for mount in meta["mounts"]:
+            if mount.get("Type") == "volume" and mount.get("Name") not in recorded:
+                raise BackupError("capture", "source-unsupported")
+    # A captured volume may be held writable only by a service this run
+    # pauses; a dumped one by its owner as well. Anything else still running,
+    # inside this project or outside it, would keep writing during capture.
+    for full_name in [project + "_" + name for name in sources] + list(dumped):
+        allowed = set(paused)
+        if full_name in dumped:
+            allowed.add(by_service[dumped[full_name]["service"]][0])
         attached = (
             command(
-                "docker",
-                "ps",
-                "--quiet",
-                "--no-trunc",
-                "--filter",
-                "volume=" + full_name,
+                "docker", "ps", "--quiet", "--no-trunc", "--filter", "volume=" + full_name
             )
             .decode()
             .split()
         )
-        foreign = [container for container in attached if container not in states]
-        for other in (
-            json.loads(command("docker", "inspect", *foreign)) if foreign else []
-        ):
+        others = [container for container in attached if container not in allowed]
+        for other in json.loads(command("docker", "inspect", *others)) if others else []:
             if any(
                 m.get("Name") == full_name and m.get("RW")
                 for m in other.get("Mounts", [])
             ):
                 raise BackupError("capture", "source-unsupported")
-    paused = [consumers[name][0] for name in pause_services]
+    bindings = bound_configuration(root, definition)
+    module = helper_module()
+    # Inventory before following paths; reject links and unsupported special files.
+    for source in sources.values():
+        try:
+            module.inventory(source)
+        except RuntimeError as error:
+            raise BackupError("capture", "source-unsupported") from error
     journal = {
         "version": VERSION,
         "kind": "source",
@@ -1204,9 +1321,9 @@ def capture_stack(config, state, run_id, command, staging):
         "capture": plan,
         "sqlite": {},
         "method": ", ".join(
-            ["quiesced application services and volume files"]
+            ["quiesced writers and volume files"]
             + (["SQLite backup API"] if any(v.get("sqlite") for v in volumes) else [])
-            + (["managed PostgreSQL dump"] if postgres else [])
+            + (["owner dumps"] if dumps else [])
         ),
     }
     started = now()
@@ -1218,12 +1335,32 @@ def capture_stack(config, state, run_id, command, staging):
                 command("docker", "stop", "--time", "120", container, timeout=150)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
             raise BackupError("capture", "capture-failed") from error
-        stopped = json.loads(command("docker", "inspect", *paused))
-        if any(
-            c["State"]["Running"] or c["State"]["ExitCode"] not in {0, 143}
+        stopped = json.loads(command("docker", "inspect", *paused)) if paused else []
+        unclean = [
+            c
             for c in stopped
-        ):
-            raise BackupError("capture", "source-stop-failed")
+            if c["State"]["Running"] or c["State"]["ExitCode"] not in {0, 143}
+        ]
+        if unclean:
+            # Which service, and how it ended: the evidence a stop-signal or
+            # grace-period correction needs.
+            first = unclean[0]
+            running = bool(first["State"]["Running"])
+            raise BackupError(
+                "capture",
+                "source-stop-failed",
+                {
+                    "step": "stop",
+                    "service": first["Config"]["Labels"]["com.docker.compose.service"],
+                    "exitCode": None if running else int(first["State"]["ExitCode"]),
+                    "output": (
+                        "was still running after the 120-second stop grace period"
+                        if running
+                        else f"exited {first['State']['ExitCode']} after the 120-second stop grace period"
+                        + (" (killed)" if first["State"]["ExitCode"] == 137 else "")
+                    ),
+                },
+            )
         manifest["stoppedServices"] = {
             c["Config"]["Labels"]["com.docker.compose.service"]: c["State"]["ExitCode"]
             for c in stopped
@@ -1275,10 +1412,11 @@ def capture_stack(config, state, run_id, command, staging):
                 if dest.exists():
                     stat = path.stat()
                     os.chown(dest, stat.st_uid, stat.st_gid)
-        if postgres:
-            container, meta = consumers[postgres]
-            manifest["postgres"] = capture_postgres_database(
-                container, meta, stage, command
+        # Owners dump while every writer is stopped: one recovery point.
+        for dump in dumps:
+            container, meta = by_service[dump["service"]]
+            manifest.setdefault("dumps", {})[dump["volume"]] = (
+                capture_declared_dump(container, meta, dump, stage, command)
             )
     finally:
         restore_source(command, state, journal)
@@ -1300,64 +1438,351 @@ def capture_stack(config, state, run_id, command, staging):
     }
 
 
-def capture_postgres_database(container, meta, stage, command):
-    try:
-        user = source_environment(meta["environment"], "POSTGRES_USER")
-        name = source_environment(meta["environment"], "POSTGRES_DB")
-        if not IDENTIFIER_PATTERN.match(user or "") or not IDENTIFIER_PATTERN.match(
-            name or ""
-        ):
-            raise BackupError("capture", "source-unsupported")
-        version = int(
-            command(
-                "docker",
-                "exec",
-                container,
-                "psql",
-                "-U",
-                user,
-                "-d",
-                name,
-                "-tAqc",
-                "SHOW server_version_num",
-            )
-            .decode()
-            .strip()
+def capture_declared_dump(container, meta, dump, stage, command):
+    """An owner's own dump, and its content fingerprint when the plan says
+    every writer is paused.
+
+    Both are commands from the recorded plan, run in the owner's container
+    with its environment; nothing here passes through a shell. A dump whose
+    writers the plan does not know is taken online by the tool's own
+    snapshot: a live fingerprint could then describe another moment, so none
+    is taken and restoration proves the copy instead.
+    """
+    (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
+    target = stage / "database" / (dump["volume"] + ".dump")
+
+    def failed(step, error=None, reason=None):
+        detail = procedure_detail(
+            step, meta["service"], meta["environment"], error, reason
         )
-        (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
-        dump = stage / "database/dump.pgc"
+        return BackupError("capture", "capture-failed", detail)
+
+    try:
         command(
             "docker",
             "exec",
             container,
-            "pg_dump",
-            "-U",
-            user,
-            "-d",
-            name,
-            "--format=custom",
-            "--no-owner",
-            "--no-acl",
-            stdout=dump,
+            *dump["dump"],
+            stdout=target,
             timeout=CAPTURE_TIMEOUT,
         )
-        os.chmod(dump, 0o600)
-        with dump.open("rb") as stream:
-            if stream.read(5) != b"PGDMP":
-                raise BackupError("capture", "capture-failed")
-        return {
-            "service": meta["service"],
-            "image": meta["image"],
-            "majorVersion": version // 10000,
-            "user": user,
-            "database": name,
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise failed("dump", error) from error
+    os.chmod(target, 0o600)
+    if not target.stat().st_size:
+        raise failed("dump", reason="the dump wrote no bytes")
+    fingerprint = None
+    if dump.get("quiescent", True):
+        try:
+            fingerprint = command(
+                "docker", "exec", container, *dump["verify"], timeout=COMMAND_TIMEOUT
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise failed("verify", error) from error
+        if len(fingerprint) > 64 * 1024:
+            raise failed("verify", reason="the fingerprint exceeds 64 KiB")
+    return {
+        "service": meta["service"],
+        "image": meta["image"],
+        "target": dump["target"],
+        "bytes": target.stat().st_size,
+        "sha256": sha256(target),
+        "fingerprint": (
+            fingerprint.decode("utf-8", "replace") if fingerprint is not None else None
+        ),
+        "quiescent": fingerprint is not None,
+    }
+
+
+def copy_tree_with_owners(source, target):
+    """Copy a captured volume into a fresh one, keeping modes and owners."""
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    for path in [source, *source.rglob("*")]:
+        dest = target / path.relative_to(source)
+        if dest.exists():
+            stat = path.stat()
+            os.chown(dest, stat.st_uid, stat.st_gid)
+
+
+def restore_definition(extracted, manifest, run_id, workspace):
+    """The archived configuration as an isolated Compose project.
+
+    No published ports, internal networks, fresh volumes that carry this
+    restore's label, no controller labels and no restart policy, with bound
+    configuration read from the archive. It runs beside the live application
+    and cannot reach anything outside itself.
+    """
+    names = restore_names(run_id)
+    project = names["project"]
+    try:
+        definition = json.loads((extracted / "configuration/compose.json").read_text())
+        services = definition["services"]
+        if not isinstance(services, dict) or not services:
+            raise ValueError("no services")
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise BackupError("restore", "manifest-mismatch") from error
+    root = SOURCE_ROOT / manifest["deploymentId"]
+
+    def archived(source):
+        raw = str(source or "")
+        path = Path(raw) if raw.startswith("/") else root / raw
+        try:
+            relative = path.relative_to(root)
+        except ValueError as error:
+            raise BackupError("restore", "manifest-mismatch") from error
+        file = extracted / "configuration" / relative
+        if not file.is_file():
+            raise BackupError("restore", "manifest-mismatch")
+        return str(file)
+
+    definition["name"] = project
+    for service in services.values():
+        for key in ("ports", "container_name", "restart"):
+            service.pop(key, None)
+        service["labels"] = {
+            key: value
+            for key, value in (service.get("labels") or {}).items()
+            if not str(key).startswith("server-guy.")
         }
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        ValueError,
-    ) as error:
-        raise BackupError("capture", "capture-failed") from error
+        service["labels"][RESTORE_LABEL] = run_id
+        for mount in service.get("volumes") or []:
+            if isinstance(mount, dict) and mount.get("type") == "bind":
+                mount["source"] = archived(mount.get("source"))
+    for kind in ("configs", "secrets"):
+        for item in (definition.get(kind) or {}).values():
+            if isinstance(item, dict) and item.get("file"):
+                item["file"] = archived(item["file"])
+    networks = definition.get("networks") or {"default": {}}
+    definition["networks"] = {
+        name: {"name": project + "_" + name, "internal": True} for name in networks
+    }
+    used = set(definition.get("volumes") or {})
+    for service in services.values():
+        for mount in service.get("volumes") or []:
+            if isinstance(mount, dict) and mount.get("type") == "volume":
+                used.add(str(mount.get("source")))
+    definition["volumes"] = {
+        name: {"name": project + "_" + name, "external": True} for name in sorted(used)
+    }
+    path = workspace / "compose.json"
+    path.write_text(json.dumps(definition))
+    os.chmod(path, 0o600)
+    return definition, path
+
+
+def restore_application(
+    extracted, manifest, restore, run_id, command, workspace, boot
+):
+    """Bring the archived application up on its restored data, in isolation.
+
+    Files go into fresh volumes; each owner is started alone and loads its
+    dump through the recorded restore command, then must print the source's
+    fingerprint. With `boot`, the whole stack then starts and its services'
+    states are recorded, so the controller can run checks inside it.
+    """
+    plan = manifest.get("capture") or {}
+    definition, path = restore_definition(extracted, manifest, run_id, workspace)
+    names = restore_names(run_id)
+    compose = ("docker", "compose", "-p", names["project"], "-f", str(path))
+    for name in definition["volumes"]:
+        command(
+            "docker",
+            "volume",
+            "create",
+            "--label",
+            RESTORE_LABEL + "=" + run_id,
+            names["project"] + "_" + name,
+        )
+    for volume in plan.get("volumes") or []:
+        source = extracted / "state" / str(volume.get("name"))
+        if str(volume.get("name")) not in definition["volumes"] or not source.is_dir():
+            raise BackupError("restore", "manifest-mismatch")
+        target = volume_path(command, names["project"] + "_" + volume["name"], "restore")
+        copy_tree_with_owners(source, target)
+    for declared in plan.get("dumps") or []:
+        captured = (manifest.get("dumps") or {}).get(declared.get("volume"))
+        dump = extracted / "database" / (str(declared.get("volume")) + ".dump")
+        if (
+            not isinstance(captured, dict)
+            or not isinstance(captured.get("fingerprint"), (str, type(None)))
+            or not dump.is_file()
+            or sha256(dump) != captured.get("sha256")
+            or declared.get("service") not in definition["services"]
+        ):
+            raise BackupError("restore", "manifest-mismatch")
+        owner = declared["service"]
+        environment = service_environment(definition["services"][owner])
+
+        def failed(code, step, error=None, reason=None):
+            detail = procedure_detail(step, owner, environment, error, reason)
+            return BackupError("restore", code, detail)
+
+        try:
+            command(
+                *compose,
+                "up",
+                "--detach",
+                "--wait",
+                "--wait-timeout",
+                str(RESTORE_TIMEOUT),
+                "--no-deps",
+                "--pull",
+                "never",
+                owner,
+                timeout=RESTORE_TIMEOUT + 60,
+            )
+        except subprocess.CalledProcessError as error:
+            raise failed("restore-failed", "start", error) from error
+        payload = dump.read_bytes()
+        deadline = now() + RESTORE_TIMEOUT
+        while True:
+            try:
+                command(
+                    *compose,
+                    "exec",
+                    "-T",
+                    owner,
+                    *declared["restore"],
+                    input=payload,
+                    timeout=RESTORE_TIMEOUT,
+                )
+                break
+            except subprocess.TimeoutExpired as error:
+                raise failed("restore-timeout", "restore", error) from error
+            except subprocess.CalledProcessError as error:
+                # A fresh server refuses connections while it initializes; a
+                # partial load is still caught by the fingerprint below.
+                if now() >= deadline:
+                    raise failed("restore-failed", "restore", error) from error
+                time.sleep(2)
+        restore["checks"].append("database-restored")
+        # An online dump carries no live fingerprint to compare: loading it
+        # without error is what proves it, and the record says only that.
+        if captured["fingerprint"] is None:
+            restore["measurements"]["databases"] = (
+                restore["measurements"].get("databases", 0) + 1
+            )
+            continue
+        try:
+            fingerprint = command(
+                *compose,
+                "exec",
+                "-T",
+                owner,
+                *declared["verify"],
+                timeout=COMMAND_TIMEOUT,
+            ).decode("utf-8", "replace")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise failed("database-check-failed", "verify", error) from error
+        if fingerprint != captured["fingerprint"]:
+            raise failed(
+                "database-check-failed",
+                "verify",
+                reason="the restored fingerprint differs from the captured one",
+            )
+        restore["checks"].append("database-content")
+        restore["measurements"]["databases"] = (
+            restore["measurements"].get("databases", 0) + 1
+        )
+    if not boot:
+        return
+    started = now()
+    try:
+        command(
+            *compose,
+            "up",
+            "--detach",
+            "--wait",
+            "--wait-timeout",
+            str(RESTORE_TIMEOUT),
+            "--pull",
+            "never",
+            timeout=RESTORE_TIMEOUT + 60,
+        )
+    except subprocess.CalledProcessError as error:
+        raise BackupError("restore", "boot-failed") from error
+    services = {}
+    for line in (
+        command(*compose, "ps", "--all", "--format", "json").decode().splitlines()
+    ):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(entry, dict) and entry.get("Service"):
+            services[str(entry["Service"])[:63]] = {
+                "state": str(entry.get("State"))[:20],
+                "exitCode": int(entry.get("ExitCode") or 0),
+            }
+    restore["boot"] = {
+        "project": names["project"],
+        "seconds": round(now() - started, 1),
+        "services": services,
+    }
+    restore["checks"].append("application-boot")
+
+
+def remove_restore_stack(command, run_id, workspace):
+    """Remove everything one restore created, by its project and label.
+
+    Returns (cleaned, removed): whether nothing of this run's is left, and
+    how many resources went. Older restores named a single container and
+    volume; those names are checked too. An unanswered daemon leaves the
+    cleanup owed.
+    """
+    names = restore_names(run_id)
+    cleaned = True
+    removed = 0
+    path = workspace / "compose.json"
+    if path.is_file():
+        try:
+            command(
+                "docker",
+                "compose",
+                "-p",
+                names["project"],
+                "-f",
+                str(path),
+                "down",
+                "--remove-orphans",
+                "--timeout",
+                "30",
+                timeout=COMMAND_TIMEOUT * 2,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            cleaned = False
+    label = RESTORE_LABEL + "=" + run_id
+    for kind, listing in (
+        ("container", ("docker", "ps", "-aq", "--no-trunc", "--filter", "label=" + label)),
+        ("volume", ("docker", "volume", "ls", "-q", "--filter", "label=" + label)),
+    ):
+        try:
+            found = command(*listing).decode().split()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return False, removed
+        for name in dict.fromkeys([*found, names[kind]]):
+            outcome = remove_owned(command, kind, name, run_id)
+            if outcome is None:
+                cleaned = False
+            elif outcome:
+                removed += 1
+    try:
+        for network in (
+            command(
+                "docker",
+                "network",
+                "ls",
+                "-q",
+                "--filter",
+                "label=com.docker.compose.project=" + names["project"],
+            )
+            .decode()
+            .split()
+        ):
+            command("docker", "network", "rm", network)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        cleaned = False
+    return cleaned, removed
 
 
 CAPTURES = {
@@ -1473,6 +1898,7 @@ def new_receipt(config, run_id, started):
         "objectKey": None,
         "sourcePauseSeconds": None,
         "errorCode": None,
+        "detail": None,
         "retention": {"deleted": 0, "failed": False},
         "restore": None,
     }
@@ -1528,6 +1954,7 @@ def perform_run(
         receipt["outcome"] = "failed"
         receipt["phase"] = getattr(error, "phase", receipt["phase"])
         receipt["errorCode"] = classify(error, receipt["phase"])
+        receipt["detail"] = getattr(error, "detail", None)
     finally:
         if not remove_tree(staging):
             receipt["pendingCleanup"] = True
@@ -1604,14 +2031,9 @@ def recover_restore(state, journal, command):
     run_id = journal["runId"]
     # Generated, never read from the record: recovery deletes these.
     names = restore_names(run_id)
-    removed = 0
-    cleaned = True
-    for kind in ("container", "volume"):
-        outcome = remove_owned(command, kind, names[kind], run_id)
-        if outcome is None:
-            cleaned = False
-        elif outcome:
-            removed += 1
+    cleaned, removed = remove_restore_stack(
+        command, run_id, state.staging / names["stage"]
+    )
     if not remove_tree(state.staging / names["stage"]):
         cleaned = False
     journal["removed"] = removed
@@ -1648,9 +2070,10 @@ def recover_restore(state, journal, command):
 def recover_run(state, receipt, storage):
     """Close a run that never finished, and clear what it left behind."""
     cleaned = remove_tree(state.staging / receipt["id"])
-    if receipt.get("objectKey"):
+    if receipt.get("objectKey") and receipt.get("outcome") != "succeeded":
         # A killed upload can leave parts billing away. Abandon this key's
-        # parts and nothing else.
+        # parts and nothing else. A verified archive is a completed object:
+        # it owns no parts, and closing it must not depend on storage.
         cleaned = (
             bool(storage and storage.abort_multipart(receipt["objectKey"])) and cleaned
         )
@@ -1745,6 +2168,33 @@ def sanitize_restore(restore):
         },
         "cleanupComplete": bool(restore.get("cleanupComplete")),
         "errorCode": code if code in ERROR_CODES else None,
+        "detail": sanitize_detail(restore.get("detail")),
+        **({"boot": boot} if (boot := sanitize_boot(restore.get("boot"))) else {}),
+    }
+
+
+def sanitize_boot(boot):
+    """The booted copy's identity and service states, bounded."""
+    if not isinstance(boot, dict) or not isinstance(boot.get("services"), dict):
+        return None
+    project = str(boot.get("project") or "")
+    if not re.fullmatch(r"sg-restore-[0-9a-f]{8}", project):
+        return None
+    services = {}
+    for name, value in list(boot["services"].items())[:32]:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{0,62}", str(name)):
+            continue
+        if not isinstance(value, dict):
+            continue
+        services[str(name)] = {
+            "state": str(value.get("state") or "")[:20],
+            "exitCode": int(value.get("exitCode") or 0),
+        }
+    seconds = boot.get("seconds")
+    return {
+        "project": project,
+        "seconds": float(seconds) if isinstance(seconds, (int, float)) else 0.0,
+        "services": services,
     }
 
 
@@ -1765,6 +2215,7 @@ def sanitize_receipt(receipt):
         "failed": bool(retention.get("failed")),
     }
     result["restoreInProgress"] = bool(receipt.get("restoreInProgress"))
+    result["detail"] = sanitize_detail(receipt.get("detail"))
     result["restore"] = sanitize_restore(receipt.get("restore"))
     return result
 
@@ -2007,9 +2458,19 @@ def verify_postgres_restore(extracted, manifest, restore, run_id, command, names
 
 
 def perform_test_restore(
-    config, state, run_id, storage_factory=make_storage, command=run_command
+    config,
+    state,
+    run_id,
+    storage_factory=make_storage,
+    command=run_command,
+    keep=False,
 ):
-    """Fetch the recorded archive again and restore it somewhere disposable."""
+    """Fetch the recorded archive again and restore it somewhere disposable.
+
+    A stack archive is restored into an isolated Compose project on this
+    host and booted; with `keep` the booted copy stays up, its journal open,
+    for the controller to check inside it until `--recover` removes it.
+    """
     receipt = state.load_receipt(run_id)
     if receipt is None:
         raise BackupError("restore", "run-not-found")
@@ -2020,14 +2481,17 @@ def perform_test_restore(
         "recoveryPointAt": None,
         "outcome": "failed",
         "scope": (
-            "offline-database-and-files"
-            if receipt.get("kind") in {"sqlite-stack", "stack"}
+            "isolated-application"
+            if receipt.get("kind") == "stack"
+            else "offline-database-and-files"
+            if receipt.get("kind") == "sqlite-stack"
             else "offline-database"
         ),
         "checks": [],
         "measurements": {},
         "cleanupComplete": False,
         "errorCode": None,
+        "detail": None,
     }
     names = restore_names(run_id)
     journal = {
@@ -2037,6 +2501,7 @@ def perform_test_restore(
         "deploymentId": config["deploymentId"],
         "container": names["container"],
         "volume": names["volume"],
+        "project": names["project"],
         "scope": restore["scope"],
         "startedAt": restore["at"],
         "complete": False,
@@ -2084,10 +2549,22 @@ def perform_test_restore(
                 raise BackupError("restore", "manifest-mismatch")
             restore["recoveryPointAt"] = manifest.get("recoveryPointAt")
             verify_sqlite_restore(extracted, manifest, restore, require_database=False)
-            if manifest["capture"].get("postgres"):
+            # An archive from the earlier stack runner dumped the managed
+            # PostgreSQL itself; it is restored offline, and its application
+            # is not booted, because that dump is not part of its project.
+            legacy = bool(manifest["capture"].get("postgres"))
+            if legacy:
                 verify_postgres_restore(
                     extracted, manifest, restore, run_id, command, names
                 )
+                for kind in ("container", "volume"):
+                    if remove_owned(command, kind, names[kind], run_id) is None:
+                        raise BackupError("restore", "restore-failed")
+            restore_application(
+                extracted, manifest, restore, run_id, command, workspace, not legacy
+            )
+            if legacy:
+                restore["scope"] = "offline-database-and-files"
         elif receipt["kind"] == "sqlite-stack":
             restore["recoveryPointAt"] = iso(float(manifest["stopStartedAt"]))
             verify_sqlite_restore(extracted, manifest, restore)
@@ -2099,16 +2576,21 @@ def perform_test_restore(
         restore["outcome"] = "verified"
     except Exception as error:  # noqa: BLE001 - every failure becomes a bounded code
         restore["errorCode"] = classify(error, "restore")
+        restore["detail"] = getattr(error, "detail", None)
     finally:
-        # Cleanup is reported, not conflated with the restore verdict.
-        cleaned = True
-        # Inspect even after a create command failed: it may have created a
-        # resource before its response was lost. Names and labels both match.
-        if receipt["kind"] in {"postgres", "stack"}:
-            for kind in ("container", "volume"):
-                if remove_owned(command, kind, names[kind], run_id) is None:
-                    cleaned = False
-        restore["cleanupComplete"] = remove_tree(workspace) and cleaned
+        # Cleanup is reported, not conflated with the restore verdict. A kept
+        # copy stays up on purpose, and its open journal says so until the
+        # controller, or the next recovery, removes it.
+        kept = keep and restore["outcome"] == "verified" and "boot" in restore
+        if kept:
+            restore["cleanupComplete"] = False
+        else:
+            # Inspect even after a create command failed: it may have created
+            # a resource before its response was lost. Names and labels match.
+            cleaned = True
+            if receipt["kind"] in {"postgres", "stack"}:
+                cleaned = remove_restore_stack(command, run_id, workspace)[0]
+            restore["cleanupComplete"] = remove_tree(workspace) and cleaned
         receipt["restore"] = restore
         receipt["restoreInProgress"] = False
         if not restore["cleanupComplete"]:
@@ -2166,13 +2648,15 @@ def main(argv):
         finally:
             os.close(descriptor)
         return 0
-    if rest[:1] == ["--test-restore"] and len(rest) == 2:
+    if rest[:1] == ["--test-restore"] and rest[2:] in ([], ["--keep"]) and len(rest) >= 2:
         descriptor = acquire_lock(config["deploymentId"])
         if descriptor is None:
             report({"version": VERSION, "errorCode": "lock-unavailable"}, sys.stderr)
             return 75
         try:
-            receipt = perform_test_restore(config, state, rest[1])
+            receipt = perform_test_restore(
+                config, state, rest[1], keep=rest[2:] == ["--keep"]
+            )
         except BackupError as error:
             report(
                 {"version": VERSION, "phase": error.phase, "errorCode": error.code},

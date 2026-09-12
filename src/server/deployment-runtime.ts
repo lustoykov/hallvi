@@ -18,6 +18,22 @@ export interface DeploymentAttempt {
   error: string | null;
   /** Offset in the action log; the next attempt bounds the end. */
   eventOffset: number;
+  /** The checks this attempt ran, in order, with what each observed. */
+  checks?: CheckResult[];
+}
+/** One verification check as it ran: bounded, redacted evidence. */
+export interface CheckResult {
+  name: string;
+  kind: "http" | "command";
+  /** The command's service, or the HTTP method and path. */
+  target: string;
+  at: string;
+  durationMs: number;
+  passed: boolean;
+  /** HTTP status or exit code; null when the outcome is unknown. */
+  status: number | null;
+  /** The end of a command's combined output, redacted. */
+  output?: string;
 }
 /** What an execution or reconciliation established on the host. */
 export interface RuntimeSnapshot {

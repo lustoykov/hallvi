@@ -5,6 +5,8 @@ import {
   cancelDeployment,
 } from "@/server/deployment-store";
 import { OperationConflictError } from "@/server/operation-store";
+import { getDeployment } from "@/server/deployment-store";
+import { acceptUnknownCommand } from "@/server/command-checks";
 import { z } from "zod";
 import { handle } from "@/server/http";
 import { parseJsonRequest } from "@/server/schemas";
@@ -82,6 +84,19 @@ export function POST(
         : input.action === "cancel"
           ? cancelOperation(record.id, input.updatedAt, attestation)
           : retryOperation(record.id, input.updatedAt);
+    // The owner's decision to run a release is the one that may accept a
+    // held command's unknown outcome on its deployment.
+    if (
+      input.action !== "cancel" &&
+      result.command?.type === "release-deployment"
+    ) {
+      const deployment = getDeployment(result.command.scope.deploymentId);
+      if (deployment)
+        acceptUnknownCommand(deployment, {
+          title: `${input.action}: ${result.title}`,
+          operationId: result.id,
+        });
+    }
     return { operation: publicOperation(result) };
   });
 }

@@ -7,11 +7,13 @@ import { imageReferenceSchema, pinContainerImage } from "./container-images";
 import type {
   Criterion,
   DeploymentRelease,
+  InputGenerator,
   NativeConfiguration,
   ResolvedCompose,
 } from "./deployment-release";
 import {
   checkIssues,
+  commandCheckSchema,
   httpPathSchema,
   primaryCheckSchema,
   serviceCheckSchema,
@@ -20,6 +22,7 @@ import type { TreeFile } from "./execution-tree";
 import { runComposeResolver } from "./pi-workspace";
 import {
   composeProject,
+  managedDatabaseProcedure,
   nativeFacts,
   primaryHttp,
   releaseFacts,
@@ -32,6 +35,11 @@ export class NativeConfigurationError extends Error {}
 
 /** The managed PostgreSQL password, available to Compose interpolation. */
 export const DATABASE_PASSWORD = "SERVER_GUY_DATABASE_PASSWORD";
+/**
+ * The application's own address, for settings such as APP_URL: the
+ * controller supplies http://<server address> once the server exists.
+ */
+export const PUBLIC_URL = "SERVER_GUY_PUBLIC_URL";
 /** Controller-generated Compose file, retained with every native release. */
 export const OVERRIDE_PATH = ".server-guy/override.compose.json";
 export const SELECTION_LIMITS = { files: 64, bytes: 512 * 1024 };
@@ -41,12 +49,20 @@ export interface NativeSelection {
   compose: string[];
   /** Other selected files Compose or builds need. */
   files?: string[];
-  /** Protection records for new named volumes. */
+  /**
+   * Protection records for named volumes. A volume the baseline already
+   * records keeps its owner, capture and procedure unless a field is set;
+   * null removes one explicitly.
+   */
   data?: {
     volume: string;
     kind: "database" | "files";
     sqlite?: string | null;
-    capture?: "quiesced-files";
+    capture?: "quiesced-files" | "dump" | null;
+    owner?: string | null;
+    procedure?: NativeConfiguration["data"][number]["procedure"] | null;
+    /** Services that write this data without mounting it; null removes. */
+    writers?: string[] | null;
   }[];
   /** JSON criterion in the current criterion's shape; omit to keep it. */
   criterion?: string;
@@ -69,6 +85,7 @@ export const criterionSchema = z
       )
       .max(8)
       .default([]),
+    commands: z.array(commandCheckSchema).max(8).optional(),
   })
   .superRefine((criterion, ctx) => {
     for (const message of checkIssues(criterion.healthPath, criterion.checks))
@@ -479,6 +496,8 @@ async function controllerOverride(
   deploymentId: string,
   revision: string,
   database: string | null,
+  /** Services that own persistent state; a label must never recreate them. */
+  owners: Set<string>,
   signal: AbortSignal,
 ) {
   const built = new Set(
@@ -492,8 +511,9 @@ async function controllerOverride(
   > = {};
   for (const [name, service] of Object.entries(resolved.services)) {
     const entry: { labels?: Record<string, string>; image?: string } = {};
-    // The managed database keeps running across application releases.
-    if (name !== database)
+    // State owners keep running across application releases: a changed
+    // revision label alone would make Compose recreate them.
+    if (!owners.has(name))
       entry.labels = {
         "server-guy.revision": revision,
         "server-guy.deployment": deploymentId,
@@ -508,7 +528,7 @@ async function controllerOverride(
     ) {
       if (!imageReferenceSchema.safeParse(service.image).success)
         throw new NativeConfigurationError(
-          `Service ${name}: ${service.image} is not a public Docker Hub or GHCR reference with a tag; the controller pins public tags to digests.`,
+          `Service ${name}: ${service.image} is not a public registry reference with a tag or digest; the controller pins public tags to digests.`,
         );
       if (!service.image.includes("@sha256:"))
         try {
@@ -525,7 +545,13 @@ async function controllerOverride(
   return { services };
 }
 
-function dataRecords(
+/**
+ * The data records of a release: Pi's declarations over what the baseline
+ * already records. A correction that redeclares a volume keeps its owner,
+ * capture and procedure unless it sets them, so protection is never lost by
+ * omission; the scope rules decide whether a change needs the owner.
+ */
+export function dataRecords(
   resolved: ResolvedCompose,
   declarations: NonNullable<NativeSelection["data"]>,
   baseline: ReleaseFacts,
@@ -550,20 +576,29 @@ function dataRecords(
       (item) => item.dockerName === resolved.volumes?.[volume]?.name,
     );
     const declaration = declared.get(volume);
+    const inherited = previous && {
+      kind: previous.kind,
+      sqlite: previous.sqlite,
+      capture: previous.capture,
+      owner: previous.owner,
+      procedure: previous.procedure,
+      writers: previous.writers,
+    };
+    const set = <T>(value: T | null | undefined, kept: T | undefined) =>
+      value === undefined ? kept : (value ?? undefined);
     const record = declaration
       ? {
           kind: declaration.kind,
-          sqlite: declaration.sqlite ?? null,
-          capture: declaration.capture,
+          sqlite: set(declaration.sqlite, inherited?.sqlite) ?? null,
+          capture: set(declaration.capture, inherited?.capture),
+          owner: set(declaration.owner, inherited?.owner),
+          procedure: set(declaration.procedure, inherited?.procedure),
+          writers: set(declaration.writers, inherited?.writers),
         }
-      : previous && {
-          kind: previous.kind,
-          sqlite: previous.sqlite,
-          capture: previous.capture,
-        };
+      : inherited;
     if (!record)
       throw new NativeConfigurationError(
-        `Declare data for new volume ${volume}: kind "files" or "database", with its SQLite path relative to the volume root, or capture "quiesced-files" only when a clean shutdown leaves all state consistent in it.`,
+        `Declare data for new volume ${volume}: kind "files" or "database", with its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all state consistent in it, or capture "dump" with its owner and procedure.`,
       );
     if (
       record.sqlite !== null &&
@@ -574,11 +609,84 @@ function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: sqlite is a file path relative to the volume root.`,
       );
+    if (
+      record.owner &&
+      !resolved.services[record.owner]?.volumes?.some(
+        (mount) =>
+          mount.type === "volume" &&
+          mount.source === volume &&
+          !mount.read_only,
+      )
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: owner ${record.owner} must be a service that mounts it read-write.`,
+      );
+    // The managed PostgreSQL is a database owner like any other; without a
+    // declared procedure it dumps with the controller's default one.
+    if (
+      record.kind === "database" &&
+      !record.capture &&
+      !record.sqlite &&
+      record.owner &&
+      record.owner === baseline.database?.service
+    ) {
+      record.capture = "dump";
+      record.procedure = managedDatabaseProcedure;
+    }
+    const procedure = record.procedure;
+    const commands = procedure
+      ? [procedure.dump, procedure.restore, procedure.verify]
+      : [];
+    if (
+      record.capture === "dump" &&
+      (!record.owner ||
+        commands.length !== 3 ||
+        commands.some(
+          (command) =>
+            !Array.isArray(command) ||
+            !command.length ||
+            command.length > 40 ||
+            command.some(
+              (part) => typeof part !== "string" || !part || part.length > 4000,
+            ),
+        ))
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: capture "dump" names its owner service and a procedure of dump, restore and verify commands, each an argument list run in the owner's container.`,
+      );
+    if (record.procedure && record.capture !== "dump")
+      throw new NativeConfigurationError(
+        `Volume ${volume}: a procedure applies only to capture "dump".`,
+      );
+    // Writers are Pi's consistency declaration beyond the mounts: services
+    // that change the data over the network. The owner is not one of them.
+    for (const writer of record.writers ?? []) {
+      if (!resolved.services[writer])
+        throw new NativeConfigurationError(
+          `Volume ${volume}: writer ${writer} is not a service.`,
+        );
+      if (writer === record.owner)
+        throw new NativeConfigurationError(
+          `Volume ${volume}: its owner ${writer} is not one of its writers; writers are the other services that change its data.`,
+        );
+    }
+    if (
+      record.procedure &&
+      redactSecrets(JSON.stringify(record.procedure)).count
+    )
+      throw new NativeConfigurationError(
+        `Volume ${volume}: commands reach credentials through the owner's environment, never as written values.`,
+      );
     return {
       volume,
       kind: record.kind,
       sqlite: record.sqlite,
       ...(record.capture ? { capture: record.capture } : {}),
+      ...(record.owner ? { owner: record.owner } : {}),
+      ...(record.procedure ? { procedure: record.procedure } : {}),
+      // An empty list is a declaration (none but the owner writes it);
+      // absent stays absent, so the plan knows the boundary is unknown.
+      ...(record.writers ? { writers: record.writers } : {}),
     };
   });
 }
@@ -587,6 +695,8 @@ function criterionOf(
   json: string | undefined,
   inherited: Criterion | null,
   resolved: ResolvedCompose,
+  /** Private inputs, by name, whose values commands may receive. */
+  inputs: string[],
 ): Criterion | null {
   if (json === undefined) return inherited;
   let value: unknown;
@@ -607,6 +717,33 @@ function criterionOf(
       throw new NativeConfigurationError(
         `Criterion service ${service.name} is not in the configuration.`,
       );
+  for (const command of parsed.data.commands ?? []) {
+    if (!resolved.services[command.service])
+      throw new NativeConfigurationError(
+        `Command check ${command.name}: service ${command.service} is not in the configuration.`,
+      );
+    const unknown = (command.inputs ?? []).filter(
+      (name) => !inputs.includes(name),
+    );
+    if (unknown.length)
+      throw new NativeConfigurationError(
+        `Command check ${command.name}: ${unknown.join(", ")} is not a recorded private input. Name only ${inputs.join(", ") || "(none recorded)"}.`,
+      );
+  }
+  // Verified behavior stays: a check is corrected under its name, never
+  // dropped to pass.
+  const kept = new Set(
+    [...parsed.data.checks, ...(parsed.data.commands ?? [])].map(
+      (check) => check.name,
+    ),
+  );
+  const dropped = [...(inherited?.checks ?? []), ...(inherited?.commands ?? [])]
+    .map((check) => check.name)
+    .filter((name) => !kept.has(name));
+  if (dropped.length)
+    throw new NativeConfigurationError(
+      `The criterion drops recorded checks: ${dropped.join(", ")}. Keep each one, corrected under its name when the revision changes its response; removing verified behavior needs the owner's decision.`,
+    );
   if (redactSecrets(json).count)
     throw new NativeConfigurationError("Credentials cannot appear in checks.");
   return parsed.data;
@@ -614,6 +751,12 @@ function criterionOf(
 
 const sha256 = (content: Buffer) =>
   createHash("sha256").update(content).digest("hex");
+
+/** The major version an official postgres image reference names. */
+function managedDatabaseVersion(image: string | undefined) {
+  const match = /^postgres:(16|17|18)(?:[.-]|@|$)/.exec(image ?? "");
+  return match ? (match[1] as "16" | "17" | "18") : null;
+}
 
 /**
  * Resolve Pi's exact selection into a native release configuration. Private
@@ -657,6 +800,8 @@ export async function prepareNativeRelease(input: {
   const names = [
     ...input.inputs.filter((name) => !/^(COMPOSE|DOCKER)_/.test(name)),
     ...(baseline.database ? [DATABASE_PASSWORD] : []),
+    // Known once the server exists; a sentinel stands in until then.
+    PUBLIC_URL,
   ];
   const sentinels = new Map(
     names.map((name, index) => [`sgp${nonce}i${index}e`, name]),
@@ -688,6 +833,13 @@ export async function prepareNativeRelease(input: {
           input.deploymentId,
           input.revision,
           baseline.database?.service ?? null,
+          new Set([
+            ...(baseline.database ? [baseline.database.service] : []),
+            ...[...baseline.volumes, ...(selection.data ?? [])].flatMap(
+              (item) =>
+                item.owner && item.kind === "database" ? [item.owner] : [],
+            ),
+          ]),
           signal,
         ),
         null,
@@ -728,16 +880,26 @@ export async function prepareNativeRelease(input: {
       content: file.content.toString("base64"),
     })),
     resolved,
-    inputs: [...referenced].filter((name) => name !== DATABASE_PASSWORD).sort(),
+    inputs: [...referenced]
+      .filter((name) => name !== DATABASE_PASSWORD && name !== PUBLIC_URL)
+      .sort(),
     data: dataRecords(resolved, selection.data ?? [], baseline),
     database: baseline.database
       ? {
           service: baseline.database.service,
-          version: baseline.database.version as "16" | "17" | "18",
+          version:
+            managedDatabaseVersion(
+              resolved.services[baseline.database.service]?.image,
+            ) ?? (baseline.database.version as "16" | "17" | "18"),
         }
       : null,
     httpAccess: baseline.httpAccess,
-    criterion: criterionOf(selection.criterion, baseline.criterion, resolved),
+    criterion: criterionOf(
+      selection.criterion,
+      baseline.criterion,
+      resolved,
+      names,
+    ),
     summary,
   };
   if (native.criterion && !primaryHttp(nativeFacts(native)))
@@ -749,8 +911,11 @@ export async function prepareNativeRelease(input: {
 
 /** A first deployment's selection: native files plus declared records. */
 export interface IntakeSelection extends NativeSelection {
-  /** Private inputs the owner supplies at approval. */
-  inputs?: { name: string; reason: string }[];
+  /**
+   * Private inputs: the owner supplies each value at approval, unless it
+   * only needs to be random and the controller generates it.
+   */
+  inputs?: { name: string; reason: string; generate?: InputGenerator }[];
   httpAccess: "public" | "controller";
   /** The managed PostgreSQL service; the controller generates its password. */
   database?: { service: string; version: "16" | "17" | "18" } | null;
@@ -775,14 +940,15 @@ export async function prepareInitialRelease(input: {
   const problems: string[] = [];
   if (new Set(names).size !== names.length)
     problems.push("Declare each private input once.");
-  for (const { name, reason } of declared)
+  for (const { name, reason, generate } of declared)
     if (
       !/^[A-Z_][A-Z0-9_]*$/.test(name) ||
       /^(COMPOSE|DOCKER)_/.test(name) ||
-      name === DATABASE_PASSWORD
+      name === DATABASE_PASSWORD ||
+      name === PUBLIC_URL
     )
       problems.push(
-        `${name}: use an upper-case environment name; ${DATABASE_PASSWORD} is generated for the managed database.`,
+        `${name}: use an upper-case environment name; the controller supplies ${DATABASE_PASSWORD} and ${PUBLIC_URL}.`,
       );
     else if (
       !reason.trim() ||
@@ -790,6 +956,17 @@ export async function prepareInitialRelease(input: {
       redactSecrets(reason).count
     )
       problems.push(`${name}: give a short reason without credentials.`);
+    else if (
+      generate &&
+      (!Number.isInteger(generate.bytes) ||
+        generate.bytes < 16 ||
+        generate.bytes > 64 ||
+        !["hex", "base64", "base64url"].includes(generate.encoding) ||
+        !/^[A-Za-z0-9:._-]{0,32}$/.test(generate.prefix ?? ""))
+    )
+      problems.push(
+        `${name}: generate takes 16 to 64 random bytes, a hex, base64 or base64url encoding and an optional short prefix.`,
+      );
   if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
   const database = selection.database ?? null;
   const native = await prepareNativeRelease({
@@ -833,12 +1010,20 @@ export async function prepareInitialRelease(input: {
       `Publish only the primary HTTP listener, on host port 80/tcp; the host firewall opens nothing else (${unsupported.map((item) => `${item.service} ${item.published || "(any)"}/${item.protocol}`).join(", ")}).`,
     );
   if (problems.length) throw new NativeConfigurationError(problems.join("\n"));
+  const generated = declared.filter((item) => item.generate);
   return declared.length
     ? {
         ...native,
         inputReasons: Object.fromEntries(
           declared.map((item) => [item.name, item.reason.trim()]),
         ),
+        ...(generated.length
+          ? {
+              inputGenerators: Object.fromEntries(
+                generated.map((item) => [item.name, item.generate!]),
+              ),
+            }
+          : {}),
       }
     : native;
 }
@@ -868,17 +1053,22 @@ export function currentConfigurationFiles(
       : `native Compose, resolved by ${native.resolver}`,
     httpAccess: facts.httpAccess,
     exposure: facts.exposure,
-    volumes: facts.volumes.map(({ name, kind, sqlite, capture, mounts }) => ({
-      name,
-      kind,
-      sqlite,
-      ...(capture ? { capture } : {}),
-      mounts: mounts.map(({ service, target, readOnly }) => ({
-        service,
-        target,
-        readOnly,
-      })),
-    })),
+    volumes: facts.volumes.map(
+      ({ name, kind, sqlite, capture, owner, procedure, writers, mounts }) => ({
+        name,
+        kind,
+        sqlite,
+        ...(capture ? { capture } : {}),
+        ...(owner ? { owner } : {}),
+        ...(procedure ? { procedure } : {}),
+        ...(writers ? { writers } : {}),
+        mounts: mounts.map(({ service, target, readOnly }) => ({
+          service,
+          target,
+          readOnly,
+        })),
+      }),
+    ),
     managedDatabase: facts.database && {
       ...facts.database,
       user: databaseUser,

@@ -1,15 +1,13 @@
 "use client";
 
-// PROTOTYPE · chosen on claude/deployment-history.
 // Deployment in Journeys' transit language (transit.tsx), on the real route
-// and inside the real shell. The owner chose it from four directions on
-// claude/deployment-history, where the others still live. The bar at the
-// bottom switches to the shipped view (0) for comparison, and the scenario.
-// The product's own panel still handles the actions that need it
-// (connecting Hetzner, starting a first deployment), and approval stays in
-// the conversation.
+// and inside the real shell, showing only the live record. The product's own
+// panel still handles the actions that need it (connecting Hetzner, starting
+// a first deployment), and approval stays in the conversation. The
+// exploration's variants and invented scenarios stay on claude/deployment-
+// history; a production view never reshapes the record.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { ApplicationFacts } from "@/server/application-facts";
 import type { DeploymentRecord } from "@/server/deployment-types";
@@ -20,13 +18,7 @@ import type { ChatSummary } from "@/server/types";
 import type { ApplicationSection } from "../application-sections";
 import { operationsFor, unresolved } from "../operation-model";
 import type { PageChrome } from "../architecture-prototype";
-import type { ScenarioId } from "../architecture-prototype/model";
-import { setMotionPreview } from "../architecture-prototype/motion";
-import {
-  PrototypeBar,
-  scenarios,
-  type VariantEntry,
-} from "../architecture-prototype/prototype-bar";
+import { scenarios } from "../architecture-prototype/prototype-bar";
 import { buildStory, type DeploymentStory } from "./deployment-model";
 import { PageHead } from "./page-head";
 import { TransitDirection } from "./transit";
@@ -46,57 +38,17 @@ export interface DirectionProps {
   onOpenDestination: (destination: ApplicationSection) => void;
 }
 
-const variants: VariantEntry[] = [
-  { key: "A", id: "transit", name: "Transit" },
-  { key: "0", id: "current", name: "Current deployment" },
-];
-const choices: ScenarioId[] = ["live", "later", "planned"];
-const DAY = 86_400_000;
-
-/** Before deploy, invented: the plan as it waited for your approval. */
-function beforeDeploy(record: DeploymentRecord): DeploymentRecord {
-  const cut = record.events.findIndex((event) =>
-    event.message.startsWith("Recommendation ready"),
-  );
-  return {
-    ...record,
-    status: "awaiting-approval",
-    verifiedAt: null,
-    serverId: null,
-    serverCreateAttempted: false,
-    address: null,
-    url: null,
-    error: null,
-    logs: "",
-    logsCollectedAt: null,
-    lifecycle: undefined,
-    events: cut >= 0 ? record.events.slice(0, cut + 1) : [],
-  };
-}
-
-function writeUrl(variant: string, scenario: ScenarioId) {
-  const url = new URL(window.location.href);
-  url.searchParams.set(
-    "variant",
-    variants.find((item) => item.id === variant)?.key ?? variant,
-  );
-  if (scenario === "live") url.searchParams.delete("record");
-  else url.searchParams.set("record", scenario);
-  window.history.replaceState(window.history.state, "", url);
-}
-
 export function DeploymentPrototype({
   record,
   operations,
   facts,
   chats,
-  now: clock,
+  now,
   onOpenConversation,
   onOpenDestination,
   onAsk,
   chrome,
   panel,
-  current,
 }: {
   record: DeploymentRecord | null;
   operations: ApplicationOperation[];
@@ -108,130 +60,50 @@ export function DeploymentPrototype({
   onAsk: (draft: string) => void;
   chrome: PageChrome;
   panel: ReactNode;
-  /** The shipped view, kept as direction 0 for comparison. */
-  current: ReactNode;
+  /** Retained for callers; the live view is the only one shown. */
+  current?: ReactNode;
 }) {
-  const [ready, setReady] = useState(false);
-  const [variantId, setVariantId] = useState("transit");
-  const [scenario, setScenario] = useState<ScenarioId>("live");
-  const [reduced, setReduced] = useState(false);
-
-  // Read the URL once on the client, so the server's first render and the
-  // browser's agree.
-  useEffect(() => {
-    const start = window.setTimeout(() => {
-      const params = new URLSearchParams(window.location.search);
-      const wanted = params.get("variant")?.toLowerCase();
-      const found = variants.find(
-        (item) => item.id === wanted || item.key.toLowerCase() === wanted,
-      );
-      if (found) setVariantId(found.id);
-      const wantedRecord = params.get("record") as ScenarioId | null;
-      if (wantedRecord && choices.includes(wantedRecord))
-        setScenario(wantedRecord);
-      setReduced(document.documentElement.dataset.axMotion === "reduced");
-      setReady(true);
-    }, 0);
-    return () => window.clearTimeout(start);
-  }, []);
-
-  const now = scenario === "later" ? clock + 3 * DAY : clock;
-  const shaped = useMemo(
-    () => (scenario === "planned" && record ? beforeDeploy(record) : record),
-    [scenario, record],
-  );
   const approvedIn =
     chats.find((chat) => chat.id === record?.chatId)?.title ?? null;
   const story = useMemo(
-    () =>
-      buildStory({
-        record: shaped,
-        operations: scenario === "planned" ? [] : operations,
-        now,
-        approvedIn,
-      }),
-    [shaped, operations, scenario, now, approvedIn],
+    () => buildStory({ record, operations, now, approvedIn }),
+    [record, operations, now, approvedIn],
   );
-
   // The shell's activity cards only while work here is unsettled; settled
   // work is already on the line.
-  const touching = operationsFor("deployment", operations);
-  const busy =
-    scenario !== "planned" &&
-    touching.some(
-      (operation) =>
-        operation.state === "working" ||
-        operation.state === "queued" ||
-        operation.state === "proposed" ||
-        (operation.state === "failed" && unresolved(operation, operations)),
-    );
-  const variant = variants.find((item) => item.id === variantId) ?? variants[0];
-  const restricted = currentFacts(shaped)?.httpAccess === "controller";
+  const busy = operationsFor("deployment", operations).some(
+    (operation) =>
+      operation.state === "working" ||
+      operation.state === "queued" ||
+      operation.state === "proposed" ||
+      (operation.state === "failed" && unresolved(operation, operations)),
+  );
+  const restricted = currentFacts(record)?.httpAccess === "controller";
   const openUrl =
     story.state === "live"
-      ? (facts.domains?.address ?? shaped?.url ?? null)
+      ? (facts.domains?.address ?? record?.url ?? null)
       : null;
-  const props: DirectionProps = {
-    story,
-    now,
-    head: (
-      <PageHead
-        bar={chrome.bar}
-        title="Deployment"
-        name={story.name}
-        openUrl={openUrl}
-        restricted={restricted}
-      />
-    ),
-    activity: busy ? chrome.activity : null,
-    panel,
-    onAsk,
-    onOpenConversation,
-    onOpenDestination,
-  };
-
   return (
-    <>
-      {variant.id === "current" && (
-        <>
-          {chrome.bar}
-          {chrome.header}
-        </>
-      )}
-      <div
-        className="ax-root"
-        data-variant={variant.id}
-        data-scenario={scenario}
-      >
-        {!ready ? (
-          <p className="ax-loading">Reading the record…</p>
-        ) : variant.id === "current" ? (
-          current
-        ) : (
-          <TransitDirection {...props} />
-        )}
-        <PrototypeBar
-          variants={variants}
-          variant={variant}
-          onVariant={(id) => {
-            setVariantId(id);
-            writeUrl(id, scenario);
-          }}
-          scenario={scenario}
-          onScenario={(id) => {
-            setScenario(id);
-            writeUrl(variant.id, id);
-          }}
-          source="live"
-          reduced={reduced}
-          onReduced={(value) => {
-            setReduced(value);
-            setMotionPreview(value);
-          }}
-          choices={choices}
-        />
-      </div>
-    </>
+    <div className="ax-root" data-variant="transit" data-scenario="live">
+      <TransitDirection
+        story={story}
+        now={now}
+        head={
+          <PageHead
+            bar={chrome.bar}
+            title="Deployment"
+            name={story.name}
+            openUrl={openUrl}
+            restricted={restricted}
+          />
+        }
+        activity={busy ? chrome.activity : null}
+        panel={panel}
+        onAsk={onAsk}
+        onOpenConversation={onOpenConversation}
+        onOpenDestination={onOpenDestination}
+      />
+    </div>
   );
 }
 

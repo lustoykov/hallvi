@@ -14,6 +14,7 @@ import {
 import { LocalTime } from "../local-time";
 import { relativeTime } from "../operation-model";
 import { BackupEvidencePanel } from "./backup-evidence";
+import { BackupStorageForm } from "./backup-storage-form";
 import {
   Condition,
   Facts,
@@ -82,7 +83,9 @@ function timeUntil(at: string, now: number) {
  * isolated restore and the history. Without facts the view lists what would
  * need protection and says nothing is backed up.
  */
-export function BackupsView(props: ViewProps) {
+export function BackupsView(
+  props: ViewProps & { onRefresh?: () => Promise<void> },
+) {
   const { stack, facts, now, operations, onOpenConversation, chats } = props;
   const protection = facts.protection;
   const evidence = facts.backupEvidence;
@@ -163,11 +166,13 @@ export function BackupsView(props: ViewProps) {
                 ],
                 [
                   "While it runs",
-                  "SQLite and file copies pause the application briefly; PostgreSQL stays online.",
+                  "Only the services that write captured files pause briefly; database owners keep running to dump.",
                 ],
               ]}
             />
-            {facts.backupSetup.connected && props.onAction ? (
+            {!facts.backupSetup.connected ? (
+              <BackupStorageForm onConnected={props.onRefresh} />
+            ) : props.onAction ? (
               <div className="sg-op-links">
                 <button
                   type="button"
@@ -182,19 +187,14 @@ export function BackupsView(props: ViewProps) {
                     : "Enable daily backups"}
                 </button>
               </div>
-            ) : (
-              <p className="sg-section-note">
-                Connect scoped R2 or S3 storage access with Server Guy before
-                enabling this schedule.
-              </p>
-            )}
+            ) : null}
           </section>
         ) : (
           <Planned title="Protection for this stack">
-            Automatic capture is currently available for the verified
-            PostgreSQL, Uptime Kuma and Grafana/Prometheus stacks. Other
-            persistent state needs a supported capture and restore method before
-            scheduling.
+            Scheduled backups need a recorded capture method for every
+            persistent volume: its files, a SQLite path, a clean-stop copy, or a
+            dump procedure run by the service that owns the data. This stack has
+            a volume without one; ask Server Guy to record it in a release.
           </Planned>
         )}
         {needed.length > 0 && (

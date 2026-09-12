@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+// Rig stand-in for coreutils timeout, which macOS lacks:
+// timeout [-k grace] seconds command... Exits 124 when the limit is reached.
+"use strict";
+const { spawn } = require("node:child_process");
+
+const args = process.argv.slice(2);
+let grace = null;
+if (args[0] === "-k") {
+  grace = Number.parseFloat(args[1]);
+  args.splice(0, 2);
+}
+const seconds = Number.parseFloat(args.shift());
+const child = spawn(args[0], args.slice(1), { stdio: "inherit" });
+let expired = false;
+const timer = setTimeout(() => {
+  expired = true;
+  child.kill("SIGTERM");
+  if (grace !== null)
+    setTimeout(() => child.kill("SIGKILL"), grace * 1000).unref();
+}, seconds * 1000);
+child.on("error", () => process.exit(127));
+child.on("exit", (code, signal) => {
+  clearTimeout(timer);
+  process.exit(expired ? 124 : (code ?? (signal ? 128 : 1)));
+});

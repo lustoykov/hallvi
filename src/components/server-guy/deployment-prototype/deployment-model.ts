@@ -1,9 +1,8 @@
-// PROTOTYPE · claude/deployment-history · throwaway.
 // What the Deployment page says, derived from the deployment record and its
-// operations: what is live, how it got there (the recorded actions grouped
-// into a few plain phases, attempts included), the checks it passes, the
-// latest logs, and what is not set up. A scenario may reshape the record;
-// the page labels it.
+// operations: what is live, how it got there (the approach to the first
+// execution in a few plain phases, then every recorded attempt with its own
+// events and outcome), the checks it passes with when each last passed, the
+// latest logs, and what is not set up.
 
 import type { DeploymentRecord } from "@/server/deployment-types";
 import { deploymentRuntime } from "@/server/deployment-runtime";
@@ -95,34 +94,19 @@ export function toneOf(text: string): LineTone {
   return "info";
 }
 
-type Kind =
-  | "inspect"
-  | "plan"
-  | "provision"
-  | "deliver"
-  | "verify"
-  | "recreate"
-  | "other";
+/** Names the approach's steps; executions come from attempt records. */
+type Kind = "inspect" | "plan" | "provision" | "other";
 
 function kindOf(text: string): Kind {
   if (/^(Inspecting the repository|Reading )/.test(text)) return "inspect";
   if (/^(Deployment configuration prepared|Recommendation ready)/.test(text))
     return "plan";
   if (
-    /^(Preparing SSH|Creating the accepted|Waiting for the pinned SSH|HTTP restricted|Metadata access restricted)/.test(
+    /^(Preparing SSH|Creating the accepted|Waiting for the pinned SSH|HTTP restricted|Metadata access restricted|Host prepared)/.test(
       text,
     )
   )
     return "provision";
-  if (/^(Host prepared|Building the application|Uploading)/.test(text))
-    return "deliver";
-  if (/^Recreating the accepted containers/.test(text)) return "recreate";
-  if (
-    /^(Checking public HTTP|Passed:|Verified private|Application behavior verified|Reconciled the existing container|Recreated containers)/.test(
-      text,
-    )
-  )
-    return "verify";
   return "other";
 }
 
@@ -210,39 +194,21 @@ export function buildStory({
             ? "unknown"
             : "live";
 
-  // ---- The recorded actions, as attempts and then plain phases.
+  // ---- The approach to the first execution, then each recorded attempt
+  // with the events between its offset and the next attempt's.
   const events = record?.events ?? [];
-  const lines: StoryLine[] = events.map((event) => ({
+  const line = (event: { at: string; message: string }): StoryLine => ({
     at: event.at,
     text: event.message,
     tone: toneOf(event.message),
-  }));
-  type Attempt = { kind: "first" | "retry" | "recreate"; lines: StoryLine[] };
-  const attempts: Attempt[] = [];
-  let checked = false;
-  for (const line of lines) {
-    const kind = kindOf(line.text);
-    const current = attempts.at(-1);
-    if (!current) attempts.push({ kind: "first", lines: [line] });
-    else if (kind === "recreate") {
-      attempts.push({ kind: "recreate", lines: [line] });
-      checked = false;
-      continue;
-    } else if (kind === "provision" && checked) {
-      attempts.push({ kind: "retry", lines: [line] });
-      checked = false;
-      continue;
-    } else current.lines.push(line);
-    if (kind === "verify") checked = true;
-  }
-
+  });
+  const recorded = record?.lifecycle?.attempts ?? [];
+  const approach = events
+    .slice(0, recorded[0]?.eventOffset ?? events.length)
+    .map(line);
   const failure = operations.find(
     (operation) =>
       operation.source.type === "deployment" && operation.state === "failed",
-  );
-  const recreated = operations.find(
-    (operation) =>
-      operation.source.type === "release" && operation.state === "verified",
   );
   const services = [
     name,
@@ -268,139 +234,145 @@ export function buildStory({
       lines: group,
     });
   };
-
-  attempts.forEach((attempt, index) => {
-    const next = attempts[index + 1];
-    const passed = attempt.lines.some((line) =>
-      /^(Application behavior verified|Recreated containers)/.test(line.text),
+  const by = (kind: Kind) =>
+    approach.filter((item) => kindOf(item.text) === kind);
+  const read = by("inspect");
+  add(
+    "inspect",
+    "Read the repository",
+    `${read.filter((item) => item.text.startsWith("Reading")).length || "Its"} files at ${short}`,
+    read,
+    "pass",
+  );
+  const planned = by("plan");
+  add(
+    "plan",
+    "Planned the server",
+    offer
+      ? `A ${offer.serverType.toUpperCase()} in ${city} for ${money(offer.monthly, offer.currency)} a month; nothing bought yet`
+      : "The deployment configuration was prepared",
+    planned,
+    "pass",
+  );
+  const provision = by("provision");
+  if (planned.length && provision.length) {
+    const waited =
+      Date.parse(provision[0].at) - Date.parse(planned.at(-1)!.at);
+    if (waited > 20_000)
+      phases.push({
+        id: "approval",
+        title: "You approved it",
+        detail: approvedIn
+          ? `In ${approvedIn}, ${took(waited)} later`
+          : `In the conversation, ${took(waited)} later`,
+        start: planned.at(-1)!.at,
+        end: provision[0].at,
+        tone: "wait",
+        lines: [],
+      });
+  }
+  add(
+    "provision",
+    "Created the server and locked it down",
+    `${offer ? `Hetzner ${offer.serverType.toUpperCase()}, ` : ""}SSH with its own key, a firewall${restricted ? ", HTTP only from your network" : ""}`,
+    provision,
+    "pass",
+  );
+  // Records from before attempts were kept: their execution as it was told.
+  if (!recorded.length)
+    add(
+      "deliver",
+      "Delivered and checked it",
+      `Revision ${short}: ${services.join(" and ")}`,
+      by("other"),
+      state === "live" ? "pass" : state === "working" ? "work" : "fail",
     );
-    if (attempt.kind === "first") {
-      const by = (kind: Kind) =>
-        attempt.lines.filter((line) => kindOf(line.text) === kind);
-      const read = by("inspect");
-      add(
-        "inspect",
-        "Read the repository",
-        `${read.filter((line) => line.text.startsWith("Reading")).length || "Its"} files at ${short}`,
-        read,
-        "pass",
-      );
-      const planned = by("plan");
-      add(
-        "plan",
-        "Planned the server",
-        offer
-          ? `A ${offer.serverType.toUpperCase()} in ${city} for ${money(offer.monthly, offer.currency)} a month; nothing bought yet`
-          : "The deployment configuration was prepared",
-        planned,
-        "pass",
-      );
-      const provision = by("provision");
-      if (planned.length && provision.length) {
-        const waited =
-          Date.parse(provision[0].at) - Date.parse(planned.at(-1)!.at);
-        if (waited > 20_000)
-          phases.push({
-            id: "approval",
-            title: "You approved it",
-            detail: approvedIn
-              ? `In ${approvedIn}, ${took(waited)} later`
-              : `In the conversation, ${took(waited)} later`,
-            start: planned.at(-1)!.at,
-            end: provision[0].at,
-            tone: "wait",
-            lines: [],
-          });
-      }
-      add(
-        "provision",
-        "Created the server and locked it down",
-        `${offer ? `Hetzner ${offer.serverType.toUpperCase()}, ` : ""}SSH with its own key, a firewall${restricted ? ", HTTP only from your network" : ""}`,
-        provision,
-        "pass",
-      );
-      add(
-        "deliver",
-        "Delivered and started it",
-        `Revision ${short}: ${services.join(" and ")}`,
-        by("deliver"),
-        "pass",
-      );
-      const verify = [...by("verify"), ...by("other")].sort((a, b) =>
-        a.at.localeCompare(b.at),
-      );
-      if (verify.length)
-        add(
-          "verify",
-          passed
-            ? "Checked it from your network"
-            : next
-              ? "The first check failed"
-              : state === "working"
-                ? "Checking it now"
-                : "Checked it",
-          passed
-            ? `${verify.filter((line) => line.tone === "pass").length} checks passed`
-            : (failure?.next ??
-                "It didn't pass its checks, so nothing was claimed"),
-          verify,
-          passed
-            ? "pass"
-            : next
-              ? "fail"
-              : state === "working"
-                ? "work"
-                : "fail",
-          next?.lines[0]?.at,
-        );
-    } else if (attempt.kind === "retry") {
-      add(
-        `retry-${index}`,
-        passed ? "Retried, and it passed" : "Retried",
-        attempt.lines.some((line) => line.text.startsWith("Reconciled"))
-          ? "Reconnected, kept the running containers, and every check passed"
-          : "Every check passed",
-        attempt.lines,
-        passed ? "pass" : state === "working" && !next ? "work" : "fail",
-      );
-    } else {
-      add(
-        `recreate-${index}`,
-        "Recreated the containers",
-        recreated?.summary ??
-          "Replaced the containers and checked the application again",
-        attempt.lines,
-        passed ? "pass" : state === "working" && !next ? "work" : "fail",
-      );
-    }
+  const revisionOf = (releaseId: string) =>
+    (
+      record?.lifecycle?.releases.find((release) => release.id === releaseId)
+        ?.revision ?? releaseId
+    ).slice(0, 7);
+  recorded.forEach((attempt, index) => {
+    const next = recorded[index + 1];
+    const group = events
+      .slice(attempt.eventOffset, next?.eventOffset ?? events.length)
+      .map(line);
+    const at = revisionOf(attempt.releaseId);
+    const rollback = operations
+      .find((operation) => operation.id === attempt.operationId)
+      ?.title.startsWith("Roll back");
+    const passed = (attempt.checks ?? []).filter((check) => check.passed);
+    phases.push({
+      id: `attempt-${attempt.id}`,
+      title:
+        attempt.kind === "recreate"
+          ? "Recreated the containers"
+          : attempt.kind === "reconcile"
+            ? "Reconciled a lost outcome from the host"
+            : rollback
+              ? `Rolled back to ${at}`
+              : attempt.kind === "release"
+                ? `Released revision ${at}`
+                : `Deployed revision ${at}`,
+      detail:
+        attempt.outcome === "working"
+          ? "In progress"
+          : attempt.outcome === "failed" || attempt.outcome === "interrupted"
+            ? (attempt.error ?? "Stopped before claiming success")
+            : attempt.outcome === "observed"
+              ? "Running; no behavior checks passed or were recorded"
+              : passed.length
+                ? `${passed.length} ${passed.length === 1 ? "check" : "checks"} passed: ${passed.map((check) => check.name).join(", ")}`
+                : "Verified against its recorded checks",
+      start: attempt.startedAt,
+      end: attempt.finishedAt ?? group.at(-1)?.at ?? attempt.startedAt,
+      tone:
+        attempt.outcome === "verified" || attempt.outcome === "observed"
+          ? "pass"
+          : attempt.outcome === "working"
+            ? "work"
+            : "fail",
+      lines: group,
+    });
   });
   if (state === "working" && phases.length) phases.at(-1)!.tone = "work";
 
-  // ---- The checks it passes, public first, then inside the server.
-  const lastSaid = (text: string) =>
-    events.findLast((event) => event.message === text)?.at ?? null;
-  const checks: Check[] = (facts?.criterion?.checks ?? []).map((check) => ({
-    name: check.name,
-    probe: `${check.method} ${check.path} → ${check.expectedStatus}${check.contains ? ` · contains ${check.contains}` : ""}`,
-    inside: false,
-    at: lastSaid(`Passed: ${check.name}`),
-  }));
-  const privately = new Map<string, Check>();
-  for (const event of events) {
-    const match = /^Verified private (\S+): (\S+)$/.exec(event.message);
-    if (!match) continue;
-    const service = beside.find((item) => item.name === match[1]);
-    const label = productName(service?.image, cap(match[1]));
-    privately.set(`${match[1]} ${match[2]}`, {
-      name: /ready/.test(match[2])
-        ? `${label} is ready`
-        : `${label} answers queries`,
-      probe: `GET ${match[2]}`,
+  // ---- The checks it passes, each with when it last passed on record.
+  const ran = recorded.flatMap((attempt) => attempt.checks ?? []);
+  const lastPassed = (check: string) =>
+    ran.findLast((item) => item.name === check && item.passed)?.at ?? null;
+  const checks: Check[] = [
+    ...(facts?.criterion?.checks ?? []).map((check) => ({
+      name: check.name,
+      probe: `${check.method} ${check.path} → ${check.expectedStatus}${check.contains ? ` · contains ${check.contains}` : ""}`,
+      inside: false,
+      at: lastPassed(check.name),
+    })),
+    ...(facts?.criterion?.commands ?? []).map((check) => ({
+      name: check.name,
+      probe: `Runs in ${check.service}${check.inputs?.length ? ` with ${check.inputs.join(", ")}` : ""}${check.contains ? ` · prints ${check.contains}` : ""}`,
       inside: true,
-      at: event.at,
-    });
-  }
-  checks.push(...privately.values());
+      at: lastPassed(check.name),
+    })),
+    ...(facts?.criterion?.services ?? []).flatMap((service) => {
+      const label = productName(
+        beside.find((item) => item.name === service.name)?.image,
+        cap(service.name),
+      );
+      return [
+        { name: `${label} is ready`, path: service.healthPath },
+        ...service.checks.map((check) => ({
+          name: `${label} answers ${check.path}`,
+          path: check.path,
+        })),
+      ].map((check) => ({
+        name: check.name,
+        probe: `GET ${check.path} on port ${service.port}`,
+        inside: true,
+        at: null,
+      }));
+    }),
+  ];
 
   // ---- What is live, plain first and exact on demand.
   const images = [
@@ -515,7 +487,7 @@ export function buildStory({
               : "Not deployed";
   const detail =
     state === "live"
-      ? "A recorded check, not continuous monitoring."
+      ? `Against the ${checks.length} ${checks.length === 1 ? "check" : "checks"} listed below, and nothing else. A recorded check, not continuous monitoring.`
       : state === "failed"
         ? (failure?.next ??
           record?.error ??
@@ -545,20 +517,21 @@ export function buildStory({
     started,
     took:
       started && ended ? took(Date.parse(ended) - Date.parse(started)) : null,
-    // Recreating containers after a verified deploy is not another attempt.
-    attempts: attempts.filter((item) => item.kind !== "recreate").length,
+    // Executions only: recreation and reconciliation are not attempts to
+    // reach a release.
+    attempts: recorded.length
+      ? recorded.filter(
+          (attempt) => attempt.kind === "deploy" || attempt.kind === "release",
+        ).length
+      : events.length
+        ? 1
+        : 0,
     checks,
     logs: {
       at: record?.logsCollectedAt ?? null,
       lines: cleanLogs(record?.logs ?? ""),
     },
     gaps: [
-      {
-        id: "rollback",
-        title: "Roll back to an earlier release",
-        detail:
-          "Not available yet. The verified images are kept, but switching back isn't built.",
-      },
       {
         id: "push",
         title: "Deploy when you push",

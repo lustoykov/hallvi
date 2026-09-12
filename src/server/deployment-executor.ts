@@ -29,6 +29,7 @@ import {
   saveDeployment,
 } from "./deployment-store";
 import type { DeploymentRecord } from "./deployment-types";
+import type { VerificationResume } from "./command-checks";
 import { redactSecrets } from "./secrets";
 
 export function saveDeploymentInputs(
@@ -36,14 +37,23 @@ export function saveDeploymentInputs(
   input: Record<string, string>,
 ) {
   const allowed = new Set(currentFacts(record)?.inputs);
+  const generators = record.native?.inputGenerators ?? {};
   for (const key of Object.keys(input))
-    if (!allowed.has(key)) throw new Error("Unexpected deployment input.");
+    if (!allowed.has(key) || generators[key])
+      throw new Error("Unexpected deployment input.");
+  // Values that only need to be random are generated here: never typed,
+  // shown to Pi or recorded outside the private inputs file.
+  const values = { ...input };
+  for (const [key, generator] of Object.entries(generators))
+    if (allowed.has(key))
+      values[key] =
+        `${generator.prefix ?? ""}${randomBytes(generator.bytes).toString(generator.encoding)}`;
   for (const key of allowed)
-    if (!input[key]?.trim())
+    if (!values[key]?.trim())
       throw new Error(`Provide ${key} before deploying.`);
   writeFileSync(
     join(deploymentDirectory(record), "inputs.json"),
-    JSON.stringify(input),
+    JSON.stringify(values),
     { mode: 0o600 },
   );
 }
@@ -469,8 +479,14 @@ export async function executeDeployment(
   );
   const { runInitialRelease } = await import("./application-releases");
   await runInitialRelease(record, signal);
+  completeInitialDeployment(record);
+}
+/** The first verified release makes the deployment live, once. */
+export function completeInitialDeployment(record: DeploymentRecord) {
+  if (record.url) return;
   const verified = currentFacts(record)!;
   record.status = "live";
+  record.correction = null;
   record.url = `http://${record.address}`;
   deploymentEvent(
     record,
@@ -502,6 +518,7 @@ export async function collectDeploymentLogs(
 export async function verifyDeployment(
   record: DeploymentRecord,
   signal: AbortSignal,
+  resume?: VerificationResume,
 ) {
   const facts = currentFacts(record);
   const criterion = facts?.criterion;
@@ -515,7 +532,8 @@ export async function verifyDeployment(
       throw new Error("Verification must stay on the application host.");
     return fetch(url, {
       ...init,
-      redirect: "error",
+      // A redirect is reported with its status and target, never followed.
+      redirect: "manual",
       signal: AbortSignal.any([
         signal,
         AbortSignal.timeout(20000),
@@ -526,6 +544,8 @@ export async function verifyDeployment(
   // A running container may still be initializing its HTTP listener. Retry
   // only the non-mutating readiness check; never blindly repeat a POST.
   let ready = false;
+  // What the last readiness request saw, so a failure names it.
+  let last = "no response";
   for (let attempt = 0; attempt < 30; attempt++) {
     signal.throwIfAborted();
     try {
@@ -534,10 +554,10 @@ export async function verifyDeployment(
         ready = true;
         break;
       }
+      const target = health.headers.get("location");
+      last = `HTTP ${health.status}${target ? ` redirecting to ${target}` : ""}`;
       if (health.status < 500)
-        throw new Error(
-          `Public application check rejected (HTTP ${health.status}).`,
-        );
+        throw new Error(`Public application check rejected (${last}).`);
     } catch (error) {
       signal.throwIfAborted();
       if (
@@ -545,12 +565,14 @@ export async function verifyDeployment(
         error.message.startsWith("Public application check rejected")
       )
         throw error;
+      const cause = error instanceof Error ? (error.cause ?? error) : error;
+      last = cause instanceof Error ? cause.message : String(cause);
     }
     await delay(2000, undefined, { signal });
   }
   if (!ready)
     throw new Error(
-      "The public application did not become ready within the verification window. The existing host is retained.",
+      `The public application did not become ready within the verification window (last response: ${last}). The existing host is retained.`,
     );
   record.serviceReadiness ??= {};
   record.serviceReadiness[primary] ??= {
@@ -619,10 +641,38 @@ export async function verifyDeployment(
         record.verificationPending +
         " before repeating verification.",
     );
+  // HTTP checks the reconciled attempt recorded passed are its receipts: a
+  // create among them already made and removed its object, so none rerun.
+  const carried =
+    resume &&
+    criterion.checks.length > 0 &&
+    criterion.checks.every((check) =>
+      resume.completed.some(
+        (item) =>
+          item.kind === "http" && item.name === check.name && item.passed,
+      ),
+    );
+  if (carried) {
+    const { recordCheck } = await import("./command-checks");
+    for (const check of criterion.checks)
+      recordCheck(
+        record,
+        resume.completed.find(
+          (item) => item.kind === "http" && item.name === check.name,
+        )!,
+      );
+    deploymentEvent(
+      record,
+      `Carried ${criterion.checks.length} HTTP check results from the reconciled attempt; none ran again.`,
+    );
+    return;
+  }
   let captured = "";
   const marker = `sg-check-${randomBytes(6).toString("hex")}`;
   try {
     for (const check of criterion.checks) {
+      const at = new Date().toISOString();
+      const started = Date.now();
       const path = check.path.replaceAll("{id}", encodeURIComponent(captured));
       if (check.path.includes("{id}") && !captured)
         throw new Error("A verification step requires a captured object ID.");
@@ -684,13 +734,23 @@ export async function verifyDeployment(
           saveDeployment(record);
         }
       }
-      if (
-        response.status !== check.expectedStatus ||
-        !responseContains(
+      const passed =
+        response.status === check.expectedStatus &&
+        responseContains(
           text,
           check.contains.replaceAll("SG_VERIFY_TOKEN", marker),
-        )
-      )
+        );
+      const { recordCheck } = await import("./command-checks");
+      recordCheck(record, {
+        name: check.name,
+        kind: "http",
+        target: `${check.method} ${check.path}`,
+        at,
+        durationMs: Date.now() - started,
+        passed,
+        status: response.status,
+      });
+      if (!passed)
         throw new Error(
           `Application behavior check failed: ${check.name} (HTTP ${response.status}).`,
         );
@@ -736,7 +796,7 @@ export async function verifyServiceImages(
     "ssh",
     [
       ...sshArgs(record),
-      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}},{{json (index .Config.Labels "server-guy.revision")}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -q)`,
+      `cd /opt/server-guy/${record.id} && docker inspect --format '[{{json .Image}},{{json .Config.Image}},{{json (index .Config.Labels "com.docker.compose.service")}},{{json .State.Running}},{{json (index .Config.Labels "server-guy.revision")}},{{json .State.Status}},{{json .State.ExitCode}}]' $(docker compose -p sg-${record.id.slice(0, 8)} -f compose.json ps -a -q)`,
     ],
     signal,
   );
@@ -745,15 +805,40 @@ export async function verifyServiceImages(
     .trim()
     .split("\n")
     .map((line) => {
-      const [Image, reference, service, running, revision] = JSON.parse(
-        line,
-      ) as [string, string, string, boolean, string | undefined];
-      return { Image, reference, service, running, revision };
+      const [Image, reference, service, running, revision, status, exitCode] =
+        JSON.parse(line) as [
+          string,
+          string,
+          string,
+          boolean,
+          string | undefined,
+          string,
+          number,
+        ];
+      return {
+        Image,
+        reference,
+        service,
+        running,
+        revision,
+        status,
+        exitCode,
+      };
     });
   const images: Record<string, string> = {};
   for (const service of facts.services) {
     const matches = containers.filter((c) => c.service === service.name);
-    if (matches.length !== 1 || !matches[0].running)
+    // A one-shot service proves itself by exiting 0; a crash is a failure.
+    if (
+      service.completes &&
+      (matches.length !== 1 ||
+        matches[0].status !== "exited" ||
+        matches[0].exitCode !== 0)
+    )
+      throw new Error(
+        `One-shot service ${service.name} did not complete successfully (${matches.length === 1 ? `${matches[0].status}, exit ${matches[0].exitCode}` : `${matches.length} containers`}).`,
+      );
+    if (!service.completes && (matches.length !== 1 || !matches[0].running))
       throw new Error(
         `Compose service ${service.name} is not running exactly once.`,
       );
@@ -799,9 +884,16 @@ export async function verifyPrivateServices(
   saveDeployment(record);
   const facts = currentFacts(record)!;
   for (const service of facts.services) {
-    // The managed database's health already gates its dependents.
-    if (!service.healthcheck || service.name === facts.database?.service)
+    // verifyServiceImages established this one-shot service's exit 0.
+    if (service.completes) {
+      record.serviceReadiness[service.name] = {
+        checkedAt: new Date().toISOString(),
+        kind: "completed",
+        imageId: record.serviceImages?.[service.name] ?? null,
+      };
       continue;
+    }
+    if (!service.healthcheck) continue;
     const output = await command(
       "ssh",
       [
@@ -995,11 +1087,14 @@ export async function verifyRuntime(
   record: DeploymentRecord,
   signal: AbortSignal,
   established?: () => void,
+  resume?: VerificationResume,
 ) {
   await verifyServiceImages(record, signal);
   established?.();
-  await verifyDeployment(record, signal);
+  await verifyDeployment(record, signal, resume);
   await verifyPrivateServices(record, signal);
+  const { verifyCommandChecks } = await import("./command-checks");
+  await verifyCommandChecks(record, signal, resume);
   await collectDeploymentLogs(record, signal);
   return currentFacts(record)?.criterion
     ? ("passed" as const)

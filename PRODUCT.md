@@ -21,10 +21,10 @@ This is the agreed support target, not a list of shipped capabilities. [ROADMAP.
 | Topology | One application stack on one Linux instance, using Docker Compose. A stack may have several web/API services, workers, schedules and dependencies. |
 | Compute | Hetzner provisioning and bring your own machine (BYOM): an accessible compatible home server, VPS or existing raw cloud instance. |
 | Software | Reuse repositories, Dockerfiles, Compose definitions and upstream images. Python/JavaScript source preparation and running prebuilt images are separate capabilities; an image does not have to contain Python or JavaScript. |
-| Data | PostgreSQL, embedded SQLite and application-specific persistent files. Redis/Valkey when the application requires a broker or cache. Install only what the software needs. |
+| Data | PostgreSQL, embedded SQLite and application-specific persistent files. Redis/Valkey when the application requires a broker or cache. Another database server the software requires (MariaDB, for example) runs as an ordinary service that owns its volume and dumps it through commands Pi records from the software's documentation; the managed PostgreSQL is protected the same way, with a default procedure. Install only what the software needs. |
 | Background work | Existing worker commands, PostgreSQL-backed or Redis/Valkey-backed queues, and cron-style scheduled commands on the same instance. Reuse the application's libraries and scheduler. |
 | Delivery | Configuration/secrets, required ports, private service connections, domains, automatic HTTPS and appropriate CDN setup. Release a selected revision on request; reuse GitHub Actions where useful. |
-| Protection | Database and persistent-file backups to Cloudflare R2 or AWS S3, retention, isolated restore verification and manual recovery. Protect controller state separately. |
+| Protection | Database and persistent-file backups to Cloudflare R2 or AWS S3, retention, an isolated restore that boots the restored application and checks it, and manual recovery. Protect controller state separately. |
 | Care | Logs, health, traffic/resource observations, job results, backup status, investigation and in-app issues. External notification providers are an agreed expansion; provider selection is still open. |
 | Controller | Server Guy may run on the application host or separately. Its state and lifecycle remain independent of the managed stack. |
 
@@ -76,6 +76,6 @@ Configured host-side collection, schedules and backups should continue when the 
 
 Manual replacement-host recovery preserves application history and establishes one active instance. It is not automatic failover. Verify restored data and isolate conflicting old processes before resuming writes/jobs.
 
-**Coolify is a reference, not a feature-parity requirement.** Excluded: multi-host application/database orchestration, replicas/clusters, automatic failover, Kafka/RabbitMQ operation and MySQL/MariaDB support. WordPress therefore remains outside the selected database scope. When a stack outgrows one instance, preserve portable configuration and data so its owner can move elsewhere.
+**Coolify is a reference, not a feature-parity requirement.** Excluded: multi-host application/database orchestration, replicas/clusters, automatic failover and Kafka/RabbitMQ operation. A database server other than the managed PostgreSQL is not a managed slot, but an application may run one as a service it declares, with the owner's dump procedure; BookStack with MariaDB is the demonstrated case, and WordPress is no longer excluded by its database. When a stack outgrows one instance, preserve portable configuration and data so its owner can move elsewhere.
 
 Previews, automatic-on-push releases, extra provisioners, dedicated build servers, richer teams, a general plugin marketplace and integrated external-agent transports are not prerequisites for this product. Plugin extraction should grow from concrete capabilities rather than block core generalization on a broad runtime. Priority belongs only in the roadmap.
