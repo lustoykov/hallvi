@@ -50,6 +50,8 @@ Native conversation histories live beside the database in `pi-sessions/<applicat
 
 ### Diagnostics
 
+Server commands show a live output block inside their chat message. The block follows new output until you scroll back; **Follow latest** resumes following, and **Copy** copies the command and recorded output. Completion keeps the block open and shows the exit code. Output remains redacted and limited to the most recent 100,000 characters by the existing execution recorder.
+
 For a live, read-only view of Pi's full recorded conversation, run this in another terminal using Node 22:
 
 ```sh

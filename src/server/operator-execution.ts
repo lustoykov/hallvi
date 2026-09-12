@@ -222,7 +222,17 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       conversationStatus("working");
       save();
       const result = await work(output);
-      output(typeof result === "string" ? result : JSON.stringify(result));
+      output(
+        tool === "server_bash" &&
+          result &&
+          typeof result === "object" &&
+          "output" in result &&
+          typeof result.output === "string"
+          ? result.output
+          : typeof result === "string"
+            ? result
+            : JSON.stringify(result),
+      );
       const exitCode =
         result && typeof result === "object" && "exitCode" in result
           ? (result.exitCode as number | null)

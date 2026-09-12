@@ -63,3 +63,90 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.sg-execution .sg-stream {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.sg-stream > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: #315bc6;
+  width: fit-content;
+}
+.sg-stream-terminal {
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #202838;
+  color: #f7f8fa;
+}
+.sg-stream pre {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  tab-size: 2;
+  scrollbar-color: #687183 #202838;
+  overscroll-behavior: contain;
+}
+.sg-stream .sg-stream-command {
+  max-height: 160px;
+  border-bottom: 1px solid #475267;
+  color: #b8ceff;
+}
+.sg-stream .sg-stream-output {
+  min-height: 80px;
+  max-height: 280px;
+  overflow-anchor: none;
+}
+.sg-stream-empty {
+  color: #bec6d4;
+}
+.sg-stream-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 14px;
+  border-top: 1px solid #475267;
+  font-size: 12px;
+}
+.sg-stream-controls button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #687183;
+  border-radius: 5px;
+  background: transparent;
+  color: #f7f8fa;
+  cursor: pointer;
+  font: inherit;
+}
+.sg-stream-controls button:hover {
+  background: #39465d;
+}
+.sg-stream-controls button[aria-pressed="true"] {
+  color: #b8ceff;
+  border-color: #8aaaf0;
+}
+.sg-stream-controls span {
+  color: #bec6d4;
+}
+.sg-stream :focus-visible {
+  outline: 2px solid #8aaaf0;
+  outline-offset: -2px;
+}
+.sg-stream ::selection {
+  background: #b8ceff;
+  color: #202838;
+}
+@media (max-width: 600px) {
+  .sg-stream .sg-stream-output {
+    max-height: 180px;
+  }
+}

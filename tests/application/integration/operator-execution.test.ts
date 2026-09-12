@@ -66,6 +66,7 @@ it("pauses the actual call until approved, then records its output and failure c
   expect(work).toHaveBeenCalledOnce();
   expect(listExecutions(run.applicationId)[0]).toMatchObject({
     status: "failed",
+    output: "missing service",
     exitCode: 3,
     approvalId: receipt.id,
   });

@@ -5,6 +5,7 @@ import type {
   OperatorSettings,
 } from "@/server/operator-execution";
 import "./operator-console.css";
+import { StreamingOutput } from "./streaming-output";
 
 async function request<T>(url: string, body?: unknown): Promise<T> {
   const response = await fetch(
@@ -159,27 +160,39 @@ export function OperatorConsole({
                 <strong>
                   {item.tool === "request_approval"
                     ? "Approval requested"
-                    : item.tool}
+                    : item.tool === "server_bash"
+                      ? "Run on server"
+                      : item.tool}
                 </strong>
-                <span>{item.status.replaceAll("-", " ")}</span>
+                <span role="status">
+                  {item.status === "succeeded"
+                    ? "Completed"
+                    : item.status.replaceAll("-", " ")}
+                  {typeof item.exitCode === "number" &&
+                    ` · exit ${item.exitCode}`}
+                </span>
               </header>
               <p>
                 {item.target} · {new Date(item.createdAt).toLocaleTimeString()}
               </p>
-              <details
-                open={
-                  item.status === "awaiting-approval" ||
-                  item.status === "running"
-                }
-              >
-                <summary>
-                  {item.status === "awaiting-approval"
-                    ? "Review this action"
-                    : "Command and output"}
-                </summary>
-                <pre>{item.input}</pre>
-                {item.output && <pre>{item.output}</pre>}
-              </details>
+              {item.tool === "server_bash" ? (
+                <StreamingOutput item={item} />
+              ) : (
+                <details
+                  open={
+                    item.status === "awaiting-approval" ||
+                    item.status === "running"
+                  }
+                >
+                  <summary>
+                    {item.status === "awaiting-approval"
+                      ? "Review this action"
+                      : "Command and output"}
+                  </summary>
+                  <pre>{item.input}</pre>
+                  {item.output && <pre>{item.output}</pre>}
+                </details>
+              )}
               {item.status === "awaiting-approval" && main && (
                 <div className="sg-execution-actions">
                   <button
