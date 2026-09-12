@@ -63,7 +63,7 @@
   top: 66px;
 }
 body:has(#sidebar.open) #hamburger {
-  display: none;
+  display: none !important;
 }
 #live-current {
   margin: 24px 0;
