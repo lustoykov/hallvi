@@ -25,6 +25,10 @@ The product guides users on **what deserves care**. Pi decides **how to provide 
 
 ## Agreed direction
 
+### Default application access
+
+Applications are private by default: bind application ports and reverse proxies to server loopback, keep application HTTP/HTTPS firewall ports closed, and use an SSH tunnel bound to the controller PC's `127.0.0.1`. Pi opens/reuses the tunnel with `open_server_port` through the normal permission boundary and gives the user its local URL. The tool checks local HTTP response status; Pi must also verify application behavior and server IPv4/IPv6 exposure. Public application access requires an explicit user request. A local link works on the PC running Server Guy while its SSH tunnel is alive; reopening after disconnect/reboot is an explicit tool call, not an automatic recovery service. A remote controller requires a separate user access arrangement.
+
 ### Current focus: the main deployment journey
 
 Get the main deployment journey right before expanding ongoing care across all sidebar views. Continue designing first; this priority does not authorize starting implementation yet. Walk through the happy path from the user's deployment request to a working application, deciding how Pi acts, what the user sees and which information is saved and resurfaced.

@@ -1,5 +1,6 @@
 import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
+import { openServerPort } from "./private-access";
 import {
   listInformation,
   saveInformation,
@@ -54,6 +55,8 @@ For an existing machine, provide server_public_key for the owner to install in a
 
 You have a repository workspace and, when connected, general Bash access to the application's server through server_bash. Choose the commands and scripts the task needs. Deployment, diagnosis and repair happen in this conversation. There is no release proposal or separate deployment planner to invoke.
 
+Application access is private by default: accessible only from the PC running Server Guy through an SSH tunnel. Bind application/container published ports and any reverse proxy to server loopback (127.0.0.1 and, if needed, ::1); do not publish on all interfaces or open application HTTP/HTTPS firewall ports. Keep SSH reachable. Use open_server_port for the chosen server loopback port, then verify the application through that returned local URL and inspect IPv4/IPv6 listeners and firewall exposure. A tunnel alone does not make an already public service private. Give the local URL to the user and save it with the access mode and verification evidence; explain that it works on the controller PC while the tunnel is alive and can be reopened with open_server_port after disconnection/reboot. If this controller is on a different machine from the user's browser, explain that localhost refers to the controller and obtain their intended access arrangement. Only configure public application access, public domain/HTTPS ingress or public application firewall rules when the user explicitly requests public access. These defaults do not alter the selected permission mode.
+
 Permissions are independent of the task. In Always ask, the executor requests approval for each command or file mutation. In Pi decides, use request_approval when your judgment calls for a user decision before acting; the user's task normally authorizes its ordinary work. In Bypass, tools run without approval prompts. A declined request is not authorization to try the same effect another way.
 
 Use judgment to avoid unnecessary downtime, data loss and spending. Inspect before making assumptions. If a command fails or its outcome is unknown, investigate using your general tools and decide how to proceed. A successful command does not prove the application works: check the result.
@@ -70,6 +73,7 @@ export const PI_TOOL_NAMES = [
   "hetzner_request",
   "server_public_key",
   "connect_server",
+  "open_server_port",
   "server_bash",
   "request_approval",
   "search_information",
@@ -270,6 +274,34 @@ export async function askPi(
     ];
     const operatorTools = main
       ? [
+          defineTool({
+            name: "open_server_port",
+            label: "Open private application access",
+            executionMode: "sequential",
+            description:
+              "Open or reuse an SSH tunnel from this controller PC's 127.0.0.1 to a loopback port on the connected server. Returns a local HTTP URL; verify the app separately. Does not change the server's listeners/firewall. If the local port is occupied, choose another. Only this PC can use the URL, while the tunnel is alive. No credentials or arbitrary bind addresses are accepted.",
+            parameters: Type.Object({
+              remotePort: Type.Number({ minimum: 1, maximum: 65535 }),
+              localPort: Type.Optional(
+                Type.Number({ minimum: 1024, maximum: 65535 }),
+              ),
+            }),
+            async execute(_id, params, signal) {
+              return json(
+                await execution.execute(
+                  "open_server_port",
+                  "Private access on the controller PC",
+                  params,
+                  () =>
+                    openServerPort(
+                      input.run.applicationId,
+                      params,
+                      signal ?? options.signal,
+                    ),
+                ),
+              );
+            },
+          }),
           defineTool({
             name: "hetzner_request",
             label: "Hetzner Cloud request",

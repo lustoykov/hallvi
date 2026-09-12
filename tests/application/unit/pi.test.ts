@@ -13,10 +13,14 @@ const mocks = vi.hoisted(() => ({
   provider: vi.fn(),
   publicKey: vi.fn(),
   connect: vi.fn(),
+  tunnel: vi.fn(),
 }));
 vi.mock("../../../src/server/hetzner", () => ({
   hetzner: mocks.provider,
   hetznerConnectionId: () => "configured",
+}));
+vi.mock("../../../src/server/private-access", () => ({
+  openServerPort: mocks.tunnel,
 }));
 vi.mock("../../../src/server/server-access", () => ({
   serverPublicKey: mocks.publicKey,
@@ -208,4 +212,22 @@ it("provider and connection tools use the same permission boundary, including de
   await tool("connect_server").execute("connect", { serverId: 456 });
   expect(mocks.provider).toHaveBeenCalledOnce();
   expect(mocks.connect).toHaveBeenCalledOnce();
+});
+
+it("opens private access through the permission boundary and honors decline", async () => {
+  mocks.tunnel.mockResolvedValue({
+    url: "http://127.0.0.1:8080",
+    httpStatus: 200,
+  });
+  await askPi(input);
+  await tool("open_server_port").execute("tunnel", { remotePort: 80 });
+  expect(mocks.execute.mock.calls[0][0]).toBe("open_server_port");
+  expect(mocks.tunnel).toHaveBeenCalledWith(
+    "app-a",
+    { remotePort: 80 },
+    undefined,
+  );
+  mocks.execute.mockResolvedValue({ declined: true });
+  await tool("open_server_port").execute("tunnel", { remotePort: 80 });
+  expect(mocks.tunnel).toHaveBeenCalledOnce();
 });
