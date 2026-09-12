@@ -23,6 +23,8 @@ import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePage } from "./architecture-page";
 import { OverviewPage } from "./overview-page";
 import { DeploymentPage } from "./deployment-page";
+import { HistoryPage } from "./history-page";
+import { LogsPage } from "./logs-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -165,6 +167,29 @@ export function ApplicationSectionView({
           onAsk={(draft) => onAsk(null, draft)}
         />
       );
+    if (section === "logs")
+      return (
+        <LogsPage
+          executions={view.executions ?? []}
+          now={now}
+          bar={bar}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+        />
+      );
+    if (section === "history")
+      return (
+        <HistoryPage
+          records={view.information}
+          executions={view.executions ?? []}
+          chats={view.chats}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+        />
+      );
     if (section === "deployment")
       return (
         <DeploymentPage
@@ -253,7 +278,8 @@ export function ApplicationSectionView({
               currentView={section}
             />
           ))}
-          {!records.length && section !== "logs" && (
+          {/* Logs has its own page and its own empty state now. */}
+          {!records.length && (
             <div className="sg-section-none">
               <h2>Nothing has been established here yet.</h2>
               <p>

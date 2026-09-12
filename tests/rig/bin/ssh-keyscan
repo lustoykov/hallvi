@@ -1,0 +1,48 @@
+#!/usr/bin/env node
+// Rig stand-in for ssh-keyscan. The product reads a host key before it will
+// connect, and the rig's "server" is not on the network at all — every host
+// command goes to the local shell or the host container through bin/ssh — so
+// a real scan of the provider's advertised address can only time out.
+//
+// This answers with one stable ED25519 host key in ssh-keyscan's own format,
+// so the product's fingerprint check and StrictHostKeyChecking see exactly
+// what they would from a real host. The key is fixed and public: it is the
+// rig's identity, not a secret, and nothing authenticates with it.
+"use strict";
+const { appendFileSync } = require("node:fs");
+const { join } = require("node:path");
+
+const root = process.env.SG_RIG_HOST_ROOT;
+const args = process.argv.slice(2);
+// The address is the last argument; the flags before it are ssh-keyscan's.
+const address = args.at(-1) ?? "";
+const port = (() => {
+  const index = args.indexOf("-p");
+  return index >= 0 ? args[index + 1] : "22";
+})();
+
+// A fixed, valid 32-byte ED25519 public key blob, base64 as ssh-keyscan
+// prints it: "ssh-ed25519" length-prefixed, then the key.
+const key = (() => {
+  const name = Buffer.from("ssh-ed25519", "utf8");
+  const seed = Buffer.alloc(32);
+  for (let i = 0; i < 32; i++) seed[i] = (i * 7 + 13) % 251;
+  const length = (buffer) => {
+    const size = Buffer.alloc(4);
+    size.writeUInt32BE(buffer.length);
+    return Buffer.concat([size, buffer]);
+  };
+  return Buffer.concat([length(name), length(seed)]).toString("base64");
+})();
+
+const host = port === "22" ? address : `[${address}]:${port}`;
+process.stdout.write(`${host} ssh-ed25519 ${key}\n`);
+if (root)
+  try {
+    appendFileSync(
+      join(root, "..", "logs", "ssh-keyscan.log"),
+      `${new Date().toISOString()} ${host}\n`,
+    );
+  } catch {
+    /* evidence only */
+  }

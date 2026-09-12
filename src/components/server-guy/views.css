@@ -1847,3 +1847,39 @@
   font-family:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* One captured run: where it ran, what was asked, when the output was taken. */
+.sg-captured {
+  margin: 0 0 18px;
+}
+.sg-captured header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 6px;
+}
+.sg-captured header strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sg-captured header code {
+  min-width: 0;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sg-captured header span {
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.sg-captured header a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--link);
+  font-size: 12px;
+}
