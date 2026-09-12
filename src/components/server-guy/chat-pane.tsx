@@ -28,7 +28,7 @@ import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
-import { hasSpokenActivity, PiActivity } from "./pi-activity";
+import { hasActivity, PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
@@ -339,7 +339,9 @@ export function ChatPane({
                       )}
                     </div>
                   ) : view.piActivity &&
-                    hasSpokenActivity(view.piActivity, message.id) ? null : (
+                    hasActivity(view.piActivity, message.id) ? null : (
+                    // With a transcript the body is drawn inside it, in the
+                    // place it happened, rather than above the calls.
                     <MessageResponse>
                       <Markdown source={message.body} />
                     </MessageResponse>
@@ -349,6 +351,7 @@ export function ChatPane({
                   <PiActivity
                     records={view.piActivity}
                     runId={message.id}
+                    live={message.status === "running" ? message.body : null}
                     renderExecution={(executionId) =>
                       view.application && chatId ? (
                         <OperatorConsole

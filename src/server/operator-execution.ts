@@ -1,4 +1,4 @@
-import { linkActivityExecution } from "./pi-activity";
+import { linkActivityExecution, settleActivity } from "./pi-activity";
 import { attachMessageBlock } from "./saved-information";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -216,6 +216,10 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         signal?.throwIfAborted();
         if (!decision.approved) {
           record.status = "declined";
+          // The runtime is handed an ordinary result, not an error, so the
+          // activity record would otherwise keep claiming this succeeded.
+          if (toolCallId)
+            settleActivity(run.applicationId, toolCallId, "declined");
           return { declined: true };
         }
         record.approvalId = record.id;

@@ -261,6 +261,30 @@ it("settles every open call at startup, as a crash restart must", () => {
   ).toBe("succeeded");
 });
 
+it("records a decline as not run, whatever the runtime returned", () => {
+  store.startActivity({
+    applicationId: APPLICATION,
+    runId: "run-4",
+    sequence: 1,
+    id: "call-j",
+    tool: "bash",
+    args: { command: "echo no" },
+  });
+  // The runtime hands back an ordinary result for a declined command, so the
+  // record would otherwise keep claiming it succeeded.
+  store.endActivity({
+    applicationId: APPLICATION,
+    id: "call-j",
+    result: { declined: true },
+    isError: false,
+  });
+  store.settleActivity(APPLICATION, "call-j", "declined");
+  const record = store
+    .listActivity(APPLICATION)
+    .find((item) => item.id === "call-j");
+  expect(record?.status).toBe("declined");
+});
+
 it("has nothing to say about an application Pi never worked on", () => {
   expect(store.listActivity("99999999-2222-4333-8444-555555555555")).toEqual(
     [],

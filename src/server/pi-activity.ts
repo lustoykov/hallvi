@@ -35,7 +35,9 @@ export type ActivityStatus =
   | "succeeded"
   | "failed"
   /** The run stopped before this call reported an end. */
-  | "interrupted";
+  | "interrupted"
+  /** The user was asked and said no, so nothing ran. */
+  | "declined";
 
 export interface ActivityRecord {
   /**
@@ -258,6 +260,22 @@ export function settleRunningActivity(
         status,
         finishedAt: new Date().toISOString(),
       });
+}
+
+/**
+ * Settles one call to an outcome the runtime cannot report. A declined
+ * command returns an ordinary result, so without this the record would keep
+ * saying it succeeded even though nothing ran.
+ */
+export function settleActivity(
+  applicationId: string,
+  id: string,
+  status: Exclude<ActivityStatus, "running">,
+) {
+  const path = recordPath(applicationId, id);
+  const record = read(path);
+  if (!record) return;
+  write(path, { ...record, status, finishedAt: new Date().toISOString() });
 }
 
 /** Every application that has any activity on record. */

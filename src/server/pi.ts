@@ -320,7 +320,7 @@ export async function askPi(
                 Type.Number({ minimum: 1024, maximum: 65535 }),
               ),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "open_server_port",
@@ -332,6 +332,8 @@ export async function askPi(
                       params,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -352,7 +354,7 @@ export async function askPi(
               path: Type.String(),
               body: Type.Optional(Type.Any()),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "hetzner_request",
@@ -366,6 +368,8 @@ export async function askPi(
                       params.method,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -377,7 +381,7 @@ export async function askPi(
             description:
               "Get or generate this application's controller-managed SSH key. Returns only the public key for provider registration or installation by the owner. Private key stays on the controller.",
             parameters: Type.Object({}, { additionalProperties: false }),
-            async execute(_id, _params, signal) {
+            async execute(id, _params, signal) {
               return json(
                 await execution.execute(
                   "server_public_key",
@@ -388,6 +392,8 @@ export async function askPi(
                       input.run.applicationId,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -405,7 +411,7 @@ export async function askPi(
               port: Type.Optional(Type.Number({ minimum: 1, maximum: 65535 })),
               hostKeyFingerprint: Type.Optional(Type.String()),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "connect_server",
@@ -417,6 +423,8 @@ export async function askPi(
                       params,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },

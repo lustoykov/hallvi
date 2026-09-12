@@ -21,11 +21,9 @@ import type { ActivityRecord } from "@/server/pi-activity";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
-/** True when this run's transcript already holds what Pi said. */
-export function hasSpokenActivity(records: ActivityRecord[], runId: string) {
-  return records.some(
-    (record) => record.runId === runId && record.kind === "message",
-  );
+/** True when this run has anything in the transcript at all. */
+export function hasActivity(records: ActivityRecord[], runId: string) {
+  return records.some((record) => record.runId === runId);
 }
 
 /** What a tool is doing, in the reader's words rather than its own. */
@@ -83,11 +81,18 @@ function duration(record: ActivityRecord) {
 export function PiActivity({
   records,
   runId,
+  live,
   renderExecution,
 }: {
   records: ActivityRecord[];
   /** The assistant message these calls belong to. */
   runId: string;
+  /**
+   * What Pi is writing right now, if it is still writing. It belongs at the
+   * end of the transcript, where it is happening — rendering it above the
+   * calls made it duplicate and jump when the message finished.
+   */
+  live?: string | null;
   /**
    * Draws the executor card for a call that produced one. A call is matched
    * to its record by the id the runtime gave it, never by the tool's name, so
@@ -99,7 +104,12 @@ export function PiActivity({
   const mine = records
     .filter((record) => record.runId === runId)
     .sort((a, b) => a.sequence - b.sequence);
-  if (!mine.length) return null;
+  // Between a message ending and the next one starting, the draft still holds
+  // the text that has just become the last item. Showing both would say it
+  // twice, so the draft waits until it has something new.
+  const said = mine.filter((record) => record.kind === "message").at(-1)?.text;
+  const tail = live?.trim() && live.trim() !== said?.trim() ? live : null;
+  if (!mine.length && !tail) return null;
   return (
     <ol className="sg-activity" aria-label="What Pi did">
       {mine.map((record) =>
@@ -114,6 +124,11 @@ export function PiActivity({
         ) : (
           <ActivityRow key={record.id} record={record} />
         ),
+      )}
+      {tail && (
+        <li className="sg-activity-said" data-live="" key="live">
+          <Markdown source={tail} />
+        </li>
       )}
     </ol>
   );
@@ -160,6 +175,11 @@ function ActivityRow({ record }: { record: ActivityRecord }) {
             <>
               <Warning weight="bold" aria-hidden="true" />
               Stopped
+            </>
+          ) : record.status === "declined" ? (
+            <>
+              <X weight="bold" aria-hidden="true" />
+              Not run
             </>
           ) : (
             <>
