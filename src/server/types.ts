@@ -8,6 +8,10 @@ export interface ApplicationRecord {
   repositoryName: string;
   createdAt: string;
   updatedAt: string;
+  permissionMode?: import("./operator-data").OperatorSettings["permissionMode"];
+  host?: import("./operator-data").OperatorSettings["host"];
+  repositoryId?: number | null;
+  repositoryCheck?: Observation | null;
 }
 
 /** An application-owned transcript with its own native model session. */
@@ -17,6 +21,9 @@ export interface Chat {
   title: string;
   createdAt: string;
   archivedAt: string | null;
+  kind?: "main" | "side";
+  status?: import("./operator-data").ConversationStatus;
+  currentResponseId?: string | null;
 }
 
 /** A chat as the list shows it: with the time of its newest message. */
@@ -29,6 +36,7 @@ export interface ChatMessage {
   chatId: string;
   role: "user" | "assistant";
   body: string;
+  blocks?: import("./operator-data").MessageBlock[];
   /**
    * `user` is the engineer's own message. `server-guy` marks a recorded
    * event or a request Server Guy started itself; it is never presented as
@@ -114,6 +122,8 @@ export interface ActivityEvent {
  * their Pi Runs, the application's operations and Activity.
  */
 export interface ChatRunSnapshot {
+  executions?: import("./operator-execution").ExecutionRecord[];
+  information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
   messages: ChatMessage[];
   runs: PiRun[];
@@ -122,6 +132,8 @@ export interface ChatRunSnapshot {
 
 /** The application page: conversations and the shared application records. */
 export interface OperatorView {
+  executions?: import("./operator-execution").ExecutionRecord[];
+  information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
   application: ApplicationRecord | null;
   /** The latest repository access check with the current GitHub login. */
@@ -161,5 +173,4 @@ export interface PiDecision {
 
 export interface PiTurnResult {
   message: string;
-  decisionProposals: PiDecision[];
 }

@@ -8,7 +8,7 @@ The target is Docker Compose on one instance, with PostgreSQL or SQLite, require
 
 ## Current direction
 
-The first [operator redesign](docs/operator-design.md) checkpoint is implemented: the main conversation has general server Bash, three permission modes, inline approval and recorded command output. Other conversations have read-only tools. Connect an existing SSH host above the main conversation or in Deployment. Provider provisioning, native queue/steer, concurrent side conversations and shared knowledge presentation are the next increments.
+The first [operator redesign](docs/operator-design.md) checkpoint is implemented: the main conversation has general server Bash, three permission modes, inline approval and recorded command output. Other conversations have read-only tools. The execution backend has been verified with a temporary SSH target; server selection will arrive with deployment setup. The four-table controller model and shared-information cards are implemented locally; see [storage verification](docs/testing/2026-09-12-operator-storage.md). Review this checkpoint before Hetzner provisioning, then a verified lightweight deployment. Queue/steer and further side-chat work are deferred until that experience is established.
 
 Prove the deployment journey in reviewable stages using lightweight, medium and more complicated applications. Then review each sidebar view's capabilities. Verify real behavior with focused checks and delete obsolete code/tests; broad hardening and application-error monitoring are deferred. [Roadmap](ROADMAP.md) owns the checkpoints.
 

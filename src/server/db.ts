@@ -1,41 +1,15 @@
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import {
-  activityEvents,
-  applications,
-  chats,
-  chatSummaries,
-  decisions,
-  messages,
-  observations,
-  piRuns,
-} from "./db-schema";
+import { applications, chats, messages, savedInformation } from "./db-schema";
 import schemaVersion from "./schema-version.json";
-import { assertOutsideRecoveryQuarantine } from "./recovery-quarantine.mjs";
-import type {
-  ActivityEvent,
-  ApplicationRecord,
-  Chat,
-  ChatMessage,
-  Decision,
-  Observation,
-} from "./types";
+import type { ApplicationRecord, ChatMessage, Observation } from "./types";
 
-const schema = {
-  activityEvents,
-  applications,
-  chats,
-  decisions,
-  messages,
-  observations,
-  piRuns,
-  chatSummaries,
-};
+const schema = { applications, chats, messages, savedInformation };
 type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
@@ -46,10 +20,6 @@ export function databasePath() {
   const path =
     process.env.SERVER_GUY_DB_PATH ??
     join(process.cwd(), ".server-guy", "server-guy.db");
-  assertOutsideRecoveryQuarantine(
-    path,
-    process.env.SERVER_GUY_CONFIG_DIR ?? join(process.cwd(), ".server-guy"),
-  );
   return path;
 }
 
@@ -65,10 +35,6 @@ function createDatabase(): ServerGuyDatabase {
     client.pragma("journal_mode = WAL");
     client.pragma("foreign_keys = ON");
     client.pragma("busy_timeout = 5000");
-    // SQLite's built-in lower() folds ASCII only. Decision text can be Unicode.
-    client.function("unicode_lower", { deterministic: true }, (value) =>
-      typeof value === "string" ? value.toLowerCase() : null,
-    );
     assertCurrentSchema(client, path);
     return drizzle({ client, schema });
   } catch (error) {
@@ -145,11 +111,15 @@ export function insertApplication(
 // Chats and messages
 
 export function insertChat(applicationId: string, title: string) {
-  const chat: Chat = {
+  const chat = {
     id: randomUUID(),
     applicationId,
     title,
+    kind: listApplicationChats(applicationId).length
+      ? ("side" as const)
+      : ("main" as const),
     createdAt: now(),
+    updatedAt: now(),
     archivedAt: null,
   };
   db().insert(chats).values(chat).run();
@@ -198,13 +168,15 @@ export function insertMessage(
   source: ChatMessage["source"],
   status: ChatMessage["status"] = "completed",
 ) {
-  const message: ChatMessage = {
+  const message = {
     id: randomUUID(),
     chatId,
     role,
     body,
+    blocks: [],
     source,
     createdAt: now(),
+    updatedAt: now(),
     status,
     revision: 0,
   };
@@ -225,90 +197,10 @@ export function listMessages(chatId: string) {
     .all();
 }
 
-// Decisions
-
-export function insertDecision(input: {
-  applicationId: string;
-  sourceMessageId: string;
-  kind: Decision["kind"];
-  label: string;
-  value: string;
-}) {
-  const decision: Decision = {
-    ...input,
-    id: randomUUID(),
-    supersededById: null,
-    createdAt: now(),
-  };
-  db().insert(decisions).values(decision).run();
-  return decision;
+// The latest repository access check is application configuration.
+export function latestObservation(applicationId: string) {
+  return getApplication(applicationId)?.repositoryCheck ?? null;
 }
-
-export function getDecision(id: string) {
-  return (
-    db().select().from(decisions).where(eq(decisions.id, id)).get() ?? null
-  );
-}
-
-export function getActiveDecision(applicationId: string, id: string) {
-  return (
-    db()
-      .select()
-      .from(decisions)
-      .where(
-        and(
-          eq(decisions.id, id),
-          eq(decisions.applicationId, applicationId),
-          isNull(decisions.supersededById),
-        ),
-      )
-      .get() ?? null
-  );
-}
-
-export function listActiveDecisions(applicationId: string) {
-  return db()
-    .select()
-    .from(decisions)
-    .where(
-      and(
-        eq(decisions.applicationId, applicationId),
-        isNull(decisions.supersededById),
-      ),
-    )
-    .orderBy(asc(decisions.createdAt), asc(rowId))
-    .all();
-}
-
-export function supersedeDecision(
-  applicationId: string,
-  previousId: string,
-  replacementId: string,
-) {
-  const result = db()
-    .update(decisions)
-    .set({ supersededById: replacementId })
-    .where(
-      and(
-        eq(decisions.id, previousId),
-        eq(decisions.applicationId, applicationId),
-        isNull(decisions.supersededById),
-        sql`${decisions.id} <> ${replacementId}`,
-        sql`exists (select 1 from decisions as replacement where replacement.id = ${replacementId} and replacement.application_id = ${applicationId} and replacement.superseded_by_id is null)`,
-      ),
-    )
-    .returning()
-    .get();
-  if (!result) {
-    throw new Error(
-      "The Decision being corrected is missing, already replaced, or belongs to another application.",
-    );
-  }
-  return result;
-}
-
-// Observations
-
 export function insertObservation(
   input: Omit<Observation, "id" | "observedAt">,
 ) {
@@ -317,108 +209,19 @@ export function insertObservation(
     id: randomUUID(),
     observedAt: now(),
   };
-  db().insert(observations).values(observation).run();
+  const raw = input.raw as { repositoryId?: number } | null;
+  db()
+    .update(applications)
+    .set({
+      repositoryCheck: observation,
+      ...(input.status === "passed" && raw?.repositoryId
+        ? { repositoryId: raw.repositoryId }
+        : {}),
+      updatedAt: now(),
+    })
+    .where(eq(applications.id, input.applicationId))
+    .run();
   return observation;
-}
-
-export function getObservation(id: string) {
-  return (
-    db().select().from(observations).where(eq(observations.id, id)).get() ??
-    null
-  );
-}
-
-export function latestObservation(applicationId: string, kind: string) {
-  return (
-    db()
-      .select()
-      .from(observations)
-      .where(
-        and(
-          eq(observations.applicationId, applicationId),
-          eq(observations.kind, kind),
-        ),
-      )
-      .orderBy(desc(observations.observedAt), desc(rowId))
-      .limit(1)
-      .get() ?? null
-  );
-}
-
-export function listObservations(applicationId: string) {
-  return db()
-    .select()
-    .from(observations)
-    .where(eq(observations.applicationId, applicationId))
-    .orderBy(desc(observations.observedAt), desc(rowId))
-    .all();
-}
-
-// Activity
-
-export function insertActivity(
-  applicationId: string,
-  kind: string,
-  summary: string,
-  detail: string,
-) {
-  const activity: ActivityEvent = {
-    id: randomUUID(),
-    applicationId,
-    kind,
-    summary,
-    detail,
-    createdAt: now(),
-  };
-  db().insert(activityEvents).values(activity).run();
-}
-
-/**
- * Records one event per deterministic ID. Retried or concurrent requests for
- * the same transition therefore cannot add a second feed item. Returns whether
- * this call recorded it.
- */
-export function recordActivityOnce(
-  id: string,
-  applicationId: string,
-  kind: string,
-  summary: string,
-  detail: string,
-) {
-  const activity: ActivityEvent = {
-    id,
-    applicationId,
-    kind,
-    summary,
-    detail,
-    createdAt: now(),
-  };
-  return (
-    db().insert(activityEvents).values(activity).onConflictDoNothing().run()
-      .changes > 0
-  );
-}
-
-// Legacy reply/Chat administration rows remain stored, but are not domain
-// Activity. New rich diagnostics go only to local logs and optional traces.
-const EXCLUDED_ACTIVITY_KINDS = [
-  "chat-execution",
-  "chat-created",
-  "chat-archived",
-];
-
-export function listActivity(applicationId: string): ActivityEvent[] {
-  return db()
-    .select()
-    .from(activityEvents)
-    .where(
-      and(
-        eq(activityEvents.applicationId, applicationId),
-        notInArray(activityEvents.kind, EXCLUDED_ACTIVITY_KINDS),
-      ),
-    )
-    .orderBy(desc(activityEvents.createdAt), desc(rowId))
-    .all();
 }
 
 let committedCallbacks: (() => void)[] | undefined;

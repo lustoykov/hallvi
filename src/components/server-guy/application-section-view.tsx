@@ -10,6 +10,7 @@ import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
+import { InformationCard } from "./information-card";
 import { ApplicationOverview } from "./application-overview";
 import {
   applicationSections,
@@ -122,6 +123,38 @@ export function ApplicationSectionView({
 }) {
   const app = view.application;
   if (!app) return null;
+  // The live operator reads shared information. Older layouts below remain
+  // available only to the isolated visual-reference scenarios.
+  if (view.information !== undefined) {
+    const records = view.information.filter(
+      (r) => !r.retiredAt && r.presentation?.views.includes(section),
+    );
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        {bar}
+        <header className="sg-section-header">
+          <h1>{applicationSections.find((s) => s.id === section)?.label}</h1>
+          <p>{descriptions[section]}</p>
+        </header>
+        <div className="sg-section-content">
+          {records.map((record) => (
+            <InformationCard
+              key={record.id}
+              record={record}
+              onOpen={onOpenDestination}
+            />
+          ))}
+          {!records.length && section !== "logs" && (
+            <p>
+              Pi hasn’t saved an update here yet. As you work together, relevant
+              findings and outcomes will appear here.
+            </p>
+          )}
+          {children}
+        </div>
+      </div>
+    );
+  }
   const live = deployment?.status === "live";
   const address = facts.domains?.address ?? deployment?.url ?? null;
   const viewProps: ViewProps = {

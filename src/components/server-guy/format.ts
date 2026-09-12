@@ -4,11 +4,8 @@
  * <LocalTime>.
  */
 export function formatTimestamp(value: string) {
-  return `${new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(new Date(value))} UTC`;
+  // Intl punctuation and month abbreviations differ between Node and Safari.
+  return `${new Date(value).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 export type LocalTimeVariant = "full" | "compact" | "date" | "title";

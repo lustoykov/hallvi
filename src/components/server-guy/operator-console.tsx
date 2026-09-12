@@ -26,18 +26,23 @@ export function OperatorConsole({
   chatId,
   main,
   settingsOnly = false,
+  executionId,
+  excludeIds = [],
+  records,
 }: {
   applicationId: string;
   chatId: string;
   main: boolean;
   settingsOnly?: boolean;
+  executionId?: string;
+  excludeIds?: string[];
+  records?: ExecutionRecord[];
 }) {
   const url = `/api/applications/${applicationId}/operator`;
   const [settings, setSettings] = useState<OperatorSettings | null>(null);
   const [executions, setExecutions] = useState<ExecutionRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const refresh = useCallback(async () => {
     const state = await request<{
       settings: OperatorSettings;
@@ -47,6 +52,7 @@ export function OperatorConsole({
     setExecutions(state.executions);
   }, [url]);
   useEffect(() => {
+    if (records !== undefined && !settingsOnly) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -69,14 +75,22 @@ export function OperatorConsole({
       alive = false;
       clearTimeout(timer);
     };
-  }, [url]);
+  }, [url, records, settingsOnly]);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("execution");
+    if (!id) return;
+    const card = document.getElementById(`execution-${id}`);
+    if (card) {
+      card.querySelector("details")?.setAttribute("open", "");
+      card.scrollIntoView({ block: "center" });
+    }
+  }, [executions.length]);
   async function save(next: OperatorSettings) {
     setBusy("settings");
     setError(null);
     try {
       await request(url, next);
       await refresh();
-      setEditing(false);
     } catch (error) {
       setError((error as Error).message);
     } finally {
@@ -103,7 +117,6 @@ export function OperatorConsole({
       {settingsOnly && settings && (
         <>
           <div className="sg-operator-toolbar">
-            <strong>{main ? "Main operator" : "Read-only side chat"}</strong>
             {main && (
               <label>
                 Permissions{" "}
@@ -125,95 +138,23 @@ export function OperatorConsole({
                 </select>
               </label>
             )}
-            {main && (
-              <button type="button" onClick={() => setEditing(!editing)}>
-                {settings.host
-                  ? `${settings.host.user}@${settings.host.address}`
-                  : "Connect existing server"}
-              </button>
-            )}
           </div>
-          {main && editing && (
-            <form
-              className="sg-host-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const data = new FormData(event.currentTarget);
-                void save({
-                  ...settings,
-                  host: {
-                    address: String(data.get("address")),
-                    user: String(data.get("user")),
-                    port: Number(data.get("port")),
-                    privateKeyPath: String(data.get("privateKeyPath")),
-                    knownHostsPath: String(data.get("knownHostsPath")),
-                  },
-                });
-              }}
-            >
-              <p>
-                Connect an existing server using an SSH key and known-hosts file
-                on the machine running Server Guy. Verify the host through SSH
-                first.
-              </p>
-              <label>
-                Host address
-                <input
-                  name="address"
-                  required
-                  defaultValue={settings.host?.address ?? ""}
-                  placeholder="203.0.113.10"
-                />
-              </label>
-              <label>
-                SSH user
-                <input
-                  name="user"
-                  required
-                  defaultValue={settings.host?.user ?? "root"}
-                />
-              </label>
-              <label>
-                SSH port
-                <input
-                  name="port"
-                  type="number"
-                  min={1}
-                  max={65535}
-                  required
-                  defaultValue={settings.host?.port ?? 22}
-                />
-              </label>
-              <label>
-                Private key file
-                <input
-                  name="privateKeyPath"
-                  required
-                  defaultValue={settings.host?.privateKeyPath ?? ""}
-                  placeholder="/absolute/path/to/ssh-key"
-                />
-              </label>
-              <label>
-                Known-hosts file
-                <input
-                  name="knownHostsPath"
-                  required
-                  defaultValue={settings.host?.knownHostsPath ?? ""}
-                  placeholder="/absolute/path/to/known_hosts"
-                />
-              </label>
-              <button className="sg-primary-button" disabled={busy !== null}>
-                Save connection
-              </button>
-            </form>
-          )}
         </>
       )}
       {!settingsOnly &&
-        executions
-          .filter((item) => item.chatId === chatId)
+        (records ?? executions)
+          .filter(
+            (item) =>
+              item.chatId === chatId &&
+              (!executionId || item.id === executionId) &&
+              !excludeIds.includes(item.id),
+          )
           .map((item) => (
-            <article key={item.id} className={`sg-execution ${item.status}`}>
+            <article
+              id={`execution-${item.id}`}
+              key={item.id}
+              className={`sg-execution ${item.status}`}
+            >
               <header>
                 <strong>
                   {item.tool === "request_approval"

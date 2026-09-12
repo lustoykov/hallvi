@@ -27,6 +27,7 @@ import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
+import { InformationCard } from "./information-card";
 import { OperatorConsole } from "./operator-console";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
@@ -164,6 +165,13 @@ export function ChatPane({
         decision={decisionFor?.(operation)}
       />
     ));
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("message");
+    if (id)
+      document
+        .getElementById(`sg-message-${id}`)
+        ?.scrollIntoView({ block: "center" });
+  }, [view.messages.length]);
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
   const readOnly = archived;
@@ -175,17 +183,12 @@ export function ChatPane({
 
   return (
     <section className="sg-chat-pane">
-      <header className="sg-pane-title sg-chat-title">
-        <div>
-          <strong>{activeChat?.title ?? "Conversation"}</strong>
+      {activeChat && activeChat.id !== view.chats[0]?.id && (
+        <header className="sg-pane-title sg-chat-title">
           <span>
-            {archived ? "Archived · read-only" : "Working with Server Guy"}
+            {archived ? "Archived · read-only" : "Read-only side chat"}
           </span>
-        </div>
-        {activeChat &&
-          !readOnly &&
-          activeChat.id !== view.chats[0]?.id &&
-          view.chats.filter((chat) => !chat.archivedAt).length > 1 && (
+          {!readOnly && (
             <button
               className="sg-text-button"
               disabled={busy !== null}
@@ -195,12 +198,13 @@ export function ChatPane({
               <Archive /> Archive chat
             </button>
           )}
-      </header>
+        </header>
+      )}
       {(busy !== null || requestPending) && (
         <div className="sg-busy-bar" aria-hidden="true" />
       )}
 
-      {view.application && chatId && (
+      {view.application && chatId && view.chats[0]?.id === chatId && (
         <OperatorConsole
           key={`settings:${view.application.id}:${chatId}`}
           applicationId={view.application.id}
@@ -339,6 +343,34 @@ export function ChatPane({
                     </MessageResponse>
                   )}
                 </MessageContent>
+                {message.blocks?.map((block, index) => {
+                  if (block.type === "text")
+                    return <Markdown key={index} source={block.text} />;
+                  if (block.type === "execution" && view.application && chatId)
+                    return (
+                      <OperatorConsole
+                        key={block.id}
+                        applicationId={view.application.id}
+                        chatId={chatId}
+                        main={view.chats[0]?.id === chatId}
+                        executionId={block.id}
+                        records={view.executions}
+                      />
+                    );
+                  if (block.type === "saved-information") {
+                    const record = view.information?.find(
+                      (r) => r.id === block.id,
+                    );
+                    return record ? (
+                      <InformationCard
+                        key={block.id}
+                        record={record}
+                        onOpen={openDestination}
+                      />
+                    ) : null;
+                  }
+                  return null;
+                })}
                 {references?.get(message.id)?.length ? (
                   <div className="sg-message-refs">
                     <span>Saved from this reply</span>
@@ -374,6 +406,13 @@ export function ChatPane({
           {view.application && chatId && (
             <OperatorConsole
               key={`executions:${view.application.id}:${chatId}`}
+              records={view.executions}
+              excludeIds={view.messages.flatMap(
+                (m) =>
+                  m.blocks?.flatMap((b) =>
+                    b.type === "execution" ? [b.id] : [],
+                  ) ?? [],
+              )}
               applicationId={view.application.id}
               chatId={chatId}
               main={view.chats[0]?.id === chatId}

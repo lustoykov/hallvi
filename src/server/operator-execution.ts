@@ -1,3 +1,4 @@
+import { attachMessageBlock } from "./saved-information";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
@@ -11,25 +12,16 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { loadApplication, loadChat } from "./applications";
-import { listApplicationChats } from "./db";
 import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
 import { redactSecrets } from "./secrets";
 import type { PiRun } from "./types";
 
-export const operatorSettingsSchema = z.object({
-  permissionMode: z.enum(["always-ask", "pi-decides", "bypass"]),
-  host: z
-    .object({
-      address: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9.:-]*$/),
-      user: z.string().regex(/^[a-z_][a-z0-9_-]*$/),
-      port: z.number().int().min(1).max(65535),
-      privateKeyPath: z.string().startsWith("/"),
-      knownHostsPath: z.string().startsWith("/"),
-    })
-    .nullable(),
-});
-export type OperatorSettings = z.infer<typeof operatorSettingsSchema>;
+import { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
+export { operatorSettingsSchema, type OperatorSettings } from "./operator-data";
+import { db } from "./db";
+import { applications, chats } from "./db-schema";
+import { and, eq } from "drizzle-orm";
 export interface ExecutionRecord {
   id: string;
   applicationId: string;
@@ -69,27 +61,28 @@ function write(path: string, value: unknown) {
   renameSync(tmp, path);
 }
 export function operatorSettings(applicationId: string): OperatorSettings {
-  loadApplication(applicationId);
-  return operatorSettingsSchema.parse(
-    read(join(directory(applicationId), "settings.json")) ?? {
-      permissionMode: "pi-decides",
-      host: null,
-    },
-  );
+  const application = loadApplication(applicationId);
+  return operatorSettingsSchema.parse({
+    permissionMode: application.permissionMode,
+    host: application.host,
+  });
 }
 export function saveOperatorSettings(
   applicationId: string,
   value: OperatorSettings,
 ) {
   loadApplication(applicationId);
-  mkdirSync(directory(applicationId), { recursive: true, mode: 0o700 });
   const settings = operatorSettingsSchema.parse(value);
-  write(join(directory(applicationId), "settings.json"), settings);
+  db()
+    .update(applications)
+    .set({ ...settings, updatedAt: new Date().toISOString() })
+    .where(eq(applications.id, applicationId))
+    .run();
   return settings;
 }
 export function isMainChat(applicationId: string, chatId: string) {
   loadChat(applicationId, chatId);
-  return listApplicationChats(applicationId)[0]?.id === chatId;
+  return loadChat(applicationId, chatId).chat.kind === "main";
 }
 function executionDirectory(applicationId: string) {
   return join(directory(applicationId), "executions");
@@ -194,8 +187,21 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       save();
     };
     save();
+    attachMessageBlock(run.applicationId, run.id, {
+      type: "execution",
+      id: record.id,
+    });
+    const conversationStatus = (status: "working" | "awaiting-approval") =>
+      db()
+        .update(chats)
+        .set({ status, updatedAt: new Date().toISOString() })
+        .where(
+          and(eq(chats.id, run.chatId), eq(chats.currentResponseId, run.id)),
+        )
+        .run();
     try {
       if (needsApproval) {
+        conversationStatus("awaiting-approval");
         let decision;
         while (!(decision = read<{ approved: boolean }>(`${path}.decision`))) {
           await delay(150, undefined, { signal });
@@ -213,6 +219,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       if (getPiRun(run.id)?.status !== "running")
         throw new Error("This turn is no longer running.");
       record.status = "running";
+      conversationStatus("working");
       save();
       const result = await work(output);
       output(typeof result === "string" ? result : JSON.stringify(result));
@@ -240,6 +247,7 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         ).text,
       );
     } finally {
+      if (getPiRun(run.id)?.status === "running") conversationStatus("working");
       record.finishedAt = new Date().toISOString();
       save();
     }

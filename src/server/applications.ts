@@ -1,21 +1,15 @@
-import { applicationDeployment } from "./deployment-store";
 import {
   archiveChat as archiveChatRecord,
   deleteApplication,
   getApplication,
   getChat,
-  insertActivity,
   insertApplication,
   insertChat,
-  insertDecision,
   insertMessage,
   insertObservation,
   latestObservation,
   listApplicationChats,
   listApplications,
-  listObservations,
-  recordActivityOnce,
-  supersedeDecision,
   withTransaction,
 } from "./db";
 import { inspectGithubRepository, parseGithubRepository } from "./github";
@@ -24,13 +18,7 @@ import {
   readGithubConnection,
 } from "./github-connection";
 import { removeNativeApplicationSessions } from "./pi-sessions";
-import type {
-  ApplicationRecord,
-  Chat,
-  CreateApplicationInput,
-  Observation,
-  PiDecision,
-} from "./types";
+import type { ApplicationRecord, Chat, CreateApplicationInput } from "./types";
 
 export class ExistingApplicationConflictError extends Error {}
 export class NotFoundError extends Error {}
@@ -87,38 +75,14 @@ export async function createApplication(input: CreateApplicationInput) {
       `I created ${name}. I’m checking access to the repository so we can work out what it needs.`,
       "server-guy",
     );
-    insertActivity(
-      application.id,
-      "application-created",
-      "Application created",
-      `Recorded ${repository.canonicalUrl}.`,
-    );
     return application;
   });
   await observeRepository(application.id);
   return { application, created: true };
 }
 
-function repositoryIdOf(observation: Observation | undefined) {
-  const raw = observation?.raw;
-  return raw &&
-    typeof raw === "object" &&
-    "repositoryId" in raw &&
-    typeof raw.repositoryId === "number"
-    ? raw.repositoryId
-    : undefined;
-}
-
-/** The repository ID the latest successful access check recorded. */
 export function recordedRepositoryId(applicationId: string) {
-  return repositoryIdOf(
-    listObservations(applicationId).find(
-      (observation) =>
-        observation.kind === REPOSITORY_OBSERVATION &&
-        observation.status === "passed" &&
-        repositoryIdOf(observation) !== undefined,
-    ),
-  );
+  return getApplication(applicationId)?.repositoryId ?? undefined;
 }
 
 function connectionIdOf(observation: { raw: unknown }) {
@@ -177,22 +141,12 @@ export async function observeRepository(
     sourceUrl: result.sourceUrl,
     raw: result.raw,
   });
-  insertActivity(
-    application.id,
-    result.status === "passed"
-      ? "repository-observed"
-      : "repository-unavailable",
-    result.status === "passed"
-      ? "Repository identity recorded"
-      : "Repository check did not pass",
-    observation.summary,
-  );
   return observation;
 }
 
 /** Whether the latest repository check counts with the current login. */
 export function repositoryAccess(application: ApplicationRecord) {
-  const latest = latestObservation(application.id, REPOSITORY_OBSERVATION);
+  const latest = latestObservation(application.id);
   const connectionId = currentGithubConnectionId();
   const current = Boolean(
     connectionId && latest && connectionIdOf(latest) === connectionId,
@@ -244,10 +198,7 @@ export async function recheckGithubRepositories(connectionId: string) {
         throw new Error(
           "The GitHub connection changed. Check repositories with the current login.",
         );
-      const previous = latestObservation(
-        application.id,
-        REPOSITORY_OBSERVATION,
-      );
+      const previous = latestObservation(application.id);
       // A failed check is still a completed attempt. Only explicit Retry runs
       // it again.
       if (
@@ -273,66 +224,11 @@ export async function recheckGithubRepositories(connectionId: string) {
   }
 }
 
-/**
- * Disconnecting or replacing the GitHub login is installation-wide; its
- * application consequence is that a passing repository check made with the
- * previous login no longer counts as current. That does not show access was
- * lost. The event ID is derived from the invalidated Observation, so a
- * retried or concurrent request cannot add a second item.
- */
-function invalidateRepositoryVerifications(
-  previousConnectionId: string,
-  next: "disconnected" | "replaced",
-) {
-  const cause =
-    next === "disconnected"
-      ? "GitHub was disconnected"
-      : "The GitHub connection was replaced";
-  withTransaction(() => {
-    for (const application of listApplications()) {
-      const latest = latestObservation(application.id, REPOSITORY_OBSERVATION);
-      if (
-        latest?.status === "passed" &&
-        connectionIdOf(latest) === previousConnectionId
-      )
-        recordActivityOnce(
-          `verification-invalidated:${latest.id}`,
-          application.id,
-          "repository-verification-invalidated",
-          "Repository verification invalidated",
-          `${cause} after this repository was verified with the previous login, so that check no longer counts as current. This does not show that access was lost. Connecting GitHub again rechecks it. Earlier result: ${latest.summary}`,
-        );
-    }
-  });
-}
-
-function savedGithubConnectionId() {
-  try {
-    return readGithubConnection()?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Runs one GitHub setup operation and records the application consequence of
- * an actual connection transition: the saved connection ID after the operation
- * differs from the one before. Token renewal keeps the ID and records nothing.
- */
+/** Access is evaluated against the current connection each time it is read. */
 export async function withGithubConnectionTransition<T>(
   operation: () => Promise<T> | T,
 ): Promise<T> {
-  const before = savedGithubConnectionId();
-  try {
-    return await operation();
-  } finally {
-    const after = savedGithubConnectionId();
-    if (before && before !== after)
-      invalidateRepositoryVerifications(
-        before,
-        after ? "replaced" : "disconnected",
-      );
-  }
+  return operation();
 }
 
 export function removeApplication(applicationId: string, repository: string) {
@@ -343,10 +239,6 @@ export function removeApplication(applicationId: string, repository: string) {
   )
     throw new Error(
       "Type the exact repository owner/name to remove this application.",
-    );
-  if (applicationDeployment(application.id))
-    throw new Error(
-      "This application owns a deployment record. Host retirement is not implemented yet; preserve this record to retain access and billing history.",
     );
   // Delete the identity too: adding the repository again gets new IDs, so old
   // in-flight messages/observations cannot repopulate the new application.
@@ -381,42 +273,4 @@ export function archiveChat(applicationId: string, chatId: string) {
   if (listApplicationChats(application.id)[0]?.id === chatId)
     throw new Error("The main operator conversation cannot be archived.");
   archiveChatRecord(chat.id);
-}
-
-// Called only inside the worker's final transaction. Model text is not a
-// Decision: every proposal must still match the current durable domain state.
-// Each committed Decision produces exactly one Activity Event in that same
-// transaction, so a rollback leaves neither the record nor a success claim.
-export function savePiDecisions(
-  applicationId: string,
-  sourceMessageId: string,
-  proposals: PiDecision[],
-) {
-  for (const proposed of proposals) {
-    const decision = insertDecision({
-      applicationId,
-      sourceMessageId,
-      kind: proposed.kind,
-      label: "Saved requirement",
-      value: proposed.value,
-    });
-    const previous =
-      proposed.replaces === undefined
-        ? null
-        : supersedeDecision(applicationId, proposed.replaces, decision.id);
-    if (previous)
-      insertActivity(
-        applicationId,
-        "decision-revised",
-        "Requirement changed",
-        `${previous.value} → ${decision.value}`,
-      );
-    else
-      insertActivity(
-        applicationId,
-        "decision-recorded",
-        "Requirement saved",
-        decision.value,
-      );
-  }
 }

@@ -137,7 +137,7 @@ test(
       .click();
     await expect(
       page.getByRole("heading", {
-        name: "Exposure has not been read back",
+        name: "Security",
         exact: true,
       }),
     ).toBeVisible();
@@ -145,7 +145,7 @@ test(
       .getByRole("button", { name: "Database after deployment", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "No database recorded", exact: true }),
+      page.getByRole("heading", { name: "Database", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Show less", exact: true }).click();
     await expect(
@@ -178,32 +178,19 @@ test(
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
     await expect(
-      page.getByText("Not implemented yet", { exact: true }),
+      page.getByText(/Pi hasn’t saved an update here yet/),
     ).toBeVisible();
     await page.goBack();
     await expect(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
-    // Architecture is the journeys map: follow a journey, open a part.
     await nav
       .getByRole("button", { name: "Architecture", exact: true })
       .click();
-    const journeys = page.getByRole("radiogroup", {
-      name: "Follow a journey",
-    });
-    await expect(journeys).toBeVisible();
-    const data = journeys.getByRole("radio", { name: "Your data" });
-    await data.click();
-    await expect(data).toHaveAttribute("aria-checked", "true");
-    await page
-      .getByRole("button", { name: /^Application shell acceptance, / })
-      .click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(journeys).toBeInViewport();
+    await expect(
+      page.getByRole("heading", { name: "Architecture", exact: true }),
+    ).toBeInViewport();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,

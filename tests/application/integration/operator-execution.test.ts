@@ -57,6 +57,10 @@ it("pauses the actual call until approved, then records its output and failure c
   const [receipt] = listExecutions(run.applicationId);
   expect(receipt.status).toBe("awaiting-approval");
   expect(work).not.toHaveBeenCalled();
+  expect(store.getChat(run.chatId)?.status).toBe("awaiting-approval");
+  store.db().$client.close();
+  delete globalThis.__serverGuyDb;
+  expect(listExecutions(run.applicationId)[0].id).toBe(receipt.id);
   decideExecution(run.applicationId, receipt.id, true);
   expect(await pending).toEqual({ output: "missing service", exitCode: 3 });
   expect(work).toHaveBeenCalledOnce();
