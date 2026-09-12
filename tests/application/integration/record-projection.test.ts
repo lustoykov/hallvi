@@ -384,3 +384,38 @@ describe("what a reading never does", () => {
     expect(seriesFor([mapRecord, withdrawn], HOST)[0].withdrawn).toBe(true);
   });
 });
+
+describe("current check observations", () => {
+  it("lets a newer event failure replace an older subject success, and a later recovery replace that", () => {
+    const failure = record({
+      id: "event-failure",
+      at: "2026-09-12T16:00:00.000Z",
+      checks: [{ ...ssh, about: HOST, status: "failed" }],
+    });
+    const recovery = record({
+      id: "host-recovery",
+      at: "2026-09-12T17:00:00.000Z",
+      states: { ref: HOST, presence: "present" },
+      checks: [ssh],
+    });
+    expect(
+      currentChecks([hostFirst, failure], HOST).get("ssh")?.value.status,
+    ).toBe("failed");
+    expect(
+      currentChecks([failure, recovery, hostFirst], HOST).get("ssh")?.record.id,
+    ).toBe("host-recovery");
+  });
+
+  it("attaches a check explicitly about a process only to that process", () => {
+    const observation = record({
+      id: "host-with-process-check",
+      at: "2026-09-12T16:00:00.000Z",
+      states: { ref: HOST, presence: "present" },
+      checks: [{ ...ssh, key: "http", about: WEB }],
+    });
+    expect(currentChecks([observation], HOST).size).toBe(0);
+    expect(currentChecks([observation], WEB).get("http")?.record.id).toBe(
+      observation.id,
+    );
+  });
+});
