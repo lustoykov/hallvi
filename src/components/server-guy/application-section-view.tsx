@@ -22,6 +22,7 @@ import {
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePage } from "./architecture-page";
 import { OverviewPage } from "./overview-page";
+import { DeploymentPage } from "./deployment-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -159,6 +160,24 @@ export function ApplicationSectionView({
             ),
             activity: null,
           }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "deployment")
+      return (
+        <DeploymentPage
+          records={view.information}
+          executions={view.executions ?? []}
+          applicationName={app.name}
+          now={now}
+          chrome={{
+            bar,
+            header: null,
+            activity: null,
+          }}
+          panel={children}
           onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
           onAsk={(draft) => onAsk(null, draft)}

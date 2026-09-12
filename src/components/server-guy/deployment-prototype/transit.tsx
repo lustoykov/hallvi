@@ -177,8 +177,16 @@ export function TransitDirection({
                       <small>
                         {check.inside
                           ? "Inside the server"
-                          : "From your network"}{" "}
-                        · <code>{check.probe}</code>
+                          : "From your network"}
+                        {/* A check Pi recorded without naming what it probed
+                            says where it ran and stops there, rather than
+                            trailing a separator into nothing. */}
+                        {check.probe && (
+                          <>
+                            {" · "}
+                            <code>{check.probe}</code>
+                          </>
+                        )}
                       </small>
                     </span>
                   </li>

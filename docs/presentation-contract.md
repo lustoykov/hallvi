@@ -311,6 +311,38 @@ between a page that reports and a page that reassures.
 
 ---
 
+## 7. Deployment: the state the page needs
+
+The accepted Transit design tells the story of one release: what was
+deployed, what changed, what was verified, and how it is reached. Its model
+is the first that needs **execution evidence as much as records** — the
+phases are what actually ran, and the controller owns those.
+
+| Field | Source | Refreshed when |
+| --- | --- | --- |
+| revision, image, server, changes | the newest `deployment` content | Pi deploys |
+| repository | that content's `repositoryUrl` | with it |
+| statement, detail | the record's title and body, as Pi wrote them | with it |
+| tone, word | `tagFor(record, shown, now)` — the record's status aged by the claims the page shows | with it, or the clock |
+| checks | that record's checks: label, `detail` as the probe, `establishedAt` as the time | with it |
+| `check.inside` | derived: a check about a `process` or `volume` was made on the server; one about `access` was made from this PC | with it |
+| phases, lines | **executions** of the run that produced the record, in order, with their output | as they run |
+| started, took | the run's first execution to its last | as they run |
+| attempts | how many `deployment` records exist — each release is its own event | Pi deploys again |
+| state | `awaiting` from an execution awaiting approval, `working` from a running one, then the record's own status | immediately for the first two |
+| access | the newest `application-access` record: mode, ports, and its URL | Pi records access |
+| gaps | recommendations whose views include deployment | Pi recommends |
+
+**Attempts are records, not a counter.** A deployment is a historical event
+and each one is written once, so "the third attempt" is the third record
+rather than a number anybody increments. That is also what lets History show
+the failures: they are still there.
+
+`logs` is the newest execution's captured output, with the time it was
+captured — never re-run to fill the panel.
+
+---
+
 ## 6. Refused at the door
 
 `src/server/record-contract.ts` runs at save. Zod settles shape; this settles
