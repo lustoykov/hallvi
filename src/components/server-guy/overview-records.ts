@@ -129,23 +129,47 @@ function readLane(held: Held[], now: number): Certainty {
   return "unknown";
 }
 
+/**
+ * The short phrase the design prints under a lane's name. Short on purpose:
+ * it sits in a 4-line stack beside the timeline, and the reference reads
+ * "Reached 3 days ago", never a sentence.
+ */
 function laneText(held: Held[], certainty: Certainty, now: number) {
   const newest = held
     .map((item) => item.record.establishedAt)
     .filter((at): at is string => Boolean(at))
     .sort()
     .at(-1);
-  if (certainty === "unknown")
-    return held.length
-      ? "Recorded, but nothing here says whether it still holds"
-      : "Nothing has looked at this yet";
+  if (certainty === "absent") return "Not set up";
   if (certainty === "failed") return "A check did not pass";
-  if (certainty === "absent") return "Pi recorded that there is none";
+  if (certainty === "unknown")
+    return held.length ? "Recorded, not dated" : "Not assessed";
   if (certainty === "stale")
-    return newest
-      ? `Last checked ${when(newest, now)}; it may have changed since`
-      : "It held when it was checked";
+    return newest ? `Last checked ${when(newest, now)}` : "Checked once";
   return newest ? `Checked ${when(newest, now)}` : "Checked";
+}
+
+/**
+ * The recorded lines behind the page — what Little Server says it did last.
+ * Checks in the order they were established, so the newest is at the end.
+ */
+export function logFromRecords(records: SavedInformation[]) {
+  return records
+    .filter((record) => !record.retiredAt && record.establishedAt)
+    .flatMap((record) =>
+      (record.presentation?.checks ?? []).map((check) => ({
+        id: `${record.id}:${check.key ?? check.label}`,
+        at: record.establishedAt!,
+        tone: (check.status === "failed"
+          ? "fail"
+          : check.status === "passed"
+            ? "pass"
+            : "info") as "pass" | "fail" | "work" | "info",
+        text: check.detail ? `${check.label} — ${check.detail}` : check.label,
+      })),
+    )
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    .slice(-12);
 }
 
 /** The subjects a lane's records speak for, so the lane can show their facts. */

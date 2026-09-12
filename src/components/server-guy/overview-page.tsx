@@ -18,7 +18,11 @@ import type { PageChrome } from "./architecture-prototype/index";
 import type { LiveRecord } from "./architecture-prototype/model";
 import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";
-import { applicationCondition, overviewFromRecords } from "./overview-records";
+import {
+  applicationCondition,
+  logFromRecords,
+  overviewFromRecords,
+} from "./overview-records";
 import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag } from "./presentation";
@@ -126,7 +130,7 @@ export function OverviewPage({
     return (
       <div className="sg-section-page sg-section-overview">
         <OverviewDirection
-          model={{ ...model, condition }}
+          model={{ ...model, condition, log: logFromRecords(records) }}
           record={live}
           built={built}
           timeline={timeline}

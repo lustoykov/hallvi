@@ -306,6 +306,7 @@ const lanes: Partial<Record<SubjectKind, Lane>> = {
   application: "checks",
   process: "checks",
   volume: "checks",
+  "backup-plan": "backups",
   host: "server",
   access: "access",
   door: "access",

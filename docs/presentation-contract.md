@@ -65,7 +65,7 @@ looked. These are different pages and they must read differently.
 ### Subject kinds
 
 `application` · `host` · `process` · `volume` · `door` · `certificate` ·
-`monitor` · `access`
+`monitor` · `access` · `backup-plan`
 
 Bounded on purpose: these are what Architecture reads. A kind is added when a
 concrete view needs it. A vocabulary nothing consumes is a second
@@ -333,6 +333,35 @@ re-check is a question in the conversation, and the records it produces are
 what change the page.
 
 ---
+
+## What the old facts model carried, and where it landed
+
+Traced against `buildModel` in `architecture-prototype/model.ts`, which is
+what the accepted designs were built on. The design is unchanged; this is
+only where each of its inputs now comes from.
+
+| Original input | Now | State |
+| --- | --- | --- |
+| `facts.services` | `topology` parts of kind `private`, state from `process:<id>` | covered |
+| `facts.security` | parts of kind `gate`, with `port` and `sources` facts from the `door` or `access` record | covered, proved on the real deployment |
+| `facts.monitoring` | a `monitor` subject, and a `monitor` part when one exists | covered, proved |
+| `deployment.address`, `serverId` | the host's `address` and `server-id` facts | covered, proved |
+| `deployment.bundleHashes` | `deployment` content's `image` and `revision` | covered, proved |
+| `deployment.events` | controller executions, read directly | covered, proved |
+| `facts.domains.tls.*` | a `certificate` subject, keys `valid` and `expires` | **in the vocabulary, unexercised** — this deployment has no domain, so nothing proves it |
+| `facts.protection.*` — coverage, history, restore tests | nothing | **deliberate gap.** `backup-plan` is deferred, so an `offsite` part draws with no state and the Backups lane reads "Not assessed" until it lands. That is honest, and it is also permanent until then: no record can currently say a copy exists. |
+
+Two mis-mappings found while tracing, both fixed in the components rather
+than in the data:
+
+- Overview's subline read the **web part's** check, so the page could say
+  "passed its checks" about the process while nothing had been established
+  about the application. It reads `condition` now.
+- A lane with nothing on record borrowed the timeline window's edge and
+  printed a duration — "No copy for 36 h" for something nobody had looked at.
+  An empty lane says so instead.
+- The design's own part-to-lane map put volumes under Backups. One rule now:
+  only an off-site copy speaks to Backups.
 
 ## Deferred
 
