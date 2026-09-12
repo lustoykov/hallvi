@@ -177,16 +177,13 @@ export function LogsPage({
                   {typeof execution.exitCode === "number" &&
                     ` · exit ${execution.exitCode}`}
                 </span>
-                <a
-                  href={`?execution=${execution.id}#logs`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    onOpenDestination("history");
-                  }}
-                >
-                  In History
+                {/* In-app navigation, so a button — an href claiming one
+                    destination while the click goes to another is a link
+                    that lies about where it leads. */}
+                <button type="button" onClick={() => onOpenDestination("history")}>
+                  See it in History
                   <ArrowUpRight weight="bold" aria-hidden="true" />
-                </a>
+                </button>
               </header>
               <pre className="sg-logs-output">{lines.join("\n")}</pre>
             </section>

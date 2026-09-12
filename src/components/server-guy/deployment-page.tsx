@@ -55,6 +55,36 @@ export function DeploymentPage({
   const restricted =
     content?.kind === "application-access" ? content.mode === "private" : false;
 
+  // The design's "nothing deployed" branch draws the product's own panel in
+  // the middle of the page. In the records path there is no form to put
+  // there, so this is what belongs: what is true, and the one thing to do.
+  const nothing = (
+    <div className="sg-deploy-none">
+      <h2>Nothing has been deployed yet.</h2>
+      <p>
+        No release is on record for this application. That is not a claim it
+        cannot be deployed — only that Server Guy has not done it, or has not
+        written down what it did.
+      </p>
+      <p>
+        Ask in the conversation. You will be shown what it intends to do
+        before anything is bought or changed, and the release, its checks and
+        the way in are all recorded here.
+      </p>
+      <button
+        type="button"
+        className="sg-primary-button"
+        onClick={() =>
+          onAsk(
+            "Work out what this application needs and deploy it, keeping it private to this PC.",
+          )
+        }
+      >
+        Ask Pi to deploy this application
+      </button>
+    </div>
+  );
+
   return (
     <div className="ax-root" data-variant="transit">
       <TransitDirection
@@ -80,7 +110,7 @@ export function DeploymentPage({
             ? chrome.activity
             : null
         }
-        panel={panel}
+        panel={story.state === "none" ? nothing : panel}
         onAsk={onAsk}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}

@@ -1875,11 +1875,43 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-.sg-captured header a {
+.sg-captured header button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--link);
+  font: inherit;
   font-size: 12px;
+  cursor: pointer;
+}
+.sg-captured header button:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Deployment before any release is on record. */
+.sg-deploy-none {
+  max-width: 62ch;
+  padding: 8px 0 0;
+}
+.sg-deploy-none h2 {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sg-deploy-none p {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+.sg-deploy-none button {
+  margin-top: 4px;
 }

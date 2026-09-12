@@ -56,7 +56,9 @@ const chrome: Record<
   },
   server: {
     label: "Server",
-    destination: "processes",
+    // The machine itself, which Architecture draws; Processes is about what
+    // runs on it, and a reader clicking "Server" means the server.
+    destination: "architecture",
     ask: "Check the server now and record what you find.",
   },
   access: {
