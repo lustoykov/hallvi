@@ -24,6 +24,9 @@ import { readTar, writeTar } from "./tar";
 import { deniedPathReason, redactSecrets } from "./secrets";
 import { pinContainerImage } from "./container-images";
 
+/** The shape a built-in tool reports while it is still running. */
+type ToolPartial = { content: unknown[]; details?: unknown };
+
 export const PI_BUILTIN_TOOLS = [
   "read",
   "write",
@@ -354,6 +357,8 @@ export class PiWorkspace {
     id: string,
     args: unknown,
     signal?: AbortSignal,
+    /** Called with the result so far, whenever the tool reports one. */
+    onUpdate?: (partial: ToolPartial) => void,
   ) {
     const run = this.tail.then(async () => {
       if (this.closed)
@@ -392,6 +397,11 @@ export class PiWorkspace {
         // owned workspace on cancellation/timeout; never silently retry it.
         const deadline = AbortSignal.timeout(180_000);
         remotePending = true;
+        // The bridge writes one JSON object per line. Reading them as they
+        // arrive is what turns a long command into visible output rather than
+        // a spinner that ends with a wall of text.
+        const seen: Buffer[] = [];
+        let delivered = 0;
         const response = await this.docker!.request(`/exec/${execId}/start`, {
           method: "POST",
           body: JSON.stringify({ Detach: false, Tty: false }),
@@ -400,6 +410,26 @@ export class PiWorkspace {
           timeoutMs: 190_000,
           maxBytes: maxOutputBytes,
           stdin: Buffer.from(JSON.stringify({ name, id, args })),
+          onChunk: onUpdate
+            ? (chunk) => {
+                seen.push(chunk);
+                const lines = demultiplex(Buffer.concat(seen)).stdout.split(
+                  "\n",
+                );
+                // The last entry is whatever has not been terminated yet.
+                for (const text of lines.slice(delivered, -1)) {
+                  delivered += 1;
+                  if (!text.trim()) continue;
+                  try {
+                    const value = JSON.parse(text) as { partial?: unknown };
+                    if (value.partial !== undefined)
+                      onUpdate(value.partial as ToolPartial);
+                  } catch {
+                    // A line the bridge did not write is not ours to read.
+                  }
+                }
+              }
+            : undefined,
         });
         const execution = await this.docker!.json<{
           Running: boolean;
@@ -417,7 +447,18 @@ export class PiWorkspace {
           error?: string;
         };
         try {
-          output = JSON.parse(stdout);
+          // The outcome is the last line that carries one; earlier lines are
+          // progress. A single object is still accepted, so an older bridge
+          // image keeps working.
+          const outcome = stdout
+            .split("\n")
+            .map((text) => text.trim())
+            .filter(Boolean)
+            .map((text) => JSON.parse(text) as typeof output)
+            .filter((value) => value.result !== undefined || value.error)
+            .at(-1);
+          if (!outcome) throw new Error("No outcome line.");
+          output = outcome;
         } catch {
           throw new Error(
             `Pi workspace tool could not return a result (exit ${execution.ExitCode ?? "unknown"}). ${stderr.trim() || stdout.trim() || "No output; inspect the workspace runtime."}`,
@@ -674,12 +715,25 @@ export function piWorkspaceTools(sdk: PiSdk, workspace: PiWorkspace) {
     prepareArguments: definition.prepareArguments,
     constrainedSampling: definition.constrainedSampling,
     executionMode: definition.executionMode,
-    async execute(id: string, args: unknown, signal?: AbortSignal) {
+    // The update callback keeps the runtime's own type here, at the one
+    // boundary where the two shapes meet, so nothing below has to know it.
+    async execute(
+      id: string,
+      args: unknown,
+      signal?: AbortSignal,
+      onUpdate?: (partial: never) => void,
+    ) {
       return workspace.execute(
         definition.name as PiBuiltinName,
         id,
         args,
         signal,
+        // Each definition has its own details type; the adapter carries the
+        // shared shape, so the cast lives here and nowhere else.
+        onUpdate
+          ? (partial: ToolPartial) =>
+              (onUpdate as (value: ToolPartial) => void)(partial)
+          : undefined,
       );
     },
   }));

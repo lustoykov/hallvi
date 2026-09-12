@@ -35,12 +35,14 @@ function render({
   error = historyError,
   archived = false,
   activity = [],
+  piActivity,
   status = "failed",
   body = "",
 }: {
   error?: string;
   archived?: boolean;
   activity?: OperatorView["activity"];
+  piActivity?: OperatorView["piActivity"];
   status?: "queued" | "running" | "failed" | "cancelled";
   body?: string;
 } = {}) {
@@ -70,6 +72,7 @@ function render({
     ],
     decisions: [],
     activity,
+    piActivity,
   };
   return renderToStaticMarkup(
     <ChatPane
@@ -145,4 +148,44 @@ describe("conversation recovery and assistant branding", () => {
     expect(html).toContain('aria-label="Message Server Guy"');
     expect(html).not.toContain("<strong>Pi</strong>");
   });
+});
+
+it("renders streaming text once after earlier tool calls, including before the first call", () => {
+  const body = "Now checking persistence.";
+  const record = {
+    kind: "tool" as const,
+    id: "read-package",
+    applicationId: "app-one",
+    runId: run.assistantMessageId,
+    sequence: 1,
+    tool: "read",
+    args: JSON.stringify({ path: "package.json" }),
+    preview: "",
+    result: "{}",
+    status: "succeeded" as const,
+    truncated: false,
+    startedAt: failedAt,
+    finishedAt: failedAt,
+  };
+  for (const piActivity of [[], [record]]) {
+    const html = render({ status: "running", body, piActivity });
+    expect(html.split(body)).toHaveLength(2);
+    if (piActivity.length)
+      expect(html.indexOf("package.json")).toBeLessThan(html.indexOf(body));
+  }
+  const html = render({
+    status: "running",
+    body,
+    piActivity: [
+      record,
+      {
+        ...record,
+        id: "said",
+        kind: "message",
+        sequence: 2,
+        text: body,
+      },
+    ],
+  });
+  expect(html.split(body)).toHaveLength(2);
 });

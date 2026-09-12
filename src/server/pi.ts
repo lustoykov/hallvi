@@ -84,6 +84,20 @@ export const PI_TOOL_NAMES = [
   "save_information",
 ];
 
+/** The text inside a tool's result-so-far, for the streaming output panel. */
+function workspaceText(value: unknown): string {
+  if (typeof value === "string") return value;
+  const content = (value as { content?: unknown })?.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      part && typeof part === "object" && "text" in part
+        ? String((part as { text: unknown }).text)
+        : "",
+    )
+    .join("");
+}
+
 export function normalizePiAssistantMessage(input: string): string {
   const message = input.trim();
   if (!message) throw new Error("Server Guy returned no user-facing message.");
@@ -112,9 +126,25 @@ export function describePiFailure(error: unknown): string {
   return "Server Guy could not reach the selected model. Check Settings or retry.";
 }
 
+/** One tool call, as the runtime reports it, before anything interprets it. */
+export type PiToolEvent =
+  | {
+      type: "start";
+      id: string;
+      sequence: number;
+      tool: string;
+      args: unknown;
+    }
+  | { type: "update"; id: string; partial: unknown }
+  | { type: "end"; id: string; result: unknown; isError: boolean }
+  /** What Pi said at this point, between its calls. */
+  | { type: "message"; sequence: number; text: string };
+
 export interface PiExecutionOptions {
   signal?: AbortSignal;
   onText?: (text: string) => void;
+  /** Every tool call, in order, with what went in and what came back. */
+  onTool?: (event: PiToolEvent) => void;
   onModelCall?: () => void;
   onActivity?: (event: ExecutionSignal) => void;
 }
@@ -290,7 +320,7 @@ export async function askPi(
                 Type.Number({ minimum: 1024, maximum: 65535 }),
               ),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "open_server_port",
@@ -302,6 +332,8 @@ export async function askPi(
                       params,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -322,7 +354,7 @@ export async function askPi(
               path: Type.String(),
               body: Type.Optional(Type.Any()),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "hetzner_request",
@@ -336,6 +368,8 @@ export async function askPi(
                       params.method,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -347,7 +381,7 @@ export async function askPi(
             description:
               "Get or generate this application's controller-managed SSH key. Returns only the public key for provider registration or installation by the owner. Private key stays on the controller.",
             parameters: Type.Object({}, { additionalProperties: false }),
-            async execute(_id, _params, signal) {
+            async execute(id, _params, signal) {
               return json(
                 await execution.execute(
                   "server_public_key",
@@ -358,6 +392,8 @@ export async function askPi(
                       input.run.applicationId,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -375,7 +411,7 @@ export async function askPi(
               port: Type.Optional(Type.Number({ minimum: 1, maximum: 65535 })),
               hostKeyFingerprint: Type.Optional(Type.String()),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               return json(
                 await execution.execute(
                   "connect_server",
@@ -387,6 +423,8 @@ export async function askPi(
                       params,
                       signal ?? options.signal,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -403,7 +441,7 @@ export async function askPi(
                 Type.Number({ minimum: 1, maximum: 1800 }),
               ),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               const host = operatorSettings(input.run.applicationId).host;
               if (!host)
                 throw new Error(
@@ -422,6 +460,8 @@ export async function askPi(
                       output,
                       params.timeoutSeconds,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -433,7 +473,7 @@ export async function askPi(
             description:
               "In Pi decides mode, ask the user to approve the proposed action before proceeding. Describe the concrete action and its effects. Bypass returns immediately. Always ask already prompts at execution; do not request duplicate approval there.",
             parameters: Type.Object({ action: Type.String() }),
-            async execute(_id, params) {
+            async execute(id, params) {
               return json(
                 await execution.execute(
                   "request_approval",
@@ -441,6 +481,7 @@ export async function askPi(
                   params.action,
                   async () => ({ approved: true }),
                   true,
+                  id,
                 ),
               );
             },
@@ -461,7 +502,14 @@ export async function askPi(
                   tool.name,
                   "Repository workspace",
                   args,
-                  () => tool.execute(id, args, signal),
+                  // The executor's own output callback: partial results reach
+                  // the execution record, so the card streams while it runs.
+                  (output) =>
+                    tool.execute(id, args, signal, (partial: unknown) =>
+                      output(workspaceText(partial)),
+                    ),
+                  false,
+                  id,
                 );
                 return "declined" in result ? json(result) : result;
               },
@@ -526,12 +574,31 @@ export async function askPi(
           key,
           kind: toolStepKind(event.toolName),
         });
+        options.onTool?.({
+          type: "start",
+          id: event.toolCallId,
+          sequence: toolSequence,
+          tool: event.toolName,
+          args: event.args,
+        });
       }
+      if (event.type === "tool_execution_update")
+        options.onTool?.({
+          type: "update",
+          id: event.toolCallId,
+          partial: event.partialResult,
+        });
       if (event.type === "tool_execution_end") {
         const key = toolKeys.get(event.toolCallId);
         if (key)
           options.onActivity?.({ type: "end", key, failed: event.isError });
         toolKeys.delete(event.toolCallId);
+        options.onTool?.({
+          type: "end",
+          id: event.toolCallId,
+          result: event.result,
+          isError: event.isError,
+        });
       }
       if (event.type === "compaction_start")
         options.onActivity?.({
@@ -591,11 +658,18 @@ export async function askPi(
             cacheWriteTokens: event.message.usage?.cacheWrite,
           },
         });
+        const said = event.message.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("");
+        if (said.trim())
+          options.onTool?.({
+            type: "message",
+            sequence: ++toolSequence,
+            text: said,
+          });
         outcome = {
-          text: event.message.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join(""),
+          text: said,
           error: event.message.stopReason !== "stop",
         };
       }

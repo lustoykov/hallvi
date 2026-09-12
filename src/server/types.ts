@@ -125,6 +125,8 @@ export interface ChatRunSnapshot {
   executions?: import("./operator-execution").ExecutionRecord[];
   information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
+  /** What Pi ran during these runs, in order. */
+  piActivity?: import("./pi-activity").ActivityRecord[];
   messages: ChatMessage[];
   runs: PiRun[];
   activity: ActivityEvent[];
@@ -135,6 +137,8 @@ export interface OperatorView {
   executions?: import("./operator-execution").ExecutionRecord[];
   information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
+  /** What Pi ran in this application's conversations, in order. */
+  piActivity?: import("./pi-activity").ActivityRecord[];
   application: ApplicationRecord | null;
   /** The latest repository access check with the current GitHub login. */
   repository?: {

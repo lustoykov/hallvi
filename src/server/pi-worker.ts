@@ -7,6 +7,14 @@ import { beginRunDiagnostics } from "./tracing";
 import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
 import { askPi, normalizePiAssistantMessage, PiUnavailableError } from "./pi";
+import {
+  applicationsWithActivity,
+  endActivity,
+  recordMessage,
+  settleRunningActivity,
+  startActivity,
+  updateActivity,
+} from "./pi-activity";
 import { assertChatWritable, loadChat } from "./applications";
 import {
   claimNextPiRun,
@@ -112,6 +120,41 @@ export async function executePiRun(
         {
           signal: controller.signal,
           onActivity: diagnostics.signal,
+          onTool(event) {
+            // Evidence of what Pi did, written as it happens so the
+            // conversation can show it before the answer arrives.
+            if (event.type === "start")
+              startActivity({
+                applicationId: run.applicationId,
+                runId: run.id,
+                sequence: event.sequence,
+                id: event.id,
+                tool: event.tool,
+                args: event.args,
+              });
+            else if (event.type === "message")
+              recordMessage({
+                applicationId: run.applicationId,
+                runId: run.id,
+                sequence: event.sequence,
+                text: event.text,
+              });
+            else if (event.type === "update")
+              updateActivity(
+                run.applicationId,
+                event.id,
+                event.partial,
+                // The runtime sends a result-so-far, never an increment.
+                "snapshot",
+              );
+            else
+              endActivity({
+                applicationId: run.applicationId,
+                id: event.id,
+                result: event.result,
+                isError: event.isError,
+              });
+          },
           onModelCall() {
             if (getPiRun(run.id)?.status === "running") recordPiCall(run.id);
             else controller.abort();
@@ -195,6 +238,9 @@ export async function executePiRun(
       failure,
     );
   } finally {
+    // A run that stopped mid-call leaves a record claiming to still be
+    // running. Say it stopped rather than leave a spinner in the transcript.
+    settleRunningActivity(run.applicationId, run.id);
     diagnostics.finish(getPiRun(run.id)?.status ?? "interrupted");
     clearInterval(poll);
     clearTimeout(timeout);
@@ -211,6 +257,11 @@ export async function runPiWorker(signal: AbortSignal) {
   let unsettled = false;
   try {
     interruptRunningPiRuns();
+    // A crash never reaches this worker's own cleanup, so any call still
+    // marked running belongs to a run that no longer exists. Startup is the
+    // only place to say so.
+    for (const applicationId of applicationsWithActivity())
+      settleRunningActivity(applicationId, null);
     await cleanupPiWorkspaces().catch(() => undefined);
     console.info("Pi worker ready. Watching saved requests, one at a time.");
     while (!signal.aborted) {

@@ -1,3 +1,4 @@
+import { listActivity } from "./pi-activity";
 import { listExecutions } from "./operator-execution";
 import { listInformation } from "./saved-information";
 import { listApplicationChatSummaries, listMessages } from "./db";
@@ -42,6 +43,7 @@ export function getOperatorView(
       connected: access.connected,
     },
     executions: listExecutions(applicationId),
+    piActivity: listActivity(applicationId),
     operations: [],
     chats,
     selectedChatId: selected?.id ?? null,
