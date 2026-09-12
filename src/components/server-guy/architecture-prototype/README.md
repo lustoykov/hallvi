@@ -142,6 +142,36 @@ collected logs…" input that the smoke journey uses.
   there is only static. The tuned station reads what was heard and when,
   then the silence since, and the lamp lights only while something listens.
 
+## Domains: Callers, and Security: Rings (`reach-prototype/`)
+
+Chosen from two sets of three, because the two pages ask different
+questions: what name this answers on and what is missing in front of it,
+and who can reach it at all. Both read the same record — the address, the
+name and certificate if any, the ports the deployment asked the provider
+to open and who they were opened to, what listens behind them, and what
+protects the server without being a way in. Nothing contacts a host: the
+firewall read is the one the shipped Security view already makes, and the
+page says plainly when the rules are only what was asked for. With nothing
+recorded, the shipped page stands in.
+
+- **Domains · Callers.** The page from the other side of the wire. Four
+  visitors knock — you on your network, a stranger, someone typing a name,
+  a browser asking for https — and each window shows what the record says
+  they meet, with how sure that is: a check proved it, the deployment asked
+  for it, or nothing is set up. Picking a window reads out what makes it
+  true. Nothing is tried now; the only knocks on record are the
+  deployment's own checks.
+- **Security · Rings.** Reach as territory: the internet, your network, the
+  server, the private network the processes share, each ring inside the
+  last, with the wall you must pass written on the border between them.
+  Every way in sits in the ring it is reachable from, with the sources
+  exactly as they are stated; picking a ring says what someone standing
+  there can reach and dims everything they cannot. A rule that opens a
+  private service to the internet is drawn as a hole through every wall,
+  and a provider read that reports no firewall at all says so where the
+  walls would be. The shipped page's own "Check now" and its status note
+  stay, so a provider read is still one click.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
@@ -151,6 +181,11 @@ collected logs…" input that the smoke journey uses.
   Processes, Database, Storage and Backups offer Live record and 3 days
   later; Logs and Monitoring offer Live record, 3 days later and Prometheus
   failing, where an invented collector finds a readiness check failing.
+  Domains offers _Domain connected_, which invents a name, its certificate
+  and public reach so the finished page can be seen at all, and Security
+  offers _Firewall read back_, an invented provider read that includes a
+  rule for a private service nobody asked for. Both are labelled invented
+  in the bar and on the page.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -179,7 +214,9 @@ become all diagrams. For Deployment and History they chose Transit ("D is
 great, let's take it"), and later its Line for Processes too. For Database
 they asked for directions without the line and chose the Timeline. From a
 round of its own with Backups, Storage took Flow and Backups the Calendar.
-On 12 Sep they took Paper for Logs and the Tuner for Monitoring.
+On 12 Sep they took Paper for Logs and the Tuner for Monitoring, then asked
+for separate concepts per page from then on; from six of those, Domains took
+Callers and Security the Rings.
 
 ## Where the exploration lives
 
@@ -193,4 +230,6 @@ directions for Processes and Database; on `claude/database-storage`, the
 Cutaway and Answers directions for Database and Storage, and the Timeline's
 Storage page; on `claude/storage-backups`, the Drill direction, Flow's
 Backups page and the Calendar's Storage page; on `claude/logs-monitoring`,
-the Scope direction, the Tuner's Logs page and Paper's inspection reports.
+the Scope direction, the Tuner's Logs page and Paper's inspection reports;
+on `claude/domains-security`, Domains' Address and Handover directions and
+Security's Doors and Statement.

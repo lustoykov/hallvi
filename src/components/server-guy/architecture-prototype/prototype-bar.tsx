@@ -46,6 +46,18 @@ export const scenarios: {
     note: "Invented: the plan, nothing running",
     invented: true,
   },
+  {
+    id: "domain",
+    label: "Domain connected",
+    note: "A name and its certificate on record",
+    invented: true,
+  },
+  {
+    id: "checked",
+    label: "Firewall read back",
+    note: "The provider's rules, one of them unasked for",
+    invented: true,
+  },
 ];
 
 export function PrototypeBar({

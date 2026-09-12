@@ -20,6 +20,7 @@ import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
+import { ReachPrototype } from "./reach-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
@@ -391,6 +392,44 @@ export function ApplicationSectionView({
           operations={operations}
           now={now}
           onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): three directions for Domains and three
+  // different ones for Security — the two pages ask different questions —
+  // beside the shipped view (0).
+  if (section === "domains" || section === "security")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <ReachPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+          panel={section === "security" ? children : null}
+          onCheck={
+            section === "security" && onAction
+              ? () => onAction({ type: "check-firewall" })
+              : undefined
+          }
+          checking={busy === "check-firewall"}
           chrome={{
             bar,
             header,

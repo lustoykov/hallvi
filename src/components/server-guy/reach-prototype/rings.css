@@ -1,0 +1,316 @@
+/* PROTOTYPE · opus-ui-improvements · Security, direction B (Rings). */
+
+.axri {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- Lede ---------- */
+
+.axri-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.axri-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axri-lede h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+.axri-lede p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.axri-lede p > span {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+/* ---------- The rings ---------- */
+
+.axri-field {
+  position: relative;
+}
+.axri-ring {
+  position: relative;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 18px;
+  transition:
+    opacity var(--ax-base) var(--ax-ease-out),
+    background-color var(--ax-base) var(--ax-ease-out),
+    border-color var(--ax-base) var(--ax-ease-out);
+}
+.axri-ring[data-level="0"] {
+  background: #fbfcfe;
+}
+.axri-ring[data-level="1"] {
+  margin-top: 14px;
+  background: #f6f8fd;
+}
+.axri-ring[data-level="2"] {
+  margin-top: 14px;
+  background: #eef2fb;
+  border-color: #cfd9ee;
+}
+.axri-ring[data-level="3"] {
+  margin-top: 14px;
+  background: #e6ecf9;
+  border-color: #c3d0ec;
+}
+.axri-ring[data-dim] {
+  opacity: 0.36;
+}
+.axri-ring[data-on] {
+  border-color: var(--ax-blue);
+  box-shadow: inset 0 0 0 1px var(--ax-blue);
+}
+
+/* The wall between one ring and the next, drawn on the border. */
+.axri-gate {
+  position: absolute;
+  top: -11px;
+  left: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 44px);
+  padding: 2px 12px 2px 4px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ax-ink-2);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.7;
+}
+.axri-gate b {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ax-ink);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.axri-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.axri-name b {
+  font-size: 15px;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+.axri-name small {
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+.axri-name:hover b {
+  color: var(--ax-blue);
+}
+.axri-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+}
+.axri-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 13px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 11px;
+  background: #fff;
+}
+.axri-item b {
+  font-size: 12.5px;
+  font-weight: 620;
+}
+.axri-item small {
+  color: var(--ax-muted);
+  font-size: 11px;
+}
+.axri-item i {
+  margin-top: 3px;
+  color: var(--ax-failed);
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.axri-item[data-plain="true"] {
+  border-style: dashed;
+  background: transparent;
+}
+.axri-item[data-plain="true"] b {
+  font-weight: 500;
+  color: var(--ax-ink-2);
+}
+.axri-item[data-warn] {
+  border-color: var(--ax-waiting-line);
+  background: var(--ax-waiting-bg);
+}
+.axri-item[data-warn] b {
+  color: var(--ax-waiting-text);
+}
+/* A rule that reaches a private service from outside goes through the lot. */
+.axri-item[data-pierce] {
+  border-color: var(--ax-failed);
+  background: var(--ax-failed-bg);
+  box-shadow: 0 0 0 4px rgb(166 49 43 / 8%);
+}
+.axri-item[data-pierce] b {
+  color: var(--ax-failed);
+}
+.axri-none {
+  color: var(--ax-faint);
+  font-size: 12px;
+  font-style: italic;
+}
+.axri-guy {
+  width: 42px;
+  margin: -6px 0 -6px auto;
+}
+
+/* ---------- What the picked ring means ---------- */
+
+.axri-says {
+  padding: 16px 18px;
+  border-left: 2px solid var(--ax-blue);
+  border-radius: 0 12px 12px 0;
+  background: var(--ax-context);
+}
+.axri-says h3 {
+  margin: 0 0 6px;
+  font-size: 14.5px;
+  font-weight: 620;
+  letter-spacing: -0.006em;
+}
+.axri-says p {
+  margin: 0;
+  color: var(--ax-ink-2);
+  font-size: 13.5px;
+  line-height: 1.62;
+  max-width: 84ch;
+}
+
+/* ---------- What nothing covers ---------- */
+
+.axri-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.axri-hole {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--ax-line-2);
+  border-radius: 12px;
+}
+.axri-hole b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 620;
+  color: var(--ax-ink-2);
+}
+.axri-hole b svg {
+  color: var(--ax-faint);
+}
+.axri-hole span {
+  color: var(--ax-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ---------- Foot ---------- */
+
+.axri-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ax-line);
+}
+.axri-foot p {
+  flex: 1 1 520px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .axri-ring {
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .axri-gate {
+    position: static;
+    display: flex;
+    max-width: 100%;
+    margin: -2px 0 10px;
+  }
+  .axri-item,
+  .axri-none {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axri-ring {
+    transition: none;
+  }
+}
+:root[data-ax-motion="reduced"] .axri-ring {
+  transition: none;
+}
+
+.axri-acts {
+  display: flex;
+  flex-wrap: wrap;
+  flex: none;
+  gap: 8px;
+}
+
+.axri > .ax-invented {
+  align-self: flex-start;
+}
+
+.axri-item em {
+  margin-top: 2px;
+  color: var(--ax-muted);
+  font-family: var(--ax-mono);
+  font-size: 10.5px;
+  font-style: normal;
+}
