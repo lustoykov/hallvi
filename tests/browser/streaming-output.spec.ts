@@ -124,7 +124,8 @@ test("server output streams inline, preserves reading position and stays readabl
       finishedAt: new Date().toISOString(),
       output: record.output + "\nContainer web started.",
     });
-    await expect(card).toContainText("Completed · exit 0");
+    await expect(card.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(card.getByText("exit 0", { exact: true })).toBeVisible();
     await expect(output).toBeVisible();
     await expect(output).toContainText("Container web started.");
     await page
@@ -156,7 +157,8 @@ test("server output streams inline, preserves reading position and stays readabl
       exitCode: 3,
       output: JSON.stringify({ output: "missing service", exitCode: 3 }),
     });
-    await expect(card).toContainText("failed · exit 3");
+    await expect(card.getByText("Failed", { exact: true })).toBeVisible();
+    await expect(card.getByText("exit 3", { exact: true })).toBeVisible();
     await expect(output).toHaveText("missing service");
   } finally {
     database.close();
