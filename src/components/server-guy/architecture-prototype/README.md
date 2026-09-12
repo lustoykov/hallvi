@@ -119,6 +119,29 @@ page stands in.
   piece of data and whether each copy holds it, and the restore tests. A
   day opens what is on record for it.
 
+## Logs: Paper, and Monitoring: Tuner (`signal-prototype/`)
+
+Chosen from three directions that each drew both pages from the same
+record: the output Server Guy read from each process (the last 100 lines of
+each, and only when asked; a process that had written more is marked cut),
+the checks the deployment ran and when, the backup checks, and what nothing
+watches (a health watch and restarts, CPU, memory and disk, alerts outside
+the app). Nothing reads logs or checks the server; asking goes to the
+conversation. With nothing recorded the shipped page stands in, and Logs
+keeps the element labelled "Collected application logs" and the "Filter
+collected logs…" input that the smoke journey uses.
+
+- **Logs · Paper.** No diagram. The read is printed on continuous paper,
+  torn where the read stopped and at the top when a process had written
+  more than was read, with a highlighter for each process and index tabs
+  for where a process said it was ready or warned. Earlier reads peek out
+  from behind and come forward when picked.
+- **Monitoring · Tuner.** A radio's glass dial with a station for each part
+  and signal bars for how recently anything heard from it. Tune by
+  clicking, dragging the needle or with the arrow keys; between stations
+  there is only static. The tuned station reads what was heard and when,
+  then the silence since, and the lamp lights only while something listens.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
@@ -126,7 +149,8 @@ page stands in.
   _Before deploy_ (the plan with nothing running). The bar labels each one.
   Deployment offers Live record, 3 days later and Before deploy; History,
   Processes, Database, Storage and Backups offer Live record and 3 days
-  later.
+  later; Logs and Monitoring offer Live record, 3 days later and Prometheus
+  failing, where an invented collector finds a readiness check failing.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -155,6 +179,7 @@ become all diagrams. For Deployment and History they chose Transit ("D is
 great, let's take it"), and later its Line for Processes too. For Database
 they asked for directions without the line and chose the Timeline. From a
 round of its own with Backups, Storage took Flow and Backups the Calendar.
+On 12 Sep they took Paper for Logs and the Tuner for Monitoring.
 
 ## Where the exploration lives
 
@@ -167,4 +192,5 @@ round's Ledger; on `claude/processes-database`, the Machine and Console
 directions for Processes and Database; on `claude/database-storage`, the
 Cutaway and Answers directions for Database and Storage, and the Timeline's
 Storage page; on `claude/storage-backups`, the Drill direction, Flow's
-Backups page and the Calendar's Storage page.
+Backups page and the Calendar's Storage page; on `claude/logs-monitoring`,
+the Scope direction, the Tuner's Logs page and Paper's inspection reports.
