@@ -75,7 +75,7 @@ export interface Journey {
 }
 
 export type ScenarioId =
-  "live" | "later" | "failing" | "planned" | "domain" | "checked";
+  "live" | "later" | "failing" | "planned" | "domain" | "checked" | "equipped";
 export type CheckMark = "checking" | "passed" | "failed";
 
 export interface LiveRecord {

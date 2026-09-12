@@ -1,0 +1,179 @@
+/* PROTOTYPE · opus-ui-improvements · Jobs (Rota). */
+
+.axro {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---------- Lede ---------- */
+
+.axro-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.axro-lede > div {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+.axro-lede h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+}
+.axro-lede p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.axro-lede p > span {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+.axro-ask {
+  flex: none;
+}
+
+/* ---------- Two columns: yours, and Server Guy's ---------- */
+
+.axro-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px 28px;
+  align-items: start;
+}
+.axro-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.axro-col h3 {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--ax-line);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ax-muted);
+}
+.axro-col:first-child h3 {
+  border-bottom-color: var(--ax-blue);
+  color: var(--ax-working-text);
+}
+.axro-job {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--ax-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.axro-job header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.axro-job b {
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.008em;
+}
+.axro-job > code {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--ax-context);
+  border: 1px solid var(--ax-line);
+  font-family: var(--ax-mono);
+  font-size: 12.5px;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axro-job p {
+  margin: 0;
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.axro-job p svg {
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--ax-faint);
+}
+.axro-facts {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 20px;
+}
+.axro-facts > div {
+  grid-template-columns: 92px minmax(0, 1fr);
+  padding-bottom: 6px;
+}
+/* The shape of a thing that is not set up. */
+.axro-ghost {
+  border-style: dashed;
+  background: transparent;
+}
+.axro-ghost b,
+.axro-ghost dd {
+  color: var(--ax-faint);
+}
+.axro-ghost > code {
+  border-style: dashed;
+  background: transparent;
+  color: var(--ax-faint);
+}
+.axro-ghost header span {
+  padding: 1px 9px;
+  border: 1px dashed #c8d0dd;
+  border-radius: 999px;
+  color: var(--ax-faint);
+  font-size: 11px;
+  font-weight: 620;
+}
+.axro-theirs {
+  border-color: var(--ax-verified-line);
+  background: linear-gradient(180deg, #fff, #f7fcf9);
+}
+
+/* ---------- Foot ---------- */
+
+.axro-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ax-line);
+}
+.axro-guy {
+  flex: none;
+  width: 46px;
+}
+.axro-foot p {
+  margin: 0 0 6px;
+  color: var(--ax-muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+  max-width: 84ch;
+}
+.axro-foot svg {
+  margin-right: 5px;
+  vertical-align: -2px;
+  color: var(--ax-faint);
+}
+.axro > .ax-invented {
+  align-self: flex-start;
+}

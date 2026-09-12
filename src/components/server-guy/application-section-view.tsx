@@ -21,6 +21,7 @@ import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
 import { ReachPrototype } from "./reach-prototype";
+import { SupplyPrototype } from "./supply-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
@@ -392,6 +393,41 @@ export function ApplicationSectionView({
           operations={operations}
           now={now}
           onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): the four remaining destinations, each
+  // drawn once: configuration, delivery, queued work and schedules.
+  if (
+    section === "variables" ||
+    section === "cdn" ||
+    section === "cache" ||
+    section === "jobs"
+  )
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <SupplyPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
           chrome={{
             bar,
             header,
