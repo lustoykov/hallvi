@@ -1,0 +1,168 @@
+// The save-time contract. Each case is something that parses cleanly and
+// would still produce a page that lies or renders nothing, and each message
+// has to tell Pi what to write instead.
+
+import { expect, it, describe } from "vitest";
+
+import { informationInputSchema } from "@/server/operator-data";
+import { reviewRecord } from "@/server/record-contract";
+
+function review(record: unknown) {
+  return reviewRecord(informationInputSchema.parse(record));
+}
+
+const host = { kind: "host", id: "hetzner-165600952" } as const;
+
+const good = {
+  title: "The host answers and carries nothing yet",
+  body: "It is ready to take the application.",
+  about: [host],
+  states: { ref: host, presence: "present" },
+  establishedAt: "2026-09-12T15:48:00.000Z",
+  presentation: {
+    views: ["deployment"],
+    role: "outcome",
+    status: "verified",
+    checks: [
+      {
+        key: "ssh",
+        label: "SSH connected",
+        status: "passed",
+        claim: "reachability",
+        basis: "observed",
+        about: host,
+      },
+    ],
+    facts: [
+      {
+        key: "region",
+        label: "Location",
+        value: "Helsinki",
+        claim: "configuration",
+        basis: "reported",
+      },
+    ],
+  },
+};
+
+describe("a record that can be drawn", () => {
+  it("passes without comment", () => {
+    expect(review(good)).toEqual([]);
+  });
+
+  it("says nothing about working knowledge, which no view draws", () => {
+    expect(
+      review({ title: "A preference", body: "Keep it private.", presentation: null }),
+    ).toEqual([]);
+  });
+});
+
+describe("what would make a record unreadable", () => {
+  it("asks for the key, claim and basis a check is missing, and suggests one", () => {
+    const found = review({
+      ...good,
+      presentation: {
+        ...good.presentation,
+        checks: [{ label: "Server is running", status: "passed" }],
+      },
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('Check 1 ("Server is running")');
+    expect(found[0]).toContain("missing key, claim, basis");
+    expect(found[0]).toContain('"server-is-running"');
+    expect(found[0]).toContain("reachability");
+  });
+
+  it("refuses two checks sharing a key, because one would erase the other", () => {
+    const check = good.presentation.checks[0];
+    const found = review({
+      ...good,
+      presentation: { ...good.presentation, checks: [check, { ...check, label: "Also SSH" }] },
+    });
+    expect(found.some((item) => item.includes('share the key "ssh"'))).toBe(true);
+  });
+
+  it("replaces the authored lane with the thing that was checked", () => {
+    const found = review({
+      ...good,
+      presentation: {
+        ...good.presentation,
+        checks: [{ ...good.presentation.checks[0], subject: "server" }],
+      },
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("subject, which is no longer read");
+    expect(found[0]).toContain("about: {kind, id}");
+  });
+
+  it("will not let a record claim verified with no time behind it", () => {
+    const found = review({ ...good, establishedAt: null });
+    expect(found.some((item) => item.includes("establishedAt is missing"))).toBe(true);
+  });
+
+  it("will not let an absence describe the thing it says is gone", () => {
+    const found = review({
+      ...good,
+      states: { ref: host, presence: "absent" },
+      presentation: { ...good.presentation, checks: [] },
+    });
+    expect(found.some((item) => item.includes("is absent and then carries facts"))).toBe(true);
+  });
+
+  it("will not let a planned check report an outcome", () => {
+    const found = review({
+      ...good,
+      presentation: {
+        ...good.presentation,
+        checks: [{ ...good.presentation.checks[0], basis: "planned" }],
+      },
+    });
+    expect(found.some((item) => item.includes("is planned, so it cannot have passed"))).toBe(true);
+  });
+});
+
+describe("the map", () => {
+  const topology = {
+    kind: "topology",
+    from: "observed",
+    parts: [
+      { id: "host", kind: "host", name: "The server", role: "Runs the container", plain: "The machine your app runs on" },
+      { id: "web", kind: "web", name: "The app", role: "Serves requests", plain: "Your application itself" },
+    ],
+    edges: [{ from: "host", to: "web", network: "loopback" }],
+    absent: [],
+  };
+
+  it("accepts a map on the record that speaks for the application", () => {
+    expect(
+      review({
+        ...good,
+        states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
+        presentation: { ...good.presentation, content: topology },
+      }),
+    ).toEqual([]);
+  });
+
+  it("refuses a map on a record that does not state the application", () => {
+    const found = review({
+      ...good,
+      presentation: { ...good.presentation, content: topology },
+    });
+    expect(found.some((item) => item.includes("has to speak for it"))).toBe(true);
+  });
+
+  it("refuses an edge that joins something the map never draws", () => {
+    const found = review({
+      ...good,
+      states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
+      presentation: {
+        ...good.presentation,
+        content: {
+          ...topology,
+          edges: [{ from: "host", to: "database", network: "private" }],
+        },
+      },
+    });
+    expect(found.some((item) => item.includes('names "database"'))).toBe(true);
+  });
+});

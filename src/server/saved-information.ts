@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { db, getApplication, getMessage } from "./db";
 import { savedInformation, messages, chats } from "./db-schema";
 import { informationInputSchema, type MessageBlock } from "./operator-data";
+import { requireReadableRecord } from "./record-contract";
 
 export function listInformation(
   applicationId: string,
@@ -33,6 +34,10 @@ export function saveInformation(
 ) {
   if (!getApplication(applicationId)) throw new Error("Application not found.");
   const value = informationInputSchema.parse(input);
+  // Shape is Zod's; readability is the contract's. A record that parses but
+  // cannot be drawn is refused here with what to change, so Pi corrects it
+  // in the same turn rather than the page rendering a lie later.
+  requireReadableRecord(value);
   for (const evidence of value.evidence) {
     if (evidence.type === "message") {
       const message = getMessage(evidence.id);
