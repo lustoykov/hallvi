@@ -2,22 +2,39 @@
 
 // What Pi did, between what Pi said.
 //
-// Work is quiet by default: a run of reads and searches collapses to one line
-// you can open, a finished command is a line like any other, and only
-// something that wants you — an approval, a command still producing output —
-// takes the room of a card. Nothing here is boxed or tinted; the reading order
-// is the conversation's, and the detail waits until it is asked for.
+// Work is quiet by default: a run of calls collapses to one line you can open,
+// and inside it each call is a line of its own. Nothing here is boxed or
+// tinted; the reading order is the conversation's, and the detail waits until
+// it is asked for.
+//
+// Three things a reader needs and the runtime alone will not say:
+//
+//   Where it happened. Pi works in three places — your server, a throwaway
+//   copy of your repository, and Server Guy's own records — and only the tool
+//   name distinguishes them. A group states its place, and a group never
+//   mixes two, so "read the repository, then ran this on the server" is
+//   legible without opening anything.
+//
+//   What deserves the room of a card. Only a call that wants you, or one
+//   whose output you could still be reading, and once earned it is kept: a
+//   card that appeared for a moment and vanished reads as a glitch, and one
+//   that collapses on finishing takes the output away mid-read.
+//
+//   What a finished call actually said. That is this component's own quiet
+//   disclosure, not a second copy of the execution card.
 
 import {
   CaretRight,
   FileText,
   FloppyDisk,
+  Globe,
   MagnifyingGlass,
   PencilSimple,
+  Question,
   SpinnerGap,
   Terminal,
 } from "@phosphor-icons/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
@@ -29,21 +46,38 @@ export function hasActivity(records: ActivityRecord[], runId: string) {
   return records.some((record) => record.runId === runId);
 }
 
-type Kind = "read" | "search" | "ran" | "wrote" | "saved";
+type Kind = "read" | "search" | "ran" | "wrote" | "saved" | "called" | "asked";
 
+// Every tool Pi has, named the way a reader would name it. An unmapped tool
+// keeps its own name rather than being dressed as something it is not.
 const kinds: { test: RegExp; kind: Kind; verb: string }[] = [
   { test: /^(read|read_file|cat)$/, kind: "read", verb: "Read" },
   { test: /^(ls|list_directory)$/, kind: "read", verb: "Listed" },
+  { test: /^(grep|find|glob|search)$/, kind: "search", verb: "Searched" },
   {
-    test: /^(grep|find|search|search_information)$/,
+    test: /^search_information$/,
     kind: "search",
-    verb: "Searched",
+    verb: "Searched records for",
   },
   { test: /^(write|write_file)$/, kind: "wrote", verb: "Wrote" },
-  { test: /^(edit|edit_file)$/, kind: "wrote", verb: "Edited" },
+  { test: /^(edit|edit_file|multi_edit)$/, kind: "wrote", verb: "Edited" },
   { test: /^(bash|powershell|server_bash)$/, kind: "ran", verb: "Command" },
   { test: /^save_information$/, kind: "saved", verb: "Saved" },
   { test: /^retire_information$/, kind: "saved", verb: "Retired" },
+  {
+    test: /^get_application_status$/,
+    kind: "read",
+    verb: "Read the application record",
+  },
+  { test: /^hetzner_request$/, kind: "called", verb: "Called" },
+  { test: /^open_server_port$/, kind: "called", verb: "Opened a tunnel to" },
+  {
+    test: /^connect_server$/,
+    kind: "saved",
+    verb: "Saved the server connection",
+  },
+  { test: /^server_public_key$/, kind: "read", verb: "Read the managed key" },
+  { test: /^request_approval$/, kind: "asked", verb: "Asked you about" },
 ];
 
 const icons: Record<Kind, typeof FileText> = {
@@ -52,7 +86,53 @@ const icons: Record<Kind, typeof FileText> = {
   ran: Terminal,
   wrote: PencilSimple,
   saved: FloppyDisk,
+  called: Globe,
+  asked: Question,
 };
+
+/**
+ * The machine a call touched. Two of these look identical on a row — `bash`
+ * runs in the repository copy and `server_bash` runs on the deployed host —
+ * so the place is never left to be inferred from the command.
+ */
+type Place = "server" | "repository" | "records" | "provider" | "controller";
+
+const places: { test: RegExp; place: Place }[] = [
+  { test: /^server_bash$/, place: "server" },
+  {
+    test: /^(read|read_file|cat|ls|list_directory|grep|find|glob|write|write_file|edit|edit_file|multi_edit|bash|powershell)$/,
+    place: "repository",
+  },
+  {
+    test: /^(save_information|retire_information|search_information|get_application_status)$/,
+    place: "records",
+  },
+  { test: /^hetzner_request$/, place: "provider" },
+  {
+    test: /^(open_server_port|server_public_key|connect_server)$/,
+    place: "controller",
+  },
+];
+
+const where: Record<Place, string> = {
+  server: "on your server",
+  repository: "in the repository copy",
+  records: "in Server Guy’s records",
+  provider: "at Hetzner",
+  controller: "on Server Guy",
+};
+
+/** A tool nobody has placed yet says nothing rather than guessing. */
+function placeOf(record: ActivityRecord): Place | null {
+  return places.find((entry) => entry.test.test(record.tool))?.place ?? null;
+}
+
+/** "root@46.62.253.6:22" — the reader wants the host, not the login. */
+function hostOf(target: string | undefined) {
+  if (!target) return null;
+  const host = target.split("@").at(-1)?.split(":")[0]?.trim();
+  return host || null;
+}
 
 /** How a call is named and grouped; an unknown tool keeps its own name. */
 function describe(record: ActivityRecord) {
@@ -86,6 +166,40 @@ function subject(record: ActivityRecord) {
   return null;
 }
 
+/**
+ * What a call actually said, rather than the envelope it arrived in. Tool
+ * arguments and results are stored as JSON, and a shell script read through
+ * JSON escaping — `set -eu\nprintf ...` on one line — is not readable. So the
+ * longest string in the object is printed as itself, and the small scalars
+ * that came with it follow on one line.
+ */
+function plain(stored: string) {
+  const trimmed = stored.trim();
+  if (!trimmed || (trimmed[0] !== "{" && trimmed[0] !== "[")) return stored;
+  let value: unknown;
+  try {
+    value = JSON.parse(trimmed);
+  } catch {
+    // Text cut at its limit is no longer valid JSON; show it as it is.
+    return stored;
+  }
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return stored;
+  const entries = Object.entries(value as Record<string, unknown>);
+  const strings = entries.filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+  if (!strings.length) return stored;
+  const main = strings.reduce((a, b) => (b[1].length > a[1].length ? b : a));
+  const rest = entries
+    .filter(([key]) => key !== main[0])
+    .map(
+      ([key, item]) =>
+        `${key}: ${typeof item === "string" ? item : JSON.stringify(item)}`,
+    );
+  return rest.length ? `${main[1]}\n\n${rest.join("\n")}` : main[1];
+}
+
 function duration(record: { startedAt: string; finishedAt?: string }) {
   if (!record.finishedAt) return null;
   const ms = Date.parse(record.finishedAt) - Date.parse(record.startedAt);
@@ -95,13 +209,23 @@ function duration(record: { startedAt: string; finishedAt?: string }) {
 
 /** "Read files, ran commands" — what a run of quiet calls amounts to. */
 function summarise(records: ActivityRecord[]) {
-  const order: Kind[] = ["read", "search", "ran", "wrote", "saved"];
+  const order: Kind[] = [
+    "read",
+    "search",
+    "ran",
+    "wrote",
+    "saved",
+    "called",
+    "asked",
+  ];
   const words: Record<Kind, string> = {
     read: "file reads",
     search: "searches",
     ran: "commands",
     wrote: "file changes",
     saved: "records",
+    called: "requests",
+    asked: "approvals",
   };
   const present = order.filter((kind) =>
     records.some((record) => describe(record).kind === kind),
@@ -113,23 +237,29 @@ function summarise(records: ActivityRecord[]) {
 type Item =
   | { type: "said"; record: ActivityRecord }
   | { type: "card"; record: ActivityRecord }
-  | { type: "quiet"; records: ActivityRecord[] };
+  | { type: "quiet"; place: Place | null; records: ActivityRecord[] };
 
-/** Messages stay separate; runs of quiet calls gather behind one line. */
-function arrange(records: ActivityRecord[], noisy: (id: string) => boolean) {
+/**
+ * Messages stay separate; runs of quiet calls gather behind one line — but
+ * only while the place holds, because a group that spans two machines cannot
+ * honestly name either.
+ */
+function arrange(records: ActivityRecord[], card: (id: string) => boolean) {
   const items: Item[] = [];
   for (const record of records) {
     if (record.kind === "message") {
       items.push({ type: "said", record });
       continue;
     }
-    if (record.executionId && noisy(record.executionId)) {
+    if (record.executionId && card(record.executionId)) {
       items.push({ type: "card", record });
       continue;
     }
+    const place = placeOf(record);
     const last = items.at(-1);
-    if (last?.type === "quiet") last.records.push(record);
-    else items.push({ type: "quiet", records: [record] });
+    if (last?.type === "quiet" && last.place === place)
+      last.records.push(record);
+    else items.push({ type: "quiet", place, records: [record] });
   }
   return items;
 }
@@ -149,6 +279,10 @@ export function PiActivity({
   live?: string | null;
   renderExecution?: (executionId: string) => ReactNode;
 }) {
+  // Executions that have earned a card keep it. Remembering is what stops a
+  // fast command flashing one open and shut, and stops a finished one
+  // snatching its output back into a closed row.
+  const kept = useRef(new Set<string>());
   const mine = records
     .filter((record) => record.runId === runId)
     .sort((a, b) => a.sequence - b.sequence);
@@ -156,22 +290,32 @@ export function PiActivity({
   // text that has just become the last item; showing both would say it twice.
   const said = mine.filter((record) => record.kind === "message").at(-1)?.text;
   const tail = live?.trim() && live.trim() !== said?.trim() ? live : null;
-  if (!mine.length && !tail) return null;
 
-  // A command that wants a decision, or is still producing output, earns the
-  // room of a card. One that has finished is a line like any other.
-  const noisy = (executionId: string) => {
-    const execution = executions?.find((item) => item.id === executionId);
-    return (
+  // A call that wants a decision earns the room of a card at once. A call
+  // that is merely running earns one only when there is output to watch:
+  // anything quick is over before a reader could have read it.
+  const cards = new Set<string>();
+  for (const record of mine) {
+    if (record.kind !== "tool" || !record.executionId) continue;
+    const execution = executions?.find(
+      (item) => item.id === record.executionId,
+    );
+    const watchable =
       !execution ||
       execution.status === "awaiting-approval" ||
-      execution.status === "running"
-    );
-  };
+      (execution.status === "running" &&
+        Boolean(record.preview.trim() || execution.output.trim()));
+    if (watchable || kept.current.has(record.executionId))
+      cards.add(record.executionId);
+  }
+  useEffect(() => {
+    for (const id of cards) kept.current.add(id);
+  });
 
+  if (!mine.length && !tail) return null;
   return (
     <div className="sg-did" aria-label="What Pi did">
-      {arrange(mine, noisy).map((item, index) =>
+      {arrange(mine, (id) => cards.has(id)).map((item) =>
         item.type === "said" ? (
           <div className="sg-did-said" key={item.record.id}>
             <Markdown source={item.record.text ?? ""} />
@@ -182,10 +326,13 @@ export function PiActivity({
           </div>
         ) : (
           <Quiet
-            key={`quiet-${index}`}
+            // Keyed by the first call in it, not by position: while Pi is
+            // working new items arrive and every index shifts, which would
+            // remount the group and snap it shut under the reader.
+            key={`quiet-${item.records[0].id}`}
+            place={item.place}
             records={item.records}
             executions={executions}
-            renderExecution={renderExecution}
           />
         ),
       )}
@@ -198,15 +345,15 @@ export function PiActivity({
   );
 }
 
-/** A run of calls that finished quietly, behind one line. */
+/** A run of calls in one place, behind one line. */
 function Quiet({
+  place,
   records,
   executions,
-  renderExecution,
 }: {
+  place: Place | null;
   records: ActivityRecord[];
   executions?: ExecutionRecord[];
-  renderExecution?: (executionId: string) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const working = records.some((record) => record.status === "running");
@@ -220,6 +367,17 @@ function Quiet({
       : count("interrupted")
         ? `${count("interrupted")} stopped`
         : "";
+  // One machine named once. Several, and the rows carry their own targets.
+  const hosts = new Set(
+    records
+      .map((record) =>
+        hostOf(
+          executions?.find((item) => item.id === record.executionId)?.target,
+        ),
+      )
+      .filter((host): host is string => host !== null),
+  );
+  const host = hosts.size === 1 ? [...hosts][0] : null;
   return (
     <div className="sg-did-quiet" data-open={open || undefined}>
       <button
@@ -230,6 +388,12 @@ function Quiet({
       >
         <CaretRight weight="bold" aria-hidden="true" />
         <span>{summarise(records)}</span>
+        {place && (
+          <span className="sg-did-where">
+            {where[place]}
+            {host && place === "server" && <code>{host}</code>}
+          </span>
+        )}
         <em>
           {records.length}
           {working ? (
@@ -252,12 +416,7 @@ function Quiet({
       {open && (
         <ol className="sg-did-rows">
           {records.map((record) => (
-            <Row
-              key={record.id}
-              record={record}
-              executions={executions}
-              renderExecution={renderExecution}
-            />
+            <Row key={record.id} record={record} />
           ))}
         </ol>
       )}
@@ -265,22 +424,11 @@ function Quiet({
   );
 }
 
-function Row({
-  record,
-  executions,
-  renderExecution,
-}: {
-  record: ActivityRecord;
-  executions?: ExecutionRecord[];
-  renderExecution?: (executionId: string) => ReactNode;
-}) {
+function Row({ record }: { record: ActivityRecord }) {
   const [open, setOpen] = useState(false);
   const { kind, verb } = describe(record);
   const Icon = icons[kind];
   const detail = subject(record);
-  const execution = record.executionId
-    ? executions?.find((item) => item.id === record.executionId)
-    : undefined;
   const took = duration(record);
   const shown = record.status === "running" ? record.preview : record.result;
   const wrong = ["failed", "declined", "interrupted"].includes(record.status);
@@ -318,21 +466,15 @@ function Row({
       </button>
       {open && (
         <div className="sg-did-detail">
-          {execution && renderExecution ? (
-            renderExecution(execution.id)
-          ) : (
-            <>
-              <pre>{record.args || "Nothing recorded."}</pre>
-              <pre data-wrong={wrong || undefined}>
-                {shown ||
-                  (record.status === "running"
-                    ? "Nothing yet."
-                    : "Nothing was recorded for this call.")}
-              </pre>
-              {record.truncated && (
-                <p>Longer than Server Guy keeps; what is shown was cut.</p>
-              )}
-            </>
+          <pre>{plain(record.args) || "Nothing recorded."}</pre>
+          <pre data-wrong={wrong || undefined}>
+            {plain(shown) ||
+              (record.status === "running"
+                ? "Nothing yet."
+                : "Nothing was recorded for this call.")}
+          </pre>
+          {record.truncated && (
+            <p>Longer than Server Guy keeps; what is shown was cut.</p>
           )}
         </div>
       )}
