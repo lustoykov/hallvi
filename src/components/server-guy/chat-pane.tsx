@@ -282,7 +282,7 @@ export function ChatPane({
                 <MessageContent>
                   {provisional ? (
                     <div className="sg-run-progress">
-                      {message.body && inProgress && (
+                      {message.body && inProgress && !view.piActivity && (
                         <MessageResponse>
                           <Markdown source={message.body} />
                         </MessageResponse>

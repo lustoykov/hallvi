@@ -270,15 +270,14 @@ it("records a decline as not run, whatever the runtime returned", () => {
     tool: "bash",
     args: { command: "echo no" },
   });
-  // The runtime hands back an ordinary result for a declined command, so the
-  // record would otherwise keep claiming it succeeded.
+  // The executor records the decision before returning to the runtime.
+  store.settleActivity(APPLICATION, "call-j", "declined");
   store.endActivity({
     applicationId: APPLICATION,
     id: "call-j",
     result: { declined: true },
     isError: false,
   });
-  store.settleActivity(APPLICATION, "call-j", "declined");
   const record = store
     .listActivity(APPLICATION)
     .find((item) => item.id === "call-j");

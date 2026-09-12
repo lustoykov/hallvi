@@ -232,7 +232,14 @@ export function endActivity(input: {
   write(path, {
     ...record,
     result: result.text,
-    status: input.isError ? "failed" : "succeeded",
+    // Executor decisions happen before the SDK completion event.
+    // Keep that outcome when the SDK returns an ordinary declined result.
+    status:
+      record.status === "running"
+        ? input.isError
+          ? "failed"
+          : "succeeded"
+        : record.status,
     truncated: record.truncated || result.truncated,
     finishedAt: new Date().toISOString(),
   });
