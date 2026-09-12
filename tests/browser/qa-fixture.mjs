@@ -169,6 +169,7 @@ const env = {
   SERVER_GUY_DB_PATH: join(state, "qa.db"),
   SERVER_GUY_LOG_DIR: join(state, "diagnostics"),
   SERVER_GUY_CONFIG_DIR: state,
+  SERVER_GUY_PI_CONFIG_DIR: state,
   PI_CODING_AGENT_DIR: pi,
   SERVER_GUY_QA_ROOT: root,
   SERVER_GUY_QA_LOGIN_MODE: loginMode,

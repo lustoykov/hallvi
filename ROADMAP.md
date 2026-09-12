@@ -39,6 +39,8 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 - [x] **Pi activity transcript — merged in [PR #59](https://github.com/lustoykov/server-guy/pull/59) and [PR #60](https://github.com/lustoykov/server-guy/pull/60), 12 September 2026.** Tool calls, intermediate messages and linked approvals keep their order across streaming and reload. Quiet call groups expand for arguments/results; workspace commands stream through the Docker bridge. Declined and stopped outcomes remain distinct. [Integration evidence and limits](docs/testing/2026-09-12-transcript-terminal-integration.md).
 
+Pi login and model preferences use a persistent machine account directory across default development previews; application data remains separate. Explicit controller directories stay isolated unless a shared Pi directory is selected. See [setup](README.md).
+
 ## Verification and deletion
 
 Exercise actual Pi behavior and the user journey, inspect execution evidence and check the resulting application. Use focused tests for consequential changed behavior. A passing mock, completed command or dated proof is not a verified current deployment. Keep claims explicit about real models, simulated providers, local Docker and real hosts.
