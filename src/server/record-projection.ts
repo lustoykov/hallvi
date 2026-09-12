@@ -24,7 +24,12 @@
 // Nothing here invents a fact. A missing input reads unknown — never healthy,
 // and never absent.
 
-import type { Claim, Ref, SavedInformation } from "./operator-data";
+import type {
+  Claim,
+  Ref,
+  SavedInformation,
+  SubjectKind,
+} from "./operator-data";
 
 type Presentation = NonNullable<SavedInformation["presentation"]>;
 export type RecordCheck = Presentation["checks"][number];
@@ -312,6 +317,48 @@ export function tagFor(
   return now - Date.parse(record.establishedAt) >= soonest
     ? "stale"
     : "verified";
+}
+
+export type Lane = "checks" | "backups" | "server" | "access";
+
+/**
+ * Which of Overview's four lanes a subject belongs to.
+ *
+ * A volume belongs to the application, not to Backups: surviving a restart is
+ * the application keeping its own data, and nothing was copied anywhere. Only
+ * a backup plan — and the copies and restores that reference one — speaks to
+ * whether a copy exists off the machine. The earlier mapping would have shown
+ * a green Backups lane on the strength of a restart test.
+ */
+const lanes: Partial<Record<SubjectKind, Lane>> = {
+  application: "checks",
+  process: "checks",
+  volume: "checks",
+  host: "server",
+  access: "access",
+  door: "access",
+  certificate: "access",
+};
+
+export function laneOf(ref: Ref | undefined): Lane | null {
+  return ref ? (lanes[ref.kind] ?? null) : null;
+}
+
+/**
+ * A check's lane comes from what it was about, or else from the subject its
+ * record speaks for. `record.about` is never consulted: it is unordered, so
+ * no element of it was ever worth privileging.
+ */
+export function lane(
+  check: RecordCheck,
+  record: SavedInformation,
+): Lane | null {
+  return laneOf(check.about ?? record.presentation?.states?.ref);
+}
+
+/** A check reaches a timeline only if it has a lane and a time. */
+export function timelineWorthy(check: RecordCheck, record: SavedInformation) {
+  return lane(check, record) !== null && record.establishedAt !== null;
 }
 
 /**

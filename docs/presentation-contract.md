@@ -246,6 +246,70 @@ Implemented as `tests/application/integration/record-projection.test.ts`.
 
 ---
 
+## 6. Overview: the state the page needs
+
+Built by `overviewFromRecords`, drawn by the accepted Overview design. It
+reads the same projection as Architecture and adds no vocabulary of its own
+except the one claim below.
+
+| Field | Source | Refreshed when |
+| --- | --- | --- |
+| headline | the `web` part's name, else the application's | Pi records a new map |
+| **needs** — a failed check | any check read as evidence about now that says `failed` | Pi observes |
+| **needs** — a decision | an execution awaiting approval | immediately; the controller owns it |
+| **needs** — a failed outcome | a record whose `status` is `failed` | Pi records one |
+| **ideas** | records with `role: "recommendation"`, using Pi's own `nextStep` as the draft | Pi recommends something |
+| **vitals** — lane state | that lane's checks, read as evidence about now, worst first | Pi observes, or the clock passes a claim's horizon |
+| **vitals** — lane facts | `currentFacts` of the subjects in that lane | Pi observes them |
+| **vitals** — plain words | the lane subject's `plain` or the record's title, as Pi wrote it | Pi rewrites it |
+| **recent** | executions and established records, newest first | any work happens |
+| Tomorrow, countdowns | **deferred** — needs `schedule`; the hero ships with history and now | — |
+
+### Lanes
+
+`lane(check) = laneOf(check.about ?? record.states.ref)`, restored to the
+projection now that a view consumes it. `record.about` is never consulted: it
+is unordered, so no element of it is privileged.
+
+```
+process, database, volume, application → checks
+backup-plan                            → backups
+host                                   → server
+access, door, domain, certificate      → access
+anything else                          → no lane, and no timeline
+```
+
+**A volume belongs to the application, not to Backups.** The design's own
+slot-based mapping put volumes under Backups, which would have read "backups
+are fine" on the strength of a restart test that never copied anything
+anywhere. Surviving a restart is the application keeping its own data. Only a
+`backup-plan` — and the copies and restores that reference one — speaks to
+whether a copy exists somewhere else.
+
+### The application's own health
+
+The `checks` lane, and Overview's headline condition, ask what is true of the
+application itself. No record answered that: a deployment event speaks for
+none of the four subjects it touches, by design.
+
+So Pi records a health claim **stating the application**, carrying the checks
+the evidence establishes, with `establishedAt` set to when that evidence was
+gathered rather than when the record is written. That single rule is what lets
+one lane distinguish four readings without any of them being guessed:
+
+| Overview reads | Because |
+| --- | --- |
+| healthy | a check passed and its claim is still in window |
+| stale | it passed, and enough time has passed that it may have changed |
+| failed | a check ran and did not pass |
+| unassessed | no record states the application |
+
+Preserving the original timestamp is the whole point. A record written now
+about evidence gathered an hour ago is stale, and saying so is the difference
+between a page that reports and a page that reassures.
+
+---
+
 ## 6. Refused at the door
 
 `src/server/record-contract.ts` runs at save. Zod settles shape; this settles
@@ -285,8 +349,6 @@ brings its own read rules and its own worked example.
 - **`measurement`** — numbers with units. A number is not a pass or a fail and
   is never coloured.
 - **`resolves`** — pairing a failure with its repair, for History.
-- **Lane derivation** — `laneOf(check.about ?? states.ref)`, for Overview's
-  timeline. `check.about` is already written and read; only the lanes wait.
 - **Withdrawing a fact without replacing it.** Write a new observation, or an
   `absent`.
 - **Ongoing synchronisation** — a deterministic check that re-reads the

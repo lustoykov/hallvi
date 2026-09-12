@@ -46,6 +46,7 @@ import {
   laneOf,
   type Lane,
   type TimeEvent,
+  type Timeline,
 } from "./timeline-model";
 import { Mascot, useServerGuy } from "./use-server-guy";
 import "./timeline.css";
@@ -253,14 +254,16 @@ export function TimelineHero({
   onShow,
   onAsk,
   onOpenDestination,
-}: HeroProps) {
+  timeline: given,
+}: HeroProps & { timeline?: Timeline }) {
   const [guy, mascot] = useServerGuy(model, recheck, { narrate: true });
   const appId = record.application.id;
-  const timeline = useMemo(
+  const fallback = useMemo(
     () =>
       buildTimeline({ model, record, live: guy.live, marks: recheck.marks }),
     [model, record, guy.live, recheck.marks],
   );
+  const timeline = given ?? fallback;
   const [open, setOpen] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axt-pop, .axt-ev, .axt-lane-name", close);
