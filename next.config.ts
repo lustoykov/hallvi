@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
     "@earendil-works/pi-ai",
     "@earendil-works/pi-coding-agent",
     "better-sqlite3",
+    "node-pty",
+    "ws",
   ],
 };
 
