@@ -120,7 +120,16 @@ it("shares one outcome between chat and two views while keeping working knowledg
       role: "outcome",
       status: "verified",
       url: "https://example.com",
-      checks: [{ label: "HTTP responds", status: "passed" }],
+      checks: [
+        {
+          key: "http",
+          label: "HTTP responds",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+          about: { kind: "application", id: "qa-app" },
+        },
+      ],
     },
   });
   attachMessageBlock(app, turn.id, {
@@ -174,7 +183,14 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     body: "The deployment is recorded.",
     presentation: {
       checks: [
-        { label: "HTTP responded", status: "passed", subject: "application" },
+        {
+          key: "http",
+          label: "HTTP responded",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+          about: { kind: "application", id: "qa-app" },
+        },
       ],
       views: ["overview", "deployment"],
       role: "outcome",
@@ -208,10 +224,12 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     listInformation(app).find((r) => r.id === deployment.id)?.presentation
       ?.content,
   ).toMatchObject({ kind: "deployment", image: "app:candidate" });
+  // What the check was about survives the round trip, which is what places
+  // it on a lane; `subject` used to carry this and named a column instead.
   expect(
     listInformation(app).find((r) => r.id === deployment.id)?.presentation
-      ?.checks[0].subject,
-  ).toBe("application");
+      ?.checks[0].about,
+  ).toEqual({ kind: "application", id: "qa-app" });
   saveInformation(
     app,
     {

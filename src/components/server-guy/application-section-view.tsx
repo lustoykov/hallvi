@@ -20,6 +20,7 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
+import { ArchitecturePage } from "./architecture-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -128,6 +129,13 @@ export function ApplicationSectionView({
   if (!app) return null;
   // The live operator reads shared information. Older layouts below remain
   // available only to the isolated visual-reference scenarios.
+  //
+  // A destination with a designed component uses it for whatever the records
+  // hold — a complete picture, a partly observed one, or nothing at all, in
+  // which case the design draws its own empty state. Only a destination that
+  // has not been ported yet falls through to the card list; going back to
+  // cards when records are thin would mean the page a reader learns is the
+  // one they see least.
   if (view.information !== undefined) {
     if (section === "overview")
       return (
@@ -136,6 +144,29 @@ export function ApplicationSectionView({
           now={now}
           bar={bar}
           onOpen={onOpenDestination}
+        />
+      );
+    if (section === "architecture")
+      return (
+        <ArchitecturePage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{
+            bar,
+            header: (
+              <header className="sg-section-header">
+                <div>
+                  <h1>Architecture</h1>
+                  <p>{descriptions.architecture}</p>
+                </div>
+              </header>
+            ),
+            activity: null,
+          }}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
         />
       );
     const records = view.information

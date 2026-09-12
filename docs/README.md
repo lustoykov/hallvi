@@ -7,7 +7,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Operator design](operator-design.md) | Agreed direction, draft deployment journey, sequencing boundary, complexity tiers and unresolved design details. |
 | [Architecture](architecture.md) | The current system, execution loop, records, protection/rollback and limits. |
 | [Required outcomes](requirements.md) | User-facing behavior and acceptance, without prescribing Pi's workflow. |
-| [Presentation contract](presentation-contract.md) | Proposal: the data and interaction contract the accepted reference designs need from real Pi output. |
+| [Presentation contract](presentation-contract.md) | How a record becomes a designed page: what Pi writes, how it is read, and what Architecture needs. Later destinations' vocabulary is kept separate under Deferred. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
