@@ -50,6 +50,16 @@ Native conversation histories live beside the database in `pi-sessions/<applicat
 
 ### Diagnostics
 
+For a live, read-only view of Pi's full recorded conversation, run this in another terminal using Node 22:
+
+```sh
+npm run inspect:conversation
+```
+
+Open <http://127.0.0.1:3001>. The viewer selects the newest application's main conversation by default; use `-- --application <id> --chat <id> --port 3001` to choose another. It respects `SERVER_GUY_DB_PATH` and `SERVER_GUY_CONFIG_DIR` when exported in that terminal.
+
+Recorded messages, reasoning and tool results refresh automatically. The current response text and running-command output update from the controller's saved state about every 750 ms. This is not a raw model-network capture: reasoning appears when Pi saves the assistant message. **Follow latest** scrolls to new content; turn it off to read earlier entries, or **Pause updates** to freeze the view. The inspector reads SQLite, native history and execution files without invoking Pi or running commands. Keep it local: conversation exports can contain private application data.
+
 Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `SERVER_GUY_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](src/server/diagnostics.ts) and [trace configuration](src/server/tracing-config.ts).
 
 ## Verify
