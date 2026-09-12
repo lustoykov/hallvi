@@ -41,11 +41,29 @@ states?: { ref: Ref; presence: "present" | "absent" }
 type Ref = { kind: SubjectKind; id: string }
 ```
 
+### 2.1 A record is a partial observation, not a snapshot
+
+**A record states only what Pi observed this time.** It does not restate what it did not look at. The consequence is that "the current state of X" is not one record — it is assembled, key by key, from the newest record that carries each key.
+
+Every fact and check therefore needs a stable machine key alongside its display label:
+
+```ts
+interface Fact  { key: string; label: string; value: string; mono?: boolean; claim: Claim; basis: Basis }
+interface Check { key: string; label: string; status: "passed" | "failed" | "info";
+                  claim: Claim; basis: Basis; about?: Ref; detail?: string }
+```
+
 | Read | Definition |
 | --- | --- |
-| **Current state of X** | the newest record whose `states.ref` is X |
-| **Series for X** | every record whose `states.ref` is X, oldest first |
+| **Presence of X** | the newest record stating X; its `presence` |
+| **Current fact `k` of X** | the `k` fact from the newest record stating X that carries `k`, within the current presence epoch |
+| **Current check `k` of X** | the same, for checks |
+| **Series for X** | every record stating X, oldest first |
 | **Everything about X** | every record with X in `about` **or** `states.ref` |
+
+The **presence epoch** is the run of records since the newest change in `presence`. Assembly never reaches past it: a host that was destroyed and rebuilt does not show the old machine's address, because those facts are on the far side of an `absent`. Within one epoch, a record that says only "SSH answered" leaves the earlier location and size facts standing — they were never contradicted, and Pi correctly did not re-assert what it did not re-observe.
+
+Withdrawing a fact without replacing it (Pi learns a value is simply no longer true, and has no new one) is deliberately **not** in the first slice; write a new observation or an `absent` instead.
 
 Consequences, stated as rules:
 
@@ -53,7 +71,8 @@ Consequences, stated as rules:
 - **A record without `states` never becomes current state of anything, no matter how many things it is about.** A copy of the database is `about` `database:todo` and `backup-plan:daily` and stays an event: it appears in Database's copies lane, on the Backups calendar and in Storage's off-the-server node, and it never answers "what is the state of the database".
 - `states` is at most one subject. A record that would state two is two records. This keeps "current" unambiguous.
 - `about` is additive and unordered. It is what every "show me everything that touched this" read uses.
-- `retiredAt` withdraws a record Pi no longer stands behind — a correction. It is not how you say a thing stopped existing; that is a new record with `presence: "absent"`.
+- **`retiredAt` is the one exception to "nothing mutates", and it is a tombstone rather than an edit.** No word of what a record said ever changes: not its title, body, checks, facts, `about`, `states`, `establishedAt` or evidence. `retiredAt` is a write-once flag meaning "Pi no longer stands behind this observation", and it changes visibility only. Retiring is a correction, not a way to say a thing stopped existing — that is a new record with `presence: "absent"`.
+- **A retired record leaves every current read.** Assembly skips it, so the previous unretired record carrying that key becomes current again, and the subject's presence falls back to the newest unretired record stating it. The retired record stays in the series and in History, marked withdrawn: the reader can still see that Pi once said it and then took it back.
 
 ### 2.1 Presence, so absence is written and never inferred
 
@@ -79,19 +98,17 @@ The review's example is exactly right: one expiry per subject kind cannot be cor
 
 | Claim | What it asserts | Ages | Example |
 | --- | --- | --- | --- |
-| `identity` | what a thing is | never | region, instance type, image digest, mount path, checksum |
-| `configuration` | what was set | slowly | firewall rules, env applied, systemd unit installed |
+| `identity` | what a thing **is**, such that a change makes it a different thing | never | image digest, repository revision, checksum, instance id, volume name, mount path |
+| `configuration` | what was **chosen**, and can be changed without replacing the thing | slowly | region, instance size, public address, firewall rules, env applied, port bindings, systemd unit installed |
 | `reachability` | something answered | quickly | SSH connected, HTTP 200, probe passed |
 | `liveness` | it is running now | very quickly | container up, process running |
-| `contents` | what is inside or how much | moderately | disk used, row count, backup size, queue depth |
+| `contents` | what is inside, or how much | moderately | disk used, row count, backup size, queue depth |
+
+The review was right that instance size and public address are not permanent, and the first draft filed them under `identity` along with the region. They are `configuration`: chosen, changeable, and worth re-reading. `identity` is now only what cannot change without the thing becoming a different thing — a digest, a revision, a volume name. That keeps `never` safe, because a rebuilt host is a new `presence` epoch rather than an expired fact.
 
 ```ts
 type Claim = "identity" | "configuration" | "reachability" | "liveness" | "contents"
 type Basis = "observed" | "planned" | "reported"
-
-interface Fact  { label: string; value: string; mono?: boolean; claim: Claim; basis: Basis }
-interface Check { label: string; status: "passed" | "failed" | "info";
-                  claim: Claim; basis: Basis; about?: Ref; detail?: string }
 ```
 
 The expiry table lives in the component layer, because how long a fact is worth trusting is a presentation judgement:
@@ -108,19 +125,51 @@ Pi may override per check or per fact with `freshFor` in seconds when it knows t
 
 ### 3.1 The rule
 
+The first draft applied one formula to two different vocabularies. Checks say `passed | failed | info`, records say `info | verified | failed | warning`, and only records carry a time. Both are needed, and they are not the same function.
+
+**Timestamps are inherited, never carried.** A check and a fact have no time of their own: they are as of `record.establishedAt`. If two observations were gathered at materially different times they belong in two records — that is the rule that keeps `establishedAt` meaningful, and it is why a per-check `at` is deliberately not in this contract. A record with `establishedAt: null` was written but nothing was established: its checks render as recorded, never as verified, and they never age because they never started.
+
 ```
-fresh(x)  = x.establishedAt + (x.freshFor ?? expiry[x.claim]) > now
-shown(x)  = x.status === "verified" && !fresh(x) ? "stale" : x.status
+age(record)      = now - record.establishedAt
+fresh(x, record) = record.establishedAt !== null
+                   && age(record) < (x.freshFor ?? expiry[x.claim])
 ```
+
+**A check, drawn on its own** (Deployment's "Checks it passes", a station log row, an Overview lane mark):
+
+| `check.status` | fresh | not fresh |
+| --- | --- | --- |
+| `passed` | verified | **stale** |
+| `failed` | failed | failed — a failure does not age into doubt |
+| `info` | noted | noted — a note makes no claim, so it never ages |
+
+**A record, drawn as a card** — its tag takes the record's own `status`, aged by the soonest-expiring claim among the checks and facts that card is showing:
+
+```
+soonest(record, shown) = min over x in shown of (x.freshFor ?? expiry[x.claim])
+tag(record, shown)     = record.status === "verified"
+                         && age(record) >= soonest(record, shown) ? "stale" : record.status
+```
+
+`failed` and `warning` pass through unaged; `info` renders as recorded. A card showing only `identity` facts never goes stale; the same record in Overview's Server lane, where the `reachability` check is what the lane draws, goes stale in twelve hours.
+
+**Ageing applies to claims about now, not to what happened.** This falls out of the `about`/`states` split rather than adding a rule:
+
+| The record | How its checks are read | Ages |
+| --- | --- | --- |
+| has `states` — it speaks for a subject | as of now | yes |
+| an event — it says what happened | as of the record | no |
+
+So Deployment's "Checks it passes" shows the three checks that deployment ran, plainly, under "They ran when it deploys" — a liveness check that passed at 16:05 is not redrawn as doubtful an hour later, because the page is a record of an event. The same `liveness` check reaching Overview's Checks lane is a claim about the application now, and there it ages in fifteen minutes. The event record's own headline tag ages either way, which is why the reference's Deployment page says "Verified 3 days ago" above a check list that is not itself greyed.
 
 Freshness is computed **per claim, and a component asks for the freshness of the claim it is drawing.** The same host record therefore reads differently in different places, correctly:
 
-| Where | Claim drawn | Three days later |
-| --- | --- | --- |
-| Architecture's host tag | `reachability` — "SSH connected" | amber, "Reached 3 days ago" |
-| CDN's "where it stands" | `identity` — Helsinki, CX23 | unchanged, no tag |
-| Overview's Server lane | `reachability` | the band of not-knowing |
-| Deployment's "Server" fact row | `identity` | plain, no ageing |
+| Where | Claim drawn | Three days later | Ten days later |
+| --- | --- | --- | --- |
+| Architecture's host tag | `reachability` — "SSH connected" | amber, "Reached 3 days ago" | amber |
+| CDN's "where it stands" | `configuration` — Helsinki, CX23 | plain, still in window | "Last read 10 days ago" |
+| Overview's Server lane | `reachability` | the band of not-knowing | the band, wider |
+| Deployment's "Server" fact row | `identity` — the machine's name | plain, no ageing | plain |
 
 A record's own headline tag, when a component needs one, takes **the soonest-expiring claim it is showing** — never an average.
 
@@ -158,17 +207,23 @@ The line that settles most arguments: **anything with an exit code is automatic;
 Today `check.subject: "application" | "backups" | "server" | "access"` does two jobs: it marks a check as timeline-worthy, and it chooses a lane. The replacement covers both without an authored lane.
 
 ```
-lane(check) = laneOf(check.about ?? record.states?.ref ?? record.about[0])
+lane(check) = laneOf(check.about ?? record.states?.ref)   // never record.about
 timelineWorthy(check) = lane(check) !== null && record.establishedAt !== null
 
-laneOf(ref) = process, database        → "application"
-              backup-plan, volume      → "backups"
-              host                     → "server"
-              access, door, domain, certificate → "access"
-              anything else            → null
+laneOf(ref) = process, database, volume, application → "application"
+              backup-plan                            → "backups"
+              host                                   → "server"
+              access, door, domain, certificate      → "access"
+              anything else                          → null
 ```
 
-`check.about` is an optional per-check override, which is what preserves today's behaviour exactly: a deployment record that touches several subjects can still place each check in its own lane. The difference is that Pi names a thing rather than a column, so the same field also drives Architecture, Processes and History, and a new lane never requires re-teaching Pi.
+Two corrections the review asked for.
+
+**`about[]` is never consulted for a lane.** It is unordered, so `about[0]` was meaningless; it is gone. A check takes its lane from its own `about`, or from the subject the record speaks for, or it has no lane and does not reach the timeline — which is exactly what a check with no `subject` does today.
+
+**The Backups lane is about protection, not about storage.** `volume` moved to Application. "SQLite persistence survived a restart" is a claim that the application kept its data through a restart; no copy was made and nothing was protected, so it belongs with the application's own health. Only `backup-plan` — and the copy and restore events that reference a plan — speak to whether a copy exists somewhere else. The earlier mapping put a restart test in Backups, which would have read as "backups are fine" on the strength of a check that never touched a backup.
+
+Naming a subject is still not the same as naming what was checked, which is why `check.about` exists: it is the escape hatch that reproduces `check.subject`'s expressiveness exactly, while naming a thing rather than a column. A deployment record touching four subjects places each of its checks itself. The gain over `check.subject` is that the same field then also drives Architecture, Processes and History, and a new lane never requires re-teaching Pi.
 
 ---
 
@@ -196,6 +251,9 @@ Ports as the provider or the plan states them. **`reach` is derived, not authore
 
 ```ts
 { kind: "doors",
+  /** True only when this is the provider's whole rule set, read back. */
+  complete: boolean,
+  at: string, basis: Basis,
   doors: {
     id, port: number, protocol: "tcp" | "udp",
     serves: { partId: string; port?: number } | null,
@@ -203,12 +261,21 @@ Ports as the provider or the plan states them. **`reach` is derived, not authore
     basis: Basis, at: string | null,
     unasked?: boolean, concern?: string
   }[] }
-
-reach(door) = sources contains 0.0.0.0/0 or ::/0        → "internet"
-              sources non-empty, all narrower           → "restricted"
-              sources empty and the port is loopback    → "private"
-              no door for that port                     → "closed"
 ```
+
+`reach` is derived from the door, and **closure has to be established like anything else**:
+
+```
+reach(port) =
+  a door exists      → sources contain 0.0.0.0/0 or ::/0 → "internet"
+                       sources non-empty and narrower     → "restricted"
+                       sources empty, bound to loopback   → "private"
+  no door, complete  → "closed"      · "as the provider reports its rules"
+  no door, a knock from outside was refused → "closed" · "a knock was refused"
+  otherwise          → "unknown"
+```
+
+The previous draft said "no door for that port → closed", which broke this contract's own rule in the section that exists to enforce it: our not having a rule on file is not evidence that a port is shut. Closure needs either `complete: true` — the provider's entire rule set read back, which is what `check-firewall` would produce — or a `reachability` check about `door:<port>` that was refused from outside. Everything else is unknown, and Security draws an unknown wall rather than a solid one.
 
 `sources` is structured so Security can print each rule verbatim *and* nest the rings correctly; `unasked` is the provider reporting a rule this deployment never requested; `at` with `basis: "planned"` is what produces "Asked for, never read back".
 
@@ -383,18 +450,19 @@ The deployment we actually have, as the records that would populate the screens.
     "role": "status",
     "status": "verified",
     "checks": [
-      { "label": "SSH connected as root", "status": "passed", "claim": "reachability", "basis": "observed" }
+      { "key": "ssh", "label": "SSH connected as root", "status": "passed", "claim": "reachability", "basis": "observed" }
     ],
     "facts": [
-      { "label": "Where", "value": "Helsinki, Finland", "claim": "identity", "basis": "reported" },
-      { "label": "Size", "value": "CX23 · 2 vCPU · 4 GB", "claim": "identity", "basis": "reported" },
-      { "label": "Public address", "value": "46.62.253.6", "mono": true, "claim": "identity", "basis": "reported" }
+      { "key": "server-id", "label": "Provider id", "value": "165600952", "mono": true, "claim": "identity", "basis": "reported" },
+      { "key": "region", "label": "Where", "value": "Helsinki, Finland", "claim": "configuration", "basis": "reported" },
+      { "key": "size", "label": "Size", "value": "CX23 · 2 vCPU · 4 GB", "claim": "configuration", "basis": "reported" },
+      { "key": "address", "label": "Public address", "value": "46.62.253.6", "mono": true, "claim": "configuration", "basis": "reported" }
     ]
   }
 }
 ```
 
-Three days on, Overview's Server lane and Architecture's host tag read "Reached 3 days ago" in amber, because `reachability` expires in twelve hours. CDN still names the machine as a CX23 in Helsinki, with no tag at all, because those facts are `identity` and do not age. One record, two correct readings.
+Three days on, Overview's Server lane and Architecture's host tag read "Reached 3 days ago" in amber, because `reachability` expires in twelve hours. CDN still names the machine as a CX23 in Helsinki with no tag, because `configuration` is good for seven days — and after ten it says when it was last read rather than pretending. Only the provider id never ages: a different id is a different machine, which is a new presence epoch, not an expired fact.
 
 ### 9.2 The map
 
@@ -418,7 +486,7 @@ Three days on, Overview's Server lane and Architecture's host tag read "Reached 
         { "id": "source", "kind": "source", "name": "docker/getting-started-app", "role": "The repository", "plain": "Where the code comes from" },
         { "id": "controller", "kind": "controller", "name": "Server Guy", "role": "This PC", "plain": "Where you are reading this" },
         { "id": "hetzner-165600952", "kind": "host", "name": "Hetzner CX23", "role": "The server", "plain": "The one machine everything runs on",
-          "facts": [{ "label": "Where", "value": "Helsinki, Finland", "claim": "identity", "basis": "reported" }] },
+          "facts": [{ "key": "region", "label": "Where", "value": "Helsinki, Finland", "claim": "configuration", "basis": "reported" }] },
         { "id": "door-22", "kind": "gate", "name": "22", "role": "SSH", "plain": "The only way in from the network", "owner": "hetzner-165600952" },
         { "id": "process-nginx", "kind": "web", "name": "nginx", "role": "The front door inside the server", "plain": "Answers on the server's own loopback, port 80", "owner": "hetzner-165600952" },
         { "id": "process-app", "kind": "private", "name": "getting-started", "role": "Your application", "plain": "The Node app, reachable only from the server", "owner": "hetzner-165600952" },
@@ -465,11 +533,11 @@ No `public` edge reaches the web: the only public edge is the controller's SSH c
     "status": "verified",
     "url": "http://127.0.0.1:8080",
     "checks": [
-      { "label": "Local browser endpoint returns HTTP 200", "status": "passed", "claim": "reachability", "basis": "observed",
+      { "key": "tunnel-200", "label": "Local browser endpoint returns HTTP 200", "status": "passed", "claim": "reachability", "basis": "observed",
         "about": { "kind": "access", "id": "app-dgs" } },
-      { "label": "Application ports bind only to server loopback", "status": "passed", "claim": "configuration", "basis": "observed",
+      { "key": "loopback-bind", "label": "Application ports bind only to server loopback", "status": "passed", "claim": "configuration", "basis": "observed",
         "about": { "kind": "process", "id": "process-nginx" } },
-      { "label": "Public HTTP unavailable from this PC", "status": "passed", "claim": "reachability", "basis": "observed",
+      { "key": "public-refused", "label": "Public HTTP unavailable from this PC", "status": "passed", "claim": "reachability", "basis": "observed",
         "about": { "kind": "access", "id": "app-dgs" } }
     ],
     "nextStep": "Ask Pi to reopen private access if the tunnel stops.",
@@ -505,12 +573,12 @@ The three checks land in two lanes via `check.about`: two in Access, one in Appl
     "role": "outcome",
     "status": "verified",
     "checks": [
-      { "label": "Web page and CRUD API answered", "status": "passed", "claim": "reachability", "basis": "observed",
+      { "key": "api-round-trip", "label": "Web page and CRUD API answered", "status": "passed", "claim": "reachability", "basis": "observed",
         "detail": "GET /api/items → 200, POST then GET round-tripped",
         "about": { "kind": "process", "id": "process-app" } },
-      { "label": "Data survived a container restart", "status": "passed", "claim": "contents", "basis": "observed",
+      { "key": "restart-persistence", "label": "Data survived a container restart", "status": "passed", "claim": "contents", "basis": "observed",
         "about": { "kind": "volume", "id": "volume-todo" } },
-      { "label": "Container healthy and recovered after reboot", "status": "passed", "claim": "liveness", "basis": "observed",
+      { "key": "reboot-recovery", "label": "Container healthy and recovered after reboot", "status": "passed", "claim": "liveness", "basis": "observed",
         "about": { "kind": "process", "id": "process-app" } }
     ],
     "content": {
@@ -525,7 +593,9 @@ The three checks land in two lanes via `check.about`: two in Access, one in Appl
 }
 ```
 
-**No `states`.** It is about four subjects and is the current state of none of them — which is the correction the review asked for. It appears in chat as a card, in Deployment as the headline and its three checks, in Overview's Recent work and three lane marks, and in History as an entry. It never answers "is the app running now"; the process records do.
+**No `states`.** It is about four subjects and is the current state of none of them. It appears in chat as a card, in Deployment as the headline and its three checks, in Overview's Recent work and three lane marks, and in History as an entry. It never answers "is the app running now"; the process records do.
+
+All three checks land in the **Application** lane: two through `process:process-app`, and `restart-persistence` through `volume:volume-todo`, which now maps to Application rather than Backups. Nothing was copied anywhere, so nothing should appear under Backups — that lane stays empty until a `backup-plan` exists, and Overview reads "Backups · Not assessed".
 
 ### 9.5 A declared absence
 
@@ -566,7 +636,7 @@ The three checks land in two lanes via `check.about`: two in Access, one in Appl
     "views": ["processes", "overview"],
     "role": "status",
     "status": "verified",
-    "checks": [{ "label": "GET / returned 200", "status": "passed", "claim": "reachability", "basis": "observed" }]
+    "checks": [{ "key": "http-root", "label": "GET / returned 200", "status": "passed", "claim": "reachability", "basis": "observed" }]
   }
 }
 ```
@@ -575,9 +645,86 @@ Processes now shows one row for `process-app` reading this record. Overview's Ch
 
 ---
 
+### 9.7 Proving the reads
+
+Six cases, each one a rule from sections 2 to 4 with the answer worked out. Times are the host's series; "now" moves down the table.
+
+The series for `host:hetzner-165600952`:
+
+| # | Written | Record | `states` | Carries |
+| --- | --- | --- | --- | --- |
+| 1 | Sep 12 15:48 | `rec-host-1` | present | facts `server-id`, `region`, `size`, `address`; check `ssh` |
+| 2 | Sep 13 09:12 | `rec-host-2` | present | check `ssh` only |
+| 3 | Sep 15 11:00 | `rec-host-4` | **absent** | nothing; "the server was destroyed" |
+| 4 | Sep 15 11:40 | `rec-host-5` | present | facts `server-id` (new), `address` (new); check `ssh` |
+
+**A · A later partial observation does not erase what it did not mention.** Read at Sep 13 10:00, after record 2:
+
+| Read | Answer | From |
+| --- | --- | --- |
+| `presence` | present | record 2 |
+| check `ssh` | passed, 48 min ago → **verified** | record 2 |
+| fact `region` | Helsinki | record 1, still the newest carrying `region` |
+| fact `size`, `address`, `server-id` | CX23 · 2 vCPU · 4 GB, 46.62.253.6, 165600952 | record 1 |
+
+Record 2 says only that SSH answered. Pi did not re-read the region and correctly did not re-assert it, and the location did not blink out of Architecture. Architecture's host tag is verified (the `reachability` check is 48 minutes old); CDN's "where it stands" is plain (the `configuration` facts are 18 hours old, inside seven days).
+
+**B · Retiring falls back; it does not edit.** Pi realises record 2's check ran against the wrong host and sets `retiredAt` on it. Nothing in record 2 changes — not a word of its title, checks or time. Read again at Sep 13 10:00:
+
+| Read | Answer | From |
+| --- | --- | --- |
+| check `ssh` | passed Sep 12 15:48, 18 h ago → **stale** | record 1, now the newest unretired record carrying `ssh` |
+| facts | unchanged | record 1 |
+
+Overview's Server lane loses its Sep 13 mark and grows its band of not-knowing back to Sep 12. History still shows record 2, marked withdrawn, because the reader is entitled to know Pi said it and took it back.
+
+**C · Assembly stops at a presence change.** Read at Sep 15 12:00, after records 3 and 4:
+
+| Read | Answer | Why |
+| --- | --- | --- |
+| `presence` | present | record 4 |
+| fact `address` | the new address | record 4 |
+| fact `server-id` | the new id | record 4 |
+| fact `region` | **unknown** | record 1 is on the far side of record 3's `absent` |
+| fact `size` | **unknown** | the same |
+
+The rebuilt machine does not inherit the dead one's region and size. Architecture draws the host with its new address and no size until Pi reads one; nothing claims Helsinki on the strength of a server that no longer exists. This is also why `identity` may safely never expire: a different machine is a new epoch, not an aged fact.
+
+**D · Lanes, on the deployment record (§9.4).** The record has no `states`, so every lane comes from `check.about`:
+
+| Check | `about` | `laneOf` | Lane |
+| --- | --- | --- | --- |
+| `api-round-trip` | `process:process-app` | process → application | Application |
+| `restart-persistence` | `volume:volume-todo` | volume → application | **Application** |
+| `reboot-recovery` | `process:process-app` | process → application | Application |
+
+Backups stays empty, and Overview reads "Backups · Not assessed". Under the previous mapping `restart-persistence` would have landed in Backups and put a green mark on a lane where nothing had ever been copied. `record.about` is never consulted, so its order cannot matter.
+
+**E · A port with no rule is unknown, not closed.** Only door 22 is on record.
+
+| When | Port 80 reads | Security draws |
+| --- | --- | --- |
+| after deployment, `doors.complete: false` | **unknown** | an unknown wall; the hole "the firewall has not been read back" |
+| after a firewall read returning only 22, `complete: true` | closed · "as the provider reports its rules" | a solid wall |
+| after a knock from outside is refused | closed · "a knock was refused" | a solid wall, cited to the knock |
+
+The deployment's own `public-refused` check (§9.3) is the third row: it is a `reachability` check about `access:app-dgs` that establishes the public address does not answer **from this PC**, which is what the reference's Domains window says and no more.
+
+**F · A check's tone, one hour after deployment.** All three checks are on an event record, read as of the record:
+
+| Check | Claim | Expiry | On Deployment | In Overview's Checks lane |
+| --- | --- | --- | --- | --- |
+| `api-round-trip` | reachability | 12 h | passed, plain | verified |
+| `restart-persistence` | contents | 3 d | passed, plain | verified |
+| `reboot-recovery` | liveness | 15 min | passed, plain | **stale** |
+
+Deployment does not grey a check that passed an hour ago, because the page is the record of an event. Overview's lane is a claim about the application now, so the liveness mark goes stale after fifteen minutes while the other two stand. The deployment card's own tag reads verified for twelve hours and stale after — `record.status` aged by the soonest claim it shows.
+
+---
+
 ## 10. The full contract, in one list
 
-`about[]` · `states {ref, presence}` · `Claim` on every check and fact · `Basis` on every check and fact · optional `freshFor` · `check.about` · `resolves` · contents: `topology`, `doors`, `schedule`, `backup-plan`, `backup-copy`, `restore-test`, `inventory`, `measurement`, plus today's `deployment` and `application-access`.
+`about[]` · `states {ref, presence}` · `key` on every check and fact · `Claim` and `Basis` on every check and fact · optional `freshFor` · `check.about` · `resolves` · contents: `topology`, `doors` (with `complete`), `schedule`, `backup-plan`, `backup-copy`, `restore-test`, `inventory`, `measurement`, plus today's `deployment` and `application-access`.
 
 ---
 
@@ -587,13 +734,14 @@ What the deployment we already have needs to run **its existing screens** — ch
 
 **In:**
 
-1. `about[]` and `states {ref, presence}`, with current-state reads as newest-per-subject. Append-only; nothing mutates.
-2. `claim` and `basis` on checks and facts, with the expiry table in the component layer and `stale` owned by the UI.
-3. `presence: "absent"` and the two empty states everywhere a design says "there is none".
-4. `topology` content with `from`, `loopback` edges, part states resolved from records, and `absent[]`.
-5. `check.about` and lane derivation (§4.1), retiring `check.subject`.
-6. `planned` as a state, so the pre-deployment screens draw.
-7. Actions: Navigate and Ask only.
+1. `about[]` and `states {ref, presence}`. Records are append-only in content; `retiredAt` stays the one write-once visibility flag.
+2. `key` on every check and fact, and key-by-key assembly within a presence epoch (§2.1, proofs A–C). This is what makes a partial observation safe to write.
+3. `claim` and `basis` on checks and facts, the expiry table in the component layer, `stale` owned by the UI, and the two readings — as of now for a record that `states`, as of the record for an event (§3.1, proof F).
+4. `presence: "absent"`, and the two empty states everywhere a design says "there is none".
+5. `topology` content with `from`, `loopback` edges, part states resolved from records, and `absent[]`.
+6. `check.about` and lane derivation (§4.1, proof D), retiring `check.subject`.
+7. `planned` as a state, so the pre-deployment screens draw.
+8. Actions: Navigate and Ask only.
 
 **Out of the first slice**, each when its destination is taken:
 
@@ -605,7 +753,9 @@ What the deployment we already have needs to run **its existing screens** — ch
 - `measurement`.
 - Any Execute action.
 
-The seven items in are the ones with no useful subset: without `states` there is no current state, without `claim` freshness is wrong for half the facts, and without `presence` the screens lie about absence. Everything else is additive and can land per destination.
+These eight have no useful subset. Without `states` there is no current state; without `key` a second observation silently erases the first; without `claim` freshness is wrong for half the facts; without `presence` the screens lie about absence. Everything else is additive and can land per destination.
+
+Three things the review raised are worth naming as deliberately deferred rather than solved: withdrawing a fact without replacing it, a per-check timestamp, and `doors.complete` — which matters for Security and arrives with it.
 
 ---
 
