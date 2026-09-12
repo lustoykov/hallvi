@@ -475,6 +475,7 @@ describe("GitHub access renewal", () => {
 
   it.each([
     "bad_refresh_token",
+    "incorrect_client_credentials",
     "expired_token",
     "invalid_grant",
     "access_denied",
