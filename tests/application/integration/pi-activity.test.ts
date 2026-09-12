@@ -284,6 +284,31 @@ it("records a decline as not run, whatever the runtime returned", () => {
   expect(record?.status).toBe("declined");
 });
 
+it("keeps a settled outcome when the end event arrives after it", () => {
+  store.startActivity({
+    applicationId: APPLICATION,
+    runId: "run-5",
+    sequence: 1,
+    id: "call-k",
+    tool: "bash",
+    args: { command: "echo no" },
+  });
+  // The executor refuses first; the runtime's end event follows and reports
+  // an ordinary result, which must not overwrite what we already know.
+  store.settleActivity(APPLICATION, "call-k", "declined");
+  store.endActivity({
+    applicationId: APPLICATION,
+    id: "call-k",
+    result: { declined: true },
+    isError: false,
+  });
+  const record = store
+    .listActivity(APPLICATION)
+    .find((item) => item.id === "call-k");
+  expect(record?.status).toBe("declined");
+  expect(record?.result).toContain("declined");
+});
+
 it("has nothing to say about an application Pi never worked on", () => {
   expect(store.listActivity("99999999-2222-4333-8444-555555555555")).toEqual(
     [],

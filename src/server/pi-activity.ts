@@ -241,7 +241,7 @@ export function endActivity(input: {
           : "succeeded"
         : record.status,
     truncated: record.truncated || result.truncated,
-    finishedAt: new Date().toISOString(),
+    finishedAt: record.finishedAt ?? new Date().toISOString(),
   });
 }
 
