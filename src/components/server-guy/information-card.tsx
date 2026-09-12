@@ -5,11 +5,10 @@
 // then where to look next. The card never invents certainty — every word in
 // the header comes from what Pi established and when.
 
-import { ArrowUpRight, CaretDown } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight } from "@phosphor-icons/react";
 
 import type { SavedInformation } from "@/server/operator-data";
-import { Markdown } from "./markdown";
+import { InformationBody } from "./information-body";
 import { LocalTime } from "./local-time";
 import {
   applicationSections,
@@ -17,8 +16,21 @@ import {
 } from "./application-sections";
 import { Tag, toneOf } from "./presentation";
 import "./information-card.css";
+import { InformationContent } from "./information-content";
 
-export function InformationCard({
+export function InformationCard(props: {
+  record: SavedInformation;
+  onOpen?: (view: ApplicationSection) => void;
+  currentView?: ApplicationSection;
+}) {
+  return props.record.presentation?.content ? (
+    <InformationContent {...props} />
+  ) : (
+    <GenericInformationCard {...props} />
+  );
+}
+
+function GenericInformationCard({
   record,
   onOpen,
   currentView,
@@ -30,23 +42,6 @@ export function InformationCard({
   currentView?: ApplicationSection;
 }) {
   const presentation = record.presentation;
-  const body = useRef<HTMLDivElement>(null);
-  const [long, setLong] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  // A record can be a sentence or six dense lines. Fold the long ones so a
-  // view full of cards stays scannable, and only offer the control when
-  // there is something folded away.
-  useEffect(() => {
-    const element = body.current;
-    // Only measurable while folded; unfolded, the answer stays as it was.
-    if (!element || open) return;
-    const timer = setTimeout(
-      () => setLong(element.scrollHeight - element.clientHeight > 4),
-      0,
-    );
-    return () => clearTimeout(timer);
-  }, [record.body, open]);
 
   if (!presentation) return null;
   const { tone, word } = toneOf(record);
@@ -73,24 +68,7 @@ export function InformationCard({
         </span>
       </header>
 
-      <div
-        className="sg-info-body"
-        ref={body}
-        data-folded={open ? undefined : ""}
-      >
-        <Markdown source={record.body} />
-      </div>
-      {long && (
-        <button
-          type="button"
-          className="sg-info-unfold"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-        >
-          <CaretDown weight="bold" aria-hidden="true" />
-          {open ? "Show less" : "Read the whole account"}
-        </button>
-      )}
+      <InformationBody source={record.body} />
 
       {presentation.checks.length > 0 && (
         <ul className="sg-info-checks">

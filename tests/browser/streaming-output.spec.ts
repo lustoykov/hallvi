@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ExecutionRecord } from "../../src/server/operator-execution";
 import { test, expect } from "./fixtures";
 
-test("server output streams inline, preserves reading position and stays readable on completion", async ({
+test("server output streams inline, preserves reading position and stays readable on completion @journey-streaming-output", async ({
   page,
   fixture,
 }) => {

@@ -1,0 +1,232 @@
+.sg-record {
+  margin: 20px 0;
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.sg-record-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sg-record-head > span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.sg-record h3 {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.sg-record-body {
+  max-width: 68ch;
+}
+.sg-record-body p {
+  margin: 0 0 12px;
+}
+.sg-record code {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sg-record a {
+  color: var(--link);
+  text-underline-offset: 3px;
+}
+.sg-record-access {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 20px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+}
+.sg-record-access > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+.sg-record-access > code {
+  flex: 1;
+}
+.sg-record-access svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.sg-record .sg-info-open {
+  min-height: 40px;
+  color: var(--surface, #fff);
+}
+.sg-record[data-context="overview"][data-kind="application-access"] h3 {
+  font-size: 24px;
+}
+.sg-record-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(
+      0,
+      1.3fr
+    );
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--context);
+  border-radius: 8px;
+}
+.sg-record-route div {
+  min-width: 0;
+}
+.sg-record-route strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.sg-record-route span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sg-record-route > svg {
+  color: var(--muted);
+}
+.sg-record-note {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 68ch;
+  margin: 12px 0 0;
+}
+.sg-record-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 28px;
+  margin: 24px 0;
+}
+.sg-record-facts > div {
+  min-width: 0;
+}
+.sg-record-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.sg-record-facts dd {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sg-record-changes h4 {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.sg-record-changes ul {
+  margin: 0;
+  padding-left: 20px;
+  max-width: 68ch;
+}
+.sg-record-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 28px;
+  margin: 22px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+.sg-record-checks li {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  min-width: 0;
+}
+.sg-record-checks svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  align-self: flex-start;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.sg-record-checks [data-status="passed"] svg {
+  color: var(--verified-text);
+}
+.sg-record-checks [data-status="failed"] svg {
+  color: var(--failed);
+}
+.sg-record-next {
+  margin: 20px 0 12px;
+  max-width: 68ch;
+  color: var(--ink-2);
+}
+.sg-record-evidence,
+.sg-record-details {
+  margin-top: 16px;
+}
+.sg-record summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--link);
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+.sg-record-evidence ul {
+  padding-left: 18px;
+}
+.sg-record[data-context="chat"] {
+  padding: 16px 20px;
+}
+.sg-record[data-context="chat"] h3 {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+.sg-record[data-context="chat"] .sg-record-access {
+  padding: 12px 0 0;
+  margin-top: 12px;
+}
+.sg-record :focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+.sg-record ::selection {
+  background: var(--selected-bg);
+  color: var(--selected-text);
+}
+@media (max-width: 600px) {
+  .sg-record {
+    padding: 20px;
+  }
+  .sg-record[data-context="overview"][data-kind="application-access"] h3 {
+    font-size: 24px;
+  }
+  .sg-record-facts,
+  .sg-record-checks {
+    grid-template-columns: 1fr;
+  }
+  .sg-record-access > code {
+    flex-basis: 100%;
+  }
+  .sg-record-route {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .sg-record-route > svg {
+    transform: rotate(90deg);
+  }
+}

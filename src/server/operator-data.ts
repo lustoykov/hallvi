@@ -20,6 +20,24 @@ export type MessageBlock =
   | { type: "text"; text: string }
   | { type: "saved-information"; id: string }
   | { type: "execution"; id: string };
+export const informationContentSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("deployment"),
+    repositoryUrl: z.url().regex(/^https:\/\//),
+    revision: z.string().regex(/^[0-9a-f]{7,64}$/),
+    image: z.string().min(1).max(300),
+    server: z.string().min(1).max(200),
+    changes: z.array(z.string().min(1).max(500)).max(10).default([]),
+  }),
+  z.strictObject({
+    kind: z.literal("application-access"),
+    mode: z.enum(["private", "public"]),
+    server: z.string().min(1).max(200),
+    localPort: z.number().int().min(1024).max(65535).optional(),
+    remotePort: z.number().int().min(1).max(65535).optional(),
+  }),
+]);
+export type InformationContent = z.infer<typeof informationContentSchema>;
 export const informationInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   body: z.string().max(10000),
@@ -71,10 +89,43 @@ export const informationInputSchema = z.object({
         )
         .default([]),
       nextStep: z.string().optional(),
+      content: informationContentSchema.optional(),
       url: z
         .url()
         .regex(/^https?:\/\//)
         .optional(),
+    })
+    .superRefine((value, context) => {
+      const content = value.content;
+      if (content?.kind !== "application-access") return;
+      if (!value.url)
+        context.addIssue({
+          code: "custom",
+          path: ["url"],
+          message: "Application access requires its browser URL.",
+        });
+      if (content.mode === "private") {
+        if (!content.localPort || !content.remotePort)
+          context.addIssue({
+            code: "custom",
+            path: ["content"],
+            message: "Private SSH access requires localPort and remotePort.",
+          });
+        if (value.url && URL.canParse(value.url)) {
+          const url = new URL(value.url);
+          if (
+            url.hostname !== "127.0.0.1" ||
+            Number(url.port || (url.protocol === "https:" ? 443 : 80)) !==
+              content.localPort
+          )
+            context.addIssue({
+              code: "custom",
+              path: ["url"],
+              message:
+                "Private access URL must use 127.0.0.1 and the declared localPort.",
+            });
+        }
+      }
     })
     .nullable()
     .default(null),

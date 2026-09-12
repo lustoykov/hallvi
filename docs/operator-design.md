@@ -319,6 +319,14 @@ Native Pi JSONL holds full model/tool context. Executor-owned files automaticall
 
 Messages support a small product-owned block vocabulary, not arbitrary generated UI. A saved-information reference renders the same card in chat and its selected sidebar views. Pi chooses the content; components provide consistent badges, checks, links and expansion. A deployment outcome has a structured URL and evidence. Empty views never infer that a recorded host means a verified deployment.
 
+### Typed deployment and access presentation
+
+The optional `presentation.content` JSON field selects a product-owned component. `deployment` carries `repositoryUrl`, `revision`, `image`, `server` and `changes`: the source revision and running image are separate, and material changes made while deploying remain explicit. `application-access` carries `mode` (`private` or `public`) and `server`, with the browser URL in `presentation.url`. Private SSH access also requires `localPort` and `remotePort`; the writer validates that the URL uses `127.0.0.1` and matches the local port. These fields use the existing saved-information table, without another storage model.
+
+Pi receives the content contract in its instructions and `save_information` description; the shared Zod schema rejects invalid writes. Chat stores references to these same records and shows compact details. Overview emphasizes opening the application; Deployment expands its source, image, changes and checks. Unrecognized content kinds are rejected; records without typed content retain the generic presentation. Components own layout and styling, and never derive a verified status from the content kind.
+
+Keep deployment results as separate historical events. Update the current application-access record in place when its URL or access mode changes. Reformatting existing records preserves their original establishment times and evidence; it is a presentation preview, not proof that a fresh Pi journey writes the new contract successfully.
+
 Ordinary knowledge can update in place. Historical outcomes remain separate records for separate events; no universal superseding/version-history mechanism. Controller-managed secrets are named and application-scoped; database records hold references. Secret-generation and injection tools arrive with the deployment need.
 
 Delete decisions, observations, activity events, deployment/operation records and chat-summary storage as their callers are replaced. Detailed vertical design and hardening follow the working deployment journey.

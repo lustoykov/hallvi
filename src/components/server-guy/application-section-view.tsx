@@ -135,6 +135,16 @@ export function ApplicationSectionView({
       .sort(
         (a, b) =>
           rank(a) - rank(b) ||
+          (a.presentation?.content?.kind === "application-access"
+            ? 0
+            : a.presentation?.content?.kind === "deployment"
+              ? 1
+              : 2) -
+            (b.presentation?.content?.kind === "application-access"
+              ? 0
+              : b.presentation?.content?.kind === "deployment"
+                ? 1
+                : 2) ||
           Date.parse(b.establishedAt ?? b.updatedAt) -
             Date.parse(a.establishedAt ?? a.updatedAt),
       );
