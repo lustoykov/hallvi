@@ -774,7 +774,9 @@ export function OperatorShell({
             open={terminal.open}
             expanded={terminal.expanded}
             minimized={terminal.minimized}
-            piBusy={runs.some((item) => item.status === "running")}
+            piBusy={runs.some((item) =>
+              ["queued", "running"].includes(item.status),
+            )}
             onClose={() =>
               setTerminal({ open: false, expanded: false, minimized: false })
             }
