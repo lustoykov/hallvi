@@ -123,6 +123,12 @@ function layoutFor(model: ArchitectureModel): Layout {
     tls: { x: 222, y: 315, w: 80, h: 17 },
   };
   if (service) rects[service.id] = BOX.svc;
+  // A monitor Pi recorded takes the place the placeholder would have had, so
+  // "something is watching this" is visible rather than merely not-missing.
+  const monitor = model.parts.find(
+    (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
+  );
+  if (monitor) rects[monitor.id] = BOX.watch;
   if (appVolume) rects[appVolume.id] = BOX.appVol;
   if (serviceVolume) rects[serviceVolume.id] = BOX.svcVol;
 
@@ -932,7 +938,10 @@ export function JourneyDirection({
             className="axj2-wire-ssh"
             d="M110 336V368Q110 382 124 382H204"
           />
-          {ghostPart && <path d="M878 132H924" className="axj2-wire-ghost" />}
+          {(ghostPart ||
+            model.parts.some(
+              (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
+            )) && <path d="M878 132H924" className="axj2-wire-ghost" />}
           {!planned &&
             layout.legs[journey].flat().map((d) => (
               <g
@@ -1038,6 +1047,11 @@ export function JourneyDirection({
             "app",
             service?.id,
             ...volumes.map((volume) => volume.id),
+            ...model.parts
+              .filter(
+                (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
+              )
+              .map((part) => part.id),
             "offsite",
           ].filter(Boolean) as string[]
         ).map((id, index) =>
