@@ -29,6 +29,7 @@ import {
   saveDeploymentInputs,
   collectDeploymentLogs,
 } from "@/server/deployment-executor";
+import { acceptUnknownCommand } from "@/server/command-checks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -194,8 +195,14 @@ export function POST(request: Request, context: Context) {
       cancelDeployment(record);
       return { deployment: null };
     } else if (input.action === "retry") {
-      retryInitialDeployment(record, {
+      // The owner's Retry is the decision that may accept a held command's
+      // unknown outcome; a continuation Pi prepares is not.
+      const retried = retryInitialDeployment(record, {
         verificationObjectId: input.verificationObjectId,
+      });
+      acceptUnknownCommand(record, {
+        title: "Retry the deployment",
+        operationId: retried.id,
       });
     } else {
       if (record.status !== "live")

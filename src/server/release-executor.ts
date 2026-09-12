@@ -14,6 +14,7 @@ import { establishedRuntime } from "./deployment-runtime";
 import { deploymentEvent, saveDeployment } from "./deployment-store";
 import { recordOperationRemoteEffect } from "./application-operations";
 import { verifyRuntime } from "./deployment-executor";
+import type { VerificationResume } from "./command-checks";
 import { composeProject, currentFacts, releaseFacts } from "./release-facts";
 import {
   DATABASE_PASSWORD,
@@ -295,19 +296,28 @@ export async function executeRelease(
   return verifyRelease(record, release, signal);
 }
 
-/** Verify an existing replacement without building or restarting containers. */
+/**
+ * Verify an existing replacement without building or restarting containers.
+ * A reconciliation passes what the reconciled attempt already established.
+ */
 export async function verifyRelease(
   record: DeploymentRecord,
   release: DeploymentRelease,
   signal: AbortSignal,
+  resume?: VerificationResume,
 ) {
   const secrets = releaseSecrets(record);
   let established = false;
   let behavior: "passed" | "unverified";
   try {
-    behavior = await verifyRuntime(record, signal, () => {
-      established = true;
-    });
+    behavior = await verifyRuntime(
+      record,
+      signal,
+      () => {
+        established = true;
+      },
+      resume,
+    );
   } catch (error) {
     const detail = secrets.redact(
       error instanceof Error ? error.message : "Release verification failed.",

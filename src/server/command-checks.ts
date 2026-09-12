@@ -47,7 +47,7 @@ export function releaseCheckTarget(
 /** What the deployment retains while a command's outcome is unknown. */
 export interface PendingCommand {
   attemptId: string;
-  /** The operation whose attempt ran it; a retry is another operation. */
+  /** The operation whose attempt ran it. */
   operationId: string;
   name: string;
   service: string;
@@ -55,6 +55,43 @@ export interface PendingCommand {
   results: string;
   startedAt: string;
   timeoutSeconds: number;
+  /**
+   * The owner's decision, made through a card after this hold, that the
+   * command may run again should the host's record of it be lost.
+   */
+  acceptedAt?: string;
+  acceptedBy?: string;
+}
+
+/**
+ * The owner's decision that a held command may run again if its host record
+ * is lost: a Retry, or an approval whose text names the unknown. A
+ * continuation Pi creates under existing authority is not such a decision.
+ * Nothing runs before reconciliation reads the host's record, and a command
+ * still running holds regardless of any decision.
+ */
+export function acceptUnknownCommand(
+  record: DeploymentRecord,
+  decision: { title: string; operationId: string },
+) {
+  const pending = record.commandPending;
+  if (!pending || pending.acceptedAt) return;
+  pending.acceptedAt = new Date().toISOString();
+  pending.acceptedBy = decision.operationId;
+  deploymentEvent(
+    record,
+    `The owner's decision to continue (${decision.title}) accepts the unknown outcome of command check ${pending.name} (attempt ${pending.attemptId}): it may run again if the host's record shows it never completed.`,
+  );
+  saveDeployment(record);
+}
+
+/**
+ * What an earlier attempt already established, so a reconciled verification
+ * consumes its receipts instead of running the checks again.
+ */
+export interface VerificationResume {
+  /** Passed results of the reconciled attempt, and the resolved command. */
+  completed: CheckResult[];
 }
 
 /** Keep a check's result with the attempt it verifies. */
@@ -253,12 +290,28 @@ export async function runCommandCheck(
 export async function verifyCommandChecks(
   record: DeploymentRecord,
   signal: AbortSignal,
+  resume?: VerificationResume,
 ) {
   if (record.commandPending)
     throw new Error(
       `Command check ${record.commandPending.name} from an earlier attempt has an unknown outcome. Reconcile it before running checks again.`,
     );
   for (const check of currentFacts(record)?.criterion?.commands ?? []) {
+    // A command the reconciled attempt completed is its receipt, not a run.
+    const carried = resume?.completed.find(
+      (item) =>
+        item.kind === "command" && item.name === check.name && item.passed,
+    );
+    if (carried) {
+      const attempt = record.lifecycle?.attempts.at(-1);
+      if (!attempt?.checks?.some((item) => item.name === check.name))
+        recordCheck(record, carried);
+      deploymentEvent(
+        record,
+        `Carried command check ${check.name} from the reconciled attempt; it did not run again.`,
+      );
+      continue;
+    }
     const result = await runCommandCheck(record, check, signal);
     recordCheck(record, result);
     if (!result.passed)

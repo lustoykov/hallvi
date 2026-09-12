@@ -838,3 +838,125 @@ it("a further correction continues the latest failed release, keeping its approv
   });
   expect(startChange(next.id, next.updatedAt).state).toBe("working");
 });
+
+it("a continuation Pi prepares keeps a held command's hold; only the owner's Retry accepts a lost record, and a running command holds regardless", async () => {
+  const record = await approved();
+  // The first attempt replaces the containers, then loses the reply of a
+  // mutating command check during verification, and the agent stops.
+  model.execute.mockImplementation(async (r, release) => {
+    invalidateDeploymentRuntime(r);
+    adopt(r, release);
+    const attempt = r.lifecycle!.attempts.at(-1)!;
+    const at = new Date().toISOString();
+    attempt.remoteStartedAt ??= at;
+    attempt.remoteResult = { phase: "replace", exitCode: 0, at };
+    r.commandPending = {
+      attemptId: attempt.id,
+      operationId: attempt.operationId,
+      name: "Create the marked page",
+      service: "app",
+      token: "3f0c8a2e-5b7d-4e9f-8a1b-2c3d4e5f6a7b",
+      results: `/opt/server-guy/${r.id}/releases/${attempt.id}/checks`,
+      startedAt: at,
+      timeoutSeconds: 60,
+    };
+    saveDeployment(r);
+    throw new ReleaseExecutionError(
+      "Application command check failed: Create the marked page (outcome unknown)",
+      false,
+      "verification",
+      true,
+    );
+  });
+  model.plan.mockImplementationOnce(async () => {
+    throw new Error("The agent stopped without a completed release.");
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("stopped");
+  const held = getDeployment(record.id)!;
+  held.status = "failed";
+  held.error = "The agent stopped without a completed release.";
+  saveDeployment(held);
+  const attempt = held.lifecycle!.attempts.at(-1)!;
+  expect(held.commandPending).toMatchObject({ attemptId: attempt.id });
+  const hostRecord = "started";
+  model.ssh.mockImplementation(async (r: DeploymentRecord, script: string) => {
+    if (script.includes("/result.json"))
+      return JSON.stringify({
+        attemptId: attempt.id,
+        releaseId: attempt.releaseId,
+        revision: r.revision,
+        phase: "replace",
+        exitCode: 0,
+      });
+    const marker = /printf '\\n(SG_CHECK_RECORD_[0-9a-f]+)%s/.exec(script)![1];
+    return `PAGE_CREATED\n${marker}${hostRecord}\n`;
+  });
+  const executions = model.execute.mock.calls.length;
+  // Pi continues the deployment from a conversation under its authority.
+  // That is not the owner's decision: the hold stays and nothing runs.
+  const continued = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Correct the check's path.",
+  );
+  expect(claimOperation(continued.id)?.executorPid).toBe(process.pid);
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("still running");
+  const afterPi = getDeployment(record.id)!;
+  expect(afterPi.commandPending).toMatchObject({
+    name: "Create the marked page",
+  });
+  expect(afterPi.commandPending!.acceptedAt).toBeUndefined();
+  expect(model.execute.mock.calls.length).toBe(executions);
+  expect(
+    afterPi.events.some((e) => e.message.includes("accepts the unknown")),
+  ).toBe(false);
+  afterPi.status = "failed";
+  saveDeployment(afterPi);
+  // The owner's Retry through the deployment card records the decision,
+  // but the host's record still says the command is running: held.
+  await post({ action: "retry", deploymentId: record.id });
+  expect(getDeployment(record.id)!.commandPending!.acceptedAt).toBeTruthy();
+  const ownerRetry = operation(getDeployment(record.id)!.operationId!)!;
+  expect(claimOperation(ownerRetry.id)?.executorPid).toBe(process.pid);
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).rejects.toThrow("still running");
+  expect(model.execute.mock.calls.length).toBe(executions);
+  // The limit passes with no result recorded: the record is lost, and the
+  // owner's decision lets the command run again, once.
+  const stale = getDeployment(record.id)!;
+  stale.commandPending!.startedAt = new Date(
+    Date.now() - 600_000,
+  ).toISOString();
+  stale.status = "failed";
+  saveDeployment(stale);
+  await post({ action: "retry", deploymentId: record.id });
+  const again = operation(getDeployment(record.id)!.operationId!)!;
+  expect(claimOperation(again.id)?.executorPid).toBe(process.pid);
+  const image = `sha256:${"d".repeat(64)}`;
+  model.prepare.mockImplementation(async ({ deploymentId }) =>
+    native(deploymentId, () => {}),
+  );
+  model.execute.mockImplementation(verified(image));
+  model.plan.mockImplementation(async (_files, _r, _signal, options) => {
+    expect(options.context).toContain("accepted that it may run again");
+    expect(await options.apply(selection, [])).toMatchObject({ ok: true });
+  });
+  await expect(
+    runInitialRelease(getDeployment(record.id)!, new AbortController().signal),
+  ).resolves.toBe("Verified the first deployment");
+  const live = getDeployment(record.id)!;
+  expect(live.status).toBe("live");
+  expect(live.commandPending).toBeNull();
+  expect(model.execute.mock.calls.length).toBe(executions + 1);
+  expect(
+    live.events.filter((e) =>
+      e.message.includes("accepted that it may run again"),
+    ),
+  ).toHaveLength(1);
+});

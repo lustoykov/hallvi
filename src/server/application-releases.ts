@@ -206,24 +206,6 @@ export async function proposeApplicationRelease(
   );
 }
 
-/**
- * The owner's explicit retry, or a new approval, is the decision that a
- * command whose host record was lost may run again; the record says so.
- */
-function acceptUnknownCommand(
-  record: DeploymentRecord,
-  tracked: StoredOperation,
-) {
-  const pending = record.commandPending;
-  if (!pending || pending.operationId === tracked.id) return;
-  deploymentEvent(
-    record,
-    `The owner's decision to continue (${tracked.title}) accepts the unknown outcome of command check ${pending.name} (attempt ${pending.attemptId}): it may run again.`,
-  );
-  record.commandPending = null;
-  saveDeployment(record);
-}
-
 function assertOwned(
   record: DeploymentRecord,
   tracked: StoredOperation,
@@ -265,12 +247,12 @@ function assertOwned(
       "Reconcile the previous verification object's outcome before another release.",
     );
   // A command whose outcome the host never reported may have changed data.
-  // Under the operation that ran it only the host's record resolves it.
-  if (record.commandPending?.operationId === tracked.id)
+  // The hold belongs to the deployment, whatever operation runs next: only
+  // the host's record, read by reconciliation, resolves it.
+  if (record.commandPending)
     throw new ReleaseScopeError(
       `Command check ${record.commandPending.name} from attempt ${record.commandPending.attemptId} has an unknown outcome. Call reconcile_release: it runs again only once the host's record resolves it.`,
     );
-  acceptUnknownCommand(record, tracked);
   const attempts = record.lifecycle!.attempts.filter(
     (a) =>
       a.authorizationId === scope.id &&
@@ -552,6 +534,20 @@ export async function runApplicationRelease(
     scope.initial && record.correction
       ? `\nCorrection requested from the owner's conversation at ${record.correction.at}: ${record.correction.instructions.slice(0, 3000)}`
       : "";
+  // A held command is read from the host's record before anything runs,
+  // whichever operation continues: a known result is consumed, a lost one
+  // proceeds only with the owner's recorded decision, a running one holds.
+  let earlier: string | null = null;
+  if (record.commandPending) {
+    const result = await reconcileRelease(
+      record,
+      { id: scope.id, operationId: tracked.id },
+      signal,
+    );
+    if (result.completed) return { evidence: result.message };
+    if (!result.retryable) throw new ReleaseScopeError(result.message);
+    earlier = result.message;
+  }
   try {
     const evidence = await releaseLoop({
       record,
@@ -561,6 +557,7 @@ export async function runApplicationRelease(
       current,
       token,
       signal,
+      earlier,
       task: `Approved task: ${requirements}${correction}\nRelease scope: ${JSON.stringify(scope)}\nUse the existing host and private inputs. Inspect source changes for migrations; do not run destructive migrations under this scope. If data compatibility cannot be established, explain the blocker. You may correct ordinary configuration and retry within this scope; there is no per-attempt approval.`,
     });
     return { evidence };
@@ -643,14 +640,9 @@ export async function runInitialRelease(
       signal,
     );
     if (result.completed) return result.message;
-    if (!result.retryable) {
-      // A lost record under the operation that ran it stays blocked; the
-      // owner's retry is the decision that the command may run again.
-      const pending = record.commandPending;
-      if (!pending || pending.operationId === tracked.id)
-        throw new ReleaseScopeError(result.message);
-      acceptUnknownCommand(record, tracked);
-    }
+    // A hold the host's record cannot resolve stays, whichever operation
+    // continues; the owner's decision is read by reconciliation itself.
+    if (!result.retryable) throw new ReleaseScopeError(result.message);
     resume = result.message;
   }
   return releaseLoop({

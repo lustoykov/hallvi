@@ -1221,11 +1221,18 @@ it("a held check that the host recorded as failed returns to Pi for correction, 
   });
   const failed = operation(started.id)!;
   expect(failed.blocksQueue).toBe(true);
-  // The owner's explicit retry is the decision: the host's record is read
-  // first, and only a record that is lost lets the command run again.
+  // The owner's Retry through the card is the decision, recorded on the
+  // hold as the route records it: the host's record is still read first,
+  // and only a record that is lost lets the command run again.
   const { retryOperation } =
     await import("../../../src/server/operation-store");
+  const { acceptUnknownCommand } =
+    await import("../../../src/server/command-checks");
   const retried = retryOperation(failed.id, failed.updatedAt);
+  acceptUnknownCommand(applicationDeployment(app)!, {
+    title: "retry: Release",
+    operationId: retried.id,
+  });
   model.execute.mockImplementation(replaced());
   model.plan.mockImplementation(async (_files, _r, _signal, options) => {
     expect(await options.apply(selection(), [])).toMatchObject({ ok: true });

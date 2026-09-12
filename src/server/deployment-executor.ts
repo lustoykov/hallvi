@@ -29,6 +29,7 @@ import {
   saveDeployment,
 } from "./deployment-store";
 import type { DeploymentRecord } from "./deployment-types";
+import type { VerificationResume } from "./command-checks";
 import { redactSecrets } from "./secrets";
 
 export function saveDeploymentInputs(
@@ -517,6 +518,7 @@ export async function collectDeploymentLogs(
 export async function verifyDeployment(
   record: DeploymentRecord,
   signal: AbortSignal,
+  resume?: VerificationResume,
 ) {
   const facts = currentFacts(record);
   const criterion = facts?.criterion;
@@ -639,6 +641,32 @@ export async function verifyDeployment(
         record.verificationPending +
         " before repeating verification.",
     );
+  // HTTP checks the reconciled attempt recorded passed are its receipts: a
+  // create among them already made and removed its object, so none rerun.
+  const carried =
+    resume &&
+    criterion.checks.length > 0 &&
+    criterion.checks.every((check) =>
+      resume.completed.some(
+        (item) =>
+          item.kind === "http" && item.name === check.name && item.passed,
+      ),
+    );
+  if (carried) {
+    const { recordCheck } = await import("./command-checks");
+    for (const check of criterion.checks)
+      recordCheck(
+        record,
+        resume.completed.find(
+          (item) => item.kind === "http" && item.name === check.name,
+        )!,
+      );
+    deploymentEvent(
+      record,
+      `Carried ${criterion.checks.length} HTTP check results from the reconciled attempt; none ran again.`,
+    );
+    return;
+  }
   let captured = "";
   const marker = `sg-check-${randomBytes(6).toString("hex")}`;
   try {
@@ -1059,13 +1087,14 @@ export async function verifyRuntime(
   record: DeploymentRecord,
   signal: AbortSignal,
   established?: () => void,
+  resume?: VerificationResume,
 ) {
   await verifyServiceImages(record, signal);
   established?.();
-  await verifyDeployment(record, signal);
+  await verifyDeployment(record, signal, resume);
   await verifyPrivateServices(record, signal);
   const { verifyCommandChecks } = await import("./command-checks");
-  await verifyCommandChecks(record, signal);
+  await verifyCommandChecks(record, signal, resume);
   await collectDeploymentLogs(record, signal);
   return currentFacts(record)?.criterion
     ? ("passed" as const)

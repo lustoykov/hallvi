@@ -362,16 +362,72 @@ it("cleans up the captured test object when a later read assertion fails", async
     fetcher.mock.calls.filter((args) => args[1].method === "DELETE"),
   ).toHaveLength(1);
 });
+it("carries the reconciled attempt's HTTP receipts instead of running the checks again", async () => {
+  const value = record();
+  value.address = "203.0.113.10";
+  withChecks(value, [
+    {
+      name: "Create",
+      method: "POST",
+      path: "/todos",
+      body: { title: "SG_VERIFY_TOKEN" },
+      expectedStatus: 201,
+      contains: "SG_VERIFY_TOKEN",
+      captureId: "id",
+    },
+    {
+      name: "Delete",
+      method: "DELETE",
+      path: "/todos/{id}",
+      body: null,
+      expectedStatus: 204,
+      contains: "",
+      captureId: null,
+    },
+  ]);
+  const fetcher = vi.fn(async (url: URL, init: RequestInit = {}) => {
+    if (url.pathname === "/health") return new Response("ok");
+    throw new Error(`unexpected ${init.method ?? "GET"} ${url.pathname}`);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const at = "2026-09-12T08:00:00Z";
+  // The reconcile attempt the carried receipts are recorded on.
+  value.lifecycle = {
+    attempts: [{ id: "reconcile-1", outcome: "working" }],
+  } as unknown as DeploymentRecord["lifecycle"];
+  const receipts = ["Create", "Delete"].map((name) => ({
+    name,
+    kind: "http" as const,
+    target: name === "Create" ? "POST /todos" : "DELETE /todos/{id}",
+    at,
+    durationMs: 5,
+    passed: true,
+    status: name === "Create" ? 201 : 204,
+  }));
+  await verifyDeployment(value, new AbortController().signal, {
+    completed: receipts,
+  });
+  // Readiness was checked; no create or delete was sent again.
+  expect(fetcher.mock.calls.map((call) => call[0].pathname)).toEqual([
+    "/health",
+  ]);
+  expect(value.lifecycle?.attempts.at(-1)?.checks?.map((c) => c.name)).toEqual([
+    "Create",
+    "Delete",
+  ]);
+  expect(value.verificationPending).toBeFalsy();
+});
 it("reports a redirecting health path with its status and target instead of waiting", async () => {
   const value = record();
   value.address = "203.0.113.10";
-  const fetcher = vi.fn(
-    async (_url: URL, _init: RequestInit = {}) =>
-      new Response(null, {
-        status: 302,
-        headers: { location: "/accounts/login/" },
-      }),
-  );
+  const fetcher = vi.fn(async (url: URL, init: RequestInit = {}) => {
+    void url;
+    void init;
+    return new Response(null, {
+      status: 302,
+      headers: { location: "/accounts/login/" },
+    });
+  });
   vi.stubGlobal("fetch", fetcher);
   await expect(
     verifyDeployment(value, new AbortController().signal),

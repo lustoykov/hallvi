@@ -26,10 +26,57 @@ vi.mock("../../../src/server/release-executor", () => ({
     values: { ADMIN_PASSWORD: "pa ss$word" },
     redact: (text: string) => text.replaceAll("pa ss$word", "[REDACTED]"),
   }),
+  // Verification's command phase, with what the reconciled attempt carried.
+  verifyRelease: async (
+    record: DeploymentRecord,
+    _release: unknown,
+    signal: AbortSignal,
+    resume?: unknown,
+  ) => {
+    const { verifyCommandChecks } =
+      await import("../../../src/server/command-checks");
+    await verifyCommandChecks(record, signal, resume as never);
+    return { behavior: "passed", evidence: "Verified after the record" };
+  },
 }));
 vi.mock("../../../src/server/deployment-store", () => ({
   deploymentEvent: vi.fn(),
   saveDeployment: vi.fn(),
+  DeploymentConflictError: class extends Error {},
+  runDeploymentAttempt: async (
+    record: DeploymentRecord,
+    kind: string,
+    operationId: string,
+    work: () => Promise<unknown>,
+    release: { id: string },
+  ) => {
+    const attempt = {
+      id: "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d",
+      kind,
+      operationId,
+      outcome: "working",
+      releaseId: release.id,
+      checks: [] as unknown[],
+    };
+    record.lifecycle!.attempts.push(attempt as never);
+    try {
+      const result = await work();
+      attempt.outcome = "verified";
+      return result;
+    } catch (error) {
+      attempt.outcome = "failed";
+      throw error;
+    }
+  },
+}));
+vi.mock("../../../src/server/deployment-lifecycle", () => ({
+  invalidateDeploymentRuntime: vi.fn(),
+}));
+vi.mock("../../../src/server/application-operations", () => ({
+  recordOperationRemoteEffect: vi.fn(),
+}));
+vi.mock("../../../src/server/deployment-release", () => ({
+  releaseOf: (record: DeploymentRecord) => record.lifecycle!.releases[0],
 }));
 vi.mock("../../../src/server/release-facts", async (original) => ({
   ...(await original<typeof import("../../../src/server/release-facts")>()),
@@ -41,18 +88,27 @@ import {
   verifyCommandChecks,
   type CheckTarget,
 } from "../../../src/server/command-checks";
+import { reconcileRelease } from "../../../src/server/release-reconciliation";
 
 let root: string;
 let mutations: string;
 let target: CheckTarget;
 const attemptId = "5d1e0d2e-2c4a-4c8e-9f7b-3a1c2b4d5e6f";
+const deploymentId = "0b38e71d-b054-412c-87dd-5c87fae80d08";
 const record = () =>
   ({
-    id: "0b38e71d-b054-412c-87dd-5c87fae80d08",
+    id: deploymentId,
     lifecycle: {
       attempts: [{ id: attemptId, operationId: "op-1", outcome: "working" }],
     },
   }) as unknown as DeploymentRecord;
+const checkB = {
+  name: "Run check B",
+  service: "app",
+  run: ["sh", "check-b.sh"],
+  contains: "B_DONE",
+  timeoutSeconds: 4,
+};
 const check = {
   name: "Create the marked page",
   service: "app",
@@ -67,6 +123,9 @@ const stub = `#!/bin/sh
 case "$*" in
   *"command -v timeout"*) exit "\${SG_STUB_NO_TIMEOUT:-0}" ;;
 esac
+case "$*" in
+  *"check-b"*) printf 'check B\\n' >> "$SG_STUB_LOG"; echo "B_DONE"; exit 0 ;;
+esac
 [ -n "$ADMIN_PASSWORD" ] || { echo "no input"; exit 2; }
 sleep "\${SG_STUB_SLEEP:-0}"
 case "$*" in
@@ -80,15 +139,19 @@ function shell(environment: Record<string, string>, drop = false) {
   mocks.ssh.mockImplementationOnce(
     (_record, script: string, options: { input?: string }) =>
       new Promise<string>((resolvePromise, reject) => {
-        const child = spawn("sh", ["-c", script], {
-          env: {
-            ...process.env,
-            ...environment,
-            PATH: `${join(root, "bin")}:${resolve("tests/rig/bin")}:${process.env.PATH}`,
-            SG_STUB_LOG: mutations,
+        const child = spawn(
+          "sh",
+          ["-c", script.replaceAll(`/opt/server-guy/${deploymentId}`, root)],
+          {
+            env: {
+              ...process.env,
+              ...environment,
+              PATH: `${join(root, "bin")}:${resolve("tests/rig/bin")}:${process.env.PATH}`,
+              SG_STUB_LOG: mutations,
+            },
+            stdio: "pipe",
           },
-          stdio: "pipe",
-        });
+        );
         let output = "";
         child.stdout!.on("data", (chunk) => (output += chunk));
         child.stdin!.end(options.input);
@@ -198,3 +261,85 @@ it("without a timeout command in the container, an expired limit is an unknown o
     await resolvePendingCommand(deployment, new AbortController().signal),
   ).toEqual({ kind: "lost" });
 }, 20_000);
+
+it("reconciliation resumes verification from the attempt's receipts: one mutation after recovery, not two", async () => {
+  // Two commands: the mutating one loses its reply; the second never ran.
+  mocks.commands.splice(0, Infinity, check, checkB);
+  const releaseId = "a".repeat(64);
+  const revision = "b".repeat(40);
+  const at = new Date().toISOString();
+  const deployment = {
+    id: deploymentId,
+    revision,
+    lifecycle: {
+      attempts: [
+        {
+          id: attemptId,
+          kind: "deploy",
+          operationId: "op-1",
+          outcome: "working",
+          releaseId,
+          remoteStartedAt: at,
+          remoteResult: { phase: "replace", exitCode: 0, at },
+          // The attempt's HTTP check already passed before the command ran.
+          checks: [
+            {
+              name: "Home",
+              kind: "http",
+              target: "GET /",
+              at,
+              durationMs: 3,
+              passed: true,
+              status: 200,
+            },
+          ],
+        },
+      ],
+      releases: [{ id: releaseId, revision }],
+      reconciliations: [],
+    },
+  } as unknown as DeploymentRecord;
+  const calls = mocks.ssh.mock.calls.length;
+  shell({ SG_STUB_SLEEP: "2" }, true);
+  const lost = await runCommandCheck(deployment, check, signal(), target);
+  expect(lost.status).toBeNull();
+  deployment.lifecycle!.attempts[0].outcome = "failed";
+  expect(deployment.commandPending).toMatchObject({ name: check.name });
+  await wait(2500);
+  // Reconciliation under a later operation: the host's receipt of the
+  // replacement, the host's record of the command, then only check B runs.
+  mocks.ssh.mockImplementationOnce(async () =>
+    JSON.stringify({
+      attemptId,
+      releaseId,
+      revision,
+      phase: "replace",
+      exitCode: 0,
+    }),
+  );
+  shell({});
+  shell({});
+  const result = await reconcileRelease(
+    deployment,
+    { id: "authorization-2", operationId: "op-2" },
+    signal(),
+  );
+  expect(result).toMatchObject({ ok: true, completed: true });
+  expect(deployment.commandPending).toBeNull();
+  // The mutation happened once, before the reply was lost; check B ran once.
+  expect(lines()).toEqual(["mutation by pa ss$word", "check B"]);
+  const reconciled = deployment.lifecycle!.attempts.at(-1)!;
+  expect(reconciled.kind).toBe("reconcile");
+  // The command phase records the resolved receipt once and check B; the
+  // HTTP receipts are carried by the executor's own verification, covered
+  // in deployment-executor.test.ts.
+  expect(reconciled.checks!.map((c) => [c.name, c.passed])).toEqual([
+    ["Create the marked page", true],
+    ["Run check B", true],
+  ]);
+  expect(reconciled.checks![0].output).toContain(
+    "resolved from the host's record",
+  );
+  // The lost run, the host receipt, the command's record, and check B.
+  expect(mocks.ssh.mock.calls.length - calls).toBe(4);
+});
