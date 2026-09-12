@@ -110,25 +110,6 @@ export function presenceOf(records: SavedInformation[], ref: Ref): Presence {
 }
 
 /**
- * Checks about a subject that were recorded by something else — a deployment
- * event says its API answered, and that is evidence about the process it
- * names even though the event speaks for no subject at all. This is the one
- * place `check.about` is read.
- */
-function mentioning(records: SavedInformation[], ref: Ref) {
-  const key = refKey(ref);
-  return records
-    .filter(
-      (record) =>
-        !record.retiredAt &&
-        (record.presentation?.checks ?? []).some(
-          (check) => check.about && refKey(check.about) === key,
-        ),
-    )
-    .sort(newestFirst);
-}
-
-/**
  * A key for assembly. Records written before the contract carry no `key`, so
  * their label stands in — which keeps the deployment already on record
  * assembling correctly. New writes are required to carry a real one.
@@ -158,26 +139,24 @@ export function currentFacts(records: SavedInformation[], ref: Ref) {
   const held = new Map<string, Held<RecordFact>>();
   for (const record of stating(records, ref))
     for (const fact of record.presentation?.facts ?? [])
-      if (!held.has(keyOf(fact))) held.set(keyOf(fact), { value: fact, record });
+      if (!held.has(keyOf(fact)))
+        held.set(keyOf(fact), { value: fact, record });
   return held;
 }
 
-/**
- * The same for checks, plus the checks other records made about this subject.
- * Order matters: a record speaking for the subject is a deliberate statement
- * about it and wins over a passing mention of the same key.
- */
+/** Newest observation per key, from a subject record or an event. */
 export function currentChecks(records: SavedInformation[], ref: Ref) {
   const held = new Map<string, Held<RecordCheck>>();
   const key = refKey(ref);
-  for (const record of stating(records, ref))
-    for (const check of record.presentation?.checks ?? [])
-      if (!held.has(keyOf(check)))
+  for (const record of records
+    .filter((item) => !item.retiredAt)
+    .sort(newestFirst)) {
+    for (const check of record.presentation?.checks ?? []) {
+      const subject = check.about ?? record.presentation?.states?.ref;
+      if (subject && refKey(subject) === key && !held.has(keyOf(check)))
         held.set(keyOf(check), { value: check, record });
-  for (const record of mentioning(records, ref))
-    for (const check of record.presentation?.checks ?? [])
-      if (check.about && refKey(check.about) === key && !held.has(keyOf(check)))
-        held.set(keyOf(check), { value: check, record });
+    }
+  }
   return held;
 }
 
@@ -202,15 +181,13 @@ export function everythingAbout(records: SavedInformation[], ref: Ref) {
       (record) =>
         (record.presentation?.states &&
           refKey(record.presentation.states.ref) === key) ||
-        (record.presentation?.about ?? []).some(
-          (item) => refKey(item) === key,
-        ),
+        (record.presentation?.about ?? []).some((item) => refKey(item) === key),
     )
     .sort(newestFirst);
 }
 
 export type Freshness =
-  /** Written, but nothing was established; it never started, so it never ages. */
+  /** Nothing was established, so it never ages. */
   | { kind: "never-established" }
   /** No claim on the item, so there is no horizon to judge it by. */
   | { kind: "unknowable"; at: string }
@@ -277,12 +254,7 @@ export function checkAsRecorded(
 }
 
 export type Tag =
-  | "verified"
-  | "stale"
-  | "failed"
-  | "warning"
-  | "info"
-  | "recorded";
+  "verified" | "stale" | "failed" | "warning" | "info" | "recorded";
 
 /**
  * A card's headline tag: the record's own status, aged by the soonest

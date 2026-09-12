@@ -129,8 +129,9 @@ everything, including the clock. A failure does not age into doubt.
 
 Checks about a subject come from records stating it **and** from `check.about`
 on records that do not — a deployment event saying its API answered is
-evidence about the process it names. A record speaking for the subject wins
-over a passing mention of the same key.
+evidence about the process it names. The newest observation of a key wins in either case. An explicit
+`check.about` selects its subject; otherwise it inherits `states.ref`. A newer
+failed check in an event must not be hidden by an older subject success.
 
 ### Freshness
 
