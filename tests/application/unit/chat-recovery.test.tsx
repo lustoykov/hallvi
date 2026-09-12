@@ -43,7 +43,7 @@ function render({
   archived?: boolean;
   activity?: OperatorView["activity"];
   piActivity?: OperatorView["piActivity"];
-  status?: "queued" | "running" | "failed" | "cancelled";
+  status?: "queued" | "running" | "failed" | "cancelled" | "completed";
   body?: string;
 } = {}) {
   const view: OperatorView = {
@@ -86,7 +86,13 @@ function render({
       onComposerChange={vi.fn()}
       onSend={vi.fn()}
       onArchive={vi.fn()}
-      runs={[{ ...run, error, status }]}
+      runs={[
+        {
+          ...run,
+          error,
+          status: status === "completed" ? "succeeded" : status,
+        },
+      ]}
       reconnecting={false}
       onRunAction={vi.fn()}
       onNewChat={vi.fn()}
@@ -169,25 +175,29 @@ it("renders streaming text once after earlier tool calls, including before the f
     startedAt: failedAt,
     finishedAt: failedAt,
   };
-  for (const piActivity of [[], [record]]) {
-    const html = render({ status: "running", body, piActivity });
+  for (const status of ["running", "completed"] as const) {
+    for (const piActivity of [[], [record]]) {
+      const html = render({ status, body, piActivity });
+      expect(html.split(body)).toHaveLength(2);
+      if (piActivity.length) {
+        expect(html).toContain("File reads");
+        expect(html.indexOf("File reads")).toBeLessThan(html.indexOf(body));
+      }
+    }
+    const html = render({
+      status,
+      body,
+      piActivity: [
+        record,
+        {
+          ...record,
+          id: "said",
+          kind: "message",
+          sequence: 2,
+          text: body,
+        },
+      ],
+    });
     expect(html.split(body)).toHaveLength(2);
-    if (piActivity.length)
-      expect(html.indexOf("package.json")).toBeLessThan(html.indexOf(body));
   }
-  const html = render({
-    status: "running",
-    body,
-    piActivity: [
-      record,
-      {
-        ...record,
-        id: "said",
-        kind: "message",
-        sequence: 2,
-        text: body,
-      },
-    ],
-  });
-  expect(html.split(body)).toHaveLength(2);
 });

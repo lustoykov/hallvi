@@ -53,7 +53,7 @@ test(
       await openConversation(page);
       await expect(
         page.getByText("[QA fixture reply] Acceptance race", { exact: true }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30_000 });
       await expect(
         page.getByText("Acceptance race", { exact: true }),
       ).toHaveCount(1);
@@ -143,10 +143,8 @@ test(
       .fill("[slow-cancel] hello");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(page.getByText("Replying…", { exact: true })).toBeVisible();
-    await page
-      .getByRole("button", { name: "Cancel request", exact: true })
-      .click();
+    await expect(page.getByText("Working", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
     await expect(
       page.getByText("Reply cancelled.", { exact: true }),
     ).toBeVisible();

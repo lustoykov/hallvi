@@ -1,3 +1,4 @@
+import { StringDecoder } from "node:string_decoder";
 import { createHash, randomUUID } from "node:crypto";
 import {
   appendFileSync,
@@ -400,8 +401,52 @@ export class PiWorkspace {
         // The bridge writes one JSON object per line. Reading them as they
         // arrive is what turns a long command into visible output rather than
         // a spinner that ends with a wall of text.
-        const seen: Buffer[] = [];
-        let delivered = 0;
+        let pendingFrame = Buffer.alloc(0);
+        let pendingLine = "";
+        let streamTooLarge = false;
+        const decoder = new StringDecoder("utf8");
+        let streamedOutcome:
+          { result?: ToolPartial; error?: string } | undefined;
+        const receive = (chunk: Buffer) => {
+          if (streamTooLarge) return;
+          pendingFrame = Buffer.concat([pendingFrame, chunk]);
+          while (pendingFrame.length >= 8) {
+            const length = pendingFrame.readUInt32BE(4);
+            if (length > maxOutputBytes) {
+              streamTooLarge = true;
+              return;
+            }
+            if (pendingFrame.length < length + 8) break;
+            if (pendingFrame[0] === 1)
+              pendingLine += decoder.write(
+                pendingFrame.subarray(8, length + 8),
+              );
+            pendingFrame = pendingFrame.subarray(length + 8);
+            if (pendingLine.length > maxOutputBytes) {
+              streamTooLarge = true;
+              return;
+            }
+            let newline: number;
+            while ((newline = pendingLine.indexOf("\n")) >= 0) {
+              const text = pendingLine.slice(0, newline);
+              pendingLine = pendingLine.slice(newline + 1);
+              if (!text.trim()) continue;
+              let value: {
+                partial?: ToolPartial;
+                result?: ToolPartial;
+                error?: string;
+              };
+              try {
+                value = JSON.parse(text);
+              } catch {
+                continue;
+              }
+              if (value.partial !== undefined) onUpdate?.(value.partial);
+              if (value.result !== undefined || value.error)
+                streamedOutcome = value;
+            }
+          }
+        };
         const response = await this.docker!.request(`/exec/${execId}/start`, {
           method: "POST",
           body: JSON.stringify({ Detach: false, Tty: false }),
@@ -410,26 +455,7 @@ export class PiWorkspace {
           timeoutMs: 190_000,
           maxBytes: maxOutputBytes,
           stdin: Buffer.from(JSON.stringify({ name, id, args })),
-          onChunk: onUpdate
-            ? (chunk) => {
-                seen.push(chunk);
-                const lines = demultiplex(Buffer.concat(seen)).stdout.split(
-                  "\n",
-                );
-                // The last entry is whatever has not been terminated yet.
-                for (const text of lines.slice(delivered, -1)) {
-                  delivered += 1;
-                  if (!text.trim()) continue;
-                  try {
-                    const value = JSON.parse(text) as { partial?: unknown };
-                    if (value.partial !== undefined)
-                      onUpdate(value.partial as ToolPartial);
-                  } catch {
-                    // A line the bridge did not write is not ours to read.
-                  }
-                }
-              }
-            : undefined,
+          onChunk: receive,
         });
         const execution = await this.docker!.json<{
           Running: boolean;
@@ -437,7 +463,7 @@ export class PiWorkspace {
         }>(`/exec/${execId}/json`);
         if (execution.Running)
           throw new Error("Workspace execution outcome is still unknown.");
-        if (response.truncated)
+        if (streamTooLarge || (response.truncated && !streamedOutcome))
           throw new Error(
             "Pi tool output exceeded the workspace transfer limit. Use read offsets or narrower searches.",
           );
@@ -450,13 +476,15 @@ export class PiWorkspace {
           // The outcome is the last line that carries one; earlier lines are
           // progress. A single object is still accepted, so an older bridge
           // image keeps working.
-          const outcome = stdout
-            .split("\n")
-            .map((text) => text.trim())
-            .filter(Boolean)
-            .map((text) => JSON.parse(text) as typeof output)
-            .filter((value) => value.result !== undefined || value.error)
-            .at(-1);
+          const outcome =
+            streamedOutcome ??
+            stdout
+              .split("\n")
+              .map((text) => text.trim())
+              .filter(Boolean)
+              .map((text) => JSON.parse(text) as typeof output)
+              .filter((value) => value.result !== undefined || value.error)
+              .at(-1);
           if (!outcome) throw new Error("No outcome line.");
           output = outcome;
         } catch {

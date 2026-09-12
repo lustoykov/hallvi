@@ -406,3 +406,65 @@ it.each(interruptions)(
     expect(engine.execs.map((exec) => exec.id)).toEqual(["long"]);
   },
 );
+
+it("streams split Docker frames and UTF-8 before the final result arrives", async () => {
+  const workspace = new PiWorkspace({
+    applicationId: "app-stream",
+    runId: "run-stream",
+  });
+  const updates: unknown[] = [];
+  let finish: () => void = () => {};
+  engine.answer = (_exec, response) => {
+    const partial =
+      JSON.stringify({
+        partial: { content: [{ type: "text", text: "tick-é\n" }] },
+      }) + "\n";
+    const data = Buffer.from(partial);
+    const split = data.indexOf(Buffer.from("é")) + 1;
+    // Build frames with the original bytes, including the split multibyte char.
+    const pack = (payload: Buffer) => {
+      const header = Buffer.alloc(8);
+      header[0] = 1;
+      header.writeUInt32BE(payload.length, 4);
+      return Buffer.concat([header, payload]);
+    };
+    const framed = Buffer.concat([
+      pack(data.subarray(0, split)),
+      pack(data.subarray(split)),
+    ]);
+    response.socket!.write(framed.subarray(0, 5));
+    setImmediate(() => response.socket!.write(framed.subarray(5)));
+    finish = () =>
+      response.end(
+        frame(
+          JSON.stringify({
+            result: { content: [{ type: "text", text: "done" }] },
+          }) + "\n",
+        ),
+      );
+  };
+  let completed = false;
+  const call = workspace
+    .execute(
+      "bash",
+      "stream",
+      { command: "printf ticks" },
+      undefined,
+      (value) => updates.push(value),
+    )
+    .then((value) => {
+      completed = true;
+      return value;
+    });
+  try {
+    await vi.waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0]).toEqual({
+      content: [{ type: "text", text: "tick-é\n" }],
+    });
+    expect(completed).toBe(false);
+  } finally {
+    finish();
+  }
+  expect(await call).toEqual({ content: [{ type: "text", text: "done" }] });
+  await workspace.dispose();
+});

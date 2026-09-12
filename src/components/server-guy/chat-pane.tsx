@@ -362,7 +362,13 @@ export function ChatPane({
                     records={view.piActivity}
                     executions={view.executions}
                     runId={message.id}
-                    live={message.status === "running" ? message.body : null}
+                    live={
+                      message.status === "running" ||
+                      (message.status === "completed" &&
+                        hasActivity(view.piActivity, message.id))
+                        ? message.body
+                        : null
+                    }
                     renderExecution={(executionId) =>
                       view.application && chatId ? (
                         <OperatorConsole
