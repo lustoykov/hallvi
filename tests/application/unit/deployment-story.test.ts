@@ -93,20 +93,45 @@ const record = {
   },
   events: [
     { at: at("00"), message: "Inspecting the repository at an exact revision" },
-    { at: at("01"), message: "Recommendation ready. No server has been purchased." },
+    {
+      at: at("01"),
+      message: "Recommendation ready. No server has been purchased.",
+    },
     { at: at("05"), message: "Preparing SSH access" },
-    { at: at("10"), message: "Releasing revision 5d9c1a8 on the existing host" },
+    {
+      at: at("10"),
+      message: "Releasing revision 5d9c1a8 on the existing host",
+    },
     { at: at("11"), message: "Passed: Login page is served" },
-    { at: at("15"), message: "Releasing revision b36da9c on the existing host" },
-    { at: at("20"), message: "Releasing revision b36da9c on the existing host" },
-    { at: at("30"), message: "Releasing revision 5d9c1a8 on the existing host" },
+    {
+      at: at("15"),
+      message: "Releasing revision b36da9c on the existing host",
+    },
+    {
+      at: at("20"),
+      message: "Releasing revision b36da9c on the existing host",
+    },
+    {
+      at: at("30"),
+      message: "Releasing revision 5d9c1a8 on the existing host",
+    },
     { at: at("40"), message: "Recreating the accepted containers" },
   ],
   lifecycle: {
-    host: { id: "host", provider: "hetzner", connectionId: null, serverId: 1, address: "203.0.113.7" },
+    host: {
+      id: "host",
+      provider: "hetzner",
+      connectionId: null,
+      serverId: 1,
+      address: "203.0.113.7",
+    },
     releases: [
       { id: "r1", repository: "linuxserver/docker-bookstack", revision: first },
-      { id: "r2", repository: "linuxserver/docker-bookstack", revision: second },
+      {
+        id: "r2",
+        repository: "linuxserver/docker-bookstack",
+        revision: second,
+      },
     ],
     attempts: [
       attempt("t1", "deploy", "r1", "deployment", 3, "verified", "10", {

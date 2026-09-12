@@ -28,7 +28,9 @@ const native = {
     },
   },
   inputs: ["ADMIN_PASSWORD", "APP_KEY"],
-  inputGenerators: { APP_KEY: { bytes: 32, encoding: "base64", prefix: "base64:" } },
+  inputGenerators: {
+    APP_KEY: { bytes: 32, encoding: "base64", prefix: "base64:" },
+  },
   data: [],
   database: null,
   httpAccess: "public",
@@ -57,7 +59,12 @@ it("generates values that only need to be random and still requires what the own
   saveDeploymentInputs(record, { ADMIN_PASSWORD: "typed-by-owner" });
   const saved = JSON.parse(
     readFileSync(
-      join(process.env.SERVER_GUY_CONFIG_DIR!, "deployments", id, "inputs.json"),
+      join(
+        process.env.SERVER_GUY_CONFIG_DIR!,
+        "deployments",
+        id,
+        "inputs.json",
+      ),
       "utf8",
     ),
   );

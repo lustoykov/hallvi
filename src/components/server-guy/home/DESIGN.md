@@ -1,5 +1,7 @@
 # Applications home
 
+This records the existing visual direction. The [operator design](../../../../docs/operator-design.md) governs conversation ownership and shared-record presentation; adapt the home-to-deployment journey as needed without treating the current data contract as permanent.
+
 The selected D / Together composition comes from `codex/homepage-exploration` at
 `896337dc4f8acd7eb4ff959a6f0b57d85330a14e`. It is integrated into the real
 `/applications` route on `codex/single-instance-runtime`.

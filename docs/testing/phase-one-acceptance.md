@@ -2,22 +2,22 @@
 
 This stable path is loaded by the local testing dashboard. The complete phase-era casebook and dated results are preserved in the [archived guide](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md); they remain regression/migration evidence, not a mandate to restore phase navigation.
 
-## Current acceptance contract
+## Current redesign acceptance
 
-| Outcome | Required evidence |
+[Roadmap](../../ROADMAP.md) owns the stages; [operator design](../operator-design.md) owns the new behavior. Review each stage with a focused diff, something the user can try, and evidence proportional to that stage.
+
+| Stage | Evidence to establish |
 | --- | --- |
-| Conversation-first integration | Real receipt/approval state, cross-conversation references, preserved drafts, correct origin and failure/retry across navigation and reload. |
-| Deployment | Pinned source/image/configuration, authorized intended host, required services and useful observed application behavior. |
-| Data protection | Correct persistent state, consistent backup, verified off-host transfer and meaningful isolated restore. |
-| Release and recovery | Chosen candidate, required checks, actual serving revision, migration uncertainty handled without blind retries and recovery reverified. |
-| Background work | Existing commands/library behavior, known run outcome/revision, logs, non-overlap and safe interruption/release handling. |
-| Ongoing care | Observed health/failure with source/time, durable issues, deduplication, freshness and honest offline/retention gaps. |
+| Main operator | One owner of changes, native queue/steer behavior, useful read-only side chats and understandable message state across navigation/reload. |
+| General execution | A direct server task, selected permission behavior, useful output and recorded actual or uncertain outcomes. |
+| Lightweight deployment | A working application deployed by Pi through general tools, useful behavior verified and the outcome surfaced in the UI. |
+| Medium and more complicated examples | Progressive evidence for dependencies, persistence and meaningful background work through the same architecture. |
 
-These are support targets; [Roadmap](../../ROADMAP.md) records what is implemented. [Compatibility cases](README.md#dated-evidence) exercise them against selected applications. A synthetic fixture or an uploaded backup does not establish live deployment or recoverability.
+These are development checkpoints, not a promise of universal support. Exact example repositories remain to be selected. Backup/restore matrices, monitoring/error detection and detailed per-view care are deferred. Historical operation receipts and approval rubrics are not requirements for the redesigned interface.
 
 ## Regression and execution
 
-Preserve provenance, accepted source/connection identity, cancellation/retry, known-schema migration and native history. Schema 14 retired the phase workflow; its records remain read-only history, and each applicable old expectation needs preservation, replacement or explicit retirement. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
+Existing development data is explicitly disposable; migration and legacy-history compatibility are not redesign acceptance requirements. Keep focused checks for behavior the new design requires; delete or rewrite obsolete workflow and hardening expectations. Schema 14 migration and retired-record evidence describe the old implementation; its code and tests can be removed. Unreviewed model answers remain unreviewed; passing schema checks do not establish semantic quality.
 
 Use the dashboard suite picker or these local commands:
 

@@ -1,8 +1,3 @@
-import { operationsFor } from "./operation-store";
-import { backupSetupFor } from "./scheduled-backup-install";
-import { backupEvidenceFor } from "./backup-evidence";
-import { scheduledProtectionFor } from "./scheduled-backup-store";
-import { applicationDeployment } from "./deployment-store";
 import {
   listActiveDecisions,
   listActivity,
@@ -30,22 +25,8 @@ export function getOperatorView(
     chats.find((chat) => !chat.archivedAt) ??
     chats[0] ??
     null;
-  // Read back from the receipts the proof runs retained. Absent evidence
-  // leaves `facts` empty, so every view keeps its unprotected state.
-  const deployment = applicationDeployment(application.id);
-  const backupEvidence = backupEvidenceFor(deployment);
-  const protection = scheduledProtectionFor(deployment);
-  const backupSetup = backupSetupFor(deployment);
   const access = repositoryAccess(application);
   return {
-    facts:
-      backupEvidence || protection || backupSetup
-        ? {
-            ...(backupEvidence ? { backupEvidence } : {}),
-            ...(protection ? { protection } : {}),
-            ...(backupSetup ? { backupSetup } : {}),
-          }
-        : undefined,
     application,
     repository: {
       status: access.status,
@@ -55,7 +36,7 @@ export function getOperatorView(
         : null,
       connected: access.connected,
     },
-    operations: operationsFor(application.id),
+    operations: [],
     chats,
     selectedChatId: selected?.id ?? null,
     messages: selected ? listMessages(selected.id) : [],

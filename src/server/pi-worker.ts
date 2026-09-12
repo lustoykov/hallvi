@@ -48,7 +48,6 @@ export function acquireWorkerLock() {
  * operations; the budget covers that work without holding the single worker
  * indefinitely.
  */
-export const PI_RUN_TIMEOUT_MS = 10 * 60_000;
 
 export async function executePiRun(
   run: PiRun,
@@ -79,14 +78,18 @@ export async function executePiRun(
       savedDraft = draft;
     }
   }, 250);
-  const timeout = setTimeout(() => {
-    finishPiRun(
-      run.id,
-      "timed-out",
-      "The reply exceeded the execution time limit. Retry when ready; no Decisions were saved.",
-    );
-    controller.abort();
-  }, options.timeoutMs ?? PI_RUN_TIMEOUT_MS);
+  // Individual commands have timeouts. A conversation can wait for its user.
+  const timeout =
+    options.timeoutMs === undefined
+      ? undefined
+      : setTimeout(() => {
+          finishPiRun(
+            run.id,
+            "timed-out",
+            "The turn exceeded its execution time limit. Check its command history before continuing.",
+          );
+          controller.abort();
+        }, options.timeoutMs);
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
   const stage: { value: "context" | "model" | "save" } = { value: "context" };

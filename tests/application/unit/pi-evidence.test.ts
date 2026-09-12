@@ -89,7 +89,10 @@ beforeEach(() => {
         status: "ahead",
         ahead_by: 2,
         commits: [
-          { sha: "1".repeat(40), commit: { message: "Add permission\n\nbody" } },
+          {
+            sha: "1".repeat(40),
+            commit: { message: "Add permission\n\nbody" },
+          },
         ],
         files: [
           {

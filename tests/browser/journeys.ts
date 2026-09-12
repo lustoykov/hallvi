@@ -3,8 +3,9 @@
 export const browserJourneys = [
   {
     id: "application-shell",
-    name: "Application workspace and deployment",
-    description: "Conversations, dashboard and reviewed deployment recovery.",
+    name: "Application workspace",
+    description:
+      "Main and side conversations, navigation and application views.",
     smoke: true,
   },
   {
@@ -16,9 +17,9 @@ export const browserJourneys = [
   },
   {
     id: "add-application",
-    name: "Add application and save a priority",
+    name: "Add application and chat",
     description:
-      "Create an application, send a priority, reload and check its saved message and Decision.",
+      "Create an application, send a message, reload and check the saved conversation.",
     smoke: true,
   },
   {

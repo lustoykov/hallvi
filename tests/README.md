@@ -2,7 +2,13 @@
 
 Run `npm run test:dashboard` and open <http://127.0.0.1:4317> to launch suites, inspect recorded runs and review saved model answers. Opening the dashboard runs nothing. It is a separate local developer tool, not the product UI.
 
-[Current acceptance](../docs/testing/README.md) connects journeys, compatibility targets and dated evidence. The [archived phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) preserves regression rubrics and older results. [Roadmap](../ROADMAP.md) alone owns implementation order.
+[Testing and evidence](../docs/testing/README.md) separates current redesign verification from dated implementation proofs. The [archived phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) preserves regression rubrics and older results. [Roadmap](../ROADMAP.md) alone owns implementation order.
+
+## Redesign verification policy
+
+Follow the [operator design](../docs/operator-design.md#verification-during-development) and [roadmap checkpoints](../ROADMAP.md#current-priority-and-sequencing-boundary). Verify actual behavior during development with focused checks and one representative application per complexity tier. Real Pi, local Docker and real provider evidence make different claims; label them accordingly.
+
+Delete or rewrite tests enforcing retired workflows, redundant gates and obsolete hardening requirements. An old failing test is a prompt to compare its expectation with the agreed design, not an automatic requirement to restore the old behavior. Keep checks that establish required current behavior and investigate genuine regressions. Avoid exhaustive case matrices and speculative fault suites while the architecture is being proved. No backup/monitoring matrix is a prerequisite for the initial deployment path.
 
 ## Suites and files
 

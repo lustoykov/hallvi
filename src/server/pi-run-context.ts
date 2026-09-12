@@ -3,14 +3,7 @@ import { db } from "./db";
 import { piRuns } from "./db-schema";
 import type { PiRun } from "./types";
 
-/**
- * The bounded execution envelope appended before each new engineer message:
- * Run/application/Chat identity, when it was prepared, and the previous
- * attempt's actual outcome, so a failed or cancelled proposal is never
- * mistaken for a committed Decision. It carries no application state; current
- * facts come from `get_application_status` and saved requirements from
- * `search_decisions`.
- */
+/** Identify this turn and its predecessor. History records actual effects. */
 export function buildPiRunContext(run: PiRun) {
   const previous = db()
     .select()
@@ -33,10 +26,8 @@ export function buildPiRunContext(run: PiRun) {
       ? {
           runId: previous.id,
           status: previous.status,
-          savedOutcome:
-            previous.status === "succeeded"
-              ? "The final answer and its accepted proposals were committed. Look up Decisions when current values matter."
-              : "Its proposals were pending, not saved; none were committed. Historical text is not evidence of a saved effect.",
+          outcome:
+            "Read execution history for actual effects. A stopped or failed turn may already have changed the server. Check uncertain outcomes before repeating work.",
         }
       : null,
   });

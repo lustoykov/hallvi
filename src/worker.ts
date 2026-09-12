@@ -1,19 +1,10 @@
-import { runOperationWorker } from "./server/operation-worker";
-import { runBackupObservationWorker } from "./server/scheduled-backup-host";
 import { PiWorkerDrainError, runPiWorker } from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
-
-import { runDeploymentWorker } from "./server/deployment-worker";
 
 const controller = new AbortController();
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => controller.abort());
-Promise.all([
-  runPiWorker(controller.signal),
-  runOperationWorker(controller.signal),
-  runDeploymentWorker(controller.signal),
-  runBackupObservationWorker(controller.signal),
-])
+runPiWorker(controller.signal)
   .catch((error) => {
     controller.abort();
     console.error(

@@ -289,8 +289,8 @@ describe("minimal native Run context", () => {
         chatId,
         previousAttempt: { runId: previous.run.id, status },
       });
-      expect(context.previousAttempt.savedOutcome).toContain(
-        "pending, not saved; none were committed",
+      expect(context.previousAttempt.outcome).toContain(
+        "may already have changed the server",
       );
       // The envelope carries identity and outcome only; current checks and
       // Approval Mode are read on demand through get_application_status.
@@ -315,7 +315,7 @@ describe("minimal native Run context", () => {
       runId: previous.run.id,
       status: "succeeded",
     });
-    expect(context.previousAttempt.savedOutcome).toContain("were committed");
+    expect(context.previousAttempt.outcome).toContain("Read execution history");
     runs.finishPiRun(next.id, "cancelled", "Stop test");
     const other = createChat(applicationId, "Other").id;
     enqueue("Fresh Chat", other);

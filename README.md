@@ -1,22 +1,28 @@
 # Server Guy
 
-[Documentation map](docs/README.md) · [Current deployment architecture](docs/architecture.md)
+[Documentation map](docs/README.md) · [Operator redesign](docs/operator-design.md) · [Current implementation](docs/architecture.md)
 
 **The agent for self-hosted software.** Deploy one application stack on a server you control, keep it healthy and protect its data. Conversation drives setup and operations; stable views show the same recorded facts and results.
 
 The target is Docker Compose on one instance, with PostgreSQL or SQLite, required Redis/Valkey services, workers, scheduled commands and persistent files. Compute starts with Hetzner + BYOM; backups with R2 + S3. **Coolify is a reference, not a parity requirement.**
 
+## Current direction
+
+The first [operator redesign](docs/operator-design.md) checkpoint is implemented: the main conversation has general server Bash, three permission modes, inline approval and recorded command output. Other conversations have read-only tools. Connect an existing SSH host above the main conversation or in Deployment. Provider provisioning, native queue/steer, concurrent side conversations and shared knowledge presentation are the next increments.
+
+Prove the deployment journey in reviewable stages using lightweight, medium and more complicated applications. Then review each sidebar view's capabilities. Verify real behavior with focused checks and delete obsolete code/tests; broad hardening and application-error monitoring are deferred. [Roadmap](ROADMAP.md) owns the checkpoints.
+
 ## Documentation
 
-Start with [Product](PRODUCT.md), [Roadmap](ROADMAP.md) and [Architecture](docs/architecture.md). The [documentation map](docs/README.md) links requirements, UI, setup and evidence; [CONTEXT.md](CONTEXT.md) owns terminology, the [component design reference](src/components/server-guy/DESIGN.md) owns visual language, and [tests/README.md](tests/README.md) owns test commands.
+Start with [Product](PRODUCT.md), [Operator design](docs/operator-design.md) and [Roadmap](ROADMAP.md). [Architecture](docs/architecture.md) describes the existing implementation. The [documentation map](docs/README.md) links requirements, UI, setup and evidence; [CONTEXT.md](CONTEXT.md) owns terminology, the [component design reference](src/components/server-guy/DESIGN.md) owns visual language, and [tests/README.md](tests/README.md) owns test commands.
 
-Keep each decision or requirement in its owning document. Update current wording and delete obsolete handoffs; Git retains development history. Documentation cleanup does not waive tests, drop runtime records or establish new support.
+Keep each decision or requirement in its owning document. Update current wording and delete obsolete handoffs; Git retains development history. Documentation changes do not establish shipped support. The user separately authorized a fresh start for current development data and deletion of legacy code/tests. Relevant verification remains necessary; migration compatibility and dedicated recovery tools are not redesign requirements.
 
 ## Implementation status
 
 A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/README.md#dated-evidence), followed by [hardening](docs/testing/README.md#dated-evidence). The [UI reference](docs/design/screens.md) distinguishes real records from simulated scenarios.
 
-The executor is still narrower than the target: first deployments and releases run Pi-authored native Compose on one Hetzner host, HTTP only, verified by a behavior criterion over public HTTP. Applications without a public endpoint, BYOM, ongoing monitoring and broad compatibility evidence need implementation. Historical results do not prove the current branch is ready to merge or that the deployed host is still online.
+The old deployment/operation workers, mutation endpoints and approval cards have been removed from the active path. Their underlying modules and data model are being replaced incrementally. This checkpoint can execute on an existing SSH server; the replacement repository-to-provider deployment journey is not complete. Historical deployment proofs describe the previous architecture.
 
 ## Run
 
@@ -47,6 +53,8 @@ Native conversation histories live beside the database in `pi-sessions/<applicat
 Local metadata-only diagnostics write rotating `diagnostics/replies.ndjson` and `diagnostics/spans.ndjson` beside the database, unless `SERVER_GUY_LOG_DIR` overrides it. Settings exposes their paths and optional trace export. Product outcomes must remain understandable without a tracing account. Implementation: [local diagnostics](src/server/diagnostics.ts) and [trace configuration](src/server/tracing-config.ts).
 
 ## Verify
+
+These are available checks, not a requirement to rerun every suite for every change. Select checks proportionate to the implementation stage; documentation-only edits need document/link checks rather than deployment proofs.
 
 ```sh
 npm test

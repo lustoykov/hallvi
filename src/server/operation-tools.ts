@@ -98,7 +98,13 @@ export function proposeAgentChange(
       title: "Recreate application containers",
       summary:
         "Recreate all containers from their accepted images on the existing host. Expect brief downtime. Persistent volumes are retained; no images are rebuilt or pulled.",
-      destinations: ["deployment", "processes", "database", "storage", "history"],
+      destinations: [
+        "deployment",
+        "processes",
+        "database",
+        "storage",
+        "history",
+      ],
       command: { type: action, deploymentId: deployment.id },
     }),
   );

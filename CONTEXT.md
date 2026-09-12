@@ -1,6 +1,30 @@
 # Domain language
 
-Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.md) and code. This glossary does not schedule implementation or claim that every concept has a dedicated database table.
+Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.md) and code. This glossary does not schedule implementation or claim that every concept has a dedicated database table. [Operator design](docs/operator-design.md) defines the intended architecture. Terms explicitly marked current implementation explain existing code and records, not constraints on the redesign.
+
+## Operator redesign vocabulary
+
+**Application operator**: The persistent owner of operational work for one application, using Pi's native runtime and general tools.
+
+**Main conversation**: The conversation through which the operator executes commands and changes. It accepts queued follow-ups and steering while work is active.
+
+**Side conversation**: A separate read-only discussion of relevant application context and evidence. It does not independently change the application.
+
+**Queued follow-up**: A message Pi processes after its current work finishes, using its native follow-up mechanism. Distinct from the existing operation change queue.
+
+**Steering**: Direction delivered to the active Pi session after the current turn's tool calls finish, before the next model call. It does not itself stop a running command.
+
+**Execution**: A tool invocation with its target, input/command, permission context, output, timing and known or uncertain outcome, recorded automatically.
+
+**Saved application knowledge**: Information Pi deliberately preserves for retrieval. The same record may also be presented to the user; there is no separate mandatory memory/UI copy.
+
+**Presentation / placement**: Optional information assigning a saved record to one or more existing views, with an appropriate summary or role. Exact fields remain a design proposal.
+
+**Permission mode**: Always ask (approval for every code execution), Pi decides (the model judges when to ask), or Bypass (no approval prompts). Independent of operational workflow types.
+
+**Wakeup**: A user message, scheduled trigger or incoming signal that brings work to the application operator. Detailed background care is deferred.
+
+**Complexity tier**: A lightweight, medium or more complicated application used to prove the same architecture progressively. Not a runtime stage or user-selected application category.
 
 ## Application and collaboration
 
@@ -10,29 +34,29 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Application requirement**: A declared need for running or checking an Application, grounded in its software configuration, documentation or the owner's request. Declaring a requirement does not establish that Server Guy can fulfill it.
 
-**Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state.
+**Conversation (Chat in existing code)**: An application-owned transcript and native model session. Conversations have separate drafts/history and share the application's operational state. In the redesign, only the main conversation owns changes; side conversations are read-only.
 
 **Application view**: An inspectable projection of recorded application facts and work, such as deployment, data or health. Chat receipts and views refer to the same records.
 
-**Operation receipt**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome. A receipt is not a second copy of execution state.
+**Operation receipt (current implementation)**: The interactive presentation of an operation's origin, progress, required decision, evidence and outcome. A receipt is not a second copy of execution state.
 
-**Pi Run**: One durable attempt to answer an accepted conversation message using the embedded Pi runtime. Retry creates a linked attempt; a successful reply does not prove an external effect.
+**Pi Run (current implementation)**: One durable attempt to answer an accepted conversation message using the embedded Pi runtime. Retry creates a linked attempt; a successful reply does not prove an external effect.
 
 ## Execution and evidence
 
-**Operation**: Application-owned work with a target, origin, state and evidence, shared by every conversation and view.
+**Operation (current implementation)**: Application-owned work with a target, origin, state and evidence, shared by every conversation and view.
 
-**Change**: An operation that modifies the application or its surroundings. Only one change executes at a time for an Application.
+**Change (current implementation)**: An operation that modifies the application or its surroundings. Only one change executes at a time for an Application.
 
-**Inspection**: An operation that reads evidence without changing the application. Inspections can run alongside changes.
+**Inspection (current implementation)**: An operation that reads evidence without changing the application. Inspections can run alongside changes.
 
-**Queued change**: An approved operation waiting for an earlier change. Its assumptions must still hold when execution begins; changed assumptions require a new decision.
+**Queued change (current implementation)**: An approved operation waiting for an earlier change. Its assumptions must still hold when execution begins; changed assumptions require a new decision.
 
-**Cancelled operation**: A proposal or stopped attempt the user chose not to continue. Its record remains part of the application's history.
+**Cancelled operation (current implementation)**: A proposal or stopped attempt the user chose not to continue. Its record remains part of the application's history.
 
 **Unknown remote outcome**: An attempted external action whose result has not been established. A stopped controller does not establish that the external action stopped.
 
-**Owner attestation**: The owner's recorded statement of what they verified, which releases the change-queue hold of an operation whose capability was retired. Server Guy records the statement without verifying it.
+**Owner attestation (current implementation)**: The owner's recorded statement of what they verified, which releases the change-queue hold of an operation whose capability was retired. Server Guy records the statement without verifying it.
 _Avoid_: Acknowledgement
 
 **Observation**: A timestamped fact attributed to its source, such as a probe result, command output, metric sample or provider response.
@@ -41,11 +65,11 @@ _Avoid_: Acknowledgement
 
 **Finding / diagnosis**: The agent's interpretation of observations, including uncertainty and possible cause. It remains distinguishable from the observations themselves.
 
-**Decision**: An explicit application-specific user requirement or choice, saved with its origin. A replacement supersedes the earlier decision without erasing history.
+**Decision (current implementation)**: An explicit application-specific user requirement or choice, saved with its origin. A replacement supersedes the earlier decision without erasing history.
 
 **Authority**: The permitted target, effects and limits for an action, including required user approval. A model recommendation or available credential does not widen it.
 
-**Release authorization**: Permission to update one application to a selected revision on its existing host, within stated data, exposure and execution limits. A corrected configuration can remain within that permission while creating a distinct release and attempt.
+**Release authorization (current implementation)**: Permission to update one application to a selected revision on its existing host, within stated data, exposure and execution limits. A corrected configuration can remain within that permission while creating a distinct release and attempt.
 
 **Activity event**: A meaningful application change or consequential operational result. It is not every message or internal tool call.
 
@@ -59,10 +83,10 @@ _Avoid_: Acknowledgement
 
 **Release**: A selected immutable source/image identity and deployment configuration intended to run for an Application.
 
-**Converted release**: A release recorded before schema 14 whose retired deployment plan was converted once into native Compose under its original release identity. Execution reads only its native configuration.
+**Converted release (current implementation)**: A release recorded before schema 14 whose retired deployment plan was converted once into native Compose under its original release identity. Execution reads only its native configuration.
 _Avoid_: Legacy plan, DeploymentPlan
 
-**Deployment attempt**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same.
+**Deployment attempt (current implementation)**: One execution to put a specific release onto an application host and verify it. A retry or container recreation is another attempt, even when its release and host stay the same.
 
 **Last verified runtime**: The release, host and running images established by a completed verification at a recorded time. A later possible remote change makes the current runtime unknown without erasing this historical observation.
 
@@ -84,7 +108,7 @@ _Avoid_: Legacy plan, DeploymentPlan
 
 **Backup**: A consistent recoverable copy of specified application or controller state. Creation, off-host transfer and restore verification are separate outcomes.
 
-**Backup capture plan**: The application data to protect, the services that can change it, and the consistency procedure used to capture it together. It describes data and writers rather than supported application names.
+**Backup capture plan (current implementation)**: The application data to protect, the services that can change it, and the consistency procedure used to capture it together. It describes data and writers rather than supported application names.
 
 **Compatible rollback**: Returning to a previously verified release whose configuration and application code can still use the current data. It does not reverse database migrations or restore an earlier copy of the data.
 

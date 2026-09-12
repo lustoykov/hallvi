@@ -1,4 +1,3 @@
-import { operationsFor } from "./operation-store";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
@@ -45,7 +44,7 @@ export function chatRunSnapshot(
       .all();
     return {
       messages: listMessages(chatId),
-      operations: operationsFor(applicationId),
+      operations: [],
       runs,
       activity: listActivity(applicationId),
     };
@@ -182,7 +181,7 @@ export function cancelPiRun(applicationId: string, chatId: string, id: string) {
       finishPiRun(
         id,
         "cancelled",
-        "Cancelled. No Decisions were saved from this attempt.",
+        "Turn cancelled. Commands already started may have changed the server; check their execution history.",
       );
     return getPiRun(id)!;
   });

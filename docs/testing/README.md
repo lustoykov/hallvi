@@ -2,7 +2,13 @@
 
 [Requirements](../requirements.md) define user outcomes; [Roadmap](../../ROADMAP.md) distinguishes shipped work from gaps. [Test runners](../../tests/README.md) owns commands, fixtures and opt-in Docker/model runs. The small [acceptance guide](phase-one-acceptance.md) stays at its existing path because the local test dashboard loads it.
 
-## What the current architecture has proved
+## Current redesign verification
+
+[Operator design](../operator-design.md#verification-during-development) and [Roadmap](../../ROADMAP.md) define proportionate verification and stage order. Prove a lightweight deployment, then medium and more complicated examples through the same operator. Exact repositories remain to be selected. Each stage needs focused checks and a concrete reviewable result; old workflows and obsolete hardening tests may be deleted.
+
+The redesign has not been implemented or validated by the historical proofs below. Documentation/link checks establish documentation consistency only. Detailed view capabilities, application-error detection and broad resilience matrices are deferred until the main deployment journey works.
+
+## What the existing architecture has proved
 
 At main `0682ab2` (PR #45), the actual configured Pi model (`openai-codex` / `gpt-5.6-sol`, high effort) installed and updated two materially different applications through the shared native path:
 
@@ -31,8 +37,8 @@ Keep this concise index rather than one permanent working-tree report per develo
 | [Initial deployment, 8 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-08-real-deployment-acceptance.md) | Product deployed a source app with private PostgreSQL on Hetzner and checked create/read/delete behavior. |
 | [Integration acceptance, 9 September](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/testing/2026-09-09-final-integration.md) | Conversation/view state, browser and operation-coordination checks, with explicit retained/retired legacy acceptance. Not current browser coverage for later changes. |
 
-## Current proof gaps
+## Existing implementation proof gaps
 
-Background-only (no-HTTP) intake and on-demand re-verification, native backup/restore and rollback on real provider hosts, restores that start the application on restored data, BYOM, additional public endpoints, replacement-host cutover and broader monitoring remain incomplete. Do not convert a requirements table into support claims. The historical [phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) retains old rubrics and judgment evidence where legacy behavior still matters; it does not require restoring phase navigation.
+These gaps describe the existing implementation and evidence, not a delivery checklist for the redesign. Background-only (no-HTTP) intake and on-demand re-verification, native backup/restore and rollback on real provider hosts, BYOM, additional public endpoints, replacement-host cutover and broader monitoring remain incomplete. Do not convert a requirements table into support claims. The historical [phase casebook](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/implementation/phase-one-acceptance.md) retains old rubrics and judgment evidence where legacy behavior still matters; it does not require restoring phase navigation.
 
 Run checks proportionate to changed behavior. Distinguish scripted model callbacks, actual Pi, local Docker, simulated providers and real hosts. Preserve exact candidate/configuration, failed or uncertain outcomes, observation time and cleanup evidence. Do not repeat expensive model or full-suite runs without a concrete reason, and do not claim document/link checks validate runtime behavior.

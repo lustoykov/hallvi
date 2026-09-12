@@ -184,6 +184,12 @@ components:
 
 # Design System: Server Guy application workspace
 
+## Redesign status
+
+[Application operator design](../../../docs/operator-design.md) and the [UI reference](../../../docs/design/screens.md) govern the redesign. Keep this visual language and the sidebar's guiding purpose as starting points; view interiors and interactions can change to serve the deployment journey.
+
+Pi chooses what to surface through shared knowledge records with optional presentation. One main conversation owns changes; side conversations are read-only, with native queue/steer for active work. The operation receipts, fixed states, approval placement and facts contracts described below document the existing UI. They do not require the redesign to preserve that record model or workflow machinery. Exact new presentation roles are not settled. Review each view's capabilities after the deployment path works.
+
 ## Overview
 
 **Creative North Star: "Quiet application workspace"**
@@ -465,8 +471,8 @@ Inherited: blue primary with a 7px radius, white secondary, password inputs with
 - **Don't** add a permanent side panel. Receipts, marks and full-width destinations carry everything the old right panel repeated.
 - **Don't** show verified green, a “Protected” line or a configured destination before the evidence exists.
 - **Don't** put the same approval card in two places at once in this option; the decision lives in the receipt.
-- **Don't** invent a sixth state or a new tint. Inspected, Waiting for you, Working, Verified and Failed cover the record.
-- **Don't** generate UI. The agent emits a record (title, state, steps, inputs, destinations, evidence); the components are fixed.
+- **For existing receipts**, use their established states and tints consistently. New shared-record presentation is designed around the deployment journey rather than forced into this operation state model.
+- **Do** use designed presentation components. Pi chooses content and placement; the current operation fields are not a required schema for new shared records.
 - **Don't** lift a card with a shadow to signal state.
 
 

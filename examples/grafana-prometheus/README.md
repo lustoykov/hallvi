@@ -1,5 +1,7 @@
 # Grafana with Prometheus — compatibility fixture
 
+This fixture documents the existing managed deployment path. It is reusable evidence, not a mandatory application in the [redesign complexity tiers](../../docs/operator-design.md#three-application-complexity-tiers); exact examples remain to be selected.
+
 This directory is an independently deployable application. It uses official published images, not Server Guy's application source. The controller resolves image tags to immutable Linux amd64 digests before asking for deployment approval.
 
 Grafana listens on 3000 and keeps its SQLite database at `/var/lib/grafana/grafana.db` in `grafana-data`. Supply a private `GF_SECURITY_ADMIN_PASSWORD`; do not use a published default. Keep HTTP restricted during initial setup and use an SSH tunnel for admin credentials until HTTPS is available.

@@ -12,16 +12,26 @@ web
 
 **Server Guy carries out the setup, asks for access or decisions when necessary, and verifies that it works.** Conversation drives the work; stable application views show the same recorded state. The user should not need to assemble infrastructure or follow a deployment wizard.
 
+## Architecture direction
+
+One persistent application operator owns operational work through the main conversation. Pi has general tools, including server shell execution, and chooses how to deploy, investigate, verify and recover. Side conversations are read-only. Queue and steer use Pi's native session capabilities.
+
+Permissions govern execution independently of workflows: **Always ask** requires UI approval for every code execution; **Pi decides** lets Pi judge when to ask; **Bypass** executes without approval prompts. The tool boundary implements the selected mode with a simple pending-call approval interaction: wait for the UI decision, then continue or decline. There are no provider/spending exceptions to Bypass and no required durable approval-resume subsystem. A release or backup proposal is not a prerequisite for executing an authorized task.
+
+The product's differentiation is the experience around that operator: understandable work, carefully designed interactions and animations, ongoing care and useful recommendations. Improved models should improve the operator without requiring more application-specific rules. Always-on care and access for other agents are directions; automated application-error detection is deferred.
+
+[Application operator design](docs/operator-design.md) owns the agreed redesign and unresolved details. [Current architecture](docs/architecture.md) documents the implementation being replaced; the redesign is not shipped yet.
+
 ## Supported scope
 
-This is the agreed support target, not a list of shipped capabilities. [ROADMAP.md](ROADMAP.md) owns implementation status and order.
+This is the longer-term support target, not a list of shipped capabilities or prerequisites for the initial redesign. [ROADMAP.md](ROADMAP.md) owns implementation status and order. Prove the deployment journey first, then decide each sidebar view's capabilities individually.
 
 | Area | Boundary |
 | --- | --- |
 | Topology | One application stack on one Linux instance, using Docker Compose. A stack may have several web/API services, workers, schedules and dependencies. |
 | Compute | Hetzner provisioning and bring your own machine (BYOM): an accessible compatible home server, VPS or existing raw cloud instance. |
 | Software | Reuse repositories, Dockerfiles, Compose definitions and upstream images. Python/JavaScript source preparation and running prebuilt images are separate capabilities; an image does not have to contain Python or JavaScript. |
-| Data | PostgreSQL, embedded SQLite and application-specific persistent files. Redis/Valkey when the application requires a broker or cache. Another database server the software requires (MariaDB, for example) runs as an ordinary service that owns its volume and dumps it through commands Pi records from the software's documentation; the managed PostgreSQL is protected the same way, with a default procedure. Install only what the software needs. |
+| Data | Run the databases and persistent storage the application actually needs, including PostgreSQL, SQLite, required Redis/Valkey and other upstream database services. Pi determines configuration and appropriate procedures from the application. Do not substitute a database to fit a managed slot. |
 | Background work | Existing worker commands, PostgreSQL-backed or Redis/Valkey-backed queues, and cron-style scheduled commands on the same instance. Reuse the application's libraries and scheduler. |
 | Delivery | Configuration/secrets, required ports, private service connections, domains, automatic HTTPS and appropriate CDN setup. Release a selected revision on request; reuse GitHub Actions where useful. |
 | Protection | Database and persistent-file backups to Cloudflare R2 or AWS S3, retention, an isolated restore that boots the restored application and checks it, and manual recovery. Protect controller state separately. |
@@ -30,7 +40,7 @@ This is the agreed support target, not a list of shipped capabilities. [ROADMAP.
 
 A source repository need not belong to the user, and GitHub Actions is not mandatory for prebuilt software. Existing external services remain usable, with explicit limits on what Server Guy can observe or manage.
 
-Use the [representative requirements cases](docs/requirements.md#proving-reuse) to expose missing machinery: Uptime Kuma, Grafana/Prometheus, Forgejo, Vaultwarden, Paperless-ngx and Immich. Each is a target to verify on an appropriately sized VPS, not a certification or promise to run the entire suite on a tiny server.
+Use one representative application in each of the [three complexity tiers](docs/operator-design.md#three-application-complexity-tiers): lightweight, medium and more complicated. Prove the same general architecture progressively. Exact repositories remain to be selected; this is not a certification matrix or a user-facing classification.
 
 ## Operating boundary
 
@@ -40,42 +50,38 @@ Use the [representative requirements cases](docs/requirements.md#proving-reuse) 
 - It surfaces application exceptions, wrong behavior and migration-code defects with impact, evidence and a copyable coding-agent handoff. The owner-merged fix returns through ordinary release verification.
 - A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR. Business logic and general bug fixes remain outside its code-writing scope.
 
-Model intelligence determines what to inspect, recommend and do next. Tools enforce access, spending limits and effect-specific authority. Recommendations and successful commands are not proof of a working or protected application.
-
-Correctness, authorization and executor capability are separate concerns. Return actionable configuration and execution errors to Pi so it can inspect, correct and retry within the authorized task. Prefer native tool diagnostics over duplicating their rules in a product-specific validator. Keep checks for executable tool inputs, permitted effects, data preservation, uncertain outcomes and actual behavior. Improving models should improve decisions without weakening these boundaries. The [scoped release slice](docs/architecture.md) implements this loop for updates on an existing host; a first deployment runs through the same loop once the owner approves its priced recommendation.
+Pi determines what to inspect, recommend and execute within the user's request and selected permission mode. Return native tool errors so it can correct and continue. The executor handles access, credentials and automatic execution facts, including uncertain outcomes. General privileged shell execution relies on Pi's judgment; a wrapper cannot prove that every command preserves data. A successful command is not proof of a working application.
 
 ## Experience
 
-Use **Fable's conversation-first design**: focused chat, interactive operation receipts, stable views, subtle activity indicators and continuity between conversations. The [design reference](src/components/server-guy/DESIGN.md) owns visual language; the [UI reference](docs/design/screens.md) explains real and simulated surfaces.
+Preserve the existing sidebar as the starting structure: it guides users on what deserves care. Pi decides how to provide that care. View interiors and conversation interactions may change wherever the main deployment journey benefits. The [design reference](src/components/server-guy/DESIGN.md) provides visual language; the [UI reference](docs/design/screens.md) distinguishes redesign guidance from existing and simulated surfaces.
 
-An Application has its own name, host, configuration, releases and history. Multiple conversations retain separate transcripts/drafts and share operational state. A second independent deployment of the same source is another Application; there is no mandatory Production/Staging hierarchy.
+An Application has its own identity, connected resources and history. One main conversation owns changes; read-only side conversations share relevant evidence and retain separate drafts/history. Users can queue a follow-up, steer active work or discuss it in a side chat. A second independent deployment of the same source is another Application; there is no mandatory Production/Staging hierarchy.
 
-The agent recommends one sensible path, explains why on demand and lets the user override it. Ask only for missing inputs, consequential choices or required authority. No mandatory stages, setup questionnaire, permanent right rail or proliferation of equivalent controls. Each supported flow needs reusable interactive components and a discoverable durable view; capability lists do not dictate sidebar labels or a tab per dependency. Unused infrastructure should not clutter the interface.
+Pi decides what matters and what to surface within a stable, carefully designed experience. Views share records and execution evidence; the database does not mirror the sidebar. Use one saved-knowledge mechanism with optional presentation, rather than separate memory and UI stores. Pi searches, saves, updates and retires records and assigns presentation to relevant views. The UI loads saved information immediately without a model call on every visit. Exact fields and presentation roles remain design proposals.
 
-The user can inspect work, facts and evidence without generating a new view. Plugins should normally contribute findings and actions to the existing application views, with their origin visible. A dedicated panel is appropriate when the domain needs it; installing a plugin should not automatically add another sidebar destination.
+Recommend one sensible path and let the user override it. Ask for missing access, private inputs or consequential decisions, not a mandatory setup questionnaire. Chat explains work, logs expose execution details and selected records make outcomes discoverable. A view without evidence should say it has not been assessed rather than imply health or absence of infrastructure.
+
+When ongoing care is introduced, surface what Pi arranged, the cadence and the last observed result. Routine success can update a view quietly; meaningful changes and required decisions deserve attention. Detailed practices for each view follow a working deployment journey.
 
 ## Generalization and extensibility
 
-**The agreed direction is a reusable core with optional, versioned Plugins.** Different images, paths, ports and environment values belong in configuration. Capabilities promised by the supported scope belong in the core; a plugin must not become a required workaround for an incomplete core capability. Specialised application APIs, functional checks and domain-specific presentation are appropriate extensions. Application-name branches in core deployment or backup behavior require a concrete, documented reason; representative application tests remain valuable.
+Prefer general tools, native runtime capabilities and small shared-record/presentation interfaces. Each new operational capability should not require its own workflow, approval type or database entity.
 
-Server Guy should be able to help author a plugin when a missing specialised capability blocks useful work. Drafting and testing the package are separate from enabling its code and access. Users should be able to inspect its source, origin, version, requested access and test evidence; keep it private, export it, or propose it upstream through a PR. Community distribution is a direction, not a promise of a marketplace or universal compatibility.
-
-The core retains authority enforcement, secret handling, operation coordination, durable evidence and recovery records. A plugin cannot grant itself access or silently redefine a successful operation. Exportable packages exclude credentials; recovery preserves the selected version, required configuration and extension state, with secrets separately protected. Disabling a plugin must retain historical evidence and identify any ongoing work that depends on it.
-
-This is a design direction agreed on 10 September 2026, not a shipped plugin runtime. The [architecture brief](docs/architecture.md) records the boundary and open questions; [ROADMAP.md](ROADMAP.md) owns implementation order. API shape, code isolation and UI contribution mechanisms remain open for review with Fable.
+Optional plugins remain a possible extension for specialised integrations. Plugin packaging, distribution and execution/UI interfaces are deferred; they are not requirements for the deployment redesign. Future access by other agents should use the same application operator and shared evidence rather than create competing writers. Do not build an extension framework ahead of a concrete need.
 
 ## Development priority
 
-**Get the general architecture right first; fine-tune, harden and polish afterward.** Prioritize reusable capabilities, simple interfaces and Pi's ability to reason, execute and recover across applications. Do not let speculative edge cases or an expanding hardening checklist displace that work.
+**Design and prove the main deployment journey first.** Implement in reviewable stages: main operator interaction, general execution and permissions, a lightweight deployment, then medium and more complicated examples. Once deployment works, review every sidebar view individually; scope its capabilities then. Broad hardening follows the established architecture and journey.
 
-Fix concrete failures that prevent the current flow from working or violate its existing data and authority guarantees. Keep those fixes proportional; document secondary limitations and defer them until the shared architecture is proven.
+Verify real behavior throughout development with focused checks and representative runs. Fix concrete failures and record material limitations. Delete unnecessary code, tests, gates and obsolete hardening cases instead of preserving old policy through tests. The user has authorized discarding the current development data: start the new schema empty and delete legacy migrations, readers and recovery machinery. Pi handles operational problems through general tools. Do not build exhaustive case matrices or speculative resilience infrastructure while the design may change. The [roadmap](ROADMAP.md) owns review checkpoints and sequencing.
 
 ## Reliability and limits
 
-Configured host-side collection, schedules and backups should continue when the controller or a chat is offline. Show last observation, retained coverage and gaps. Bounded off-host diagnostic archives preserve earlier evidence when the host is unavailable; they do not prove its current health or guarantee the final seconds before failure.
+For future care features, configured host-side collection, schedules and backups should continue when the controller or a chat is offline. Show last observation, retained coverage and gaps. Bounded off-host diagnostic archives preserve earlier evidence when the host is unavailable; they do not prove its current health or guarantee the final seconds before failure.
 
 Manual replacement-host recovery preserves application history and establishes one active instance. It is not automatic failover. Verify restored data and isolate conflicting old processes before resuming writes/jobs.
 
-**Coolify is a reference, not a feature-parity requirement.** Excluded: multi-host application/database orchestration, replicas/clusters, automatic failover and Kafka/RabbitMQ operation. A database server other than the managed PostgreSQL is not a managed slot, but an application may run one as a service it declares, with the owner's dump procedure; BookStack with MariaDB is the demonstrated case, and WordPress is no longer excluded by its database. When a stack outgrows one instance, preserve portable configuration and data so its owner can move elsewhere.
+**Coolify is a reference, not a feature-parity requirement.** Excluded: multi-host application/database orchestration, replicas/clusters, automatic failover and Kafka/RabbitMQ operation. An application's required database can run as an ordinary service; the existing implementation has dated BookStack/MariaDB evidence, not universal compatibility. When a stack outgrows one instance, preserve portable configuration and data so its owner can move elsewhere.
 
 Previews, automatic-on-push releases, extra provisioners, dedicated build servers, richer teams, a general plugin marketplace and integrated external-agent transports are not prerequisites for this product. Plugin extraction should grow from concrete capabilities rather than block core generalization on a broad runtime. Priority belongs only in the roadmap.

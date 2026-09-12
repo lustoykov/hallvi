@@ -168,7 +168,10 @@ function syntheticEngine() {
     const chunks = [head];
     socket.on("data", (chunk) => chunks.push(chunk));
     socket.on("end", () => {
-      const input = Buffer.concat(chunks);
+      // Upgrade head also contains the HTTP request body before tool stdin.
+      const input = Buffer.concat(chunks).subarray(
+        Number(request.headers["content-length"] ?? 0),
+      );
       const execIndex = Number(request.url!.split("/").at(-2));
       Object.assign(state.execs[execIndex], JSON.parse(input.toString()));
       state.answer(state.execs[execIndex], {

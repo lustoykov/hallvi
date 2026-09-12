@@ -341,7 +341,9 @@ describe("the seven native eval scenarios use real local data and explicitly syn
         {
           runId: previous.id,
           status: "cancelled",
-          savedOutcome: expect.stringContaining("none were committed"),
+          outcome: expect.stringContaining(
+            "may already have changed the server",
+          ),
         },
       );
     },

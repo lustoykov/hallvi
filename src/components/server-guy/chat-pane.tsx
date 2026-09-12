@@ -27,6 +27,7 @@ import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
+import { OperatorConsole } from "./operator-console";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
 
@@ -183,6 +184,7 @@ export function ChatPane({
         </div>
         {activeChat &&
           !readOnly &&
+          activeChat.id !== view.chats[0]?.id &&
           view.chats.filter((chat) => !chat.archivedAt).length > 1 && (
             <button
               className="sg-text-button"
@@ -198,6 +200,15 @@ export function ChatPane({
         <div className="sg-busy-bar" aria-hidden="true" />
       )}
 
+      {view.application && chatId && (
+        <OperatorConsole
+          key={`settings:${view.application.id}:${chatId}`}
+          applicationId={view.application.id}
+          chatId={chatId}
+          main={view.chats[0]?.id === chatId}
+          settingsOnly
+        />
+      )}
       <Conversation className="sg-conversation">
         <ConversationContent className="sg-messages">
           {reconnecting && (
@@ -358,6 +369,15 @@ export function ChatPane({
             <div className="sg-message sg-message-assistant sg-message-receipts">
               {receipts(unanchored)}
             </div>
+          )}
+
+          {view.application && chatId && (
+            <OperatorConsole
+              key={`executions:${view.application.id}:${chatId}`}
+              applicationId={view.application.id}
+              chatId={chatId}
+              main={view.chats[0]?.id === chatId}
+            />
           )}
 
           {pendingMessage !== null && (

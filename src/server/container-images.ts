@@ -27,7 +27,10 @@ function parse(reference: string) {
   // Docker's rule: a first component with a dot or port names a registry.
   const host =
     repository.includes("/") && /[.:]/.test(first) ? first : "docker.io";
-  const path = host === "docker.io" ? repository.replace(/^docker\.io\//, "") : repository.slice(host.length + 1);
+  const path =
+    host === "docker.io"
+      ? repository.replace(/^docker\.io\//, "")
+      : repository.slice(host.length + 1);
   return {
     repository,
     version: reference.slice(split + 1),
@@ -86,7 +89,9 @@ async function pullToken(
   const realm = /realm="([^"]+)"/i.exec(challenge ?? "")?.[1];
   const service = /service="([^"]+)"/i.exec(challenge ?? "")?.[1];
   if (!/^bearer /i.test(challenge ?? "") || !realm)
-    throw new Error("The container registry requires credentials; only public images are supported.");
+    throw new Error(
+      "The container registry requires credentials; only public images are supported.",
+    );
   const url = new URL(realm);
   if (url.protocol !== "https:" || url.username || url.password)
     throw new Error("The container registry named an unusable token service.");
@@ -94,7 +99,8 @@ async function pullToken(
   if (service) url.searchParams.set("service", service);
   url.searchParams.set("scope", `repository:${name}:pull`);
   const response = await fetch(url, { signal, redirect: "error" });
-  if (!response.ok) throw new Error("Container registry authentication failed.");
+  if (!response.ok)
+    throw new Error("Container registry authentication failed.");
   const body = (await response.json()) as {
     token?: unknown;
     access_token?: unknown;

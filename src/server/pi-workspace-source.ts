@@ -6,34 +6,6 @@ export async function applicationWorkspaceSource(
   applicationId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceSource> {
-  const { applicationDeployment } = await import("./deployment-store");
-  const deployment = applicationDeployment(applicationId);
-  if (deployment?.revision) {
-    const { checkDeploymentSource } = await import("./deployment-source");
-    const { releaseOf } = await import("./deployment-release");
-    const { deploymentRuntime } = await import("./deployment-runtime");
-    const { currentConfigurationFiles } = await import("./native-compose");
-    const { token } = await checkDeploymentSource(deployment);
-    // The deployed configuration beside its source: evidence of what the
-    // host was last told to run, including every file it built or mounted.
-    const release = releaseOf(deployment);
-    return {
-      description: `${deployment.repository}@${deployment.revision}${
-        release
-          ? `\n.server-guy/current/ holds the configuration last executed on the host (release ${release.id.slice(0, 12)}, runtime ${deploymentRuntime(deployment).state}): compose.json as resolved, with private values only as \${NAME}; release.json with the records Compose cannot express; files/ with every file it built or mounted.`
-          : ""
-      }`,
-      files: [
-        ...(await fetchBaseTree(
-          deployment.repository,
-          deployment.revision,
-          token,
-          signal,
-        )),
-        ...(release ? currentConfigurationFiles(release) : []),
-      ],
-    };
-  }
   // Before a deployment selects a revision, read the default branch as it is
   // now, through the repository identity a successful access check recorded.
   const { getApplication } = await import("./db");
@@ -64,7 +36,7 @@ export async function applicationWorkspaceSource(
   if (!commit.sha || !/^[0-9a-f]{40}$/.test(commit.sha))
     throw new Error("GitHub did not identify the default branch revision.");
   return {
-    description: `${repository}@${commit.sha}, the ${branch} branch when this request started; no deployment has selected a revision yet`,
+    description: `${repository}@${commit.sha}, the ${branch} branch when this request started; repository snapshot for this request`,
     files: await fetchBaseTree(repository, commit.sha, token, signal),
   };
 }

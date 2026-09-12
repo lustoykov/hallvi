@@ -1,5 +1,7 @@
 # Dashboard redesign — prototype
 
+These are existing visual explorations and implementation notes. The [operator design](../../../../docs/operator-design.md) now governs architecture and sequencing: keep the sidebar as a starting point, adapt the deployment journey first, then revisit each view. Depicted monitoring, backup actions, fixed operation states and future controls are not an implementation checklist for the redesign.
+
 The designs the owner chose, rendered inside the real application shell on
 the real routes: Overview and Architecture from
 `claude/architecture-directions`, Deployment and History from

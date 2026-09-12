@@ -434,9 +434,7 @@ describe("applications and conversations", () => {
       repositoryOwner: "lustoykov",
       repositoryName: "todo-fastapi",
     });
-    expect(view.chats.map((chat) => chat.title)).toEqual([
-      "Deploy application",
-    ]);
+    expect(view.chats.map((chat) => chat.title)).toEqual(["Main operator"]);
     expect(view.messages).toMatchObject([
       { role: "assistant", source: "server-guy" },
     ]);

@@ -1,9 +1,11 @@
 # Scheduled backup runner contract
 
+This is the contract of the existing runner and its installed consumers. It is not a prescribed backup workflow for the [operator redesign](../../docs/operator-design.md); broader backup-view design is deferred. Change or retire this contract with its actual consumers, preserving required records and data.
+
 The host-side engine that protects one deployment on a schedule. The controller
 installs it, a systemd timer runs it, and the controller reads its receipts.
-This file is the integration surface: everything below is stable, everything
-else is an implementation detail.
+This file documents the current integration surface; other runner internals
+are implementation details.
 
 ## Invocation
 

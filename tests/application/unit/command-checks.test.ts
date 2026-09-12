@@ -151,7 +151,9 @@ it("resolves a held command from the host's record: never started, still running
   const pending = deployment.commandPending!;
   const reply = (tail: string, output = "") =>
     mocks.ssh.mockImplementationOnce(async (_record, script: string) => {
-      const marker = /printf '\\n(SG_CHECK_RECORD_[0-9a-f]+)%s/.exec(script)![1];
+      const marker = /printf '\\n(SG_CHECK_RECORD_[0-9a-f]+)%s/.exec(
+        script,
+      )![1];
       expect(script).toContain(`${pending.results}/${pending.token}`);
       return `${output}\n${marker}${tail}\n`;
     });

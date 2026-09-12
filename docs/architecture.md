@@ -1,6 +1,20 @@
 # Architecture
 
-Current at schema v14, 11 September 2026. Server Guy is a Next.js application with SQLite records and a Node worker running Pi. Pi investigates, authors configuration and chooses corrections; tools execute authorized effects and record actual outcomes. [Product](../PRODUCT.md) defines scope, [requirements](requirements.md) defines outcomes, and [Roadmap](../ROADMAP.md) owns what remains.
+The [operator design](operator-design.md) defines the target. Delivery follows the [Roadmap](../ROADMAP.md).
+
+## Current operator checkpoint
+
+The main application conversation owns general server execution. `pi.ts` registers repository workspace tools, `server_bash`, `request_approval` and `get_application_status`; side chats get only read/search and recorded evidence. The Node worker runs Pi directly. The old deployment/operation workers and their mutation endpoints and approval controls are deleted.
+
+`operator-execution.ts` owns application permission settings, an existing SSH connection and per-call JSON execution history. Credentials stay in controller-side files. Always ask pauses each command/file mutation; Pi decides permits ordinary execution and exposes an explicit approval tool; Bypass does not prompt. The UI reads pending calls and records a decision, and the live tool continues or declines. A worker restart does not replay calls. The default ten-minute conversation deadline was removed; host commands retain individual timeouts and report uncertain termination.
+
+The first chat is the permanent main conversation. The worker still serializes turns globally; native queue/steer and parallel read-only side explanations are the next increment. Provider provisioning and shared knowledge presentation are also unfinished. See [verification](testing/2026-09-12-operator-execution.md).
+
+## Previous architecture and remaining legacy modules
+
+The sections below describe the pre-redesign implementation at PR #49. Remaining modules/tables are transitional, not requirements or a preservation checklist. Current development data and obsolete code may be discarded.
+
+Implementation baseline: schema v14, merged PR #49 at `2a1258a`. Server Guy is a Next.js application with SQLite records and a Node worker running Pi. Pi investigates, authors configuration and chooses corrections; tools execute authorized effects and record actual outcomes. [Product](../PRODUCT.md) defines scope, [requirements](requirements.md) defines outcomes, and [Roadmap](../ROADMAP.md) owns what remains.
 
 ```mermaid
 flowchart TD
@@ -95,4 +109,4 @@ Compatible rollback selects a previously verified release's retained local image
 
 Core source: [Pi runtime](../src/server/pi.ts), [evidence tools](../src/server/pi-evidence.ts), [workspace](../src/server/pi-workspace.ts), [planner](../src/server/deployment-planner.ts), [native preparation](../src/server/native-compose.ts), [shared release loop](../src/server/application-releases.ts), [executor](../src/server/release-executor.ts), [command checks](../src/server/command-checks.ts), [release facts](../src/server/release-facts.ts), [operation store](../src/server/operation-store.ts), [reconciliation](../src/server/release-reconciliation.ts), [backup runner](../scripts/scheduled-backups/runner.py), [rollback](../src/server/rollback.ts) and the [schema 14 migration](../scripts/retire-preparation.mjs).
 
-[Evidence](testing/README.md) distinguishes actual model runs, scripted tests, local Docker and live-host observations. PRs #43–#45 established the native path and reuse across two application structures; that is demonstrated generalization, not universal compatibility. Preserve existing IDs, native sessions, history and pending-work evidence when changing legacy storage. Retire obsolete implementation only when its required behavior has an equivalent path.
+[Evidence](testing/README.md) distinguishes actual model runs, scripted tests, local Docker and live-host observations. PRs #43–#45 established the native path and reuse across two application structures; that is demonstrated generalization, not universal compatibility. For the redesign, existing development records may be discarded instead of migrated. Retain behavior still required by the agreed design; explicitly retire obsolete workflow constraints and their tests. Preserving historical records does not require preserving the executors that produced them.

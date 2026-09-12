@@ -23,12 +23,27 @@ If there are no material findings, say so directly.
   generalized systems.
 - Ask what required behavior would break if the machinery were deleted. If
   nothing required breaks, recommend deleting it.
-- Do not simplify away correctness, required capability, observability, data
-  protection, recovery, or testability.
+- Preserve correctness and capabilities required by the stage under review.
+  Do not turn deferred hardening or old acceptance rubrics into new blockers.
 - Recommend the smallest corrective change. Do not propose a broad redesign
   unless the current design fundamentally prevents the requirement.
 
-## Preserve Server Guy's current boundaries
+## Follow the agreed architecture
+
+- Use [operator design](docs/operator-design.md) for the new architecture and
+  [Roadmap](ROADMAP.md) for stage scope. Existing implementation descriptions
+  and dated audits do not require retaining obsolete workflow gates.
+- Expect one main operator, general tools, independent permission modes and
+  shared knowledge with optional presentation. Reuse Pi's native capabilities.
+- Welcome deletion of obsolete code, tests, migrations and recovery machinery.
+  Existing development data is explicitly disposable; do not demand compatibility
+  adapters or durable approval replay. Pi handles operational repair through general tools.
+- Use exactly three permission modes with no provider exception to Bypass.
+  Approval is a pending call awaiting the UI decision.
+- Welcome deletion of obsolete hardening cases. Report a
+  removed check only when the behavior it protected is still required.
+- Prove the deployment path before defining all sidebar capabilities. Avoid
+  exhaustive compatibility or failure matrices as requirements for early stages.
 
 - Keep the current implementation a full-stack Next.js modular monolith until
   a concrete requirement proves that another service or process is necessary.

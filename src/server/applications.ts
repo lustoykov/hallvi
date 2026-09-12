@@ -80,7 +80,7 @@ export async function createApplication(input: CreateApplicationInput) {
       },
       input.requestKey,
     );
-    const chat = insertChat(application.id, "Deploy application");
+    const chat = insertChat(application.id, "Main operator");
     insertMessage(
       chat.id,
       "assistant",
@@ -367,7 +367,7 @@ export function createChat(applicationId: string, title?: string) {
   insertMessage(
     chat.id,
     "assistant",
-    `We can continue working on ${application.name} here. The application keeps its configuration and history; this conversation starts fresh.`,
+    `This is a read-only side chat for ${application.name}. I can explain the application and its execution history. Send commands and changes to the main conversation.`,
     "server-guy",
   );
   // Chat administration is visible in the chat list; it is not an application
@@ -378,13 +378,8 @@ export function createChat(applicationId: string, title?: string) {
 export function archiveChat(applicationId: string, chatId: string) {
   const { application, chat } = loadChat(applicationId, chatId);
   assertChatWritable(chat);
-  if (
-    listApplicationChats(application.id).filter((item) => !item.archivedAt)
-      .length < 2
-  )
-    throw new Error(
-      "Keep at least one active conversation. Start another before archiving this one.",
-    );
+  if (listApplicationChats(application.id)[0]?.id === chatId)
+    throw new Error("The main operator conversation cannot be archived.");
   archiveChatRecord(chat.id);
 }
 

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
-import type { ApplicationFacts, ViewAction } from "@/server/application-facts";
+import type { ApplicationFacts } from "@/server/application-facts";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
 import type {
@@ -19,7 +19,6 @@ import type {
 } from "@/server/types";
 
 import { api } from "./api";
-import { useFirewallFacts } from "./use-firewall-facts";
 import {
   ApplicationIdentity,
   type IdentityVariant,
@@ -33,12 +32,10 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
-import { DeploymentPanel } from "./deployment-panel";
-import { OperationControls } from "./operation-controls";
-import { DeploymentDecision } from "./deployment-decision";
 import type { DeploymentRecord } from "@/server/deployment-types";
 import "./application-shell.css";
 import "./views.css";
+import { OperatorConsole } from "./operator-console";
 import { ChatPane, type MessageHighlight } from "./chat-pane";
 import {
   conversationMarks,
@@ -130,16 +127,13 @@ export function OperatorShell({
   identityVariant?: IdentityVariant;
 }) {
   const router = useRouter();
-  const showDeployment = !demo;
-  const [deployment, setDeployment] = useState<DeploymentRecord | null>(null);
+  const [deployment] = useState<DeploymentRecord | null>(null);
   // Until the first response arrives a view cannot honestly say a resource
   // is absent, so it shows the shape of the answer instead.
   const [recordLoaded, setRecordLoaded] = useState(demo);
-  const [hetznerConnected, setHetznerConnected] = useState(false);
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
     null,
   );
-  const firewall = useFirewallFacts(deployment, activeSection === "security");
   const recordVisible = activeSection !== null;
   const [seen, setSeen] = useState<Partial<Record<ApplicationSection, string>>>(
     {},
@@ -208,11 +202,6 @@ export function OperatorShell({
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [backupRequest, setBackupRequest] = useState<{
-    applicationId: string;
-    busy: string | null;
-    error: string | null;
-  } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const submittingChat = useRef<string | null>(null);
@@ -225,14 +214,7 @@ export function OperatorShell({
   const selectedChatId = view.selectedChatId;
   const refreshDeployment = useCallback(async () => {
     if (!applicationId || !selectedChatId || demo) return;
-    const response = await fetch(
-      `/api/applications/${applicationId}/deployment`,
-    );
     setRecordLoaded(true);
-    if (!response.ok) return;
-    const value = await response.json();
-    setDeployment(value.deployment);
-    setHetznerConnected(value.connected);
     {
       const next = await api.view(applicationId, selectedChatId);
       setView((current) =>
@@ -245,43 +227,6 @@ export function OperatorShell({
       );
     }
   }, [applicationId, selectedChatId, demo]);
-  async function backupAction(action: ViewAction) {
-    if (
-      !applicationId ||
-      ![
-        "configure-backups",
-        "run-backup",
-        "test-restore",
-        "refresh-backups",
-      ].includes(action.type)
-    )
-      return;
-    setBackupRequest({ applicationId, busy: action.type, error: null });
-    try {
-      const response = await fetch(
-        `/api/applications/${applicationId}/backups`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: action.type }),
-        },
-      );
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error ?? "Could not start the backup action.");
-      await refreshDeployment();
-      setBackupRequest({ applicationId, busy: null, error: null });
-    } catch (failure) {
-      setBackupRequest({
-        applicationId,
-        busy: null,
-        error:
-          failure instanceof Error
-            ? failure.message
-            : "Could not complete the backup request.",
-      });
-    }
-  }
   useEffect(() => {
     const initial = window.setTimeout(() => {
       void refreshDeployment().catch(() => setRecordLoaded(true));
@@ -303,7 +248,7 @@ export function OperatorShell({
   const stack = useMemo(() => stackOf(deployment), [deployment]);
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.
-  const facts: ApplicationFacts = { ...view.facts, ...firewall.facts };
+  const facts: ApplicationFacts = { ...view.facts };
   const [stackRevealed, setStackRevealed] = useState(false);
   // The open destination is being looked at: it never shows "updated".
   const indicators = navigationIndicators(operations, seen);
@@ -670,36 +615,7 @@ export function OperatorShell({
               now={now}
               loading={!recordLoaded}
               facts={facts}
-              busy={
-                activeSection === "backups" &&
-                backupRequest &&
-                backupRequest.applicationId === applicationId
-                  ? backupRequest.busy
-                  : firewall.loading
-                    ? "check-firewall"
-                    : null
-              }
-              onAction={
-                activeSection === "security" && deployment?.serverId
-                  ? () => firewall.refresh()
-                  : activeSection === "backups" &&
-                      (facts.protection || facts.backupSetup)
-                    ? backupAction
-                    : undefined
-              }
               onRefresh={refreshDeployment}
-              decisionFor={(operation) =>
-                (operation.source.type !== "deployment" ||
-                  operation.state === "queued") &&
-                applicationId ? (
-                  <OperationControls
-                    key={operation.id}
-                    applicationId={applicationId}
-                    operation={operation}
-                    onRefresh={refreshDeployment}
-                  />
-                ) : null
-              }
               onOpenDestination={selectSection}
               onOpenConversation={openConversation}
               onAsk={askInConversation}
@@ -729,36 +645,22 @@ export function OperatorShell({
               }
             >
               {activeSection === "deployment" &&
-                showDeployment &&
                 applicationId &&
                 selectedChatId && (
-                  <DeploymentPanel
+                  <OperatorConsole
                     applicationId={applicationId}
                     chatId={selectedChatId}
-                    record={deployment}
-                    connected={hetznerConnected}
-                    onRefresh={refreshDeployment}
+                    main={view.chats[0]?.id === selectedChatId}
+                    settingsOnly
                   />
                 )}
-              {activeSection === "security" &&
-                (firewall.loading || firewall.error) && (
-                  <p role="status" className="sg-section-note">
-                    {firewall.loading
-                      ? "Checking Hetzner firewall rules…"
-                      : firewall.error}
-                    {firewall.error &&
-                      firewall.facts.security &&
-                      " The last successful check is shown below."}
-                  </p>
-                )}
-              {activeSection === "backups" &&
-                backupRequest &&
-                backupRequest.applicationId === applicationId &&
-                backupRequest.error && (
-                  <p role="alert" className="sg-section-note">
-                    {backupRequest.error}
-                  </p>
-                )}
+              {activeSection === "logs" && applicationId && (
+                <OperatorConsole
+                  applicationId={applicationId}
+                  chatId={view.chats[0]?.id ?? ""}
+                  main={false}
+                />
+              )}
             </ApplicationSectionView>
           )}
           <div
@@ -807,32 +709,6 @@ export function OperatorShell({
               onOpenDestination={selectSection}
               onOpenConversation={openConversation}
               highlight={highlight}
-              decisionFor={(operation) =>
-                operation.source.type === "deployment" &&
-                operation.state !== "queued" &&
-                deployment &&
-                operation.id ===
-                  (deployment.operationId ?? `deployment:${deployment.id}`) &&
-                applicationId &&
-                showDeployment ? (
-                  <DeploymentDecision
-                    applicationId={applicationId}
-                    record={deployment}
-                    connected={hetznerConnected}
-                    onRefresh={refreshDeployment}
-                    onOpen={selectSection}
-                  />
-                ) : (operation.source.type !== "deployment" ||
-                    operation.state === "queued") &&
-                  applicationId ? (
-                  <OperationControls
-                    key={operation.id}
-                    applicationId={applicationId}
-                    operation={operation}
-                    onRefresh={refreshDeployment}
-                  />
-                ) : null
-              }
             />
           </div>
         </section>

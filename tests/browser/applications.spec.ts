@@ -165,7 +165,7 @@ test(
 );
 
 test(
-  "P1-04/06 add an application, record a priority, reload",
+  "add an application, send a message and reload",
   journey("add-application"),
   async ({ page }) => {
     // Cold CI navigation took ~60s; leave room for 30s HTTP acceptance and the
@@ -175,18 +175,14 @@ test(
     await expect(page).toHaveURL(/\/applications$/);
     await addApplication(page, "smoke-app");
     await openConversation(page);
-    await send(page, "priority: Fast recovery matters most");
+    const message = "What should we check before deploying?";
+    await send(page, message);
     await page.reload();
     const saved = await view(page);
-    expect(saved.decisions).toHaveLength(1);
-    expect(saved.decisions[0].value).toBe("Fast recovery matters most");
-    expect(saved.decisions[0].sourceMessageId).toBe(saved.messages.at(-2).id);
+    expect(saved.messages.at(-2).body).toBe(message);
     await openConversation(page);
     await expect(
-      page.getByText(
-        "[QA fixture reply] priority: Fast recovery matters most",
-        { exact: true },
-      ),
+      page.getByText(`[QA fixture reply] ${message}`, { exact: true }),
     ).toBeVisible();
   },
 );

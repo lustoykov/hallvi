@@ -22,6 +22,8 @@ rounded: {card: "14px", button: "7px", help: "12px"}
 
 # Settings design reference
 
+This documents the existing settings surface. The [operator redesign](../operator-design.md) adds permission modes whose placement and controls are not designed here yet. Preserve useful visual conventions without treating current settings as feature-complete.
+
 ## Overview
 
 GitHub settings extends the approved Pi setup layout. This is an Operate surface: make the current account, next action, and repository-access implications easy to inspect. This is a settings-specific implementation reference, originally observed on 4 September 2026 and checked against the shared settings CSS on 11 September. It is not a separate product color system. The [application design reference](../../src/components/server-guy/DESIGN.md) owns overall visual language; this document records the settings surface's existing differences.

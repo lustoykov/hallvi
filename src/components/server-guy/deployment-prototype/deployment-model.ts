@@ -256,8 +256,7 @@ export function buildStory({
   );
   const provision = by("provision");
   if (planned.length && provision.length) {
-    const waited =
-      Date.parse(provision[0].at) - Date.parse(planned.at(-1)!.at);
+    const waited = Date.parse(provision[0].at) - Date.parse(planned.at(-1)!.at);
     if (waited > 20_000)
       phases.push({
         id: "approval",

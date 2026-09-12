@@ -47,9 +47,8 @@ function registry(
     "fetch",
     vi.fn(async (input: string | URL, init: RequestInit = {}) => {
       const url = String(input);
-      const authorization = (
-        init.headers as Record<string, string> | undefined
-      )?.Authorization;
+      const authorization = (init.headers as Record<string, string> | undefined)
+        ?.Authorization;
       calls.push({ url, authorization, redirect: init.redirect });
       const { host } = new URL(url);
       if (url.includes("/token?"))

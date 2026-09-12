@@ -1,5 +1,7 @@
 # BookStack follow-ups: plan and status
 
+Historical implementation and proof report for merged PR #49. Its next actions and workflow rules describe that work; [Roadmap](../../ROADMAP.md) now owns delivery, and [operator design](../operator-design.md) supersedes its architectural priorities.
+
 Working plan for implementing the [BookStack audit](2026-09-11-bookstack-audit.md) findings on branch `claude/pi-evidence-and-state`, based on main `0dba3ec` (PR #48). Updated as work lands; the PR description carries the final account.
 
 Principle: support applications through declared requirements with the smallest set of reusable capabilities; Pi plans, investigates and recovers with native tools; the core executes, constrains and records.
