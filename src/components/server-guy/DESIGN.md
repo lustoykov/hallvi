@@ -190,6 +190,37 @@ components:
 
 Pi chooses what to surface through shared knowledge records with optional presentation. One main conversation owns changes; side conversations are read-only, with native queue/steer for active work. The operation receipts, fixed states, approval placement and facts contracts described below document the existing UI. They do not require the redesign to preserve that record model or workflow machinery. Exact new presentation roles are not settled. Review each view's capabilities after the deployment path works.
 
+## The presentation protocol
+
+Pi decides what a view says. This decides how it is said, so a destination nobody has designed yet still comes out looking like the rest of the product. Everything that renders a saved record obeys it.
+
+**One source of tone.** `presentation.css` holds the tokens and the certainty tag; `presentation.tsx` holds `Tag`, `Working`, `toneOf` and `rank`. A component that draws a record does not pick its own colour, and no file below this layer writes a hex value for a state. The shell's `--ink`, `--muted` and `--line` and this file's `--verified*`, `--waiting*`, `--failed*`, `--unknown-bg` and `--blue` are the whole palette.
+
+**Five tones, five meanings.** Verified (checked, and the check is recent), stale (true once, wants looking at), failed (it did not work), unknown (recorded, not established), absent (retired, or never there). Each carries an icon as well as a tint so the state survives a colour-blind reading. A component never chooses a tone from a literal — it passes the record to `toneOf`.
+
+**Never print the enum.** `status: "info"` reads “Recorded”. `status: "warning"` reads “Needs attention”. A raw field name on screen means the design stopped early.
+
+**One certainty per record, at the top left.** The tag, then the title, then when it was established. Never a second badge repeating the first, and never a tint without its word.
+
+**Say which clock.** “Established” when Pi established it, “Saved” when that is all we know. `LocalTime` with `variant="compact"` — the full date lives in the hover title. One timestamp per fact: if the header carries it, the footer does not.
+
+**One measure.** Prose, the checks grid and the next step all stop at 68ch. A body longer than four lines folds, with the control only offered when something is folded away; a view of six records must stay scannable without scrolling past one of them.
+
+**Checks are the substance.** What was actually verified goes in `checks`, one line each, with its own pass/fail/noted mark — not buried in the prose. Failed checks colour their own line and nothing else.
+
+**Actions are pills, and there is at most one primary.** The primary is the application itself. A card never offers to open the page it is already on; pass `currentView` and it will not.
+
+**Evidence is a disclosure.** Counted, closed by default, named for what it is (“What this rests on”), never an open list of ids.
+
+**Attention first.** Views sort with `rank`: failed, then needs attention, then what is simply true, then what Pi suggests, then retired. No group headings — with two or three records they weigh more than the records do.
+
+**Empty means unestablished, never healthy.** “Nothing has been established here yet”, and a sentence saying that is not a claim that there is nothing to find. Never an empty state that implies working backups, an absent firewall or a healthy application.
+
+**Motion is for state, not arrival.** `--fast` for the press of a control, `--base` for a state changing, nothing on page entrance. Every transition has a reduced-motion answer in the same file.
+
+**Adding a destination** means rendering `InformationCard` from the sorted records with `currentView` set, and nothing else until that destination earns more. The content contract Pi writes against lives with the `save_information` tool in `src/server/pi.ts`; when a component needs a field the records do not carry, the fix is that contract, not a component that invents one.
+
+
 ## Overview
 
 **Creative North Star: "Quiet application workspace"**

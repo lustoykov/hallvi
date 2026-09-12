@@ -9,36 +9,85 @@
   padding: 12px 20px;
   border-bottom: 1px solid var(--border, #e6e6e6);
 }
-.sg-operator-toolbar label {
+.sg-modes {
   margin-left: auto;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
+  color: var(--muted);
+  font-size: 12.5px;
 }
-.sg-operator-toolbar select {
-  border: 1px solid #dededb;
-  border-radius: 6px;
-  padding: 5px 8px;
+.sg-modes [role="radiogroup"] {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: #eceff5;
+  box-shadow: inset 0 1px 2px rgb(23 34 56 / 10%);
+}
+.sg-modes button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
   background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    background-color var(--base) var(--ease-out),
+    color var(--base) var(--ease-out);
+}
+.sg-modes button:hover:not([aria-checked="true"]) {
+  color: var(--ink-2);
+}
+.sg-modes button[aria-checked="true"] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow:
+    0 1px 1px rgb(23 34 56 / 10%),
+    inset 0 0 0 1px rgb(40 90 216 / 10%);
+}
+.sg-modes button[disabled] {
+  cursor: default;
 }
 .sg-execution {
-  border: 1px solid #dededb;
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px;
   margin: 12px 0;
+  background: #fff;
 }
 .sg-execution header {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 10px;
 }
-.sg-execution header span {
-  color: #696960;
+.sg-execution header strong {
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--ink);
 }
-.sg-execution p {
-  color: #696960;
-  font-size: 12px;
-  margin: 4px 0 10px;
+.sg-execution-where {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.sg-execution-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.sg-execution-state em {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-style: normal;
 }
 .sg-execution pre {
   white-space: pre-wrap;
@@ -46,17 +95,18 @@
   max-height: 320px;
   overflow: auto;
   padding: 10px;
-  background: #f5f5f1;
+  background: var(--context);
   border-radius: 5px;
   font-size: 12px;
   margin-top: 8px;
 }
 .sg-execution.awaiting-approval {
-  border-color: #c5a650;
-  background: #fffcf3;
+  border-color: var(--waiting-line);
+  background: var(--waiting-bg);
 }
-.sg-execution.failed {
-  border-color: #d8a5a0;
+.sg-execution.failed,
+.sg-execution.interrupted {
+  border-color: var(--failed-line);
 }
 .sg-execution-actions {
   display: flex;
@@ -72,14 +122,14 @@
 .sg-stream > summary {
   cursor: pointer;
   padding: 6px 0;
-  color: #315bc6;
+  color: var(--link);
   width: fit-content;
 }
 .sg-stream-terminal {
   margin-top: 8px;
   overflow: hidden;
   border-radius: 7px;
-  background: #202838;
+  background: var(--ink);
   color: #f7f8fa;
 }
 .sg-stream pre {
