@@ -2,6 +2,13 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "shared-information",
+    name: "Shared outcome cards",
+    description:
+      "Render rich records in chat and their selected views, including after refresh.",
+    smoke: true,
+  },
+  {
     id: "application-shell",
     name: "Application workspace",
     description:

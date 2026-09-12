@@ -282,6 +282,8 @@ export function OperatorShell({
               ...current,
               messages: mergeMessages(current.messages, snapshot.messages),
               activity: snapshot.activity ?? current.activity,
+              information: snapshot.information ?? current.information,
+              executions: snapshot.executions ?? current.executions,
               operations: snapshot.operations ?? current.operations,
             }
           : current,
@@ -644,16 +646,6 @@ export function OperatorShell({
                 </div>
               }
             >
-              {activeSection === "deployment" &&
-                applicationId &&
-                selectedChatId && (
-                  <OperatorConsole
-                    applicationId={applicationId}
-                    chatId={selectedChatId}
-                    main={view.chats[0]?.id === selectedChatId}
-                    settingsOnly
-                  />
-                )}
               {activeSection === "logs" && applicationId && (
                 <OperatorConsole
                   applicationId={applicationId}

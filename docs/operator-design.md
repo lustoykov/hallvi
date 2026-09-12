@@ -37,8 +37,8 @@ Application-error detection is explicitly deferred. Interpreting arbitrary appli
 
 1. **Design the main deployment happy path.** Work from a concrete deployment request through a verified, usable application. Settle the interactions and minimum architecture needed for that journey before implementation.
 2. **Implement and prove that journey once its design is agreed.** Adapt the UI wherever the main path needs it. Verify real behavior throughout development and remove obsolete machinery as its replacement works.
-3. **Then review every sidebar view individually.** Decide what each view can usefully show and do from the experience of a working deployment path. Define its capabilities and care practices at that point rather than committing to all verticals in advance.
-4. **Broaden hardening after the architecture and journey are established.** Let actual use and community feedback inform additional cases and refinements.
+4. **Then review every sidebar view individually.** Decide what each view can usefully show and do from the experience of a working deployment path. Define its capabilities and care practices at that point rather than committing to all verticals in advance.
+5. **Broaden hardening after the architecture and journey are established.** Let actual use and community feedback inform additional cases and refinements.
 
 This is a sequencing boundary, not a promise to implement every example elsewhere in this document. Broader monitoring, per-view actions, detailed care policies and speculative extensibility are not prerequisites for the deployment path. Add supporting capability only when the main journey demonstrates a concrete need.
 
@@ -76,10 +76,13 @@ Start with one concrete application per tier. Prove the lightweight path first, 
 
 The architectural direction is sufficiently clear to begin bounded implementation after agreeing the first stage. Resolve remaining details inside the smallest relevant stage rather than planning every vertical up front. Each stage should produce a coherent diff, something the user can try, a short account of verification and limitations, and a list of obsolete machinery removed. Offer review between stages rather than accumulating one large redesign.
 
-1. **One operator and responsive conversation.** Establish the main conversation as the sole owner of changes. Integrate Pi's native queue and steer behavior and a read-only side-chat interaction. Verify that users can follow and redirect active work, that side chats cannot write, and that pending messages remain understandable across reloads. This establishes interaction and ownership, not a new deployment engine.
-2. **General server execution and permissions.** Let the main operator execute general server commands through the selected permission mode, with useful output and recorded outcomes. Demonstrate an ordinary host task directly in conversation and verify relevant permission behavior. Reuse transport where useful; delete workflow-specific execution and recovery machinery. Use a fresh schema instead of migrating old development records.
-3. **Complete the lightweight deployment journey.** Deploy one selected lightweight application through the main operator's general tools, verify useful behavior, and surface the result using the minimum shared-record and presentation capabilities needed. Adapt the UI to this actual journey. Remove the replaced deployment/planning path and its obsolete records and tests.
-4. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then review the medium result before the more complicated example. Add only capabilities those concrete deployments demonstrate are necessary; keep the same operator and tools. These are separate reviewable increments, not a single three-application change.
+1. **Main operator, execution and permissions — first slice implemented.** One conversation owns changes and has general host commands, the three permission modes and execution history. This proved execution; it did not complete the new database model or deployment onboarding.
+2. **Four-table storage and presentation references.** Implement the agreed storage checkpoint below, remove replaced workflow code and reset disposable application data. Verify refresh, approvals, native conversation continuity and rich saved-information cards. Review separately.
+3. **Hetzner provisioning.** Pi inspects a real repository and arranges a host within the deployment journey. Save its identity and connection using the new application model; review the interaction before deployment.
+4. **Complete the lightweight deployment journey.** Deploy one selected lightweight application through the main operator's general tools, verify useful behavior, and surface the result using minimum shared-record and presentation capabilities. Adapt the UI to this journey and remove replaced planning/workflow code and tests.
+5. **Prove generalization progressively.** Review the lightweight journey before moving to the medium example, then the more complicated example. Add capabilities those deployments actually need. These remain separate reviewable increments.
+
+**Queue, steer and side-chat work is deferred to a later milestone.** Get the core deployment experience right first. Existing read-only tool restrictions remain in effect; native queue/steer, contextual side-chat opening and concurrent side explanations are not part of the provisioning milestone.
 
 After those checkpoints establish the deployment journey, begin the view-by-view design work described above. Detailed care features and broad hardening remain deferred. Exact application repositories, final record fields and visual details can be settled at the relevant checkpoint; they do not require another comprehensive architecture exercise.
 
@@ -90,7 +93,7 @@ This walkthrough is a proposal to refine with the user, not a fixed workflow or 
 | “Deploy this repository” | Inspect available source, existing connections and saved preferences. | Enter or select the repository and a request; enter the main conversation without an infrastructure questionnaire. |
 | Understand what is needed | Determine how the application runs, its dependencies, configuration and persistent data. | A concise explanation of the intended setup; ask only for access, private inputs or consequential choices that are actually missing. |
 | Establish the target | Recommend an appropriate server using available context, explain any new cost, and obtain authority when needed under the permission mode. | A concrete recommendation or decision in the conversation, not a mandatory release-proposal workflow. |
-| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress, expandable execution logs, and queue/steer/side-chat controls. |
+| Prepare and deploy | Use general tools to prepare the host and configuration and start the application; respond to native tool feedback. | Legible progress and expandable execution logs. Queue/steer/side-chat controls follow in a later milestone. |
 | Verify useful behavior | Choose and execute checks appropriate to the actual application, including reachability and meaningful behavior. | Explain what was actually verified and any remaining limitation. |
 | Hand over a working application | Preserve useful configuration and consequential knowledge and publish the relevant outcome. | An application link where applicable, an understandable deployment result and evidence available in the relevant existing views. |
 
@@ -108,7 +111,7 @@ Background work and, eventually, requests from other agents must coordinate with
 
 ### Interaction while Pi is busy
 
-Use the familiar queue/steer/side-chat interaction described by the user, reusing Pi's native session capabilities rather than building another conversation scheduler:
+For the deferred conversation-controls milestone, use the familiar queue/steer/side-chat interaction described by the user, reusing Pi's native session capabilities rather than building another conversation scheduler:
 
 | Interaction | Intended behavior |
 | --- | --- |
@@ -268,17 +271,50 @@ The immediate next design exercise is the main deployment happy path. Monitoring
 
 When adding an operational capability, can Pi accomplish it through general tools and explain it through existing presentation primitives? Requiring another workflow, approval type and database entity for each capability is a sign that the design is drifting from this direction.
 
-Continue designing before choosing implementation slices or rewriting the schema. Keep this document updated as decisions are made, and distinguish agreed principles from illustrative proposals.
+The four-table checkpoint below is approved for implementation. Keep this document updated as decisions are made, and distinguish agreed principles from illustrative proposals.
 
 
 ## First implementation checkpoint — 12 September 2026
 
-The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The current worker still processes turns serially; concurrent side explanations and native queue/steer are the next lifecycle increment.
+The first conversation is the main operator and cannot be archived. Other conversations receive only repository read/search and stored application/execution evidence tools. Only the main operator gets workspace mutations, server Bash and approval requests. The current worker still processes turns serially; concurrent side explanations and native queue/steer are deferred until the core deployment experience is established.
 
 An existing server connection contains address, SSH user/port and controller-side paths to a key and verified known-hosts file. Pi sees the target and command, not those credential paths. Provider provisioning and named private-input injection are not implemented in this checkpoint.
 
-Permission settings and per-call execution JSON files live under the application's operator directory. Each execution retains target, input, mode, status, bounded output, exit code and any approval reference. A pending approval waits in the live tool call for the UI's decision. There is no approval replay after a worker restart. Cancelled/failed turns may have already produced effects; Pi reads the evidence and investigates through general tools.
+In that first checkpoint, permission settings and per-call execution JSON files lived under the application’s operator directory. Schema 15 moves settings into the application row; executions remain files. Each execution retains target, input, mode, status, bounded output, exit code and any approval reference. A pending approval waits in the live tool call for the UI's decision. There is no approval replay after a worker restart. Cancelled/failed turns may have already produced effects; Pi reads the evidence and investigates through general tools.
 
 The old deployment/operation workers, mutation endpoints and approval cards have been deleted. Remaining workflow modules and tables are transitional implementation to remove as the new deployment path replaces them; they are not constraints on that path. No compatibility migration is required.
 
 Verification and limits are recorded in the [checkpoint evidence](testing/2026-09-12-operator-execution.md). This is an execution checkpoint, not a completed deployment journey.
+
+
+### Server setup belongs in the deployment journey
+
+The execution checkpoint proves that Pi can run commands on a selected host. It does not establish server onboarding. Its test ran against a temporary SSH server on the development Mac, not a Hetzner host. The standalone SSH attachment button and file-path form were premature and have been removed from the product UI.
+
+The deployment journey should first let Pi inspect the application and determine its needs. When a host is needed, integrate Hetzner provisioning or bring-your-own-machine setup into that journey, using the chosen permission mode and designed input controls. Pi then executes on the selected host and verifies the application. Detailed provider and machine-connection interactions belong to that upcoming checkpoint.
+
+Conversation identity appears in the page header and corresponding navigation entry. The permission control should not repeat the conversation title, and the chat body needs no second title header.
+
+
+### Controller storage versus the deployed application's database
+
+The controller currently uses SQLite and still has legacy `deployments` and `application_operations` tables. The execution checkpoint did not replace that schema. A separate storage checkpoint before provisioning replaces this storage and initializes fresh development application data; there is no requirement to provision a separate hosted database for Server Guy merely to use Hetzner.
+
+A database needed by the deployed application is a separate concern. Pi determines that requirement from the repository and prepares the appropriate database on the target as part of deployment. A lightweight application may not need one at all.
+
+## Agreed storage checkpoint — four tables
+
+Implement and review storage before Hetzner provisioning, then review provisioning before the first lightweight deployment. Queue/steer and further side-chat interactions stay deferred. Old development application data is disposable; account credentials and `.env.local` are separate and must remain.
+
+- **Applications:** repository identity and latest access check, permission mode (Pi decides by default), optional host connection with controller credential references and optional provider/server identity, timestamps.
+- **Conversations:** application/title, one main conversation and read-only sides, native session reference, current status and response pointer, timestamps. The worker enforces one active turn; the main label alone is not a lock.
+- **Messages:** user-facing text and structured references to saved information or executions, source, completion state and timestamps. Response delivery metadata belongs here; there is no separate runs table. An in-memory response projection may serve the worker/API without duplicating database records.
+- **Saved information:** application, title/body, evidence references, establishment time, optional presentation (views, role, outcome, checks, next step and URL), creation/update/retirement times. Pi searches, saves, updates and retires it. Presentation is optional: private working knowledge and surfaced information use the same record. Saved preferences cannot override permission settings.
+
+Native Pi JSONL holds full model/tool context. Executor-owned files automatically hold execution IDs, commands, targets, approvals, bounded output and outcomes. Approval waits on the original live call and uses a separate decision file; no reissued-command hash matching or replay framework. Refresh loads SQLite and file evidence and reconnects to streaming updates; worker restart marks unfinished replies interrupted and never replays commands.
+
+Messages support a small product-owned block vocabulary, not arbitrary generated UI. A saved-information reference renders the same card in chat and its selected sidebar views. Pi chooses the content; components provide consistent badges, checks, links and expansion. A deployment outcome has a structured URL and evidence. Empty views never infer that a recorded host means a verified deployment.
+
+Ordinary knowledge can update in place. Historical outcomes remain separate records for separate events; no universal superseding/version-history mechanism. Controller-managed secrets are named and application-scoped; database records hold references. Secret-generation and injection tools arrive with the deployment need.
+
+Delete decisions, observations, activity events, deployment/operation records and chat-summary storage as their callers are replaced. Detailed vertical design and hardening follow the working deployment journey.

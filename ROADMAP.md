@@ -6,17 +6,27 @@ The active delivery sequence for the application operator redesign. [Product](PR
 
 The first general-execution checkpoint is implemented; see [current evidence](docs/testing/2026-09-12-operator-execution.md). Continue delivering the main deployment journey in small stages the user can try and review. Do not scope every sidebar view or build monitoring/error detection ahead of a working deployment path. View interiors may change wherever the main journey needs them; preserve the sidebar's guiding purpose.
 
-| Checkpoint | Reviewable result |
-| --- | --- |
-| 1. Execution loop — ready for review | Main conversation, existing-host Bash, three permission modes, live approval and execution history. Side chats have read-only tools. |
-| 2. Interact during work | Integrate native queue/steer and concurrent read-only side conversations with the operator lifecycle. |
-| 3. Lightweight deployment | A repository becomes a working application through that operator, with meaningful verification and shared records surfaced in the UI. |
-| 4a. Medium application | The same path handles a database, private configuration, migrations and persistent data. Review before expanding again. |
-| 4b. More complicated application | The same path handles multiple services and a useful background task involving stored data. |
+## Sprint TODO
 
-Stop at the first implementation checkpoint for user review, then use feedback to shape the next increment. Each checkpoint includes a focused diff, a concrete way to try it, verification and limitations, and obsolete machinery removed. Exact example repositories and remaining details are settled in the relevant stage. See the [three complexity tiers](docs/operator-design.md#three-application-complexity-tiers) and [draft journey](docs/operator-design.md#draft-deployment-happy-path).
+This is the single implementation checklist. Completed means merged into `main`; distinguish local work from shipped work. Update the remaining items as implementation and user reviews teach us more.
+
+- [x] **Execution loop** — merged as [5426bbc](https://github.com/lustoykov/server-guy/commit/5426bbc7da15ac3e779d6bb2270785c01bc232db), 12 September 2026. Main conversation, general host Bash, three permission modes, live approval and execution history; side chats have read-only tools. [Verification](docs/testing/2026-09-12-operator-execution.md).
+- [ ] **Finish checkpoint cleanup** — remove the premature server-attachment form and duplicate conversation headings, and clarify server setup in the design. Implemented locally and verified; not yet merged.
+- [ ] **Remove the fake test application** from the normal workspace. Done locally with the schema 15 reset; keep test fixtures separate from applications the user manages.
+- [ ] **Data model — [draft PR #55](https://github.com/lustoykov/server-guy/pull/55), user-tested and awaiting merge.** [Verification](docs/testing/2026-09-12-operator-storage.md). The owner reported the UI works perfectly on 12 September using Docker’s getting-started app. [Main-PC handoff](docs/handoffs/2026-09-12-operator-storage.md). Four tables: applications, conversations, messages and saved information. Put current operator state on the conversation and response; keep native Pi history and execution files. Support text and shared-record/execution references in messages. Delete the replaced workflow tables and callers, initialize fresh development SQLite, and preserve account credentials and `.env.local`. Verify creation, refresh, conversation execution and shared information before review. No provider provisioning in this checkpoint.
+- [ ] **Hetzner provisioning — next checkpoint.** Pi inspects a real repository, determines its needs, arranges a host through general tools and saves its connection. Review server selection within the deployment journey; no standalone SSH attachment form. Settle BYOM interaction here.
+- [ ] **First lightweight deployment.** Pi deploys on the selected host, verifies behavior and saves an outcome with its URL and evidence. Chat, Overview and Deployment render the same saved information. Review before expanding application complexity.
+- [ ] **Medium application.** Prove the same path with a database, private configuration, migrations and persistent data. Review before expanding again.
+- [ ] **More complicated application.** Prove multiple services and a useful background task involving stored data.
+- [ ] **After the deployment journey:** review each sidebar view and define useful capabilities; then broaden hardening and ongoing care.
+
+Stop after each reviewable increment and use the user's feedback to shape the next. Each checkpoint includes a focused diff, a concrete way to try it, verification and limitations, and obsolete machinery removed. Exact example repositories and remaining details are settled in the relevant stage. See the [three complexity tiers](docs/operator-design.md#three-application-complexity-tiers) and [draft journey](docs/operator-design.md#draft-deployment-happy-path).
 
 After the deployment journey works, review every sidebar view individually and decide what it can usefully show and do. Broaden hardening after the architecture is established. Always-on care remains a direction; log-error detection, Pi-authored monitors, detailed care cadences and per-vertical policies are deferred.
+
+## Later milestone: conversation controls
+
+- [ ] **Queue, steer and side chats — deferred.** Revisit native queue/steer, opening contextual side chats and concurrent read-only explanations after the core deployment experience works well. Existing read-only tool restrictions remain, but expanding side-chat behavior is outside the current sprint. Do not make these controls prerequisites for provisioning or first deployment.
 
 ## Verification and deletion
 
@@ -26,9 +36,11 @@ Delete unnecessary code, tests, validators, workflow branches and hardening case
 
 The owner does not use CI as a merge gate. Relevant local checks and concrete execution evidence still apply; broad coverage and additional model runs need a reason. [Test runners](tests/README.md) owns commands.
 
-## Current state
+## Previous architecture evidence
 
-Implementation baseline: merged `2a1258a` (PR #49), reviewed for this redesign on 12 September 2026. The [BookStack follow-ups](docs/testing/2026-09-11-bookstack-followups.md) are merged; their proofs remain dated evidence. These are implementation/evidence statements, not a claim that a particular local dashboard or remote application is currently running this revision.
+The following describes the pre-redesign baseline, not completion of the sprint above. Its old workflows are being replaced; their historical proofs do not establish the new deployment journey.
+
+Previous baseline: merged `2a1258a` (PR #49), reviewed for this redesign on 12 September 2026. The [BookStack follow-ups](docs/testing/2026-09-11-bookstack-followups.md) are merged; their proofs remain dated evidence. These are implementation/evidence statements, not a claim that a particular local dashboard or remote application is currently running this revision.
 
 | Area | Evidence and remaining limit |
 | --- | --- |
@@ -49,5 +61,9 @@ These longer-term product areas are not another ordered implementation checklist
 Optional plugins, a marketplace, external notifications, automatic-on-push releases, previews, dedicated build servers and richer teams have no committed delivery order. Multi-host orchestration, replicas/clusters and automatic failover remain outside the product boundary. A manual replacement host is distinct from failover.
 
 ## Updating this plan
+
+Review this checklist in every implementation PR. Include needed updates in that same PR: completed work, remaining gaps, changed priorities and new findings that affect delivery. If nothing changes, say so briefly in the PR. On merge, confirm the checklist reflects what actually landed and add its PR or commit reference. Apply the same rule to direct commits to `main`.
+
+Keep local/in-review work unchecked until merged. Do not create a separate sprint checklist in another document; the PR template and review guide point here.
 
 Update status only with evidence and its date/candidate. Replace superseded priorities rather than retaining competing plans. Do not store live spending authorization, credentials or temporary machine availability as product requirements. The operator design records the reasoning; this document owns the delivery sequence.

@@ -11,3 +11,9 @@
 ## Verification
 
 <!-- State what was actually checked, how the user can try this stage, and material limitations. Distinguish real Pi/hosts from mocks or local stand-ins. Use proportionate checks; deferred hardening is not a new acceptance checklist. -->
+
+## Sprint tracking
+
+- [ ] Reviewed `ROADMAP.md`; included any needed status, scope or sequencing updates in this PR, or explained why no plan change is needed.
+
+<!-- Keep unmerged work labeled in review. When merging, confirm what landed and record the PR or commit reference in ROADMAP.md. -->

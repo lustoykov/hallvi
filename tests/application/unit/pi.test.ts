@@ -111,7 +111,6 @@ function tool(name: string) {
 it("executes host and workspace mutations through the permission boundary in the main native session", async () => {
   expect(await askPi(input)).toMatchObject({
     message: "Checked.",
-    decisionProposals: [],
   });
   await tool("server_bash").execute("call", { command: "uname -s" });
   expect(mocks.host).toHaveBeenCalledWith(
@@ -144,6 +143,7 @@ it("side chats have no shell, approval or mutation tools", async () => {
     "grep",
     "find",
     "ls",
+    "search_information",
     "get_application_status",
   ]);
   await tool("read").execute("read", { path: "README.md" });

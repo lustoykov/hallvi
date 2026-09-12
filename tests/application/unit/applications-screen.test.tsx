@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import Home from "../../../src/app/page";
 import { ApplicationsScreen } from "../../../src/components/server-guy/applications-screen";
 import { NewApplicationScreen } from "../../../src/components/server-guy/new-application-screen";
-import { listItem } from "../../../src/server/application-list";
+import { listItem } from "../../../src/components/server-guy/reference/list-item";
 import type { ApplicationRecord } from "../../../src/server/types";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));

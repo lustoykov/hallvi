@@ -136,7 +136,6 @@ export interface DeploymentRecord {
    * have changed data, so nothing executes or verifies again until the
    * host's record of it is read, or a new approval accepts the unknown.
    */
-  commandPending?: import("./command-checks").PendingCommand | null;
   repositoryId?: number;
   githubConnectionId?: string;
   cleanup?: { path: string; expectedStatus: number; marker: string } | null;

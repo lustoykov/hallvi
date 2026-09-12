@@ -111,18 +111,9 @@ it("does not duplicate the accepted user message from the first queued Run", asy
   store
     .db()
     .$client.prepare(
-      "INSERT INTO pi_runs (id, application_id, chat_id, user_message_id, assistant_message_id, request_key, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "UPDATE messages SET response_to = ?, request_key = ? WHERE id = ?",
     )
-    .run(
-      "queued-run",
-      applicationId,
-      chatId,
-      user.id,
-      answer.id,
-      "key",
-      "queued",
-      "2026-09-05",
-    );
+    .run(user.id, "key", answer.id);
   const opened = await openNativeChatSession(applicationId, chatId);
   expect(opened.sessionManager.buildSessionContext().messages).toEqual([]);
   opened.release();
@@ -224,7 +215,7 @@ it("releases its lock after an association failure and adopts the initialized he
   store
     .db()
     .$client.exec(
-      "CREATE TRIGGER reject_native_association BEFORE UPDATE OF native_session_id ON chats BEGIN SELECT RAISE(ABORT, 'synthetic association failure'); END",
+      "CREATE TRIGGER reject_native_association BEFORE UPDATE OF native_session_id ON conversations BEGIN SELECT RAISE(ABORT, 'synthetic association failure'); END",
     );
   try {
     await expect(

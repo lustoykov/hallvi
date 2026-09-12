@@ -2,7 +2,7 @@
 // list and the connections. Invented, like everything in the prototype.
 import type { ApplicationListItem } from "../applications-screen";
 import type { ConnectionItem } from "../connections-screen";
-import { listItem } from "@/server/application-list";
+import { listItem } from "./list-item";
 
 import { stateAt } from "./engine";
 import { richScenario } from "./scenario-rich";

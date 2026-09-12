@@ -1,4 +1,3 @@
-import { recordOperationRemoteEffect } from "./application-operations";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -29,7 +28,6 @@ export async function githubJson(
     allowNotFound?: boolean;
   } = {},
 ): Promise<{ data: unknown; scopes: string[] }> {
-  if (options.method) recordOperationRemoteEffect();
   const timeout = AbortSignal.timeout(20_000);
   try {
     const response = await fetch(`https://api.github.com${path}`, {

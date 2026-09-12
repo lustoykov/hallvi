@@ -1,9 +1,6 @@
-import {
-  listActiveDecisions,
-  listActivity,
-  listApplicationChatSummaries,
-  listMessages,
-} from "./db";
+import { listExecutions } from "./operator-execution";
+import { listInformation } from "./saved-information";
+import { listApplicationChatSummaries, listMessages } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
 import type { OperatorView } from "./types";
 
@@ -27,7 +24,15 @@ export function getOperatorView(
     null;
   const access = repositoryAccess(application);
   return {
-    application,
+    application: {
+      id: application.id,
+      name: application.name,
+      repositoryUrl: application.repositoryUrl,
+      repositoryOwner: application.repositoryOwner,
+      repositoryName: application.repositoryName,
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+    },
     repository: {
       status: access.status,
       result: access.result,
@@ -36,11 +41,15 @@ export function getOperatorView(
         : null,
       connected: access.connected,
     },
+    executions: listExecutions(applicationId),
     operations: [],
     chats,
     selectedChatId: selected?.id ?? null,
     messages: selected ? listMessages(selected.id) : [],
-    decisions: listActiveDecisions(application.id),
-    activity: listActivity(application.id),
+    decisions: [],
+    information: listInformation(application.id, "", true).filter(
+      (r) => r.presentation,
+    ),
+    activity: [],
   };
 }

@@ -4,7 +4,7 @@ import { parseJsonRequest } from "@/server/schemas";
 import {
   backupDestination,
   saveBackupDestination,
-} from "@/server/scheduled-backup-install";
+} from "@/server/backup-connection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

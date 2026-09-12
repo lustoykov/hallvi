@@ -59,6 +59,7 @@ If there are no material findings, say so directly.
 ## Check the pull request itself
 
 - The PR states the concrete requirement and where reviewers should focus.
+- The PR reviews `ROADMAP.md` and includes needed sprint status, scope or sequencing updates, or explains why none are needed. Local work must not be presented as already merged.
 - Architecture or control-flow changes are explained with a diagram.
 - Verification is proportionate to the risk and supports the claims being made.
 - The change does not include unrelated refactors or preparatory machinery.

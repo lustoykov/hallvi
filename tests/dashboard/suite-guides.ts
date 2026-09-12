@@ -11,7 +11,7 @@ const browserGuide = {
   isolation:
     "Product journeys start one disposable Server Guy app on port 3180 with its own temporary SQLite file. All selected journeys share that file, but each creates a different application. Example: a priority saved by the isolation journey cannot appear in the revision journey. After the suite, Next.js and the Pi worker stop and the whole /tmp/server-guy-e2e-* directory, database included, is deleted; the dashboard's Stop button and shutdown take the same path. Only a hard kill (SIGKILL) can leave one behind. Port 3000 and your normal database are never opened. Dashboard-only journeys use synthetic dashboard state.",
   checks:
-    "Code assertions check visible UI and saved state: for example, send a priority, reload, and verify its message and Decision. No human or LLM grading.",
+    "Code assertions check visible UI and saved state: for example, send a message, reload, and verify its saved response and shared cards. No human or LLM grading.",
   limits:
     "Passing proves the selected journeys work with simulated providers. It does not prove real OAuth, GitHub access or model response quality.",
   artifacts:
@@ -36,21 +36,21 @@ export const suiteGuides = {
     isolation:
       "Unit tests do not open SQLite. The database-backed integration tests create temporary databases: application tests reuse one file but clear its application rows before every test, while schema tests create a fresh file for every test. Example: a chat saved by one application test cannot appear in the next. After the tests, database connections close and these temporary folders are deleted. Your normal Server Guy database is never opened.",
     checks:
-      "Code assertions compare expected values, errors, saved messages, Decisions and rollback behavior. No human or LLM grading.",
+      "Code assertions compare expected values, errors, saved messages, shared information, permissions and refresh behavior. No human or LLM grading.",
     limits:
       "Passing does not establish browser behavior, real provider access or whether a live model interprets your intent correctly.",
     artifacts:
       "Dashboard runs save the command and terminal output under tests/results/runs/. Temporary integration databases are removed during test teardown.",
     sources: [
       "tests/application/vitest.config.mjs",
-      "tests/application/integration/applications.test.ts",
-      "tests/application/integration/db.test.ts",
+      "tests/application/integration/operator-storage.test.ts",
+      "tests/application/integration/db-setup.test.ts",
     ],
   },
   smoke: {
     ...browserGuide,
     purpose:
-      "The small automatic subset: the application workspace and deployment recovery, adding an application with a priority, and settings with privacy help and saved effort.",
+      "The small automatic subset: the application workspace, shared outcome cards, adding an application and chatting, and settings with privacy help and saved effort.",
     execution:
       "Playwright drives Chromium against a disposable Next.js app and Pi worker. Only the journeys tagged @smoke run.",
     mocked:
@@ -65,25 +65,20 @@ export const suiteGuides = {
   },
   live: {
     purpose:
-      "Exercise the real Server Guy agent, then evaluate both its answer and the state it saved.",
+      "Review retained model answers. The old decision/workflow eval runner is retired during the operator redesign.",
     execution:
-      "Vitest enqueues a saved message, claims its Pi Run, and executes the same worker code in Node.js. No Next.js server, HTTP request or browser is involved.",
-    real: "Pi, the configured model, tool proposals, domain validation and the SQLite transaction. Uses your configured ChatGPT subscription.",
-    mocked:
-      "Application data and existing Decisions are seeded examples. Conversation memory & compaction cases also seed earlier history and usage, with a smaller retained-history setting to trigger real compaction affordably. GitHub is blocked; model replies, tool choices and compaction summaries are not mocked.",
-    isolation:
-      "Each live eval run creates one temporary eval database under /tmp/server-guy-pi-eval-*. All selected cases share that file, but every case and repetition gets a new application and chat. Example: the greeting case cannot inherit messages or Decisions from revise-existing. After the reports are written, the database connection closes and the /tmp/server-guy-pi-eval-* directory is deleted; what remains for review is under tests/results/. The answer report is saved separately under tests/results/evals/. Your normal application database is never opened; configured Pi credentials are real and may be refreshed.",
+      "New live evals are deferred until the deployment tools are ready; eval:pi reports this explicitly.",
+    real: "Retained answers are dated model evidence.",
+    mocked: "No new model call is made by the retired runner.",
+    isolation: "Historical answer files remain separate from application data.",
     checks:
-      "Code checks proposal counts, replacement IDs and persistence. An optional LLM judge and/or a human reviews meaning. LLM clearance is not human approval; failed code checks stay failed.",
-    limits:
-      "Passing covers these inputs with this model at this time. It does not prove browser flows, real GitHub integration or correctness for every prompt. An LLM judge can also be wrong.",
+      "Use the focused operator storage/execution tests for the current checkpoint.",
+    limits: "Historical answers do not verify the redesigned operator.",
     artifacts:
-      "Answers, before/after state and reviews: tests/results/evals/. Temporary eval databases are deleted once the run's reports are written. Archiving a saved run hides it; it does not delete its files.",
+      "Retained answers and reviews remain under tests/results/evals/.",
     sources: [
-      "tests/evals/cases.ts",
-      "tests/evals/pi.eval.ts",
-      "tests/evals/checks.ts",
       "tests/evals/judge.ts",
+      "tests/application/integration/operator-storage.test.ts",
     ],
   },
 };

@@ -135,7 +135,6 @@ export async function executePiRun(
           diagnostics.signal({
             type: "end",
             key: "save",
-            metadata: { requirements: reply.decisionProposals.length },
           });
       } catch (error) {
         diagnostics.signal({ type: "end", key: "save", failed: true });
@@ -192,7 +191,7 @@ export async function executePiRun(
       "failed",
       error instanceof NativeSessionError
         ? error.message
-        : `${advice} Your message is saved; no Decisions were saved from this attempt.`,
+        : `${advice} Your message is saved. Check execution history for any effects.`,
       failure,
     );
   } finally {
