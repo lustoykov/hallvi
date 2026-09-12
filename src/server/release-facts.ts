@@ -258,6 +258,14 @@ export function stateOwners(facts: Pick<ReleaseFacts, "volumes">) {
   );
 }
 
+/** Every service that owns a declared volume, files included: the service
+ * whose decision a change of that volume's declaration or mount needs. */
+export function declaredOwners(facts: Pick<ReleaseFacts, "volumes">) {
+  return new Set(
+    facts.volumes.flatMap((volume) => (volume.owner ? [volume.owner] : [])),
+  );
+}
+
 /** The host port 80 listener, when the release serves primary HTTP. */
 export function primaryHttp(facts: ReleaseFacts | null) {
   return (

@@ -601,6 +601,42 @@ it("a stopped first deployment continues from a conversation under its approval:
   expect(operation(resumed.id)!.state).toBe("verified");
 });
 
+it("an owner of files can be named in a state change, so its declaration or mount can change with a decision", async () => {
+  const record = await stopped((native) => {
+    native.data[0] = {
+      volume: "data",
+      kind: "files",
+      sqlite: null,
+      capture: "quiesced-files",
+      owner: "app",
+    };
+  });
+  expect(getDeployment(record.id)!.status).toBe("failed");
+  const proposed = await proposeApplicationRelease(
+    app,
+    chat,
+    undefined,
+    "Stop capturing the config volume; the application's state is in its database.",
+    undefined,
+    {
+      services: ["app"],
+      evidence:
+        "The volume holds generated settings only; the database keeps every record.",
+    },
+  );
+  expect(proposed.summary).toContain(
+    "Allow changing the image, data declarations and mounts of app",
+  );
+  expect(proposed.summary).toContain("generated settings only");
+  await expect(
+    proposeApplicationRelease(app, chat, undefined, "Switch it", undefined, {
+      services: ["worker"],
+      evidence: "Same data format",
+    }),
+  ).rejects.toThrow(
+    "not a declared owner of persistent data. Declared owners: app.",
+  );
+});
 it("a state owner's image change on a stopped first deployment is a release the owner approves, which finishes the deployment", async () => {
   // The app owns its SQLite volume, so its image is protected.
   const record = await stopped((native) => {

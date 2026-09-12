@@ -394,7 +394,7 @@ export async function askPi(
         name: "prepare_release",
         label: "Prepare application update",
         description:
-          "Propose a release of an already deployed application on its existing host: a selected revision, or corrected configuration. Resolves ref once, defaulting to the default branch's latest commit; to correct configuration without changing code, pass the deployed revision. Requests task-scoped approval: preserve volumes/exposure, no spending, up to three agent-corrected attempts. State in instructions what the release session must achieve and the evidence for a correction; the owner reviews it in the approval. For a first deployment that stopped after its host was prepared, this continues it under the approval it already has: an ordinary correction retries the deployment with your instructions and needs no new approval; name a state owner in stateChange (with compatibility evidence) when its image must change, which requests that specific authority. This tool does not execute or grant itself permission.",
+          "Propose a release of an already deployed application on its existing host: a selected revision, or corrected configuration. Resolves ref once, defaulting to the default branch's latest commit; to correct configuration without changing code, pass the deployed revision. Requests task-scoped approval: preserve volumes/exposure, no spending, up to three agent-corrected attempts. State in instructions what the release session must achieve and the evidence for a correction; the owner reviews it in the approval. For a first deployment that stopped after its host was prepared, this continues it under the approval it already has: an ordinary correction retries the deployment with your instructions and needs no new approval; name an owner of declared data in stateChange (with evidence that the data stays usable) when its image, a data declaration it owns or an owned volume's mount must change, which requests that specific authority; owners of files count as well as database owners. This tool does not execute or grant itself permission.",
         parameters: Type.Object(
           {
             ref: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
@@ -483,9 +483,12 @@ export async function askPi(
                       { minItems: 1, maxItems: 40 },
                     ),
                     inputs: Type.Optional(
-                      Type.Array(Type.String({ pattern: "^[A-Z_][A-Z0-9_]*$" }), {
-                        maxItems: 10,
-                      }),
+                      Type.Array(
+                        Type.String({ pattern: "^[A-Z_][A-Z0-9_]*$" }),
+                        {
+                          maxItems: 10,
+                        },
+                      ),
                     ),
                     contains: Type.Optional(Type.String({ maxLength: 300 })),
                     timeoutSeconds: Type.Optional(

@@ -34,6 +34,7 @@ import {
 import {
   currentFacts,
   releaseFacts,
+  declaredOwners,
   stateOwners,
   type ReleaseFacts,
 } from "./release-facts";
@@ -103,7 +104,7 @@ export async function proposeApplicationRelease(
   // Owners keep their image unless this approval names them.
   let stateChange: ReleaseScope["stateChange"];
   if (stateChangeRequest) {
-    const owners = [...stateOwners(facts)];
+    const owners = [...declaredOwners(facts)];
     const services = [...new Set(stateChangeRequest.services)];
     const unknown = services.filter((name) => !owners.includes(name));
     const evidence = releaseSecrets(record)
@@ -118,7 +119,9 @@ export async function proposeApplicationRelease(
         `${unknown.join(", ")}: not a declared owner of persistent data. Declared owners: ${owners.join(", ") || "none"}.`,
       );
     if (!evidence)
-      throw new Error("Explain why the new image can use the current data.");
+      throw new Error(
+        "Explain why the current data stays usable after this change.",
+      );
     stateChange = { services, evidence };
   }
   const kept = [
