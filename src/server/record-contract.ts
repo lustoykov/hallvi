@@ -110,6 +110,25 @@ export function reviewRecord(value: InformationInput): string[] {
     ...duplicates((presentation.facts ?? []).map((f) => f.key), "facts"),
   );
 
+  // Facts and checks that name nothing are unreachable: a page asks for the
+  // facts of a subject, and a record that speaks for none is never asked.
+  const names = presentation.states || (presentation.about ?? []).length;
+  if ((presentation.facts ?? []).length && !names)
+    found.push(
+      `These facts describe something, but the record does not say what. Set ` +
+        `states: {ref: {kind, id}, presence: "present"} for the thing whose ` +
+        `current state this is — that is what a page reads to find them. Use ` +
+        `about for anything else the record concerns.`,
+    );
+  presentation.checks.forEach((check, index) => {
+    if (!check.about && !presentation.states)
+      found.push(
+        `Check ${index + 1} ("${check.label}") has nothing to attach to: the ` +
+          `record states no subject, so give the check an about: {kind, id} ` +
+          `naming what was checked.`,
+      );
+  });
+
   if (presentation.status === "verified" && !value.establishedAt)
     found.push(
       `status is "verified" but establishedAt is missing. Set it to when you ` +

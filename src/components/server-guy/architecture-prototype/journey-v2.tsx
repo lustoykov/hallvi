@@ -103,7 +103,12 @@ interface Layout {
 function layoutFor(model: ArchitectureModel): Layout {
   const service = model.parts.find((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
-  const appVolume = volumes.find((volume) => volume.owner === "app");
+  // Which volume goes in the application's disk slot. Pi may name what mounts
+  // it; where it named the host, or named nothing, a single volume still
+  // belongs under the application. This is placement, not a claim.
+  const appVolume =
+    volumes.find((volume) => volume.owner === "app") ??
+    (volumes.length === 1 ? volumes[0] : undefined);
   const serviceVolume = service
     ? volumes.find((volume) => volume.owner === service.id)
     : undefined;

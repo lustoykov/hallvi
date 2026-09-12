@@ -43,15 +43,31 @@ import type {
  * controller and the source repository have no subject kind: Server Guy is
  * not a thing it observes, and the repository's state lives in Deployment.
  */
-const subjects: Partial<Record<Part["kind"], SubjectKind>> = {
-  host: "host",
-  web: "process",
-  private: "process",
-  volume: "volume",
-  gate: "door",
-  tls: "certificate",
-  monitor: "monitor",
+const subjects: Partial<Record<Part["kind"], SubjectKind[]>> = {
+  host: ["host"],
+  web: ["process"],
+  private: ["process"],
+  volume: ["volume"],
+  // A way in is a door; Pi may reasonably speak of the tunnel through it as
+  // access instead. Both are the same thing on the map.
+  gate: ["door", "access"],
+  tls: ["certificate"],
+  monitor: ["monitor"],
 };
+
+/** The subject a drawn part's records are under, whichever kind Pi chose. */
+function refFor(
+  records: SavedInformation[],
+  part: { id: string; kind: Part["kind"] },
+) {
+  const kinds = subjects[part.kind] ?? [];
+  const stated = kinds.find(
+    (kind) => presenceOf(records, { kind, id: part.id }).known,
+  );
+  return kinds.length
+    ? ({ kind: stated ?? kinds[0], id: part.id } as Ref)
+    : null;
+}
 
 /**
  * The checks a drawn part's tag may rest on, most telling first. A check with
@@ -116,8 +132,8 @@ function evidenceFor(
   planned: boolean,
   now: number,
 ): Evidence {
-  const kind = subjects[part.kind];
-  if (!kind)
+  const ref = refFor(records, part);
+  if (!ref)
     return {
       certainty: planned ? "planned" : "verified",
       short: planned
@@ -132,8 +148,6 @@ function evidenceFor(
           : "The repository the deployment was built from; what was built is on Deployment.",
       at: null,
     };
-  const ref: Ref = { kind, id: part.id };
-
   // Established absence outranks everything: a record spoke for this and
   // said there is nothing there.
   const presence = presenceOf(records, ref);
@@ -216,20 +230,18 @@ function factOf(
   part: { id: string; kind: Part["kind"] },
   key: string,
 ) {
-  const kind = subjects[part.kind];
-  if (!kind) return null;
-  return (
-    currentFacts(records, { kind, id: part.id }).get(key)?.value.value ?? null
-  );
+  const ref = refFor(records, part);
+  if (!ref) return null;
+  return currentFacts(records, ref).get(key)?.value.value ?? null;
 }
 
 function factsFor(
   records: SavedInformation[],
   part: { id: string; kind: Part["kind"] },
 ) {
-  const kind = subjects[part.kind];
-  if (!kind) return [];
-  return [...currentFacts(records, { kind, id: part.id }).values()].map(
+  const ref = refFor(records, part);
+  if (!ref) return [];
+  return [...currentFacts(records, ref).values()].map(
     (held) => ({
       label: held.value.label,
       value: held.value.value,
@@ -338,6 +350,11 @@ export function architectureFromRecords({
       slotFor(part, sshLooking(part, records)),
     ]),
   );
+  const edges = map.value.edges.map((edge) => ({
+    ...edge,
+    from: slots.get(edge.from) ?? edge.from,
+    to: slots.get(edge.to) ?? edge.to,
+  }));
 
   const parts: Part[] = map.value.parts.map((part) => {
     const evidence = evidenceFor(records, part, planned, now);
@@ -362,8 +379,17 @@ export function architectureFromRecords({
       name: part.name,
       role: part.role,
       plain: part.plain,
-      // A volume says what mounts it, in the slot the design drew it in.
-      owner: part.owner ? (slots.get(part.owner) ?? part.owner) : undefined,
+      // What mounts a volume, in the slot the design drew it in. Pi may say
+      // so directly; otherwise the disk edge already said it, and asking for
+      // it twice is asking for two answers that can disagree.
+      owner: part.owner
+        ? (slots.get(part.owner) ?? part.owner)
+        : part.kind === "volume"
+          ? edges.find(
+              (edge) =>
+                edge.network === "disk" && edge.to === slots.get(part.id),
+            )?.from
+          : undefined,
       // What was observed of something Pi has since recorded as gone
       // described the thing that is gone; it is in the series, not here.
       facts: evidence.certainty === "absent" ? [] : facts,
@@ -441,11 +467,6 @@ export function architectureFromRecords({
   for (const part of all) byId[part.id] = part;
 
   const of = (kind: Part["kind"]) => parts.filter((part) => part.kind === kind);
-  const edges = map.value.edges.map((edge) => ({
-    ...edge,
-    from: slots.get(edge.from) ?? edge.from,
-    to: slots.get(edge.to) ?? edge.to,
-  }));
   const web = of("web");
   const volumes = of("volume");
   const offsite = of("offsite");

@@ -95,6 +95,34 @@ describe("what would make a record unreadable", () => {
     expect(found[0]).toContain("about: {kind, id}");
   });
 
+  it("will not let facts float free of the thing they describe", () => {
+    const { states, about, ...rest } = good.presentation;
+    const found = review({ ...good, presentation: rest });
+    expect(
+      found.some((item) => item.includes("does not say what")),
+    ).toBe(true);
+  });
+
+  it("will not let a check float free either", () => {
+    const { states, ...rest } = good.presentation;
+    const found = review({
+      ...good,
+      presentation: {
+        ...rest,
+        facts: undefined,
+        checks: [{ ...good.presentation.checks[0], about: undefined }],
+      },
+    });
+    expect(
+      found.some((item) => item.includes("nothing to attach to")),
+    ).toBe(true);
+  });
+
+  it("accepts a check that names what it checked on a record stating nothing", () => {
+    const { states, ...rest } = good.presentation;
+    expect(review({ ...good, presentation: { ...rest, facts: undefined } })).toEqual([]);
+  });
+
   it("will not let a record claim verified with no time behind it", () => {
     const found = review({ ...good, establishedAt: null });
     expect(found.some((item) => item.includes("establishedAt is missing"))).toBe(true);
