@@ -1,139 +1,269 @@
 # The presentation contract
 
-A proposal, 12 September 2026. It describes the data and interaction contract the accepted reference designs need in order to run on real Pi output. Nothing here is implemented: no schema, database, migration or deployment change is proposed, and no view is rewritten. The staging section says what the lightweight happy path needs first.
+A proposal, 12 September 2026, revised after review. It describes the data and interaction contract the accepted reference designs need in order to run on real Pi output. Nothing here is implemented: no schema, database, migration or deployment change is proposed, and no view is rewritten.
 
-Written against every reference destination and its states on the reference build, and against what exists today on `codex/hetzner-provisioning`: `src/server/operator-data.ts`, `src/server/pi.ts`, `src/components/server-guy/record-overview.tsx`, `application-section-view.tsx`, [component design](../src/components/server-guy/DESIGN.md) and [operator design](operator-design.md).
+Written against every reference destination and its states on the reference build, and against what exists on `codex/hetzner-provisioning`: `src/server/operator-data.ts`, `src/server/pi.ts`, `src/components/server-guy/record-overview.tsx`, `application-section-view.tsx`, [component design](../src/components/server-guy/DESIGN.md) and [operator design](operator-design.md).
 
 **The premise throughout: Pi supplies facts, components own layout.** Every sentence the reference speaks is composed by a component from fields. Pi is never asked to write a relative time, a colour, a count, a lane, a journey sentence or a headline.
 
----
-
-## 1. What exists, and the five things missing
-
-Today a surfaced record is prose plus a flat list of checks, with two typed contents (`deployment`, `application-access`) and four authored check subjects. That is enough for a card and a first timeline. Five things the designs do are not expressible in it.
-
-1. **A record cannot say what it is about.** Every record is new. Nothing says this observation of `grafana.db` replaces the last one, so no view can show a current state — only a pile of past statements. Every inventory in the reference (processes, volumes, doors, values, jobs, checks, monitors) needs identity.
-2. **A record cannot say how long a fact stays true.** `establishedAt` exists but nothing says when it stops meaning "now". "Checked 3 days ago", "No check for 3 days", "it may have changed" and "As recorded: nothing here is observed live" are on nearly every reference screen.
-3. **A record cannot say what is going to happen.** Overview's timeline runs into Tomorrow; the Backups calendar draws scheduled days with no copy on record; Jobs shows "Next: the next time it would run". All need installed schedules as data.
-4. **A record cannot say how we know.** Security states outright: "These are the rules the deployment asked for, not a read of what is in place." Domains marks one caller "A check proved this" and another "What the deployment asked for". A fact's basis is as load-bearing as its value.
-5. **A record cannot distinguish not-yet from not-there.** Before deployment every lane reads "Planned"; after it, Backups reads "Not set up". Same absence of evidence, opposite meanings, different drawings.
-
-Everything else is either a small addition to the typed-content union, or something the UI should derive and never store.
+Two documents in one. Sections 2–9 are the **full contract** the accepted designs need. Section 11 is the **smallest slice** — what the deployment we already have needs to run its existing screens on real records, with backups, scheduling and recovery deliberately left out.
 
 ---
 
-## 2. The state vocabulary
+## 1. What exists, and what is missing
 
-Six states, not five. The reference uses all six, and only three are Pi's to write.
+Today a surfaced record is prose plus a flat list of checks, with two typed contents (`deployment`, `application-access`) and four authored check subjects. That is enough for a card and a first timeline. Six things the designs do are not expressible in it.
 
-| State | Means | Reference wording | Set by |
-| --- | --- | --- | --- |
-| **unknown** | Nothing has been established. Not a claim of health. | "Size not measured", "No copy on record", "Not on record" | UI, when no record covers the subject |
-| **planned** | In the approved plan; has not run yet. | "Planned", "After deployment", "Nothing runs yet" | Pi, on the plan record |
-| **working** | Running right now. | the spinner, "Checking now" | Controller, from a live execution |
-| **verified** | Pi checked it and the check is still in its window. | "Checked 3 days ago", "A check proved this" | Pi writes it; UI confirms it is in window |
-| **stale** | Verified once; the window has passed. It may have changed. | "Out of date", "No check for 3 days", "may have changed" | **UI only** |
-| **failed** | A check ran and did not pass. | "Failed", "isn't answering" | Pi |
+1. **A record cannot say what it is about.** Every record is new. Nothing says this observation of `todo.db` concerns the same thing as the last one, so no view can show a current state.
+2. **A record cannot say how long a fact stays true**, and different facts about the same thing age differently. "This host is in Helsinki" and "SSH answered" are both about the host; one is permanent and one is worth hours.
+3. **A record cannot say what is going to happen.** Overview runs into Tomorrow; the Backups calendar draws scheduled days with no copy on record.
+4. **A record cannot say how we know.** Security exists to say "these are the rules the deployment asked for, not a read of what is in place".
+5. **A record cannot distinguish not-yet, not-there and not-looked.** Before deployment every lane reads "Planned". After it, Backups reads "Not set up". Neither is the same as nobody having checked.
+6. **Several of the designs' fields are prose.** "Daily at 03:15" cannot drive a calendar; a door's sources cannot be a sentence.
 
-`absent` is not a state but a **declared fact**: Pi establishing that a thing does not exist ("Not set up", "No cache or broker", "Nothing listens between deployments"). It is verified knowledge about a nothing, which is why the reference draws it in dashed confidence rather than in doubt. `warning` stays as a judgement — true, and it wants looking at — and survives ageing.
+---
 
-### 2.1 The freshness rule
+## 2. Records are append-only; "current" is a read
 
-The single rule that makes the reference's copy possible, and the thing today's code cannot do.
+The first draft said both "updates in place" and "keeps every observation". That was a contradiction. The write behaviour is:
 
+**Nothing is ever mutated or deleted. Every record is written once and kept.** What changes is which record a view reads.
+
+Two independent fields carry the relationships, and only one of them makes a record answerable as current state.
+
+```ts
+/** Everything this record concerns. Links, never replacement. */
+about: Ref[]
+
+/** At most one subject whose current state this record asserts. */
+states?: { ref: Ref; presence: "present" | "absent" }
+
+type Ref = { kind: SubjectKind; id: string }
 ```
-fresh(record) = establishedAt + freshFor(subject.kind) > now
-shown(record) = record.status === "verified" && !fresh(record) ? "stale" : record.status
-```
 
-`freshFor` belongs to the component layer, per subject kind, because it is a presentation judgement: a container health check goes stale in hours, a firewall rule in days, a server's identity effectively never. Pi may override with `freshFor` in seconds when it knows the real horizon (a certificate expiry, a lease, a token).
+| Read | Definition |
+| --- | --- |
+| **Current state of X** | the newest record whose `states.ref` is X |
+| **Series for X** | every record whose `states.ref` is X, oldest first |
+| **Everything about X** | every record with X in `about` **or** `states.ref` |
 
-Consequences the designs depend on:
+Consequences, stated as rules:
 
-- A lane measures from its newest observation to now and draws the gap as **not-knowing**, which is where "No check for 3 days" and "No copy on record for 2 days 20 h" come from.
-- Overview can honestly say "Nothing needed you when Server Guy **last looked**" rather than "everything is fine".
-- **Ageing never turns green into red.** Stale is amber and says it may have changed; only a check that ran and failed is red.
-- A subject with no record is unknown and says so. Missing data is never health.
+- A record with `states` supersedes nothing physically. The previous record for that subject is still stored, still readable, still in the series and still in History. "Superseded" is a property of a read, not a write.
+- **A record without `states` never becomes current state of anything, no matter how many things it is about.** A copy of the database is `about` `database:todo` and `backup-plan:daily` and stays an event: it appears in Database's copies lane, on the Backups calendar and in Storage's off-the-server node, and it never answers "what is the state of the database".
+- `states` is at most one subject. A record that would state two is two records. This keeps "current" unambiguous.
+- `about` is additive and unordered. It is what every "show me everything that touched this" read uses.
+- `retiredAt` withdraws a record Pi no longer stands behind — a correction. It is not how you say a thing stopped existing; that is a new record with `presence: "absent"`.
 
-### 2.2 Basis: how we know
+### 2.1 Presence, so absence is written and never inferred
 
-Every check and every fact carries where it came from. Three values cover every reference screen:
+`presence` is on the `states` field because only a record that speaks for a subject can say the subject is not there.
 
-| Basis | Means | Reference |
+| What the view sees | Means | Reference wording |
 | --- | --- | --- |
-| `observed` | Something ran and saw it. | "A check proved this · Sep 9, 15:03" |
-| `planned` | The deployment asked for it; nobody read it back. | "What the deployment asked for · Sep 9, 15:01" |
-| `reported` | A third party states it (the provider, the registrar). | the firewall as Hetzner returns it |
+| no record states the subject | **nobody has looked** | "Backup protection hasn't been assessed", "Monitoring hasn't been assessed" |
+| newest record has `presence: "absent"` | **Pi established there is none** | "Nothing is listening", "No cache or broker", "No cache here", "Not set up" |
+| newest record has `presence: "present"` | it exists; its state is that record's status | — |
 
-Security's whole design rests on this: rings drawn from `planned` rules say so, and the page lists "The firewall has not been read back" as a hole. Without `basis`, a planned rule and a verified rule look identical, which is the one mistake that page exists to prevent.
+This is the correction the review asked for, and it changes several screens: **every design that says "there is none" needs two empty states, not one.** Monitoring, Cache & queue, CDN, Jobs, off-site copies and HTTPS each get an unassessed state that offers the Ask, and a designed absence that only appears once Pi has written it. Section 8 lists both for every destination.
+
+`topology.absent[]` and `inventory.absent[]` are the same declaration in list form, for the ghosts a map or a table draws inline; they are written by Pi for the same reason and carry the same weight.
 
 ---
 
-## 3. Three sources
+## 3. Claims and freshness
+
+The review's example is exactly right: one expiry per subject kind cannot be correct, because "the host is in Helsinki" and "SSH answered" are both about `host:hetzner-165600952`.
+
+**Freshness belongs to the claim, not the subject.** Every check and every fact names what kind of claim it is making, from a closed list:
+
+| Claim | What it asserts | Ages | Example |
+| --- | --- | --- | --- |
+| `identity` | what a thing is | never | region, instance type, image digest, mount path, checksum |
+| `configuration` | what was set | slowly | firewall rules, env applied, systemd unit installed |
+| `reachability` | something answered | quickly | SSH connected, HTTP 200, probe passed |
+| `liveness` | it is running now | very quickly | container up, process running |
+| `contents` | what is inside or how much | moderately | disk used, row count, backup size, queue depth |
+
+```ts
+type Claim = "identity" | "configuration" | "reachability" | "liveness" | "contents"
+type Basis = "observed" | "planned" | "reported"
+
+interface Fact  { label: string; value: string; mono?: boolean; claim: Claim; basis: Basis }
+interface Check { label: string; status: "passed" | "failed" | "info";
+                  claim: Claim; basis: Basis; about?: Ref; detail?: string }
+```
+
+The expiry table lives in the component layer, because how long a fact is worth trusting is a presentation judgement:
+
+```
+identity       never
+configuration  7 days
+contents       3 days
+reachability   12 hours
+liveness       15 minutes
+```
+
+Pi may override per check or per fact with `freshFor` in seconds when it knows the real horizon — a certificate expiry, a lease, a token. Choosing the claim kind is semantic, which is why it is Pi's; choosing the number is arithmetic, which is why it is not.
+
+### 3.1 The rule
+
+```
+fresh(x)  = x.establishedAt + (x.freshFor ?? expiry[x.claim]) > now
+shown(x)  = x.status === "verified" && !fresh(x) ? "stale" : x.status
+```
+
+Freshness is computed **per claim, and a component asks for the freshness of the claim it is drawing.** The same host record therefore reads differently in different places, correctly:
+
+| Where | Claim drawn | Three days later |
+| --- | --- | --- |
+| Architecture's host tag | `reachability` — "SSH connected" | amber, "Reached 3 days ago" |
+| CDN's "where it stands" | `identity` — Helsinki, CX23 | unchanged, no tag |
+| Overview's Server lane | `reachability` | the band of not-knowing |
+| Deployment's "Server" fact row | `identity` | plain, no ageing |
+
+A record's own headline tag, when a component needs one, takes **the soonest-expiring claim it is showing** — never an average.
+
+### 3.2 States
+
+Six states. Three are Pi's, three the UI's.
+
+| State | Means | Set by |
+| --- | --- | --- |
+| **unknown** | no record states this subject | UI |
+| **planned** | in the approved plan; has not run | Pi (`basis: "planned"` and no observation) |
+| **working** | running right now | controller, from a live execution |
+| **verified** | checked, and the claim is in window | Pi writes; UI confirms |
+| **stale** | verified once; the window has passed | **UI only** |
+| **failed** | a check ran and did not pass | Pi |
+
+`absent` is not a state: it is `presence`, above. `warning` stays as a judgement — true, and it wants looking at — and survives ageing.
+
+**Ageing never turns green into red.** Stale is amber and says it may have changed; only a check that ran and failed is red.
+
+---
+
+## 4. Three sources
 
 | Source | Owns | Rule |
 | --- | --- | --- |
-| **Pi writes** | Meaning. What a thing is, what it is for, whether an outcome is good, what the parts are and how they connect, what is missing and why it matters. | Only what it established. Never a relative time, a count, a colour, a lane, or a fact it did not observe. |
+| **Pi writes** | Meaning. What a thing is and is for, whether an outcome is good, what the parts are and how they connect, what is missing and why it matters, which claim a fact makes. | Only what it established. Never a relative time, count, colour, lane, or a fact it did not observe. |
 | **The controller records** | Events. Executions (command, target, exit code, output, start, finish), messages, approvals, conversation identity, run grouping. | Automatic and already true. Pi never re-types what an execution proves; it cites the execution as evidence. |
-| **The UI derives** | Time, arithmetic, layout. Relative times, freshness, ordering, counts, timeline windows and ticks, gaps between observations, expected-but-not-recorded, journey sentences, lane assignment, caller outcomes. | Derivation never invents a fact. Missing inputs render unknown, never healthy. |
+| **The UI derives** | Time, arithmetic, layout. Relative times, freshness, ordering, counts, timeline windows, gaps, expected-but-not-recorded, journey sentences, lane assignment, caller outcomes, a door's reach from its sources. | Derivation never invents a fact. Missing inputs render unknown, never healthy and never absent. |
 
-The line that settles most arguments: **anything with an exit code is automatic; anything with a meaning is Pi's; anything with a clock in it is the UI's.**
+The line that settles most arguments: **anything with an exit code is automatic; anything with a meaning is Pi's; anything with a clock or a comparison in it is the UI's.**
 
----
+### 4.1 Replacing `check.subject`
 
-## 4. Current state versus history
+Today `check.subject: "application" | "backups" | "server" | "access"` does two jobs: it marks a check as timeline-worthy, and it chooses a lane. The replacement covers both without an authored lane.
 
-One mechanism, and the main addition this proposal asks for: a record may name its subject.
+```
+lane(check) = laneOf(check.about ?? record.states?.ref ?? record.about[0])
+timelineWorthy(check) = lane(check) !== null && record.establishedAt !== null
 
-```ts
-subject?: { kind: SubjectKind; id: string }
+laneOf(ref) = process, database        → "application"
+              backup-plan, volume      → "backups"
+              host                     → "server"
+              access, door, domain, certificate → "access"
+              anything else            → null
 ```
 
-- **With a subject**, the record is *current state*. A newer record with the same `(kind, id)` supersedes the older. "What is true now" views read the newest per subject. The superseded record is kept — it is how a timeline shows an observation changing.
-- **Without a subject**, the record is an *event*. Events accumulate and are never superseded: a deployment, a restore test, a copy made, an incident, a handover.
-
-`SubjectKind`, for the destinations that have designs: `application`, `host`, `process`, `volume`, `database`, `door`, `domain`, `certificate`, `value`, `config-file`, `job`, `monitor`, `backup-plan`, `access`. The list grows one entry at a time as a destination earns it.
-
-This answers the three questions the designs kept asking:
-
-- **What updates in place?** Anything with a subject. Pi re-checks `process:grafana`; Processes shows one row, Overview's Checks lane gains a mark, History keeps both.
-- **What must remain?** Every event, and every superseded observation. Overview's timeline, Database's lanes, Monitoring's station log and History are all reads over the full series; only "current" views collapse to the newest.
-- **What does retiring mean?** `retiredAt` says the subject no longer exists (a container removed, a rule deleted), not that the record was wrong. It renders absent and the history stays.
+`check.about` is an optional per-check override, which is what preserves today's behaviour exactly: a deployment record that touches several subjects can still place each check in its own lane. The difference is that Pi names a thing rather than a column, so the same field also drives Architecture, Processes and History, and a new lane never requires re-teaching Pi.
 
 ---
 
-## 5. Typed content
+## 5. Typed content, with concrete schemas
 
-`presentation.content` is the right home for shapes a component cannot draw from prose. Today it has two kinds; this proposes four more, each because a designed component is impossible without it.
+`presentation.content` is the right home for shapes a component cannot draw from prose.
 
-### `topology` — Architecture, Overview's map
+### 5.1 `topology` — Architecture, Overview's map
 
-One per application, updated in place (`subject: {kind:"application"}`). Parts carry identity and description and **no state**: a part's state is the newest record whose subject is that part. A part with no record renders unknown. This is what stops a map inventing infrastructure to look finished.
+One per application; the newest record stating `application:<id>` is the map. Parts carry identity and description and **no state**: a part's state is the newest record stating that part.
 
 ```ts
 { kind: "topology",
   from: "plan" | "observed",
   parts: { id, kind: PartKind, name, role, plain, owner?, facts?: Fact[] }[],
-  edges: { from, to, network: "public" | "private" | "disk", label? }[],
+  edges: { from, to, network: "public" | "private" | "loopback" | "disk", label? }[],
   absent: { id, kind: PartKind, name, would: string }[] }
 ```
 
-`PartKind`: `controller | source | gate | tls | host | web | private | volume | offsite | monitor`. `from` is what lets Before-deploy draw the whole map in ghost from the plan, with every part planned — the reference's most convincing empty state, and impossible if topology only came from observation. `absent` is how the ghosts are drawn ("Off-site copies · would keep a copy of the data away from this server"): **drawn because Pi declared them missing**, never because a field was empty.
+`PartKind`: `controller | source | gate | tls | host | web | private | volume | offsite | monitor`. `from: "plan"` is what lets the pre-deployment screen draw the whole map in ghost with every part planned. `loopback` was added in this revision: the reference's current deployment is reached through an SSH tunnel to the host's loopback, which is neither public nor the container network, and drawing it as `public` was the inconsistency the review caught.
 
-### `schedule` — Backups' calendar, Overview's future, Jobs, Monitoring
+### 5.2 `doors` — Security, Domains, Processes
 
-Written when Pi installs recurring work; updated in place.
+Ports as the provider or the plan states them. **`reach` is derived, not authored** — one less judgement for Pi to get wrong.
 
 ```ts
-{ kind: "schedule", what, cadence, timezone, installedAt,
-  nextAt?, keep?, paused?, hour?: null }
+{ kind: "doors",
+  doors: {
+    id, port: number, protocol: "tcp" | "udp",
+    serves: { partId: string; port?: number } | null,
+    sources: ({ cidr: string } | { tag: string })[],
+    basis: Basis, at: string | null,
+    unasked?: boolean, concern?: string
+  }[] }
+
+reach(door) = sources contains 0.0.0.0/0 or ::/0        → "internet"
+              sources non-empty, all narrower           → "restricted"
+              sources empty and the port is loopback    → "private"
+              no door for that port                     → "closed"
 ```
 
-The UI derives future marks, countdowns, and the expected-but-not-recorded days the Backups calendar draws in outline. It never asserts a scheduled run happened: a run exists only as an event record or an execution. `hour: null` is meaningful — Jobs says "At what hour · Not on record" because the schedule was installed but its time was not captured.
+`sources` is structured so Security can print each rule verbatim *and* nest the rings correctly; `unasked` is the provider reporting a rule this deployment never requested; `at` with `basis: "planned"` is what produces "Asked for, never read back".
 
-### `inventory` — Processes, Storage, Domains, Security, Variables, Jobs, Cache
+### 5.3 `schedule` — Backups, Jobs, Monitoring, Overview's future
 
-A list whose members are subjects in their own right. The record holds membership and shape; each member's state is its own record.
+`cadence: "Daily at 03:15"` cannot drive a calendar. Recurrence is computable or explicitly unknown, never prose to be parsed.
+
+```ts
+{ kind: "schedule",
+  what: string,
+  recurrence:
+    | { rule: "cron"; expression: string; timezone: string }
+    | { rule: "interval"; everySeconds: number }
+    | { rule: "unknown"; words: string },
+  installedAt: string,
+  nextAt?: string,
+  keep?: number,
+  paused?: boolean }
+```
+
+- `cron` + IANA `timezone` is what a systemd timer or crontab actually is, and the UI expands occurrences from it.
+- `interval` covers "every 15 minutes" without inventing a cron.
+- **`unknown` forbids calculation.** Jobs' "At what hour · Not on record" is this case: the schedule is installed, its time was not captured, and the calendar draws no expected marks — it says the cadence in words and nothing more. This is the only honest answer, and making it a separate rule means a component cannot accidentally compute from prose.
+
+`nextAt` is Pi's when the installer reported it (systemd does); otherwise the UI expands `recurrence`.
+
+### 5.4 `backup-plan` and its events — Backups, Storage, Database
+
+The calendar needs to know what the plan covers, what each copy actually contained, and what a restore proved. Three shapes, linked by id.
+
+```ts
+// states backup-plan:<id>
+{ kind: "backup-plan",
+  destination: { where: string; offServer: boolean },
+  covers: { volumeId: string; piece: string; method: string }[],
+  excludes: { volumeId: string; piece: string; why: string }[],
+  keep?: number }
+
+// an event, about backup-plan:<id> and each volume it touched
+{ kind: "backup-copy",
+  planId: string,
+  contents: { volumeId: string; piece: string }[],
+  bytes?: number, checksum?: string, verified: boolean }
+
+// an event, about backup-plan:<id>
+{ kind: "restore-test",
+  planId: string, copyAt: string,
+  proved: string[], untested: string[] }
+```
+
+This makes every cell on the calendar a lookup rather than a guess: a solid cell is a `backup-copy` whose `contents` include that piece; a hatched cell is `covers` with no copy that day; a pale cell is `excludes`; an outlined cell is an expansion of `recurrence` with no copy. `untested` is what keeps "a backup success does not imply a tested restoration" true in data rather than in a sentence.
+
+### 5.5 `inventory` — Processes, Storage, Variables, Jobs
+
+Membership and shape; each member's state is its own record.
 
 ```ts
 { kind: "inventory", of: SubjectKind,
@@ -141,331 +271,142 @@ A list whose members are subjects in their own right. The record holds membershi
   absent?: { id, name, would: string }[] }
 ```
 
-One shape serves seven destinations. A destination becomes real when Pi writes its inventory, with no new content kind per view.
-
-### `measurement` — the numbers
+### 5.6 `measurement` — the numbers
 
 ```ts
 { kind: "measurement", of, value, unit, at, total?, note? }
 ```
 
-Disk used, volume size, backup size, queue depth, line counts. Separate from checks because a number is not a pass or a fail, and the reference never colours one. `note` carries "Not measured", which several screens say out loud.
-
-`Fact` throughout is `{ label, value, mono?, basis?: Basis }`.
+Separate from checks because a number is not a pass or a fail, and the reference never colours one.
 
 ---
 
-## 6. Destination by destination
+## 6. Subject kinds
 
-**From**: `pi` (Pi writes), `auto` (controller records), `derived` (UI computes). Every state column lists what the component draws when the input is missing.
-
-### Overview — Timeline
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Headline | Whether anything is failing or waiting; else the newest observation time | derived | "Nothing has been established here yet" |
-| Subline | Newest observation and its freshness | derived | — |
-| Access chip + "Open <app>" | `application-access` content + url | pi | chip hidden, no button |
-| Attention card | Records with `status: failed \| warning` in view `overview`; title, detail, `partId` | pi | section absent |
-| Four lanes | Every observation with a subject; lane from subject kind | pi + derived | lane shows "Planned" or "Not set up" |
-| Lane status line | Newest per lane + freshness | derived | "Not set up" (absent declared) or unknown |
-| **Freshness band** | Newest observation → now | derived | full-width not-knowing hatch |
-| **Future column** | `schedule.nextAt` | pi | "After deployment" when planned, else empty |
-| **Changing observations** | The whole series per subject | pi (each) + derived | single mark |
-| Log console | Executions: command, output, exit, time; day headings | auto | "Nothing done yet" |
-| Map | `topology`; part states from subject records | pi | map from plan in ghost |
-| Recent work | Events + executions with origin, state, conversation | auto | "Nothing has run yet" |
-| Ideas | Records with `role: "recommendation"` and `nextStep` | pi | section absent |
-
-Lane assignment replaces today's authored `check.subject`: `process`/`database` → Checks, `backup-plan`/`volume` → Backups, `host` → Server, `access`/`door`/`domain`/`certificate` → Access. Pi stops choosing a lane — one fewer thing to get wrong.
-
-### Architecture — Journeys
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Parts, boundaries, edges | `topology` | pi | nothing drawn; "Not deployed yet" |
-| Each part's tag | newest record for that subject + freshness | pi + derived | unknown dot, no claim |
-| Part facts panel | `facts[]` with `basis` | pi | name and role only |
-| Ghosts ("Off-site copies", "Monitoring") | `topology.absent[]` | pi | omitted entirely |
-| Journey selector and its sentence | ordered path through `edges` | derived | selector hidden |
-| Re-check control | an Ask draft | derived | — |
-
-Journeys are derived: the stops are a path through the graph and the sentence is composed from the parts it passes. Pi never writes journey prose.
-
-### Deployment — Transit
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Headline + tone | the deployment event record | pi | "Not deployed yet" |
-| "Against the 4 checks listed below, and nothing else" | count of `checks[]` | derived | — |
-| Facts (revision, images, server, access) | `deployment` + `application-access` content | pi | row omitted, never guessed |
-| "Checks it passes" | `checks[]` with probe detail, `inside`, evidence | pi | "No checks recorded" |
-| "They ran when it deploys" | `basis: observed` at deploy time | derived | — |
-| Transit stops with start/end/duration | executions grouped by run | auto | single stop |
-| "Deploy when you push · Not set up" | declared absence | pi | omitted |
-| "Now" stop | freshness of the newest check | derived | — |
-| Latest logs link | newest log-collection execution | auto | link hidden |
-| Release or update | Ask | derived | — |
-
-### History — Transit
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Counts and filters (All, Changes, Inspections, Outside chat, Needs you) | every event + execution, with kind and origin | auto + derived | "Nothing has run yet" |
-| Entry: state, title, summary | event record, or execution when Pi wrote none | pi + auto | execution alone |
-| Origin line ("Automatic · Backups", "From Deploy application · …") | conversation id or automatic flag; touched views | auto + pi | "automatic" |
-| Touched destinations | `presentation.views` | pi | none listed |
-| Evidence disclosure | `evidence[]` + the executions | pi + auto | disclosure hidden |
-| "Resolves the failure at 15:01 →" | `resolves: recordId` | pi | pair not drawn |
-| Needs-you flag | an unanswered approval | auto | 0 |
-
-`resolves` is History's one addition: only Pi knows a repair and a failure are the same story.
-
-### Storage — Flow
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Volumes with mount, owner, docker name | `inventory` of `volume` | pi | "No volumes recorded" |
-| Pieces inside a volume, and the method | per-volume `pieces: {label, method\|null}` | pi | volume drawn whole, uncovered |
-| "not in the backup plan" (dashed) | `method: null` | pi | — |
-| "kept through a replacement" | event record for the replacement | pi | "Not recorded" |
-| Size | `measurement`, else "Size not measured" | pi | "Size not measured" |
-| Daily backups node | `schedule` for `backup-plan` | pi | node absent, edge dashed |
-| Off-the-server node | newest copy event + count | pi | "No copy on record" |
-| Restore-tested node | newest restore event and what it left untested | pi | "Never tested" |
-| Selected-piece fact table | `facts[]` | pi | — |
-| Measure them | Ask | derived | — |
-
-### Backups — Calendar
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Rows (copies off the server, each piece, restore tests) | `inventory` of `volume` + the plan | pi | "Backups have not been assessed" |
-| Cell: copy on record | copy event on that day | pi | — |
-| Cell: **scheduled, nothing recorded** | `schedule` minus copy events | derived | — |
-| Cell: in the copy per the plan | `method` | pi | — |
-| Cell: left out of the plan | `method: null` | pi | — |
-| Cell: restore test passed | restore event | pi | — |
-| Headline ("the schedule keeps 7") | `schedule.keep` | pi | omitted |
-| "The scheduled copies for Sep 10, 11 and 12 aren't on record here" | the same subtraction | derived | — |
-| List the copies | Ask | derived | — |
-
-The calendar's honesty is exactly schedule-minus-events, and it must stay a statement about **the record**, never about the copies.
-
-### Database — Timeline
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Headline | newest copy event | derived | "No copy on record" |
-| Three lanes (check, copies, restore tests) | series per subject: `database`, copy events, restore events | pi | empty lane, named |
-| Gap labels ("No check for 3 days 2 h") | newest → now | derived | — |
-| Folded / To scale | the same series, two scales | derived | — |
-| Footnote "Daily backups are scheduled, so newer copies may exist; none is on record here" | `schedule` + absence of events | derived | — |
-| Back it up now | Ask | derived | — |
-
-### Processes — Line
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Count and headline | `inventory` of `process` | pi | "Nothing recorded runs" |
-| Each process: role, port mapping, reach | member `facts[]` | pi | name only |
-| Per-process check ratio ("2 of 2 checks") | that subject's newest record `checks[]` | pi | unknown |
-| The reaching line (your network → port → web → private) | `topology.edges` | pi | list without the line |
-| "Inside the server: nothing outside reaches past here" | `network: private` boundary | derived | — |
-| "Health watch and restarts · Not set up" | declared absence | pi | omitted |
-| "Background workers · None declared" | declared absence | pi | omitted |
-| Recent changes | events touching `processes` | auto | — |
-| Check now | Ask | derived | — |
-
-### Logs — Paper
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Headline + "Printed 3 days ago" | newest collection execution | auto + derived | "No output has been read" |
-| Lines with time, speaker, level | the execution's output, parsed | auto + derived | — |
-| Speaker chips and counts | parsed | derived | — |
-| "earlier ones weren't read" | the execution's own truncation | auto | — |
-| Earlier reads selector | older collection executions | auto | single read |
-| "Nothing printed since · 3 days 2 h" | newest → now | derived | — |
-| Print the latest output | Ask | derived | — |
-
-Logs needs **no Pi record at all**: it is a designed read of executions. That is the model for anything the controller already captures.
-
-### Monitoring — Tuner
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Stations | `inventory` of `monitor` + the subjects watched | pi | "Nothing is listening" |
-| Signal strength per station | count and freshness of that subject's observations | derived | no signal |
-| "NOT LISTENING · Nothing listens between deployments" | no `monitor` with a `schedule` | derived | — |
-| Station log rows (time, name, probe, outcome) | the subject's series with `checks[]` | pi | empty, named |
-| "Silence since Sep 9, 15:03 · 3 days 2 h" | newest → now | derived | — |
-| Set up a health watch | Ask | derived | — |
-
-Monitoring is where "no health from missing data" matters most: no signal means **nothing is listening**, and the design says that instead of drawing a healthy meter.
-
-### Domains — Callers
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Four caller windows | composed from doors, `domain`, `certificate`, access | derived | all four still drawn, as unknown |
-| What each caller meets | `door.reach` + `sources` + certificate presence | pi | — |
-| Footer per window ("A check proved this" / "What the deployment asked for" / "Nothing is set up") | `basis` + `establishedAt` | pi + derived | "Nothing is set up" |
-| The opened caller's facts (Who, Typed) | `facts[]` | pi | — |
-| Ask for a knock test | Ask | derived | — |
-
-Callers are **derived**: the component asks four questions and answers them from the doors. Pi supplies doors as the provider or the plan states them; it never writes four caller stories.
-
-### Security — Rings
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| The four rings | reach levels present in the `door` inventory | derived | the internet ring alone |
-| Gate on each wall | door: port, what is behind it, `sources` verbatim | pi | wall with no gate, marked unknown |
-| "Asked for, never read back" | `basis: planned` on every door | derived | — |
-| Ring contents ("Every container, and the output it has written") | `inventory` of `volume` + `process` | pi | ring named, empty |
-| Holes ("The firewall has not been read back", "Traffic is not encrypted") | declared absences + derived from `basis` | pi + derived | — |
-| Check now | **Execute** (`check-firewall`), or Ask when no provider is connected | auto | Ask |
-| Ask what a stranger can reach | Ask | derived | — |
-
-### Variables — Manifest
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| Count and headline | `inventory` of `value` and `config-file` | pi | "Nothing configures it on record" |
-| Groups (stated by the plan / only you could give / made by Server Guy / wired to services) | `who` per member | pi | one ungrouped list |
-| Where a value lives, never the value | `held` + `where` in words | pi | — |
-| Pending ("not live yet") | recorded after the newest deployment | derived | — |
-| Files table (file, read by, size, checksum, mode) | `inventory` of `config-file` with `facts[]` | pi | section absent |
-| Waiting for you | inputs with no value yet, with the reason | pi | section absent |
-| Change a value | Ask | derived | — |
-
-**The model never carries a value.** A page cannot leak what it does not hold; this is a contract requirement, not a rendering choice.
-
-### CDN, Cache & queue, Jobs — Origin, Queue, Rota
-
-These three are designs about absence and need **no new content**. Each draws the one thing that exists and names the missing layer where it would go.
-
-| Component | Needs | From | Missing → |
-| --- | --- | --- | --- |
-| CDN: the one machine, where it stands | `host` facts | pi | "Location not recorded" |
-| CDN: the empty shelf | absence of a `cdn` subject | derived | the shelf, labelled |
-| Cache: the empty line | absence of a `broker` subject | derived | "Nothing puts work here" |
-| Cache: "No worker" | `inventory` of `process` with no worker role | derived | — |
-| Jobs: Server Guy's own recurring work | `schedule` for `backup-plan` | pi | "Nothing recurs" |
-| Jobs: the ghost "A command of yours" | component-owned shape | derived | — |
-| Jobs: "At what hour · Not on record" | `schedule.hour: null` | pi | — |
-
-They must never be given invented infrastructure to draw.
+`application`, `host`, `process`, `volume`, `database`, `door`, `domain`, `certificate`, `value`, `config-file`, `job`, `monitor`, `backup-plan`, `access`, `cache`, `cdn`. Grows one entry at a time as a destination earns it.
 
 ---
 
 ## 7. Actions
 
-Three kinds. The reference uses the first two almost everywhere.
+**Navigate** — no backend, no record: open a destination, open the conversation at a message, open a part on the map, open the application, and every in-view selection (journey, ring, caller, station, day, folded/to-scale, earlier reads, filters).
 
-**Navigate** — no backend, no record.
+**Ask** — drafts a message into the main conversation. No new capability, no new permission surface. The contract is one optional field on the thing drawn: `ask?: string`. Components compose drafts from facts they hold; Pi supplies one only through `nextStep` on a recommendation.
 
-| Action | Where |
-| --- | --- |
-| Open a destination | every card footer; "Open Architecture →", "Open History →", "The processes that run", "The name and certificate in front of it" |
-| Open the conversation at a message | History entries, Deployment's origin line |
-| Open a part on the map | Overview attention card → "Show on the map →" |
-| Open the application | the header's "Open <app> ↗", `application-access.url` |
-| Select within a view | journey selector, ring, caller window, station, day, Folded/To scale, earlier reads, filters |
+Every Ask in the reference: check processes now (Processes) · check the database now, back it up now (Database) · list the copies (Backups) · measure the volumes (Storage) · print the latest output (Logs) · set up a health watch (Monitoring) · what a stranger can reach (Security) · a knock test (Domains) · change a value, give it in the conversation (Variables) · release or update (Deployment) · would it help / is one needed / what could be scheduled (CDN, Cache, Jobs) · look into it (Overview attention) · re-check this part (Architecture) · per-lane ask (Overview).
 
-**Ask** — drafts a message into the main conversation. This is how the reference does everything consequential, and it needs no new capability and no new permission surface.
-
-| Draft | Where |
-| --- | --- |
-| "Check that <processes> are running and healthy now" | Processes |
-| "Check that <app>'s database is healthy now" | Database |
-| "Back up <app>'s database now and verify the copy" | Database |
-| "Ask Server Guy to list the copies" | Backups |
-| "Ask Server Guy to measure them" | Storage |
-| "Ask Server Guy to print the latest output" | Logs |
-| "Ask Server Guy to set up a health watch" | Monitoring |
-| "Ask what a stranger can reach" | Security |
-| "Ask for a knock test" | Domains |
-| "Change a value" / "Give it in the conversation" | Variables |
-| "Release or update" | Deployment |
-| "Ask whether it would help" / "one is needed" / "what could be scheduled" | CDN, Cache, Jobs |
-| "Look into it" | Overview attention card |
-| per-part re-check | Architecture |
-| per-vital ask | Overview lanes |
-
-The contract for an Ask is one optional field on the thing drawn: `ask?: string`. Components compose their own drafts from facts they hold; Pi supplies one only on a recommendation, through `nextStep`.
-
-**Execute** — a capability the controller runs without a model call. Today's `ViewAction` union has twelve. The proposal: the happy path ships **none**, and each must earn its place by being idempotent, explicable in one sentence, and genuinely worse as an Ask. Only `check-firewall` and `refresh-logs` are plausible survivors, both read-only. Chat stays the place to act, which is the product's premise.
+**Execute** — a capability the controller runs without a model call. The happy path ships **none**. Each must earn its place by being idempotent, explicable in one sentence, and genuinely worse as an Ask; only `check-firewall` and `refresh-logs` are plausible, both read-only.
 
 ---
 
-## 8. One deployment, across chat and the views
+## 8. Destination by destination
 
-The lightweight application, as the records it would produce. Ids abbreviated.
+**From**: `pi`, `auto` (controller), `derived`. The last two columns are the two empty states the presence rule requires.
 
-### 8.1 In chat — the deployment, as an event
+### Overview — Timeline
+
+| Component | Needs | From | Nobody looked | Pi established none |
+| --- | --- | --- | --- | --- |
+| Headline, subline | failing/waiting records; newest observation | derived | "Nothing has been established here yet" | — |
+| Access chip, Open app | `application-access` + url | pi | chip hidden | "Not reachable from here" |
+| Attention card | records `failed`/`warning` in `overview`, with `partId` | pi | section absent | — |
+| Four lanes | every check with a lane (§4.1) | pi + derived | lane shown, "Not assessed" | "Not set up" |
+| Lane status line | newest per lane + freshness of its claim | derived | "Not assessed" | "Not set up" |
+| Freshness band | newest observation → now | derived | full-width hatch | none drawn |
+| Future column | `schedule.recurrence` expansion, `nextAt` | pi + derived | empty | empty |
+| Changing observations | the series per subject | pi + derived | — | — |
+| Log console | executions: command, output, exit, time | auto | "Nothing done yet" | — |
+| Map | `topology`; part states from records | pi | map from plan, in ghost | ghosts from `absent[]` |
+| Recent work | events + executions with origin | auto | "Nothing has run yet" | — |
+| Ideas | `role: "recommendation"` | pi | section absent | — |
+
+### Architecture — Journeys
+
+Parts, boundaries and edges from `topology`; each part's tag from the newest record stating it, aged by the claim being shown; facts from `facts[]` with their `basis`; ghosts from `absent[]`; journeys and their sentences **derived** from `edges`; re-check is an Ask. Unassessed part → unknown dot and no claim. Declared-absent part → dashed ghost with its `would`.
+
+### Deployment — Transit
+
+Headline, tone and facts from the deployment event and `deployment` content; "Checks it passes" from `checks[]` with `detail` and `basis`; "Against the N checks listed below" counted; transit stops, durations and attempts from executions grouped by run; "Deploy when you push · Not set up" is a declared absence; the Now stop is freshness of the soonest-expiring claim; latest-logs link is the newest collection execution. Never deployed → "Not deployed yet".
+
+### History — Transit
+
+Counts and filters over every event and execution; entry state, title and summary from the event record, falling back to the execution alone; origin from conversation id or the automatic flag; touched destinations from `presentation.views`; evidence from `evidence[]` plus the executions; needs-you from unanswered approvals; **`resolves: recordId`** pairs a repair with its failure — the one field only Pi can supply.
+
+### Storage — Flow, Backups — Calendar, Database — Timeline
+
+All three read `inventory` of `volume`, the `backup-plan`, and `backup-copy` / `restore-test` events (§5.4), plus `schedule` and `measurement`. Cells, gap labels, "the scheduled copies for Sep 10, 11 and 12 aren't on record here" and "newer copies may exist; none is on record here" are all the plan-versus-events subtraction, and stay statements about **the record**. Unassessed → "Backup protection hasn't been assessed", with the Ask. Declared none → "No copies are made".
+
+### Processes — Line
+
+`inventory` of `process` with per-member facts; the reaching line from `topology.edges`; the private boundary from `network`; per-process check ratios from that subject's newest record; "Health watch and restarts · Not set up" and "Background workers · None declared" are declared absences, not empty lists; recent changes from executions.
+
+### Logs — Paper
+
+**No Pi record at all.** The headline, the lines, speakers, levels, truncation, earlier reads and "Nothing printed since" are all a designed read of collection executions. This is the model for anything the controller already captures.
+
+### Monitoring — Tuner
+
+Stations from `inventory` of `monitor` plus the subjects watched; signal strength from the count and freshness of each subject's observations; station log from the series; "Silence since …" derived. **"Nothing listens between deployments" requires a `monitor` record with `presence: "absent"`.** Until Pi writes one the page says monitoring has not been assessed and offers the Ask — this was the clearest instance of inferring absence in the previous draft.
+
+### Domains — Callers, Security — Rings
+
+Doors from §5.2, plus `domain` and `certificate` subjects. The four caller windows and the ring nesting are **derived** from doors, the certificate and the access content; each window's footer comes from `basis` and `establishedAt` ("A check proved this" / "What the deployment asked for" / "Nothing is set up"). Holes come from declared absences and from `basis: "planned"` with no observation. Unassessed → every window unknown, the page says so.
+
+### Variables — Manifest
+
+`inventory` of `value` and `config-file`; groups from `who`; `held` and `where` in words; pending derived by comparing against the newest deployment; the files table from `facts[]`; waiting-for-you from inputs with no value and their reason. **The model never carries a value.** A page cannot leak what it does not hold.
+
+### CDN, Cache & queue, Jobs
+
+No new content. CDN draws the host from its `identity` facts and an empty shelf; Cache draws an empty line; Jobs draws Server Guy's own recurring work from `schedule` and a component-owned ghost for a command of yours. Each needs its `presence: "absent"` record before it may say "there is none"; before that, each says it has not been assessed.
+
+---
+
+## 9. One deployment, completely
+
+The deployment we actually have, as the records that would populate the screens. Every id, port and address below is consistent with the others: the application is reached **only** through an SSH tunnel from the controller PC to the host's loopback, and no public web door exists.
+
+### 9.1 The host
 
 ```json
 {
-  "title": "Docker Getting Started is deployed and answering",
-  "body": "The app runs as a non-root Node 22 container behind Nginx, managed by systemd. It answers on the host's loopback only; the access record says how to open it.",
-  "establishedAt": "2026-09-12T16:05:00Z",
-  "evidence": [{ "type": "execution", "id": "exec-a1" }, { "type": "execution", "id": "exec-a2" }],
-  "presentation": {
-    "views": ["deployment", "overview"],
-    "role": "outcome",
-    "status": "verified",
-    "checks": [
-      { "label": "Public web page and CRUD API answered", "status": "passed", "basis": "observed" },
-      { "label": "SQLite persistence survived a restart", "status": "passed", "basis": "observed" },
-      { "label": "HTTPS and off-server backups not configured", "status": "info", "basis": "observed" }
-    ],
-    "content": {
-      "kind": "deployment",
-      "repositoryUrl": "https://github.com/docker/getting-started-app",
-      "revision": "6b025fc",
-      "image": "getting-started:6b025fc",
-      "server": "docker-getting-started-4bda8854",
-      "changes": ["First deployment", "systemd unit installed"]
-    }
-  }
-}
-```
-
-**In chat** it renders as the information card, under the reply, with `showInChat`.
-**In Deployment** it is the headline, the tone, the facts row and "Checks it passes" — three checks, so the page says "Against the 3 checks listed below, and nothing else".
-**In Overview** it is the first mark on the Checks lane and the newest entry in Recent work.
-**In History** it is an entry on 12 September with its evidence and its origin conversation.
-
-### 8.2 The host, as a subject
-
-```json
-{
-  "subject": { "kind": "host", "id": "hetzner-165600952" },
+  "id": "rec-host-1",
+  "applicationId": "app-dgs",
   "title": "Server reachable over SSH",
-  "body": "CX23 in hel1/Helsinki, 2 vCPU, 4 GB, Ubuntu 24.04. Root SSH uses the controller-managed key.",
+  "body": "CX23 in hel1/Helsinki, 2 vCPU, 4 GB, 40 GB disk, Ubuntu 24.04. Root SSH uses the controller-managed key.",
   "establishedAt": "2026-09-12T15:48:00Z",
+  "about": [{ "kind": "host", "id": "hetzner-165600952" }],
+  "states": { "ref": { "kind": "host", "id": "hetzner-165600952" }, "presence": "present" },
   "evidence": [{ "type": "execution", "id": "exec-b7" }],
   "presentation": {
     "views": ["overview", "architecture"],
     "role": "status",
     "status": "verified",
-    "checks": [{ "label": "SSH connected as root", "status": "passed", "basis": "observed" }]
+    "checks": [
+      { "label": "SSH connected as root", "status": "passed", "claim": "reachability", "basis": "observed" }
+    ],
+    "facts": [
+      { "label": "Where", "value": "Helsinki, Finland", "claim": "identity", "basis": "reported" },
+      { "label": "Size", "value": "CX23 · 2 vCPU · 4 GB", "claim": "identity", "basis": "reported" },
+      { "label": "Public address", "value": "46.62.253.6", "mono": true, "claim": "identity", "basis": "reported" }
+    ]
   }
 }
 ```
 
-At 15:48 Overview's Server lane reads "Reached just now". Three days later **the same record** reads "Reached 3 days ago" with a freshness band across the gap, Architecture's host tag turns amber, and CDN still names the machine and its city — because `host` facts do not expire the way a check does. Pi wrote nothing new; nothing pretended otherwise.
+Three days on, Overview's Server lane and Architecture's host tag read "Reached 3 days ago" in amber, because `reachability` expires in twelve hours. CDN still names the machine as a CX23 in Helsinki, with no tag at all, because those facts are `identity` and do not age. One record, two correct readings.
 
-### 8.3 The map
+### 9.2 The map
 
 ```json
 {
-  "subject": { "kind": "application", "id": "app-e16000ed" },
+  "id": "rec-topo-1",
+  "applicationId": "app-dgs",
   "title": "How the application is put together",
-  "body": "One host answers the web, with the database on disk beside it.",
+  "body": "One host runs the app behind Nginx on its own loopback. Nothing on the public internet reaches the web; you reach it through an SSH tunnel.",
   "establishedAt": "2026-09-12T16:05:00Z",
+  "about": [{ "kind": "application", "id": "app-dgs" }],
+  "states": { "ref": { "kind": "application", "id": "app-dgs" }, "presence": "present" },
   "presentation": {
     "views": ["architecture", "overview"],
     "role": "status",
@@ -475,16 +416,23 @@ At 15:48 Overview's Server lane reads "Reached just now". Three days later **the
       "from": "observed",
       "parts": [
         { "id": "source", "kind": "source", "name": "docker/getting-started-app", "role": "The repository", "plain": "Where the code comes from" },
-        { "id": "hetzner-165600952", "kind": "host", "name": "Hetzner CX23", "role": "The server", "plain": "The one machine everything runs on", "facts": [{ "label": "Where", "value": "Helsinki", "basis": "reported" }] },
-        { "id": "door-80", "kind": "gate", "name": "80", "role": "HTTP", "plain": "The way in from the network", "owner": "hetzner-165600952" },
-        { "id": "process-app", "kind": "web", "name": "getting-started", "role": "Your application", "plain": "The pages you open", "owner": "hetzner-165600952" },
+        { "id": "controller", "kind": "controller", "name": "Server Guy", "role": "This PC", "plain": "Where you are reading this" },
+        { "id": "hetzner-165600952", "kind": "host", "name": "Hetzner CX23", "role": "The server", "plain": "The one machine everything runs on",
+          "facts": [{ "label": "Where", "value": "Helsinki, Finland", "claim": "identity", "basis": "reported" }] },
+        { "id": "door-22", "kind": "gate", "name": "22", "role": "SSH", "plain": "The only way in from the network", "owner": "hetzner-165600952" },
+        { "id": "process-nginx", "kind": "web", "name": "nginx", "role": "The front door inside the server", "plain": "Answers on the server's own loopback, port 80", "owner": "hetzner-165600952" },
+        { "id": "process-app", "kind": "private", "name": "getting-started", "role": "Your application", "plain": "The Node app, reachable only from the server", "owner": "hetzner-165600952" },
         { "id": "volume-todo", "kind": "volume", "name": "todo.db", "role": "The database file", "plain": "Where your list is kept", "owner": "process-app" }
       ],
       "edges": [
-        { "from": "door-80", "to": "process-app", "network": "public", "label": "80" },
+        { "from": "controller", "to": "door-22", "network": "public", "label": "SSH" },
+        { "from": "door-22", "to": "process-nginx", "network": "loopback", "label": "tunnel 8080 → 80" },
+        { "from": "process-nginx", "to": "process-app", "network": "private", "label": "127.0.0.1:3000" },
         { "from": "process-app", "to": "volume-todo", "network": "disk" }
       ],
       "absent": [
+        { "id": "door-80", "kind": "gate", "name": "Public web door", "would": "let anyone on the internet reach the application" },
+        { "id": "tls", "kind": "tls", "name": "HTTPS", "would": "encrypt what travels between you and the server" },
         { "id": "offsite", "kind": "offsite", "name": "Off-site copies", "would": "keep a copy of todo.db away from this server" },
         { "id": "watch", "kind": "monitor", "name": "Monitoring", "would": "watch the application between deployments" }
       ]
@@ -493,87 +441,179 @@ At 15:48 Overview's Server lane reads "Reached just now". Three days later **the
 }
 ```
 
-**In Architecture** this draws five parts, two ghosts, the private boundary and the disk boundary; `process-app` shows verified because a `process:process-app` record exists and is fresh; `volume-todo` shows unknown until one does. **Nothing on the map is coloured by the topology record itself.**
-**In Overview** the same record draws the small map, and the two ghosts explain why Backups reads "Not set up".
-**In Storage** the volume part contributes its mount and owner; its pieces come from the volume inventory.
-**Before deployment** the identical shape with `from: "plan"` draws every part in ghost and every lane as Planned.
+No `public` edge reaches the web: the only public edge is the controller's SSH connection, and the application is behind a `loopback` hop. Architecture draws seven parts and four ghosts; Overview draws the same in miniature.
 
-### 8.4 The backup schedule
+### 9.3 How you reach it
 
 ```json
 {
-  "subject": { "kind": "backup-plan", "id": "daily-todo" },
-  "title": "Daily copy of the database, seven kept",
-  "body": "A systemd timer copies todo.db at 03:15 UTC after an integrity check.",
-  "establishedAt": "2026-09-12T16:02:00Z",
-  "evidence": [{ "type": "execution", "id": "exec-c3" }],
+  "id": "rec-access-1",
+  "applicationId": "app-dgs",
+  "title": "Private application access ready",
+  "body": "SSH forwards local 127.0.0.1:8080 to the server's loopback port 80, where Nginx listens. The public HTTP rules were removed; only SSH remains allowed. The tunnel lasts while its SSH process is alive.",
+  "establishedAt": "2026-09-12T16:16:00Z",
+  "about": [
+    { "kind": "access", "id": "app-dgs" },
+    { "kind": "host", "id": "hetzner-165600952" },
+    { "kind": "process", "id": "process-nginx" }
+  ],
+  "states": { "ref": { "kind": "access", "id": "app-dgs" }, "presence": "present" },
+  "evidence": [{ "type": "execution", "id": "exec-e1" }],
   "presentation": {
-    "views": ["backups", "overview", "jobs", "storage"],
+    "views": ["overview", "domains", "security"],
     "role": "status",
     "status": "verified",
-    "content": { "kind": "schedule", "what": "Copy todo.db", "cadence": "Daily at 03:15", "timezone": "UTC", "installedAt": "2026-09-12T16:02:00Z", "nextAt": "2026-09-13T03:15:00Z", "keep": 7 }
+    "url": "http://127.0.0.1:8080",
+    "checks": [
+      { "label": "Local browser endpoint returns HTTP 200", "status": "passed", "claim": "reachability", "basis": "observed",
+        "about": { "kind": "access", "id": "app-dgs" } },
+      { "label": "Application ports bind only to server loopback", "status": "passed", "claim": "configuration", "basis": "observed",
+        "about": { "kind": "process", "id": "process-nginx" } },
+      { "label": "Public HTTP unavailable from this PC", "status": "passed", "claim": "reachability", "basis": "observed",
+        "about": { "kind": "access", "id": "app-dgs" } }
+    ],
+    "nextStep": "Ask Pi to reopen private access if the tunnel stops.",
+    "content": { "kind": "application-access", "mode": "private", "server": "docker-getting-started-4bda8854", "localPort": 8080, "remotePort": 80 }
   }
 }
 ```
 
-**In Backups** it names the rows and draws tomorrow's 03:15 in outline.
-**In Overview** it fills the Backups lane and puts one mark in the Tomorrow column.
-**In Jobs** it is the "Server Guy's own backup" card.
-**In Storage** it is the "Daily backups · keeping the latest 7" node between the volumes and off-the-server.
+The three checks land in two lanes via `check.about`: two in Access, one in Application — which is what today's `check.subject` did, without Pi naming a column.
 
-If 03:15 passes with no copy event, every one of those says the copy is **not on record** — never that the backup failed, because nothing checked.
-
-### 8.5 A copy actually made, as an event
+### 9.4 The deployment, as an event
 
 ```json
 {
-  "title": "Copied todo.db off the server",
-  "body": "6.1 MB archive verified by size and SHA-256 after download.",
-  "establishedAt": "2026-09-13T03:15:41Z",
-  "evidence": [{ "type": "execution", "id": "exec-d9" }],
+  "id": "rec-deploy-1",
+  "applicationId": "app-dgs",
+  "title": "Docker Getting Started is deployed and answering",
+  "body": "The app runs as a non-root Node 22 container behind Nginx, managed by systemd with resource limits and automatic recovery after reboot. SQLite data persists at /var/lib/docker-getting-started/todo.db.",
+  "establishedAt": "2026-09-12T16:05:00Z",
+  "about": [
+    { "kind": "host", "id": "hetzner-165600952" },
+    { "kind": "process", "id": "process-app" },
+    { "kind": "process", "id": "process-nginx" },
+    { "kind": "volume", "id": "volume-todo" }
+  ],
+  "evidence": [
+    { "type": "execution", "id": "exec-a1" },
+    { "type": "execution", "id": "exec-a2" },
+    { "type": "message", "id": "msg-77" }
+  ],
   "presentation": {
-    "views": ["backups", "storage", "database"],
+    "views": ["deployment", "overview", "history"],
     "role": "outcome",
     "status": "verified",
-    "checks": [{ "label": "Archive matched its checksum", "status": "passed", "basis": "observed" }],
-    "content": { "kind": "measurement", "of": "backup", "value": 6.1, "unit": "MB", "at": "2026-09-13T03:15:41Z" }
+    "checks": [
+      { "label": "Web page and CRUD API answered", "status": "passed", "claim": "reachability", "basis": "observed",
+        "detail": "GET /api/items → 200, POST then GET round-tripped",
+        "about": { "kind": "process", "id": "process-app" } },
+      { "label": "Data survived a container restart", "status": "passed", "claim": "contents", "basis": "observed",
+        "about": { "kind": "volume", "id": "volume-todo" } },
+      { "label": "Container healthy and recovered after reboot", "status": "passed", "claim": "liveness", "basis": "observed",
+        "about": { "kind": "process", "id": "process-app" } }
+    ],
+    "content": {
+      "kind": "deployment",
+      "repositoryUrl": "https://github.com/docker/getting-started-app",
+      "revision": "6b025fc53bc7b9bef435d6b09bcd1da5a871c9cc",
+      "image": "getting-started:6b025fc",
+      "server": "docker-getting-started-4bda8854",
+      "changes": ["First deployment", "systemd unit installed", "Public HTTP rules removed"]
+    }
   }
 }
 ```
 
-It fills the outlined cell on the calendar, adds a mark to Database's copies lane, updates Storage's "Off the server · Newest copy" and never supersedes anything: tomorrow's copy is a second event beside it.
+**No `states`.** It is about four subjects and is the current state of none of them — which is the correction the review asked for. It appears in chat as a card, in Deployment as the headline and its three checks, in Overview's Recent work and three lane marks, and in History as an entry. It never answers "is the app running now"; the process records do.
+
+### 9.5 A declared absence
+
+```json
+{
+  "id": "rec-watch-1",
+  "applicationId": "app-dgs",
+  "title": "Nothing watches the application between deployments",
+  "body": "No health check, log watcher or uptime probe is installed. The only evidence is what a deployment or an ask produces at the time.",
+  "establishedAt": "2026-09-12T16:06:00Z",
+  "about": [{ "kind": "monitor", "id": "app-dgs" }],
+  "states": { "ref": { "kind": "monitor", "id": "app-dgs" }, "presence": "absent" },
+  "evidence": [{ "type": "execution", "id": "exec-f2" }],
+  "presentation": {
+    "views": ["monitoring", "overview"],
+    "role": "status",
+    "status": "verified",
+    "nextStep": "Ask Server Guy to set up a health watch."
+  }
+}
+```
+
+`status: "verified"` with `presence: "absent"` is the honest combination: Pi checked, and there is none. **Only with this record may Monitoring say "Nothing is listening."** Without it the page says monitoring has not been assessed.
+
+### 9.6 A later observation of one process
+
+```json
+{
+  "id": "rec-proc-2",
+  "applicationId": "app-dgs",
+  "title": "The application answered",
+  "body": "GET / returned 200 in 41 ms through the tunnel.",
+  "establishedAt": "2026-09-13T09:12:00Z",
+  "about": [{ "kind": "process", "id": "process-app" }],
+  "states": { "ref": { "kind": "process", "id": "process-app" }, "presence": "present" },
+  "evidence": [{ "type": "execution", "id": "exec-g4" }],
+  "presentation": {
+    "views": ["processes", "overview"],
+    "role": "status",
+    "status": "verified",
+    "checks": [{ "label": "GET / returned 200", "status": "passed", "claim": "reachability", "basis": "observed" }]
+  }
+}
+```
+
+Processes now shows one row for `process-app` reading this record. Overview's Checks lane shows **both** this mark and yesterday's from the deployment, because the lane is a series read. Nothing was overwritten.
 
 ---
 
-## 9. What the lightweight happy path needs now
+## 10. The full contract, in one list
 
-**Now**, to make Overview, Architecture, Deployment, History and Logs real for one simple application:
-
-1. `subject` on the record, and newest-per-subject reads. Everything else depends on it.
-2. The freshness rule in the component layer: `freshFor` per subject kind, `stale` owned by the UI, optional `freshFor` override from Pi.
-3. `basis` on checks and facts.
-4. `topology` content with `from`, part states resolved from subject records, and `absent` for declared gaps.
-5. `schedule` content, for the future column and the calendar.
-6. Lane derivation from subject kind; retire the authored `check.subject`.
-7. `resolves` on event records, for History's pairs.
-8. Actions limited to Navigate and Ask.
-9. `planned` as a state, so the pre-deployment screens are drawable.
-
-**Later**, each when its destination is taken:
-
-- `inventory`, one subject kind at a time: `process` first, then `volume`, `door`, `value`, `config-file`, `job`, `monitor`.
-- `measurement`, when a view first needs a number.
-- Log parsing for Logs' speakers and levels (the collection itself is already an execution).
-- Restore-test and copy events for the Backups calendar's full behaviour.
-- Any Execute action, each argued for on its own.
-- Side conversations reading the same records.
+`about[]` · `states {ref, presence}` · `Claim` on every check and fact · `Basis` on every check and fact · optional `freshFor` · `check.about` · `resolves` · contents: `topology`, `doors`, `schedule`, `backup-plan`, `backup-copy`, `restore-test`, `inventory`, `measurement`, plus today's `deployment` and `application-access`.
 
 ---
 
-## 10. What this contract refuses
+## 11. The smallest slice
 
-- **No health from absence.** A missing record is unknown, drawn as unknown, worded as unknown. There is no path from "nothing recorded" to a green mark.
-- **No invented infrastructure.** A diagram draws what Pi found plus what Pi explicitly declared missing. Never a placeholder to balance a layout.
-- **No generic cards where a design exists.** A destination with an accepted design renders that design from these facts. The card is for records no designed component claims, and for chat.
-- **No prose where a field belongs.** If a component needs a number, a time, an identity or a basis, it gets a field. Parsing it back out of Pi's sentences is how the freshness and lane bugs return.
-- **No values, ever.** Variables carries names, places and reasons. A page cannot leak what it does not hold.
+What the deployment we already have needs to run **its existing screens** — chat, Overview, Architecture, Deployment, History, Processes, Logs — on real records. Backups, scheduling and recovery are deliberately out.
+
+**In:**
+
+1. `about[]` and `states {ref, presence}`, with current-state reads as newest-per-subject. Append-only; nothing mutates.
+2. `claim` and `basis` on checks and facts, with the expiry table in the component layer and `stale` owned by the UI.
+3. `presence: "absent"` and the two empty states everywhere a design says "there is none".
+4. `topology` content with `from`, `loopback` edges, part states resolved from records, and `absent[]`.
+5. `check.about` and lane derivation (§4.1), retiring `check.subject`.
+6. `planned` as a state, so the pre-deployment screens draw.
+7. Actions: Navigate and Ask only.
+
+**Out of the first slice**, each when its destination is taken:
+
+- `schedule` and everything that expands a recurrence — the Backups calendar, Overview's future column, Jobs' next run. Overview's timeline ships with history and now, and no Tomorrow.
+- `backup-plan`, `backup-copy`, `restore-test` — all of Backups and Storage's flow.
+- `resolves` — History ships without failure/repair pairing.
+- `doors` — Security and Domains keep their current views.
+- `inventory` beyond what `topology.parts` already gives Processes.
+- `measurement`.
+- Any Execute action.
+
+The seven items in are the ones with no useful subset: without `states` there is no current state, without `claim` freshness is wrong for half the facts, and without `presence` the screens lie about absence. Everything else is additive and can land per destination.
+
+---
+
+## 12. What this contract refuses
+
+- **No health from absence, and no absence from absence.** A missing record means nobody looked. Only a record with `presence: "absent"` licenses "there is none".
+- **No invented infrastructure.** A diagram draws what Pi found plus what Pi explicitly declared missing.
+- **No generic cards where a design exists.** The card is for records no designed component claims, and for chat.
+- **No prose where a field belongs.** A number, a time, an identity, a basis, a claim or a recurrence gets a field. `"Daily at 03:15"` is not a schedule.
+- **No computing from an unknown.** `recurrence: {rule:"unknown"}` may be printed and never expanded.
+- **No values, ever.** Variables carries names, places and reasons.
