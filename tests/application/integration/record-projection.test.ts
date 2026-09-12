@@ -290,7 +290,9 @@ describe("4 · monitoring, from unlooked-at to established to present", () => {
         content: {
           ...(mapRecord.presentation!.content as { kind: "topology"; parts: unknown[]; edges: unknown[]; from: "observed" }),
           parts: [
-            ...(mapRecord.presentation!.content as { parts: { id: string }[] }).parts,
+            ...(mapRecord.presentation!.content as {
+              parts: { id: string }[];
+            }).parts,
             { id: "uptime", kind: "monitor", name: "Uptime check", role: "Asks the homepage every minute", plain: "Watches your application" },
           ],
         },
@@ -314,7 +316,9 @@ describe("5 · the same records read twice give the same page", () => {
     const records = [mapRecord, hostFirst, deployed];
     const first = architecture(records, SEP_12_16_30)!;
     const second = architecture([...records].reverse(), SEP_12_16_30)!;
-    expect(second.parts.map((part) => [part.id, part.evidence.certainty])).toEqual(
+    expect(
+      second.parts.map((part) => [part.id, part.evidence.certainty]),
+    ).toEqual(
       first.parts.map((part) => [part.id, part.evidence.certainty]),
     );
     expect(second.journeys).toEqual(first.journeys);
@@ -346,7 +350,9 @@ describe("what a reading never does", () => {
       ],
     });
     expect(
-      event.presentation!.checks.map((check) => checkAsNow(check, event, ONE_HOUR_ON)),
+      event.presentation!.checks.map((check) =>
+        checkAsNow(check, event, ONE_HOUR_ON),
+      ),
     ).toEqual(["verified", "verified", "stale"]);
     expect(tagFor(event, event.presentation!.checks, ONE_HOUR_ON)).toBe("stale");
     expect(tagFor(event, [{ claim: "identity" }], ONE_HOUR_ON)).toBe("verified");
@@ -380,7 +386,9 @@ describe("what a reading never does", () => {
   it("retires by falling back, and changes not a word of what was said", () => {
     const withdrawn = { ...hostFirst, retiredAt: "2026-09-13T09:30:00.000Z" };
     expect(currentFacts([mapRecord, withdrawn, deployed], HOST).size).toBe(0);
-    expect(withdrawn.presentation!.facts).toEqual(hostFirst.presentation!.facts);
+    expect(withdrawn.presentation!.facts).toEqual(
+      hostFirst.presentation!.facts,
+    );
     expect(seriesFor([mapRecord, withdrawn], HOST)[0].withdrawn).toBe(true);
   });
 });
