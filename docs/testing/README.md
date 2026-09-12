@@ -6,6 +6,8 @@
 
 [Operator design](../operator-design.md#verification-during-development) and [Roadmap](../../ROADMAP.md) define proportionate verification and stage order. Prove a lightweight deployment, then medium and more complicated examples through the same operator. Exact repositories remain to be selected. Each stage needs focused checks and a concrete reviewable result; old workflows and obsolete hardening tests may be deleted.
 
+Redesign checkpoints so far, newest first: [Architecture from real records](2026-09-12-architecture-records.md) (the first designed destination driven by records Pi wrote, accepted 12 September 2026), [transcript and terminal](2026-09-12-transcript-terminal-integration.md), [Hetzner provisioning](2026-09-12-hetzner-provisioning.md), [operator storage](2026-09-12-operator-storage.md) and [operator execution](2026-09-12-operator-execution.md).
+
 The redesign has not been implemented or validated by the historical proofs below. Documentation/link checks establish documentation consistency only. Detailed view capabilities, application-error detection and broad resilience matrices are deferred until the main deployment journey works.
 
 ## What the existing architecture has proved

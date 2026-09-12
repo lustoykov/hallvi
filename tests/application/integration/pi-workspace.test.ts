@@ -168,12 +168,27 @@ function syntheticEngine() {
     const chunks = [head];
     socket.on("data", (chunk) => chunks.push(chunk));
     socket.on("end", () => {
-      // Upgrade head also contains the HTTP request body before tool stdin.
-      const input = Buffer.concat(chunks).subarray(
-        Number(request.headers["content-length"] ?? 0),
-      );
+      // Everything after the upgrade is the tool's stdin. Whether the HTTP
+      // request body precedes it in this stream depends on when Node's
+      // parser hands the socket over — with the body in the upgrade head, or
+      // already consumed and head empty. Both are valid HTTP and the real
+      // engine takes either, so the body is skipped only when it is there.
+      const all = Buffer.concat(chunks);
+      const body = Number(request.headers["content-length"] ?? 0);
+      const read = () => {
+        for (const candidate of [all, all.subarray(body)]) {
+          try {
+            return JSON.parse(candidate.toString());
+          } catch {
+            /* the other layout */
+          }
+        }
+        throw new Error(
+          `Synthetic engine could not read tool stdin from ${all.length} bytes: ${all.toString().slice(0, 120)}`,
+        );
+      };
       const execIndex = Number(request.url!.split("/").at(-2));
-      Object.assign(state.execs[execIndex], JSON.parse(input.toString()));
+      Object.assign(state.execs[execIndex], read());
       state.answer(state.execs[execIndex], {
         writeHead: () => undefined,
         end: (data: Buffer) => socket.end(data),
