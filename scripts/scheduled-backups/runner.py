@@ -251,7 +251,7 @@ def sanitize_detail(detail):
     }
 
 
-PROCEDURE_STEPS = {"dump", "verify", "start", "restore"}
+PROCEDURE_STEPS = {"stop", "dump", "verify", "start", "restore"}
 
 
 def now():
@@ -1335,11 +1335,31 @@ def capture_stack(config, state, run_id, command, staging):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
             raise BackupError("capture", "capture-failed") from error
         stopped = json.loads(command("docker", "inspect", *paused)) if paused else []
-        if any(
-            c["State"]["Running"] or c["State"]["ExitCode"] not in {0, 143}
+        unclean = [
+            c
             for c in stopped
-        ):
-            raise BackupError("capture", "source-stop-failed")
+            if c["State"]["Running"] or c["State"]["ExitCode"] not in {0, 143}
+        ]
+        if unclean:
+            # Which service, and how it ended: the evidence a stop-signal or
+            # grace-period correction needs.
+            first = unclean[0]
+            running = bool(first["State"]["Running"])
+            raise BackupError(
+                "capture",
+                "source-stop-failed",
+                {
+                    "step": "stop",
+                    "service": first["Config"]["Labels"]["com.docker.compose.service"],
+                    "exitCode": None if running else int(first["State"]["ExitCode"]),
+                    "output": (
+                        "was still running after the 120-second stop grace period"
+                        if running
+                        else f"exited {first['State']['ExitCode']} after the 120-second stop grace period"
+                        + (" (killed)" if first["State"]["ExitCode"] == 137 else "")
+                    ),
+                },
+            )
         manifest["stoppedServices"] = {
             c["Config"]["Labels"]["com.docker.compose.service"]: c["State"]["ExitCode"]
             for c in stopped

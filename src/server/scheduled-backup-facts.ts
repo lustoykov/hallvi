@@ -22,7 +22,7 @@ function procedureFailure(detail: ProcedureDetail) {
 
 export function backupFailure(run: ScheduledRun) {
   if (run.errorCode === "source-stop-failed")
-    return "A service failed to stop cleanly or exceeded the two-minute grace period. Check its exit status and shutdown handling before retrying; source restart is recorded separately.";
+    return `${run.detail ? `Service ${run.detail.service} ${run.detail.output}` : "A service failed to stop cleanly or exceeded the two-minute grace period"}. Check its exit status and shutdown handling before retrying; source restart is recorded separately.`;
   if (run.errorCode === "credentials-rejected")
     return "Backup storage rejected the credential. Reconnect storage access, then retry.";
   if (run.errorCode === "interrupted")

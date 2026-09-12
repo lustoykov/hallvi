@@ -2125,7 +2125,16 @@ class ScheduledBackupTest(unittest.TestCase):
                     "output": 'ERROR:  relation "pages" does not exist',
                 },
             ),
-            (killed_after_grace_period, "source-stop-failed", None),
+            (
+                killed_after_grace_period,
+                "source-stop-failed",
+                {
+                    "step": "stop",
+                    "service": "app",
+                    "exitCode": 137,
+                    "output": "exited 137 after the 120-second stop grace period (killed)",
+                },
+            ),
         ):
             with self.subTest(code):
                 config, docker = self.generic_stack()

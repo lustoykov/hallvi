@@ -340,6 +340,21 @@ describe("scheduled backup evidence", () => {
     expect(backupFailure(failed)).toContain(
       "the verify procedure declared for mariadb exited 1: ERROR 1146",
     );
+    // A service that ignored the stop signal is named with how it ended.
+    expect(
+      backupFailure({
+        ...failed,
+        errorCode: "source-stop-failed",
+        detail: {
+          step: "stop",
+          service: "healthchecks",
+          exitCode: 137,
+          output: "exited 137 after the 120-second stop grace period (killed)",
+        },
+      }),
+    ).toContain(
+      "Service healthchecks exited 137 after the 120-second stop grace period (killed). Check its exit status",
+    );
     // A receipt from an older runner keeps the generic reason.
     expect(backupFailure({ ...failed, detail: null })).toContain(
       "Check the source application",

@@ -30,7 +30,7 @@ export type BackupPolicy = z.infer<typeof backupPolicySchema>;
 
 /** Why an owner's declared procedure failed; the host masks its values. */
 export const procedureDetailSchema = z.object({
-  step: z.enum(["dump", "verify", "start", "restore"]),
+  step: z.enum(["stop", "dump", "verify", "start", "restore"]),
   service: z.string().regex(/^[a-z0-9][a-z0-9_.-]{0,62}$/),
   exitCode: z.number().int().nullable(),
   output: z.string().max(2000),

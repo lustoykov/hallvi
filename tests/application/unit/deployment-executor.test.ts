@@ -366,7 +366,7 @@ it("reports a redirecting health path with its status and target instead of wait
   const value = record();
   value.address = "203.0.113.10";
   const fetcher = vi.fn(
-    async () =>
+    async (_url: URL, _init: RequestInit = {}) =>
       new Response(null, {
         status: 302,
         headers: { location: "/accounts/login/" },
