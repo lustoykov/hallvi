@@ -1001,6 +1001,9 @@ export function JourneyDirection({
             const doors = model.parts.filter(
               (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
             ).length;
+            // No door drawn is not a count of zero: it means the rules
+            // have not been drawn, which is a different thing from none.
+            if (!doors) return "rules not drawn";
             const named = doors === 1 ? "one door" : `${doors} doors`;
             return model.openness === "restricted"
               ? `only ${named} open`
