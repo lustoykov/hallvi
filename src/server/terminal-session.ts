@@ -109,7 +109,12 @@ export class TerminalSession {
   private state: TerminalState = { name: "connecting" };
   private disposed = false;
 
-  constructor(id: string, applicationId: string, host: Host, size: Size) {
+  constructor(
+    id: string,
+    applicationId: string,
+    private readonly host: Host,
+    size: Size,
+  ) {
     this.id = id;
     this.applicationId = applicationId;
     this.target = { user: host.user, address: host.address, port: host.port };
@@ -185,6 +190,35 @@ export class TerminalSession {
 
   get currentState(): TerminalState {
     return this.state;
+  }
+
+  /** An existing shell must never outlive a changed application target. */
+  checkTarget() {
+    let current: Host | null = null;
+    try {
+      current = hostFor(this.applicationId);
+    } catch {
+      // Removed applications and unreadable settings invalidate the session.
+    }
+    if (
+      current &&
+      current.address === this.host.address &&
+      current.user === this.host.user &&
+      current.port === this.host.port &&
+      current.privateKeyPath === this.host.privateKeyPath &&
+      current.knownHostsPath === this.host.knownHostsPath &&
+      current.serverId === this.host.serverId &&
+      current.providerConnectionId === this.host.providerConnectionId
+    )
+      return true;
+    this.publish({
+      name: "failed",
+      failure: "credentials",
+      detail:
+        "The application's server connection changed. Connect again to use its current server.",
+    });
+    this.dispose();
+    return false;
   }
 
   write(data: Buffer) {
