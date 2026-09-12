@@ -184,7 +184,9 @@ describe("what is true now", () => {
     const vitals = overview([volume], TEN_MINUTES_ON).vitals;
     expect(vitals.find((v) => v.id === "checks")!.status.certainty).toBe("verified");
     expect(vitals.find((v) => v.id === "backups")!.status.certainty).toBe("unknown");
-    expect(vitals.find((v) => v.id === "backups")!.status.text).toBe("Not assessed");
+    expect(vitals.find((v) => v.id === "backups")!.status.text).toBe(
+      "Nobody has looked yet",
+    );
   });
 
   it("keeps a lane stale when any of its claims has lapsed", () => {

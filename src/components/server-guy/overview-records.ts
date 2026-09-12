@@ -143,7 +143,7 @@ function laneText(held: Held[], certainty: Certainty, now: number) {
   if (certainty === "absent") return "Not set up";
   if (certainty === "failed") return "A check did not pass";
   if (certainty === "unknown")
-    return held.length ? "Recorded, not dated" : "Not assessed";
+    return held.length ? "Recorded, not dated" : "Nobody has looked yet";
   if (certainty === "stale")
     return newest ? `Last checked ${when(newest, now)}` : "Checked once";
   return newest ? `Checked ${when(newest, now)}` : "Checked";
@@ -180,6 +180,40 @@ function subjectsOf(held: Held[]) {
     if (ref) refs.set(`${ref.kind}:${ref.id}`, ref);
   }
   return [...refs.values()];
+}
+
+/**
+ * What an execution is called in a list of past work. The tool name alone is
+ * not a reading: "bash" says nothing about whether it touched the server or a
+ * throwaway copy of the repository, and those are the two things a reader
+ * most needs to tell apart.
+ */
+function titleOf(execution: ExecutionRecord) {
+  switch (execution.tool) {
+    case "server_bash":
+      return `Ran on the server${execution.target ? ` · ${execution.target.split("@").at(-1)?.split(":")[0]}` : ""}`;
+    case "request_approval":
+      return "Asked you for a decision";
+    case "bash":
+    case "powershell":
+      return "Ran in the repository copy";
+    case "read":
+    case "read_file":
+      return "Read a file in the repository copy";
+    case "write":
+    case "write_file":
+    case "edit":
+    case "edit_file":
+      return "Changed a file in the repository copy";
+    case "hetzner_request":
+      return "Asked Hetzner";
+    case "open_server_port":
+      return "Opened a tunnel to the server";
+    case "connect_server":
+      return "Saved the server connection";
+    default:
+      return execution.tool.replaceAll("_", " ");
+  }
 }
 
 export function overviewFromRecords({
@@ -295,12 +329,7 @@ export function overviewFromRecords({
   const recent: RecentItem[] = [
     ...executions.map((execution) => ({
       id: execution.id,
-      title:
-        execution.tool === "server_bash"
-          ? `Ran on ${execution.target}`
-          : execution.tool === "request_approval"
-            ? "Asked for a decision"
-            : execution.tool.replaceAll("_", " "),
+      title: titleOf(execution),
       state: (execution.status === "succeeded"
         ? "verified"
         : execution.status === "failed"

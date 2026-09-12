@@ -27,6 +27,7 @@ import { OverviewDirection } from "./overview-prototype/overview";
 import { timelineFromRecords } from "./overview-timeline-records";
 import { Tag } from "./presentation";
 import "./overview-prototype/overview.css";
+import "./overview-plain.css";
 
 const idle: Recheck = {
   phase: "idle",
