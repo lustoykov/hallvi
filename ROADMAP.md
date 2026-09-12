@@ -34,6 +34,10 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 - [ ] **Queue, steer and side chats — deferred.** Revisit native queue/steer, opening contextual side chats and concurrent read-only explanations after the core deployment experience works well. Existing read-only tool restrictions remain, but expanding side-chat behavior is outside the current sprint. Do not make these controls prerequisites for provisioning or first deployment.
 
+## Later milestone: Pi heartbeat and state synchronization
+
+- [ ] **Pi heartbeat — deferred until after the simple deployment UI/UX checkpoint.** Periodically review whether saved application observations still match reality, refresh the evidence each view needs, and wake Pi for interpretation or follow-up when appropriate. Define checks and refresh needs view by view; deterministic checks can save their results without a model call. Keep last-checked times and failed checks visible, and surface meaningful changes rather than repetitive status messages. Cadence and scheduling details remain open. See [operator design](docs/operator-design.md#always-on-care-and-visible-commitments).
+
 ## Integrated terminal and Pi activity
 
 - [x] **Browser terminal — merged in [PR #58](https://github.com/lustoykov/server-guy/pull/58), with integration fixes in [PR #60](https://github.com/lustoykov/server-guy/pull/60), 12 September 2026.** The [browser terminal contract](docs/browser-terminal.md) describes the implemented separate stage. A Terminal action opens an optional bottom panel with a separate user shell on the connected application server through managed SSH. Keep Pi’s execution stream in chat; show when Pi is also working without taking over either session. Selected output can become an editable, unsent question to Pi. Minimize preserves the shell; disconnect or page departure ends it. Workspace targets, shared sessions and persistent recovery stay deferred.
