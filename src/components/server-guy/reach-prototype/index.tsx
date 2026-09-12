@@ -1,22 +1,15 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Six directions, three for each page, because the two pages are different
-// questions: Domains asks what name this answers on and what is missing in
-// front of it; Security asks who can reach it at all.
-//
-//   Domains   A Address   the address life-size, taken apart
-//             B Callers   what each kind of visitor meets
-//             C Handover  the one step only you can do, and what follows
-//   Security  A Doors     the server's face, one door per port
-//             B Rings     who is inside which ring, and what each can reach
-//             C Statement the exposure said out loud, with its evidence
-//
-// They run on the real routes inside the real shell; the bar at the bottom
-// switches direction, record scenario and reduced motion, and 0 is the
-// shipped page. Nothing here contacts a host: the firewall read-back is the
-// one the shipped Security view makes, and the scenarios that invent one
-// say so. Asking goes to the conversation.
+// PROTOTYPE · opus-ui-improvements · chosen for Domains and Security.
+// The two pages ask different questions, so the owner chose from two sets
+// of three: Domains in Callers (callers.tsx), the page seen from the other
+// side of the wire, and Security in Rings (rings.tsx), reach drawn as
+// territory. They run on the real routes inside the real shell; the four
+// directions not chosen stay on claude/domains-security. The bar at the
+// bottom switches to the shipped view (0), which also stands in while
+// nothing is recorded. Nothing here contacts a host: the firewall read is
+// the one the shipped Security view already makes, and the scenarios that
+// invent one say so.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -35,11 +28,7 @@ import {
   type VariantEntry,
 } from "../architecture-prototype/prototype-bar";
 import { PageHead } from "../deployment-prototype/page-head";
-import { AddressDirection } from "./address";
 import { CallersDirection } from "./callers";
-import { DoorsDirection } from "./doors";
-import { HandoverDirection } from "./handover";
-import { StatementDirection } from "./statement";
 import { buildReachStory, type ReachStory } from "./reach-model";
 import { RingsDirection } from "./rings";
 import "../architecture-prototype/prototype.css";
@@ -63,29 +52,17 @@ export interface ReachDirectionProps {
 
 const variants: Record<ReachPage, VariantEntry[]> = {
   domains: [
-    { key: "A", id: "address", name: "Address" },
-    { key: "B", id: "callers", name: "Callers" },
-    { key: "C", id: "handover", name: "Handover" },
+    { key: "A", id: "callers", name: "Callers" },
     { key: "0", id: "current", name: "Current page" },
   ],
   security: [
-    { key: "A", id: "doors", name: "Doors" },
-    { key: "B", id: "rings", name: "Rings" },
-    { key: "C", id: "statement", name: "Statement" },
+    { key: "A", id: "rings", name: "Rings" },
     { key: "0", id: "current", name: "Current page" },
   ],
 };
 const choices: Record<ReachPage, ScenarioId[]> = {
   domains: ["live", "domain", "later"],
   security: ["live", "checked", "later"],
-};
-const directions = {
-  address: AddressDirection,
-  callers: CallersDirection,
-  handover: HandoverDirection,
-  doors: DoorsDirection,
-  rings: RingsDirection,
-  statement: StatementDirection,
 };
 const DAY = 86_400_000;
 
@@ -128,7 +105,8 @@ export function ReachPrototype({
   current: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
-  const [chosen, setChosen] = useState(0);
+  // Whether the shipped view is showing; it carries across the two pages.
+  const [showCurrent, setShowCurrent] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>("live");
   const [reduced, setReduced] = useState(false);
 
@@ -138,10 +116,7 @@ export function ReachPrototype({
     const start = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const wanted = params.get("variant")?.toLowerCase();
-      const index = variants[page].findIndex(
-        (item) => item.key.toLowerCase() === wanted || item.id === wanted,
-      );
-      if (index >= 0) setChosen(index);
+      if (wanted === "0" || wanted === "current") setShowCurrent(true);
       const wantedRecord = params.get("record") as ScenarioId | null;
       if (wantedRecord && choices[page].includes(wantedRecord))
         setScenario(wantedRecord);
@@ -169,13 +144,11 @@ export function ReachPrototype({
       operation.state === "proposed" ||
       (operation.state === "failed" && unresolved(operation, operations)),
   );
-  const list = variants[page];
-  const variant = list[Math.min(chosen, list.length - 1)];
+  const variant = variants[page][showCurrent ? 1 : 0];
   // With nothing deployed there is no address and no firewall to speak of;
   // the shipped page's honest empty state stands in.
-  const shipped = variant.id === "current" || story.state === "none";
-  const Direction =
-    directions[variant.id as keyof typeof directions] ?? AddressDirection;
+  const shipped = showCurrent || story.state === "none";
+  const Direction = page === "domains" ? CallersDirection : RingsDirection;
   const props: ReachDirectionProps = {
     story,
     now,
@@ -214,19 +187,16 @@ export function ReachPrototype({
         ) : shipped ? (
           current
         ) : (
-          // Each direction starts with its own selection.
-          <Direction key={variant.id} {...props} />
+          // Each page starts with its own selection.
+          <Direction key={page} {...props} />
         )}
         <PrototypeBar
-          variants={list}
+          variants={variants[page]}
           variant={variant}
           onVariant={(id) => {
-            const next = Math.max(
-              0,
-              list.findIndex((item) => item.id === id),
-            );
-            setChosen(next);
-            writeUrl(list[next].key, scenario);
+            const next = id === "current";
+            setShowCurrent(next);
+            writeUrl(next ? "0" : "A", scenario);
           }}
           scenario={scenario}
           onScenario={(id) => {

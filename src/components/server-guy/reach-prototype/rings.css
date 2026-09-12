@@ -306,3 +306,11 @@
 .axri > .ax-invented {
   align-self: flex-start;
 }
+
+.axri-item em {
+  margin-top: 2px;
+  color: var(--ax-muted);
+  font-family: var(--ax-mono);
+  font-size: 10.5px;
+  font-style: normal;
+}

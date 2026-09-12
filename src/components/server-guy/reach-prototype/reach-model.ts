@@ -1,9 +1,10 @@
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// What the Domains and Security pages say: the address this application
-// answers on and what is missing in front of it, and every way in that the
-// record can account for — the ports the deployment asked the provider to
-// open, who they were opened to, and the checks that proved something
-// answered. Built on the story the Processes page reads (stack-model.ts).
+// PROTOTYPE · opus-ui-improvements · chosen for Domains and Security.
+// What both pages read: what a visitor meets when they knock — the address,
+// the name and certificate in front of it, and what the record says each
+// kind of caller would get — and every way in the record can account for:
+// the ports the deployment asked the provider to open, who they were opened
+// to, what listens behind them and what protects the server without being a
+// way in. Built on the story the Processes page reads (stack-model.ts).
 // Nothing here contacts a host: the firewall read-back is the one the
 // shipped Security view makes, and the scenarios that invent one say so.
 
@@ -19,7 +20,6 @@ import { currentFacts, primaryHttp } from "@/server/release-facts";
 
 import { ago, FRESH_MS } from "../architecture-prototype/model";
 import type { Tone } from "../deployment-prototype/deployment-model";
-import { toneOf } from "../signal-prototype/signal-model";
 import {
   buildStackStory,
   when,
@@ -27,30 +27,22 @@ import {
   type StackStory,
 } from "../stack-prototype/stack-model";
 
-export { when, toneOf };
+export { when };
 
 /** How far a way in reaches. */
 export type Reach = "internet" | "restricted" | "private" | "closed";
-/** What the record can say about a way in, and how it knows. */
+/** Where what the page says comes from. */
 export type Told = "provider" | "plan" | "stack";
 
 export interface Door {
   id: string;
   port: string;
-  protocol: string;
   /** What is behind it, in words. */
   title: string;
   serves: string | null;
   reach: Reach;
-  /** Who can knock: "Anyone on the internet", "Only your network". */
-  reachWords: string;
-  /** The sources exactly as they are stated. */
+  /** The sources exactly as the provider or the plan states them. */
   sources: string[];
-  told: Told;
-  toldWords: string;
-  at: string | null;
-  /** A check that proved something answered here. */
-  proof: { words: string; at: string } | null;
   /** Worth naming even when the firewall works exactly as asked. */
   concern: string | null;
   detail: string;
@@ -62,9 +54,7 @@ export interface Door {
 export interface Guard {
   id: string;
   title: string;
-  detail: string;
   at: string | null;
-  told: Told;
 }
 
 /** What nothing on record covers. */
@@ -72,28 +62,6 @@ export interface Hole {
   id: string;
   title: string;
   detail: string;
-}
-
-/** One thing that has to be true before the name works. */
-export interface Leg {
-  id: "name" | "https" | "cdn" | "serves";
-  label: string;
-  value: string;
-  detail: string;
-  state: "ok" | "pending" | "failed" | "absent" | "skipped";
-  /** Whose move it is while the state is not ok. */
-  who: "you" | "server-guy" | null;
-  note: string | null;
-}
-
-/** A step in connecting a name: yours, or Server Guy's. */
-export interface Step {
-  id: string;
-  who: "you" | "server-guy";
-  title: string;
-  detail: string;
-  state: "done" | "waiting" | "blocked" | "standing";
-  at: string | null;
 }
 
 /** What a visitor meets, derived from the record — never observed. */
@@ -115,19 +83,11 @@ export interface Caller {
 
 export interface ReachStory extends StackStory {
   address: string | null;
-  scheme: "http" | "https";
-  hostName: string | null;
-  portLabel: string | null;
-  path: string;
   domain: DomainFacts["domain"];
   tls: DomainFacts["tls"];
-  cdn: DomainFacts["cdn"];
-  routes: DomainFacts["routes"];
   /** Who the deployment opened HTTP to. */
   audience: "public" | "controller";
   controllerIp: string | null;
-  legs: Leg[];
-  steps: Step[];
   callers: Caller[];
   doors: Door[];
   ssh: { word: string; tone: Tone; detail: string; told: Told };
@@ -143,8 +103,6 @@ export interface ReachStory extends StackStory {
   /** The scenario that invented part of this, in words. */
   invented: string | null;
 }
-
-const short = (at: string | null) => (at ? when(at) : null);
 
 /** The web process, which is what a visitor reaches. */
 const webOf = (processes: ProcessCard[]) =>
@@ -274,153 +232,10 @@ export function buildReachStory(input: {
   const secure = tls.state === "valid";
   const hostName = domains?.domain?.name ?? parsed?.hostname ?? null;
 
-  // ---- What is in front of the application, stage by stage.
+  // ---- What is in front of the application.
   const web = webOf(base.processes);
   const exposed = primaryHttp(release);
-  const servesWords = exposed
-    ? `${web?.product ?? exposed.service} · port ${exposed.target}`
-    : (web?.product ?? "the application");
   const domain = domains?.domain ?? null;
-  const cdn = domains?.cdn ?? {
-    state: "not-configured" as const,
-    detail: "Requests reach the host directly.",
-  };
-  const legs: Leg[] = [
-    {
-      id: "name",
-      label: "Name",
-      value: domain?.name ?? "No custom domain",
-      detail: domain
-        ? domain.provider === "cloudflare"
-          ? "DNS at Cloudflare"
-          : "DNS at your provider"
-        : "Visitors type the server’s address",
-      state: !domain
-        ? "absent"
-        : domain.state === "resolving"
-          ? "ok"
-          : domain.state === "failed"
-            ? "failed"
-            : "pending",
-      who: domain?.state === "resolving" ? null : "you",
-      note: domain?.userStep ?? null,
-    },
-    {
-      id: "https",
-      label: "HTTPS",
-      value:
-        tls.state === "valid"
-          ? "Certificate valid"
-          : tls.state === "pending"
-            ? "Certificate pending"
-            : tls.state === "failed"
-              ? "Certificate failed"
-              : "HTTP only",
-      detail:
-        tls.state === "valid"
-          ? `${tls.issuer ?? "Issued"}${tls.expiresAt ? ` · expires ${when(tls.expiresAt)}` : ""}`
-          : (tls.detail ??
-            "Nothing between a visitor and the server is encrypted."),
-      state:
-        tls.state === "valid"
-          ? "ok"
-          : tls.state === "pending"
-            ? "pending"
-            : tls.state === "failed"
-              ? "failed"
-              : "absent",
-      who: tls.state === "valid" ? null : "server-guy",
-      note: tls.renewal ?? null,
-    },
-    {
-      id: "cdn",
-      label: "CDN",
-      value:
-        cdn.state === "active" || cdn.state === "partial"
-          ? (cdn.provider ?? "Configured")
-          : cdn.state === "not-useful"
-            ? "Not useful here"
-            : "Not enabled",
-      detail: cdn.detail,
-      state:
-        cdn.state === "active"
-          ? "ok"
-          : cdn.state === "partial"
-            ? "pending"
-            : cdn.state === "not-useful"
-              ? "skipped"
-              : "absent",
-      who: null,
-      note: null,
-    },
-    {
-      id: "serves",
-      label: "Serves",
-      value: servesWords,
-      detail: address
-        ? `${address} answers${audience === "controller" ? ", from your network only" : ""}`
-        : "No public address recorded",
-      state: base.state === "running" ? "ok" : "absent",
-      who: null,
-      note: null,
-    },
-  ];
-
-  // ---- The way a name gets connected, and who has to move.
-  // Nothing on record says when a name was pointed, so a real one gets no
-  // date at all; the invented scenario gets an invented time.
-  const pointedAt =
-    invent === "domain" ? new Date(now - 34 * 3_600_000).toISOString() : null;
-  const steps: Step[] = [
-    {
-      id: "choose",
-      who: "you",
-      title: "Say which name it should answer on",
-      detail:
-        "In the conversation. Server Guy needs the name before it can do anything else.",
-      state: domain ? "done" : "waiting",
-      at: domain ? pointedAt : null,
-    },
-    {
-      id: "point",
-      who: "you",
-      title: `Point the name at ${record?.address ?? "this server"}`,
-      detail: `One A record at your DNS provider. Nobody else can do this for you: only the account that owns the name can change it.`,
-      state: domain ? "done" : "blocked",
-      at: domain ? pointedAt : null,
-    },
-    {
-      id: "resolve",
-      who: "server-guy",
-      title: "Watch for the name to resolve here",
-      detail:
-        "It asks the internet where the name points until the answer is this server, then records it.",
-      state: domain?.state === "resolving" ? "done" : "blocked",
-      at: domain?.state === "resolving" ? pointedAt : null,
-    },
-    {
-      id: "certificate",
-      who: "server-guy",
-      title: "Ask for a certificate and install it",
-      detail:
-        tls.state === "valid"
-          ? `${tls.issuer ?? "Issued"}${tls.expiresAt ? `, valid until ${when(tls.expiresAt)}` : ""}.`
-          : "The certificate authority checks the name really is yours, which needs the name to resolve first.",
-      state: tls.state === "valid" ? "done" : "blocked",
-      at: null,
-    },
-    {
-      id: "renew",
-      who: "server-guy",
-      title: "Renew it before it expires, from then on",
-      detail:
-        tls.renewal ??
-        "Certificates last about three months; renewing is the part people forget.",
-      state: tls.state === "valid" ? "standing" : "blocked",
-      at: null,
-    },
-  ];
-
   // ---- The checks the deployment ran, which are the only proof of reach.
   const probes = base.processes.flatMap((process) =>
     process.probes.map((probe) => ({ ...probe, process })),
@@ -445,10 +260,6 @@ export function buildReachStory(input: {
   const publicPort = exposed?.published || "80";
   const httpReach: Reach =
     audience === "controller" ? "restricted" : "internet";
-  const httpWords =
-    audience === "controller"
-      ? `Only your network${controllerIp ? ` · ${controllerIp}` : ""}`
-      : "Anyone on the internet";
   const privatePort = (name: string) =>
     release?.criterion?.services.find((service) => service.name === name)
       ?.port ?? null;
@@ -456,24 +267,13 @@ export function buildReachStory(input: {
     {
       id: "http",
       port: publicPort,
-      protocol: "tcp",
       title: web?.product ?? "The web application",
       serves: exposed ? `${exposed.service} · port ${exposed.target}` : null,
       reach: httpReach,
-      reachWords: httpWords,
       sources:
         audience === "controller"
           ? [`${controllerIp ?? "your network"}/32`]
           : ["0.0.0.0/0", "::/0"],
-      told: "plan",
-      toldWords: "Asked of the provider by this deployment",
-      at: restrictedAt ?? preparedAt,
-      proof: fromOutside?.at
-        ? {
-            words: `Checked from outside the server · ${fromOutside.name}`,
-            at: fromOutside.at,
-          }
-        : null,
       concern:
         audience === "controller"
           ? null
@@ -486,16 +286,10 @@ export function buildReachStory(input: {
     {
       id: "ssh",
       port: "22",
-      protocol: "tcp",
       title: "Administration",
       serves: "SSH on the host",
       reach: "internet",
-      reachWords: "Anyone on the internet can knock",
       sources: ["0.0.0.0/0", "::/0"],
-      told: "plan",
-      toldWords: "Asked of the provider by this deployment",
-      at: preparedAt,
-      proof: null,
       concern:
         "Open to every network. Only a key opens it: the host was created with password sign-in switched off.",
       detail:
@@ -511,17 +305,7 @@ export function buildReachStory(input: {
       title: process.product,
       serves: `${process.name} · inside the server`,
       reach: "private" as const,
-      reachWords: "Only processes inside the server",
       sources: [],
-      told: "stack" as const,
-      toldWords: "From the release the deployment ran",
-      at: process.lastPassed,
-      proof: process.lastPassed
-        ? {
-            words: "Reached from inside the server by a check",
-            at: process.lastPassed,
-          }
-        : null,
       concern: null,
       detail:
         "No port is published for it, so nothing outside the server can open it at all.",
@@ -533,10 +317,6 @@ export function buildReachStory(input: {
         String(process.port ?? privatePort(process.name)) === rule.port ||
         (rule.port === publicPort && process.role === "web"),
     );
-    const yours = Boolean(
-      controllerIp &&
-      rule.sources.some((source) => source.startsWith(controllerIp)),
-    );
     const asked =
       rule.port === "22" ||
       rule.port === publicPort ||
@@ -545,7 +325,6 @@ export function buildReachStory(input: {
     return {
       id: rule.id,
       port: rule.port,
-      protocol: rule.protocol,
       title:
         rule.port === "22"
           ? "Administration"
@@ -557,23 +336,7 @@ export function buildReachStory(input: {
             ? `${listener.name} · port ${listener.port ?? rule.port}`
             : null,
       reach: rule.reach,
-      reachWords:
-        rule.reach === "internet"
-          ? "Anyone on the internet"
-          : yours
-            ? `Only your network · ${rule.sources.join(", ")}`
-            : `Only ${rule.sources.join(", ")}`,
       sources: rule.sources,
-      told: "provider",
-      toldWords: `Reported by ${security?.firewall.provider ?? "the provider"}`,
-      at: security?.firewall.lastCheckedAt ?? null,
-      proof:
-        rule.port === publicPort && fromOutside?.at
-          ? {
-              words: `Checked from outside the server · ${fromOutside.name}`,
-              at: fromOutside.at,
-            }
-          : null,
       concern: !asked
         ? `This deployment never asked for port ${rule.port} to be open. Someone opened it on the provider, or another application on this instance did.`
         : rule.port === "22" && rule.reach === "internet"
@@ -621,25 +384,20 @@ export function buildReachStory(input: {
     },
   ];
 
-  // ---- What protects the server without being a way in.
+  // ---- What protects the server without being a way in. Rings names
+  // these under the rings; the record's own times are what date them.
   const guards: Guard[] = [
     {
       id: "password",
-      title: "Password sign-in is off",
-      detail:
-        "The host was created with password authentication disabled and a pinned host key, so a guessed password opens nothing.",
+      title: "Password sign-in is off on the host",
       at: preparedAt,
-      told: "plan",
     },
     ...(guardedAt
       ? [
           {
             id: "metadata",
             title: "Containers cannot read the server’s cloud credentials",
-            detail:
-              "Access to the provider’s metadata service is blocked for application containers before any application code runs.",
             at: guardedAt,
-            told: "plan" as const,
           },
         ]
       : []),
@@ -648,10 +406,7 @@ export function buildReachStory(input: {
           {
             id: "private",
             title: `${privateDoors.map((door) => door.title).join(", ")} publish no port`,
-            detail:
-              "They are reachable only from the other processes on the server, over the private network Compose makes.",
             at: fromInside?.at ?? null,
-            told: "stack" as const,
           },
         ]
       : []),
@@ -777,29 +532,10 @@ export function buildReachStory(input: {
   return {
     ...base,
     address,
-    scheme: secure ? "https" : "http",
-    hostName,
-    portLabel: parsed?.port || null,
-    path: parsed?.pathname && parsed.pathname !== "/" ? parsed.pathname : "/",
     domain,
     tls,
-    cdn,
-    routes: domains?.routes.length
-      ? domains.routes
-      : exposed
-        ? [
-            {
-              host: hostName ?? "this server",
-              service: exposed.service,
-              port: exposed.target,
-              protocol: "HTTP",
-            },
-          ]
-        : [],
     audience,
     controllerIp,
-    legs,
-    steps,
     callers,
     doors,
     ssh: security
@@ -848,4 +584,4 @@ export function buildReachStory(input: {
 }
 
 /** "3 days ago", as the other pages say it. */
-export { ago, short };
+export { ago };

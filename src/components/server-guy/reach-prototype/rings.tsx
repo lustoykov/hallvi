@@ -58,6 +58,9 @@ export function RingsDirection({
   const pierce = doors.find(
     (door) => door.reach === "internet" && privately(door),
   );
+  // With no firewall attached there is no wall between the rings at all.
+  const walled =
+    story.doors.find((door) => door.id === "rest")?.reach === "closed";
   const at = (test: (door: Door) => boolean) => doors.filter(test);
   const web = story.processes.find((process) => process.role === "web");
   const rings: Ring[] = [
@@ -160,7 +163,8 @@ export function RingsDirection({
                 {door.port ? `port ${door.port} · ` : ""}
                 {door.title}
               </b>
-              <small>{door.serves ?? "nothing recorded listens"}</small>
+              <small>{door.serves ?? door.detail}</small>
+              {door.sources.length > 0 && <em>{door.sources.join(", ")}</em>}
               {door.unasked && <i>nobody asked for this</i>}
             </span>
           ))}
@@ -194,9 +198,11 @@ export function RingsDirection({
       <div className="axri-lede">
         <div>
           <h2>
-            {pierce
-              ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
-              : `Four rings in, and each wall needs something different to pass.`}
+            {!walled
+              ? "Nothing stands between the internet and this server."
+              : pierce
+                ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
+                : "Four rings in, and each wall needs something different to pass."}
           </h2>
           <p>
             <Tag
