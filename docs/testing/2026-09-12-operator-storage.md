@@ -1,6 +1,6 @@
 # Four-table operator checkpoint — 12 September 2026
 
-Implementation in [draft PR #55](https://github.com/lustoykov/server-guy/pull/55) on `codex/operator-data-model`; not merged. This checkpoint changes storage and shared presentation. Hetzner provisioning and first deployment are the next two separate review checkpoints.
+Merged in [PR #55](https://github.com/lustoykov/server-guy/pull/55) as `95b382964e50c96fbb0c828bc8a6a02fca40976c` on 12 September 2026, after the owner accepted the UI. This checkpoint changes storage and shared presentation. Hetzner provisioning and first deployment are the next two separate review checkpoints.
 
 ## Result
 
