@@ -28,6 +28,10 @@ After the deployment journey works, review every sidebar view individually and d
 
 - [ ] **Queue, steer and side chats — deferred.** Revisit native queue/steer, opening contextual side chats and concurrent read-only explanations after the core deployment experience works well. Existing read-only tool restrictions remain, but expanding side-chat behavior is outside the current sprint. Do not make these controls prerequisites for provisioning or first deployment.
 
+## Later milestone: integrated terminal
+
+- [ ] **Browser terminal — product direction captured 12 September 2026; implementation deferred.** After the current UI and simple-app happy path work well, add a Terminal action opening an interactive shell in an optional bottom panel. Start with the connected application server, clearly showing its target; distinguish it from Pi's repository workspace. Use the controller's managed SSH connection, with browser input/output carried through the controller, without exposing a public terminal service. The initial experience is a separate user shell on the same server, not attachment to Pi's running command. Keep Pi's execution stream in chat. Explore selecting terminal output and asking Pi about it. Decide how manual changes and Pi's concurrent work interact before implementation; do not add terminal-sharing or recovery machinery ahead of that need. Leave implementation until the ongoing UI work is finished.
+
 ## Verification and deletion
 
 Exercise actual Pi behavior and the user journey, inspect execution evidence and check the resulting application. Use focused tests for consequential changed behavior. A passing mock, completed command or dated proof is not a verified current deployment. Keep claims explicit about real models, simulated providers, local Docker and real hosts.
