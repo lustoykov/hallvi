@@ -1,6 +1,6 @@
 # Hetzner provisioning checkpoint — 12 September 2026
 
-Implemented on `codex/hetzner-provisioning`, pending review and merge. This follows the accepted storage checkpoint, PR #55 (`95b3829`). Application deployment remains the next checkpoint.
+Implemented in [draft PR #56](https://github.com/lustoykov/server-guy/pull/56) on `codex/hetzner-provisioning`, pending review and merge. This follows the accepted storage checkpoint, PR #55 (`95b3829`). Application deployment remains the next checkpoint.
 
 ## Result
 
