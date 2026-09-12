@@ -172,6 +172,40 @@ recorded, the shipped page stands in.
   walls would be. The shipped page's own "Check now" and its status note
   stay, so a provider read is still one click.
 
+## The four remaining destinations (`supply-prototype/`)
+
+Configuration, delivery, queued work and schedules, drawn in one round and
+each in its own way — because three of the four are about something this
+application does not have, which is the honest answer for most
+applications and worth more than an empty state. Each says why the record
+shows nothing, and what it would take.
+
+- **Environment Variables · Manifest.** Everything the application was
+  given, grouped by who decided it: what the repository states, and what
+  only you could give. No value is printed, and the model does not carry
+  one — a page cannot leak what it does not hold, and Server Guy cannot
+  tell a harmless literal from a credential somebody pasted into a
+  repository. Each entry says where its value lives instead, and opening
+  one says what changing it would cost. Configuration that is a file is
+  listed the same way, by what reads it, where, and at which checksum.
+- **CDN · Origin.** The layer that is not there, drawn as an empty shelf
+  above the one machine that is: its size, where in the world it stands,
+  and the address every request ends at. Then the three questions Server
+  Guy would answer before recommending a cache, and the failure a cache
+  brings with it — a copy served long after the machine changed, which is
+  why clearing one needs a place of its own.
+- **Cache & queue · Queue.** The line of work waiting to be done, drawn
+  empty, because nothing on record queues anything. The broker that would
+  hold the line and the workers that would take from it are drawn where
+  they would stand. A backlog appears only when a supported integration
+  reported one; an empty line is never invented to fill the page.
+- **Jobs · Rota.** What recurs on this server, in two columns: yours, and
+  Server Guy's. With nothing of yours scheduled the first column draws the
+  shape a job would take — its command, its schedule, its next run and its
+  last result — beside the one thing that really does recur here, the
+  nightly backup, which says plainly that the record does not name its
+  hour.
+
 ## What is invented
 
 - Record scenarios other than "Live record": _3 days later_ (same record,
@@ -184,8 +218,11 @@ recorded, the shipped page stands in.
   Domains offers _Domain connected_, which invents a name, its certificate
   and public reach so the finished page can be seen at all, and Security
   offers _Firewall read back_, an invented provider read that includes a
-  rule for a private service nobody asked for. Both are labelled invented
-  in the bar and on the page.
+  rule for a private service nobody asked for. The four remaining
+  destinations offer _Fitted out_, which invents a cache, a queue with a
+  backlog, a scheduled command, a waiting value and a CDN, so the pages can
+  be seen with something on them. All are labelled invented in the bar and
+  on the page.
 - "Check now" runs a simulated check: nothing is contacted, and every line
   it produces is tagged simulated. In the product this would be a request in
   the conversation, and its receipt would drive the same motion.
@@ -216,7 +253,10 @@ they asked for directions without the line and chose the Timeline. From a
 round of its own with Backups, Storage took Flow and Backups the Calendar.
 On 12 Sep they took Paper for Logs and the Tuner for Monitoring, then asked
 for separate concepts per page from then on; from six of those, Domains took
-Callers and Security the Rings.
+Callers and Security the Rings. They then asked for the four remaining
+destinations in one go ("Redesign the rest of the pages that you haven't in
+one go and push to main"), so CDN, Environment Variables, Cache & queue and
+Jobs were each drawn once and merged.
 
 ## Where the exploration lives
 

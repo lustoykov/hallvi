@@ -58,6 +58,12 @@ export const scenarios: {
     note: "The provider's rules, one of them unasked for",
     invented: true,
   },
+  {
+    id: "equipped",
+    label: "Fitted out",
+    note: "A cache, a queue, a scheduled command and a CDN",
+    invented: true,
+  },
 ];
 
 export function PrototypeBar({

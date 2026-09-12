@@ -493,9 +493,10 @@ test(
     await nav
       .getByRole("button", { name: "Environment Variables", exact: true })
       .click();
-    await expect(page.locator(".sg-section-content")).toContainText("API_KEY");
-    await expect(page.locator(".sg-section-content")).not.toContainText(
-      "synthetic-input",
-    );
+    // The destination, whichever page draws it: names are listed, values
+    // are not, wherever they live.
+    const variables = page.locator(".sg-section-variables");
+    await expect(variables).toContainText("API_KEY");
+    await expect(variables).not.toContainText("synthetic-input");
   },
 );
