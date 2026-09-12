@@ -33,8 +33,6 @@ export interface LogLine {
   /** The time the process wrote into the line, when it wrote one. */
   at: string | null;
   level: Level;
-  /** The part of the process that spoke: its logger or component. */
-  source: string | null;
   text: string;
   /** The line's other fields. */
   rest: string;
@@ -49,8 +47,6 @@ export interface Speaker {
   lines: number;
   warns: number;
   errors: number;
-  firstAt: string | null;
-  lastAt: string | null;
   /** Its output reached the cap, so earlier lines weren't read. */
   cut: boolean;
 }
@@ -69,7 +65,6 @@ export interface Look {
   /** The name without its product, for tight places: "Login page". */
   short: string;
   how: string;
-  where: "outside" | "inside" | "host" | "off-server";
   kind: "check" | "output" | "backup";
   at: string | null;
   state: "passing" | "failing" | "unknown" | "seen";
@@ -110,7 +105,6 @@ const keyed = (key: string) =>
 const TIME = keyed("(?:t|time|ts)");
 const LEVEL = keyed("level");
 const MSG = keyed("msg");
-const SOURCE = keyed("(?:logger|component)");
 const STRIP =
   /(?:^|\s)(?:t|time|ts|level|msg|logger|component|caller|source)=(?:"(?:[^"\\]|\\.)*"|\S+)/g;
 const LEADING = /^(\d{4}-\d\d-\d\d[T ][\d:.]+(?:Z|[+-]\d\d:?\d\d)?)\s*/;
@@ -156,7 +150,6 @@ function parseLine(
     speaker: names.get(service) ?? cap(service),
     at: isoOf(valueOf(raw.match(TIME)) ?? leading?.[1] ?? null),
     level: levelOf(valueOf(raw.match(LEVEL))?.toLowerCase() ?? null, raw),
-    source: valueOf(raw.match(SOURCE)),
     text: text.trim() || raw,
     rest: msg ? stripped.replace(/\s+/g, " ").trim() : "",
     raw,
@@ -184,17 +177,11 @@ function collectionOf(
       lines: 0,
       warns: 0,
       errors: 0,
-      firstAt: null,
-      lastAt: null,
       cut: false,
     };
     speaker.lines += 1;
     if (line.level === "warn") speaker.warns += 1;
     if (line.level === "error") speaker.errors += 1;
-    if (line.at && (!speaker.firstAt || line.at < speaker.firstAt))
-      speaker.firstAt = line.at;
-    if (line.at && (!speaker.lastAt || line.at > speaker.lastAt))
-      speaker.lastAt = line.at;
     speaker.cut = capped && speaker.lines >= CAP;
     speakers.set(line.service, speaker);
   }
@@ -356,7 +343,6 @@ export function buildSignalStory(input: {
         check.kind === "http"
           ? `GET ${check.target}`
           : `${cap(check.kind)} check on ${check.target}`,
-      where: "host",
       kind: "check",
       at: check.lastAt ?? null,
       state: check.state,
@@ -376,7 +362,6 @@ export function buildSignalStory(input: {
         name: probe.name,
         short: shortOf(probe.name, process.product),
         how: probe.probe,
-        where: probe.inside ? "inside" : "outside",
         kind: "check",
         at: probe.at,
         state: probe.at ? "passing" : "unknown",
@@ -401,7 +386,6 @@ export function buildSignalStory(input: {
     how: speaker.cut
       ? `Its last ${CAP} lines`
       : `All ${speaker.lines} ${speaker.lines === 1 ? "line" : "lines"} it had written`,
-    where: "host",
     kind: "output",
     at: newest.at,
     state: "seen",
@@ -433,7 +417,6 @@ export function buildSignalStory(input: {
             name: "Newest copy off the server",
             short: "Copy verified",
             how: "A copy off the server, verified when it was made",
-            where: "off-server" as const,
             kind: "backup" as const,
             at: guard.backup.at,
             state: "passing" as const,
@@ -451,7 +434,6 @@ export function buildSignalStory(input: {
             name: "Restore test",
             short: "Restore tested",
             how: "A copy restored into an isolated place",
-            where: "off-server" as const,
             kind: "backup" as const,
             at: guard.restore.at,
             state: "passing" as const,

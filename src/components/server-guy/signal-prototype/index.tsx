@@ -1,15 +1,13 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Directions for the Logs and Monitoring destinations, on the real routes
-// and inside the real shell, switchable with ?variant= and the prototype bar
-// (← → keys). Each direction draws both pages from the same record: A Scope
-// places everything that looked at the application by how long ago it
-// looked, B Tuner tunes into one part at a time and reads what it said or
-// what was heard from it, and C Paper prints the output and the inspection
-// reports on paper. 0 is the shipped view, which also stands in while
-// nothing is recorded. Nothing here reads logs or checks the server; asking
-// goes to the conversation.
+// PROTOTYPE · opus-ui-improvements · chosen for Logs and Monitoring.
+// Logs in Paper (paper.tsx), the read printed on continuous paper, and
+// Monitoring in Tuner (tuner.tsx), a radio dial of the parts anything can
+// be heard from, on the real routes and inside the real shell. The owner
+// chose them from three directions, which stay on claude/logs-monitoring.
+// The bar at the bottom switches to the shipped view (0), which also stands
+// in while nothing is recorded. Nothing here reads logs or checks the
+// server; asking goes to the conversation.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -20,7 +18,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 
 import { operationsFor, unresolved } from "../operation-model";
 import type { PageChrome } from "../architecture-prototype";
-import { CITIES, type ScenarioId } from "../architecture-prototype/model";
+import type { ScenarioId } from "../architecture-prototype/model";
 import { setMotionPreview } from "../architecture-prototype/motion";
 import {
   PrototypeBar,
@@ -28,7 +26,6 @@ import {
 } from "../architecture-prototype/prototype-bar";
 import { PageHead } from "../deployment-prototype/page-head";
 import { PaperDirection } from "./paper";
-import { ScopeDirection } from "./scope";
 import { buildSignalStory, type SignalStory } from "./signal-model";
 import { TunerDirection } from "./tuner";
 import "../architecture-prototype/prototype.css";
@@ -36,39 +33,30 @@ import "../architecture-prototype/journey-v2.css";
 
 export type SignalPage = "logs" | "monitoring";
 export interface SignalDirectionProps {
-  page: SignalPage;
   story: SignalStory;
   now: number;
   head: ReactNode;
   /** Work in progress on this destination, as the shell shows it. */
   activity: ReactNode;
-  /** The bar's invented scenario is showing. */
-  invented: boolean;
-  /** The server it all runs on. */
-  server: { label: string; city: string | null } | null;
   onAsk: (draft: string) => void;
 }
 
-const variants: VariantEntry[] = [
-  { key: "A", id: "scope", name: "Scope" },
-  { key: "B", id: "tuner", name: "Tuner" },
-  { key: "C", id: "paper", name: "Paper" },
-  { key: "0", id: "current", name: "Current page" },
-];
-const directions: Record<string, (props: SignalDirectionProps) => ReactNode> = {
-  scope: ScopeDirection,
-  tuner: TunerDirection,
-  paper: PaperDirection,
+const variants: Record<SignalPage, VariantEntry[]> = {
+  logs: [
+    { key: "A", id: "paper", name: "Paper" },
+    { key: "0", id: "current", name: "Current page" },
+  ],
+  monitoring: [
+    { key: "A", id: "tuner", name: "Tuner" },
+    { key: "0", id: "current", name: "Current page" },
+  ],
 };
 const choices: ScenarioId[] = ["live", "later", "failing"];
 const DAY = 86_400_000;
 
-function writeUrl(variant: string, scenario: ScenarioId) {
+function writeUrl(key: string, scenario: ScenarioId) {
   const url = new URL(window.location.href);
-  url.searchParams.set(
-    "variant",
-    variants.find((item) => item.id === variant)?.key ?? variant,
-  );
+  url.searchParams.set("variant", key);
   if (scenario === "live") url.searchParams.delete("record");
   else url.searchParams.set("record", scenario);
   window.history.replaceState(window.history.state, "", url);
@@ -97,7 +85,8 @@ export function SignalPrototype({
   current: ReactNode;
 }) {
   const [ready, setReady] = useState(false);
-  const [variantId, setVariantId] = useState("scope");
+  // Whether the shipped view is showing; it carries across the two pages.
+  const [showCurrent, setShowCurrent] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>("live");
   const [reduced, setReduced] = useState(false);
 
@@ -107,10 +96,7 @@ export function SignalPrototype({
     const start = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const wanted = params.get("variant")?.toLowerCase();
-      const found = variants.find(
-        (item) => item.id === wanted || item.key.toLowerCase() === wanted,
-      );
-      if (found) setVariantId(found.id);
+      if (wanted === "0" || wanted === "current") setShowCurrent(true);
       const wantedRecord = params.get("record") as ScenarioId | null;
       if (wantedRecord && choices.includes(wantedRecord))
         setScenario(wantedRecord);
@@ -121,18 +107,10 @@ export function SignalPrototype({
   }, []);
 
   const now = scenario === "later" ? clock + 3 * DAY : clock;
-  const invented = scenario === "failing";
+  const invent = scenario === "failing";
   const story = useMemo(
-    () =>
-      buildSignalStory({
-        record,
-        stack,
-        facts,
-        operations,
-        now,
-        invent: invented,
-      }),
-    [record, stack, facts, operations, now, invented],
+    () => buildSignalStory({ record, stack, facts, operations, now, invent }),
+    [record, stack, facts, operations, now, invent],
   );
   const busy = operationsFor(page, operations).some(
     (operation) =>
@@ -141,16 +119,14 @@ export function SignalPrototype({
       operation.state === "proposed" ||
       (operation.state === "failed" && unresolved(operation, operations)),
   );
-  const variant = variants.find((item) => item.id === variantId) ?? variants[0];
+  const variant = variants[page][showCurrent ? 1 : 0];
   // With nothing recorded, the shipped page's honest empty state stands in;
   // on Logs that is also where a first read is asked for.
   const shipped =
-    variant.id === "current" ||
+    showCurrent ||
     (page === "logs" ? !story.collections.length : story.state === "none");
-  const Direction = directions[variant.id] ?? ScopeDirection;
-  const offer = record?.offer ?? null;
+  const Direction = page === "logs" ? PaperDirection : TunerDirection;
   const props: SignalDirectionProps = {
-    page,
     story,
     now,
     head: (
@@ -167,13 +143,6 @@ export function SignalPrototype({
       />
     ),
     activity: busy ? chrome.activity : null,
-    invented,
-    server: offer
-      ? {
-          label: `Hetzner ${offer.serverType.toUpperCase()}`,
-          city: CITIES[offer.location]?.[0] ?? offer.location,
-        }
-      : null,
     onAsk,
   };
 
@@ -199,16 +168,17 @@ export function SignalPrototype({
           <Direction key={page} {...props} />
         )}
         <PrototypeBar
-          variants={variants}
+          variants={variants[page]}
           variant={variant}
           onVariant={(id) => {
-            setVariantId(id);
-            writeUrl(id, scenario);
+            const next = id === "current";
+            setShowCurrent(next);
+            writeUrl(next ? "0" : "A", scenario);
           }}
           scenario={scenario}
           onScenario={(id) => {
             setScenario(id);
-            writeUrl(variant.id, id);
+            writeUrl(variant.key, id);
           }}
           source="live"
           reduced={reduced}

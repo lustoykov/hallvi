@@ -1,7 +1,7 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction C for Logs and Monitoring, Paper. Prefix: axpa-. Printed output
-   and inspection reports on a desk. A sheet shuffles forward only when you
-   pick it, and a tab flashes the line it jumps to. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Logs.
+   Paper. Prefix: axpa-. The read printed on a desk. A sheet shuffles
+   forward only when you pick it, and a tab flashes the line it jumps
+   to. */
 
 .axpa {
   display: grid;
@@ -62,12 +62,6 @@
   background:
     radial-gradient(#dfe4ec 1px, transparent 1.4px) 0 0 / 18px 18px,
     #f4f6f9;
-}
-.axpa-desk-reports {
-  grid-template-columns: minmax(0, 1fr) 264px;
-  align-items: start;
-  gap: 34px;
-  padding: 40px 30px 34px;
 }
 .axpa-tools {
   display: flex;
@@ -253,8 +247,8 @@
   padding: 26px 44px 30px;
   background: #ffffff;
 }
-.axpa-sheet:not(.axpa-report)::before,
-.axpa-sheet:not(.axpa-report)::after {
+.axpa-sheet::before,
+.axpa-sheet::after {
   content: "";
   position: absolute;
   top: 0;
@@ -267,11 +261,11 @@
     )
     0 0 / 26px 22px repeat-y;
 }
-.axpa-sheet:not(.axpa-report)::before {
+.axpa-sheet::before {
   left: 0;
   border-right: 1px dashed #e3e7ee;
 }
-.axpa-sheet:not(.axpa-report)::after {
+.axpa-sheet::after {
   right: 0;
   border-left: 1px dashed #e3e7ee;
 }
@@ -463,270 +457,6 @@
   --tab-ink: var(--ax-failed);
 }
 
-/* ---------- Inspection reports ---------- */
-
-.axpa-sheet[data-torn="none"] {
-  border-radius: 3px;
-  box-shadow:
-    0 1px 1px rgb(23 34 56 / 10%),
-    0 18px 30px -18px rgb(23 34 56 / 28%);
-}
-.axpa-report {
-  padding: 30px 40px 32px;
-}
-.axpa-form-head {
-  display: grid;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid var(--ax-ink);
-}
-.axpa-form-head h3 {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 750;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ax-ink);
-}
-.axpa-form-head dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 24px;
-  margin: 0;
-}
-.axpa-form-head dl div {
-  display: grid;
-  gap: 1px;
-}
-.axpa-form-head dt,
-.axpa-form-part h4 {
-  margin: 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ax-faint);
-}
-.axpa-form-head dd {
-  margin: 0;
-  font-size: 14px;
-  color: var(--ax-ink);
-}
-.axpa-form-part {
-  display: grid;
-  gap: 2px;
-  padding: 16px 0 2px;
-}
-.axpa-form-part h4 {
-  margin-bottom: 6px;
-  color: var(--ax-muted);
-}
-.axpa-check {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 70px;
-  align-items: baseline;
-  gap: 14px;
-  padding: 8px 0;
-  border-bottom: 1px dotted #c9d1de;
-}
-.axpa-check span {
-  display: grid;
-  gap: 2px;
-  font-size: 14px;
-  color: var(--ax-ink);
-}
-.axpa-check code {
-  font-family: var(--ax-mono);
-  font-size: 11.5px;
-  color: var(--ax-muted);
-  overflow-wrap: anywhere;
-}
-.axpa-check small {
-  font-size: 12.5px;
-  color: var(--ax-failed);
-}
-.axpa-check b {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ax-verified-text);
-}
-.axpa-check[data-state="failing"] b {
-  color: var(--ax-failed);
-}
-.axpa-check[data-state="seen"] b {
-  color: var(--ax-working-text);
-}
-.axpa-check time {
-  font-family: var(--ax-mono);
-  font-size: 12px;
-  text-align: right;
-  color: var(--ax-muted);
-  font-variant-numeric: tabular-nums;
-}
-.axpa-field {
-  display: grid;
-  grid-template-columns: 190px minmax(40px, 1fr) auto;
-  align-items: end;
-  gap: 12px;
-  padding: 7px 0;
-  font-size: 13.5px;
-  color: var(--ax-ink-2);
-}
-.axpa-field i {
-  height: 1px;
-  margin-bottom: 5px;
-  border-bottom: 1.5px solid #c3ccd9;
-}
-.axpa-field em {
-  font-size: 13px;
-  color: var(--ax-waiting-text);
-}
-.axpa-field[data-filled] em {
-  font-style: normal;
-  color: var(--ax-working-text);
-}
-.axpa-also {
-  margin: 16px 0 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--ax-muted);
-}
-.axpa-sign {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid #e3e7ee;
-  font-size: 12px;
-  color: var(--ax-muted);
-}
-.axpa-sign b {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ax-ink);
-}
-.axpa-stamp {
-  --stamp: var(--ax-verified);
-  position: absolute;
-  right: 34px;
-  bottom: 22px;
-  display: grid;
-  justify-items: center;
-  padding: 6px 16px 5px;
-  border: 3px double var(--stamp);
-  border-radius: 8px;
-  color: var(--stamp);
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  opacity: 0.86;
-  mix-blend-mode: multiply;
-  transform: rotate(-9deg);
-  pointer-events: none;
-}
-.axpa-stamp small {
-  font-size: 11px;
-  letter-spacing: 0.12em;
-}
-.axpa-stamp[data-state="failed"] {
-  --stamp: var(--ax-failed);
-}
-/* Ink fades as the report ages. */
-.axpa-stamp[data-faded] {
-  opacity: 0.4;
-}
-.axpa-sheet[data-shuffled] .axpa-stamp {
-  animation: axpa-stamp 380ms 200ms var(--ax-spring) both;
-}
-@keyframes axpa-stamp {
-  from {
-    opacity: 0;
-    transform: rotate(-9deg) scale(1.4);
-  }
-}
-
-/* The note on the desk. */
-.axpa-note-wrap {
-  position: sticky;
-  top: 16px;
-  display: grid;
-  justify-items: center;
-}
-.axpa-note-guy {
-  position: relative;
-  z-index: 1;
-  width: 78px;
-  height: 78px;
-  margin-bottom: -8px;
-}
-.axpa-note {
-  position: relative;
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  padding: 22px 18px 16px;
-  background: linear-gradient(180deg, #fff6e8 0%, #ffeed6 100%);
-  color: #6b3d10;
-  font-size: 14px;
-  line-height: 1.5;
-  box-shadow:
-    0 1px 1px rgb(80 50 10 / 10%),
-    0 16px 22px -14px rgb(80 50 10 / 32%);
-  transform: rotate(1.4deg);
-}
-.axpa-note::before {
-  content: "";
-  position: absolute;
-  top: -9px;
-  left: 50%;
-  width: 72px;
-  height: 18px;
-  margin-left: -36px;
-  background: rgb(211 224 255 / 75%);
-  box-shadow: 0 1px 2px rgb(23 34 56 / 12%);
-  transform: rotate(-3deg);
-}
-.axpa-note p {
-  margin: 0;
-  font-weight: 560;
-}
-.axpa-note small {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #8a5a26;
-}
-.axpa-note[data-state="failed"] {
-  background: linear-gradient(180deg, #fdf1f0 0%, #fbe3e0 100%);
-  color: #7a211c;
-}
-.axpa-ask-small {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid rgb(107 61 16 / 25%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 70%);
-  color: inherit;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.axpa-ask-small:hover {
-  background: #ffffff;
-}
-.axpa-ask-small svg {
-  width: 14px;
-  height: 14px;
-}
-
 @media (max-width: 1100px) {
   .axpa-desk {
     padding-right: 30px;
@@ -734,26 +464,4 @@
   .axpa-tabs {
     display: none;
   }
-  .axpa-desk-reports {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .axpa-note-wrap {
-    position: static;
-    max-width: 340px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .axpa-sheet[data-shuffled],
-  .axpa-sheet[data-shuffled] .axpa-stamp,
-  .axpa-row[data-flash] {
-    animation: none;
-  }
-}
-:root[data-ax-motion="reduced"]
-  :is(
-    .axpa-sheet[data-shuffled],
-    .axpa-sheet[data-shuffled] .axpa-stamp,
-    .axpa-row[data-flash]
-  ) {
-  animation: none;
 }

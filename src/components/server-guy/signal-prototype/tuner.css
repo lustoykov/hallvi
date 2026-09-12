@@ -1,7 +1,7 @@
-/* PROTOTYPE · opus-ui-improvements · throwaway.
-   Direction B for Logs and Monitoring, Tuner. Prefix: axtu-. A radio's
-   glass dial over a transcript. The needle glides when you tune; static
-   covers the transcript only while the needle is between stations. */
+/* PROTOTYPE · opus-ui-improvements · chosen for Monitoring.
+   Tuner. Prefix: axtu-. A radio's glass dial over a transcript. The needle
+   glides when you tune; static covers the transcript only while the needle
+   is between stations. */
 
 .axtu {
   --axtu-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.2 0 0 0 0 0.3 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -201,20 +201,6 @@
 .axtu-station[data-state="failing"] small {
   color: #f3a39c;
 }
-.axtu-station[data-alert="warn"] b::after,
-.axtu-station[data-alert="error"] b::after {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin: 0 0 2px 6px;
-  border-radius: 50%;
-  background: #f0c38a;
-  vertical-align: middle;
-}
-.axtu-station[data-alert="error"] b::after {
-  background: #f3a39c;
-}
 .axtu-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -364,68 +350,6 @@
   line-height: 1.45;
   color: var(--ax-muted);
 }
-.axtu-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.axtu-reads {
-  display: inline-flex;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 12px;
-  background: #f1f4f8;
-}
-.axtu-reads button {
-  padding: 5px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--ax-ink-2);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 560;
-  cursor: pointer;
-}
-.axtu-reads button small {
-  font-size: 11px;
-  color: var(--ax-muted);
-}
-.axtu-reads [aria-checked="true"] {
-  background: #ffffff;
-  color: var(--ax-ink);
-  box-shadow: 0 1px 2px rgb(23 34 56 / 14%);
-}
-.axtu-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  width: 240px;
-  padding: 6px 10px;
-  border: 1px solid var(--ax-line-2);
-  border-radius: 10px;
-  background: #ffffff;
-}
-.axtu-filter svg {
-  width: 14px;
-  height: 14px;
-  color: var(--ax-muted);
-}
-.axtu-filter input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: var(--ax-ink);
-  font: inherit;
-  font-size: 13px;
-}
-.axtu-filter:focus-within {
-  border-color: var(--ax-blue);
-  box-shadow: 0 0 0 3px rgb(40 90 216 / 14%);
-}
 
 /* Monitoring: what was heard, then the silence. */
 .axtu-heard {
@@ -534,95 +458,6 @@
 .axtu-ask-small svg {
   width: 14px;
   height: 14px;
-}
-
-/* Logs: what each process said, as turns. */
-.axtu-lines {
-  display: grid;
-  gap: 14px;
-  max-height: 620px;
-  overflow: auto;
-  padding: 2px 6px 2px 2px;
-  scrollbar-color: #c9d1de transparent;
-}
-.axtu-lines:focus-visible {
-  outline: 2px solid var(--ax-blue);
-  outline-offset: 4px;
-}
-.axtu-turn {
-  display: grid;
-  gap: 4px;
-}
-.axtu-turn[data-all] {
-  grid-template-columns: 104px minmax(0, 1fr);
-  gap: 16px;
-}
-.axtu-speaker {
-  padding-top: 2px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ax-blue);
-}
-.axtu-speaker[data-who="1"] {
-  color: #5a6b86;
-}
-.axtu-turn p {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 12px;
-  margin: 0;
-  padding: 1px 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ax-ink);
-}
-.axtu-turn time {
-  padding-top: 2px;
-  font-family: var(--ax-mono);
-  font-size: 11.5px;
-  color: var(--ax-faint);
-  font-variant-numeric: tabular-nums;
-}
-.axtu-turn span {
-  overflow-wrap: anywhere;
-}
-.axtu-turn small {
-  display: block;
-  font-family: var(--ax-mono);
-  font-size: 11.5px;
-  color: var(--ax-muted);
-}
-.axtu-turn [data-milestone] span {
-  font-weight: 650;
-}
-.axtu-turn [data-milestone] span::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin: 0 8px 2px 0;
-  border-radius: 50%;
-  background: var(--ax-blue);
-  vertical-align: middle;
-}
-.axtu-turn [data-level="warn"] span {
-  color: var(--ax-waiting-text);
-  text-decoration: underline wavy #e3b67f;
-  text-underline-offset: 4px;
-}
-.axtu-turn [data-level="error"] span {
-  color: var(--ax-failed);
-  text-decoration: underline wavy #efb3ad;
-  text-underline-offset: 4px;
-}
-.axtu-lines ::selection {
-  background: #dbe4ff;
-}
-.axtu-empty {
-  margin: 0;
-  color: var(--ax-muted);
 }
 
 @media (max-width: 900px) {

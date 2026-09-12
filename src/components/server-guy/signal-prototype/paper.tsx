@@ -1,34 +1,24 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Direction C, Paper: no diagram. Logs is the read printed on continuous
-// paper from a printer that prints only when asked. Each process has a
-// highlighter, index tabs mark where a process said it was ready and where
-// it warned, and the paper is torn where the read stopped, and at the top
-// when a process had written more than was read. Monitoring is a stack of
-// inspection reports, one for each time Server Guy checked the application.
-// The blanks nobody filled in are what nothing watches, and a note on the
-// desk says how old the top report is. Earlier sheets peek out from behind
-// and come forward when picked; nothing moves on arrival.
+// PROTOTYPE · opus-ui-improvements · chosen for Logs.
+// Paper: no diagram. The read is printed on continuous paper from a printer
+// that prints only when asked. Each process has a highlighter, index tabs
+// mark where a process said it was ready and where it warned, and the paper
+// is torn where the read stopped, and at the top when a process had written
+// more than was read. Earlier reads peek out from behind and come forward
+// when picked; nothing moves on arrival.
 
 import { ChatCircleText, MagnifyingGlass } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 
-import type { MascotMood } from "../home/mascot-scene";
 import { useReducedMotion } from "../architecture-prototype/motion";
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import { dayOf, lasting, listed } from "../backup-prototype/model";
+import { lasting, listed } from "../backup-prototype/model";
 import { ago, when } from "../stack-prototype/stack-model";
 import type { SignalDirectionProps } from "./index";
-import {
-  CAP,
-  toneOf,
-  type LogLine,
-  type Look,
-  type SignalStory,
-} from "./signal-model";
+import { CAP, toneOf, type LogLine } from "./signal-model";
 import "./paper.css";
 
 const stamp = (at: string | null, fraction = true) =>
@@ -41,10 +31,6 @@ const stamp = (at: string | null, fraction = true) =>
         ...(fraction ? { fractionalSecondDigits: 3 as const } : {}),
       })
     : "";
-const day = (at: string) =>
-  new Date(at)
-    .toLocaleDateString(undefined, { month: "short", day: "numeric" })
-    .toUpperCase();
 
 function Lede({
   say,
@@ -110,9 +96,7 @@ function Behind({
   );
 }
 
-// ---------- Logs: the read, printed ----------
-
-function PaperLogs({
+export function PaperDirection({
   story,
   now,
   head,
@@ -341,346 +325,5 @@ function PaperLogs({
         </div>
       </div>
     </section>
-  );
-}
-
-// ---------- Monitoring: the inspection reports ----------
-
-interface Report {
-  id: string;
-  at: string;
-  until: string;
-  by: string;
-  invented: boolean;
-  rows: { look: Look; at: string }[];
-  reads: { look: Look; at: string; text: string }[];
-}
-
-/** One report for each run of checks: checks less than a minute apart. */
-function reportsOf(story: SignalStory): Report[] {
-  const items = story.looks
-    .filter((look) => look.kind === "check" && !look.invented)
-    .flatMap((look) => look.evidence.map((item) => ({ look, at: item.at })))
-    .sort((a, b) => a.at.localeCompare(b.at));
-  const runs: Report[] = [];
-  for (const item of items) {
-    const run = runs.at(-1);
-    if (run && Date.parse(item.at) - Date.parse(run.until) < 60_000) {
-      run.rows.push(item);
-      run.until = item.at;
-    } else
-      runs.push({
-        id: `run-${runs.length}`,
-        at: item.at,
-        until: item.at,
-        by: "Server Guy, while deploying",
-        invented: false,
-        rows: [item],
-        reads: [],
-      });
-  }
-  const outputs = story.looks.filter((look) => look.kind === "output");
-  for (const run of runs)
-    run.reads = outputs.flatMap((look) =>
-      look.evidence
-        .filter(
-          (item) =>
-            item.at >= run.at &&
-            Date.parse(item.at) - Date.parse(run.until) < 30_000,
-        )
-        .map((item) => ({ look, at: item.at, text: item.text })),
-    );
-  const invented = story.looks.filter((look) => look.invented && look.at);
-  if (invented.length) {
-    const times = invented.map((look) => look.at!).sort();
-    runs.push({
-      id: "watch",
-      at: times[0],
-      until: times.at(-1)!,
-      by: story.watcher?.detail ?? "A collector on the host (invented)",
-      invented: true,
-      rows: invented.map((look) => ({ look, at: look.at! })),
-      reads: [],
-    });
-  }
-  return runs.reverse();
-}
-
-const sections: { where: Look["where"]; title: string }[] = [
-  { where: "outside", title: "From outside the server" },
-  { where: "inside", title: "Inside the server" },
-  { where: "host", title: "On the server" },
-];
-
-function PaperWatch({
-  story,
-  now,
-  head,
-  activity,
-  server,
-  onAsk,
-}: SignalDirectionProps) {
-  const reports = reportsOf(story);
-  const [front, setFront] = useState(reports[0]?.id ?? "");
-  const [shuffled, setShuffled] = useState(false);
-  const report = reports.find((item) => item.id === front) ?? reports[0];
-  const failing = story.looks.find((look) => look.state === "failing") ?? null;
-  const watching = story.watcher?.state === "running";
-  const top = reports[0];
-  const health = story.unwatched.find((gap) => gap.id === "watch");
-  const guard = story.looks.filter((look) => look.kind === "backup");
-  const blanks = [
-    {
-      label: "Next inspection",
-      words: watching ? "in about a minute (invented)" : "not scheduled",
-      filled: watching,
-    },
-    ...(health
-      ? [
-          {
-            label: "If a process stops",
-            words: "nothing restarts it",
-            filled: false,
-          },
-        ]
-      : []),
-    ...story.unwatched
-      .filter((gap) => gap.id !== "watch")
-      .map((gap) => ({
-        label: gap.title,
-        words:
-          gap.id === "notify"
-            ? "no provider"
-            : gap.id.startsWith("unchecked")
-              ? "no check"
-              : "not measured",
-        filled: false,
-      })),
-  ];
-  const failed = (item: Report) =>
-    item.rows.some((row) => row.look.state === "failing");
-  const note = !top
-    ? `Nothing has inspected ${story.name}: the deployment recorded no checks.`
-    : failing
-      ? `${failing.name} failed ${ago(failing.at!, now)}: ${failing.detail}. (Invented scenario.)`
-      : watching
-        ? "A collector inspects it every minute (invented)."
-        : `The newest report is ${lasting(now - Date.parse(top.until))} old. Nothing has inspected ${story.name} since, and no next inspection is scheduled.`;
-
-  const lede = failing
-    ? {
-        say: `${failing.name} failed its inspection.`,
-        tone: "failed" as Tone,
-        word: `Failed ${ago(failing.at!, now)}`,
-        sub: `${failing.detail}. ${story.watcher?.detail ?? ""}.`,
-        ask: {
-          label: "Ask Server Guy to look into it",
-          draft: `${failing.name} is failing: ${failing.detail}. Find out why and tell me what you would change.`,
-        },
-      }
-    : {
-        say: top
-          ? `${story.name} was last inspected ${when(top.until)}.`
-          : `${story.name} has never been inspected.`,
-        tone: toneOf(top?.until ?? null, now),
-        word: top ? `${ago(top.until, now)}` : "No report",
-        sub: top
-          ? `Every check passed then, while it was deploying. No next inspection is scheduled: nothing inspects it between deployments.`
-          : "The deployment recorded no checks.",
-        ask: {
-          label: "Ask Server Guy to schedule inspections",
-          draft: `Set up a health watch for ${story.name}: check each process every minute, restart one that stops, and tell me when something fails.`,
-        },
-      };
-  const mood: MascotMood = failing
-    ? "attention"
-    : watching
-      ? "checking"
-      : toneOf(top?.until ?? null, now) === "verified"
-        ? "ready"
-        : "resting";
-
-  return (
-    <section className="axpa" aria-label="Monitoring">
-      {head}
-      {activity}
-      <Lede {...lede} onAsk={onAsk} />
-      <div className="axpa-desk axpa-desk-reports">
-        <div className="axpa-stack">
-          <Behind
-            sheets={reports
-              .filter((item) => item.id !== report?.id)
-              .map((item) => ({
-                id: item.id,
-                label: `Inspection report · ${when(item.at)}${item.invented ? " · invented" : ""}`,
-              }))}
-            onPick={(id) => {
-              setFront(id);
-              setShuffled(true);
-            }}
-          />
-          {report ? (
-            <article
-              key={report.id}
-              className="axpa-sheet axpa-report"
-              data-torn="none"
-              data-shuffled={shuffled || undefined}
-              aria-label={`Inspection report, ${when(report.at)}`}
-            >
-              <header className="axpa-form-head">
-                <h3>Inspection report</h3>
-                <dl>
-                  <div>
-                    <dt>Application</dt>
-                    <dd>{story.name}</dd>
-                  </div>
-                  <div>
-                    <dt>Server</dt>
-                    <dd>
-                      {server
-                        ? `${server.label}${server.city ? `, ${server.city}` : ""}`
-                        : "Not recorded"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Inspected</dt>
-                    <dd>
-                      {dayOf(report.at)}, {stamp(report.at, false)}
-                      {report.until !== report.at
-                        ? `–${stamp(report.until, false)}`
-                        : ""}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>By</dt>
-                    <dd>{report.by}</dd>
-                  </div>
-                </dl>
-              </header>
-              {sections.map((section) => {
-                const rows = report.rows.filter(
-                  (row) => row.look.where === section.where,
-                );
-                return rows.length ? (
-                  <section key={section.where} className="axpa-form-part">
-                    <h4>{section.title}</h4>
-                    {rows.map((row, index) => (
-                      <div
-                        key={index}
-                        className="axpa-check"
-                        data-state={row.look.state}
-                      >
-                        <span>
-                          {row.look.name}
-                          <code>{row.look.how}</code>
-                          {row.look.state === "failing" && row.look.detail && (
-                            <small>{row.look.detail}</small>
-                          )}
-                        </span>
-                        <b>
-                          {row.look.state === "failing"
-                            ? "Failed"
-                            : row.look.state === "passing"
-                              ? "Passed"
-                              : "No result"}
-                        </b>
-                        <time>{stamp(row.at, false)}</time>
-                      </div>
-                    ))}
-                  </section>
-                ) : null;
-              })}
-              {report.reads.length > 0 && (
-                <section className="axpa-form-part">
-                  <h4>Output</h4>
-                  {report.reads.map((row, index) => (
-                    <div key={index} className="axpa-check" data-state="seen">
-                      <span>
-                        {row.look.name}
-                        <code>{row.text}</code>
-                      </span>
-                      <b>Read</b>
-                      <time>{stamp(row.at, false)}</time>
-                    </div>
-                  ))}
-                </section>
-              )}
-              <section className="axpa-form-part axpa-blanks">
-                <h4>Left blank</h4>
-                {blanks.map((blank) => (
-                  <div
-                    key={blank.label}
-                    className="axpa-field"
-                    data-filled={blank.filled || undefined}
-                  >
-                    <span>{blank.label}</span>
-                    <i aria-hidden="true" />
-                    <em>{blank.words}</em>
-                  </div>
-                ))}
-              </section>
-              {report === top && guard.length > 0 && (
-                <p className="axpa-also">
-                  Also on record:{" "}
-                  {guard
-                    .map(
-                      (look) => `${look.name.toLowerCase()} ${when(look.at!)}`,
-                    )
-                    .join("; ")}
-                  . Backups has the details.
-                </p>
-              )}
-              <footer className="axpa-sign">
-                <span>Signed</span>
-                <b>
-                  {report.invented ? "Host collector (invented)" : "Server Guy"}
-                </b>
-              </footer>
-              <div
-                className="axpa-stamp"
-                data-state={failed(report) ? "failed" : "passed"}
-                data-faded={
-                  toneOf(report.until, now) !== "verified" || undefined
-                }
-                aria-hidden="true"
-              >
-                {failed(report) ? "Failed" : "Passed"}
-                <small>{day(report.until)}</small>
-              </div>
-            </article>
-          ) : (
-            <article className="axpa-sheet axpa-report" data-torn="none">
-              <p className="axpa-none">No inspection is on record.</p>
-            </article>
-          )}
-        </div>
-        <aside className="axpa-note-wrap">
-          <LittleServer mood={mood} className="axpa-note-guy" />
-          <div
-            className="axpa-note"
-            data-state={failing ? "failed" : undefined}
-          >
-            <p>{note}</p>
-            {health && !watching && <small>{health.detail}</small>}
-            <button
-              type="button"
-              className="axpa-ask-small"
-              onClick={() => onAsk(lede.ask.draft)}
-            >
-              <ChatCircleText weight="bold" />
-              Ask in the conversation
-            </button>
-          </div>
-        </aside>
-      </div>
-    </section>
-  );
-}
-
-export function PaperDirection(props: SignalDirectionProps) {
-  return props.page === "logs" ? (
-    <PaperLogs {...props} />
-  ) : (
-    <PaperWatch {...props} />
   );
 }

@@ -1,16 +1,15 @@
 "use client";
 
-// PROTOTYPE · opus-ui-improvements · throwaway.
-// Direction B, Tuner: an old radio's glass dial. Each part of the
-// application is a station, and its signal bars say how recently anything
-// heard from it: strong for minutes, faint for a week, none for never. Tune
-// by clicking a station, dragging the needle or with the arrow keys; between
-// stations there is only static. Logs reads what the tuned process said, as
-// a transcript; Monitoring reads what was heard from the tuned part and
+// PROTOTYPE · opus-ui-improvements · chosen for Monitoring.
+// Tuner: an old radio's glass dial. Each part of the application is a
+// station, and its signal bars say how recently anything heard from it:
+// strong for minutes, faint for a week, none for never. Tune by clicking a
+// station, dragging the needle or with the arrow keys; between stations
+// there is only static. The tuned station reads what was heard from it and
 // when, then the silence since. The lamp lights only while something
 // listens. Nothing moves on arrival.
 
-import { ChatCircleText, MagnifyingGlass } from "@phosphor-icons/react";
+import { ChatCircleText } from "@phosphor-icons/react";
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import type { MascotMood } from "../home/mascot-scene";
@@ -18,10 +17,10 @@ import { useReducedMotion } from "../architecture-prototype/motion";
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import { lasting, listed } from "../backup-prototype/model";
-import { ago, clock, countWord, when } from "../stack-prototype/stack-model";
+import { lasting } from "../backup-prototype/model";
+import { ago, countWord, when } from "../stack-prototype/stack-model";
 import type { SignalDirectionProps } from "./index";
-import { CAP, toneOf, type Look, type LogLine } from "./signal-model";
+import { toneOf, type Look } from "./signal-model";
 import "./tuner.css";
 
 interface Station {
@@ -31,7 +30,6 @@ interface Station {
   /** The newest thing heard from it. */
   at: string | null;
   state: "fresh" | "stale" | "failing" | "live" | "static";
-  alert?: "warn" | "error";
 }
 
 /** Where a station sits on the dial, in percent. */
@@ -51,16 +49,6 @@ const resultWord: Record<Look["state"], string> = {
   unknown: "No result",
   seen: "Read",
 };
-const stamp = (at: string | null) =>
-  at
-    ? new Date(at).toLocaleTimeString(undefined, {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        fractionalSecondDigits: 3,
-      })
-    : "";
 
 function Radio({
   stations,
@@ -168,7 +156,6 @@ function Radio({
               tabIndex={index === tuned ? 0 : -1}
               className="axtu-station"
               data-state={station.state}
-              data-alert={station.alert}
               style={{ left: `${placeOf(index, count)}%` }}
               onClick={() => onTune(index)}
             >
@@ -264,9 +251,7 @@ function Transcript({
   );
 }
 
-// ---------- Monitoring: what was heard from each part ----------
-
-function TunerWatch({
+export function TunerDirection({
   story,
   now,
   head,
@@ -491,214 +476,5 @@ function TunerWatch({
         </button>
       </Transcript>
     </section>
-  );
-}
-
-// ---------- Logs: what each process said ----------
-
-function TunerLogs({
-  story,
-  now,
-  head,
-  activity,
-  onAsk,
-}: SignalDirectionProps) {
-  const [readId, setReadId] = useState(story.collections[0].id);
-  const [tuned, setTuned] = useState(0);
-  const [drag, setDrag] = useState<number | null>(null);
-  const [fade, setFade] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const read =
-    story.collections.find((item) => item.id === readId) ??
-    story.collections[0];
-  const newest = story.collections[0];
-  const failing = story.looks.find((look) => look.state === "failing") ?? null;
-  const state: Station["state"] =
-    toneOf(read.at, now) === "verified" ? "fresh" : "stale";
-  const stations: Station[] = [
-    {
-      id: "all",
-      name: "All",
-      sub: "Every process, in the order the read printed them",
-      at: read.at,
-      state,
-    },
-    ...read.speakers.map((speaker) => ({
-      id: speaker.service,
-      name: speaker.name,
-      sub: speaker.cut
-        ? `Its last ${CAP} lines; earlier ones weren't read`
-        : `All ${speaker.lines} ${speaker.lines === 1 ? "line" : "lines"} it had written`,
-      at: read.at,
-      state,
-      alert: speaker.errors
-        ? ("error" as const)
-        : speaker.warns
-          ? ("warn" as const)
-          : undefined,
-    })),
-  ];
-  const index = Math.min(tuned, stations.length - 1);
-  const station = stations[index];
-  const between =
-    drag !== null &&
-    Math.abs(placeOf(index, stations.length) - drag) >= lockOf(stations.length);
-  const lines = read.lines.filter(
-    (line) =>
-      (station.id === "all" || line.service === station.id) &&
-      line.raw.toLowerCase().includes(query.toLowerCase()),
-  );
-  // Consecutive lines from one process read as one turn.
-  const turns: {
-    speaker: LogLine["speaker"];
-    who: number;
-    lines: LogLine[];
-  }[] = [];
-  for (const line of lines) {
-    const turn = turns.at(-1);
-    if (turn && turn.lines[0].service === line.service) turn.lines.push(line);
-    else
-      turns.push({
-        speaker: line.speaker,
-        who: read.speakers.findIndex((item) => item.service === line.service),
-        lines: [line],
-      });
-  }
-
-  const warns = read.speakers.reduce((sum, item) => sum + item.warns, 0);
-  const errors = read.speakers.reduce((sum, item) => sum + item.errors, 0);
-  const holds = newest.speakers.map((speaker) =>
-    speaker.cut
-      ? `${speaker.name}'s last ${CAP} lines (earlier ones weren't read)`
-      : `all ${speaker.lines} of ${speaker.name}'s`,
-  );
-  const lede = {
-    say: `The newest output on record was read ${when(newest.at)}.`,
-    tone: failing ? ("failed" as Tone) : toneOf(newest.at, now),
-    word: `Read ${ago(newest.at, now)}`,
-    sub: [
-      failing &&
-        `${failing.name} is failing now (invented); this output was read before that.`,
-      `It holds ${listed(holds)}. Nothing records output between reads.`,
-    ]
-      .filter(Boolean)
-      .join(" "),
-    ask: {
-      label: "Ask Server Guy to read the latest output",
-      draft: `Read the latest logs from each of ${story.name}'s processes and tell me whether anything looks wrong.`,
-    },
-  };
-
-  return (
-    <section className="axtu" aria-label="Logs">
-      {head}
-      {activity}
-      <Lede {...lede} onAsk={onAsk} />
-      <Radio
-        stations={stations}
-        tuned={index}
-        onTune={(next) => {
-          setTuned(next);
-          setFade(stations[next].id);
-        }}
-        drag={drag}
-        onDrag={setDrag}
-        now={now}
-        mood={failing ? "attention" : state === "fresh" ? "ready" : "resting"}
-        live={false}
-        note="Output is read only when someone asks"
-      />
-      <Transcript
-        between={between}
-        fade={fade}
-        label={`${station.name}: output`}
-      >
-        <header className="axtu-head">
-          <div>
-            <h3>{station.name}</h3>
-            <p>
-              {station.sub} · read {when(read.at)}, {ago(read.at, now)}
-              {station.id === "all" && (warns || errors)
-                ? ` · ${[warns && `${warns} ${warns === 1 ? "warning" : "warnings"}`, errors && `${errors} ${errors === 1 ? "error" : "errors"}`].filter(Boolean).join(", ")}`
-                : ""}
-            </p>
-          </div>
-          <div className="axtu-tools">
-            {story.collections.length > 1 && (
-              <div className="axtu-reads" role="radiogroup" aria-label="Read">
-                {story.collections.map((item, position) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={item.id === read.id}
-                    onClick={() => setReadId(item.id)}
-                  >
-                    {position === 0 ? "Newest" : "Earlier"}{" "}
-                    <small>{clock(item.at)}</small>
-                  </button>
-                ))}
-              </div>
-            )}
-            <label className="axtu-filter">
-              <MagnifyingGlass aria-hidden="true" />
-              <input
-                aria-label="Filter log lines"
-                placeholder="Filter collected logs…"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-          </div>
-        </header>
-        <div
-          className="axtu-lines"
-          role="log"
-          aria-label="Collected application logs"
-          tabIndex={0}
-        >
-          {turns.length ? (
-            turns.map((turn) => (
-              <div
-                key={turn.lines[0].id}
-                className="axtu-turn"
-                data-all={station.id === "all" || undefined}
-              >
-                {station.id === "all" && (
-                  <b className="axtu-speaker" data-who={turn.who}>
-                    {turn.speaker}
-                  </b>
-                )}
-                <div>
-                  {turn.lines.map((line) => (
-                    <p
-                      key={line.id}
-                      data-level={line.level}
-                      data-milestone={line.milestone || undefined}
-                    >
-                      <time>{stamp(line.at)}</time>
-                      <span>
-                        {line.text}
-                        {line.rest && <small>{line.rest}</small>}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="axtu-empty">No lines match your filter.</p>
-          )}
-        </div>
-      </Transcript>
-    </section>
-  );
-}
-
-export function TunerDirection(props: SignalDirectionProps) {
-  return props.page === "logs" ? (
-    <TunerLogs {...props} />
-  ) : (
-    <TunerWatch {...props} />
   );
 }
