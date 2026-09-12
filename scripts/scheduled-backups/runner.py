@@ -1209,6 +1209,7 @@ def capture_stack(config, state, run_id, command, staging):
             or not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", str(dump.get("volume")))
             or not re.fullmatch(service_name, str(dump.get("service")))
             or not isinstance(dump.get("target"), str)
+            or not isinstance(dump.get("quiescent", True), bool)
             or not all(
                 isinstance(dump.get(step), list)
                 and dump[step]
@@ -1438,10 +1439,14 @@ def capture_stack(config, state, run_id, command, staging):
 
 
 def capture_declared_dump(container, meta, dump, stage, command):
-    """An owner's own dump and content fingerprint, taken during the pause.
+    """An owner's own dump, and its content fingerprint when the plan says
+    every writer is paused.
 
     Both are commands from the recorded plan, run in the owner's container
-    with its environment; nothing here passes through a shell.
+    with its environment; nothing here passes through a shell. A dump whose
+    writers the plan does not know is taken online by the tool's own
+    snapshot: a live fingerprint could then describe another moment, so none
+    is taken and restoration proves the copy instead.
     """
     (stage / "database").mkdir(parents=True, exist_ok=True, mode=0o700)
     target = stage / "database" / (dump["volume"] + ".dump")
@@ -1466,21 +1471,26 @@ def capture_declared_dump(container, meta, dump, stage, command):
     os.chmod(target, 0o600)
     if not target.stat().st_size:
         raise failed("dump", reason="the dump wrote no bytes")
-    try:
-        fingerprint = command(
-            "docker", "exec", container, *dump["verify"], timeout=COMMAND_TIMEOUT
-        )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        raise failed("verify", error) from error
-    if len(fingerprint) > 64 * 1024:
-        raise failed("verify", reason="the fingerprint exceeds 64 KiB")
+    fingerprint = None
+    if dump.get("quiescent", True):
+        try:
+            fingerprint = command(
+                "docker", "exec", container, *dump["verify"], timeout=COMMAND_TIMEOUT
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise failed("verify", error) from error
+        if len(fingerprint) > 64 * 1024:
+            raise failed("verify", reason="the fingerprint exceeds 64 KiB")
     return {
         "service": meta["service"],
         "image": meta["image"],
         "target": dump["target"],
         "bytes": target.stat().st_size,
         "sha256": sha256(target),
-        "fingerprint": fingerprint.decode("utf-8", "replace"),
+        "fingerprint": (
+            fingerprint.decode("utf-8", "replace") if fingerprint is not None else None
+        ),
+        "quiescent": fingerprint is not None,
     }
 
 
@@ -1594,7 +1604,7 @@ def restore_application(
         dump = extracted / "database" / (str(declared.get("volume")) + ".dump")
         if (
             not isinstance(captured, dict)
-            or not isinstance(captured.get("fingerprint"), str)
+            or not isinstance(captured.get("fingerprint"), (str, type(None)))
             or not dump.is_file()
             or sha256(dump) != captured.get("sha256")
             or declared.get("service") not in definition["services"]
@@ -1646,6 +1656,13 @@ def restore_application(
                     raise failed("restore-failed", "restore", error) from error
                 time.sleep(2)
         restore["checks"].append("database-restored")
+        # An online dump carries no live fingerprint to compare: loading it
+        # without error is what proves it, and the record says only that.
+        if captured["fingerprint"] is None:
+            restore["measurements"]["databases"] = (
+                restore["measurements"].get("databases", 0) + 1
+            )
+            continue
         try:
             fingerprint = command(
                 *compose,

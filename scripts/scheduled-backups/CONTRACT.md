@@ -279,9 +279,14 @@ Bounded and stable. No SDK text, no exception messages, no paths, no addresses.
      touched, and an empty list is valid. Read each recorded volume where
      Docker keeps it, copy its files with ownership and take SQLite files
      through SQLite's backup API; copy every file the definition binds into a
-     container. Run each owner's `dump` and `verify` commands inside its
-     still-running container, keeping the dump under `database/<volume>.dump`
-     and the printed content fingerprint; restart what was stopped. Before
+     container. Run each owner's `dump` command inside its still-running
+     container, keeping the dump under `database/<volume>.dump`, then its
+     `verify` command for the content fingerprint only when the dump entry
+     says `quiescent: true` (every writer the controller knows of is
+     paused); an entry with `quiescent: false` is dumped online by the
+     tool's own snapshot, its manifest records `fingerprint: null`, and the
+     restore test proves it by loading it (`database-restored`) without the
+     `database-content` comparison. Restart what was stopped. Before
      touching anything, refuse a captured volume that any running container
      outside the plan holds writable, a planned container whose volume mounts
      the plan does not record, or an owner whose image differs from the

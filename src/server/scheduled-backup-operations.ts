@@ -16,6 +16,7 @@ function capturePause(record: DeploymentRecord) {
     return "Capture pauses the application's services. Pause duration depends on shutdown and data size.";
   const plan = backupCapturePlan(facts);
   const kept = [...new Set((plan.dumps ?? []).map((dump) => dump.service))];
+  const online = (plan.dumps ?? []).filter((dump) => !dump.quiescent);
   return [
     plan.pauseServices.length
       ? `Capture stops ${plan.pauseServices.join(", ")}.`
@@ -23,6 +24,11 @@ function capturePause(record: DeploymentRecord) {
     ...(kept.length
       ? [
           `${kept.join(", ")} ${kept.length === 1 ? "keeps" : "keep"} running to dump ${kept.length === 1 ? "its" : "their"} data.`,
+        ]
+      : []),
+    ...(online.length
+      ? [
+          `${online.map((dump) => dump.volume).join(", ")} ${online.length === 1 ? "is" : "are"} dumped online, with no writers declared: the copy is proven by restoring it, not compared live, and files captured beside it may be from another moment.`,
         ]
       : []),
     "Pause duration depends on shutdown and data size.",

@@ -2169,7 +2169,7 @@ class ScheduledBackupTest(unittest.TestCase):
 
     # Declared owner dumps
 
-    def dump_stack(self, web_labels=None):
+    def dump_stack(self, web_labels=None, quiescent=True):
         """A web service writes files and a database it does not own; the
         owner dumps it with its recorded commands; a migration job has
         finished. No service is called app or postgres."""
@@ -2246,6 +2246,7 @@ class ScheduledBackupTest(unittest.TestCase):
                     "dump": ["mariadb-dump", "--all-databases"],
                     "restore": ["mariadb", "--batch"],
                     "verify": ["mariadb-fingerprint"],
+                    "quiescent": quiescent,
                 }
             ],
         }
@@ -2258,6 +2259,37 @@ class ScheduledBackupTest(unittest.TestCase):
             ),
         )
         return runner.load_config(path), docker
+
+    def test_a_dump_with_undeclared_writers_is_taken_online_and_proven_by_restoring(self):
+        # The controller could not establish that every writer of the
+        # database pauses (a client could write it over the network), so the
+        # plan marks the dump not quiescent: the owner dumps by its tool's own
+        # snapshot, no live fingerprint is taken, and the restore test proves
+        # the copy by loading it, recording no content comparison.
+        config, docker = self.dump_stack(quiescent=False)
+        state = self.state(config)
+        client = FakeClient()
+        stored = runner.perform_run(
+            config, state, storage_factory=self.storage(client), command=docker
+        )
+        self.assertEqual(stored["outcome"], "succeeded", stored["errorCode"])
+        self.assertNotIn("mariadb-fingerprint", docker.exec_running)
+        self.assertIn("mariadb-dump", docker.exec_running)
+        # A restore that would have compared a live fingerprint has none to
+        # compare: the copy loads, and that is what the record claims.
+        restorer = FakeDocker(exec_results={"mariadb": b""})
+        restore = runner.perform_test_restore(
+            config,
+            state,
+            stored["id"],
+            storage_factory=self.storage(client),
+            command=restorer,
+        )["restore"]
+        self.assertEqual(restore["outcome"], "verified", restore["errorCode"])
+        self.assertIn("database-restored", restore["checks"])
+        self.assertNotIn("database-content", restore["checks"])
+        self.assertNotIn("mariadb-fingerprint", restorer.exec_running)
+        self.assertEqual(restorer.stdin["db"], [b"-- dump of shelf\nINSERT 42;\n"])
 
     def test_a_declared_owner_dumps_while_its_writers_are_stopped(self):
         config, docker = self.dump_stack()

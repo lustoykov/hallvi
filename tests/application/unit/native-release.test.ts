@@ -254,6 +254,95 @@ it("a correction that redeclares a volume keeps its owner, capture and procedure
   ).toThrow("a procedure applies only to capture");
 });
 
+it("declared writers pause for a dump; without a declaration the dump is online unless nothing else runs", () => {
+  const stack = (
+    data: NativeConfiguration["data"],
+    extra: Record<string, unknown> = {},
+  ): NativeConfiguration => ({
+    ...native,
+    resolved: {
+      name: project,
+      services: {
+        web: {
+          image: `ghcr.io/qa/notes@sha256:${"a".repeat(64)}`,
+          ports: [{ target: 8000, published: "80", protocol: "tcp" }],
+          depends_on: { postgres: { condition: "service_started" } },
+        },
+        worker: {
+          image: `ghcr.io/qa/notes@sha256:${"a".repeat(64)}`,
+          depends_on: { web: { condition: "service_started" } },
+        },
+        ...extra,
+        postgres: {
+          image: "postgres:17",
+          environment: { POSTGRES_USER: "serverguy", POSTGRES_DB: "app" },
+          volumes: [volume("database", "/var/lib/postgresql/data")],
+        },
+      },
+      volumes: { database: { name: `${project}_database` } },
+    },
+    inputs: [],
+    data,
+    database: { service: "postgres", version: "17" },
+    summary: "Notes whose web and worker write PostgreSQL over the network",
+  });
+  const record = (writers?: string[]) => [
+    {
+      volume: "database",
+      kind: "database" as const,
+      sqlite: null,
+      capture: "dump" as const,
+      owner: "postgres",
+      procedure: managedDatabaseProcedure,
+      ...(writers ? { writers } : {}),
+    },
+  ];
+  // Network writers mount nothing, yet they pause, dependents first, and the
+  // dump is quiescent: its live fingerprint describes the same moment.
+  const declared = backupCapturePlan(
+    nativeFacts(stack(record(["web", "worker"]))),
+  );
+  expect(declared.pauseServices).toEqual(["worker", "web"]);
+  expect(declared.dumps![0]).toMatchObject({
+    service: "postgres",
+    quiescent: true,
+  });
+  // Pi asserts that nothing but the owner writes it: nothing pauses, and the
+  // fingerprint still counts.
+  const none = backupCapturePlan(nativeFacts(stack(record([]))));
+  expect(none.pauseServices).toEqual([]);
+  expect(none.dumps![0].quiescent).toBe(true);
+  // No declaration while clients keep running: the dump is taken online and
+  // the plan says so, instead of comparing a live fingerprint to it.
+  const online = backupCapturePlan(nativeFacts(stack(record())));
+  expect(online.pauseServices).toEqual([]);
+  expect(online.dumps![0].quiescent).toBe(false);
+  // The owner cannot be its own writer: it keeps running to dump.
+  expect(() =>
+    backupCapturePlan(nativeFacts(stack(record(["postgres"])))),
+  ).toThrow("cannot both pause and dump");
+  // When every other running service already pauses for captured files,
+  // nothing that could write the database keeps running: quiescent without
+  // a declaration.
+  const paused = stack(
+    [
+      ...record(),
+      {
+        volume: "uploads",
+        kind: "files",
+        sqlite: null,
+        capture: "quiesced-files",
+      },
+    ],
+    {},
+  );
+  paused.resolved.services.web.volumes = [volume("uploads", "/uploads")];
+  paused.resolved.services.worker.volumes = [volume("uploads", "/work")];
+  paused.resolved.volumes!.uploads = { name: `${project}_uploads` };
+  const quiet = backupCapturePlan(nativeFacts(paused));
+  expect(quiet.pauseServices).toEqual(["worker", "web"]);
+  expect(quiet.dumps![0].quiescent).toBe(true);
+});
 it("the managed PostgreSQL is a database owner with a default procedure, on new and older records alike", () => {
   const managed = (data: NativeConfiguration["data"]): NativeConfiguration => ({
     ...native,
@@ -288,6 +377,8 @@ it("the managed PostgreSQL is a database owner with a default procedure, on new 
     capture: "dump",
     procedure: managedDatabaseProcedure,
   });
+  // No writers are declared and the app keeps running, so the dump is
+  // taken online: nothing pauses, and no live fingerprint is compared.
   expect(backupCapturePlan(legacy)).toEqual({
     version: 2,
     pauseServices: [],
@@ -298,6 +389,7 @@ it("the managed PostgreSQL is a database owner with a default procedure, on new 
         service: "postgres",
         target: "/var/lib/postgresql/data",
         ...managedDatabaseProcedure,
+        quiescent: false,
       },
     ],
   });

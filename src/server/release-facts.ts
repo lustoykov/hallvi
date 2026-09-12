@@ -38,6 +38,12 @@ export interface VolumeFacts {
   /** The service that owns this state; it keeps its image across releases. */
   owner?: string;
   procedure?: StateProcedure;
+  /**
+   * Services that change this data without mounting it, such as database
+   * clients over the network; they pause while it is captured. Declared by
+   * Pi: absent means unknown, an empty list means none but the owner.
+   */
+  writers?: string[];
   /** SQLite file relative to the volume root. */
   sqlite: string | null;
   mounts: {
@@ -156,6 +162,7 @@ export function nativeFacts(native: NativeConfiguration): ReleaseFacts {
         ...(record?.capture ? { capture: record.capture } : {}),
         ...(record?.owner ? { owner: record.owner } : {}),
         ...(record?.procedure ? { procedure: record.procedure } : {}),
+        ...(record?.writers ? { writers: record.writers } : {}),
         sqlite: record?.sqlite ?? null,
         mounts: [],
       };

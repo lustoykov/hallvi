@@ -61,6 +61,8 @@ export interface NativeSelection {
     capture?: "quiesced-files" | "dump" | null;
     owner?: string | null;
     procedure?: NativeConfiguration["data"][number]["procedure"] | null;
+    /** Services that write this data without mounting it; null removes. */
+    writers?: string[] | null;
   }[];
   /** JSON criterion in the current criterion's shape; omit to keep it. */
   criterion?: string;
@@ -580,6 +582,7 @@ export function dataRecords(
       capture: previous.capture,
       owner: previous.owner,
       procedure: previous.procedure,
+      writers: previous.writers,
     };
     const set = <T>(value: T | null | undefined, kept: T | undefined) =>
       value === undefined ? kept : (value ?? undefined);
@@ -590,6 +593,7 @@ export function dataRecords(
           capture: set(declaration.capture, inherited?.capture),
           owner: set(declaration.owner, inherited?.owner),
           procedure: set(declaration.procedure, inherited?.procedure),
+          writers: set(declaration.writers, inherited?.writers),
         }
       : inherited;
     if (!record)
@@ -654,6 +658,18 @@ export function dataRecords(
       throw new NativeConfigurationError(
         `Volume ${volume}: a procedure applies only to capture "dump".`,
       );
+    // Writers are Pi's consistency declaration beyond the mounts: services
+    // that change the data over the network. The owner is not one of them.
+    for (const writer of record.writers ?? []) {
+      if (!resolved.services[writer])
+        throw new NativeConfigurationError(
+          `Volume ${volume}: writer ${writer} is not a service.`,
+        );
+      if (writer === record.owner)
+        throw new NativeConfigurationError(
+          `Volume ${volume}: its owner ${writer} is not one of its writers; writers are the other services that change its data.`,
+        );
+    }
     if (
       record.procedure &&
       redactSecrets(JSON.stringify(record.procedure)).count
@@ -1035,13 +1051,14 @@ export function currentConfigurationFiles(
     httpAccess: facts.httpAccess,
     exposure: facts.exposure,
     volumes: facts.volumes.map(
-      ({ name, kind, sqlite, capture, owner, procedure, mounts }) => ({
+      ({ name, kind, sqlite, capture, owner, procedure, writers, mounts }) => ({
         name,
         kind,
         sqlite,
         ...(capture ? { capture } : {}),
         ...(owner ? { owner } : {}),
         ...(procedure ? { procedure } : {}),
+        ...(writers ? { writers } : {}),
         mounts: mounts.map(({ service, target, readOnly }) => ({
           service,
           target,

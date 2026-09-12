@@ -347,16 +347,24 @@ const selection = {
               Type.Null(),
             ]),
           ),
+          writers: Type.Optional(
+            Type.Union([
+              Type.Array(Type.String({ minLength: 1, maxLength: 63 }), {
+                maxItems: 16,
+              }),
+              Type.Null(),
+            ]),
+          ),
           procedure: Type.Optional(
             Type.Union([
               Type.Object(
                 Object.fromEntries(
                   ["dump", "restore", "verify"].map((name) => [
                     name,
-                    Type.Array(
-                      Type.String({ minLength: 1, maxLength: 4000 }),
-                      { minItems: 1, maxItems: 40 },
-                    ),
+                    Type.Array(Type.String({ minLength: 1, maxLength: 4000 }), {
+                      minItems: 1,
+                      maxItems: 40,
+                    }),
                   ]),
                 ),
                 { additionalProperties: false },
@@ -439,7 +447,7 @@ The executor enforces the following and returns specific feedback:
 - It builds from the repository at the selected revision plus the new files you select. Never modify repository files: workspace edits to source are not deployed, and application code changes need an owner-merged revision. Author packaging (Compose files, Dockerfiles, configuration) as new files.
 - Private values appear only as \${NAME} references to recorded private inputs. Never write secret values.
 - Each service runs exactly one container. A one-shot service (a migration or initialization) is a dependency of the services that need it with condition service_completed_successfully: Compose starts them only after it exits 0, and verification requires that exit instead of a running process. Bind mounts must be read-only files you select. Host namespaces, privileged mode, added capabilities, devices, the Docker socket, host paths, external or driver-backed volumes/networks, remote build contexts and profiles are unsupported capability gaps.
-- Declare data for each new named volume: kind "files" or "database", its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all its state consistent in it, or capture "dump" for a database server. Name its owner: the service that owns the state, not every service that mounts it. The owner of a database keeps its image across releases and rollbacks unless the owner approves a change; the owner of files is recorded and upgrades freely. A dump procedure is three argument lists run in the owner's container, chosen from the software's documentation: dump prints a consistent copy while the services that write files are stopped; restore loads that copy from standard input into a fresh instance started from the same image and environment; verify prints a content fingerprint, such as row counts and checksums of key tables, that must match between the source and the restored copy. Reach credentials through the owner's environment variables inside sh -c, never as written values. A volume that release.json already records keeps its owner, capture and procedure unless you set them; changing or removing an owner is a state change the owner decides, never an ordinary correction. Backups stop only the services that write captured files, dependents first; dump owners and everything else keep running.
+- Declare data for each new named volume: kind "files" or "database", its SQLite path relative to the volume root, capture "quiesced-files" only when a clean shutdown leaves all its state consistent in it, or capture "dump" for a database server. Name its owner: the service that owns the state, not every service that mounts it. The owner of a database keeps its image across releases and rollbacks unless the owner approves a change; the owner of files is recorded and upgrades freely. A dump procedure is three argument lists run in the owner's container, chosen from the software's documentation: dump prints a consistent copy while the services that write files are stopped; restore loads that copy from standard input into a fresh instance started from the same image and environment; verify prints a content fingerprint, such as row counts and checksums of key tables, that must match between the source and the restored copy. Reach credentials through the owner's environment variables inside sh -c, never as written values. Declare writers: the services that change a volume's data without mounting it, such as the web and worker services that write a database over the network; they stop while that data is captured, so the dump, its fingerprint and the files captured beside it describe one moment. Declare writers: [] when nothing but the owner writes it. Without a writers declaration a dump is taken online by the tool's own snapshot, its content is proven by restoring it rather than compared live, and files captured beside it may be from another moment. A volume that release.json already records keeps its owner, capture, procedure and writers unless you set them; changing or removing an owner is a state change the owner decides, never an ordinary correction. Backups stop only the services that write captured files or are declared writers, dependents first; dump owners and everything else keep running.
 - It verifies each service's exact image, readiness and the behavior criterion. Readiness is not behavior. Give workers and brokers a Compose healthcheck; a running process alone does not prove queued work is processed. HTTP checks see only unauthenticated responses. Criterion commands verify what they cannot, such as an administrator login, completed setup or a processed job: each runs with docker compose exec in a running service after the HTTP checks, and passes when it exits 0 and its output includes its contains text. Name recorded private inputs in its inputs to receive them as environment variables; never write their values. Commands may change data, so keep them idempotent and limited to marked test data. Keep recorded checks: correct one under its name when a revision changes its response, and never drop or weaken one to pass.
 Tool errors are actionable feedback: inspect evidence, correct the configuration and resubmit when retryable; ordinary corrections need no approval. Complete at most one successful call. If unsafe or unsupported, explain why instead.`;
 

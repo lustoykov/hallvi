@@ -117,6 +117,16 @@ Head `fa3862a` (docs commits follow it and change no code): TypeScript suites 84
 - Pi needed several rounds for its own checks and procedures (paths inside images, table names, a Django relation); each failure was recorded with the check's output and Pi corrected it from the record. The number of rounds is a cost of this design, not hidden by it.
 - Still not shown: capture and isolated restoration of the independently built shared-state topology; legacy schedules on a real host; an application without a public HTTP endpoint; a controller update refreshing installed schedules on its own (today the owner asks for a reinstall).
 
+## Third pass: replay, successor operations and consistency boundaries
+
+Reviewer gaps on head `3912c9c` (code `fa3862a`), accepted direction unchanged.
+
+| Gap | Change | Proof |
+| --- | --- | --- |
+| 1. Reconciliation replayed completed mutating checks: a known successful command cleared the hold and `verifyRelease` ran every check again. | Verification resumes from the prior attempt's receipts: HTTP checks recorded passed are carried over, commands recorded passed and the resolved command are consumed, only unfinished commands run. | `command-check-hold.test.ts` runs `reconcileRelease` to completion with two commands: one mutation after recovery, not two. |
+| 2. A Pi-created continuation was mistaken for owner acceptance: any other operation id cleared `commandPending`. | The hold is a fact of the deployment, not of an operation. Only an owner decision made through a card (Retry, or approving a proposal whose text names the unknown) marks the hold accepted; `reconcile_release` then proceeds only when the host's record is lost, never while the command runs. Pi's `prepare_release` continuation keeps the hold. | `initial-release.test.ts`: `prepare_release` alone cannot clear the hold; the owner's Retry can, and a still-running command holds even then. |
+| 3. Writers were inferred from mounts only; a network client could write between the dump and its live fingerprint. | Data records may declare `writers`: services that change a volume's data without mounting it. They pause for the capture. A dump whose writers Pi declared (possibly none) is quiescent and its live fingerprint counts; without a declaration the dump is online by the tool's own snapshot, the runner takes no live fingerprint, and the restore test proves it by restoration, not comparison. Mounts stay evidence for file writers. | `native-release.test.ts` (plan), `test_scheduled_backups.py`: a network writer pauses when declared; an undeclared one leaves an online dump with no live comparison and an honest restore record. |
+
 ## Next actions
 
 The final account is in PR #49. The smallest next step: prove the same protection and restoration on the independently built shared-state topology (web and worker sharing files with SQLite), whose capture pauses two writers of one volume, and let the restore test's chosen checks run against it.

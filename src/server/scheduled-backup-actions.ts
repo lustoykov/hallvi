@@ -64,7 +64,9 @@ function restorationSummary(run: ScheduledRun) {
       : null,
     restore.checks.includes("database-content")
       ? "Each database dump loaded into a fresh instance of its owner and matched the source's content fingerprint."
-      : null,
+      : restore.checks.includes("database-restored")
+        ? "Each database dump loaded into a fresh instance of its owner; taken online, its content is proven by that restoration, not by a live comparison."
+        : null,
     restore.checks.includes("database-integrity")
       ? "SQLite integrity and recorded rows matched."
       : null,

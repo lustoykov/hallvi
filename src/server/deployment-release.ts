@@ -111,6 +111,8 @@ export interface NativeConfiguration {
     owner?: string;
     /** For capture "dump": commands run in the owner's container. */
     procedure?: StateProcedure;
+    /** Services that change this data without mounting it; they pause. */
+    writers?: string[];
   }[];
   database: { service: string; version: "16" | "17" | "18" } | null;
   httpAccess: "public" | "controller";
