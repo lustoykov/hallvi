@@ -16,10 +16,10 @@ const host = { kind: "host", id: "hetzner-165600952" } as const;
 const good = {
   title: "The host answers and carries nothing yet",
   body: "It is ready to take the application.",
-  about: [host],
-  states: { ref: host, presence: "present" },
   establishedAt: "2026-09-12T15:48:00.000Z",
   presentation: {
+    about: [host],
+    states: { ref: host, presence: "present" },
     views: ["deployment"],
     role: "outcome",
     status: "verified",
@@ -103,8 +103,11 @@ describe("what would make a record unreadable", () => {
   it("will not let an absence describe the thing it says is gone", () => {
     const found = review({
       ...good,
-      states: { ref: host, presence: "absent" },
-      presentation: { ...good.presentation, checks: [] },
+      presentation: {
+        ...good.presentation,
+        states: { ref: host, presence: "absent" },
+        checks: [],
+      },
     });
     expect(found.some((item) => item.includes("is absent and then carries facts"))).toBe(true);
   });
@@ -130,15 +133,17 @@ describe("the map", () => {
       { id: "web", kind: "web", name: "The app", role: "Serves requests", plain: "Your application itself" },
     ],
     edges: [{ from: "host", to: "web", network: "loopback" }],
-    absent: [],
   };
 
   it("accepts a map on the record that speaks for the application", () => {
     expect(
       review({
         ...good,
-        states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
-        presentation: { ...good.presentation, content: topology },
+        presentation: {
+          ...good.presentation,
+          states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
+          content: topology,
+        },
       }),
     ).toEqual([]);
   });
@@ -154,9 +159,9 @@ describe("the map", () => {
   it("refuses an edge that joins something the map never draws", () => {
     const found = review({
       ...good,
-      states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
       presentation: {
         ...good.presentation,
+        states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
         content: {
           ...topology,
           edges: [{ from: "host", to: "database", network: "private" }],

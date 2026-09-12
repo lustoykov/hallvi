@@ -21,26 +21,25 @@ export type MessageBlock =
   | { type: "saved-information"; id: string }
   | { type: "execution"; id: string };
 /**
- * What a record can speak about (contract §6). This list grows one entry at a
- * time, as a destination earns it.
+ * What a record can speak about. Bounded on purpose: these are the subjects
+ * the Architecture page actually reads, plus the application itself. A kind
+ * is added when a concrete view needs it, never in advance — a vocabulary
+ * nothing consumes is a second representation waiting to disagree with the
+ * first.
+ *
+ * Deferred with their destinations: `database` (a volume covers the stored
+ * data Architecture draws), `domain`, `certificate`'s siblings, `value`,
+ * `config-file`, `job`, `cache`, `cdn`, `backup-plan`.
  */
 export const subjectKinds = [
   "application",
   "host",
   "process",
   "volume",
-  "database",
   "door",
-  "domain",
   "certificate",
-  "value",
-  "config-file",
-  "job",
   "monitor",
-  "backup-plan",
   "access",
-  "cache",
-  "cdn",
 ] as const;
 export type SubjectKind = (typeof subjectKinds)[number];
 export const refSchema = z.strictObject({
@@ -108,9 +107,12 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
      */
     from: z.enum(["plan", "observed"]),
     /**
-     * Parts carry identity and description and **no state**: a part's state
-     * is the newest record stating that part, so a map never contradicts the
-     * page a reader clicks through to.
+     * Composition, and only composition. A part carries what it is and what
+     * it is for; its facts, its presence and its checks are read from the
+     * records that state it, so the map has no second copy of them to
+     * disagree with. It does not declare anything absent either: a design
+     * may draw a placeholder where something could be, but only a record
+     * stating that subject can say it is not there.
      */
     parts: z
       .array(
@@ -141,47 +143,12 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
       )
       .max(48)
       .default([]),
-    /** Ghosts: what is not there, and what it would do if it were. */
-    absent: z
-      .array(
-        z.strictObject({
-          id: z.string().trim().min(1).max(120),
-          kind: z.enum(partKinds),
-          name: z.string().trim().min(1).max(120),
-          would: z.string().trim().min(1).max(300),
-        }),
-      )
-      .max(12)
-      .default([]),
   }),
 ]);
 export type InformationContent = z.infer<typeof informationContentSchema>;
 export const informationInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   body: z.string().max(10000),
-  /**
-   * Everything this record concerns: links, never replacement. Additive and
-   * unordered — it is what "show me everything that touched this" reads, and
-   * it is never consulted for a lane, because an unordered list has no first
-   * element worth privileging.
-   */
-  about: z.array(refSchema).max(12).optional(),
-  /**
-   * At most one subject whose **current state** this record asserts. A record
-   * without it never becomes the current state of anything, however many
-   * things it is about: a copy of the database is an event, not the
-   * database's state. A record that would state two subjects is two records.
-   *
-   * `presence` lives here because only a record speaking for a subject may
-   * say the subject is not there. Absence is written, never inferred from
-   * silence — silence means nobody looked.
-   */
-  states: z
-    .strictObject({
-      ref: refSchema,
-      presence: z.enum(["present", "absent"]),
-    })
-    .optional(),
   evidence: z
     .array(
       z.discriminatedUnion("type", [
@@ -197,6 +164,29 @@ export const informationInputSchema = z.object({
   establishedAt: z.iso.datetime().nullable().default(null),
   presentation: z
     .object({
+      /**
+       * Everything this record concerns: links, never replacement. Additive
+       * and unordered — it is what "show me everything that touched this"
+       * reads, so no element of it is privileged over another.
+       */
+      about: z.array(refSchema).max(12).optional(),
+      /**
+       * At most one subject whose **current state** this record asserts. A
+       * record without it never becomes the current state of anything,
+       * however many things it is about: a deployment is an event, not the
+       * state of the four things it touched. A record that would state two
+       * subjects is two records.
+       *
+       * `presence` lives here because only a record speaking for a subject
+       * may say the subject is not there. Absence is written, never inferred
+       * from silence — silence means nobody looked.
+       */
+      states: z
+        .strictObject({
+          ref: refSchema,
+          presence: z.enum(["present", "absent"]),
+        })
+        .optional(),
       views: z
         .array(
           z.enum([

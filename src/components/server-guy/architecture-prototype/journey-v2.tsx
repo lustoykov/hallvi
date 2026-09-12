@@ -23,6 +23,7 @@ import {
   HardDrives,
   Heartbeat,
   Key,
+  Question,
   LockOpen,
   ShieldCheck,
   X,
@@ -217,7 +218,7 @@ function ServerGuyFace() {
   );
 }
 
-function iconFor(part: Part, restricted: boolean): ReactNode {
+function iconFor(part: Part, openness: ArchitectureModel["openness"]): ReactNode {
   if (part.id.startsWith("gap:")) return <Heartbeat weight="bold" />;
   switch (part.kind) {
     case "controller":
@@ -241,13 +242,18 @@ function iconFor(part: Part, restricted: boolean): ReactNode {
     case "gate":
       return part.id === "gate:ssh" ? (
         <Key weight="bold" />
-      ) : restricted ? (
+      ) : openness === "restricted" ? (
         <ShieldCheck weight="bold" />
-      ) : (
+      ) : openness === "public" ? (
         <Globe weight="bold" />
+      ) : (
+        // Nobody has read the rules back, so neither a shield nor a globe.
+        <Question weight="bold" />
       );
     case "tls":
       return <LockOpen weight="bold" />;
+    case "monitor":
+      return <Heartbeat weight="bold" />;
   }
 }
 
@@ -260,14 +266,20 @@ function titleFor(part: Part) {
 function subtitleFor(part: Part, model: ArchitectureModel) {
   const fact = (label: string) =>
     part.facts.find((item) => item.label === label)?.value;
-  if (part.id.startsWith("gap:")) return `would watch ${model.headline}`;
+  if (part.id.startsWith("gap:"))
+    return part.evidence.certainty === "absent"
+      ? `not watching ${model.headline}`
+      : `nobody has looked`;
   switch (part.kind) {
     case "controller":
       return "your network";
     case "source":
-      return `${part.name.split("/")[0]} · ${fact("Revision")?.slice(0, 7) ?? "not chosen"}`;
+      return `${part.name.split("/")[0]} · ${fact("Revision")?.slice(0, 7) ?? "no revision on record"}`;
     case "web":
-      return model.restricted ? "your application" : "your application, public";
+      // Only an established public reach says so; silence says nothing.
+      return model.openness === "public"
+        ? "your application, public"
+        : "your application";
     case "private":
       return "private, no way in";
     case "volume":
@@ -321,7 +333,7 @@ function Card({
       aria-label={`${part.name}, ${part.role}.${part.quiet ? "" : ` ${part.checking ? "Checking" : part.evidence.short}.`}`}
     >
       <span className="axj2-icon" aria-hidden="true">
-        {iconFor(part, model.restricted)}
+        {iconFor(part, model.openness)}
       </span>
       <span className="axj2-text">
         <b>{titleFor(part)}</b>
@@ -368,7 +380,7 @@ function Port({
       aria-label={`${part.name}, ${part.role}. ${part.evidence.short}.`}
       title={part.role}
     >
-      {iconFor(part, model.restricted)}
+      {iconFor(part, model.openness)}
       <span className="axj2-port-text">
         <b>
           {part.name.replace("Port ", "")}
@@ -377,9 +389,11 @@ function Port({
         <em>
           {part.id === "gate:ssh"
             ? "Server Guy"
-            : model.restricted
+            : model.openness === "restricted"
               ? "your network"
-              : "anyone"}
+              : model.openness === "public"
+                ? "anyone"
+                : "not read back"}
         </em>
       </span>
     </button>
@@ -427,7 +441,7 @@ function Popover({
     >
       <header>
         <span className={`axj2-icon k-${part.kind}`} aria-hidden="true">
-          {iconFor(part, model.restricted)}
+          {iconFor(part, model.openness)}
         </span>
         <div>
           <b>{part.name}</b>
@@ -729,8 +743,11 @@ export function JourneyDirection({
   const service = model.parts.find((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
   const monitoringGap = model.gaps.find((gap) => gap.id === "monitoring");
+  // The model owns what the ghost's state is — unassessed is not absent —
+  // and this only decides where to put it.
   const ghostPart = monitoringGap
-    ? gapPart(monitoringGap, model.headline)
+    ? (model.byId[`gap:${monitoringGap.id}`] ??
+      gapPart(monitoringGap, model.headline))
     : null;
   const planned = model.status !== "live";
   const host = model.byId.host;
@@ -965,7 +982,18 @@ export function JourneyDirection({
         {/* The firewall is named where its wall begins. */}
         <span className="axj2-wall-label" style={point(276, 151)}>
           Firewall ·{" "}
-          {model.restricted ? "only these two doors open" : "two doors open"}
+          {(() => {
+            // Count what the map draws rather than assuming two.
+            const doors = model.parts.filter(
+              (part) => part.kind === "gate" && !part.id.startsWith("gap:"),
+            ).length;
+            const named = doors === 1 ? "one door" : `${doors} doors`;
+            return model.openness === "restricted"
+              ? `only ${named} open`
+              : model.openness === "public"
+                ? `${named} open`
+                : `${named} on record`;
+          })()}
         </span>
         {(["gate:http", "gate:ssh"] as const).map((id) =>
           model.byId[id] ? (

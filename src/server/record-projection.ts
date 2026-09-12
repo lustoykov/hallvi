@@ -24,12 +24,7 @@
 // Nothing here invents a fact. A missing input reads unknown — never healthy,
 // and never absent.
 
-import type {
-  Claim,
-  Ref,
-  SavedInformation,
-  SubjectKind,
-} from "./operator-data";
+import type { Claim, Ref, SavedInformation } from "./operator-data";
 
 type Presentation = NonNullable<SavedInformation["presentation"]>;
 export type RecordCheck = Presentation["checks"][number];
@@ -38,8 +33,6 @@ export type Topology = Extract<
   NonNullable<Presentation["content"]>,
   { kind: "topology" }
 >;
-
-export type Lane = "application" | "backups" | "server" | "access";
 
 /**
  * How long a claim is worth trusting. Arithmetic, which is why it lives in
@@ -89,8 +82,8 @@ function stating(records: SavedInformation[], ref: Ref) {
     .filter(
       (record) =>
         !record.retiredAt &&
-        record.states &&
-        refKey(record.states.ref) === key,
+        record.presentation?.states &&
+        refKey(record.presentation.states.ref) === key,
     )
     .sort(newestFirst);
 }
@@ -106,26 +99,28 @@ export type Presence =
 /** Presence of a subject: the newest record stating it, and what it said. */
 export function presenceOf(records: SavedInformation[], ref: Ref): Presence {
   const [newest] = stating(records, ref);
-  if (!newest?.states) return { known: false };
-  return { known: true, presence: newest.states.presence, record: newest };
+  const states = newest?.presentation?.states;
+  if (!states) return { known: false };
+  return { known: true, presence: states.presence, record: newest };
 }
 
 /**
- * The run of records since the newest change in presence. Assembly never
- * reaches past it: a host that was destroyed and rebuilt does not show the
- * old machine's address, because those facts are on the far side of an
- * `absent`.
+ * Checks about a subject that were recorded by something else — a deployment
+ * event says its API answered, and that is evidence about the process it
+ * names even though the event speaks for no subject at all. This is the one
+ * place `check.about` is read.
  */
-function epoch(records: SavedInformation[], ref: Ref) {
-  const series = stating(records, ref);
-  const current = series[0]?.states?.presence;
-  if (!current) return [];
-  const run: SavedInformation[] = [];
-  for (const record of series) {
-    if (record.states?.presence !== current) break;
-    run.push(record);
-  }
-  return run;
+function mentioning(records: SavedInformation[], ref: Ref) {
+  const key = refKey(ref);
+  return records
+    .filter(
+      (record) =>
+        !record.retiredAt &&
+        (record.presentation?.checks ?? []).some(
+          (check) => check.about && refKey(check.about) === key,
+        ),
+    )
+    .sort(newestFirst);
 }
 
 /**
@@ -144,25 +139,39 @@ export interface Held<T> {
 }
 
 /**
- * Current facts of a subject, assembled key by key within the presence
- * epoch. A record that says only "SSH answered" leaves the earlier location
- * and size standing: they were never contradicted, and Pi correctly did not
- * re-assert what it did not re-observe.
+ * Current facts of a subject, assembled key by key: the newest record
+ * carrying each key wins, and each value keeps the record it came from, which
+ * is what dates it and cites its evidence.
+ *
+ * A record that says only "SSH answered" therefore leaves the earlier
+ * location and size standing — they were never contradicted, and Pi
+ * correctly did not re-assert what it did not re-observe. A replaced machine
+ * cannot inherit anything, because a new machine is a new identity and so a
+ * different subject.
  */
 export function currentFacts(records: SavedInformation[], ref: Ref) {
   const held = new Map<string, Held<RecordFact>>();
-  for (const record of epoch(records, ref))
+  for (const record of stating(records, ref))
     for (const fact of record.presentation?.facts ?? [])
       if (!held.has(keyOf(fact))) held.set(keyOf(fact), { value: fact, record });
   return held;
 }
 
-/** The same, for checks. */
+/**
+ * The same for checks, plus the checks other records made about this subject.
+ * Order matters: a record speaking for the subject is a deliberate statement
+ * about it and wins over a passing mention of the same key.
+ */
 export function currentChecks(records: SavedInformation[], ref: Ref) {
   const held = new Map<string, Held<RecordCheck>>();
-  for (const record of epoch(records, ref))
+  const key = refKey(ref);
+  for (const record of stating(records, ref))
     for (const check of record.presentation?.checks ?? [])
       if (!held.has(keyOf(check)))
+        held.set(keyOf(check), { value: check, record });
+  for (const record of mentioning(records, ref))
+    for (const check of record.presentation?.checks ?? [])
+      if (check.about && refKey(check.about) === key && !held.has(keyOf(check)))
         held.set(keyOf(check), { value: check, record });
   return held;
 }
@@ -172,7 +181,9 @@ export function seriesFor(records: SavedInformation[], ref: Ref) {
   const key = refKey(ref);
   return records
     .filter(
-      (record) => record.states && refKey(record.states.ref) === key,
+      (record) =>
+        record.presentation?.states &&
+        refKey(record.presentation.states.ref) === key,
     )
     .sort((a, b) => -newestFirst(a, b))
     .map((record) => ({ record, withdrawn: Boolean(record.retiredAt) }));
@@ -184,8 +195,11 @@ export function everythingAbout(records: SavedInformation[], ref: Ref) {
   return records
     .filter(
       (record) =>
-        (record.states && refKey(record.states.ref) === key) ||
-        (record.about ?? []).some((item) => refKey(item) === key),
+        (record.presentation?.states &&
+          refKey(record.presentation.states.ref) === key) ||
+        (record.presentation?.about ?? []).some(
+          (item) => refKey(item) === key,
+        ),
     )
     .sort(newestFirst);
 }
@@ -300,44 +314,6 @@ export function tagFor(
     : "verified";
 }
 
-const lanes: Partial<Record<SubjectKind, Lane>> = {
-  process: "application",
-  database: "application",
-  // Protection, not storage: surviving a restart is the application keeping
-  // its own data, and nothing was copied anywhere.
-  volume: "application",
-  application: "application",
-  "backup-plan": "backups",
-  host: "server",
-  access: "access",
-  door: "access",
-  domain: "access",
-  certificate: "access",
-};
-
-export function laneOf(ref: Ref | undefined): Lane | null {
-  return ref ? (lanes[ref.kind] ?? null) : null;
-}
-
-/**
- * A check's lane comes from what the check was about, or else from the
- * subject the record speaks for. `record.about` is never consulted: it is
- * unordered, so its first element was never meaningful.
- *
- * The legacy `subject` is still read, so the deployment already on record
- * keeps its lanes until fresh Pi output replaces it.
- */
-export function lane(check: RecordCheck, record: SavedInformation): Lane | null {
-  return (
-    laneOf(check.about ?? record.states?.ref) ?? (check.subject as Lane) ?? null
-  );
-}
-
-/** A check reaches a timeline only if it has a lane and a time. */
-export function timelineWorthy(check: RecordCheck, record: SavedInformation) {
-  return lane(check, record) !== null && record.establishedAt !== null;
-}
-
 /**
  * The map: the newest topology on a record stating this application. One per
  * application, and its parts carry no state — a part's state is the newest
@@ -349,7 +325,7 @@ export function topologyOf(
   applicationId: string,
 ): Held<Topology> | null {
   const ref: Ref = { kind: "application", id: applicationId };
-  for (const record of epoch(records, ref)) {
+  for (const record of stating(records, ref)) {
     const content = record.presentation?.content;
     if (content?.kind === "topology") return { value: content, record };
   }

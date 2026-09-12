@@ -2070,3 +2070,27 @@ dd.sg-protection-warn {
 .sg-op-receipt > .sg-op-ref {
   justify-self: start;
 }
+
+/* Architecture, before anybody has mapped the application. The designed
+   page's own empty state: it says nobody looked, which is not the same as
+   saying there is nothing to find. */
+.sg-arch-unmapped {
+  max-width: 62ch;
+  padding: 8px 0 0;
+}
+.sg-arch-unmapped h2 {
+  margin: 0 0 10px;
+  color: var(--ink, #202838);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sg-arch-unmapped p {
+  margin: 0 0 12px;
+  color: var(--ink-2, #3e4a60);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.sg-arch-unmapped button {
+  margin-top: 4px;
+}

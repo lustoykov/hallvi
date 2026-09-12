@@ -29,7 +29,8 @@ export type PartKind =
   | "web"
   | "private"
   | "volume"
-  | "offsite";
+  | "offsite"
+  | "monitor";
 
 export interface Fact {
   label: string;
@@ -116,6 +117,13 @@ export interface ArchitectureModel {
   condition: { certainty: Certainty; text: string };
   gaps: Gap[];
   region: string | null;
+  /**
+   * How far the application can be reached from. `restricted` cannot say
+   * "nobody has read this back", and its absence renders as "anyone", which
+   * is a claim. So the three-way reading is what the design consults, and
+   * `restricted` stays for the parts that only need the boolean.
+   */
+  openness: "restricted" | "public" | "unknown";
   restricted: boolean;
   monitored: boolean;
   /** When a restore of an off-site copy was last tested, if ever. */
@@ -1181,6 +1189,9 @@ export function buildModel({
     condition,
     gaps,
     region,
+    // This builder reads the old facts model, which knows the firewall rules
+    // it was given, so its reading is never the unread one.
+    openness: restricted ? "restricted" : "public",
     restricted,
     monitored: Boolean(monitoring),
     restoreAt: facts.protection?.restoreTest?.at ?? null,

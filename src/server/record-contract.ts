@@ -117,9 +117,12 @@ export function reviewRecord(value: InformationInput): string[] {
         `the record can only be shown as recorded.`,
     );
 
-  if (value.states?.presence === "absent" && (presentation.facts ?? []).length)
+  if (
+    presentation.states?.presence === "absent" &&
+    (presentation.facts ?? []).length
+  )
     found.push(
-      `This record says ${value.states.ref.kind} "${value.states.ref.id}" is ` +
+      `This record says ${presentation.states.ref.kind} "${presentation.states.ref.id}" is ` +
         `absent and then carries facts about it. An absence states that there ` +
         `is nothing there: write it on its own, and keep what you observed ` +
         `while it existed on the earlier record.`,
@@ -127,23 +130,20 @@ export function reviewRecord(value: InformationInput): string[] {
 
   const content = presentation.content;
   if (content?.kind === "topology") {
-    if (value.states?.ref.kind !== "application")
+    if (presentation.states?.ref.kind !== "application")
       found.push(
         `A topology is the application's own map, so the record has to speak ` +
           `for it: states: {ref: {kind:"application", id:"<the application ` +
           `id>"}, presence:"present"}. Without that the map is never read.`,
       );
-    const known = new Set([
-      ...content.parts.map((part) => part.id),
-      ...content.absent.map((part) => part.id),
-    ]);
+    const known = new Set(content.parts.map((part) => part.id));
     for (const edge of content.edges)
       for (const end of [edge.from, edge.to])
         if (!known.has(end))
           found.push(
-            `Edge ${edge.from} → ${edge.to} names "${end}", which is not in ` +
-              `parts or absent. Every edge has to join two pieces the map ` +
-              `draws; add the piece, or drop the edge.`,
+            `Edge ${edge.from} → ${edge.to} names "${end}", which is not ` +
+              `in parts. Every edge joins two pieces the map draws; add the ` +
+              `part, or drop the edge.`,
           );
   }
 
