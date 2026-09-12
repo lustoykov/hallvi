@@ -1,0 +1,566 @@
+/* PROTOTYPE · opus-ui-improvements · chosen for Database.
+   Timeline. Prefix: axdt-. Overview's lanes, with the quiet stretches
+   folded; "To scale" slides every moment to its clock time, the one
+   movement on the page. */
+
+.axdt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  padding-top: 10px;
+}
+.axdt-lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.axdt-say {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  color: var(--ax-ink);
+  text-wrap: balance;
+}
+.axdt-sub {
+  margin: 8px 0 0;
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.axdt-ask {
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.axdt-ask:hover {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* ---------- The board ---------- */
+
+.axdt-board {
+  --axdt-move: 720ms var(--ax-ease-in-out);
+  position: relative;
+  padding: 18px 24px 10px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 4%),
+    0 30px 60px -44px rgb(23 34 56 / 34%);
+}
+.axdt-time {
+  --head: 228px;
+  position: relative;
+  padding-top: 88px;
+}
+.axdt-scale {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 7;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f1f4f8;
+}
+.axdt-scale button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ax-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    background-color var(--ax-fast),
+    color var(--ax-fast),
+    box-shadow var(--ax-fast);
+}
+.axdt-scale button:hover {
+  color: var(--ax-ink);
+}
+.axdt-scale button[aria-pressed="true"] {
+  background: #ffffff;
+  color: var(--ax-ink);
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 12%),
+    0 2px 6px -2px rgb(23 34 56 / 14%);
+}
+.axdt-scale button:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 1px;
+}
+.axdt-field {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 36px;
+  left: var(--head);
+  pointer-events: none;
+}
+.axdt-midnight {
+  position: absolute;
+  top: 82px;
+  bottom: 0;
+  width: 1px;
+  background: #e3e8ef;
+}
+.axdt-now {
+  position: absolute;
+  top: 80px;
+  bottom: -8px;
+  left: var(--now);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--ax-blue), rgb(40 90 216 / 30%));
+  transition: left var(--axdt-move);
+}
+/* The moment being pointed at, through every lane. */
+.axdt-hair {
+  position: absolute;
+  top: 82px;
+  bottom: -8px;
+  width: 1px;
+  background: rgb(40 90 216 / 45%);
+}
+.axdt-hair b {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--ax-ink);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+.axdt-over {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--head);
+  z-index: 6;
+  height: 0;
+  pointer-events: none;
+}
+.axdt-stand {
+  position: absolute;
+  top: 2px;
+  left: var(--now);
+  transform: translateX(-50%);
+  transition: left var(--axdt-move);
+}
+.axdt-guy {
+  width: 80px;
+  height: 80px;
+}
+
+/* ---------- Lanes ---------- */
+
+.axdt-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--head) minmax(0, 1fr);
+  align-items: center;
+  height: 58px;
+}
+/* The lane whose moment is open sits above the others. */
+.axdt-lane:has(.axdt-pop) {
+  z-index: 30;
+}
+.axdt-lane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 16px;
+}
+.axdt-lane-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #f4f6fa, #e8ecf3);
+  color: var(--ax-ink-2);
+  box-shadow: inset 0 0 0 1px rgb(23 34 56 / 7%);
+}
+.axdt-lane-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.axdt-lane-text {
+  display: grid;
+  min-width: 0;
+}
+.axdt-lane-text b {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.axdt-lane-text small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axdt-lane-text small i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aab4c4;
+}
+.axdt-lane[data-c="verified"] small {
+  color: var(--ax-verified-text);
+}
+.axdt-lane[data-c="verified"] small i {
+  background: var(--ax-verified);
+}
+.axdt-lane[data-c="stale"] small {
+  color: var(--ax-waiting-text);
+}
+.axdt-lane[data-c="stale"] small i {
+  background: var(--ax-amber);
+}
+.axdt-lane[data-c="failed"] small {
+  color: var(--ax-failed);
+}
+.axdt-lane[data-c="failed"] small i {
+  background: var(--ax-failed);
+}
+.axdt-lane[data-c="absent"] small i {
+  border: 1.5px dashed #9aa6ba;
+  background: transparent;
+}
+
+.axdt-track {
+  position: relative;
+  height: 100%;
+}
+.axdt-track::before,
+.axdt-track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  height: 0;
+  border-top: 1.5px solid #dfe5ee;
+  transition:
+    left var(--axdt-move),
+    width var(--axdt-move);
+}
+.axdt-track::before {
+  left: 0;
+  width: var(--now);
+}
+.axdt-track::after {
+  right: 0;
+  left: var(--now);
+  border-top-style: dashed;
+  border-top-color: #cfd8e6;
+}
+.axdt-lane[data-c="absent"] .axdt-track::before {
+  border-top-style: dashed;
+  border-top-color: #d5dce7;
+}
+
+/* A fold: the line breaks, dotted, between two slanted ticks. */
+.axdt-break {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  height: 16px;
+  margin-top: -8px;
+  background:
+    radial-gradient(circle, #b9c3d3 1.1px, transparent 1.7px) 0 50% / 7px 7px
+      repeat-x,
+    #ffffff;
+}
+.axdt-break::before,
+.axdt-break::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 1.5px;
+  border-radius: 1px;
+  background: #aeb8c9;
+  transform: skewX(-20deg);
+}
+.axdt-break::before {
+  left: 0;
+}
+.axdt-break::after {
+  right: 0;
+}
+
+/* The stretch since this last happened, named where it ends. */
+.axdt-gap {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 5px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(178 90 22 / 22%) 0 4px,
+    rgb(178 90 22 / 6%) 4px 8px
+  );
+  transition:
+    left var(--axdt-move),
+    width var(--axdt-move);
+}
+.axdt-gap > span {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  padding: 1px 9px;
+  border: 1px solid var(--ax-waiting-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1.5;
+  color: var(--ax-waiting-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.axdt-ghost {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  padding: 2px 10px;
+  border: 1px dashed #c9d1de;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--ax-muted);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+/* Moments: one dot each. A ring is a change of plan, not a copy. Where
+   moments share a place, outcomes sit above plan changes, the newest on
+   top. */
+.axdt-ev {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #8b95a5;
+  box-shadow: 0 0 0 3px #ffffff;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition:
+    transform 260ms var(--ax-spring),
+    box-shadow 260ms,
+    width 260ms,
+    height 260ms,
+    left var(--axdt-move);
+}
+.axdt-ev[data-tone="pass"] {
+  z-index: 4;
+  background: var(--ax-verified);
+}
+.axdt-ev[data-tone="fail"] {
+  z-index: 4;
+  background: var(--ax-failed);
+}
+.axdt-ev[data-tone="set"] {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px #ffffff,
+    inset 0 0 0 2.5px var(--ax-blue);
+}
+.axdt-ev:hover,
+.axdt-ev[data-lit],
+.axdt-ev[aria-expanded="true"] {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+.axdt-ev[aria-expanded="true"] {
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 6px rgb(40 90 216 / 22%);
+}
+.axdt-ev[data-tone="set"][aria-expanded="true"] {
+  box-shadow:
+    0 0 0 3px #ffffff,
+    0 0 0 6px rgb(40 90 216 / 22%),
+    inset 0 0 0 2.5px var(--ax-blue);
+}
+.axdt-ev:focus-visible {
+  outline: 2px solid var(--ax-blue);
+  outline-offset: 4px;
+}
+.axdt-board[data-scale="true"] .axdt-ev {
+  width: 11px;
+  height: 11px;
+}
+
+/* ---------- The line under the lanes ---------- */
+
+.axdt-axis {
+  display: grid;
+  grid-template-columns: var(--head) minmax(0, 1fr);
+  height: 36px;
+}
+.axdt-ticks {
+  position: relative;
+  grid-column: 2;
+}
+.axdt-ticks span {
+  position: absolute;
+  top: 11px;
+  font-size: 11.5px;
+  color: var(--ax-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+.axdt-ticks .is-fold {
+  color: var(--ax-faint);
+}
+.axdt-ticks .is-now {
+  font-weight: 650;
+  color: var(--ax-blue);
+  transition: left var(--axdt-move);
+}
+
+/* ---------- A moment's record ---------- */
+
+.axdt-pop {
+  position: absolute;
+  top: calc(50% + 16px);
+  z-index: 20;
+  width: 340px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--ax-line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgb(23 34 56 / 6%),
+    0 24px 44px -20px rgb(23 34 56 / 34%);
+  transform: translateX(-50%);
+}
+.axdt-pop[data-align="end"] {
+  transform: translateX(calc(-100% + 26px));
+}
+.axdt-pop[data-align="start"] {
+  transform: translateX(-26px);
+}
+.axdt-pop header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.axdt-pop header div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.axdt-pop header b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axdt-pop header small {
+  font-size: 12px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axdt-pop header button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef1f6;
+  color: var(--ax-muted);
+  cursor: pointer;
+}
+.axdt-pop header button:hover {
+  background: #e2e7ef;
+  color: var(--ax-ink);
+}
+.axdt-pop header button svg {
+  width: 11px;
+  height: 11px;
+}
+.axdt-pop p {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ax-ink-2);
+  overflow-wrap: anywhere;
+}
+.axdt-pop .ax-textlink {
+  margin-top: 10px;
+}
+.axdt-note {
+  margin: -8px 0 0;
+  max-width: 72ch;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
+}
+
+/* Narrow screens keep the lanes readable and let the board scroll. */
+@media (max-width: 900px) {
+  .axdt-board {
+    padding: 16px 14px 8px;
+    overflow-x: auto;
+  }
+  .axdt-time {
+    --head: 184px;
+    min-width: 720px;
+  }
+  .axdt-say {
+    font-size: 22px;
+  }
+  .axdt-pop {
+    width: 280px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axdt-board {
+    --axdt-move: 0s;
+  }
+}
+:root[data-ax-motion="reduced"] .axdt-board {
+  --axdt-move: 0s;
+}

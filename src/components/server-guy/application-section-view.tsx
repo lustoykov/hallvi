@@ -17,10 +17,16 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePrototype } from "./architecture-prototype";
+import { BackupPrototype } from "./backup-prototype";
+import { DataPrototype } from "./data-prototype";
 import { OverviewPrototype } from "./overview-prototype";
+import { ReachPrototype } from "./reach-prototype";
+import { SupplyPrototype } from "./supply-prototype";
 import { DeploymentPrototype } from "./deployment-prototype";
 import { DestinationActivity } from "./destination-activity";
 import { HistoryPrototype } from "./history-prototype";
+import { SignalPrototype } from "./signal-prototype";
+import { StackPrototype } from "./stack-prototype";
 import { BackupsView } from "./views/backups-view";
 import { CacheView } from "./views/cache-view";
 import { CdnView } from "./views/cdn-view";
@@ -371,6 +377,194 @@ export function ApplicationSectionView({
           activity={view.activity}
           chrome={{ bar, header, activity: null }}
           current={<div className="sg-section-content">{content}</div>}
+        />
+      </div>
+    );
+  // Storage in Flow and Backups in Calendar, chosen on opus-ui-improvements,
+  // are the default the same way.
+  if (section === "storage" || section === "backups")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <BackupPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): the four remaining destinations, each
+  // drawn once: configuration, delivery, queued work and schedules.
+  if (
+    section === "variables" ||
+    section === "cdn" ||
+    section === "cache" ||
+    section === "jobs"
+  )
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <SupplyPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): three directions for Domains and three
+  // different ones for Security — the two pages ask different questions —
+  // beside the shipped view (0).
+  if (section === "domains" || section === "security")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <ReachPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+          panel={section === "security" ? children : null}
+          onCheck={
+            section === "security" && onAction
+              ? () => onAction({ type: "check-firewall" })
+              : undefined
+          }
+          checking={busy === "check-firewall"}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // PROTOTYPE (opus-ui-improvements): directions for Logs and Monitoring,
+  // beside the shipped view (0).
+  if (section === "logs" || section === "monitoring")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <SignalPrototype
+          page={section}
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  // Processes in Transit's Line and Database in Overview's Timeline, chosen
+  // on opus-ui-improvements, are the default the same way.
+  if (section === "database")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <DataPrototype
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
+        />
+      </div>
+    );
+  if (section === "processes")
+    return (
+      <div className={`sg-section-page sg-section-${section}`}>
+        <StackPrototype
+          record={deployment}
+          stack={stack}
+          facts={facts}
+          operations={operations}
+          now={now}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          chrome={{
+            bar,
+            header,
+            activity: activity ? (
+              <div className="sg-section-activity">{activity}</div>
+            ) : null,
+          }}
+          current={
+            <div className="sg-section-content">
+              {activity}
+              {content}
+            </div>
+          }
         />
       </div>
     );
