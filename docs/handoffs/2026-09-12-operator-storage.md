@@ -117,3 +117,12 @@ First check PR #55's latest review/merge state. The owner has accepted the UI. F
 Then design and implement the smallest Hetzner provisioning interaction within the main conversation: inspect the repository, choose a suitable host through Pi's judgment and general tools, apply the selected permission mode, retain controller-owned credentials, save host/provider identity, and show the meaningful outcome. Review it before completing deployment. No provider resource has been provisioned by this checkpoint.
 
 Use `docker/getting-started-app` as the current small candidate; Grafana was considered but is a much larger source repository. A useful follow-up is the first verified deployment with a saved reachable URL and evidence. Database-backed and multi-service examples come afterward. Do not add monitoring, new approval modes, workflow-specific recovery tools or conversation-control infrastructure as prerequisites.
+
+
+## Continuation on the main PC — 12 September 2026
+
+PR #55 was accepted and merged as `95b382964e50c96fbb0c828bc8a6a02fca40976c`; `f41c318` records the merged checklist state. Provisioning continues separately on `codex/hetzner-provisioning`.
+
+The Mac mini had no running app/worker or listener on port 3000 when checked. The main PC's old app/worker and its port-3000 SSH tunnel were stopped. The schema-15 database, native sessions and execution files were copied as a set from the idle mini. The old local schema-14 state was kept in `.server-guy/before-local-continuation-20260912`; local account settings and `.env.local` were preserved. The transferred native session opened with its original ID. Docker Getting Started remains the only normal application.
+
+The main PC app and worker run on Node 22 with the default local database/configuration; the app is at `http://127.0.0.1:3000`. Docker Desktop was started for repository workspaces. Runtime logs and PID files are under `.server-guy/logs/`. These are dated machine observations; check processes before restarting or copying state again.

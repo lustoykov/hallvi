@@ -1,98 +1,145 @@
 "use client";
+
+// One saved record, read the way the rest of the workspace reads evidence:
+// how certain it is first, then what it says, then what was actually checked,
+// then where to look next. The card never invents certainty — every word in
+// the header comes from what Pi established and when.
+
+import { ArrowUpRight } from "@phosphor-icons/react";
+
 import type { SavedInformation } from "@/server/operator-data";
-import { Markdown } from "./markdown";
+import { InformationBody } from "./information-body";
 import { LocalTime } from "./local-time";
 import {
   applicationSections,
   type ApplicationSection,
 } from "./application-sections";
+import { Tag, toneOf } from "./presentation";
 import "./information-card.css";
+import { InformationContent } from "./information-content";
 
-export function InformationCard({
+export function InformationCard(props: {
+  record: SavedInformation;
+  onOpen?: (view: ApplicationSection) => void;
+  currentView?: ApplicationSection;
+}) {
+  return props.record.presentation?.content ? (
+    <InformationContent {...props} />
+  ) : (
+    <GenericInformationCard {...props} />
+  );
+}
+
+function GenericInformationCard({
   record,
   onOpen,
+  currentView,
 }: {
   record: SavedInformation;
   onOpen?: (view: ApplicationSection) => void;
+  /** The destination this card is already sitting in, so it does not
+      offer to open the page you are reading. */
+  currentView?: ApplicationSection;
 }) {
   const presentation = record.presentation;
+
   if (!presentation) return null;
-  const destinations = applicationSections.filter((s) =>
-    presentation.views.includes(s.id),
+  const { tone, word } = toneOf(record);
+  const destinations = applicationSections.filter(
+    (section) =>
+      presentation.views.includes(section.id) && section.id !== currentView,
   );
+  const established = record.establishedAt ?? record.updatedAt;
+  const recommendation = presentation.role === "recommendation";
+
   return (
     <article
-      className={`sg-information-card ${presentation.status}`}
+      className="sg-info"
+      data-tone={tone}
+      data-role={presentation.role}
       data-information-id={record.id}
     >
-      <header>
-        <span className="sg-information-status">
-          {record.retiredAt ? "Retired" : presentation.status}
+      <header className="sg-info-head">
+        <Tag tone={tone}>{word}</Tag>
+        <h3>{record.title}</h3>
+        <span className="sg-info-when">
+          {record.establishedAt ? "Established" : "Saved"}{" "}
+          <LocalTime value={established} variant="compact" />
         </span>
-        <strong>{record.title}</strong>
-        <LocalTime
-          value={record.establishedAt ?? record.updatedAt}
-          variant="compact"
-        />
       </header>
-      <Markdown source={record.body} />
+
+      <InformationBody source={record.body} />
+
       {presentation.checks.length > 0 && (
-        <ul className="sg-information-checks">
-          {presentation.checks.map((check, i) => (
-            <li key={i} data-status={check.status}>
-              <span aria-hidden="true">
-                {check.status === "passed"
-                  ? "✓"
-                  : check.status === "failed"
-                    ? "!"
-                    : "·"}
-              </span>{" "}
+        <ul className="sg-info-checks">
+          {presentation.checks.map((check, index) => (
+            <li key={index} data-status={check.status}>
+              <span aria-hidden="true" />
               {check.label}
             </li>
           ))}
         </ul>
       )}
+
       {presentation.nextStep && (
-        <p className="sg-information-next">Next: {presentation.nextStep}</p>
+        <p className="sg-info-next">
+          <span>{recommendation ? "What Pi suggests" : "Next"}</span>
+          {presentation.nextStep}
+        </p>
       )}
-      <footer>
-        {presentation.url && (
-          <a href={presentation.url} target="_blank" rel="noreferrer">
-            Open application ↗
-          </a>
-        )}
-        {onOpen &&
-          destinations.map((view) => (
-            <button type="button" key={view.id} onClick={() => onOpen(view.id)}>
-              Open {view.label} →
-            </button>
-          ))}
-      </footer>
-      <small>
-        {record.establishedAt ? "Last established" : "Saved"}:{" "}
-        <LocalTime value={record.establishedAt ?? record.updatedAt} />
-      </small>
+
+      {(presentation.url || destinations.length > 0) && (
+        <footer className="sg-info-foot">
+          {presentation.url && (
+            <a
+              className="sg-info-open"
+              href={presentation.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open application
+              <ArrowUpRight weight="bold" aria-hidden="true" />
+            </a>
+          )}
+          {onOpen &&
+            destinations.map((view) => (
+              <button
+                type="button"
+                className="sg-info-go"
+                key={view.id}
+                onClick={() => onOpen(view.id)}
+              >
+                {view.label}
+              </button>
+            ))}
+        </footer>
+      )}
+
       {record.evidence.length > 0 && (
-        <details>
-          <summary>Evidence ({record.evidence.length})</summary>
+        <details className="sg-info-evidence">
+          <summary>
+            What this rests on
+            <em>{record.evidence.length}</em>
+          </summary>
           <ul>
-            {record.evidence.map((e, i) => (
-              <li key={i}>
-                {e.type === "url" ? (
-                  <a href={e.url} target="_blank" rel="noreferrer">
-                    Source ↗
+            {record.evidence.map((item, index) => (
+              <li key={index}>
+                {item.type === "url" ? (
+                  <a href={item.url} target="_blank" rel="noreferrer">
+                    The page it answered with
+                    <ArrowUpRight weight="bold" aria-hidden="true" />
                   </a>
-                ) : e.type === "execution" ? (
+                ) : item.type === "execution" ? (
                   <a
-                    href={`/applications/${record.applicationId}?execution=${e.id}#logs`}
+                    href={`/applications/${record.applicationId}?execution=${item.id}#logs`}
                   >
-                    Execution details
+                    A command that ran
                   </a>
                 ) : (
                   <a
-                    href={`/applications/${record.applicationId}?message=${e.id}`}
+                    href={`/applications/${record.applicationId}?message=${item.id}`}
                   >
-                    Conversation message
+                    A moment in the conversation
                   </a>
                 )}
               </li>

@@ -2,6 +2,13 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "streaming-output",
+    name: "Inline command output",
+    description:
+      "Follow live output, read back and inspect completion in chat.",
+    smoke: false,
+  },
+  {
     id: "shared-information",
     name: "Shared outcome cards",
     description:

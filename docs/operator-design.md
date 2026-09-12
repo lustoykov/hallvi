@@ -25,6 +25,10 @@ The product guides users on **what deserves care**. Pi decides **how to provide 
 
 ## Agreed direction
 
+### Default application access
+
+Applications are private by default: bind application ports and reverse proxies to server loopback, keep application HTTP/HTTPS firewall ports closed, and use an SSH tunnel bound to the controller PC's `127.0.0.1`. Pi opens/reuses the tunnel with `open_server_port` through the normal permission boundary and gives the user its local URL. The tool checks local HTTP response status; Pi must also verify application behavior and server IPv4/IPv6 exposure. Public application access requires an explicit user request. A local link works on the PC running Server Guy while its SSH tunnel is alive; reopening after disconnect/reboot is an explicit tool call, not an automatic recovery service. A remote controller requires a separate user access arrangement.
+
 ### Current focus: the main deployment journey
 
 Get the main deployment journey right before expanding ongoing care across all sidebar views. Continue designing first; this priority does not authorize starting implementation yet. Walk through the happy path from the user's deployment request to a working application, deciding how Pi acts, what the user sees and which information is saved and resurfaced.
@@ -315,6 +319,23 @@ Native Pi JSONL holds full model/tool context. Executor-owned files automaticall
 
 Messages support a small product-owned block vocabulary, not arbitrary generated UI. A saved-information reference renders the same card in chat and its selected sidebar views. Pi chooses the content; components provide consistent badges, checks, links and expansion. A deployment outcome has a structured URL and evidence. Empty views never infer that a recorded host means a verified deployment.
 
+### Typed deployment and access presentation
+
+The optional `presentation.content` JSON field selects a product-owned component. `deployment` carries `repositoryUrl`, `revision`, `image`, `server` and `changes`: the source revision and running image are separate, and material changes made while deploying remain explicit. `application-access` carries `mode` (`private` or `public`) and `server`, with the browser URL in `presentation.url`. Private SSH access also requires `localPort` and `remotePort`; the writer validates that the URL uses `127.0.0.1` and matches the local port. These fields use the existing saved-information table, without another storage model.
+
+Pi receives the content contract in its instructions and `save_information` description; the shared Zod schema rejects invalid writes. Chat stores references to these same records and shows compact details. Overview uses the selected timeline, recorded-work log, architecture miniature and recent-work composition. Optional check `subject` (`application`, `backups`, `server`, `access`) selects the timeline lane; `establishedAt` selects its time. Unclassified checks remain in record details and the log, without guessed lane assignments. Missing evidence remains unknown. Deployment expands source, image, changes and checks. Unrecognized content kinds are rejected; records without typed content retain the generic presentation. Components own layout and styling, and never derive a verified status from the content kind.
+
+Keep deployment results as separate historical events. Update the current application-access record in place when its URL or access mode changes. Reformatting existing records preserves their original establishment times and evidence; it is a presentation preview, not proof that a fresh Pi journey writes the new contract successfully.
+
 Ordinary knowledge can update in place. Historical outcomes remain separate records for separate events; no universal superseding/version-history mechanism. Controller-managed secrets are named and application-scoped; database records hold references. Secret-generation and injection tools arrive with the deployment need.
 
 Delete decisions, observations, activity events, deployment/operation records and chat-summary storage as their callers are replaced. Detailed vertical design and hardening follow the working deployment journey.
+
+
+## Provisioning checkpoint — 12 September 2026
+
+After the owner accepted the storage UI, PR #55 was merged as `95b3829`. The separate provisioning implementation follows the existing model-owned judgment and permission rules: a general Hetzner REST tool, an application public-key tool, and a connection tool that resolves the provider address, verifies SSH and saves controller credential references. Pi chooses server type, location and image from current evidence and saves its recommendation or preparation outcome through the existing cards.
+
+Bring-your-own-machine setup stays in the conversation. The owner installs the controller-generated public key through their trusted terminal and supplies public connection details plus an ED25519 host-key fingerprint. No secret is pasted into chat and no standalone file-path form returns. Hetzner can pin the host key on first use at the provider-reported address; a supplied fingerprint is checked when available. This limit is explicit in the [checkpoint evidence](testing/2026-09-12-hetzner-provisioning.md).
+
+Provisioning stops at an SSH-verified host for review. Software installation, application deployment and its reachable URL belong to the next increment. No generic monitoring or recovery machinery is required first.

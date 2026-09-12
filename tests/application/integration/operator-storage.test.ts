@@ -167,3 +167,117 @@ it("marks unfinished work interrupted on worker restart and cascades only applic
       store.db().$client.prepare(`SELECT count(*) AS n FROM ${table}`).get(),
     ).toEqual({ n: 0 });
 });
+
+it("persists typed deployment/access facts and shares edits without duplicating records", () => {
+  const deployment = saveInformation(app, {
+    title: "Application deployed",
+    body: "The deployment is recorded.",
+    presentation: {
+      checks: [
+        { label: "HTTP responded", status: "passed", subject: "application" },
+      ],
+      views: ["overview", "deployment"],
+      role: "outcome",
+      content: {
+        kind: "deployment",
+        repositoryUrl: "https://github.com/qa/app",
+        revision: "abcdef0123456789",
+        image: "app:candidate",
+        server: "fixture-server",
+        changes: ["Added container packaging"],
+      },
+    },
+  })!;
+  const access = saveInformation(app, {
+    title: "Private access ready",
+    body: "Open on the controller PC.",
+    presentation: {
+      views: ["overview", "deployment"],
+      role: "status",
+      url: "http://127.0.0.1:8080",
+      content: {
+        kind: "application-access",
+        mode: "private",
+        server: "fixture-server",
+        localPort: 8080,
+        remotePort: 80,
+      },
+    },
+  })!;
+  expect(
+    listInformation(app).find((r) => r.id === deployment.id)?.presentation
+      ?.content,
+  ).toMatchObject({ kind: "deployment", image: "app:candidate" });
+  expect(
+    listInformation(app).find((r) => r.id === deployment.id)?.presentation
+      ?.checks[0].subject,
+  ).toBe("application");
+  saveInformation(
+    app,
+    {
+      ...access,
+      presentation: {
+        ...access.presentation!,
+        url: "http://127.0.0.1:8081",
+        content: {
+          kind: "application-access",
+          mode: "private",
+          server: "fixture-server",
+          localPort: 8081,
+          remotePort: 80,
+        },
+      },
+    },
+    access.id,
+  );
+  expect(
+    listInformation(app).filter(
+      (r) => r.presentation?.content?.kind === "application-access",
+    ),
+  ).toHaveLength(1);
+  expect(
+    listInformation(app).find((r) => r.id === access.id)?.presentation?.url,
+  ).toBe("http://127.0.0.1:8081");
+});
+
+it("rejects malformed typed records before saving them", () => {
+  const base = {
+    title: "Access",
+    body: "",
+    presentation: {
+      views: ["overview"],
+      role: "status",
+      url: "http://example.com",
+      content: {
+        kind: "application-access",
+        mode: "private",
+        server: "fixture-server",
+        localPort: 8080,
+        remotePort: 80,
+      },
+    },
+  };
+  expect(() => saveInformation(app, base)).toThrow("127.0.0.1");
+  expect(() =>
+    saveInformation(app, {
+      ...base,
+      presentation: { ...base.presentation, url: "http://127.0.0.1:8081" },
+    }),
+  ).toThrow("localPort");
+  expect(() =>
+    saveInformation(app, {
+      ...base,
+      presentation: { ...base.presentation, url: undefined },
+    }),
+  ).toThrow("browser URL");
+  expect(() =>
+    saveInformation(app, {
+      ...base,
+      presentation: {
+        ...base.presentation,
+        content: { kind: "arbitrary-html", html: "<script>" },
+      },
+    }),
+  ).toThrow();
+  expect(listInformation(app)).toHaveLength(0);
+});

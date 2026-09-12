@@ -5,6 +5,27 @@ import type {
   OperatorSettings,
 } from "@/server/operator-execution";
 import "./operator-console.css";
+import { Tag, Working, type Tone } from "./presentation";
+import { StreamingOutput } from "./streaming-output";
+
+const modes = [
+  { id: "always-ask", label: "Always ask" },
+  { id: "pi-decides", label: "Pi decides" },
+  { id: "bypass", label: "Bypass" },
+] as const;
+
+/** What a command's state is called, and how sure that state is. */
+const states: Record<
+  ExecutionRecord["status"],
+  { tone: Tone; word: string } | null
+> = {
+  succeeded: { tone: "verified", word: "Completed" },
+  failed: { tone: "failed", word: "Failed" },
+  declined: { tone: "absent", word: "Not run" },
+  interrupted: { tone: "stale", word: "Interrupted" },
+  "awaiting-approval": { tone: "stale", word: "Waiting for you" },
+  running: null,
+};
 
 async function request<T>(url: string, body?: unknown): Promise<T> {
   const response = await fetch(
@@ -118,25 +139,25 @@ export function OperatorConsole({
         <>
           <div className="sg-operator-toolbar">
             {main && (
-              <label>
-                Permissions{" "}
-                <select
-                  aria-label="Operator permissions"
-                  value={settings.permissionMode}
-                  disabled={busy !== null}
-                  onChange={(event) =>
-                    void save({
-                      ...settings,
-                      permissionMode: event.target
-                        .value as OperatorSettings["permissionMode"],
-                    })
-                  }
-                >
-                  <option value="always-ask">Always ask</option>
-                  <option value="pi-decides">Pi decides</option>
-                  <option value="bypass">Bypass</option>
-                </select>
-              </label>
+              <div className="sg-modes">
+                <span id="sg-modes-label">Permissions</span>
+                <div role="radiogroup" aria-labelledby="sg-modes-label">
+                  {modes.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={settings.permissionMode === mode.id}
+                      disabled={busy !== null}
+                      onClick={() =>
+                        void save({ ...settings, permissionMode: mode.id })
+                      }
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </>
@@ -159,27 +180,45 @@ export function OperatorConsole({
                 <strong>
                   {item.tool === "request_approval"
                     ? "Approval requested"
-                    : item.tool}
+                    : item.tool === "server_bash"
+                      ? "Run on server"
+                      : item.tool}
                 </strong>
-                <span>{item.status.replaceAll("-", " ")}</span>
+                <span className="sg-execution-where">
+                  {item.target} ·{" "}
+                  {new Date(item.createdAt).toLocaleTimeString()}
+                </span>
+                <span role="status" className="sg-execution-state">
+                  {states[item.status] ? (
+                    <Tag tone={states[item.status]!.tone}>
+                      {states[item.status]!.word}
+                    </Tag>
+                  ) : (
+                    <Working>Running</Working>
+                  )}
+                  {typeof item.exitCode === "number" && (
+                    <em>exit {item.exitCode}</em>
+                  )}
+                </span>
               </header>
-              <p>
-                {item.target} · {new Date(item.createdAt).toLocaleTimeString()}
-              </p>
-              <details
-                open={
-                  item.status === "awaiting-approval" ||
-                  item.status === "running"
-                }
-              >
-                <summary>
-                  {item.status === "awaiting-approval"
-                    ? "Review this action"
-                    : "Command and output"}
-                </summary>
-                <pre>{item.input}</pre>
-                {item.output && <pre>{item.output}</pre>}
-              </details>
+              {item.tool === "server_bash" ? (
+                <StreamingOutput item={item} />
+              ) : (
+                <details
+                  open={
+                    item.status === "awaiting-approval" ||
+                    item.status === "running"
+                  }
+                >
+                  <summary>
+                    {item.status === "awaiting-approval"
+                      ? "Review this action"
+                      : "Command and output"}
+                  </summary>
+                  <pre>{item.input}</pre>
+                  {item.output && <pre>{item.output}</pre>}
+                </details>
+              )}
               {item.status === "awaiting-approval" && main && (
                 <div className="sg-execution-actions">
                   <button

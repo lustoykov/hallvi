@@ -1,0 +1,116 @@
+/* The presentation language shared by everything Pi surfaces: the certainty
+   tag, the evidence list and the information card itself. The shell already
+   sets --ink, --muted and --line; this adds the tones a record is read in,
+   and the timings motion is written in. Prefix: sg-. */
+
+.sg-adaptive-shell {
+  --ink-2: #3e4a60;
+  --faint: #8b95a5;
+  --line-2: #d8dee8;
+  --context: #fafbfc;
+  --blue: #285ad8;
+  --link: #315bc6;
+  --verified: #14945f;
+  --verified-bg: #eaf8f1;
+  --verified-text: #0f7a4e;
+  --verified-line: #bfe4d1;
+  --waiting-bg: #fff4e9;
+  --waiting-text: #9a4b10;
+  --waiting-line: #ecd6b8;
+  --failed: #a6312b;
+  --failed-bg: #fdf1f0;
+  --failed-line: #f2d3d0;
+  --working-bg: #edf3ff;
+  --working-text: #2852a6;
+  --unknown-bg: #eef1f6;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fast: 140ms;
+  --base: 260ms;
+  --mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- Certainty tag ---------- */
+
+.sg-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 9px 1px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.sg-tag svg {
+  font-size: 12px;
+}
+.sg-tag[data-tone="verified"] {
+  background: var(--verified-bg);
+  color: var(--verified-text);
+}
+.sg-tag[data-tone="stale"] {
+  background: var(--waiting-bg);
+  color: var(--waiting-text);
+}
+.sg-tag[data-tone="failed"] {
+  background: var(--failed-bg);
+  color: var(--failed);
+}
+.sg-tag[data-tone="unknown"] {
+  background: var(--unknown-bg);
+  color: var(--muted);
+}
+.sg-tag[data-tone="absent"] {
+  background: transparent;
+  color: var(--faint);
+  border-color: #d3d9e3;
+  border-style: dashed;
+}
+
+.sg-spin {
+  animation: sg-spin 0.9s linear infinite;
+}
+@keyframes sg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-spin {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- A destination that reads saved records ---------- */
+
+.sg-section-fresh {
+  flex-shrink: 0;
+  padding-top: 6px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.sg-section-none {
+  max-width: 60ch;
+  margin: 6px 0 0;
+  padding: 22px 24px;
+  border: 1px dashed var(--line-2);
+  border-radius: 12px;
+  background: var(--context);
+}
+.sg-section-none h2 {
+  margin: 0 0 8px;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+.sg-section-none p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--muted);
+}

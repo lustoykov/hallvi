@@ -11,6 +11,9 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
 import { InformationCard } from "./information-card";
+import { LocalTime } from "./local-time";
+import { rank } from "./presentation";
+import { RecordOverview } from "./record-overview";
 import { ApplicationOverview } from "./application-overview";
 import {
   applicationSections,
@@ -126,15 +129,52 @@ export function ApplicationSectionView({
   // The live operator reads shared information. Older layouts below remain
   // available only to the isolated visual-reference scenarios.
   if (view.information !== undefined) {
-    const records = view.information.filter(
-      (r) => !r.retiredAt && r.presentation?.views.includes(section),
-    );
+    if (section === "overview")
+      return (
+        <RecordOverview
+          records={view.information}
+          now={now}
+          bar={bar}
+          onOpen={onOpenDestination}
+        />
+      );
+    const records = view.information
+      .filter((r) => !r.retiredAt && r.presentation?.views.includes(section))
+      // What needs you comes first, what is simply true next, what Pi
+      // suggests last; within a group, the most recently established.
+      .sort(
+        (a, b) =>
+          rank(a) - rank(b) ||
+          (a.presentation?.content?.kind === "application-access"
+            ? 0
+            : a.presentation?.content?.kind === "deployment"
+              ? 1
+              : 2) -
+            (b.presentation?.content?.kind === "application-access"
+              ? 0
+              : b.presentation?.content?.kind === "deployment"
+                ? 1
+                : 2) ||
+          Date.parse(b.establishedAt ?? b.updatedAt) -
+            Date.parse(a.establishedAt ?? a.updatedAt),
+      );
+    const freshest = records
+      .map((r) => r.establishedAt ?? r.updatedAt)
+      .sort()
+      .at(-1);
     return (
       <div className={`sg-section-page sg-section-${section}`}>
         {bar}
         <header className="sg-section-header">
-          <h1>{applicationSections.find((s) => s.id === section)?.label}</h1>
-          <p>{descriptions[section]}</p>
+          <div>
+            <h1>{applicationSections.find((s) => s.id === section)?.label}</h1>
+            <p>{descriptions[section]}</p>
+          </div>
+          {freshest && (
+            <span className="sg-section-fresh">
+              Last established <LocalTime value={freshest} variant="compact" />
+            </span>
+          )}
         </header>
         <div className="sg-section-content">
           {records.map((record) => (
@@ -142,13 +182,18 @@ export function ApplicationSectionView({
               key={record.id}
               record={record}
               onOpen={onOpenDestination}
+              currentView={section}
             />
           ))}
           {!records.length && section !== "logs" && (
-            <p>
-              Pi hasn’t saved an update here yet. As you work together, relevant
-              findings and outcomes will appear here.
-            </p>
+            <div className="sg-section-none">
+              <h2>Nothing has been established here yet.</h2>
+              <p>
+                That is not a claim that there is nothing to find — only that Pi
+                has not looked, or has not saved what it found. Ask in the
+                conversation and whatever it establishes will be kept here.
+              </p>
+            </div>
           )}
           {children}
         </div>

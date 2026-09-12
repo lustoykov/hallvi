@@ -85,32 +85,24 @@ test("shared information cards survive refresh and appear in their selected view
     );
   database.close();
   await page.goto(`/applications/${appId}`);
-  await expect(page.locator(".sg-chat-pane .sg-information-card")).toHaveCount(
-    2,
-  );
+  await expect(page.locator(".sg-chat-pane .sg-info")).toHaveCount(2);
   await expect(
-    page.getByRole("link", { name: "Open application ↗" }),
+    page.getByRole("link", { name: "Open application" }),
   ).toHaveAttribute("href", "https://example.com");
   await page.reload();
-  await expect(page.locator(".sg-chat-pane .sg-information-card")).toHaveCount(
-    2,
-  );
+  await expect(page.locator(".sg-chat-pane .sg-info")).toHaveCount(2);
   await page.screenshot({
     path: "tests/results/operator-information-chat.png",
     fullPage: true,
   });
   await page
     .locator(".sg-chat-pane")
-    .getByRole("button", { name: "Open Deployment →" })
+    .getByRole("button", { name: "Deployment", exact: true })
     .first()
     .click();
-  await expect(
-    page.locator(".sg-section-deployment .sg-information-card"),
-  ).toHaveCount(2);
+  await expect(page.locator(".sg-section-deployment .sg-info")).toHaveCount(2);
   await page.reload();
-  await expect(
-    page.locator(".sg-section-deployment .sg-information-card"),
-  ).toHaveCount(2);
+  await expect(page.locator(".sg-section-deployment .sg-info")).toHaveCount(2);
   await page.screenshot({
     path: "tests/results/operator-information-deployment.png",
     fullPage: true,

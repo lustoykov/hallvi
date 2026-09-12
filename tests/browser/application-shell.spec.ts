@@ -178,7 +178,7 @@ test(
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
     await expect(
-      page.getByText(/Pi hasn’t saved an update here yet/),
+      page.getByText(/Nothing has been established here yet/),
     ).toBeVisible();
     await page.goBack();
     await expect(
