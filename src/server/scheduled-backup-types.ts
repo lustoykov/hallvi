@@ -15,6 +15,12 @@ export const backupPolicySchema = z.object({
       fileDatabases: z.boolean().optional(),
       /** Databases their declared owners dump by recorded commands. */
       dumps: z.boolean().optional(),
+      /**
+       * Some dump was quiescent, so a live fingerprint was taken and the
+       * restore test compares it. Absent on older schedules, where every
+       * dump was compared.
+       */
+      comparedDumps: z.boolean().optional(),
     })
     .optional(),
   provider: z.enum(["r2", "s3"]),

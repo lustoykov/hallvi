@@ -684,6 +684,9 @@ export function dataRecords(
       ...(record.capture ? { capture: record.capture } : {}),
       ...(record.owner ? { owner: record.owner } : {}),
       ...(record.procedure ? { procedure: record.procedure } : {}),
+      // An empty list is a declaration (none but the owner writes it);
+      // absent stays absent, so the plan knows the boundary is unknown.
+      ...(record.writers ? { writers: record.writers } : {}),
     };
   });
 }

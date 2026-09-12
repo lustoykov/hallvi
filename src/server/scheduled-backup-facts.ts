@@ -112,7 +112,10 @@ export function scheduledProtection(
           run.restore.checks.includes("file-inventory") &&
           (!policy.data!.postgres ||
             run.restore.checks.includes("database-restored")) &&
+          // Every dump must load; only a compared one must also match.
           (!policy.data!.dumps ||
+            run.restore.checks.includes("database-restored")) &&
+          (!(policy.data!.comparedDumps ?? policy.data!.dumps) ||
             run.restore.checks.includes("database-content")) &&
           (!policy.data!.sqlite ||
             (run.restore.checks.includes("database-integrity") &&
@@ -221,7 +224,7 @@ export function scheduledProtection(
           recoveryPointAt: restored.restore.recoveryPointAt!,
           verified:
             policy.kind === "stack"
-              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${policy.data?.dumps ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""}${restored.restore.checks.includes("application-boot") ? ` The restored application booted in isolation${restored.restore.boot ? ` in ${restored.restore.boot.seconds} s (${Object.keys(restored.restore.boot.services).length} services)` : ""}; its behavior checks are recorded on the restore operation.` : " Application boot was not tested."}`
+              ? `Downloaded archive verified separately${measured ? `: ${measured}` : ""}. File hashes and all recorded restore checks passed.${restored.restore.checks.includes("database-content") ? " Each database dump loaded into a fresh isolated instance and matched its content fingerprint." : restored.restore.checks.includes("database-restored") ? " Each database dump loaded into a fresh isolated instance; taken online, its content is proven by that loading, not by a live comparison." : ""}${policy.data?.fileDatabases ? " File-captured databases received file-hash checks only." : ""}${restored.restore.checks.includes("application-boot") ? ` The restored application booted in isolation${restored.restore.boot ? ` in ${restored.restore.boot.seconds} s (${Object.keys(restored.restore.boot.services).length} services)` : ""}; its behavior checks are recorded on the restore operation.` : " Application boot was not tested."}`
               : policy.kind === "postgres"
                 ? `Downloaded archive restored into isolated PostgreSQL${measured ? `: ${measured}` : ""}. Application boot was not tested.`
                 : `Downloaded archive extracted separately${measured ? `: ${measured}` : ""}. SQLite integrity, recorded data hashes and file hashes matched. Application boot was not tested.`,

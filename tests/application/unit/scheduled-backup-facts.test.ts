@@ -423,6 +423,74 @@ describe("scheduled backup evidence", () => {
       ),
     ).not.toContain("private-host-password");
   });
+  it("recognizes an online dump's restore by its loading, and a compared dump's only by its match", () => {
+    const stackWith = (data: Record<string, boolean>) =>
+      backupPolicySchema.parse({ ...policy, kind: "stack", data });
+    const restoredWith = (...checks: string[]) => ({
+      ...snapshot,
+      runs: [
+        scheduledRunSchema.parse({
+          ...run,
+          restore: {
+            at,
+            recoveryPointAt: at,
+            outcome: "verified",
+            scope: "isolated-application",
+            checks,
+            measurements: { files: 7 },
+            cleanupComplete: true,
+            errorCode: null,
+          },
+        }),
+      ],
+    });
+    const loaded = [
+      "archive-hash",
+      "backup-identity",
+      "file-inventory",
+      "database-restored",
+      "application-boot",
+    ];
+    // Online: the runner took no live fingerprint, so loading is the claim.
+    const online = scheduledProtection(
+      deployment,
+      stackWith({ sqlite: false, dumps: true, comparedDumps: false }),
+      restoredWith(...loaded),
+      now,
+    );
+    expect(online.restoreTest?.verified).toContain(
+      "proven by that loading, not by a live comparison",
+    );
+    expect(online.restoreTest?.verified).not.toContain("matched its content");
+    // Quiescent: the same receipt is not a recognized restore until the
+    // fingerprint matched, and then the wording says so.
+    const compared = stackWith({
+      sqlite: false,
+      dumps: true,
+      comparedDumps: true,
+    });
+    expect(
+      scheduledProtection(deployment, compared, restoredWith(...loaded), now)
+        .restoreTest,
+    ).toBeNull();
+    expect(
+      scheduledProtection(
+        deployment,
+        compared,
+        restoredWith(...loaded, "database-content"),
+        now,
+      ).restoreTest?.verified,
+    ).toContain("matched its content fingerprint");
+    // A schedule from before the distinction compared every dump.
+    expect(
+      scheduledProtection(
+        deployment,
+        stackWith({ sqlite: false, dumps: true }),
+        restoredWith(...loaded),
+        now,
+      ).restoreTest,
+    ).toBeNull();
+  });
   it("credits a stack restore test only when every recorded kind of data was restored", () => {
     const stack = backupPolicySchema.parse({
       ...policy,

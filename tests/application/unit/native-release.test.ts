@@ -343,6 +343,92 @@ it("declared writers pause for a dump; without a declaration the dump is online 
   expect(quiet.pauseServices).toEqual(["worker", "web"]);
   expect(quiet.dumps![0].quiescent).toBe(true);
 });
+it("declared writers survive preparation and corrections, and enter the pause set as declared", () => {
+  // A worker that mounts nothing writes the database over the network.
+  const withWorker = (config: NativeConfiguration): NativeConfiguration => ({
+    ...config,
+    resolved: {
+      ...config.resolved,
+      services: {
+        ...config.resolved.services,
+        worker: { image: `ghcr.io/qa/worker@sha256:${"d".repeat(64)}` },
+      },
+    },
+  });
+  const first = withWorker(wiki());
+  const baseline = nativeFacts(first);
+  const plan = (data: NativeConfiguration["data"]) =>
+    backupCapturePlan(nativeFacts(withWorker(wiki(data))));
+  // Without the declaration the worker keeps running: the dump is online.
+  expect(plan(baseline.volumes.length ? first.data : [])).toMatchObject({
+    pauseServices: ["wiki"],
+    dumps: [{ service: "mariadb", quiescent: false }],
+  });
+  // Pi declares the worker a writer through preparation: the record keeps
+  // it, and the plan pauses the worker although it mounts nothing.
+  const declared = dataRecords(
+    first.resolved,
+    [{ volume: "mariadb-data", kind: "database", writers: ["worker"] }],
+    baseline,
+  );
+  expect(declared.find((r) => r.volume === "mariadb-data")).toMatchObject({
+    owner: "mariadb",
+    capture: "dump",
+    writers: ["worker"],
+  });
+  const paused = plan(declared);
+  expect([...paused.pauseServices].sort()).toEqual(["wiki", "worker"]);
+  expect(paused.dumps).toMatchObject([{ service: "mariadb", quiescent: true }]);
+  // A correction that lists the volume plainly inherits the writers.
+  const second = withWorker(wiki(declared));
+  const corrected = dataRecords(
+    second.resolved,
+    [{ volume: "mariadb-data", kind: "database" }],
+    nativeFacts(second),
+  );
+  expect(corrected.find((r) => r.volume === "mariadb-data")!.writers).toEqual([
+    "worker",
+  ]);
+  expect([...plan(corrected).pauseServices].sort()).toEqual(["wiki", "worker"]);
+  // An empty list is a declaration of its own: nothing else writes it, so
+  // the worker keeps running and the dump is still quiescent.
+  const none = dataRecords(
+    second.resolved,
+    [{ volume: "mariadb-data", kind: "database", writers: [] }],
+    nativeFacts(second),
+  );
+  expect(none.find((r) => r.volume === "mariadb-data")!.writers).toEqual([]);
+  expect(plan(none)).toMatchObject({
+    pauseServices: ["wiki"],
+    dumps: [{ quiescent: true }],
+  });
+  // Only an explicit null removes the declaration: the boundary is unknown
+  // again and the dump goes online.
+  const removed = dataRecords(
+    second.resolved,
+    [{ volume: "mariadb-data", kind: "database", writers: null }],
+    nativeFacts(second),
+  );
+  expect(
+    removed.find((r) => r.volume === "mariadb-data")!.writers,
+  ).toBeUndefined();
+  expect(plan(removed).dumps![0].quiescent).toBe(false);
+  // A writer must be a service, and the owner is not one of its writers.
+  expect(() =>
+    dataRecords(
+      first.resolved,
+      [{ volume: "mariadb-data", kind: "database", writers: ["cron"] }],
+      baseline,
+    ),
+  ).toThrow("writer cron is not a service");
+  expect(() =>
+    dataRecords(
+      first.resolved,
+      [{ volume: "mariadb-data", kind: "database", writers: ["mariadb"] }],
+      baseline,
+    ),
+  ).toThrow("not one of its writers");
+});
 it("the managed PostgreSQL is a database owner with a default procedure, on new and older records alike", () => {
   const managed = (data: NativeConfiguration["data"]): NativeConfiguration => ({
     ...native,

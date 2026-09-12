@@ -203,6 +203,7 @@ export async function installScheduledBackups(
       ),
       sqlite: capture.volumes.some((v) => v.sqlite !== null),
       dumps: Boolean(capture.dumps?.length),
+      comparedDumps: Boolean(capture.dumps?.some((dump) => dump.quiescent)),
     },
     provider: destination.provider,
     bucket: destination.bucket,
