@@ -1,11 +1,12 @@
 // Rig B: start the Linux host container and the S3-compatible storage its
 // backups upload to. Idempotent. MinIO comes from its own registry (Quay);
-// Docker Hub no longer serves its latest tag. The host publishes HTTP on 127.0.0.1:80, so
-// Rig A's containers must not hold that port. MinIO runs inside the host's
-// own dockerd as https://s3.rig.amazonaws.com (the product's S3 endpoint
-// rule), with a rig CA that only the host's server-guy-* units trust through
-// a systemd drop-in: the stand-in for a public certificate authority. Test
-// credentials stay under ignored tests/results/rig/<container>/.
+// Docker Hub no longer serves its latest tag. The host publishes HTTP on
+// 127.0.0.1:80, so Rig A's containers must not hold that port. MinIO runs
+// inside the host's own dockerd as https://s3.rig.amazonaws.com (the
+// product's S3 endpoint rule), with a rig CA that only the host's
+// server-guy-* units trust through a systemd drop-in: the stand-in for a
+// public certificate authority. Test credentials stay under ignored
+// tests/results/rig/<container>/.
 // Usage: node tests/rig/host/start.mjs [container] [http-port]
 // A second host beside the first publishes its HTTP on another local port.
 import { execFileSync } from "node:child_process";
