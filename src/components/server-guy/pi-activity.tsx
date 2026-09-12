@@ -2,21 +2,24 @@
 
 // What Pi did, between what Pi said.
 //
-// One compact row per tool call, in the order the runtime reported them. A row
-// says what was called and how it ended; opening it shows the exact arguments
-// and whatever came back, redacted before it was ever stored. Calls that
-// already draw their own card — a command through the executor, a record shown
-// in chat — are left to that card rather than shown twice.
+// Work is quiet by default: a run of reads and searches collapses to one line
+// you can open, a finished command is a line like any other, and only
+// something that wants you — an approval, a command still producing output —
+// takes the room of a card. Nothing here is boxed or tinted; the reading order
+// is the conversation's, and the detail waits until it is asked for.
 
 import {
   CaretRight,
-  Check,
+  FileText,
+  FloppyDisk,
+  MagnifyingGlass,
+  PencilSimple,
   SpinnerGap,
-  Warning,
-  X,
+  Terminal,
 } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 
+import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
@@ -26,44 +29,56 @@ export function hasActivity(records: ActivityRecord[], runId: string) {
   return records.some((record) => record.runId === runId);
 }
 
-/** What a tool is doing, in the reader's words rather than its own. */
-const verbs: Record<string, string> = {
-  read_file: "Read",
-  write_file: "Wrote",
-  edit_file: "Edited",
-  list_directory: "Listed",
-  search_files: "Searched",
-  glob: "Searched",
-  grep: "Searched",
-  workspace_bash: "Ran in the repository workspace",
-  save_information: "Saved",
-  search_information: "Searched saved information",
-  retire_information: "Retired",
-  get_application_status: "Read the application record",
+type Kind = "read" | "search" | "ran" | "wrote" | "saved";
+
+const kinds: { test: RegExp; kind: Kind; verb: string }[] = [
+  { test: /^(read|read_file|cat)$/, kind: "read", verb: "Read" },
+  { test: /^(ls|list_directory)$/, kind: "read", verb: "Listed" },
+  {
+    test: /^(grep|find|search|search_information)$/,
+    kind: "search",
+    verb: "Searched",
+  },
+  { test: /^(write|write_file)$/, kind: "wrote", verb: "Wrote" },
+  { test: /^(edit|edit_file)$/, kind: "wrote", verb: "Edited" },
+  { test: /^(bash|powershell|server_bash)$/, kind: "ran", verb: "Command" },
+  { test: /^save_information$/, kind: "saved", verb: "Saved" },
+  { test: /^retire_information$/, kind: "saved", verb: "Retired" },
+];
+
+const icons: Record<Kind, typeof FileText> = {
+  read: FileText,
+  search: MagnifyingGlass,
+  ran: Terminal,
+  wrote: PencilSimple,
+  saved: FloppyDisk,
 };
 
-function words(record: ActivityRecord) {
-  const verb = verbs[record.tool];
-  if (verb) return verb;
-  // An unknown tool is named as the runtime named it, never guessed at.
-  return record.tool.replaceAll("_", " ");
+/** How a call is named and grouped; an unknown tool keeps its own name. */
+function describe(record: ActivityRecord) {
+  const match = kinds.find((entry) => entry.test.test(record.tool));
+  return {
+    kind: match?.kind ?? ("ran" as Kind),
+    verb: match?.verb ?? record.tool.replaceAll("_", " "),
+  };
 }
 
-/** The one detail worth putting on the row: a path, a pattern, a command. */
+/** The one detail worth putting on a row: a path, a pattern, a command. */
 function subject(record: ActivityRecord) {
   try {
     const args = JSON.parse(record.args) as Record<string, unknown>;
     for (const key of [
+      "command",
       "path",
       "file",
       "filePath",
       "pattern",
       "query",
-      "command",
       "title",
     ]) {
       const value = args[key];
-      if (typeof value === "string" && value.trim()) return value;
+      if (typeof value === "string" && value.trim())
+        return value.replace(/\s+/g, " ").trim();
     }
   } catch {
     // Arguments that are not JSON are shown only in the opened row.
@@ -71,145 +86,253 @@ function subject(record: ActivityRecord) {
   return null;
 }
 
-function duration(record: ActivityRecord) {
+function duration(record: { startedAt: string; finishedAt?: string }) {
   if (!record.finishedAt) return null;
   const ms = Date.parse(record.finishedAt) - Date.parse(record.startedAt);
   if (!Number.isFinite(ms) || ms < 0) return null;
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
+/** "Read files, ran commands" — what a run of quiet calls amounts to. */
+function summarise(records: ActivityRecord[]) {
+  const order: Kind[] = ["read", "search", "ran", "wrote", "saved"];
+  const words: Record<Kind, string> = {
+    read: "file reads",
+    search: "searches",
+    ran: "commands",
+    wrote: "file changes",
+    saved: "records",
+  };
+  const present = order.filter((kind) =>
+    records.some((record) => describe(record).kind === kind),
+  );
+  const phrase = present.map((kind) => words[kind]).join(", ");
+  return phrase ? phrase[0].toUpperCase() + phrase.slice(1) : "Worked";
+}
+
+type Item =
+  | { type: "said"; record: ActivityRecord }
+  | { type: "card"; record: ActivityRecord }
+  | { type: "quiet"; records: ActivityRecord[] };
+
+/** Messages stay separate; runs of quiet calls gather behind one line. */
+function arrange(records: ActivityRecord[], noisy: (id: string) => boolean) {
+  const items: Item[] = [];
+  for (const record of records) {
+    if (record.kind === "message") {
+      items.push({ type: "said", record });
+      continue;
+    }
+    if (record.executionId && noisy(record.executionId)) {
+      items.push({ type: "card", record });
+      continue;
+    }
+    const last = items.at(-1);
+    if (last?.type === "quiet") last.records.push(record);
+    else items.push({ type: "quiet", records: [record] });
+  }
+  return items;
+}
+
 export function PiActivity({
   records,
+  executions,
   runId,
   live,
   renderExecution,
 }: {
   records: ActivityRecord[];
+  executions?: ExecutionRecord[];
   /** The assistant message these calls belong to. */
   runId: string;
-  /**
-   * What Pi is writing right now, if it is still writing. It belongs at the
-   * end of the transcript, where it is happening — rendering it above the
-   * calls made it duplicate and jump when the message finished.
-   */
+  /** What Pi is writing right now, drawn at the end where it happens. */
   live?: string | null;
-  /**
-   * Draws the executor card for a call that produced one. A call is matched
-   * to its record by the id the runtime gave it, never by the tool's name, so
-   * every executor-backed tool shows exactly one card — and that card is what
-   * knows waiting, declined, running and failed.
-   */
   renderExecution?: (executionId: string) => ReactNode;
 }) {
   const mine = records
     .filter((record) => record.runId === runId)
     .sort((a, b) => a.sequence - b.sequence);
-  // Between a message ending and the next one starting, the draft still holds
-  // the text that has just become the last item. Showing both would say it
-  // twice, so the draft waits until it has something new.
+  // Between a message ending and the next starting, the draft still holds the
+  // text that has just become the last item; showing both would say it twice.
   const said = mine.filter((record) => record.kind === "message").at(-1)?.text;
   const tail = live?.trim() && live.trim() !== said?.trim() ? live : null;
   if (!mine.length && !tail) return null;
+
+  // A command that wants a decision, or is still producing output, earns the
+  // room of a card. One that has finished is a line like any other.
+  const noisy = (executionId: string) => {
+    const execution = executions?.find((item) => item.id === executionId);
+    return (
+      !execution ||
+      execution.status === "awaiting-approval" ||
+      execution.status === "running"
+    );
+  };
+
   return (
-    <ol className="sg-activity" aria-label="What Pi did">
-      {mine.map((record) =>
-        record.kind === "message" ? (
-          <li className="sg-activity-said" key={record.id}>
-            <Markdown source={record.text ?? ""} />
-          </li>
-        ) : record.executionId ? (
-          <li className="sg-activity-card" key={record.id}>
-            {renderExecution?.(record.executionId)}
-          </li>
+    <div className="sg-did" aria-label="What Pi did">
+      {arrange(mine, noisy).map((item, index) =>
+        item.type === "said" ? (
+          <div className="sg-did-said" key={item.record.id}>
+            <Markdown source={item.record.text ?? ""} />
+          </div>
+        ) : item.type === "card" ? (
+          <div className="sg-did-card" key={item.record.id}>
+            {renderExecution?.(item.record.executionId as string)}
+          </div>
         ) : (
-          <ActivityRow key={record.id} record={record} />
+          <Quiet
+            key={`quiet-${index}`}
+            records={item.records}
+            executions={executions}
+            renderExecution={renderExecution}
+          />
         ),
       )}
       {tail && (
-        <li className="sg-activity-said" data-live="" key="live">
+        <div className="sg-did-said" data-live="">
           <Markdown source={tail} />
-        </li>
+        </div>
       )}
-    </ol>
+    </div>
   );
 }
 
-function ActivityRow({ record }: { record: ActivityRecord }) {
+/** A run of calls that finished quietly, behind one line. */
+function Quiet({
+  records,
+  executions,
+  renderExecution,
+}: {
+  records: ActivityRecord[];
+  executions?: ExecutionRecord[];
+  renderExecution?: (executionId: string) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
-  const detail = subject(record);
-  const took = duration(record);
-  const shown = record.status === "running" ? record.preview : record.result;
+  const working = records.some((record) => record.status === "running");
+  // A refusal is not a failure, and a stop is not either; say which it was.
+  const count = (status: string) =>
+    records.filter((record) => record.status === status).length;
+  const wrong = count("failed")
+    ? `${count("failed")} failed`
+    : count("declined")
+      ? `${count("declined")} not run`
+      : count("interrupted")
+        ? `${count("interrupted")} stopped`
+        : "";
   return (
-    <li className="sg-activity-item" data-status={record.status}>
+    <div className="sg-did-quiet" data-open={open || undefined}>
       <button
         type="button"
-        className="sg-activity-row"
+        className="sg-did-head"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <CaretRight
-          weight="bold"
-          aria-hidden="true"
-          className="sg-activity-caret"
-        />
-        <span className="sg-activity-what">
-          {words(record)}
-          {detail && <code>{detail}</code>}
-        </span>
-        <span className="sg-activity-state">
+        <CaretRight weight="bold" aria-hidden="true" />
+        <span>{summarise(records)}</span>
+        <em>
+          {records.length}
+          {working ? (
+            <>
+              {" · "}
+              <SpinnerGap
+                weight="bold"
+                aria-hidden="true"
+                className="sg-did-spin"
+              />
+              working
+            </>
+          ) : wrong ? (
+            ` · ${wrong}`
+          ) : (
+            ""
+          )}
+        </em>
+      </button>
+      {open && (
+        <ol className="sg-did-rows">
+          {records.map((record) => (
+            <Row
+              key={record.id}
+              record={record}
+              executions={executions}
+              renderExecution={renderExecution}
+            />
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function Row({
+  record,
+  executions,
+  renderExecution,
+}: {
+  record: ActivityRecord;
+  executions?: ExecutionRecord[];
+  renderExecution?: (executionId: string) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const { kind, verb } = describe(record);
+  const Icon = icons[kind];
+  const detail = subject(record);
+  const execution = record.executionId
+    ? executions?.find((item) => item.id === record.executionId)
+    : undefined;
+  const took = duration(record);
+  const shown = record.status === "running" ? record.preview : record.result;
+  const wrong = ["failed", "declined", "interrupted"].includes(record.status);
+  return (
+    <li className="sg-did-item" data-status={record.status}>
+      <button
+        type="button"
+        className="sg-did-row"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon weight="regular" aria-hidden="true" />
+        <span className="sg-did-verb">{verb}</span>
+        {detail && <span className="sg-did-subject">{detail}</span>}
+        <span className="sg-did-state">
           {record.status === "running" ? (
             <>
               <SpinnerGap
                 weight="bold"
                 aria-hidden="true"
-                className="sg-activity-spin"
+                className="sg-did-spin"
               />
-              Running
-            </>
-          ) : record.status === "failed" ? (
-            <>
-              <Warning weight="bold" aria-hidden="true" />
-              Failed
-            </>
-          ) : record.status === "interrupted" ? (
-            <>
-              <Warning weight="bold" aria-hidden="true" />
-              Stopped
+              working
             </>
           ) : record.status === "declined" ? (
-            <>
-              <X weight="bold" aria-hidden="true" />
-              Not run
-            </>
+            "not run"
+          ) : record.status === "interrupted" ? (
+            "stopped"
+          ) : record.status === "failed" ? (
+            "failed"
           ) : (
-            <>
-              <Check weight="bold" aria-hidden="true" />
-              Done
-            </>
+            (took ?? "")
           )}
-          {took && <em>{took}</em>}
         </span>
       </button>
       {open && (
-        <div className="sg-activity-detail">
-          <h4>What Pi passed</h4>
-          <pre>{record.args || "Nothing recorded."}</pre>
-          <h4>
-            {record.status === "running"
-              ? "What has come back so far"
-              : "What came back"}
-          </h4>
-          <pre>
-            {shown ||
-              (record.status === "running"
-                ? "Nothing yet."
-                : "Nothing was recorded for this call.")}
-          </pre>
-          {record.truncated && (
-            <p className="sg-activity-cut">
-              <X weight="bold" aria-hidden="true" />
-              This was longer than Server Guy keeps; what is shown was cut.
-            </p>
+        <div className="sg-did-detail">
+          {execution && renderExecution ? (
+            renderExecution(execution.id)
+          ) : (
+            <>
+              <pre>{record.args || "Nothing recorded."}</pre>
+              <pre data-wrong={wrong || undefined}>
+                {shown ||
+                  (record.status === "running"
+                    ? "Nothing yet."
+                    : "Nothing was recorded for this call.")}
+              </pre>
+              {record.truncated && (
+                <p>Longer than Server Guy keeps; what is shown was cut.</p>
+              )}
+            </>
           )}
         </div>
       )}

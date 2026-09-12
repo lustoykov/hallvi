@@ -91,11 +91,9 @@ test(
       .fill("Cancel **me** [slow-cancel]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(
-      page.getByRole("button", { name: "Cancel request" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
     await openConversation(page);
-    await expect(page.locator(".sg-run-progress")).toContainText(
+    await expect(page.locator(".sg-did").last()).toContainText(
       "[QA fixture reply]",
     );
     // The HTTP acceptance has finished, but the saved run is still active.
@@ -112,7 +110,7 @@ test(
         response.url().endsWith("/cancel") &&
         response.request().method() === "POST",
     );
-    await page.getByRole("button", { name: "Cancel request" }).click();
+    await page.getByRole("button", { name: "Stop" }).click();
     expect((await (await cancellation).json()).status).toBe("cancelled");
     await page.reload();
     await expect(
@@ -145,7 +143,7 @@ test(
     await openConversation(page);
     await expect(
       page
-        .locator(".sg-messages .sg-message-response strong")
+        .locator(".sg-messages strong:visible")
         .filter({ hasText: /^me$/ }),
     ).toHaveCount(2); // Original user message and successful assistant answer.
     const saved = await (await page.request.get(endpoint)).json();

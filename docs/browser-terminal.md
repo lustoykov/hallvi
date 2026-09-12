@@ -1,6 +1,6 @@
 # Browser terminal — implementation brief
 
-Status: specified for delegation, 12 September 2026. No terminal implementation is included. This is a separate stage from the presentation contract in PR #57; it does not require that contract to land. Coordinate changes to the shared application shell with its owner.
+Status: implemented in PR #58, with integration corrections in PR #60, 12 September 2026. This document remains the product contract. The shell uses xterm.js and a controller-local WebSocket bridge backed by a separate SSH PTY. Pi activity stays in the conversation. The supported environment is still the single-owner controller on loopback; this is not an authenticated public terminal service.
 
 ## Outcome and boundary
 

@@ -159,6 +159,7 @@ function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
   let alive = true;
   socket.on("pong", () => (alive = true));
   const heartbeat = setInterval(() => {
+    if (!session.checkTarget()) return socket.close(1000);
     if (!alive) return socket.terminate();
     alive = false;
     socket.ping();
@@ -169,6 +170,7 @@ function open(state: Bridge, socket: WebSocket, ticket: Ticket) {
 
   socket.on("message", (data, isBinary) => {
     silence.refresh();
+    if (!session.checkTarget()) return socket.close(1000);
     if (isBinary) return session.write(data as Buffer);
     let message: { type?: string; size?: unknown };
     try {

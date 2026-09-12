@@ -574,22 +574,65 @@
 }
 .sg-run-progress {
   display: grid;
-  gap: 10px;
+  gap: 4px;
   overflow-wrap: anywhere;
 }
+/* While Pi works this is the whole announcement: a pulse, how long, and a
+   quiet way to stop. It should read as a status line, not as an alert. */
 .sg-run-status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.6;
 }
 .sg-run-status svg {
-  width: 14px;
+  width: 12px;
   flex: none;
-  color: var(--blue);
+  color: var(--muted);
+  opacity: 0.85;
+  animation: sg-run-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sg-run-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Stopping is available, never loud: a word, at the end of the status line. */
+.sg-run-progress:has(.sg-run-stop) {
+  grid-auto-flow: column;
+  grid-template-columns: max-content max-content;
+  justify-content: start;
+  align-items: baseline;
+  gap: 12px;
+}
+.sg-run-stop {
+  align-self: baseline;
+  justify-self: start;
+  margin: 0;
+  padding: 1px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-2, #d8dee8);
+}
+.sg-run-stop:hover {
+  color: var(--ink, #202838);
+}
+.sg-run-stop[disabled] {
+  opacity: 0.5;
+  cursor: default;
 }
 .sg-message-failed .sg-run-status {
   color: var(--amber-text);

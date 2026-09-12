@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isControllerHost } from "@/server/controller-origin";
 import { handle } from "@/server/http";
+import { assertSameOrigin } from "@/server/schemas";
 import { issueTerminalTicket } from "@/server/terminal-bridge";
 import { hostFor, readSize } from "@/server/terminal-session";
 
@@ -28,6 +29,7 @@ export function GET(_request: Request, context: Context) {
  */
 export function POST(request: Request, context: Context) {
   return handle(async () => {
+    assertSameOrigin(request);
     const { applicationId } = await context.params;
     const origin = request.headers.get("origin") ?? "";
     let host: string;

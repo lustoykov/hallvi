@@ -161,6 +161,7 @@ export function TerminalPanel({
       runtime.current.socket = socket;
 
       socket.onmessage = (event) => {
+        if (disposed) return;
         if (event.data instanceof ArrayBuffer) {
           // Bytes, not text: xterm reassembles split UTF-8 itself.
           term.write(new Uint8Array(event.data));
@@ -182,12 +183,14 @@ export function TerminalPanel({
                 : `Shell exited${typeof state.code === "number" ? ` (${state.code})` : ""}.`,
           });
       };
-      socket.onclose = () =>
+      socket.onclose = () => {
+        if (disposed) return;
         setPhase((current) =>
-          current.name === "connected"
+          current.name === "connected" || current.name === "connecting"
             ? { name: "ended", detail: "Connection lost." }
             : current,
         );
+      };
       socket.onerror = () =>
         setPhase((current) =>
           current.name === "connecting"
@@ -219,7 +222,14 @@ export function TerminalPanel({
     }
 
     let cleanup = () => {};
-    void begin();
+    void begin().catch(() => {
+      if (!disposed)
+        setPhase({
+          name: "failed",
+          detail:
+            "The terminal could not be initialized. Retry to connect again.",
+        });
+    });
 
     return () => {
       disposed = true;

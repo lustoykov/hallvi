@@ -8,7 +8,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Architecture](architecture.md) | The current system, execution loop, records, protection/rollback and limits. |
 | [Required outcomes](requirements.md) | User-facing behavior and acceptance, without prescribing Pi's workflow. |
 | [Presentation contract](presentation-contract.md) | Proposal: the data and interaction contract the accepted reference designs need from real Pi output. |
-| [Browser terminal](browser-terminal.md) | Delegation spec for an interactive application-server shell, session lifecycle and acceptance. |
+| [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
