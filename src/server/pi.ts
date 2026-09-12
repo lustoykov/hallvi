@@ -84,6 +84,20 @@ export const PI_TOOL_NAMES = [
   "save_information",
 ];
 
+/** The text inside a tool's result-so-far, for the streaming output panel. */
+function workspaceText(value: unknown): string {
+  if (typeof value === "string") return value;
+  const content = (value as { content?: unknown })?.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      part && typeof part === "object" && "text" in part
+        ? String((part as { text: unknown }).text)
+        : "",
+    )
+    .join("");
+}
+
 export function normalizePiAssistantMessage(input: string): string {
   const message = input.trim();
   if (!message) throw new Error("Server Guy returned no user-facing message.");
@@ -122,7 +136,9 @@ export type PiToolEvent =
       args: unknown;
     }
   | { type: "update"; id: string; partial: unknown }
-  | { type: "end"; id: string; result: unknown; isError: boolean };
+  | { type: "end"; id: string; result: unknown; isError: boolean }
+  /** What Pi said at this point, between its calls. */
+  | { type: "message"; sequence: number; text: string };
 
 export interface PiExecutionOptions {
   signal?: AbortSignal;
@@ -417,7 +433,7 @@ export async function askPi(
                 Type.Number({ minimum: 1, maximum: 1800 }),
               ),
             }),
-            async execute(_id, params, signal) {
+            async execute(id, params, signal) {
               const host = operatorSettings(input.run.applicationId).host;
               if (!host)
                 throw new Error(
@@ -436,6 +452,8 @@ export async function askPi(
                       output,
                       params.timeoutSeconds,
                     ),
+                  false,
+                  id,
                 ),
               );
             },
@@ -447,7 +465,7 @@ export async function askPi(
             description:
               "In Pi decides mode, ask the user to approve the proposed action before proceeding. Describe the concrete action and its effects. Bypass returns immediately. Always ask already prompts at execution; do not request duplicate approval there.",
             parameters: Type.Object({ action: Type.String() }),
-            async execute(_id, params) {
+            async execute(id, params) {
               return json(
                 await execution.execute(
                   "request_approval",
@@ -455,6 +473,7 @@ export async function askPi(
                   params.action,
                   async () => ({ approved: true }),
                   true,
+                  id,
                 ),
               );
             },
@@ -475,7 +494,14 @@ export async function askPi(
                   tool.name,
                   "Repository workspace",
                   args,
-                  () => tool.execute(id, args, signal),
+                  // The executor's own output callback: partial results reach
+                  // the execution record, so the card streams while it runs.
+                  (output) =>
+                    tool.execute(id, args, signal, (partial: unknown) =>
+                      output(workspaceText(partial)),
+                    ),
+                  false,
+                  id,
                 );
                 return "declined" in result ? json(result) : result;
               },
@@ -624,11 +650,18 @@ export async function askPi(
             cacheWriteTokens: event.message.usage?.cacheWrite,
           },
         });
+        const said = event.message.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("");
+        if (said.trim())
+          options.onTool?.({
+            type: "message",
+            sequence: ++toolSequence,
+            text: said,
+          });
         outcome = {
-          text: event.message.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join(""),
+          text: said,
           error: event.message.stopReason !== "stop",
         };
       }

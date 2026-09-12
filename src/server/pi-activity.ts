@@ -30,9 +30,19 @@ const ARGUMENT_LIMIT = 8_000;
 const RESULT_LIMIT = 20_000;
 const PREVIEW_LIMIT = 20_000;
 
-export type ActivityStatus = "running" | "succeeded" | "failed";
+export type ActivityStatus =
+  | "running"
+  | "succeeded"
+  | "failed"
+  /** The run stopped before this call reported an end. */
+  | "interrupted";
 
 export interface ActivityRecord {
+  /**
+   * What this is: a tool Pi called, or something Pi said on the way. Both sit
+   * in one sequence, because the reader wants the transcript, not two lists.
+   */
+  kind: "tool" | "message";
   /** Pi's own tool-call id: stable across start, update and end. */
   id: string;
   applicationId: string;
@@ -41,6 +51,8 @@ export interface ActivityRecord {
   /** Position within the run, so order survives any read. */
   sequence: number;
   tool: string;
+  /** For a message, what Pi said at this point in the run. */
+  text?: string;
   /** Redacted arguments, as Pi passed them. */
   args: string;
   /** Whatever streamed back before the call finished. */
@@ -48,6 +60,12 @@ export interface ActivityRecord {
   /** Redacted final result, once there is one. */
   result: string;
   status: ActivityStatus;
+  /**
+   * The executor record this call produced. When set, the conversation draws
+   * that card — which already knows waiting, declined, running and failed —
+   * instead of a second row for the same work.
+   */
+  executionId?: string;
   /** True when the stored text was cut to its limit. */
   truncated: boolean;
   startedAt: string;
@@ -76,17 +94,43 @@ function write(path: string, value: ActivityRecord) {
 
 function read(path: string): ActivityRecord | undefined {
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as ActivityRecord;
+    const record = JSON.parse(readFileSync(path, "utf8")) as ActivityRecord;
+    // Records written before messages joined the transcript carry no kind.
+    return record.kind ? record : { ...record, kind: "tool" };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
 }
 
+/**
+ * A tool result is usually `{content:[{type:"text",text}]}`. Reading the text
+ * out of it keeps the record readable and, more importantly, stops the JSON
+ * scaffolding being compared and re-appended as if it were output.
+ */
+function words(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object") {
+    const content = (value as { content?: unknown }).content;
+    if (Array.isArray(content)) {
+      const parts = content
+        .map((part) =>
+          part && typeof part === "object" && "text" in part
+            ? String((part as { text: unknown }).text)
+            : null,
+        )
+        .filter((part): part is string => part !== null);
+      if (parts.length) return parts.join("");
+    }
+    const output = (value as { output?: unknown }).output;
+    if (typeof output === "string") return output;
+  }
+  return safeStringify(value);
+}
+
 /** Redacts, then cuts, and says whether anything was cut. */
 function keep(value: unknown, limit: number) {
-  const text = typeof value === "string" ? value : safeStringify(value);
-  const redacted = redactSecrets(text).text;
+  const redacted = redactSecrets(words(value)).text;
   return redacted.length > limit
     ? { text: redacted.slice(0, limit), truncated: true }
     : { text: redacted, truncated: false };
@@ -111,6 +155,7 @@ export function startActivity(input: {
   mkdirSync(directory(input.applicationId), { recursive: true, mode: 0o700 });
   const args = keep(input.args, ARGUMENT_LIMIT);
   const record: ActivityRecord = {
+    kind: "tool",
     id: input.id,
     applicationId: input.applicationId,
     runId: input.runId,
@@ -128,27 +173,48 @@ export function startActivity(input: {
 }
 
 /**
- * Stores whatever a tool has produced so far. The runtime does not promise
- * whether a partial result is cumulative or a delta, so this keeps the longer
- * of the two readings rather than guessing and doubling the output.
+ * How to read what a caller handed us. Guessing between the two by comparing
+ * prefixes loses data — two legitimate deltas of "tick\n" look like one
+ * snapshot — so every caller states which it is sending.
+ *
+ * `snapshot` is everything produced so far and replaces what we hold; the
+ * runtime's `partialResult` is a result-so-far, so it is always a snapshot.
+ * `delta` is only the new bytes and is appended; a source that streams
+ * increments says so.
  */
+export type PartialMode = "snapshot" | "delta";
+
 export function updateActivity(
   applicationId: string,
   id: string,
   partial: unknown,
+  mode: PartialMode,
 ) {
   const path = recordPath(applicationId, id);
   const record = read(path);
   if (!record || record.status !== "running") return;
   const incoming = keep(partial, PREVIEW_LIMIT);
-  const grew = incoming.text.startsWith(record.preview);
-  const preview = grew ? incoming.text : record.preview + incoming.text;
+  const preview =
+    mode === "snapshot" ? incoming.text : record.preview + incoming.text;
+  if (preview === record.preview) return;
   const cut = preview.length > PREVIEW_LIMIT;
   write(path, {
     ...record,
     preview: cut ? preview.slice(-PREVIEW_LIMIT) : preview,
     truncated: record.truncated || incoming.truncated || cut,
   });
+}
+
+/** Ties a call to the record it produced, by id rather than by tool name. */
+export function linkActivityExecution(
+  applicationId: string,
+  id: string,
+  executionId: string,
+) {
+  const path = recordPath(applicationId, id);
+  const record = read(path);
+  if (!record) return;
+  write(path, { ...record, executionId });
 }
 
 export function endActivity(input: {
@@ -171,21 +237,76 @@ export function endActivity(input: {
 }
 
 /**
- * A run interrupted between start and end leaves a record claiming to run
- * forever. Settling the run says so rather than leaving a spinner behind.
+ * A run that stopped between a call's start and its end leaves a record
+ * claiming to run forever. Pass a run to settle that run's calls; pass null to
+ * settle every one of them, which is what a controller does at startup — a
+ * crash never reaches the worker's own cleanup, so a restart is the only place
+ * some of these can be put right.
  */
 export function settleRunningActivity(
   applicationId: string,
-  runId: string,
-  status: Exclude<ActivityStatus, "running"> = "failed",
+  runId: string | null,
+  status: Exclude<ActivityStatus, "running"> = "interrupted",
 ) {
   for (const record of listActivity(applicationId))
-    if (record.runId === runId && record.status === "running")
+    if (
+      (runId === null || record.runId === runId) &&
+      record.status === "running"
+    )
       write(recordPath(applicationId, record.id), {
         ...record,
         status,
         finishedAt: new Date().toISOString(),
       });
+}
+
+/** Every application that has any activity on record. */
+export function applicationsWithActivity(): string[] {
+  try {
+    return readdirSync(join(piConfigDir(), "operator"), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+/**
+ * What Pi said between its tool calls. Each assistant message is kept where it
+ * happened, so a reader sees the reasoning that led to the next command rather
+ * than only the last paragraph.
+ */
+export function recordMessage(input: {
+  applicationId: string;
+  runId: string;
+  sequence: number;
+  text: string;
+}) {
+  const text = input.text.trim();
+  if (!text) return;
+  mkdirSync(directory(input.applicationId), { recursive: true, mode: 0o700 });
+  const id = `${input.runId}:said:${input.sequence}`;
+  const kept = keep(text, RESULT_LIMIT);
+  const now = new Date().toISOString();
+  write(recordPath(input.applicationId, id), {
+    kind: "message",
+    id,
+    applicationId: input.applicationId,
+    runId: input.runId,
+    sequence: input.sequence,
+    tool: "",
+    text: kept.text,
+    args: "",
+    preview: "",
+    result: "",
+    status: "succeeded",
+    truncated: kept.truncated,
+    startedAt: now,
+    finishedAt: now,
+  });
 }
 
 export function listActivity(applicationId: string): ActivityRecord[] {
@@ -196,12 +317,23 @@ export function listActivity(applicationId: string): ActivityRecord[] {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
-  return names
+  const records = names
     .filter((name) => name.endsWith(".json"))
     .map((name) => read(join(directory(applicationId), name)))
-    .filter((record): record is ActivityRecord => Boolean(record))
-    .sort(
-      (a, b) =>
-        a.startedAt.localeCompare(b.startedAt) || a.sequence - b.sequence,
-    );
+    .filter((record): record is ActivityRecord => Boolean(record));
+  // Sequence is the runtime's own counter and is the only authority on order
+  // within a run; wall-clock times tie at millisecond resolution and say
+  // nothing across runs. So: runs in the order they began, calls in sequence.
+  const began = new Map<string, string>();
+  for (const record of records) {
+    const first = began.get(record.runId);
+    if (!first || record.startedAt < first)
+      began.set(record.runId, record.startedAt);
+  }
+  return records.sort(
+    (a, b) =>
+      (began.get(a.runId) ?? "").localeCompare(began.get(b.runId) ?? "") ||
+      a.runId.localeCompare(b.runId) ||
+      a.sequence - b.sequence,
+  );
 }

@@ -15,13 +15,18 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ActivityRecord } from "@/server/pi-activity";
+import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
-/** Tools whose work is already drawn by a card of its own. */
-const drawnElsewhere = new Set(["server_bash", "request_approval"]);
+/** True when this run's transcript already holds what Pi said. */
+export function hasSpokenActivity(records: ActivityRecord[], runId: string) {
+  return records.some(
+    (record) => record.runId === runId && record.kind === "message",
+  );
+}
 
 /** What a tool is doing, in the reader's words rather than its own. */
 const verbs: Record<string, string> = {
@@ -78,21 +83,38 @@ function duration(record: ActivityRecord) {
 export function PiActivity({
   records,
   runId,
+  renderExecution,
 }: {
   records: ActivityRecord[];
   /** The assistant message these calls belong to. */
   runId: string;
+  /**
+   * Draws the executor card for a call that produced one. A call is matched
+   * to its record by the id the runtime gave it, never by the tool's name, so
+   * every executor-backed tool shows exactly one card — and that card is what
+   * knows waiting, declined, running and failed.
+   */
+  renderExecution?: (executionId: string) => ReactNode;
 }) {
   const mine = records
     .filter((record) => record.runId === runId)
-    .filter((record) => !drawnElsewhere.has(record.tool))
     .sort((a, b) => a.sequence - b.sequence);
   if (!mine.length) return null;
   return (
     <ol className="sg-activity" aria-label="What Pi did">
-      {mine.map((record) => (
-        <ActivityRow key={record.id} record={record} />
-      ))}
+      {mine.map((record) =>
+        record.kind === "message" ? (
+          <li className="sg-activity-said" key={record.id}>
+            <Markdown source={record.text ?? ""} />
+          </li>
+        ) : record.executionId ? (
+          <li className="sg-activity-card" key={record.id}>
+            {renderExecution?.(record.executionId)}
+          </li>
+        ) : (
+          <ActivityRow key={record.id} record={record} />
+        ),
+      )}
     </ol>
   );
 }
@@ -133,6 +155,11 @@ function ActivityRow({ record }: { record: ActivityRecord }) {
             <>
               <Warning weight="bold" aria-hidden="true" />
               Failed
+            </>
+          ) : record.status === "interrupted" ? (
+            <>
+              <Warning weight="bold" aria-hidden="true" />
+              Stopped
             </>
           ) : (
             <>

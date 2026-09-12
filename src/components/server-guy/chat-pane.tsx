@@ -28,7 +28,7 @@ import type { ApplicationSection } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
-import { PiActivity } from "./pi-activity";
+import { hasSpokenActivity, PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
@@ -338,16 +338,40 @@ export function ChatPane({
                         </button>
                       )}
                     </div>
-                  ) : (
+                  ) : view.piActivity &&
+                    hasSpokenActivity(view.piActivity, message.id) ? null : (
                     <MessageResponse>
                       <Markdown source={message.body} />
                     </MessageResponse>
                   )}
                 </MessageContent>
                 {message.role === "assistant" && view.piActivity && (
-                  <PiActivity records={view.piActivity} runId={message.id} />
+                  <PiActivity
+                    records={view.piActivity}
+                    runId={message.id}
+                    renderExecution={(executionId) =>
+                      view.application && chatId ? (
+                        <OperatorConsole
+                          applicationId={view.application.id}
+                          chatId={chatId}
+                          main={view.chats[0]?.id === chatId}
+                          executionId={executionId}
+                          records={view.executions}
+                        />
+                      ) : null
+                    }
+                  />
                 )}
                 {message.blocks?.map((block, index) => {
+                  // A call already drawn in the activity order is not drawn
+                  // again here; the link is by execution id, not by name.
+                  if (
+                    block.type === "execution" &&
+                    view.piActivity?.some(
+                      (record) => record.executionId === block.id,
+                    )
+                  )
+                    return null;
                   if (block.type === "text")
                     return <Markdown key={index} source={block.text} />;
                   if (block.type === "execution" && view.application && chatId)

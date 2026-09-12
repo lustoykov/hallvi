@@ -12,6 +12,9 @@
 .sg-activity-item[data-status="failed"] {
   --activity-mark: var(--failed, #a6312b);
 }
+.sg-activity-item[data-status="interrupted"] {
+  --activity-mark: var(--waiting-text, #9a4b10);
+}
 .sg-activity-item[data-status="succeeded"] {
   --activity-mark: var(--verified-text, #0f7a4e);
 }
@@ -123,4 +126,23 @@
   .sg-activity-spin {
     animation-duration: 2.4s;
   }
+}
+
+/* A call the executor owns keeps its own card, in its place in the order. */
+.sg-activity-card {
+  margin: 2px 0 2px -13px;
+}
+
+/* What Pi said on the way, in its place among the calls. */
+.sg-activity-said {
+  margin: 8px 0 8px -13px;
+  color: var(--ink-2, #3e4a60);
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.sg-activity-said > :first-child {
+  margin-top: 0;
+}
+.sg-activity-said > :last-child {
+  margin-bottom: 0;
 }
