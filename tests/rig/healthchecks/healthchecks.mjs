@@ -93,15 +93,21 @@ async function login() {
     email: owner.email,
     password: owner.password,
   });
-  // Authenticated only if this session reaches its own project checks.
-  const checks = await session.request("/checks/");
-  const project = /^\/projects\/([0-9a-f-]+)\/checks\/$/.exec(location(checks));
+  // Authenticated only if the session lands on its own project's checks,
+  // either straight from the login or through the checks index.
+  const projectOf = (path) =>
+    /^\/projects\/([0-9a-f-]+)\/checks\/$/.exec(path)?.[1] ?? null;
+  let project = projectOf(location(response));
+  if (!project) {
+    const checks = await session.request("/checks/");
+    project = checks.status === 302 ? projectOf(location(checks)) : null;
+  }
   return {
     session,
-    authenticated: checks.status === 302 && Boolean(project),
+    authenticated: Boolean(project),
     loginStatus: response.status,
     loginTarget: location(response),
-    project: project?.[1] ?? null,
+    project,
   };
 }
 
@@ -110,18 +116,35 @@ async function setup() {
     await login();
   record("owner-login", { authenticated, loginStatus, loginTarget });
   if (!authenticated) throw new Error("The owner cannot sign in.");
+  // The project's own "Add Check" form, with its default simple period.
   const added = await session.form(
     `/projects/${project}/checks/add/`,
-    {},
+    {
+      name: NAME,
+      slug: "",
+      tags: "audit",
+      kind: "simple",
+      timeout: "86400",
+      grace: "3600",
+      schedule: "* * * * *",
+      tz: "UTC",
+    },
     `/projects/${project}/checks/`,
   );
-  const code = /^\/checks\/([0-9a-f-]+)\/details\/$/.exec(location(added))?.[1];
-  if (!code) throw new Error(`Adding a check returned HTTP ${added.status}`);
-  const named = await session.form(
-    `/checks/${code}/name/`,
-    { name: NAME, slug: "", tags: "audit", desc: `Marker ${MARKER}` },
-    `/checks/${code}/details/`,
-  );
+  // The form returns to the project's list; the new check is the row that
+  // carries the marker name.
+  const listed = await session.request(`/projects/${project}/checks/`);
+  const rows = listed.status === 200 ? await listed.text() : "";
+  const row = [...rows.matchAll(/<tr[\s\S]*?<\/tr>/g)]
+    .map((match) => match[0])
+    .find((markup) => markup.includes(NAME));
+  const code = row
+    ? /\/checks\/([0-9a-f-]+)\/details\//.exec(row)?.[1]
+    : undefined;
+  if (!code)
+    throw new Error(
+      `Adding a check returned HTTP ${added.status} and no row named for it.`,
+    );
   const ping = await session.request(`/ping/${code}`);
   const pingBody = (await ping.text()).trim();
   const state = { project, code, name: NAME, marker: MARKER };
@@ -129,7 +152,6 @@ async function setup() {
   record("content", {
     checkCode: code,
     addStatus: added.status,
-    nameStatus: named.status,
     pingStatus: ping.status,
     pingBody,
   });
@@ -141,7 +163,8 @@ async function verify(state, session) {
   const html = details.status === 200 ? await details.text() : "";
   const log = await session.request(`/checks/${state.code}/log/`);
   const logHtml = log.status === 200 ? await log.text() : "";
-  const pings = (logHtml.match(/class="[^"]*\bping\b[^"]*"/g) ?? []).length;
+  // Each recorded ping is an "ok" row in the check's own log.
+  const pings = (logHtml.match(/<tr class="ok"/g) ?? []).length;
   return {
     detailsStatus: details.status,
     detailsHasName: html.includes(NAME),
