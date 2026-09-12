@@ -1,0 +1,235 @@
+/* Keep the selected Timeline composition; live records supply its contents. */
+.sg-record-overview {
+  padding-bottom: 40px;
+}
+.sg-overview-head {
+  margin-bottom: 2px;
+}
+.sg-overview-back .sg-view-bar {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.sg-overview-back {
+  margin: 0 0 22px;
+}
+.sg-overview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.sg-overview-title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.sg-overview-open {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.sg-overview-open small {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+.sg-overview-open a {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: var(--ax-ink);
+  color: var(--ax-surface);
+  font-size: 13px;
+  text-decoration: none;
+}
+.sg-overview-mascot {
+  width: 84px;
+  height: 84px;
+}
+.sg-overview-mascot .mascot-scene {
+  width: 100%;
+  height: 100%;
+}
+.sg-record-overview .axt-say {
+  animation: none;
+}
+.sg-record-overview .axt-axis {
+  height: 34px;
+}
+.sg-record-overview .axt-ticks b {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--ax-blue);
+  font-size: 11px;
+}
+.sg-overview-unread {
+  position: absolute;
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  padding: 0 8px;
+  background: var(--ax-surface);
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+.sg-overview-loghead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0 12px;
+  border-top: 1px dashed var(--ax-line-2);
+  margin-top: 12px;
+  color: var(--ax-muted);
+  font-size: 12px;
+}
+.sg-overview-loghead button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ax-ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+.sg-overview-log {
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: var(--ax-ink);
+  color: var(--ax-line-2);
+  font: 12px/1.7 var(--ax-mono);
+}
+.sg-overview-log button {
+  display: grid;
+  grid-template-columns: 118px 12px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sg-overview-log button:hover {
+  background: var(--ax-ink-2);
+}
+.sg-overview-log time {
+  opacity: 0.75;
+}
+.sg-overview-log button[data-status="passed"] b {
+  color: var(--ax-verified-line);
+}
+.sg-overview-log button[data-status="failed"] b {
+  color: var(--ax-failed-line);
+}
+.sg-overview-log span {
+  overflow-wrap: anywhere;
+}
+.sg-overview-map .sg-overview-map-label {
+  fill: var(--ax-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.sg-overview-map .sg-overview-map-note {
+  fill: var(--ax-muted);
+  font-size: 12px;
+}
+.sg-overview-attention {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  border: 1px solid var(--ax-waiting-line);
+  border-radius: 12px;
+  background: var(--ax-waiting-bg);
+  color: var(--ax-ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sg-overview-detail {
+  border-top: 1px solid var(--ax-line);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+@media (max-width: 700px) {
+  .sg-record-overview {
+    padding: 12px 16px 30px;
+  }
+  .sg-record-overview .axt {
+    padding: 20px 16px 16px;
+  }
+  .sg-record-overview .axt-say {
+    font-size: 24px;
+  }
+  .sg-overview-title,
+  .sg-overview-loghead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .sg-overview-open {
+    flex-wrap: wrap;
+  }
+  .sg-overview-timeline-scroll {
+    overflow-x: auto;
+  }
+  .sg-record-overview .axt-time {
+    min-width: 620px;
+  }
+  .sg-record-overview .axo-lower {
+    grid-template-columns: 1fr;
+  }
+  .sg-overview-log button {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 4px 8px;
+  }
+  .sg-overview-log time {
+    grid-column: 2;
+    font-size: 11px;
+  }
+  .sg-overview-log b {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+.sg-record-overview .axo,
+.sg-record-overview .axt,
+.sg-record-overview .axt-top > div,
+.sg-overview-timeline-scroll {
+  min-width: 0;
+}
+.sg-overview-timeline-scroll {
+  max-width: 100%;
+}
+.sg-overview-mascot .mascot-scene {
+  position: relative;
+}
+.sg-overview-mascot .mascot-scene canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.sg-overview-mascot .mascot-fallback {
+  display: none;
+}
+.sg-overview-mascot [data-fallback] .mascot-fallback {
+  display: block;
+  text-align: center;
+  font: 24px/0.8 var(--ax-mono);
+  color: var(--ax-ink);
+  padding-top: 18px;
+}
+.sg-record-overview .axt-ev[data-tone="fail"]::after {
+  animation: none;
+}

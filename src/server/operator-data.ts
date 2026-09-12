@@ -84,6 +84,9 @@ export const informationInputSchema = z.object({
         .array(
           z.object({
             label: z.string(),
+            subject: z
+              .enum(["application", "backups", "server", "access"])
+              .optional(),
             status: z.enum(["passed", "failed", "info"]),
           }),
         )

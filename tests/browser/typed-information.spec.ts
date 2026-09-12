@@ -30,7 +30,13 @@ test("typed results render in chat and views and update by record ID @journey-sh
     role: "status",
     status: "verified",
     url: "http://127.0.0.1:8080",
-    checks: [{ label: "Private endpoint responded", status: "passed" }],
+    checks: [
+      {
+        label: "Private endpoint responded",
+        status: "passed",
+        subject: "access",
+      },
+    ],
     content: {
       kind: "application-access",
       mode: "private",
@@ -48,7 +54,13 @@ test("typed results render in chat and views and update by record ID @journey-sh
         views: ["overview", "deployment"],
         role: "outcome",
         status: "verified",
-        checks: [{ label: "Data survived restart", status: "passed" }],
+        checks: [
+          {
+            label: "Data survived restart",
+            status: "passed",
+            subject: "application",
+          },
+        ],
         content: {
           kind: "deployment",
           repositoryUrl: "https://github.com/qa/app",
@@ -113,13 +125,30 @@ test("typed results render in chat and views and update by record ID @journey-sh
       .first()
       .click();
     const overview = page.locator(".sg-section-overview");
-    await expect(overview.locator(".sg-record").first()).toHaveAttribute(
-      "data-kind",
-      "application-access",
-    );
     await expect(
-      overview.getByText("Encrypted SSH", { exact: true }),
+      overview.getByRole("heading", {
+        name: "Application deployed",
+        exact: true,
+      }),
     ).toBeVisible();
+    await expect(overview.locator(".axt-lane")).toHaveCount(4);
+    await expect(
+      overview.locator(".axt-lane").filter({ hasText: "Backups" }),
+    ).toContainText("Not established");
+    await expect(
+      overview.getByRole("link", { name: "Open application" }),
+    ).toHaveAttribute("href", "http://127.0.0.1:8080");
+    await expect(
+      overview.getByRole("button", { name: "Open Architecture", exact: true }),
+    ).toBeVisible();
+    await overview
+      .getByRole("button", { name: /Checks: Application deployed/ })
+      .click();
+    await expect(overview.locator(".sg-overview-detail")).toContainText(
+      "app:candidate",
+    );
+    await overview.getByRole("button", { name: "Close details" }).click();
+    await expect(overview.locator(".sg-overview-detail")).toHaveCount(0);
     await page.screenshot({
       path: "tests/results/typed-information-overview.png",
     });
@@ -157,8 +186,19 @@ test("typed results render in chat and views and update by record ID @journey-sh
     await expect(
       view.getByRole("link", { name: "Open application" }),
     ).toHaveAttribute("href", "http://127.0.0.1:8081");
+    await page
+      .getByRole("button", { name: "Overview", exact: true })
+      .first()
+      .click();
+    await expect(
+      overview.getByRole("link", { name: "Open application" }),
+    ).toHaveAttribute("href", "http://127.0.0.1:8081");
     await page.setViewportSize({ width: 390, height: 844 });
-    await view.locator(".sg-record").first().scrollIntoViewIfNeeded();
+    await overview
+      .getByRole("heading", { name: "Overview", exact: true })
+      .scrollIntoViewIfNeeded();
+    const heroBounds = await overview.locator(".axt").boundingBox();
+    expect(heroBounds!.x + heroBounds!.width).toBeLessThanOrEqual(390);
     await page.screenshot({
       path: "tests/results/typed-information-mobile.png",
     });

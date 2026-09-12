@@ -173,6 +173,9 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     title: "Application deployed",
     body: "The deployment is recorded.",
     presentation: {
+      checks: [
+        { label: "HTTP responded", status: "passed", subject: "application" },
+      ],
       views: ["overview", "deployment"],
       role: "outcome",
       content: {
@@ -205,6 +208,10 @@ it("persists typed deployment/access facts and shares edits without duplicating 
     listInformation(app).find((r) => r.id === deployment.id)?.presentation
       ?.content,
   ).toMatchObject({ kind: "deployment", image: "app:candidate" });
+  expect(
+    listInformation(app).find((r) => r.id === deployment.id)?.presentation
+      ?.checks[0].subject,
+  ).toBe("application");
   saveInformation(
     app,
     {

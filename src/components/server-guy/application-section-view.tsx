@@ -13,6 +13,7 @@ import type { OperatorView } from "@/server/types";
 import { InformationCard } from "./information-card";
 import { LocalTime } from "./local-time";
 import { rank } from "./presentation";
+import { RecordOverview } from "./record-overview";
 import { ApplicationOverview } from "./application-overview";
 import {
   applicationSections,
@@ -128,6 +129,15 @@ export function ApplicationSectionView({
   // The live operator reads shared information. Older layouts below remain
   // available only to the isolated visual-reference scenarios.
   if (view.information !== undefined) {
+    if (section === "overview")
+      return (
+        <RecordOverview
+          records={view.information}
+          now={now}
+          bar={bar}
+          onOpen={onOpenDestination}
+        />
+      );
     const records = view.information
       .filter((r) => !r.retiredAt && r.presentation?.views.includes(section))
       // What needs you comes first, what is simply true next, what Pi
