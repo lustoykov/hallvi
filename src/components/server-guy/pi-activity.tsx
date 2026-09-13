@@ -38,6 +38,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
+import { plainText } from "./execution-text";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -164,41 +165,6 @@ function subject(record: ActivityRecord) {
     // Arguments that are not JSON are shown only in the opened row.
   }
   return null;
-}
-
-/**
- * What a call actually said, rather than the envelope it arrived in. Tool
- * arguments and results are stored as JSON, and a shell script read through
- * JSON escaping — `set -eu\nprintf ...` on one line — is not readable. So the
- * longest string in the object is printed as itself, and the small scalars
- * that came with it follow on one line.
- */
-function plain(stored: string) {
-  const trimmed = stored.trim();
-  if (!trimmed || (trimmed[0] !== "{" && trimmed[0] !== "[")) return stored;
-  let value: unknown;
-  try {
-    value = JSON.parse(trimmed);
-  } catch {
-    // Text cut at its limit is no longer valid JSON; show it as it is.
-    return stored;
-  }
-  if (typeof value === "string") return value;
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return stored;
-  const entries = Object.entries(value as Record<string, unknown>);
-  const strings = entries.filter(
-    (entry): entry is [string, string] => typeof entry[1] === "string",
-  );
-  if (!strings.length) return stored;
-  const main = strings.reduce((a, b) => (b[1].length > a[1].length ? b : a));
-  const rest = entries
-    .filter(([key]) => key !== main[0])
-    .map(
-      ([key, item]) =>
-        `${key}: ${typeof item === "string" ? item : JSON.stringify(item)}`,
-    );
-  return rest.length ? `${main[1]}\n\n${rest.join("\n")}` : main[1];
 }
 
 function duration(record: { startedAt: string; finishedAt?: string }) {
@@ -467,9 +433,9 @@ function Row({ record }: { record: ActivityRecord }) {
       </button>
       {open && (
         <div className="sg-did-detail">
-          <pre>{plain(record.args) || "Nothing recorded."}</pre>
+          <pre>{plainText(record.args) || "Nothing recorded."}</pre>
           <pre data-wrong={wrong || undefined}>
-            {plain(shown) ||
+            {plainText(shown) ||
               (record.status === "running"
                 ? "Nothing yet."
                 : "Nothing was recorded for this call.")}

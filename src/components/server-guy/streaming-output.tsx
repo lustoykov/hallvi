@@ -1,17 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { plainText } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
-
-function commandText(input: string) {
-  try {
-    const value = JSON.parse(input);
-    if (typeof value?.command === "string") return value.command;
-  } catch {
-    // Some recorded commands are already plain text.
-  }
-  return input;
-}
 
 function outputText(item: ExecutionRecord) {
   // Earlier execution records stored the whole command result as JSON.
@@ -35,7 +26,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const [copyStatus, setCopyStatus] = useState("");
   const viewport = useRef<HTMLPreElement>(null);
   const output = outputText(item);
-  const command = commandText(item.input);
+  const command = plainText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
 

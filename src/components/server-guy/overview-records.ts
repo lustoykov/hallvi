@@ -12,6 +12,7 @@
 // was about, and its headline condition comes from the one record that states
 // the application itself.
 
+import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
@@ -277,7 +278,7 @@ export function overviewFromRecords({
         id: `approval:${execution.id}`,
         tone: "waiting",
         title: "A decision is waiting",
-        detail: execution.input.split("\n")[0].slice(0, 200),
+        detail: clip(essence(commandOf(execution.input)), 200),
         primary: {
           label: "Open the conversation",
           open: () => onOpenConversation(execution.chatId, null),

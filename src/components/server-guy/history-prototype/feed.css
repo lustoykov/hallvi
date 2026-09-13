@@ -129,8 +129,11 @@
   color: var(--ax-ink-2);
   text-wrap: pretty;
 }
+/* The chip, the dot and the spine already say it failed. Colouring three
+   lines of explanation red as well makes the reader's eye bounce off the one
+   part of the entry that tells them what to do about it. */
 .axh-row[data-state="failed"] .axh-summary {
-  color: var(--ax-failed);
+  color: var(--ax-ink-2);
 }
 .axh-meta {
   margin: 0;
@@ -311,4 +314,45 @@
 }
 :root[data-ax-motion="reduced"] .axh-row.is-flash {
   animation: none;
+}
+
+/* Evidence, not events.
+   A History page is roughly two-thirds individual commands and one-third the
+   conclusions Pi drew from them. At equal weight the commands win by sheer
+   count, and the page stops being a history of the application and becomes a
+   shell log. Evidence keeps its place in the sequence and gives up its
+   prominence: no chip, no summary line, the command set in mono at meta size.
+   A failed command is not quiet and never takes this treatment. */
+.axh-row[data-weight="evidence"] .axh-title {
+  font-family: var(
+    --font-geist-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace
+  );
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ax-muted);
+}
+.axh-row[data-weight="evidence"] .axh-dot {
+  transform: scale(0.62);
+  opacity: 0.75;
+}
+.axh-row[data-weight="evidence"] + .axh-row[data-weight="evidence"] {
+  margin-top: -2px;
+}
+.axh-row[data-weight="evidence"]:hover .axh-title {
+  color: var(--ax-ink-2);
+}
+/* The exit status rides on the title's line rather than claiming one. */
+.axh-exit {
+  font-size: 11px;
+  color: var(--ax-muted);
+  font-variant-numeric: tabular-nums;
+}
+.axh-row[data-state="failed"] .axh-exit {
+  color: var(--ax-failed);
+  font-weight: 600;
 }

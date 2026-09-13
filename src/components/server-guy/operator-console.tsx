@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { plainText } from "./execution-text";
 import type {
   ExecutionRecord,
   OperatorSettings,
@@ -227,7 +228,7 @@ export function OperatorConsole({
                       ? "Review this action"
                       : "Command and output"}
                   </summary>
-                  <pre>{item.input}</pre>
+                  <pre>{plainText(item.input)}</pre>
                   {item.output && <pre>{item.output}</pre>}
                 </details>
               )}

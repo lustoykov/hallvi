@@ -115,11 +115,17 @@ export function FeedRow({
   const evidence = Boolean(op.evidence || op.steps?.length);
   const finished = op.state === "verified" || op.state === "inspected";
   const first = op.destinations.find((item) => item !== "history");
+  // Two different things share this timeline: what Pi established, and the
+  // individual commands it ran to establish it. There are twice as many of the
+  // second, and at equal weight they bury the first. Evidence recedes — except
+  // when it failed, because a failure is never quiet.
+  const quiet = op.source.type === "check" && op.state !== "failed";
   return (
     <li
       id={`axh-${op.id}`}
       className={`axh-row${flash ? " is-flash" : ""}${className ? ` ${className}` : ""}`}
       data-state={op.state}
+      data-weight={quiet ? "evidence" : "record"}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
@@ -129,10 +135,13 @@ export function FeedRow({
       <span className="axh-dot" aria-hidden="true" />
       <div className="axh-body">
         <div className="axh-head">
-          <OpChip state={op.state} />
+          {!quiet && <OpChip state={op.state} />}
           <b className="axh-title">{op.title}</b>
+          {quiet && entry.summary && (
+            <span className="axh-exit">{entry.summary}</span>
+          )}
         </div>
-        <p className="axh-summary">{entry.summary}</p>
+        {!quiet && <p className="axh-summary">{entry.summary}</p>}
         <p className="axh-meta">
           {entry.from}
           {entry.where.length > 0 &&

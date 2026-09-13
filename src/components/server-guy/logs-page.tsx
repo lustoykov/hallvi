@@ -14,6 +14,7 @@
 import { ArrowUpRight, MagnifyingGlass } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 
+import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
 import { LocalTime } from "./local-time";
@@ -198,7 +199,7 @@ export function LogsPage({
             <section className="sg-captured" key={execution.id}>
               <header>
                 <strong>{placeOf(execution.tool)}</strong>
-                <code>{execution.input.split("\n")[0].slice(0, 96)}</code>
+                <code>{clip(essence(commandOf(execution.input)), 96)}</code>
                 <span>
                   Captured <LocalTime value={at} variant="compact" />
                   {typeof execution.exitCode === "number" &&
