@@ -238,3 +238,124 @@ Shop's earlier single-image record was not wrong to keep — it is a real record
 in the older shape, and it still reads. What changed is Pi's guidance:
 everything a release puts on the server is part of it, including the database
 and cache images it did not build.
+
+---
+
+# The browser audit
+
+Everything above was proved before a browser was pointed at it. This is what
+happened when one was.
+
+## Where it ran
+
+| | |
+|---|---|
+| the branch, on real records | `http://127.0.0.1:3410` — Getting Started, Shop, Metrics |
+| isolated scenarios | `http://127.0.0.1:3411` — six applications, one per shape of doubt |
+| the rig's own controller | `http://127.0.0.1:3430` |
+
+The scenario database is built by `node --import tsx scripts/load-scenarios.mjs
+<dir>` and holds states a real journey never produces: a failure forty days
+old, claims just past every horizon, four established absences beside things
+nobody looked at, a recovery, a withdrawal, and one application with every
+destination populated using awkward values — Unicode names, a registry with a
+port, thousands separators, sub-megabyte sizes.
+
+**Scenario records never touch a real application.** They live in their own
+database and their own server.
+
+Its readings age, which is the point and also a chore: rebuild it before
+looking, or a fifteen-minute liveness claim will have gone stale and the page
+will be right about something you did not mean to test.
+
+## What the browser found
+
+Every one of these is a page saying more than its records supported. None
+would have surfaced against a fixture written by the same person as the
+reader.
+
+| where | what it said | what was true |
+|---|---|---|
+| Monitoring | crashed outright | a record established that nothing is watching, and nothing had been observed |
+| Monitoring | "Nothing is listening" | a watcher had gone quiet, which is not the same thing |
+| Monitoring | "No result" | the check ran, passed, and went out of its window |
+| Monitoring | "Good" signal | every reading out of date |
+| Monitoring | green tag beside "has gone quiet" | the tone came from the clock, not the sentence |
+| Monitoring | `http` / `http` on two lines | a check with no detail printed its own label twice |
+| Monitoring, Domains | "(invented)" | the reference scenario's word, on a page drawn from records |
+| Processes | "One process is running" over a red tag | its only check had failed |
+| Processes | two processes both called "Shop" | they run one built image; a name that does not distinguish is not a name |
+| Storage | "Not replaced yet" | the persistence check had **failed** |
+| Storage | "Kept: volumes stay when containers are replaced" | nobody had tested |
+| Storage | a volume of 534 GB | Pi measured 534 **bytes** |
+| Cache & queue | "NaN tasks waiting" | `Number("1,204")` |
+| Cache & queue | "Shop queues nothing" | a Redis whose recorded role is "Queue and cache" |
+| Security | "Nothing stands between the internet and this server" | a Hetzner policy read back: deny unless listed |
+| Security | "Asked for, never read back" | Pi read it back and found it absent |
+| Security | "read just now" | it was read two hours ago |
+| Security | two sentences with no stop between them | Pi's prose rarely ends in one |
+| Domains | "while X is being set up" | nothing records a setup phase |
+| Variables | "They live in the repository" | said of values whose own row names another source |
+| Architecture | one part drawn on top of another | two web processes share the "app" slot |
+| every page | a dead "Open application" link | the tunnel died with a restart |
+| the sidebar | "after deployment" | the application had deployed |
+| the whole product | every ask button dead | no conversation to draft into |
+| the tuner | a name cut mid-word | a sixty-character container name |
+
+## What passed first time
+
+Worth saying, because a list of defects reads as if nothing worked.
+
+- **Keyboard**: forty controls tabbed through, every one with an accessible
+  name and a visible focus ring. No fixes needed.
+- **Sidebar state**: `aria-current="page"` correct on every destination, and
+  it follows browser back and forward.
+- **Parsers**: eighteen adversarial cases over sizes, ports, images, sources
+  and durations — all correct after the earlier size fix.
+- **Restart**: records, subjects, secrets, executions and conversations came
+  back byte for byte across three applications.
+- **Layout**: no horizontal overflow and no clipped text at 1440 or 1180, on
+  96 page visits.
+
+## The sixteen views, and the states each was inspected in
+
+Real means a real Pi record on Getting Started, Shop or Metrics. Scenario
+means the isolated database. Unit means a projection test with the clock in
+hand.
+
+| view | unassessed | absent | partial | fresh | stale | failed |
+|---|---|---|---|---|---|---|
+| Overview | real | scenario | real | real | scenario | scenario |
+| Architecture | real | scenario | real | real | unit | scenario |
+| Deployment | real | — | real | real | unit | unit |
+| History | real | — | real | real | — | scenario |
+| Processes | real | unit | real | real | scenario | scenario |
+| Database | real | unit | real | real | unit | unit |
+| Cache & queue | real | unit | real | real | unit | — |
+| Jobs | real | unit | real | real | unit | unit |
+| Storage | real | unit | real | real | unit | scenario |
+| Backups | real | real | scenario | scenario | unit | — |
+| Logs | real | — | real | real | — | — |
+| Monitoring | real | scenario | real | real | scenario | scenario |
+| Domains | real | unit | scenario | scenario | unit | unit |
+| Environment Variables | real | unit | real | real | — | — |
+| CDN | real | scenario | — | scenario | unit | unit |
+| Security | real | real | real | real | unit | unit |
+
+Where a cell is empty, that state is not one the view meaningfully has: a
+release either happened or did not, so Deployment has no absence; Logs
+collects nothing itself, so it has no failure of its own.
+
+## Still unproved
+
+- **Domains and CDN against a real name.** Both read records, both have unit
+  and scenario coverage, and neither has been driven by DNS that exists. That
+  needs a mutation on a domain the owner owns.
+- **A restore test that actually restored.** Backups' populated state is
+  scenario data; no journey has taken a copy and put it back.
+- **`pi-activity.tsx` reads a ref during render** (two lint errors, pre-existing
+  on main). It works, and the fix risks reintroducing the flashing-card bug
+  that reading during render was added to solve.
+- **Exact-value redaction is exact.** Output containing a secret verbatim is
+  replaced. A command that base64s it, or prints its first eight characters,
+  is not something the product can promise to catch, and it does not claim to.
