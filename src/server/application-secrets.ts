@@ -220,9 +220,22 @@ export function establishSecret(
   write(applicationId, held);
 }
 
-/** The owner takes one back. The handle stops resolving immediately. */
+/**
+ * The owner takes a value back. It stops resolving immediately, and the
+ * request stays open.
+ *
+ * Removing the request as well was a dead end: the request is Pi's and the
+ * value is the owner's, so an owner who withdrew by mistake — or who wanted
+ * to supply a different value — could not, because nothing had asked for it
+ * any more, and only Pi can ask. Keeping the request open leaves the page
+ * saying what is still needed, which is also the truth.
+ */
 export function withdrawSecret(applicationId: string, name: string) {
-  const held = read(applicationId).filter((item) => item.name !== name);
+  const held = read(applicationId);
+  const found = held.find((item) => item.name === name);
+  if (!found) return;
+  found.sealed = null;
+  found.establishedAt = null;
   write(applicationId, held);
 }
 

@@ -125,6 +125,22 @@ describe("giving a command a secret", () => {
     ).toThrow(/No value has been supplied/);
   });
 
+  it("leaves the request open, so the owner can give a different one", () => {
+    // Removing the request as well was a dead end: only Pi can ask, so an
+    // owner who withdrew by mistake could not put anything back.
+    secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
+    secrets.withdrawSecret(APP, "GF_SECURITY_ADMIN_PASSWORD");
+    const listed = secrets.listSecrets(APP);
+    expect(listed.map((item) => item.name)).toContain(
+      "GF_SECURITY_ADMIN_PASSWORD",
+    );
+    expect(listed[0].establishedAt).toBeNull();
+    secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", "a-second-one");
+    expect(
+      secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"]),
+    ).toContain("a-second-one");
+  });
+
   it("refuses a command that writes a handle into its own text", () => {
     const refuse = () =>
       secrets.refuseSecretHandles(

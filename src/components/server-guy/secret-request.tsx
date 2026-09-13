@@ -128,7 +128,8 @@ function SecretField({
           type="button"
           className="sg-secret-drop"
           disabled={busy}
-          title="Server Guy should not have asked for this"
+          title="Forget the value I gave you"
+          aria-label="Forget the value I gave you"
           onClick={() => void send("DELETE")}
         >
           <Trash weight="bold" aria-hidden="true" />
