@@ -172,9 +172,10 @@ describe("stackOf", () => {
     const notes = Object.fromEntries(
       hiddenSections(stack, null).map((section) => [section.id, section.note]),
     );
-    // A CDN can be recorded now, so a deployment that has one and does not
-    // use it reads "not used" rather than "nothing can record this".
-    expect(notes.cdn).toBe("not used");
+    // Nothing has been deployed in this fixture, so the honest note is that
+    // the destination appears once something has. "Not used" would be a
+    // claim about an application that has not run yet.
+    expect(notes.cdn).toBe("after deployment");
     expect(notes.security).toBe("check firewall rules");
     expect(
       visibleSections(stack, null, {}, true).some(

@@ -162,14 +162,16 @@ const of = (records: SavedInformation[]) => ({
     applicationId: APP,
     applicationName: "App",
     now: NOW,
-  }),
+  })!,
   overview: overviewFromRecords({
     records,
     executions: [],
     applicationId: APP,
     applicationName: "App",
+    headline: "App",
     chats: [],
     now: NOW,
+    onOpenConversation: () => {},
   }),
 });
 
@@ -196,17 +198,17 @@ describe("Architecture and the destinations agree", () => {
   });
 
   it("never shows a part healthy that its own page shows failing", () => {
-    const records = world().map((item) =>
+    const records: SavedInformation[] = world().map((item) =>
       item.presentation?.states?.ref.id === "web" &&
       item.presentation.states.ref.kind === "process"
-        ? {
+        ? ({
             ...item,
             presentation: {
               ...item.presentation,
               status: "failed" as const,
               checks: [check("http", "failed", "liveness")],
             },
-          }
+          } as SavedInformation)
         : item,
     );
     const { architecture, processes } = of(records);
@@ -294,28 +296,30 @@ describe("Overview does not disagree with the lane it links to", () => {
   it("reads the application healthy only when its own page does", () => {
     const { overview, processes } = of(world());
     expect(processes.tone).toBe("verified");
-    expect(overview.vitals.some((item) => item.tone === "failed")).toBe(false);
+    expect(
+      overview.vitals.some((item) => item.status.certainty === "failed"),
+    ).toBe(false);
   });
 
   it("shows a failure on Overview when the destination shows one", () => {
-    const records = world().map((item) =>
+    const records: SavedInformation[] = world().map((item) =>
       item.presentation?.states?.ref.id === "web" &&
       item.presentation.states.ref.kind === "process"
-        ? {
+        ? ({
             ...item,
             presentation: {
               ...item.presentation,
               status: "failed" as const,
               checks: [check("http", "failed", "liveness")],
             },
-          }
+          } as SavedInformation)
         : item,
     );
     const { overview, processes } = of(records);
     expect(processes.tone).toBe("failed");
     expect(
       overview.needs.length > 0 ||
-        overview.vitals.some((item) => item.tone === "failed"),
+        overview.vitals.some((item) => item.status.certainty === "failed"),
     ).toBe(true);
   });
 });

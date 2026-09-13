@@ -468,7 +468,22 @@ export function OperatorShell({
   // Drafts a message in a conversation without sending it.
   function askInConversation(chatId: string | null, draft: string) {
     const target = chatId ?? view.selectedChatId;
-    if (!target) return;
+    if (!target) {
+      // Every destination's primary action goes through here. Returning
+      // quietly made all of them dead buttons for an application whose only
+      // conversation had been archived — the page invites the question and
+      // then swallows it. Start one instead.
+      if (!application) return;
+      void run("chat", async () => {
+        const next = await api.createChat(application.id);
+        const started = next.selectedChatId;
+        if (started) setDrafts((current) => ({ ...current, [started]: draft }));
+        return next;
+      });
+      closeSection();
+      focusComposer();
+      return;
+    }
     setDrafts((current) => ({ ...current, [target]: draft }));
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));

@@ -11,18 +11,31 @@ import { processesFromRecords } from "@/components/server-guy/processes-records"
 import { reachFromRecords } from "@/components/server-guy/reach-records";
 import { storageFromRecords } from "@/components/server-guy/storage-records";
 import { supplyFromRecords } from "@/components/server-guy/supply-records";
-import { APP, NOW, resetRecordIds, states, topology } from "../fixtures/records";
+import {
+  APP,
+  NOW,
+  resetRecordIds,
+  states,
+  topology,
+} from "../fixtures/records";
 
 beforeEach(resetRecordIds);
 
 const fact = (key: string, value: string, claim = "contents") =>
   ({ key, label: key, value, claim, basis: "observed" }) as never;
-const check = (key: string, status: "passed" | "failed", claim = "reachability") =>
-  ({ key, label: key, status, claim, basis: "observed" }) as never;
+const check = (
+  key: string,
+  status: "passed" | "failed",
+  claim = "reachability",
+) => ({ key, label: key, status, claim, basis: "observed" }) as never;
 
 const sizeOf = (value: string) =>
   storageFromRecords({
-    records: [states({ kind: "volume", id: "v" }, { facts: [fact("size", value)] } as never)],
+    records: [
+      states({ kind: "volume", id: "v" }, {
+        facts: [fact("size", value)],
+      } as never),
+    ],
     applicationId: APP,
     now: NOW,
   }).volumes[0].sizeGb;
@@ -31,7 +44,9 @@ const portOf = (value: string) =>
   processesFromRecords({
     records: [
       topology([{ id: "web", kind: "web", name: "Web" }]),
-      states({ kind: "process", id: "web" }, { facts: [fact("port", value, "configuration")] } as never),
+      states({ kind: "process", id: "web" }, {
+        facts: [fact("port", value, "configuration")],
+      } as never),
     ],
     applicationId: APP,
     now: NOW,
@@ -41,7 +56,9 @@ const imageOf = (value: string) =>
   processesFromRecords({
     records: [
       topology([{ id: "web", kind: "web", name: "Web" }]),
-      states({ kind: "process", id: "web" }, { facts: [fact("image", value, "identity")] } as never),
+      states({ kind: "process", id: "web" }, {
+        facts: [fact("image", value, "identity")],
+      } as never),
     ],
     applicationId: APP,
     now: NOW,
@@ -140,13 +157,13 @@ describe("sources on a door", () => {
   const doorOf = (sources: string) =>
     reachFromRecords({
       records: [
-        states(
-          { kind: "door", id: "d" },
-          {
-            facts: [fact("port", "443", "configuration"), fact("sources", sources, "configuration")],
-            checks: [check("open", "passed")],
-          } as never,
-        ),
+        states({ kind: "door", id: "d" }, {
+          facts: [
+            fact("port", "443", "configuration"),
+            fact("sources", sources, "configuration"),
+          ],
+          checks: [check("open", "passed")],
+        } as never),
       ],
       applicationId: APP,
       applicationName: "App",

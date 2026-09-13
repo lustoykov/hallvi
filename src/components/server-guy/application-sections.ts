@@ -138,11 +138,20 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
  * planned map is worth navigating to before anything runs — and both pages
  * say plainly that nothing has been looked at yet.
  */
+/**
+ * What the records establish, plus whether anything has been deployed at all.
+ * The second is not a destination; it is what tells a hidden row apart from a
+ * row that is hidden because nothing has happened yet.
+ */
+export type Recorded = Partial<Record<ApplicationSection, boolean>> & {
+  deployed?: boolean;
+};
+
 export function recordedSections(
   records: SavedInformation[],
   /** Whether Pi has asked the owner for a value it has not been given. */
   waiting = false,
-) {
+): Recorded {
   const live = records.filter((record) => !record.retiredAt);
   const states = (...kinds: string[]) =>
     live.some((record) =>
@@ -168,10 +177,13 @@ export function recordedSections(
     // including a value Pi has asked the owner for and not yet been given.
     variables: secrets || waiting,
     cdn: states("cdn"),
+    deployed: live.some(
+      (record) => record.presentation?.content?.kind === "deployment",
+    ),
     // Backups and Monitoring are always listed: "nothing is watching" and
     // "nothing has been established about copies" are the answers a reader
     // most needs, and a destination that hides them says the opposite.
-  } as Partial<Record<ApplicationSection, boolean>>;
+  };
 }
 
 /** Whether a hideable destination has anything recorded to show. */
@@ -181,7 +193,7 @@ export function sectionRecorded(
   facts: ApplicationFacts = {},
   hasHost = false,
   /** What the records establish; preferred over the retired stack model. */
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   if (recorded[section] !== undefined) return recorded[section];
   switch (section) {
@@ -215,7 +227,7 @@ export function visibleSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   return applicationSections.filter(
     (section) =>
@@ -234,7 +246,7 @@ export function hiddenSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   return applicationSections
     .filter(
@@ -250,9 +262,12 @@ export function hiddenSections(
         section.id === "security"
           ? "check firewall rules"
           : !("available" in section && section.available)
-            ? "nothing recorded yet"
-            : stack.recorded
-              ? "not used"
+            ? "nothing can record this yet"
+            : recorded.deployed
+              ? // Deployed, and still nothing names one. "Not used" would be
+                // a claim; "after deployment" was simply wrong, because the
+                // deployment has happened.
+                "nothing has looked"
               : "after deployment",
     }));
 }
