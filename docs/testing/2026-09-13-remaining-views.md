@@ -209,7 +209,32 @@ records disappear with the containers.
 - **`pi-activity.tsx` reads a ref during render** (2 lint errors, pre-existing
   on main). It works, and the fix risks reintroducing the flashing-card bug
   that reading during render was added to solve. Left alone deliberately.
-- **Pi recorded Shop as one image** rather than using `services[]`, because it
-  built one image for its own three processes and treated PostgreSQL and Redis
-  as infrastructure. That is a defensible reading, so the multi-service shape
-  is proved by tests rather than by this journey.
+- ~~Pi recorded Shop as one image.~~ Proved on a third journey; see below.
+
+## Journey 3 · Metrics, and a release with two images
+
+`examples/grafana-prometheus`: two published images, neither built, both
+first-class. Pi asked for `GF_SECURITY_ADMIN_PASSWORD` through the new
+structured flow, reused the existing server rather than buying one, and
+recorded the release as:
+
+```json
+"services": [
+  { "process": "grafana",    "image": "grafana/grafana:13.2.1",
+    "digest": "sha256:f772d434e8fa…" },
+  { "process": "prometheus", "image": "prom/prometheus:v3.14.0",
+    "digest": "sha256:5ce7540c3c00…" }
+]
+```
+
+No `image` field at all, both digests pinned. Deployment draws "2 services"
+and opens to the two rows above. That is prerequisite A proved by a journey
+rather than by a fixture.
+
+Eleven subjects from the one turn: `application`, `host`, `process` ×2,
+`database`, `volume` ×2, `firewall`, `access`, `variable`, `backup-plan`.
+
+Shop's earlier single-image record was not wrong to keep — it is a real record
+in the older shape, and it still reads. What changed is Pi's guidance:
+everything a release puts on the server is part of it, including the database
+and cache images it did not build.
