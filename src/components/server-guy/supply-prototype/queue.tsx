@@ -42,21 +42,26 @@ export function QueueDirection({
       <div className="axqu-lede">
         <div>
           <h2>
+            {/* A broker on record with no queue on record is not an
+                application that queues nothing — it is one whose queue
+                nobody has looked into, which is a different sentence. */}
             {measured
               ? waiting === 0
                 ? "Nothing is waiting in the queue."
                 : `${waiting} task${waiting === 1 ? "" : "s"} waiting for a worker.`
               : queue
                 ? `${story.name} has a queue, and nothing has measured it.`
-                : `${story.name} queues nothing, so nothing is waiting.`}
+                : broker
+                  ? `${story.name} has a broker, and nothing has looked at what is in it.`
+                  : `Nothing has looked at whether ${story.name} caches or queues anything.`}
           </h2>
           <p>
             <Tag tone={measured ? "verified" : queue ? "stale" : "planned"}>
               {measured
                 ? `Measured ${ago(measured.at, now)}`
-                : queue
+                : queue || broker
                   ? "Never measured"
-                  : "No cache, no queue"}
+                  : "Not assessed"}
             </Tag>
             <span>
               {measured
