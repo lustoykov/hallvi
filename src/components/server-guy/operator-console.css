@@ -187,6 +187,11 @@
 .sg-stream-controls span {
   color: #bec6d4;
 }
+/* The clock sits away from the buttons: it is read, not pressed. */
+.sg-stream-pulse {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
 .sg-stream :focus-visible {
   outline: 2px solid #8aaaf0;
   outline-offset: -2px;

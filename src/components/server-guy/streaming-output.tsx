@@ -18,6 +18,31 @@ function outputText(item: ExecutionRecord) {
   return item.output;
 }
 
+const spell = (seconds: number) =>
+  seconds < 60
+    ? `${seconds}s`
+    : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+
+/**
+ * What a long command looks like while it says nothing.
+ *
+ * Building Paperless-ngx installs 201 Python packages and prints nothing for
+ * minutes at a stretch. The last line on screen then reads exactly the same
+ * whether the command is working, wedged or gone, and the reader has no way
+ * to tell. The clock can: "running 6m 12s · quiet for 3m 40s" is the same
+ * screen with the missing fact restored.
+ */
+export function pulse(item: ExecutionRecord, now: number) {
+  const started = Date.parse(item.createdAt);
+  if (!now || !Number.isFinite(started) || now < started) return null;
+  const running = `running ${spell(Math.floor((now - started) / 1000))}`;
+  const spoke = item.outputAt ? Date.parse(item.outputAt) : NaN;
+  if (!Number.isFinite(spoke) || now < spoke) return running;
+  const quiet = Math.floor((now - spoke) / 1000);
+  // Under twenty seconds is not a silence, it is the gap between two lines.
+  return quiet < 20 ? running : `${running} · quiet for ${spell(quiet)}`;
+}
+
 export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   // A command waiting for a decision opens closed. The terminal was open by
   // default, which made a dark block of shell the primary content of the one
@@ -37,6 +62,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const command = plainText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    if (!running) return setNow(0);
+    setNow(Date.now());
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [running]);
 
   useEffect(() => {
     if (!follow || !open) return;
@@ -134,6 +167,15 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
             <button type="button" onClick={() => void copy()}>
               {output ? "Copy" : "Copy command"}
             </button>
+            {/* From the deployment work merged into this branch: a command
+                that has gone quiet says how long it has been running and how
+                long since it last spoke, so silence is legible as silence
+                rather than as a stall. */}
+            {running && (
+              <span className="sg-stream-pulse" role="status">
+                {pulse(item, now)}
+              </span>
+            )}
             <span role="status">{copyStatus}</span>
           </div>
         </div>

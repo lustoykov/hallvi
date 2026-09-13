@@ -70,6 +70,27 @@ describe("chat markdown", () => {
     );
   });
 
+  it("never puts a link inside a link", () => {
+    // The handover sentence: the link text is the URL, so the bare-URL rule
+    // used to wrap it in a second anchor. Nested anchors are invalid HTML and
+    // React's hydration threw away the whole message when it met them.
+    const handover = render(
+      "**[http://127.0.0.1:3000](http://127.0.0.1:3000)**",
+    );
+    expect(handover).toBe(
+      '<p><strong><a href="http://127.0.0.1:3000" rel="noreferrer" target="_blank">http://127.0.0.1:3000</a></strong></p>',
+    );
+    expect(handover.match(/<a /g)).toHaveLength(1);
+    const labelled = render("Open [the app](https://example.com/app) now.");
+    expect(labelled).toBe(
+      '<p>Open <a href="https://example.com/app" rel="noreferrer" target="_blank">the app</a> now.</p>',
+    );
+    // A bare URL on its own still becomes one link.
+    expect(render("Reach it at https://example.com/app.")).toBe(
+      '<p>Reach it at <a href="https://example.com/app" rel="noreferrer" target="_blank">https://example.com/app</a>.</p>',
+    );
+  });
+
   it("keeps single newlines visible inside a paragraph", () => {
     expect(render("Application: todo\nPermission policy: Pi decides")).toBe(
       "<p>Application: todo<br/>Permission policy: Pi decides</p>",

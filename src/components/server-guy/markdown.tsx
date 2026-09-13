@@ -159,7 +159,15 @@ function renderLines(lines: string[]): ReactNode {
 const INLINE =
   /(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)|\*\*((?:[^*\n]|\*(?!\*))+?)\*\*|(?<![A-Za-z0-9])__([^_\n]+?)__(?![A-Za-z0-9])|\*([^*\s](?:[^*\n]*?[^*\s])?)\*|(?<![A-Za-z0-9])_([^_\s](?:[^_\n]*?[^_\s])?)_(?![A-Za-z0-9])|\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+)/g;
 
-function renderInline(text: string): ReactNode[] {
+/**
+ * `insideLink` stops a link from growing another link inside itself. The
+ * commonest sentence this product writes is the one handing over the
+ * application — `[http://127.0.0.1:3000](http://127.0.0.1:3000)` — whose link
+ * text is a URL, and the bare-URL rule used to wrap that text in a second
+ * anchor. Nested anchors are invalid HTML, so React's hydration failed and
+ * threw away the whole message.
+ */
+function renderInline(text: string, insideLink = false): ReactNode[] {
   const nodes: ReactNode[] = [];
   let last = 0;
   let key = 0;
@@ -183,23 +191,38 @@ function renderInline(text: string): ReactNode[] {
     if (code !== undefined) {
       nodes.push(<code key={key++}>{code.trim()}</code>);
     } else if (bold !== undefined || boldAlt !== undefined) {
-      nodes.push(<strong key={key++}>{renderInline(bold ?? boldAlt)}</strong>);
-    } else if (emphasis !== undefined || emphasisAlt !== undefined) {
-      nodes.push(<em key={key++}>{renderInline(emphasis ?? emphasisAlt)}</em>);
-    } else if (linkText !== undefined) {
       nodes.push(
-        <a href={linkHref} key={key++} rel="noreferrer" target="_blank">
-          {renderInline(linkText)}
-        </a>,
+        <strong key={key++}>
+          {renderInline(bold ?? boldAlt, insideLink)}
+        </strong>,
+      );
+    } else if (emphasis !== undefined || emphasisAlt !== undefined) {
+      nodes.push(
+        <em key={key++}>{renderInline(emphasis ?? emphasisAlt, insideLink)}</em>,
+      );
+    } else if (linkText !== undefined) {
+      const inner = renderInline(linkText, true);
+      nodes.push(
+        insideLink ? (
+          <Fragment key={key++}>{inner}</Fragment>
+        ) : (
+          <a href={linkHref} key={key++} rel="noreferrer" target="_blank">
+            {inner}
+          </a>
+        ),
       );
     } else if (bareUrl !== undefined) {
       // Sentence punctuation after a pasted URL is not part of it.
       const trailing = /[.,;:!?]+$/.exec(bareUrl)?.[0] ?? "";
       const href = bareUrl.slice(0, bareUrl.length - trailing.length);
       nodes.push(
-        <a href={href} key={key++} rel="noreferrer" target="_blank">
-          {href}
-        </a>,
+        insideLink ? (
+          <Fragment key={key++}>{href}</Fragment>
+        ) : (
+          <a href={href} key={key++} rel="noreferrer" target="_blank">
+            {href}
+          </a>
+        ),
       );
       if (trailing) nodes.push(trailing);
     }

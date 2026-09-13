@@ -2,11 +2,11 @@ import { z } from "zod";
 
 import { GithubAccessError, githubJson } from "./github-api";
 import {
-  connectedGithubCredential,
   currentGithubConnectionId,
   githubAccountSchema,
   invalidateGithubConnection,
   readGithubConnection,
+  repositoryCredential,
 } from "./github-connection";
 import type { GithubConnection } from "./github-connection";
 
@@ -15,6 +15,9 @@ export interface RepositoryIdentity {
   name: string;
   canonicalUrl: string;
 }
+
+/** What a check that used no login records as its credential. */
+export const ANONYMOUS_CREDENTIAL = "Public repository, read without a login";
 
 export interface GithubInspection {
   status: "passed" | "failed" | "unavailable";
@@ -203,12 +206,12 @@ async function inspectGithubRepositoryAttempt(
   let connection: GithubConnection | undefined;
 
   try {
-    const credential = await connectedGithubCredential();
-    connection = credential.connection;
+    const credential = await repositoryCredential();
+    connection = credential.connection ?? undefined;
     const { token } = credential;
-    const identity = await githubJson("/user", token);
-    const account = githubAccountSchema.parse(identity.data);
-    if (account.id !== connection.account.id)
+    const identity = token ? await githubJson("/user", token) : null;
+    const account = identity ? githubAccountSchema.parse(identity.data) : null;
+    if (connection && account && account.id !== connection.account.id)
       throw new GithubAccessError(
         "The GitHub account changed. Choose a connection again in Settings.",
         "auth",
@@ -230,22 +233,31 @@ async function inspectGithubRepositoryAttempt(
       GithubInspection["raw"],
       "installationId" | "repositorySelection" | "grantedPermissions"
     >;
-    try {
-      scope = await verifyInstallation(token, connection, repo);
-    } catch (error) {
-      if (
-        !(error instanceof GithubAccessError) ||
-        error.kind !== "access" ||
-        repo.visibility !== "public"
-      )
-        throw error;
-      // Public upstream software is readable without installing our App in
-      // its owner's account. This is read authority only; publication still
-      // requires the exact installation and its separate write checks.
+    if (!token || !connection) {
+      // GitHub answered for this repository without being asked who we are,
+      // so it is public and nothing was privileged about reading it.
       scope = {
-        repositorySelection: "public-read",
+        repositorySelection: "public-anonymous",
         grantedPermissions: { contents: "read" },
       };
+    } else {
+      try {
+        scope = await verifyInstallation(token, connection, repo);
+      } catch (error) {
+        if (
+          !(error instanceof GithubAccessError) ||
+          error.kind !== "access" ||
+          repo.visibility !== "public"
+        )
+          throw error;
+        // Public upstream software is readable without installing our App in
+        // its owner's account. This is read authority only; publication still
+        // requires the exact installation and its separate write checks.
+        scope = {
+          repositorySelection: "public-read",
+          grantedPermissions: { contents: "read" },
+        };
+      }
     }
     const commit = z
       .object({ sha: z.string().regex(/^[a-f0-9]{40}$/) })
@@ -266,7 +278,7 @@ async function inspectGithubRepositoryAttempt(
         tree.data,
       );
     }
-    if (currentGithubConnectionId() !== connection.id)
+    if (connection && currentGithubConnectionId() !== connection.id)
       throw new GithubAccessError(
         "The connection changed during this check. Run it again.",
         "auth",
@@ -280,17 +292,20 @@ async function inspectGithubRepositoryAttempt(
       raw: {
         repository: repo.full_name,
         repositoryId: repo.id,
-        connectionId: connection.id,
-        credentialSource: "Server Guy GitHub App",
-        accountId: account.id,
-        scopes: identity.scopes,
+        ...(connection ? { connectionId: connection.id } : {}),
+        credentialSource: connection
+          ? "Server Guy GitHub App"
+          : ANONYMOUS_CREDENTIAL,
+        ...(account
+          ? { accountId: account.id, authenticatedAs: account.login }
+          : {}),
+        ...(identity ? { scopes: identity.scopes } : {}),
         ...scope,
         checkedAt,
         visibility: repo.visibility,
         defaultBranch: repo.default_branch,
         commitSha: commit.sha,
         commitUrl,
-        authenticatedAs: account.login,
         // The account's repository role is not the App token's effective grant.
         accountRepositoryPermissions: repo.permissions,
       },
@@ -335,6 +350,9 @@ async function inspectGithubRepositoryAttempt(
       raw: {
         repository: fullName,
         connectionId: connection?.id,
+        credentialSource: connection
+          ? "Server Guy GitHub App"
+          : ANONYMOUS_CREDENTIAL,
         checkedAt,
         error: failure.reason,
       },
