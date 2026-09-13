@@ -1,0 +1,102 @@
+# The simple deployment journey, end to end — 13 September 2026
+
+Docker's Getting Started app, from an empty workspace to a working todo list
+opened through Server Guy's own access link. Run on the local rig, which is
+free and isolated; the accepted Hetzner deployment was not touched.
+
+Views delivered in [#63](https://github.com/lustoykov/server-guy/pull/63);
+the rig support that made the last step possible in
+[#64](https://github.com/lustoykov/server-guy/pull/64).
+
+## Result: pass
+
+| Step | Result |
+| --- | --- |
+| Add application through the UI, repository `docker/getting-started-app` | **pass** |
+| Pi inspects the source and states what it needs | **pass** — port 3000, SQLite at `/etc/todos/todo.db`, so a persistent path and a loopback-only port |
+| Provider catalog, pricing, server creation | **pass** (simulated provider) — CX23 in Helsinki, €5.49 + €0.50 = €5.99/month |
+| Host key scanned and pinned, SSH verified | **pass** (real SSH) |
+| Deploy, verify, restart test | **pass** — container healthy, SQLite survived |
+| Private tunnel opened by the product | **pass** (real SSH forward) — `http://127.0.0.1:13000` |
+| Open and use the application through that link | **pass** — page loads, todo created, earlier todo still present |
+| Records the views need, written without being asked | **pass** — see below |
+| Access stays private to the controller | **pass** — bound to `127.0.0.1:3000` on the host; no public port |
+
+## What is real and what is simulated
+
+| Real | Simulated |
+| --- | --- |
+| The product: app, worker, records, Pi runtime, executor, tunnel code | The provider API — catalog, create, pricing, firewalls |
+| SSH transport, host-key scan and pinning, key authentication, port forwarding | The server's address (TEST-NET-1, not routable) |
+| Docker Engine, systemd, host paths, the deployed container and its volume | — |
+| GitHub source at an exact mirrored revision, `6b025fc53bc7` | — |
+| The model, its tool calls and everything it wrote | — |
+
+## Records the normal flow produced
+
+No corrective "document the topology" turn, and nothing seeded by hand.
+
+| Record | Carries |
+| --- | --- |
+| Server SSH access is verified | `states: host` · 7 facts · 2 checks |
+| Getting Started was deployed in a hardened container | `deployment` content |
+| Getting Started is healthy on the server | `topology` content **and** `states: application` |
+| SQLite data survives application restarts | `states: volume` |
+| Application ingress is restricted to server loopback | `states: door` |
+| Private browser access is ready on this PC | `application-access`, `states: access`, url |
+| Production dependencies need security updates | recommendation |
+
+Pi used the declared keys — `revision`, `image`, `port`, `http`, `container`
+— because they are now in its guidance. The topology it drew is five parts
+and three edges, with `loopback` from host to application and `disk` from
+application to its data.
+
+**An earlier attempt recorded the tunnel's failure honestly** — "Private
+browser tunnel could not be opened", `states: access` — rather than
+inventing a URL. That record is the reason the failure was visible.
+
+## Functional proof of the application
+
+Through the product's link, `http://127.0.0.1:13000`:
+
+```
+create  → {"id":"dbc686c4…","name":"Opus overnight check","completed":false}
+change  → completed: true
+restart → getting-started-app Up 12 seconds (healthy)
+after   → [{"id":"dbc686c4…","completed":true}]      data survived
+via link→ {"id":"ab2fca59…","name":"Created through the product link"}
+```
+
+The browser shows both items, one struck through.
+
+## What the rig needed, and what it did not
+
+Four drifts fixed so the rig runs current code: the Hetzner stand-in's
+signature, a missing `/pricing` route, a loopback public address Pi rightly
+refused, and a missing `ssh-keyscan`.
+
+Then the real change: an **actual sshd** in the isolated host container,
+published on loopback, with the controller's own per-application key
+installed the way a provider would. The shims stop emulating and execute the
+real client, so host-key pinning, key authentication and the `-L` forward are
+the product's own. **No product security behaviour was changed and no URL was
+forwarded by hand.**
+
+## Not proved
+
+- **Grafana + Prometheus** — the multi-service journey has not been run.
+- **A real provider host.** Everything above the provider API is real; server
+  creation and the address are the stand-in's.
+- **The public path.** This deployment is private by design; nothing here
+  says anything about HTTPS, domains or public ingress.
+- **Backups.** No `backup-plan` content exists, so the Backups lane reads
+  "not assessed" and can read nothing else until that lands.
+
+## Resources left running
+
+- `sg-rig-opus` — the host container, with `getting-started-app` deployed and
+  MinIO; sshd published on `127.0.0.1:2222` via `sg-rig-ssh-2222`.
+- Rig apps: `opus2` on :3399, `opus3` on :3401 (the one with the open tunnel).
+- The tunnel itself: `http://127.0.0.1:13000`, held by an SSH master the
+  product started.
+- Previews: :3396, :3397. The reference on :3370 is untouched.
