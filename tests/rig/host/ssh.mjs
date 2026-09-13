@@ -47,8 +47,20 @@ systemctl restart ssh
 // would install it from the create request.
 if (authorize) {
   const key = readFileSync(authorize, "utf8").trim();
-  host(
-    `grep -qxF '${key}' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\\n' '${key}' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys`,
+  docker(
+    "exec",
+    "-i",
+    container,
+    "sh",
+    "-c",
+    `set -e
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+touch /root/.ssh/authorized_keys
+grep -qxF -- "$1" /root/.ssh/authorized_keys || printf '%s\\n' "$1" >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys`,
+    "rig-authorize",
+    key,
   );
 }
 

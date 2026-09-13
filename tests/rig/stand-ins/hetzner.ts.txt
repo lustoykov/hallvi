@@ -25,8 +25,7 @@ type Cloud = {
   firewalls: Labelled[];
 };
 
-const file = () =>
-  join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.json");
+const file = () => join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.json");
 function load(): Cloud {
   return existsSync(file())
     ? JSON.parse(readFileSync(file(), "utf8"))
@@ -143,7 +142,8 @@ export async function hetzner<T>(
     // where sshd will read it — which is what makes a fresh application work
     // without anybody authorizing it by hand.
     const container = process.env.SG_RIG_HOST_CONTAINER;
-    const material = typeof input.public_key === "string" ? input.public_key : "";
+    const material =
+      typeof input.public_key === "string" ? input.public_key : "";
     if (container && material.startsWith("ssh-"))
       try {
         const { execFileSync } = await import("node:child_process");
@@ -152,7 +152,14 @@ export async function hetzner<T>(
           container,
           "sh",
           "-c",
-          `mkdir -p /root/.ssh && chmod 700 /root/.ssh && grep -qxF '${material.replace(/'/g, "")}' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' '${material.replace(/'/g, "")}' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys`,
+          `set -e
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+touch /root/.ssh/authorized_keys
+grep -qxF -- "$1" /root/.ssh/authorized_keys || printf '%s\\n' "$1" >> /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys`,
+          "rig-authorize",
+          material,
         ]);
       } catch {
         // The proof will fail at the connection instead, which is louder.
