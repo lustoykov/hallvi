@@ -92,6 +92,30 @@ forwarded by hand.**
 - **Backups.** No `backup-plan` content exists, so the Backups lane reads
   "not assessed" and can read nothing else until that lands.
 
+## A gap the multi-service example exposed
+
+**There is no supported way for the owner to hand Pi a secret.**
+
+The Grafana example needs a private `GF_SECURITY_ADMIN_PASSWORD` and says
+not to use a published default. Pi's guidance forbids the two wrong answers
+— "never ask the user to paste secrets into chat", "never save secrets" —
+and `redactSecrets` scrubs anything that leaks into output. But the flow that
+used to carry a private value, the operation decision with private inputs,
+was deleted with the old workflow machinery in
+[#55](https://github.com/lustoykov/server-guy/pull/55), and nothing replaced
+it.
+
+So today the only ways to get a credential onto a host are the two the
+product tells Pi not to use. For this run Pi generated the password itself
+and set it as container configuration without recording it, which is
+defensible for a disposable fixture and is not an answer for a real
+application: the owner then cannot log in to their own Grafana.
+
+This is a product gap, not a rig one, and it wants a design decision rather
+than an overnight implementation — where a supplied value is held, how it
+reaches the host, whether it is write-only, and what the views say about a
+value they must never show. Left for review.
+
 ## Resources left running
 
 - `sg-rig-opus` — the host container, with `getting-started-app` deployed and
