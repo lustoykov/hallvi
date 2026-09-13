@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { ReachDirectionProps } from "./index";
+import type { ReachProps } from "./reach-story";
 import { countWord } from "../stack-prototype/stack-model";
 import { ago, when, type Caller } from "./reach-model";
 import "./callers.css";
@@ -48,7 +48,7 @@ export function CallersDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: ReachDirectionProps) {
+}: ReachProps) {
   const [picked, setPicked] = useState(story.callers[0]?.id ?? "");
   const open = story.callers.find((caller) => caller.id === picked) ?? null;
   const named = Boolean(story.domain);

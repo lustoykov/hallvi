@@ -364,3 +364,65 @@ whether you would hear about a problem must not imply you would.
 
 **Never inferred.** That anything is being watched continuously. `invented` is
 always null on records; it exists only in the isolated visual reference.
+
+# 9 · Domains
+
+The Callers design: who can reach this, from where, and what they get.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| the name | `domain:<name>` + fact `name` | reported | `identity` | recorded |
+| does it resolve | `domain` check `resolves` | observed | `reachability` | recorded |
+| does it serve this application | `domain` check `serves` | observed | `reachability` | recorded |
+| who it is registered with | `domain` fact `registrar` | reported | `configuration` | recorded |
+| nameservers | `domain` fact `nameservers` | observed | `configuration` | recorded |
+| the DNS records | `domain` fact `records` | observed | `configuration` | recorded |
+| HTTPS state | `certificate` check `valid` | observed | `reachability` | recorded |
+| who issued it, when it expires | `certificate` facts `issuer` `expires` | reported | `identity`, and `freshFor` to the expiry | recorded |
+| the address in use now | the `application-access` record's URL | observed | `configuration` | derived |
+| who can reach it | `application-access` `mode` + `door` `sources` | observed | `configuration` | derived |
+| each caller row | one probe: a `door` or `certificate` check, or the access record | observed | `reachability` | derived from checks |
+
+**Empty and partial.** No `domain` → the page shows the address actually in
+use and says no name has been recorded, which for a tunnelled private
+deployment is the whole truth. A `domain` that resolves but whose `serves`
+check has not run → drawn as resolving, with the second row a ghost: DNS
+pointing somewhere is not the same as that somewhere answering.
+
+**Never inferred.** That HTTPS works because a name exists. A certificate is
+its own subject with its own check.
+
+# 10 · CDN
+
+Contracted in §6 (it shares the supply projection). The one rule worth
+repeating: **no CDN recorded reads "nobody has looked"**, and only a `cdn`
+subject stated `absent` reads "nothing caches in front". The distinction
+matters because the second is a finding and the first is a to-do.
+
+# 11 · Security
+
+The Rings design: what can reach in, over which ports, and what is guarding.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| each door | `door:<id>` + facts `port`, `sources` | observed | `configuration` | recorded |
+| is it open or refused | `door` checks `open` / `refused` | observed | `reachability` | recorded |
+| what it serves | the map's edge from that gate | — | — | derived |
+| the firewall | `firewall:<id>` presence + check `configured` | observed | `configuration` | recorded |
+| who provides it | `firewall` fact `provider` | reported | `configuration` | recorded |
+| its default | `firewall` fact `default` | reported | `configuration` | recorded |
+| its rules | `firewall` fact `rules` | observed | `configuration` | recorded |
+| SSH | `host` check `ssh` | observed | `reachability` | recorded |
+| the audience | `application-access` `mode` | observed | `configuration` | derived |
+| the guards | checks that passed *by refusing* — a `refused` door | observed | `reachability` | derived |
+| the holes | doors open to everyone, and a firewall nobody has read | — | — | derived |
+
+**The one to get right.** A port that refused a connection is a **pass**, and
+a page that colours every failed connection red would report the firewall
+working as the firewall broken. `refused` passing is the door doing its job.
+Conversely, no `firewall` record at all is a hole — not a green tick — because
+an unread policy is an unknown policy.
+
+**Empty and partial.** No `door` and no `firewall` → the page says nothing has
+been established about what can reach in, and offers to find out. That is
+different from "nothing can reach in", which no record has said.

@@ -1,0 +1,112 @@
+// What the Callers and Rings designs draw, and nothing else.
+// ReachStory satisfies it structurally, so the visual reference is untouched.
+
+export type Reach = "internet" | "restricted" | "private" | "closed";
+/** Who said so: the provider read it back, the plan intends it, or a
+ * process is what tells us. */
+export type Told = "provider" | "plan" | "stack";
+
+export interface Door {
+  id: string;
+  port: string;
+  title: string;
+  serves: string | null;
+  reach: Reach;
+  sources: string[];
+  /** Worth a second look, in words. */
+  concern: string | null;
+  detail: string;
+  /** Nobody has checked this one. */
+  unasked?: boolean;
+}
+
+export interface Guard {
+  id: string;
+  title: string;
+  at: string | null;
+  detail?: string;
+}
+
+export interface Hole {
+  id: string;
+  title: string;
+  detail: string;
+}
+
+export interface Caller {
+  id: string;
+  who: string;
+  from: string;
+  typed: string;
+  outcome: "loads" | "refused" | "no-name" | "insecure";
+  secure: boolean;
+  headline: string;
+  detail: string;
+  /** Whether we watched it, only asked, or know it is not there. */
+  sure: "proved" | "asked" | "absent";
+  at: string | null;
+}
+
+export interface DomainState {
+  name: string;
+  provider: "cloudflare" | "external";
+  state: "resolving" | "pending-dns" | "failed";
+  detail: string;
+  userStep?: string | null;
+}
+
+export interface TlsState {
+  state: "valid" | "pending" | "failed" | "not-configured";
+  issuer?: string | null;
+  expiresAt?: string | null;
+  renewal?: string | null;
+  detail?: string | null;
+}
+
+export interface ReachView {
+  name: string;
+  address: string | null;
+  domain: DomainState | null;
+  tls: TlsState;
+  /** Who the deployment opened HTTP to. */
+  audience: "public" | "controller";
+  controllerIp: string | null;
+  callers: Caller[];
+  doors: Door[];
+  processes: import("../stack-prototype/line-story").ProcessCard[];
+  database: import("../data-prototype/data-story").DataStore | null;
+  ssh: {
+    word: string;
+    tone: "verified" | "stale" | "planned" | "failed" | "checking";
+    detail: string;
+    told: Told;
+  };
+  firewall: {
+    state: "read" | "asked" | "none";
+    provider: string;
+    name: string | null;
+    at: string | null;
+    detail: string;
+  };
+  guards: Guard[];
+  holes: Hole[];
+  /** Set only in the isolated visual reference; always null on records. */
+  invented: string | null;
+}
+
+export interface ReachProps {
+  story: ReachView;
+  now: number;
+  head: import("react").ReactNode;
+  /** Work in progress on this destination, as the shell shows it. */
+  activity: import("react").ReactNode;
+  onAsk: (draft: string) => void;
+  onOpenDestination: (
+    destination: import("../application-sections").ApplicationSection,
+  ) => void;
+  /** The shell's own note about the provider read, when there is one. */
+  panel?: import("react").ReactNode;
+  /** Reads the firewall from the provider again; the shell owns the read. */
+  onCheck?: () => void;
+  checking?: boolean;
+}

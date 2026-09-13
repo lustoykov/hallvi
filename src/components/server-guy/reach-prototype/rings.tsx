@@ -18,7 +18,7 @@ import { useState, type ReactNode } from "react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { ReachDirectionProps } from "./index";
+import type { ReachProps } from "./reach-story";
 import { ago, when, type Door } from "./reach-model";
 import "./rings.css";
 
@@ -43,7 +43,7 @@ export function RingsDirection({
   panel,
   onCheck,
   checking,
-}: ReachDirectionProps) {
+}: ReachProps) {
   const [picked, setPicked] = useState<number | null>(null);
   // The "everything else" entry only belongs in a ring when nothing
   // refuses it, which is what a missing firewall means.

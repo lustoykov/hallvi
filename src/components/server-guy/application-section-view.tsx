@@ -29,6 +29,7 @@ import { BackupsPage } from "./backups-page";
 import { DatabasePage } from "./database-page";
 import { MonitoringPage } from "./monitoring-page";
 import { ProcessesPage } from "./processes-page";
+import { ReachPageView } from "./reach-pages";
 import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
@@ -235,6 +236,20 @@ export function ApplicationSectionView({
           applicationName={app.name}
           now={now}
           chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "domains" || section === "security")
+      return (
+        <ReachPageView
+          page={section}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          panel={section === "security" ? children : null}
+          onOpenDestination={onOpenDestination}
           onAsk={(draft) => onAsk(null, draft)}
         />
       );
