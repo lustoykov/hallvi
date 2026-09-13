@@ -21,6 +21,10 @@ import {
 } from "./application-sections";
 import { ArchitectureCanvas } from "./architecture-canvas";
 import { ArchitecturePage } from "./architecture-page";
+import { OverviewPage } from "./overview-page";
+import { DeploymentPage } from "./deployment-page";
+import { HistoryPage } from "./history-page";
+import { LogsPage } from "./logs-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -139,11 +143,69 @@ export function ApplicationSectionView({
   if (view.information !== undefined) {
     if (section === "overview")
       return (
-        <RecordOverview
+        <OverviewPage
           records={view.information}
+          executions={view.executions ?? []}
+          application={app}
+          chats={view.chats}
+          now={now}
+          reduced={false}
+          chrome={{
+            bar,
+            header: (
+              <header className="sg-section-header">
+                <div>
+                  <h1>Overview</h1>
+                  <p>{descriptions.overview}</p>
+                </div>
+              </header>
+            ),
+            activity: null,
+          }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "logs")
+      return (
+        <LogsPage
+          executions={view.executions ?? []}
           now={now}
           bar={bar}
-          onOpen={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+          onOpenDestination={onOpenDestination}
+        />
+      );
+    if (section === "history")
+      return (
+        <HistoryPage
+          records={view.information}
+          executions={view.executions ?? []}
+          chats={view.chats}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+        />
+      );
+    if (section === "deployment")
+      return (
+        <DeploymentPage
+          records={view.information}
+          executions={view.executions ?? []}
+          applicationName={app.name}
+          now={now}
+          chrome={{
+            bar,
+            header: null,
+            activity: null,
+          }}
+          panel={children}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
         />
       );
     if (section === "architecture")
@@ -216,7 +278,8 @@ export function ApplicationSectionView({
               currentView={section}
             />
           ))}
-          {!records.length && section !== "logs" && (
+          {/* Logs has its own page and its own empty state now. */}
+          {!records.length && (
             <div className="sg-section-none">
               <h2>Nothing has been established here yet.</h2>
               <p>

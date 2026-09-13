@@ -155,6 +155,12 @@ const env = {
   SERVER_GUY_TRACING: "0",
   SG_RIG_MIRROR_DIR: join(results, "upstream"),
   SG_RIG_HOST_ROOT: host,
+  // With a real sshd published by host/ssh.mjs, the shims stop emulating SSH
+  // and run the real client against it, so the product's host-key pinning,
+  // key authentication and port forwarding are its own.
+  ...(process.env.SG_RIG_SSH_PORT
+    ? { SG_RIG_SSH_PORT: process.env.SG_RIG_SSH_PORT }
+    : {}),
   ...(hostContainer ? { SG_RIG_HOST_CONTAINER: hostContainer } : {}),
   PATH: `${join(rig, "bin")}:${process.env.PATH}`,
 };

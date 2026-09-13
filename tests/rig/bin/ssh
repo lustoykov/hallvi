@@ -17,6 +17,53 @@ if (!root) {
   console.error("SG_RIG_HOST_ROOT is not set");
   process.exit(255);
 }
+// Rig B with a real sshd: stop emulating SSH and be it. The product's own
+// arguments run against the real client — its host-key pinning, its key,
+// its control socket, its `-L` forward — and only the destination is
+// rewritten to the loopback endpoint the rig published. Anything the product
+// does for security it still does here.
+const sshPort = process.env.SG_RIG_SSH_PORT;
+if (sshPort) {
+  const { execFileSync } = require("node:child_process");
+  const takesValue = new Set(
+    "b c D E e F I i J L l m O o p Q R S W w".split(" "),
+  );
+  const argv = process.argv.slice(2);
+  const out = [];
+  let destination = -1;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (destination < 0 && arg.startsWith("-") && arg.length > 1) {
+      const flag = arg.slice(1);
+      out.push(arg);
+      // `-p 22` becomes the published port; everything else passes through.
+      if (takesValue.has(flag)) {
+        const value = argv[++i];
+        out.push(flag === "p" ? sshPort : value);
+      }
+      continue;
+    }
+    if (destination < 0) {
+      destination = out.length;
+      const at = arg.lastIndexOf("@");
+      out.push(at >= 0 ? `${arg.slice(0, at + 1)}127.0.0.1` : "127.0.0.1");
+      continue;
+    }
+    out.push(arg);
+  }
+  if (destination < 0) out.push("127.0.0.1");
+  try {
+    const result = execFileSync("/usr/bin/ssh", out, {
+      stdio: "inherit",
+      encoding: "utf8",
+    });
+    if (result) process.stdout.write(result);
+    process.exit(0);
+  } catch (error) {
+    process.exit(typeof error.status === "number" ? error.status : 255);
+  }
+}
+
 const original = process.argv.at(-1) ?? "";
 // Only the host's per-deployment paths: a path inside a container, such as
 // /opt/server-guy/check.php in a check command, must pass through unchanged.

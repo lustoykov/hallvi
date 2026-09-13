@@ -305,6 +305,8 @@ function opennessOf(
   records: SavedInformation[],
   edges: { from: string; to: string; network: string }[],
   webIds: Set<string>,
+  /** Slots that only describe where the code came from. */
+  sources: Set<string>,
 ): ArchitectureModel["openness"] {
   const access = records
     .filter((record) => !record.retiredAt)
@@ -312,7 +314,13 @@ function opennessOf(
     .find((content) => content?.kind === "application-access");
   if (access?.kind === "application-access")
     return access.mode === "private" ? "restricted" : "public";
-  const inbound = edges.filter((edge) => webIds.has(edge.to));
+  // Only edges that describe reaching the running application. An edge from
+  // the repository is a build-time relationship — Pi drew "GitHub source →
+  // the app" as public, meaning the code is public, and reading that as
+  // network reach told the page the application was open to the internet.
+  const inbound = edges.filter(
+    (edge) => webIds.has(edge.to) && !sources.has(edge.from),
+  );
   if (inbound.some((edge) => edge.network === "public")) return "public";
   if (inbound.some((edge) => edge.network === "loopback")) return "restricted";
   return "unknown";
@@ -477,6 +485,7 @@ export function architectureFromRecords({
     records,
     edges,
     new Set(web.map((part) => part.id)),
+    new Set(of("source").map((part) => part.id)),
   );
 
   const stops = (kinds: Part["kind"][]) =>

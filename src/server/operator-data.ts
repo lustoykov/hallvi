@@ -29,7 +29,7 @@ export type MessageBlock =
  *
  * Deferred with their destinations: `database` (a volume covers the stored
  * data Architecture draws), `domain`, `certificate`'s siblings, `value`,
- * `config-file`, `job`, `cache`, `cdn`, `backup-plan`.
+ * `config-file`, `job`, `cache` and `cdn`.
  */
 export const subjectKinds = [
   "application",
@@ -40,6 +40,11 @@ export const subjectKinds = [
   "certificate",
   "monitor",
   "access",
+  // Earned by Overview's Backups lane: without it nothing can say whether a
+  // copy exists, and "not assessed" would be the only reading forever. The
+  // kind is the whole addition — schedules, copies and restore tests stay
+  // deferred with the Backups destination.
+  "backup-plan",
 ] as const;
 export type SubjectKind = (typeof subjectKinds)[number];
 export const refSchema = z.strictObject({
