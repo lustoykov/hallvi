@@ -3,8 +3,9 @@ import { serverPublicKey, connectServer } from "./server-access";
 import { openServerPort } from "./private-access";
 import {
   listSecrets,
+  refuseSecretHandles,
   requestSecret,
-  resolveSecretHandles,
+  secretEnvironment,
 } from "./application-secrets";
 import {
   listInformation,
@@ -66,7 +67,7 @@ Permissions are independent of the task. In Always ask, the executor requests ap
 
 Use judgment to avoid unnecessary downtime, data loss and spending. Inspect before making assumptions. If a command fails or its outcome is unknown, investigate using your general tools and decide how to proceed. A successful command does not prove the application works: check the result.
 
-Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold — an admin password, an API key, a token — call request_secret and use the handle it returns wherever the value would go. The privileged layer substitutes it as the command runs, so what is recorded, shown and logged keeps the handle. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
+Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold — an admin password, an API key, a token — call request_secret, then list its name in server_bash's secrets argument and refer to it in your script as an ordinary variable such as "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs, so the value never appears in the command, the record, the activity or the log. Do not write a value or a handle into the command text: a value spliced into a command is shell syntax rather than data. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
 
 Save information worth preserving with save_information: discoveries costly to rediscover, preferences, recommendations and consequential outcomes. Search saved information when needed. Omit presentation for working knowledge. To surface a record, provide presentation.views and role; the product renders the same record in those views and, when showInChat is true, in this reply. Use a separate outcome for each historical event; update ordinary knowledge in place. Retire stale records. A deployment handover should save the application URL and verification evidence. Saved preferences never change permission settings. Never save secrets. Sidebar destinations are overview, architecture, deployment, history, processes, database, cache, jobs, storage, backups, logs, monitoring, domains, security, variables.
 
@@ -449,14 +450,23 @@ export async function askPi(
             executionMode: "sequential",
             label: "Run on server",
             description:
-              "Run a Bash script on the connected application server. Use ordinary shell tools to inspect, deploy, configure or repair it. Returns output and exit code. The timeout closes SSH; a remote process may continue, so inspect when completion is uncertain.",
+              'Run a Bash script on the connected application server. Use ordinary shell tools to inspect, deploy, configure or repair it. Returns output and exit code. The timeout closes SSH; a remote process may continue, so inspect when completion is uncertain. To use a secret the owner supplied, list its name in secrets and refer to it in the command as an ordinary variable — secrets:["POSTGRES_PASSWORD"] with the command using "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs. Never write a value or a {{secret:NAME}} handle into the command itself: a value spliced into a command is shell syntax rather than data, and the command is refused.',
             parameters: Type.Object({
               command: Type.String(),
+              /**
+               * Names of secrets this command needs, exported for it before
+               * it runs. Never values, and never spliced into the command.
+               */
+              secrets: Type.Optional(Type.Array(Type.String())),
               timeoutSeconds: Type.Optional(
                 Type.Number({ minimum: 1, maximum: 1800 }),
               ),
             }),
             async execute(id, params, signal) {
+              // A value written into the command text would be shell syntax,
+              // not data. Refuse it here, before the record is written, with
+              // a message saying what to do instead.
+              refuseSecretHandles(params.command);
               const host = operatorSettings(input.run.applicationId).host;
               if (!host)
                 throw new Error(
@@ -470,13 +480,14 @@ export async function askPi(
                   (output) =>
                     runHostCommand(
                       host,
-                      // Handles become values here and nowhere earlier: the
-                      // record above was already written with the handle, so
-                      // what is stored, shown and logged never holds one.
-                      resolveSecretHandles(
+                      // The export prologue is built here and nowhere
+                      // earlier: the record above was written with the
+                      // command Pi wrote and the names it asked for, so what
+                      // is stored, shown and logged holds no value.
+                      secretEnvironment(
                         input.run.applicationId,
-                        params.command,
-                      ),
+                        params.secrets ?? [],
+                      ) + params.command,
                       signal ?? options.signal,
                       output,
                       params.timeoutSeconds,
@@ -492,7 +503,7 @@ export async function askPi(
             executionMode: "parallel",
             label: "Ask for a secret",
             description:
-              "Ask the owner for a value you must never see: a password, an API key, a token the application needs. Returns a handle such as {{secret:GF_SECURITY_ADMIN_PASSWORD}}. Put the handle in server_bash commands and compose files exactly where the value would go; the privileged layer substitutes it when the command runs, and what is recorded, shown and logged keeps the handle. There is no tool that reads a value back. Name it after the environment variable the application reads, in capitals with underscores, and say plainly in `why` what it is for so the owner can judge it. If no value has been supplied yet, the command fails rather than running with a blank — say what you are waiting for and stop.",
+              'Ask the owner for a value you must never see: a password, an API key, a token the application needs. Name it after the environment variable the application reads, in capitals with underscores, at least eight characters long, and say plainly in `why` what it is for so the owner can judge it. To use it afterwards, list the name in server_bash\'s secrets argument and refer to it in your script as "$NAME": the privileged layer exports it before the script runs, so the value never appears in the command, the record, the activity or the log. There is no tool that reads a value back. If no value has been supplied yet the command fails rather than running with a blank — say what you are waiting for and stop.',
             parameters: Type.Object({
               name: Type.String(),
               why: Type.String(),

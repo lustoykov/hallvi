@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   establishSecret,
   listSecrets,
+  MINIMUM_LENGTH,
   withdrawSecret,
 } from "@/server/application-secrets";
 import { handle } from "@/server/http";
@@ -36,7 +37,9 @@ export async function POST(
       request,
       z.strictObject({
         name: z.string().min(1).max(64),
-        value: z.string().min(1).max(4096),
+        // The same floor the store enforces, so the browser is told before
+        // the round trip rather than after it.
+        value: z.string().min(MINIMUM_LENGTH).max(4096),
       }),
     );
     establishSecret(applicationId, name, value);

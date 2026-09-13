@@ -17,9 +17,16 @@
 //   The owner types it into a masked field the product renders. It never
 //   becomes a message.
 //
-//   The controller keeps it here, encrypted, and resolves handles at the
-//   moment a command is spawned. What is recorded, displayed and logged is
-//   the handle.
+//   The controller keeps it here, encrypted, and hands it to a command as an
+//   **environment variable**, never as text spliced into the command. Pi names
+//   the variables it needs; the command refers to "$POSTGRES_PASSWORD" like any
+//   other shell variable. What is recorded, displayed and logged is the name.
+//
+// Why not substitute the value into the command text: a value containing a
+// quote, a semicolon or $(...) would stop being data and start being shell
+// syntax. Pi does not write the value, so Pi cannot escape it, and neither can
+// we without knowing where in the command it landed. Passing it through the
+// environment removes the question: the shell never parses it.
 //
 // What the encryption is for, honestly: it stops a value leaking the ways
 // values actually leak — a copied directory, a grep, a backup, a screen
@@ -35,6 +42,8 @@ import {
 } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { z } from "zod";
 
 import { piConfigDir } from "./pi-configuration";
 
@@ -56,7 +65,18 @@ interface Stored extends SecretRequest {
 }
 
 const NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+/** Only recognised now to refuse it: see `refuseSecretHandles`. */
 export const HANDLE = /\{\{secret:([A-Z][A-Z0-9_]{0,63})\}\}/g;
+
+/**
+ * The shortest value the controller will hold.
+ *
+ * Redaction works by finding the exact value in output, and a value of two or
+ * three characters occurs in ordinary text constantly — redacting it would
+ * corrupt every log it appears in, and not redacting it would mean claiming a
+ * protection that is not there. Refusing it is the only answer that is true.
+ */
+export const MINIMUM_LENGTH = 8;
 
 function directory() {
   const path = join(piConfigDir(), "secrets");
@@ -103,13 +123,21 @@ function unseal(sealed: string) {
   );
 }
 
+/**
+ * The store for one application. The id is validated exactly as the execution
+ * store validates it, so nothing can be talked into reading or writing a path
+ * outside this directory.
+ */
 function path(applicationId: string) {
-  return join(directory(), `${applicationId}.json`);
+  return join(directory(), `${z.uuid().parse(applicationId)}.json`);
 }
 
 function read(applicationId: string): Stored[] {
+  // The id is validated outside the try: a bad one is a caller mistake and
+  // must not be swallowed into "this application has no secrets".
+  const file = path(applicationId);
   try {
-    return JSON.parse(readFileSync(path(applicationId), "utf8"));
+    return JSON.parse(readFileSync(file, "utf8"));
   } catch {
     return [];
   }
@@ -174,6 +202,13 @@ export function establishSecret(
   value: string,
 ) {
   if (!value) throw new Error("A secret cannot be empty.");
+  if (value.length < MINIMUM_LENGTH)
+    throw new Error(
+      `Server Guy holds secrets of at least ${MINIMUM_LENGTH} characters. ` +
+        `Shorter values cannot be kept out of command output reliably — they ` +
+        `occur in ordinary text — and it would be dishonest to accept one and ` +
+        `imply it is hidden.`,
+    );
   const held = read(applicationId);
   const found = held.find((item) => item.name === name);
   if (!found)
@@ -203,39 +238,63 @@ function values(applicationId: string) {
 }
 
 /**
- * Replaces handles with values, at the moment a command is spawned. What is
- * recorded and shown keeps the handle, because the substitution happens after
- * the record is written and to a different string.
+ * A shell prologue that exports the named secrets, to run before a command
+ * that refers to them as ordinary variables.
  *
- * An unresolved handle is an error rather than an empty string: a deployment
- * that quietly ran with a blank password is worse than one that stopped.
+ * The value is single-quoted with POSIX escaping, so it reaches the process as
+ * bytes and never as syntax. A value of `a'; rm -rf /; echo '` becomes exactly
+ * that string in the variable, and no second command runs — which is the whole
+ * reason this is not a text substitution into whatever Pi wrote.
+ *
+ * Names are already constrained to `[A-Z][A-Z0-9_]*`, so they are safe as
+ * identifiers without further quoting.
+ *
+ * An unresolved name is an error rather than an empty export: a deployment
+ * that quietly came up with a blank admin password is worse than one that
+ * stopped.
  */
-export function resolveSecretHandles(applicationId: string, text: string) {
+export function secretEnvironment(applicationId: string, names: string[]) {
+  if (!names.length) return "";
   const held = new Map(
     values(applicationId).map((item) => [item.name, item.value]),
   );
-  const missing = new Set<string>();
-  const resolved = text.replace(HANDLE, (whole, name: string) => {
-    const value = held.get(name);
-    if (value === undefined) {
-      missing.add(name);
-      return whole;
-    }
-    return value;
-  });
-  if (missing.size)
+  const missing = names.filter((name) => !held.has(name));
+  if (missing.length)
     throw new Error(
-      `No value has been supplied for ${[...missing].join(", ")}. Ask for it ` +
-        `with request_secret and wait for the owner to fill it in; do not ` +
+      `No value has been supplied for ${missing.join(", ")}. Ask for it with ` +
+        `request_secret and wait for the owner to fill it in; do not ` +
         `substitute a value of your own.`,
     );
-  return resolved;
+  return (
+    names
+      .map((name) => `export ${name}=${posixQuote(held.get(name)!)}`)
+      .join("\n") + "\n"
+  );
 }
 
-/** Whether any handle appears, so callers can skip the work when none do. */
-export function hasSecretHandle(text: string) {
+/** `it's` → `'it'\''s'`. The only escaping a single-quoted shell word needs. */
+function posixQuote(value: string) {
+  return `'${value.split("'").join(`'\\''`)}'`;
+}
+
+/**
+ * Refuses a command that still writes `{{secret:NAME}}` into its own text.
+ *
+ * That was the earlier shape and it was wrong: substituting a value into
+ * Pi-authored shell makes the value syntax. The message says what to do
+ * instead, so a turn that reaches for the old pattern corrects itself.
+ */
+export function refuseSecretHandles(command: string) {
   HANDLE.lastIndex = 0;
-  return HANDLE.test(text);
+  const found = [...command.matchAll(HANDLE)].map((match) => match[1]);
+  if (!found.length) return;
+  throw new Error(
+    `This command writes ${[...new Set(found)].join(", ")} into its own text ` +
+      `as {{secret:NAME}}. A value spliced into a command is shell syntax, ` +
+      `not data. Pass the names in the secrets argument instead and refer to ` +
+      `them as ordinary variables: secrets: ["${found[0]}"] with the command ` +
+      `using "$${found[0]}".`,
+  );
 }
 
 /**
@@ -246,7 +305,7 @@ export function hasSecretHandle(text: string) {
 export function redactHeldSecrets(applicationId: string, text: string) {
   let result = text;
   for (const { name, value } of values(applicationId))
-    if (value.length >= 4 && result.includes(value))
+    if (result.includes(value))
       result = result.split(value).join(`{{secret:${name}}}`);
   return result;
 }

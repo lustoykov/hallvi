@@ -15,6 +15,9 @@
 import { Eye, Key, Trash } from "@phosphor-icons/react";
 import { useState } from "react";
 
+/** The floor the controller enforces; see MINIMUM_LENGTH on the server. */
+const MINIMUM_LENGTH = 8;
+
 import "./secret-request.css";
 
 export interface SecretRequest {
@@ -95,7 +98,7 @@ function SecretField({
       className="sg-secret"
       onSubmit={(event) => {
         event.preventDefault();
-        if (value) void send("POST");
+        if (value.length >= MINIMUM_LENGTH) void send("POST");
       }}
     >
       <h3>
@@ -118,7 +121,7 @@ function SecretField({
           placeholder="Type or paste it here"
           onChange={(event) => setValue(event.target.value)}
         />
-        <button type="submit" disabled={busy || !value}>
+        <button type="submit" disabled={busy || value.length < MINIMUM_LENGTH}>
           Give it
         </button>
         <button
@@ -132,6 +135,13 @@ function SecretField({
         </button>
       </div>
       {error && <p className="sg-secret-error">{error}</p>}
+      {value.length > 0 && value.length < MINIMUM_LENGTH && (
+        <p className="sg-secret-error">
+          At least {MINIMUM_LENGTH} characters. Anything shorter turns up in
+          ordinary command output too often to be kept out of it, and Server Guy
+          will not accept a value it cannot promise to hide.
+        </p>
+      )}
       <p className="sg-secret-note">
         <Eye weight="bold" aria-hidden="true" />
         This does not become a message. Server Guy is given a handle,{" "}

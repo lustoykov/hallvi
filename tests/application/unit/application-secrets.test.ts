@@ -5,13 +5,14 @@
 // command as recorded, in the output of the command that used it, and in a
 // record Pi tried to save.
 
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const VALUE = "correct-horse-battery-staple";
-const APP = "app-1";
+const APP = "11111111-1111-4111-8111-111111111111";
 
 let directory: string;
 let secrets: typeof import("@/server/application-secrets");
@@ -96,39 +97,96 @@ describe("holding", () => {
   });
 });
 
-describe("using", () => {
-  it("resolves a handle only at the point of use", () => {
+describe("giving a command a secret", () => {
+  it("exports it rather than splicing it into the command", () => {
     secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
-    const command =
-      "docker run -e GF_SECURITY_ADMIN_PASSWORD={{secret:GF_SECURITY_ADMIN_PASSWORD}} grafana/grafana";
-    expect(command).not.toContain(VALUE);
-    expect(secrets.resolveSecretHandles(APP, command)).toBe(
-      `docker run -e GF_SECURITY_ADMIN_PASSWORD=${VALUE} grafana/grafana`,
+    expect(secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"])).toBe(
+      `export GF_SECURITY_ADMIN_PASSWORD='${VALUE}'\n`,
     );
   });
 
-  it("stops rather than running with a blank", () => {
-    // The failure mode this prevents: a deployment that quietly came up with
-    // an empty admin password and looked like a success.
+  it("exports nothing when nothing was asked for", () => {
+    expect(secrets.secretEnvironment(APP, [])).toBe("");
+  });
+
+  it("stops rather than exporting a blank", () => {
+    // The failure this prevents: a deployment that quietly came up with an
+    // empty admin password and looked like a success.
     expect(() =>
-      secrets.resolveSecretHandles(
-        APP,
-        "echo {{secret:GF_SECURITY_ADMIN_PASSWORD}}",
-      ),
+      secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"]),
     ).toThrow(/No value has been supplied/);
   });
 
-  it("stops resolving the moment the owner takes it back", () => {
+  it("stops the moment the owner takes it back", () => {
     secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
     secrets.withdrawSecret(APP, "GF_SECURITY_ADMIN_PASSWORD");
     expect(() =>
-      secrets.resolveSecretHandles(
-        APP,
-        "{{secret:GF_SECURITY_ADMIN_PASSWORD}}",
-      ),
+      secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"]),
     ).toThrow(/No value has been supplied/);
   });
 
+  it("refuses a command that writes a handle into its own text", () => {
+    const refuse = () =>
+      secrets.refuseSecretHandles(
+        "docker run -e P={{secret:GF_SECURITY_ADMIN_PASSWORD}} grafana",
+      );
+    expect(refuse).toThrow(/shell syntax, not data/);
+    expect(refuse).toThrow(/secrets: \["GF_SECURITY_ADMIN_PASSWORD"\]/);
+  });
+
+  it("lets an ordinary command through", () => {
+    expect(() =>
+      secrets.refuseSecretHandles('printf "%s" "$GF_SECURITY_ADMIN_PASSWORD"'),
+    ).not.toThrow();
+  });
+});
+
+describe("a hostile value is data, not syntax", () => {
+  // Each of these would be a second command if the value were spliced into
+  // the text Pi wrote. Through the environment, none of them is.
+  const hostile = [
+    ["a quote", `pa'ss word`],
+    ["a command substitution", "x$(touch /tmp/sg-pwned)y"],
+    ["backticks", "x`touch /tmp/sg-pwned2`y"],
+    ["a semicolon", "abc; touch /tmp/sg-pwned3"],
+    ["a newline", "line one\ntouch /tmp/sg-pwned4"],
+    ["a dollar variable", "$HOME and ${PATH}"],
+    ["unicode and spaces", "  pä ss — wörd  "],
+    ["a backslash", "back\\slash\\"],
+  ] as const;
+
+  for (const [what, value] of hostile)
+    it(`survives ${what} unchanged`, () => {
+      secrets.requestSecret(APP, { name: "HOSTILE", why: "x" });
+      secrets.establishSecret(APP, "HOSTILE", value);
+      const prologue = secrets.secretEnvironment(APP, ["HOSTILE"]);
+      // Round-trip it through a real shell: what the variable holds must be
+      // the value byte for byte, and nothing else may have run.
+      const printed = execFileSync(
+        "bash",
+        ["-c", `${prologue}printf %s "$HOSTILE"`],
+        { encoding: "utf8" },
+      );
+      expect(printed).toBe(value);
+    });
+
+  it("runs no second command", () => {
+    const marker = join(directory, "pwned");
+    secrets.requestSecret(APP, { name: "HOSTILE", why: "x" });
+    secrets.establishSecret(APP, "HOSTILE", `x'; touch ${marker}; echo '`);
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `${secrets.secretEnvironment(APP, ["HOSTILE"])}printf %s "$HOSTILE"`,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(existsSync(marker)).toBe(false);
+  });
+});
+
+describe("using", () => {
   it("puts the handle back into anything the command printed", () => {
     secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
     const output = `admin_password=${VALUE}\nstarting…`;
@@ -139,12 +197,60 @@ describe("using", () => {
 
   it("keeps one application's values out of another's output", () => {
     secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
-    expect(secrets.redactHeldSecrets("app-2", VALUE)).toBe(VALUE);
+    expect(
+      secrets.redactHeldSecrets("22222222-2222-4222-8222-222222222222", VALUE),
+    ).toBe(VALUE);
   });
 
-  it("does not chase values too short to be distinctive", () => {
+  it("has no value too short to redact, because none is accepted", () => {
+    // The old gap: the store took any non-empty value and the redactor
+    // skipped anything under four characters, so a three-character secret
+    // was accepted and then silently not hidden.
     secrets.requestSecret(APP, { name: "PIN", why: "x" });
-    secrets.establishSecret(APP, "PIN", "abc");
-    expect(secrets.redactHeldSecrets(APP, "abcdef")).toBe("abcdef");
+    expect(() => secrets.establishSecret(APP, "PIN", "abc")).toThrow(
+      /at least 8 characters/,
+    );
+    expect(
+      secrets.listSecrets(APP).find((s) => s.name === "PIN")?.establishedAt,
+    ).toBeNull();
+  });
+});
+
+describe("one application cannot reach another's", () => {
+  const OTHER = "22222222-2222-4222-8222-222222222222";
+
+  it("cannot export a value held by another application", () => {
+    secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
+    secrets.requestSecret(OTHER, {
+      name: "GF_SECURITY_ADMIN_PASSWORD",
+      why: "x",
+    });
+    expect(() =>
+      secrets.secretEnvironment(OTHER, ["GF_SECURITY_ADMIN_PASSWORD"]),
+    ).toThrow(/No value has been supplied/);
+  });
+
+  it("cannot list, overwrite or withdraw another application's", () => {
+    secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
+    expect(secrets.listSecrets(OTHER)).toEqual([]);
+    expect(() =>
+      secrets.establishSecret(
+        OTHER,
+        "GF_SECURITY_ADMIN_PASSWORD",
+        "another-one",
+      ),
+    ).toThrow(/nowhere to put it/);
+    secrets.withdrawSecret(OTHER, "GF_SECURITY_ADMIN_PASSWORD");
+    // Untouched.
+    expect(
+      secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"]),
+    ).toContain(VALUE);
+  });
+
+  it("refuses an application id that is not one", () => {
+    // The same check the execution store makes, so nothing can be talked
+    // into a path outside the secrets directory.
+    for (const bad of ["../../etc/passwd", "not-a-uuid", ""])
+      expect(() => secrets.listSecrets(bad)).toThrow();
   });
 });
