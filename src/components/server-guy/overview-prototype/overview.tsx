@@ -26,9 +26,10 @@ import type {
 } from "../architecture-prototype/model";
 import type { Recheck } from "../architecture-prototype/use-recheck";
 import { MiniMap } from "./mini-map";
-import { buildOverview } from "./overview-model";
+import { buildOverview, type Overview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";
 import { TimelineHero } from "./timeline";
+import type { Timeline } from "./timeline-model";
 import "./overview.css";
 
 const counts = ["No", "One", "Two", "Three", "Four"];
@@ -44,9 +45,17 @@ export function OverviewDirection({
   onOpenConversation,
   onOpenDestination,
   onAsk,
+  built,
+  timeline,
 }: {
   model: ArchitectureModel;
   record: LiveRecord;
+  /**
+   * Built from records by the caller. The prototype route still builds its
+   * own from the old facts model; the live page hands one in.
+   */
+  built?: Overview;
+  timeline?: Timeline;
   recheck: Recheck;
   page: PageContext;
   operations: ApplicationOperation[];
@@ -56,11 +65,12 @@ export function OverviewDirection({
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
 }) {
-  const overview = useMemo(
+  const fallback = useMemo(
     () =>
       buildOverview({ model, record, operations, chats, onOpenConversation }),
     [model, record, operations, chats, onOpenConversation],
   );
+  const overview = built ?? fallback;
   const [pointed, setPointed] = useState<string | null>(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const planned = model.status !== "live";
@@ -113,6 +123,7 @@ export function OverviewDirection({
         onShow={openArchitecture}
         onAsk={onAsk}
         onOpenDestination={onOpenDestination}
+        timeline={timeline}
       />
 
       <div className="axo-lower">

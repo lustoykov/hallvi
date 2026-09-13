@@ -46,6 +46,7 @@ import {
   laneOf,
   type Lane,
   type TimeEvent,
+  type Timeline,
 } from "./timeline-model";
 import { Mascot, useServerGuy } from "./use-server-guy";
 import "./timeline.css";
@@ -88,6 +89,14 @@ const since: Record<Lane["id"], string> = {
   access: "Not read for",
 };
 
+/** When the lane holds nothing at all, which is not a duration. */
+const nothing: Record<Lane["id"], string> = {
+  checks: "No check on record",
+  backups: "Never looked",
+  server: "Never reached",
+  access: "Never read",
+};
+
 function subline(model: HeroProps["model"], overview: Overview) {
   if (model.status !== "live")
     return model.status === "none"
@@ -96,8 +105,27 @@ function subline(model: HeroProps["model"], overview: Overview) {
   if (overview.needs.length) return null;
   const app = model.byId.app;
   const host = model.byId.host;
+  const server =
+    host?.evidence.certainty === "verified"
+      ? ` The server answered ${ago(host.evidence.at, model.now)}.`
+      : "";
+  // The application's own condition, when a record states it. Reading this
+  // off the web part instead would let the page say "passed its checks" about
+  // the process while nothing had been established about the application.
+  if (model.condition.certainty === "unknown")
+    return `Nothing on record says whether ${model.headline} is working.${server}`;
+  if (model.condition.certainty === "failed")
+    return `A check on ${model.headline} did not pass.${server}`;
+  if (model.condition.certainty === "stale")
+    return `${model.condition.text}${server}`;
+  // Verified takes its words and its time from the same place as the verdict.
+  // Reading the sentence off the web part while the verdict came from the
+  // application's own condition let the page say "passed its checks 10 h ago"
+  // about evidence gathered eight minutes earlier.
+  if (model.condition.certainty === "verified")
+    return `${model.condition.text}${server}`;
   if (app?.evidence.certainty === "stale" && app.evidence.at)
-    return `${model.headline} hasn't been checked for ${span(model.now - Date.parse(app.evidence.at))}, so it may have changed.${host?.evidence.certainty === "verified" ? ` The server answered ${ago(host.evidence.at, model.now)}.` : ""}`;
+    return `${model.headline} hasn't been checked for ${span(model.now - Date.parse(app.evidence.at))}, so it may have changed.${server}`;
   return `${model.headline} passed its checks ${ago(app?.evidence.at, model.now)}.`;
 }
 
@@ -253,14 +281,16 @@ export function TimelineHero({
   onShow,
   onAsk,
   onOpenDestination,
-}: HeroProps) {
+  timeline: given,
+}: HeroProps & { timeline?: Timeline }) {
   const [guy, mascot] = useServerGuy(model, recheck, { narrate: true });
   const appId = record.application.id;
-  const timeline = useMemo(
+  const fallback = useMemo(
     () =>
       buildTimeline({ model, record, live: guy.live, marks: recheck.marks }),
     [model, record, guy.live, recheck.marks],
   );
+  const timeline = given ?? fallback;
   const [open, setOpen] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axt-pop, .axt-ev, .axt-lane-name", close);
@@ -731,7 +761,12 @@ export function TimelineHero({
                   >
                     {nowX - x(gapFrom) > 14 && (
                       <span>
-                        {since[lane.id]} {span(now - (lane.lastAt ?? start))}
+                        {/* A lane with nothing on record has no stretch to
+                            measure: borrowing the window's edge would report
+                            a duration nobody observed. */}
+                        {lane.lastAt === null
+                          ? nothing[lane.id]
+                          : `${since[lane.id]} ${span(now - lane.lastAt)}`}
                       </span>
                     )}
                   </div>

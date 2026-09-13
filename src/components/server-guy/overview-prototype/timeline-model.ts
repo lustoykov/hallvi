@@ -47,7 +47,11 @@ const TOGETHER = 30 * 60_000;
 export function laneOf(partId: string): LaneId {
   if (partId === "host") return "server";
   if (partId.startsWith("gate:") || partId === "tls") return "access";
-  if (partId === "offsite" || partId.startsWith("vol:")) return "backups";
+  // Only an off-site copy speaks to Backups. A volume belongs to the
+  // application: surviving a restart is the application keeping its own data,
+  // and nothing was copied anywhere — pointing at one used to light the
+  // Backups lane on the strength of a check that never touched a backup.
+  if (partId === "offsite") return "backups";
   return "checks";
 }
 

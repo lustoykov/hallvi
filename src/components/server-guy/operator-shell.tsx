@@ -28,6 +28,7 @@ import {
   applicationSections,
   hiddenSections,
   sectionFromHash,
+  recordedSections,
   visibleSections,
   type ApplicationSection,
 } from "./application-sections";
@@ -252,6 +253,13 @@ export function OperatorShell({
     [deployment, view.operations],
   );
   const stack = useMemo(() => stackOf(deployment), [deployment]);
+  // Which hideable destinations the records establish. The stack model above
+  // is no longer written to, so without this every one of them stays dark
+  // however much Pi records.
+  const recordedHere = useMemo(
+    () => recordedSections(view.information ?? []),
+    [view.information],
+  );
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.
   const facts: ApplicationFacts = { ...view.facts };
@@ -636,12 +644,14 @@ export function OperatorShell({
             activeSection,
             facts,
             Boolean(deployment?.serverId),
+            recordedHere,
           )}
           hidden={hiddenSections(
             stack,
             activeSection,
             facts,
             Boolean(deployment?.serverId),
+            recordedHere,
           )}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
