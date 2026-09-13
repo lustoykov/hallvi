@@ -8,7 +8,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -195,6 +195,25 @@ export function ChatPane({
   // that is when a request appears, and once afterwards so the field goes
   // away when the turn that needed it has finished.
   const [secrets, setSecrets] = useState<SecretRequest[]>([]);
+
+  /**
+   * Where each saved record is shown in full.
+   *
+   * Pi attaches a record to a reply, and the same record can be attached to
+   * more than one — so a real transcript drew the same Cloudflare failure
+   * three times at 653px each, and a reader saw three problems where there
+   * was one. A record earns its full card at its first appearance; later
+   * appearances keep their place in the order and say what they are in one
+   * line, with everything still one click down.
+   */
+  const firstShown = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const message of view.messages)
+      for (const [index, block] of (message.blocks ?? []).entries())
+        if (block.type === "saved-information" && !seen.has(block.id))
+          seen.set(block.id, `${message.id}:${index}`);
+    return seen;
+  }, [view.messages]);
   const applicationId = view.application?.id;
   useEffect(() => {
     if (!applicationId) return;
@@ -451,6 +470,9 @@ export function ChatPane({
                         key={block.id}
                         record={record}
                         onOpen={openDestination}
+                        superseded={
+                          firstShown.get(record.id) !== `${message.id}:${index}`
+                        }
                       />
                     ) : null;
                   }

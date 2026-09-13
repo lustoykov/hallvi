@@ -22,6 +22,8 @@ export function InformationCard(props: {
   record: SavedInformation;
   onOpen?: (view: ApplicationSection) => void;
   currentView?: ApplicationSection;
+  /** A later record states the same subject; see GenericInformationCard. */
+  superseded?: boolean;
 }) {
   return props.record.presentation?.content ? (
     <InformationContent {...props} />
@@ -34,12 +36,21 @@ function GenericInformationCard({
   record,
   onOpen,
   currentView,
+  superseded,
 }: {
   record: SavedInformation;
   onOpen?: (view: ApplicationSection) => void;
   /** The destination this card is already sitting in, so it does not
       offer to open the page you are reading. */
   currentView?: ApplicationSection;
+  /**
+   * A later record in the same conversation states this same subject, so
+   * this one is history. It keeps its place, its words and its evidence and
+   * gives up the room: one real transcript carried the same failure three
+   * times at 653px each, which reads as three problems rather than one
+   * re-checked twice.
+   */
+  superseded?: boolean;
 }) {
   const presentation = record.presentation;
 
@@ -59,50 +70,53 @@ function GenericInformationCard({
   const told = labels("reported");
   const intended = labels("planned");
 
-  return (
-    <article
-      className="sg-info"
-      data-tone={tone}
-      data-role={presentation.role}
-      data-information-id={record.id}
-    >
-      <header className="sg-info-head">
-        <Tag tone={tone}>{word}</Tag>
-        <h3>{record.title}</h3>
-        <span className="sg-info-when">
-          {record.establishedAt ? "Established" : "Saved"}{" "}
-          <LocalTime value={established} variant="compact" />
-        </span>
-      </header>
+  // Folded in a transcript, open on the destination the record belongs to.
+  const foldFacts = !currentView && facts.length > 4;
+  const factList = (
+    <>
+      <dl className="sg-info-facts">
+        {facts.map((fact, index) => (
+          // A value too long for a column takes the whole row rather
+          // than breaking an identifier across two lines.
+          <div key={index} data-wide={fact.value.length > 26 || undefined}>
+            <dt>{fact.label}</dt>
+            <dd>{fact.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {/* Said once for the whole card. Repeating it under every value
+          turns one honest qualification into five lines of noise. */}
+      {told.length > 0 && (
+        <p className="sg-info-basis">
+          As reported, not measured here: {told.join(", ")}.
+        </p>
+      )}
+      {intended.length > 0 && (
+        <p className="sg-info-basis">
+          Planned, not in place yet: {intended.join(", ")}.
+        </p>
+      )}
+    </>
+  );
 
+  const body = (
+    <>
       <InformationBody source={record.body} />
 
-      {facts.length > 0 && (
-        <>
-          <dl className="sg-info-facts">
-            {facts.map((fact, index) => (
-              // A value too long for a column takes the whole row rather
-              // than breaking an identifier across two lines.
-              <div key={index} data-wide={fact.value.length > 26 || undefined}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-          {/* Said once for the whole card. Repeating it under every value
-              turns one honest qualification into five lines of noise. */}
-          {told.length > 0 && (
-            <p className="sg-info-basis">
-              As reported, not measured here: {told.join(", ")}.
-            </p>
-          )}
-          {intended.length > 0 && (
-            <p className="sg-info-basis">
-              Planned, not in place yet: {intended.join(", ")}.
-            </p>
-          )}
-        </>
-      )}
+      {facts.length > 0 &&
+        // A spec sheet is supporting evidence, not the outcome. Ten rows of
+        // server size, region and monthly cost under a two-line result made
+        // a 726px card out of one sentence and one next step. On the
+        // destination the record belongs to they stay open — that page is
+        // about them; in a transcript they fold.
+        (foldFacts ? (
+          <details className="sg-info-more">
+            <summary>{facts.length} details</summary>
+            {factList}
+          </details>
+        ) : (
+          factList
+        ))}
 
       {presentation.checks.length > 0 && (
         <ul className="sg-info-checks">
@@ -181,6 +195,82 @@ function GenericInformationCard({
           </ul>
         </details>
       )}
+    </>
+  );
+
+  // Two reasons a record gives up the room, and neither hides anything.
+  //
+  // Superseded: it is already shown in full earlier in this conversation, so
+  // this is the same record mentioned again.
+  //
+  // Routine: it went well, nothing is waiting on the reader, and it is being
+  // read in a transcript rather than on the destination it belongs to. A
+  // conversation is mostly results that went well; at 726px each they bury
+  // the one that needs attention.
+  const passed = presentation.checks.filter(
+    (check) => check.status === "passed",
+  ).length;
+  const routine =
+    !currentView &&
+    !superseded &&
+    tone === "verified" &&
+    !presentation.nextStep &&
+    !recommendation;
+
+  if (superseded || routine)
+    return (
+      <article
+        className="sg-result"
+        data-tone={tone}
+        data-quiet=""
+        data-information-id={record.id}
+      >
+        <div className="sg-result-head">
+          <span className="sg-result-dot" data-tone={tone} aria-hidden="true" />
+          <h3 title={record.title}>{record.title}</h3>
+          {routine && presentation.url && (
+            <a
+              className="sg-result-open"
+              href={presentation.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open <ArrowUpRight aria-hidden="true" weight="bold" />
+            </a>
+          )}
+          <span className="sg-result-then">
+            <LocalTime value={established} variant="compact" />
+          </span>
+        </div>
+        <details className="sg-result-more sg-result-alone">
+          <summary>
+            {superseded
+              ? `${word} · shown in full above`
+              : passed > 0
+                ? `${passed} check${passed === 1 ? "" : "s"} passed · details`
+                : "Details"}
+          </summary>
+          <div className="sg-result-inside">{body}</div>
+        </details>
+      </article>
+    );
+
+  return (
+    <article
+      className="sg-info"
+      data-tone={tone}
+      data-role={presentation.role}
+      data-information-id={record.id}
+    >
+      <header className="sg-info-head">
+        <Tag tone={tone}>{word}</Tag>
+        <h3>{record.title}</h3>
+        <span className="sg-info-when">
+          {record.establishedAt ? "Established" : "Saved"}{" "}
+          <LocalTime value={established} variant="compact" />
+        </span>
+      </header>
+      {body}
     </article>
   );
 }

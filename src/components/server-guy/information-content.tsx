@@ -89,6 +89,96 @@ export function InformationContent({
       ))}
     </ul>
   );
+  // ---- The routine result, said once.
+  //
+  // A verified access record in the transcript took 408px to report that an
+  // application answers on this PC, and said so five times on the way: the
+  // Verified badge, the title, the paragraph, the access row and a check all
+  // carried the same fact. Three of them in a row — which is what a real
+  // conversation contained — spent 1,200px on one sentence.
+  //
+  // A result that went well is one line, its one qualification, and a way in.
+  // Everything that was on the face is still here, one disclosure down. This
+  // applies only to a verified record with nothing waiting on the reader: a
+  // failure, a warning or a next step keeps the room it needs.
+  const routine =
+    compact && tone === "verified" && !presentation.nextStep && !primary;
+  const passed = presentation.checks.filter(
+    (check) => check.status === "passed",
+  ).length;
+
+  if (routine)
+    return (
+      <article
+        className="sg-result"
+        data-kind={content.kind}
+        data-context="chat"
+        data-tone={tone}
+        data-information-id={record.id}
+      >
+        <div className="sg-result-head">
+          <Check className="sg-result-mark" aria-hidden="true" weight="bold" />
+          <h3 title={record.title}>{record.title}</h3>
+          {access && presentation.url && (
+            <a
+              className="sg-result-open"
+              href={presentation.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open <ArrowUpRight aria-hidden="true" weight="bold" />
+            </a>
+          )}
+        </div>
+        {/* The limitation stays on the face. Compactness must not hide the
+            thing that decides whether the link will work tomorrow. */}
+        <p className="sg-result-scope">
+          {access
+            ? content.mode === "private"
+              ? "Only on this PC, while the tunnel is open"
+              : "Reachable from the internet"
+            : content.kind === "deployment"
+              ? `${content.server} · ${content.revision.slice(0, 7)}`
+              : ""}
+        </p>
+        <div className="sg-result-meta">
+          <span>
+            {record.establishedAt ? "Checked" : "Saved"}{" "}
+            <LocalTime
+              value={record.establishedAt ?? record.updatedAt}
+              variant="compact"
+            />
+            {passed > 0 &&
+              ` · ${passed} check${passed === 1 ? "" : "s"} passed`}
+          </span>
+          <details className="sg-result-more">
+            <summary>Details</summary>
+            <div className="sg-result-inside">
+              <div className="sg-record-body">
+                <InformationBody source={record.body} />
+              </div>
+              {access && presentation.url && (
+                <p className="sg-result-url">
+                  <code>{presentation.url}</code>
+                </p>
+              )}
+              {details}
+              {checks}
+              {onOpen && presentation.views.includes("deployment") && (
+                <button
+                  type="button"
+                  className="sg-info-go"
+                  onClick={() => onOpen("deployment")}
+                >
+                  View deployment <ArrowRight aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </details>
+        </div>
+      </article>
+    );
+
   return (
     <article
       className="sg-record"

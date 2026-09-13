@@ -230,3 +230,205 @@
     transform: rotate(90deg);
   }
 }
+
+/* ---------- The routine result ----------
+   A result that went well, in three lines: what happened, the one thing that
+   qualifies it, and when it was checked. It replaces a card that spent 408px
+   saying an application answers on this PC — and said it five times, in a
+   badge, a title, a paragraph, an access row and a check.
+
+   Lighter than a record card on purpose. A transcript is mostly results that
+   went well; if each one arrives as a bordered object of equal weight, the
+   conversation becomes a stack of boxes and the one that needs the reader
+   does not stand out. This has a hairline and no tint; anything failed,
+   waiting or carrying a next step keeps the full card. */
+.sg-result {
+  margin: 10px 0;
+  padding: 11px 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.sg-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sg-result-mark {
+  flex: none;
+  position: relative;
+  top: 2px;
+  font-size: 13px;
+  color: var(--verified, #14945f);
+}
+.sg-result-head h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.011em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The way in is the only action on the face, and it is a link, not a slab of
+   blue: the outcome is the news, and opening it is what you do about it. */
+.sg-result-open {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--line-2, #d8dee8);
+  border-radius: 999px;
+  color: var(--blue, #285ad8);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.sg-result-open:hover {
+  border-color: #bcc9e4;
+  background: var(--working-bg, #edf3ff);
+}
+.sg-result-scope {
+  margin: 2px 0 0 21px;
+  color: var(--ink-2, #3e4a60);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.sg-result-scope:empty {
+  display: none;
+}
+.sg-result-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 0 21px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.sg-result-more > summary {
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  transition: color 120ms ease;
+}
+.sg-result-more > summary::-webkit-details-marker {
+  display: none;
+}
+.sg-result-more > summary::after {
+  content: " ›";
+}
+.sg-result-more[open] > summary::after {
+  content: " ⌄";
+}
+.sg-result-more > summary:hover {
+  color: var(--ink-2, #3e4a60);
+}
+.sg-result-inside {
+  margin-top: 9px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.sg-result-url code {
+  font-size: 12px;
+  color: var(--ink-2, #3e4a60);
+}
+/* The disclosure spans the card rather than the column it opened in. */
+.sg-result-meta {
+  position: relative;
+  flex-wrap: wrap;
+}
+.sg-result-more {
+  margin-left: auto;
+}
+.sg-result-more[open] {
+  flex: 1 1 100%;
+  margin-left: 0;
+}
+.sg-result-more[open] > summary {
+  display: inline-block;
+  margin-bottom: 0;
+}
+
+/* ---------- A record the conversation has since re-stated ----------
+   Same words, same evidence, less room. It is history: the newer record for
+   that subject carries the current claim, and five full failure cards for two
+   distinct problems reads as five problems. The dot keeps the state legible
+   at a glance so nothing is disguised as fine. */
+.sg-result[data-quiet] {
+  padding: 8px 14px;
+  border-color: var(--line);
+  background: var(--context, #fafbfc);
+}
+.sg-result-dot {
+  flex: none;
+  position: relative;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line-strong, #ccd5e3);
+}
+.sg-result-dot[data-tone="verified"] {
+  background: var(--verified, #14945f);
+}
+.sg-result-dot[data-tone="failed"] {
+  background: var(--failed, #a6312b);
+}
+.sg-result-dot[data-tone="stale"] {
+  background: var(--amber, #b25a16);
+}
+.sg-result[data-quiet] h3 {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--ink-2, #3e4a60);
+}
+.sg-result-then {
+  flex: none;
+  color: var(--faint, #8b95a5);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.sg-result-alone {
+  margin: 3px 0 0 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sg-result-alone > summary {
+  color: var(--faint, #8b95a5);
+}
+
+/* Supporting detail in a transcript folds; on its own destination it does not. */
+.sg-info-more {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+.sg-info-more > summary {
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+.sg-info-more > summary::-webkit-details-marker {
+  display: none;
+}
+.sg-info-more > summary::after {
+  content: " ›";
+}
+.sg-info-more[open] > summary::after {
+  content: " ⌄";
+}
+.sg-info-more > summary:hover {
+  color: var(--ink-2, #3e4a60);
+}
+.sg-info-more[open] > summary {
+  margin-bottom: 8px;
+}
