@@ -323,3 +323,40 @@ describe("Overview does not disagree with the lane it links to", () => {
     ).toBe(true);
   });
 });
+
+describe("an absence beside something that works", () => {
+  it("does not read the whole lane as not set up", () => {
+    // Shop states its public HTTP port absent — deliberately, because the
+    // deployment is private — and its tunnel present and passing. Overview
+    // read the lane as "Not set up", turning the good half of that
+    // arrangement into a warning.
+    const records: SavedInformation[] = [
+      states({ kind: "access", id: "private-tunnel" }, {
+        title: "It is reachable through a tunnel",
+        checks: [check("tunnel", "passed"), check("loopback", "passed")],
+      } as never),
+      states({ kind: "door", id: "public-http" }, {
+        title: "There is no public HTTP port",
+        presence: "absent",
+      } as never),
+    ];
+    const lane = of(records).overview.vitals.find(
+      (item) => item.id === "access",
+    );
+    expect(lane?.status.certainty).toBe("verified");
+    expect(lane?.status.text).not.toMatch(/not set up/i);
+  });
+
+  it("still reads as absent when nothing in the lane is present", () => {
+    const records: SavedInformation[] = [
+      states({ kind: "backup-plan", id: "plan" }, {
+        title: "Nothing backs this up",
+        presence: "absent",
+      } as never),
+    ];
+    const lane = of(records).overview.vitals.find(
+      (item) => item.id === "backups",
+    );
+    expect(lane?.status.certainty).toBe("absent");
+  });
+});
