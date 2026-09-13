@@ -10,12 +10,12 @@ export async function applicationWorkspaceSource(
   // now, through the repository identity a successful access check recorded.
   const { getApplication } = await import("./db");
   const { recordedRepositoryId } = await import("./applications");
-  const { connectedGithubCredential } = await import("./github-connection");
+  const { repositoryCredential } = await import("./github-connection");
   const { githubJson } = await import("./github-api");
   const application = getApplication(applicationId);
   if (!application) throw new Error("Application not found.");
   const repository = `${application.repositoryOwner}/${application.repositoryName}`;
-  const { token } = await connectedGithubCredential();
+  const { token } = await repositoryCredential();
   const found = (await githubJson(`/repos/${repository}`, token, { signal }))
     .data as { id?: number; default_branch?: string };
   // A later failed or unavailable check records no identity; it does not

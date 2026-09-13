@@ -366,3 +366,25 @@ export async function connectedGithubCredential() {
     "auth",
   );
 }
+
+/**
+ * The credential for reading one repository. A usable login is used when there
+ * is one; otherwise the read is anonymous, because a public repository is
+ * public and most software worth self-hosting belongs to somebody else. The
+ * caller finds out which it got and says so; a private repository then fails
+ * the way an unreadable repository always did.
+ */
+export async function repositoryCredential(): Promise<{
+  connection: GithubConnection | null;
+  token: string | null;
+}> {
+  if (!readGithubConnection()) return { connection: null, token: null };
+  try {
+    return await connectedGithubCredential();
+  } catch (error) {
+    // An expired or refused login is not a reason to refuse public software.
+    if (error instanceof GithubAccessError && error.kind === "auth")
+      return { connection: null, token: null };
+    throw error;
+  }
+}

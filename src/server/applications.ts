@@ -12,7 +12,11 @@ import {
   listApplications,
   withTransaction,
 } from "./db";
-import { inspectGithubRepository, parseGithubRepository } from "./github";
+import {
+  ANONYMOUS_CREDENTIAL,
+  inspectGithubRepository,
+  parseGithubRepository,
+} from "./github";
 import {
   currentGithubConnectionId,
   readGithubConnection,
@@ -95,6 +99,16 @@ function connectionIdOf(observation: { raw: unknown }) {
     : null;
 }
 
+function credentialOf(observation: { raw: unknown } | null | undefined) {
+  const raw = observation?.raw;
+  return raw &&
+    typeof raw === "object" &&
+    "credentialSource" in raw &&
+    typeof raw.credentialSource === "string"
+    ? raw.credentialSource
+    : null;
+}
+
 /** Records a fresh GitHub access check of the application's repository. */
 export async function observeRepository(
   applicationId: string,
@@ -148,20 +162,27 @@ export async function observeRepository(
 export function repositoryAccess(application: ApplicationRecord) {
   const latest = latestObservation(application.id);
   const connectionId = currentGithubConnectionId();
-  const current = Boolean(
-    connectionId && latest && connectionIdOf(latest) === connectionId,
-  );
+  // A check that used no login belongs to no login: what it established about
+  // a public repository does not change when one is connected or dropped. A
+  // failed anonymous check is different — connecting a login is exactly what
+  // might make a private repository readable — so it stops counting then.
+  const anonymous = credentialOf(latest) === ANONYMOUS_CREDENTIAL;
+  const current = latest
+    ? anonymous
+      ? latest.status === "passed" || !connectionId
+      : Boolean(connectionId && connectionIdOf(latest) === connectionId)
+    : false;
   return {
     status: (!current || !latest || latest.status === "unavailable"
       ? "not-yet"
       : latest.status === "passed"
         ? "passed"
         : "blocked") as "passed" | "blocked" | "not-yet",
-    result: !connectionId
-      ? "Connect GitHub, then run the repository check."
-      : !current
+    result: current
+      ? (latest?.summary ?? "The repository has not been checked yet.")
+      : connectionId
         ? "Run the repository check with your current GitHub connection."
-        : (latest?.summary ?? "The repository has not been checked yet."),
+        : "Run the repository check, or connect GitHub if this repository is private.",
     observation: latest,
     current,
     connected: Boolean(connectionId),

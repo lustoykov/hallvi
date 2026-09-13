@@ -21,7 +21,8 @@ export const ARCHIVE_LIMITS = { gzipBytes: 48 * 1024 * 1024 } as const;
 export async function fetchBaseTree(
   fullName: string,
   sha: string,
-  token: string,
+  /** A login's token, or null for a public repository. */
+  token: string | null,
   signal?: AbortSignal,
 ): Promise<TreeFile[]> {
   const gzip = await githubArchive(fullName, sha, token, {
