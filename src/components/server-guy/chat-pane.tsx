@@ -45,10 +45,32 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
   running: "Draft",
   succeeded: "Saved",
   failed: "Failed",
-  cancelled: "Cancelled",
+  // Both of these mean the reader stopped it. The status line beneath says
+  // "Stopped", and a tag reading "Cancelled" beside it made one action look
+  // like two different outcomes.
+  cancelled: "Stopped",
   "timed-out": "Timed out",
-  interrupted: "Interrupted",
+  interrupted: "Stopped",
 };
+
+/**
+ * What stopping actually did.
+ *
+ * Stopping ends the reply; it does not undo the work. By the time somebody
+ * reaches for Stop, Pi has usually already run something on their server, and
+ * "Reply cancelled." invites them to believe otherwise. This counts what had
+ * finished and says so, because the difference matters when the next thing
+ * they do is decide whether to run it again.
+ */
+export function stopOutcome(
+  executions: { runId: string; status: string }[] | undefined,
+  runId: string,
+) {
+  const mine = (executions ?? []).filter((item) => item.runId === runId);
+  const done = mine.filter((item) => item.status === "succeeded").length;
+  if (!done) return "Stopped. Nothing had run.";
+  return `Stopped. ${done} command${done === 1 ? "" : "s"} had already run and ${done === 1 ? "was" : "were"} not undone.`;
+}
 
 /** "Working for 1m 12s" — Pi is busy, and for how long. */
 function working(run: PiRun | undefined, now: number) {
@@ -363,8 +385,9 @@ export function ChatPane({
                                   "Conversation history unavailable.",
                                 )
                               ? run.error
-                              : message.status === "cancelled"
-                                ? "Reply cancelled."
+                              : message.status === "cancelled" ||
+                                  message.status === "interrupted"
+                                ? stopOutcome(view.executions, message.id)
                                 : "Something went wrong. Please retry."}
                       </p>
                       {message.body && !inProgress && (
