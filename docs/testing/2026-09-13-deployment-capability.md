@@ -362,10 +362,41 @@ volumes; volumes that only another record names.
 | `blog-2080decc` (165702693) | Blog | 2.29.46.226 | disposable |
 | `counter-bd2e9028` (165706272) | Counter | 89.167.84.129 | disposable |
 
-Also created: four SSH keys and two firewalls, all labelled with their
-application id. `getting-started-b2184a72` (165619823) is the owner's, from 12
-September, and was not touched.
+Also created: four SSH keys (118733588, 118734392, 118735847, 118736918) and
+two firewalls (11617636, 11617752), all labelled with their application id.
+`getting-started-b2184a72` (165619823) is the owner's, from 12 September, and
+was not touched.
 
-Cost while they ran: four × CX23 at €0.0088/hour plus €0.0008/hour for each
-IPv4 — about **€0.04 an hour for all four**, and nothing after they are
-deleted.
+**They were left running** so the four applications can be opened and used,
+because a screenshot of a working Ghost is not the same as a working Ghost.
+Cost while they run: four × CX23 at €0.0088/hour plus €0.0008/hour for each
+IPv4 — about **€0.04 an hour for all four**, €0.96 a day, and nothing after
+they are deleted.
+
+To delete them, either ask Server Guy in each application's conversation to
+delete its server and the key and firewall it made, or remove the four servers
+named above in the Hetzner console along with the keys and firewalls listed
+beside them. Everything this session created carries a
+`server-guy-application` label naming one of the four applications; nothing
+else does.
+
+## Opening them again
+
+The four application links are SSH forwards this controller holds, so they
+work only while it is running on this Mac. If one stops answering, ask in that
+application's conversation to reopen private access; `open_server_port` makes
+a new forward and gives back the same kind of URL.
+
+| | |
+|---|---|
+| the controller, with every record and transcript | `http://127.0.0.1:3460` |
+| Todo baseline | `http://127.0.0.1:3000` |
+| Paperless — sign in as `owner` | `http://127.0.0.1:18000` |
+| Ghost — admin at `/ghost/`, owner `owner@quokka-notes.test` | `http://127.0.0.1:2368` |
+| Plausible — sign in as `owner@quokka-notes.test` | `http://127.0.0.1:8080` |
+
+The three application passwords are throwaway values this session generated
+for disposable fixtures; they are in the session transcript and nowhere in the
+product, which is exactly where the product intends them not to be. Ghost will
+not accept a fresh sign-in from a new browser while it has no SMTP, which is
+the limitation it reported itself.
