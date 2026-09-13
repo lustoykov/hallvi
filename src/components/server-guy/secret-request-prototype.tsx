@@ -113,7 +113,7 @@ function Handling() {
   );
 }
 
-/* ───────────────────────── A — In the conversation ───────────────────────── */
+/* ──────────────────── A — In the conversation ──────────────────── */
 
 export function VariantATranscript({
   applicationId,
@@ -227,7 +227,7 @@ export function VariantAChip({ waiting }: { waiting: SecretRequest[] }) {
   );
 }
 
-/* ─────────────────────── B — The composer's mode ─────────────────────── */
+/* ─────────────────── B — The composer's mode ─────────────────── */
 
 export function VariantBStrip({
   waiting,
@@ -320,7 +320,7 @@ export function VariantBComposer({
   );
 }
 
-/* ───────────────────────────── C — A sheet ───────────────────────────── */
+/* ───────────────────────── C — A sheet ───────────────────────── */
 
 export function VariantCLine({
   waiting,
@@ -441,7 +441,7 @@ export function VariantCSheet({
   );
 }
 
-/* ───────────────────────────── the switcher ───────────────────────────── */
+/* ───────────────────────── the switcher ───────────────────────── */
 
 export function SecretsSwitcher({ current }: { current: Variant }) {
   const router = useRouter();
