@@ -145,7 +145,7 @@ Digest is separate from image on purpose. `grafana/grafana:11.2.0` is what
 somebody asked for and can change under them; `sha256:…` is what actually ran.
 The first is `configuration`, the second is `identity` and never expires.
 
-## Prerequisite B · giving Pi a secret without Pi seeing it
+## Prerequisite B · keeping a secret out of Pi's conversation
 
 Grafana needs an admin password. Pi is correctly forbidden from asking for one
 in chat and from saving it, so today the journey stops.
@@ -154,20 +154,22 @@ The flow, and the boundary at each step:
 
 1. **Pi asks for a handle, not a value.** `request_secret({name, why, process?})`
    records that the application needs `GF_SECURITY_ADMIN_PASSWORD` and returns
-   the handle `{{secret:GF_SECURITY_ADMIN_PASSWORD}}`. Pi never receives a value
-   and has no tool that returns one.
+   the handle `{{secret:GF_SECURITY_ADMIN_PASSWORD}}`. No tool returns the value
+   directly to Pi.
 2. **The owner types it into a masked field** rendered by the product in the
    conversation — not into the message box. It never becomes a message, so it
    is never in the transcript, never in Pi's context, and never in an evaluation
    artifact.
 3. **The controller stores it** under `piConfigDir()/secrets/`, encrypted with
-   AES-256-GCM under a key file at mode 0600. This is *not* a claim of
-   protection against someone who already has the controller's filesystem — it
-   is protection against the ways a value leaks by accident: a backup, a grep, a
-   screen share, a copied directory. The UI says exactly that and no more.
-4. **Only the execution layer resolves it.** `server_bash` substitutes handles
-   at spawn time. The command as recorded, as displayed and as logged keeps the
-   handle. Output is scanned for every held value before it is stored.
+   AES-256-GCM under a key file at mode 0600. This keeps plaintext out of casual
+   file inspection, grep output and screenshots. The key sits beside the
+   ciphertext, so copying or backing up the full configuration copies both and
+   is outside this protection.
+4. **Only the execution layer resolves it.** `server_bash` supplies named values
+   as environment variables at spawn time. The recorded and displayed command
+   keeps the names, and exact held values are removed from captured output. A
+   Pi-authored command can still read, transform or transmit its environment;
+   this boundary prevents accidental disclosure, not deliberate exfiltration.
 5. **Pi records the variable, not the value.** A `variable` subject with
    `source` and `established` facts. Save-time validation rejects a `value` key
    on a `variable`, and rejects any fact whose value matches a held secret or

@@ -1,4 +1,4 @@
-// A secret the owner supplies, that Pi never sees.
+// A secret the owner supplies without putting it in Pi's conversation.
 //
 // Some applications cannot be deployed without one: Grafana wants an admin
 // password, a database wants its own. Pi is forbidden from asking for one in
@@ -12,7 +12,7 @@
 //   Pi asks for a **handle**. request_secret records that the application
 //   needs GF_SECURITY_ADMIN_PASSWORD and hands back
 //   {{secret:GF_SECURITY_ADMIN_PASSWORD}}. There is no tool that returns a
-//   value, so there is nothing for Pi to leak.
+//   value directly.
 //
 //   The owner types it into a masked field the product renders. It never
 //   becomes a message.
@@ -28,11 +28,13 @@
 // we without knowing where in the command it landed. Passing it through the
 // environment removes the question: the shell never parses it.
 //
-// What the encryption is for, honestly: it stops a value leaking the ways
-// values actually leak — a copied directory, a grep, a backup, a screen
-// share, a support bundle. It is not a claim of protection from someone who
-// already has this machine's filesystem, because the key is on it. Saying
-// otherwise would be the kind of security theatre that gets people hurt.
+// What the encryption is for, honestly: it keeps plaintext out of casual file
+// inspection, grep output and screenshots. The key is stored beside the
+// ciphertext, so a copy or backup of the full configuration contains both and
+// is not protected by this encryption. A Pi-authored command also receives the
+// value in its environment and can read, transform or transmit it. Exact-value
+// redaction prevents accidental plaintext disclosure; it is not a boundary
+// against a malicious command or someone with filesystem access.
 
 import {
   createCipheriv,

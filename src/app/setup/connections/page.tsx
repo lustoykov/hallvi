@@ -35,9 +35,8 @@ export default async function ConnectionsPage() {
           detail: hetzner
             ? "A controller-held API token. Server Guy chooses sizes and regions and shows the cost before buying."
             : "Not connected. Server Guy cannot prepare a server without it.",
-          // A fingerprint of the token, shortened: enough to tell two tokens
-          // apart, and no reason for a whole hash to sit on the screen.
-          credential: hetzner ? `Token ending ${hetzner.slice(-8)}` : null,
+          // Presence is useful; characters from the credential are not.
+          credential: hetzner ? "Controller token configured" : null,
           href: "/applications",
           action: hetzner ? "Manage in the conversation" : "Connect",
         },

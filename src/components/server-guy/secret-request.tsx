@@ -2,9 +2,9 @@
 
 // The one place a secret is typed.
 //
-// Pi asked for a value it must never hold, and this is where the owner
-// supplies it. It is deliberately not the message box: anything typed there
-// becomes a message, and a message is in the model's context, in the
+// Pi asked for a value that should stay out of chat, and this is where the
+// owner supplies it. It is deliberately not the message box: anything typed
+// there becomes a message, and a message is in the model's context, in the
 // transcript, and in every artifact made from either. This posts straight to
 // the controller instead, and what Pi is given is a handle.
 //
@@ -103,7 +103,7 @@ function SecretField({
     >
       <h3>
         <Key weight="bold" aria-hidden="true" />
-        Server Guy needs a value it should not see
+        Server Guy needs a value that should stay out of chat
       </h3>
       <p className="sg-secret-why">{secret.why}</p>
       <label htmlFor={`secret-${secret.name}`}>
@@ -139,18 +139,18 @@ function SecretField({
       {value.length > 0 && value.length < MINIMUM_LENGTH && (
         <p className="sg-secret-error">
           At least {MINIMUM_LENGTH} characters. Anything shorter turns up in
-          ordinary command output too often to be kept out of it, and Server Guy
-          will not accept a value it cannot promise to hide.
+          ordinary command output too often for exact-value redaction to be
+          useful, so Server Guy will not accept it.
         </p>
       )}
       <p className="sg-secret-note">
         <Eye weight="bold" aria-hidden="true" />
-        This does not become a message. Server Guy is given a handle,{" "}
+        This does not become a message. Pi is given a handle,{" "}
         <code>{`{{secret:${secret.name}}}`}</code>, and the value is put in only
-        as a command is run — so it stays out of the conversation, the saved
-        records and the logs. It is kept encrypted on this computer, which
-        protects it from being copied by accident, not from anyone who already
-        has this computer.
+        as a command is run. Its exact value is removed from captured output,
+        but a command can still read, transform or transmit it. Encryption keeps
+        plaintext out of casual file inspection; it does not protect a copy of
+        the full Server Guy configuration or anyone who can read this computer.
       </p>
     </form>
   );
