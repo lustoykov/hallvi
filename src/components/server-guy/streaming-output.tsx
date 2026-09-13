@@ -62,11 +62,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const command = plainText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
-  const [now, setNow] = useState(0);
+  // Set once at mount and kept fresh by the ticker. Seeding it inside the
+  // effect meant a synchronous setState on every render that started or
+  // finished a command, which cascades; the pulse only draws while something
+  // is running, so there is nothing to reset when it stops either.
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!running) return setNow(0);
-    setNow(Date.now());
+    if (!running) return;
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
   }, [running]);
