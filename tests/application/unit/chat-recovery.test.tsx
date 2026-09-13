@@ -107,7 +107,9 @@ describe("conversation recovery and assistant branding", () => {
     ["queued", "Waiting to reply"],
     ["running", "Working"],
     ["failed", "Something went wrong. Please retry."],
-    ["cancelled", "Reply cancelled."],
+    // Stopping ends the reply and does not undo work that already ran, so
+    // the line reports what happened rather than naming the reply.
+    ["cancelled", "Stopped."],
   ] as const)("keeps %s status user-facing", (status, expected) => {
     const html = render({
       status,
