@@ -34,8 +34,30 @@ import type {
   ReachView,
 } from "./reach-prototype/reach-story";
 
+/**
+ * Sources, as Pi wrote them. Split on commas only: "Server loopback via SSH
+ * tunnel" is one source described in words, and splitting it on spaces
+ * turned it into five imaginary networks.
+ */
 const listOf = (value: string | null) =>
-  (value ?? "").split(/[,\s]+/).filter(Boolean);
+  (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+/**
+ * The port a way in is reached on. A door has one; an SSH tunnel has two, and
+ * the one that matters to a reader is the end they type. Naming both keys
+ * here rather than aliasing them keeps `access` an honest kind of its own.
+ */
+function portOf(fact: (key: string) => string | null) {
+  const local = fact("local-port");
+  const remote = fact("remote-port");
+  const direct = fact("port");
+  if (direct) return direct;
+  if (local && remote) return `${local} → ${remote}`;
+  return local ?? remote ?? null;
+}
 
 export function reachFromRecords({
   records,
@@ -77,7 +99,9 @@ export function reachFromRecords({
       const shut = refused?.value.status === "passed";
       const reach: Reach = shut
         ? "closed"
-        : sources.includes("public") || sources.includes("0.0.0.0/0")
+        : sources.some((source) =>
+              /^(public|anywhere|0\.0\.0\.0\/0|::\/0)$/i.test(source),
+            )
           ? "internet"
           : sources.length
             ? "restricted"
@@ -86,9 +110,10 @@ export function reachFromRecords({
               : "private";
 
       const edge = map?.edges.find((item) => item.from === ref.id);
+      const port = portOf(fact);
       doors.push({
         id: ref.id,
-        port: fact("port") ?? "?",
+        port: port ?? "not recorded",
         title: presence.known ? presence.record.title : ref.id,
         serves: edge
           ? (map?.parts.find((part) => part.id === edge.to)?.name ?? null)
@@ -111,7 +136,7 @@ export function reachFromRecords({
       if (shut && refused)
         guards.push({
           id: `refused:${ref.id}`,
-          title: `Port ${fact("port") ?? ref.id} refuses connections`,
+          title: `${port ? `Port ${port}` : ref.id} refuses connections`,
           at: refused.record.establishedAt,
           detail: refused.value.detail ?? refused.value.label,
         });
@@ -245,7 +270,7 @@ export function reachFromRecords({
     if (door.reach === "internet")
       holes.push({
         id: `open:${door.id}`,
-        title: `Port ${door.port} is open to everyone`,
+        title: `${door.port === "not recorded" ? door.id : `Port ${door.port}`} is open to everyone`,
         detail: door.sources.length
           ? `Its sources are ${door.sources.join(", ")}.`
           : "No source restriction is recorded.",
@@ -254,7 +279,7 @@ export function reachFromRecords({
     if (door.unasked)
       holes.push({
         id: `unasked:${door.id}`,
-        title: `Nobody has checked port ${door.port}`,
+        title: `Nobody has checked ${door.port === "not recorded" ? door.id : `port ${door.port}`}`,
         detail:
           "It is on record as a way in, and no check says whether it answers or refuses.",
       });

@@ -53,7 +53,19 @@ export interface Gap {
   detail: string;
 }
 
+/** The way in, as the records describe it. */
+export interface Entry {
+  title: string;
+  detail: string;
+}
+
 export interface LineStory {
+  /**
+   * The two stops before the web process. The design used to hard-code
+   * "Port 80 on the server · opened by the firewall", which asserted a port
+   * and a firewall that a tunnelled deployment has neither of.
+   */
+  entry?: Entry;
   state: "none" | "planned" | "running" | "unknown";
   tone: "verified" | "stale" | "planned" | "failed" | "checking";
   word: string;

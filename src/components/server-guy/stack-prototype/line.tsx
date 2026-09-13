@@ -316,8 +316,13 @@ export function LineDirection({
               id: "port",
               line: "visit",
               at: 1,
-              title: "Port 80 on the server",
-              detail: `HTTP, opened by the firewall for ${story.restricted ? "your network" : "everyone"}`,
+              // What the records say the way in is. The fallback is the
+              // shape of a plain HTTP deployment, which is what the
+              // isolated visual reference draws.
+              title: story.entry?.title ?? "Port 80 on the server",
+              detail:
+                story.entry?.detail ??
+                `HTTP, opened by the firewall for ${story.restricted ? "your network" : "everyone"}`,
             })}
             {web.map((item, index) => processStop(item, "visit", 2 + index))}
           </ol>

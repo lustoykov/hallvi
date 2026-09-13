@@ -119,6 +119,18 @@ export function processesFromRecords({
   const restricted =
     access?.kind === "application-access" ? access.mode === "private" : false;
 
+  // The address filter, when a door recorded one. Not derived from the access
+  // mode: a tunnel and an allow-list restrict in different ways, and only the
+  // door that was read knows which this is.
+  const doors = subjectsOfKind(live, "door").map((door) =>
+    currentFacts(live, door),
+  );
+  const filter =
+    doors.map((facts) => facts.get("sources")?.value.value).find(Boolean) ??
+    null;
+  const doorPort =
+    doors.map((facts) => facts.get("port")?.value.value).find(Boolean) ?? null;
+
   const processes: ProcessCard[] = refs.map((ref) => {
     const facts = currentFacts(live, ref);
     const checks = currentChecks(live, ref);
@@ -135,7 +147,12 @@ export function processesFromRecords({
         ? services[0]
         : null);
     const image = service?.image ?? fact("image");
-    const port = Number(fact("port")) || null;
+    // Pi describes a port the way Docker does — "127.0.0.1:3000 → 3000/tcp",
+    // "3000/tcp", "3000". Reading it as a bare number threw all three away
+    // and the page said "its port" while the record said exactly which.
+    const recordedPort = fact("port");
+    const port = Number(recordedPort?.match(/(\d+)(?!.*\d)/)?.[1]) || null;
+    const mapping = recordedPort && /[→:]/.test(recordedPort);
 
     const role: ProcessCard["role"] =
       part?.kind === "web"
@@ -155,9 +172,11 @@ export function processesFromRecords({
       port,
       reach:
         role === "web"
-          ? `Port 80 → ${port ?? "its port"} · ${restricted ? "from your network only" : "open to anyone"}`
-          : port
-            ? `Port ${port} · inside the server only`
+          ? // Pi's own mapping when it wrote one; it is more exact than
+            // anything derivable, and it is what was observed.
+            `${mapping ? recordedPort : `Port 80 → ${port ?? "its port"}`} · ${restricted ? "from your network only" : "open to anyone"}`
+          : recordedPort
+            ? `${mapping ? recordedPort : `Port ${recordedPort}`} · inside the server only`
             : "No port recorded",
       health: fact("health"),
       image: image ?? "Not recorded",
@@ -232,8 +251,9 @@ export function processesFromRecords({
             : "Nothing recorded",
     verifiedAt,
     restricted,
-    from: null,
     processes,
+    from: filter,
+    entry: entryFrom(access, doorPort, filter),
     processChanges: changesFor(live, refs),
     processGaps: gapsFor(processes),
   };
@@ -295,4 +315,36 @@ function gapsFor(processes: ProcessCard[]): Gap[] {
           },
         ]),
   ];
+}
+
+/**
+ * The stop between the network and the web process, from what was recorded.
+ *
+ * The design hard-coded "Port 80 on the server · opened by the firewall",
+ * which asserts a port and a firewall. A deployment reached through an SSH
+ * tunnel to the host's own loopback has neither, and saying it did was the
+ * page inventing the one thing a reader most needs to be true.
+ */
+function entryFrom(
+  access:
+    | { kind: string; mode?: string; localPort?: number; remotePort?: number }
+    | undefined,
+  doorPort: string | null,
+  filter: string | null,
+) {
+  if (access?.kind === "application-access" && access.mode === "private")
+    return {
+      title: `An SSH tunnel from this computer`,
+      detail: access.localPort
+        ? `127.0.0.1:${access.localPort} here, forwarded to ${access.remotePort ?? "the server"} on the server. Nothing is published publicly.`
+        : "Forwarded to the server's own loopback. Nothing is published publicly.",
+    };
+  if (doorPort)
+    return {
+      title: `Port ${doorPort} on the server`,
+      detail: filter
+        ? `Reachable from ${filter}.`
+        : "No record says what may reach it.",
+    };
+  return undefined;
 }

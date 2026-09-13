@@ -228,3 +228,81 @@ describe("domains", () => {
     expect(read([]).invented).toBeNull();
   });
 });
+
+describe("how a way in is described", () => {
+  it("keeps a source written in words as one source", () => {
+    // "Server loopback via SSH tunnel" is one thing described in prose, and
+    // splitting it on spaces turned it into five imaginary networks.
+    const story = read([
+      states(
+        { kind: "door", id: "loopback" },
+        {
+          facts: [
+            fact("port", "127.0.0.1:3000"),
+            fact("sources", "Server loopback via SSH tunnel"),
+          ],
+          checks: [check("open", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors[0].sources).toEqual(["Server loopback via SSH tunnel"]);
+    expect(story.doors[0].reach).toBe("restricted");
+  });
+
+  it("still splits a real list of sources", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "ssh" },
+        {
+          facts: [
+            fact("port", "22"),
+            fact("sources", "203.0.113.4, 198.51.100.7"),
+          ],
+          checks: [check("open", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors[0].sources).toEqual(["203.0.113.4", "198.51.100.7"]);
+  });
+
+  it("names both ends of a tunnel rather than printing a question mark", () => {
+    const story = read([
+      states(
+        { kind: "access", id: "grafana-private-access" },
+        {
+          facts: [fact("local-port", "33000"), fact("remote-port", "3000")],
+          checks: [check("http", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors[0].port).toBe("33000 → 3000");
+  });
+
+  it("says a port is not recorded rather than inventing one", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "prometheus-host-port" },
+        { checks: [check("refused", "passed")] },
+      ),
+    ]);
+    expect(story.doors[0].port).toBe("not recorded");
+    expect(story.guards[0].title).toBe(
+      "prometheus-host-port refuses connections",
+    );
+  });
+
+  it("reads anywhere and ::/0 as open to everyone, like 0.0.0.0/0", () => {
+    for (const source of ["anywhere", "::/0", "0.0.0.0/0"]) {
+      const story = read([
+        states(
+          { kind: "door", id: "http" },
+          {
+            facts: [fact("port", "80"), fact("sources", source)],
+            checks: [check("open", "passed")],
+          },
+        ),
+      ]);
+      expect(story.doors[0].reach).toBe("internet");
+    }
+  });
+});

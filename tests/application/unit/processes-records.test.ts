@@ -271,3 +271,79 @@ describe("processesFromRecords", () => {
     expect(story.processes[0].lastPassed).toBeNull();
   });
 });
+
+describe("the port, as Pi actually writes it", () => {
+  const withPort = (value: string) =>
+    processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app", {
+          facts: [
+            {
+              key: "port",
+              label: "Published port",
+              value,
+              claim: "configuration",
+              basis: "observed",
+            },
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    }).processes[0];
+
+  it("keeps Pi's own mapping, which is more exact than anything derived", () => {
+    // Reading this as a bare number threw it away and the page said "its
+    // port" while the record said exactly which.
+    expect(withPort("127.0.0.1:3000 → 3000/tcp").reach).toBe(
+      "127.0.0.1:3000 → 3000/tcp · open to anyone",
+    );
+    expect(withPort("127.0.0.1:3000 → 3000/tcp").port).toBe(3000);
+  });
+
+  it("reads a bare port and a docker-style one alike", () => {
+    expect(withPort("3000").port).toBe(3000);
+    expect(withPort("3000/tcp").port).toBe(3000);
+    expect(withPort("3000").reach).toBe("Port 80 → 3000 · open to anyone");
+  });
+
+  it("takes the address filter from the door, not from the access mode", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app"),
+        record({
+          states: {
+            ref: { kind: "door", id: "app-port" },
+            presence: "present",
+          },
+          facts: [
+            {
+              key: "sources",
+              label: "Listener sources",
+              value: "127.0.0.1 only",
+              claim: "configuration",
+              basis: "observed",
+            },
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.from).toBe("127.0.0.1 only");
+  });
+
+  it("leaves the filter unknown when no door recorded one", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app"),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.from).toBeNull();
+  });
+});
