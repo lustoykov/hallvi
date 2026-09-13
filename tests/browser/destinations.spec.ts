@@ -9,6 +9,8 @@
 
 import { expect, test, type ConsoleMessage, type Page } from "@playwright/test";
 
+import { journey } from "./journeys";
+
 const ACCEPTANCE = process.env.SG_ACCEPTANCE_URL ?? "http://127.0.0.1:3410";
 const SCENARIOS = process.env.SG_SCENARIO_URL ?? "http://127.0.0.1:3411";
 
@@ -123,63 +125,67 @@ for (const [label, base] of [
   ["acceptance", ACCEPTANCE],
   ["scenarios", SCENARIOS],
 ] as const)
-  test(`every destination on every ${label} application`, async ({ page }) => {
-    test.setTimeout(600_000);
-    const found: Finding[] = [];
-    let current: string = label;
-    watch(page, found, () => current);
+  test(
+    `every destination on every ${label} application`,
+    journey("record-destinations"),
+    async ({ page }) => {
+      test.setTimeout(600_000);
+      const found: Finding[] = [];
+      let current: string = label;
+      watch(page, found, () => current);
 
-    const apps = await applications(page, base);
-    test.skip(!apps.length, `no server on ${base}`);
+      const apps = await applications(page, base);
+      test.skip(!apps.length, `no server on ${base}`);
 
-    for (const app of apps)
-      for (const destination of DESTINATIONS) {
-        current = `${app.name} · ${destination}`;
-        const url = `${base}/applications/${app.id}#${destination}`;
-        await page.goto(url, { waitUntil: "domcontentloaded" });
-        await page.waitForLoadState("networkidle").catch(() => {});
+      for (const app of apps)
+        for (const destination of DESTINATIONS) {
+          current = `${app.name} · ${destination}`;
+          const url = `${base}/applications/${app.id}#${destination}`;
+          await page.goto(url, { waitUntil: "domcontentloaded" });
+          await page.waitForLoadState("networkidle").catch(() => {});
 
-        // The page drew something, and it is not a crash screen.
-        const main = page.locator("main").first();
-        await expect(main).toBeVisible();
-        const text = (await main.innerText().catch(() => "")) ?? "";
-        if (/Application error|Unhandled Runtime Error/i.test(text))
-          found.push({ where: current, what: "error boundary" });
-        if (text.trim().length < 20)
-          found.push({ where: current, what: "drew almost nothing" });
+          // The page drew something, and it is not a crash screen.
+          const main = page.locator("main").first();
+          await expect(main).toBeVisible();
+          const text = (await main.innerText().catch(() => "")) ?? "";
+          if (/Application error|Unhandled Runtime Error/i.test(text))
+            found.push({ where: current, what: "error boundary" });
+          if (text.trim().length < 20)
+            found.push({ where: current, what: "drew almost nothing" });
 
-        // The sidebar agrees with where we are.
-        const active = await page
-          .locator("[aria-current='page'], .sg-nav-item[data-active='true']")
-          .allInnerTexts()
-          .catch(() => []);
-        if (active.length === 0)
-          found.push({
-            where: current,
-            what: "no sidebar item marked current",
-          });
-
-        for (const width of [1440, 1180]) {
-          await page.setViewportSize({ width, height: 1000 });
-          await page.waitForTimeout(120);
-          if (await overflows(page))
+          // The sidebar agrees with where we are.
+          const active = await page
+            .locator("[aria-current='page'], .sg-nav-item[data-active='true']")
+            .allInnerTexts()
+            .catch(() => []);
+          if (active.length === 0)
             found.push({
               where: current,
-              what: `scrolls sideways at ${width}`,
+              what: "no sidebar item marked current",
             });
-          for (const clip of await clipped(page))
-            found.push({
-              where: current,
-              what: `clipped at ${width}: "${clip}"`,
-            });
+
+          for (const width of [1440, 1180]) {
+            await page.setViewportSize({ width, height: 1000 });
+            await page.waitForTimeout(120);
+            if (await overflows(page))
+              found.push({
+                where: current,
+                what: `scrolls sideways at ${width}`,
+              });
+            for (const clip of await clipped(page))
+              found.push({
+                where: current,
+                what: `clipped at ${width}: "${clip}"`,
+              });
+          }
+          await page.setViewportSize({ width: 1440, height: 1000 });
         }
-        await page.setViewportSize({ width: 1440, height: 1000 });
-      }
 
-    if (found.length) {
-      const grouped = found
-        .map((item) => `  ${item.where}: ${item.what}`)
-        .join("\n");
-      throw new Error(`${found.length} findings:\n${grouped}`);
-    }
-  });
+      if (found.length) {
+        const grouped = found
+          .map((item) => `  ${item.where}: ${item.what}`)
+          .join("\n");
+        throw new Error(`${found.length} findings:\n${grouped}`);
+      }
+    },
+  );
