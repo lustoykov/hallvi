@@ -669,12 +669,20 @@ describe("exact repository access", () => {
     });
     expect(JSON.stringify(result)).not.toContain(token);
   });
-  it("does no provider inspection before consent", async () => {
-    expect((await inspectGithubRepository(repository)).status).toBe(
-      "unavailable",
-    );
-    expect(json).not.toHaveBeenCalled();
+  it("reads a public repository without a login, and never borrows one", async () => {
+    // Server Guy exists to deploy software its user did not write, and a
+    // public repository is public. What must not happen is reaching for a
+    // credential the owner did not choose: the host's gh login stays untouched
+    // and the read carries no token.
+    expect(await inspectGithubRepository(repository)).toMatchObject({
+      status: "passed",
+      raw: {
+        credentialSource: "Public repository, read without a login",
+        repositorySelection: "public-anonymous",
+      },
+    });
     expect(cli).not.toHaveBeenCalled();
+    for (const call of json.mock.calls) expect(call[1]).toBeNull();
   });
   it("does not silently accept a deleted-and-recreated repository at the same URL", async () => {
     await reuse();

@@ -25,7 +25,7 @@ vi.mock("../../../src/server/github-api", async (original) => ({
 }));
 vi.mock("../../../src/server/execution-tree", async (original) => ({
   ...(await original<object>()),
-  fetchBaseTree: async () => [],
+  fetchBaseTree: async () => ({ files: [], omitted: [] }),
 }));
 import * as store from "../../../src/server/db";
 import { applicationWorkspaceSource } from "../../../src/server/pi-workspace-source";
