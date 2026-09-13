@@ -87,10 +87,14 @@ export function storageFromRecords({
     const created = facts.get("created")?.record.establishedAt ?? null;
     if (created && (!createdAt || created < createdAt)) createdAt = created;
 
+    // What is in it, in the fewest words that stay true. Pi's own `holds`
+    // is best; failing that the owner names it, because "Grafana's data"
+    // reads and a mount path does not.
     const holds = fact("holds");
     const piece: Piece = {
       key: ref.id,
-      label: holds ?? `Everything in ${fact("path") ?? ref.id}`,
+      label:
+        holds ?? (owner ? `${owner.name}'s data` : `Everything in ${ref.id}`),
       volume: ref.id,
       // Only a backup plan that says it covers this volume makes it copied.
       method: null,

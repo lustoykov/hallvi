@@ -42,8 +42,7 @@ export function DeploymentPage({
   onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
-    () =>
-      deploymentFromRecords({ records, executions, applicationName, now }),
+    () => deploymentFromRecords({ records, executions, applicationName, now }),
     [records, executions, applicationName, now],
   );
   const access = records
@@ -67,9 +66,9 @@ export function DeploymentPage({
         written down what it did.
       </p>
       <p>
-        Ask in the conversation. You will be shown what it intends to do
-        before anything is bought or changed, and the release, its checks and
-        the way in are all recorded here.
+        Ask in the conversation. You will be shown what it intends to do before
+        anything is bought or changed, and the release, its checks and the way
+        in are all recorded here.
       </p>
       <button
         type="button"

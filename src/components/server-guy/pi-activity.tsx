@@ -184,7 +184,8 @@ function plain(stored: string) {
     return stored;
   }
   if (typeof value === "string") return value;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return stored;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return stored;
   const entries = Object.entries(value as Record<string, unknown>);
   const strings = entries.filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",

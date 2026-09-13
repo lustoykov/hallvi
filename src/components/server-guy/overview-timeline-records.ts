@@ -11,7 +11,11 @@
 // timeline would date it to the moment someone wrote it down.
 
 import type { SavedInformation } from "@/server/operator-data";
-import { checkAsNow, lane, type Lane as LaneId } from "@/server/record-projection";
+import {
+  checkAsNow,
+  lane,
+  type Lane as LaneId,
+} from "@/server/record-projection";
 
 import type { LogLine } from "./architecture-prototype/model";
 import type {
@@ -41,7 +45,8 @@ export function timelineFromRecords({
   now: number;
 }): Timeline {
   const ids: LaneId[] = ["checks", "backups", "server", "access"];
-  const moments: Record<LaneId, { at: number; tone: EventTone; line: LogLine }[]> = {
+  type Moment = { at: number; tone: EventTone; line: LogLine };
+  const moments: Record<LaneId, Moment[]> = {
     checks: [],
     backups: [],
     server: [],
@@ -63,7 +68,11 @@ export function timelineFromRecords({
           id: `${record.id}:${check.key ?? check.label}`,
           at: record.establishedAt,
           tone:
-            reading === "failed" ? "fail" : reading === "verified" ? "pass" : "info",
+            reading === "failed"
+              ? "fail"
+              : reading === "verified"
+                ? "pass"
+                : "info",
           text: check.detail ? `${check.label} — ${check.detail}` : check.label,
         },
       });

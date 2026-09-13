@@ -43,7 +43,10 @@ export interface Change {
   origin: { chatId: string; messageId: string | null } | null;
 }
 
-/** Something Server Guy cannot do yet, drawn as a ghost and never as a reading. */
+/**
+ * Something Server Guy cannot do yet, drawn as a ghost and never as a
+ * reading.
+ */
 export interface Gap {
   id: string;
   title: string;

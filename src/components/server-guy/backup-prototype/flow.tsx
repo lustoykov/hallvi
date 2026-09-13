@@ -272,7 +272,9 @@ export function FlowDirection({
           if (!p) return null;
           const y = p.y + p.h / 2;
           if (!item.method) {
-            const wall = edge + 26;
+            // A long volume name widens the server box, which used to push
+            // this label off the right of the board and clip it mid-word.
+            const wall = Math.min(edge + 26, geo.width - 96);
             return (
               <g
                 key={item.key}

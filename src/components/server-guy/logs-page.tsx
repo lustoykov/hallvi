@@ -72,7 +72,10 @@ export function LogsPage({
         lastAt: held && held.lastAt > at ? held.lastAt : at,
       });
     }
-    return [...counted.entries()].map(([label, value]) => ({ label, ...value }));
+    return [...counted.entries()].map(([label, value]) => ({
+      label,
+      ...value,
+    }));
   }, [captured]);
   const peak = Math.max(1, ...streams.map((stream) => stream.lines));
 
@@ -180,7 +183,10 @@ export function LogsPage({
                 {/* In-app navigation, so a button — an href claiming one
                     destination while the click goes to another is a link
                     that lies about where it leads. */}
-                <button type="button" onClick={() => onOpenDestination("history")}>
+                <button
+                  type="button"
+                  onClick={() => onOpenDestination("history")}
+                >
                   See it in History
                   <ArrowUpRight weight="bold" aria-hidden="true" />
                 </button>

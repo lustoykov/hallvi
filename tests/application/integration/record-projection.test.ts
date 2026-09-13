@@ -80,13 +80,42 @@ const mapRecord = record({
     kind: "topology",
     from: "observed",
     parts: [
-      { id: "controller", kind: "controller", name: "Server Guy", role: "Runs the work", plain: "This PC" },
-      { id: "hetzner-165600952", kind: "host", name: "getting-started", role: "Runs the container", plain: "The machine your application runs on" },
-      { id: "app", kind: "web", name: "Getting Started", role: "Serves the pages", plain: "Your application" },
-      { id: "todo-db", kind: "volume", name: "todo.db", role: "Holds the database", plain: "Where your data lives" },
+      {
+        id: "controller",
+        kind: "controller",
+        name: "Server Guy",
+        role: "Runs the work",
+        plain: "This PC",
+      },
+      {
+        id: "hetzner-165600952",
+        kind: "host",
+        name: "getting-started",
+        role: "Runs the container",
+        plain: "The machine your application runs on",
+      },
+      {
+        id: "app",
+        kind: "web",
+        name: "Getting Started",
+        role: "Serves the pages",
+        plain: "Your application",
+      },
+      {
+        id: "todo-db",
+        kind: "volume",
+        name: "todo.db",
+        role: "Holds the database",
+        plain: "Where your data lives",
+      },
     ],
     edges: [
-      { from: "controller", to: "hetzner-165600952", network: "public", label: "SSH" },
+      {
+        from: "controller",
+        to: "hetzner-165600952",
+        network: "public",
+        label: "SSH",
+      },
       { from: "hetzner-165600952", to: "app", network: "loopback" },
       { from: "app", to: "todo-db", network: "disk" },
     ],
@@ -99,10 +128,34 @@ const hostFirst = record({
   states: { ref: HOST, presence: "present" },
   checks: [ssh],
   facts: [
-    { key: "server-id", label: "Server ID", value: "165600952", claim: "identity", basis: "reported" },
-    { key: "region", label: "Location", value: "Helsinki", claim: "configuration", basis: "reported" },
-    { key: "size", label: "Type", value: "CX23 · 2 vCPU · 4 GB", claim: "configuration", basis: "reported" },
-    { key: "address", label: "Address", value: "46.62.253.6", claim: "configuration", basis: "observed" },
+    {
+      key: "server-id",
+      label: "Server ID",
+      value: "165600952",
+      claim: "identity",
+      basis: "reported",
+    },
+    {
+      key: "region",
+      label: "Location",
+      value: "Helsinki",
+      claim: "configuration",
+      basis: "reported",
+    },
+    {
+      key: "size",
+      label: "Type",
+      value: "CX23 · 2 vCPU · 4 GB",
+      claim: "configuration",
+      basis: "reported",
+    },
+    {
+      key: "address",
+      label: "Address",
+      value: "46.62.253.6",
+      claim: "configuration",
+      basis: "observed",
+    },
   ],
 });
 
@@ -112,8 +165,22 @@ const deployed = record({
   at: "2026-09-12T16:05:00.000Z",
   about: [APP, WEB],
   checks: [
-    { key: "http", label: "Homepage answered", status: "passed", claim: "reachability", basis: "observed", about: WEB },
-    { key: "persistence", label: "Data survived a restart", status: "passed", claim: "contents", basis: "observed", about: { kind: "volume", id: "todo-db" } },
+    {
+      key: "http",
+      label: "Homepage answered",
+      status: "passed",
+      claim: "reachability",
+      basis: "observed",
+      about: WEB,
+    },
+    {
+      key: "persistence",
+      label: "Data survived a restart",
+      status: "passed",
+      claim: "contents",
+      basis: "observed",
+      about: { kind: "volume", id: "todo-db" },
+    },
   ],
 });
 
@@ -137,12 +204,11 @@ describe("1 · the first observations produce the designed map", () => {
     // later observation — and the design has one place for a host. The two
     // are deliberately different: the slot is the component's, the reference
     // is Pi's, and only the reference reads records.
-    expect(model.parts.filter((part) => !part.id.startsWith("gap:")).map((part) => part.id)).toEqual([
-      "controller",
-      "host",
-      "app",
-      "todo-db",
-    ]);
+    expect(
+      model.parts
+        .filter((part) => !part.id.startsWith("gap:"))
+        .map((part) => part.id),
+    ).toEqual(["controller", "host", "app", "todo-db"]);
     expect(model.status).toBe("live");
     expect(model.headline).toBe("Getting Started");
   });
@@ -150,7 +216,9 @@ describe("1 · the first observations produce the designed map", () => {
   it("resolves each part's state from the records that state it", () => {
     expect(model.byId.host.evidence.certainty).toBe("verified");
     // Facts and the region are read against Pi's reference, not the slot.
-    expect(model.byId.host.facts.map((fact) => fact.label)).toContain("Location");
+    expect(model.byId.host.facts.map((fact) => fact.label)).toContain(
+      "Location",
+    );
     expect(model.region).toBe("Helsinki");
   });
 
@@ -193,7 +261,9 @@ describe("2 · a later SSH-only observation keeps the configuration and its time
   it("keeps each value's own observation time, not the newest record's", () => {
     const facts = currentFacts(records, HOST);
     // The location was read on the 12th and has not been read since.
-    expect(facts.get("region")!.record.establishedAt).toBe("2026-09-12T15:48:00.000Z");
+    expect(facts.get("region")!.record.establishedAt).toBe(
+      "2026-09-12T15:48:00.000Z",
+    );
     expect(facts.get("region")!.record.id).toBe("rec-host-1");
     expect(currentChecks(records, HOST).get("ssh")!.record.establishedAt).toBe(
       "2026-09-13T09:12:00.000Z",
@@ -204,13 +274,22 @@ describe("2 · a later SSH-only observation keeps the configuration and its time
     const facts = currentFacts(records, HOST);
     const region = facts.get("region")!;
     // 18 hours on: the location still stands, a reachability claim would not.
-    expect(freshnessOf(region.value, region.record, SEP_13_10_00).kind).toBe("fresh");
-    expect(freshnessOf({ claim: "reachability" }, region.record, SEP_13_10_00).kind).toBe("stale");
-    expect(freshnessOf(facts.get("server-id")!.value, region.record, SEP_13_10_00).kind).toBe("fresh");
+    expect(freshnessOf(region.value, region.record, SEP_13_10_00).kind).toBe(
+      "fresh",
+    );
+    expect(
+      freshnessOf({ claim: "reachability" }, region.record, SEP_13_10_00).kind,
+    ).toBe("stale");
+    expect(
+      freshnessOf(facts.get("server-id")!.value, region.record, SEP_13_10_00)
+        .kind,
+    ).toBe("fresh");
   });
 
   it("still draws the host as verified, on the newer check", () => {
-    expect(architecture(records, SEP_13_10_00)!.byId.host.evidence.certainty).toBe("verified");
+    expect(
+      architecture(records, SEP_13_10_00)!.byId.host.evidence.certainty,
+    ).toBe("verified");
   });
 });
 
@@ -228,16 +307,32 @@ describe("3 · a replacement machine inherits nothing", () => {
     states: { ref: replacement, presence: "present" },
     checks: [ssh],
     facts: [
-      { key: "server-id", label: "Server ID", value: "165700111", claim: "identity", basis: "reported" },
-      { key: "address", label: "Address", value: "46.62.99.9", claim: "configuration", basis: "observed" },
+      {
+        key: "server-id",
+        label: "Server ID",
+        value: "165700111",
+        claim: "identity",
+        basis: "reported",
+      },
+      {
+        key: "address",
+        label: "Address",
+        value: "46.62.99.9",
+        claim: "configuration",
+        basis: "observed",
+      },
     ],
   });
   const records = [mapRecord, hostFirst, deployed, gone, fresh];
 
   it("keeps the two machines' facts apart, because they are two subjects", () => {
-    expect(currentFacts(records, replacement).get("address")!.value.value).toBe("46.62.99.9");
+    expect(currentFacts(records, replacement).get("address")!.value.value).toBe(
+      "46.62.99.9",
+    );
     expect(currentFacts(records, replacement).has("region")).toBe(false);
-    expect(currentFacts(records, HOST).get("address")!.value.value).toBe("46.62.253.6");
+    expect(currentFacts(records, HOST).get("address")!.value.value).toBe(
+      "46.62.253.6",
+    );
   });
 
   it("says the first machine is gone, and stops describing it", () => {
@@ -288,12 +383,25 @@ describe("4 · monitoring, from unlooked-at to established to present", () => {
       presentation: {
         ...mapRecord.presentation!,
         content: {
-          ...(mapRecord.presentation!.content as { kind: "topology"; parts: unknown[]; edges: unknown[]; from: "observed" }),
+          ...(mapRecord.presentation!.content as {
+            kind: "topology";
+            parts: unknown[];
+            edges: unknown[];
+            from: "observed";
+          }),
           parts: [
-            ...(mapRecord.presentation!.content as {
-              parts: { id: string }[];
-            }).parts,
-            { id: "uptime", kind: "monitor", name: "Uptime check", role: "Asks the homepage every minute", plain: "Watches your application" },
+            ...(
+              mapRecord.presentation!.content as {
+                parts: { id: string }[];
+              }
+            ).parts,
+            {
+              id: "uptime",
+              kind: "monitor",
+              name: "Uptime check",
+              role: "Asks the homepage every minute",
+              plain: "Watches your application",
+            },
           ],
         },
       },
@@ -302,7 +410,15 @@ describe("4 · monitoring, from unlooked-at to established to present", () => {
       id: "rec-monitor-up",
       at: "2026-09-12T16:25:00.000Z",
       states: { ref: MONITOR, presence: "present" },
-      checks: [{ key: "answering", label: "The check is answering", status: "passed", claim: "liveness", basis: "observed" }],
+      checks: [
+        {
+          key: "answering",
+          label: "The check is answering",
+          status: "passed",
+          claim: "liveness",
+          basis: "observed",
+        },
+      ],
     });
     const model = architecture([watched, hostFirst, deployed, up], now)!;
     expect(model.gaps).toEqual([]);
@@ -318,9 +434,7 @@ describe("5 · the same records read twice give the same page", () => {
     const second = architecture([...records].reverse(), SEP_12_16_30)!;
     expect(
       second.parts.map((part) => [part.id, part.evidence.certainty]),
-    ).toEqual(
-      first.parts.map((part) => [part.id, part.evidence.certainty]),
-    );
+    ).toEqual(first.parts.map((part) => [part.id, part.evidence.certainty]));
     expect(second.journeys).toEqual(first.journeys);
     expect(second.condition).toEqual(first.condition);
     expect(second.region).toBe(first.region);
@@ -336,7 +450,10 @@ describe("what a reading never does", () => {
   const ONE_HOUR_ON = Date.parse("2026-09-12T17:05:00.000Z");
 
   it("keeps the recorded outcome where the page records an event", () => {
-    expect(deployed.presentation!.checks.map(checkAsRecorded)).toEqual(["passed", "passed"]);
+    expect(deployed.presentation!.checks.map(checkAsRecorded)).toEqual([
+      "passed",
+      "passed",
+    ]);
   });
 
   it("ages the liveness claim, and only that one, as evidence about now", () => {
@@ -344,9 +461,27 @@ describe("what a reading never does", () => {
       id: "rec-three",
       at,
       checks: [
-        { key: "http", label: "Answered", status: "passed", claim: "reachability", basis: "observed" },
-        { key: "persistence", label: "Survived", status: "passed", claim: "contents", basis: "observed" },
-        { key: "container", label: "Running", status: "passed", claim: "liveness", basis: "observed" },
+        {
+          key: "http",
+          label: "Answered",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+        },
+        {
+          key: "persistence",
+          label: "Survived",
+          status: "passed",
+          claim: "contents",
+          basis: "observed",
+        },
+        {
+          key: "container",
+          label: "Running",
+          status: "passed",
+          claim: "liveness",
+          basis: "observed",
+        },
       ],
     });
     expect(
@@ -354,8 +489,12 @@ describe("what a reading never does", () => {
         checkAsNow(check, event, ONE_HOUR_ON),
       ),
     ).toEqual(["verified", "verified", "stale"]);
-    expect(tagFor(event, event.presentation!.checks, ONE_HOUR_ON)).toBe("stale");
-    expect(tagFor(event, [{ claim: "identity" }], ONE_HOUR_ON)).toBe("verified");
+    expect(tagFor(event, event.presentation!.checks, ONE_HOUR_ON)).toBe(
+      "stale",
+    );
+    expect(tagFor(event, [{ claim: "identity" }], ONE_HOUR_ON)).toBe(
+      "verified",
+    );
   });
 
   it("never ages a failure into doubt", () => {
@@ -363,10 +502,22 @@ describe("what a reading never does", () => {
       id: "rec-failed",
       at,
       status: "failed",
-      checks: [{ key: "http", label: "Answered", status: "failed", claim: "reachability", basis: "observed" }],
+      checks: [
+        {
+          key: "http",
+          label: "Answered",
+          status: "failed",
+          claim: "reachability",
+          basis: "observed",
+        },
+      ],
     });
-    expect(checkAsNow(failed.presentation!.checks[0], failed, ONE_HOUR_ON)).toBe("failed");
-    expect(tagFor(failed, failed.presentation!.checks, ONE_HOUR_ON)).toBe("failed");
+    expect(
+      checkAsNow(failed.presentation!.checks[0], failed, ONE_HOUR_ON),
+    ).toBe("failed");
+    expect(tagFor(failed, failed.presentation!.checks, ONE_HOUR_ON)).toBe(
+      "failed",
+    );
   });
 
   it("will not let an unknown key decide what the map says", () => {
@@ -374,7 +525,15 @@ describe("what a reading never does", () => {
       id: "rec-odd",
       at,
       states: { ref: HOST, presence: "present" },
-      checks: [{ key: "moon-phase", label: "Waxing", status: "passed", claim: "liveness", basis: "observed" }],
+      checks: [
+        {
+          key: "moon-phase",
+          label: "Waxing",
+          status: "passed",
+          claim: "liveness",
+          basis: "observed",
+        },
+      ],
     });
     const part = architecture([mapRecord, odd], ONE_HOUR_ON)!.byId.host;
     // A record speaks for the host, so it is not unlooked-at; but nothing
