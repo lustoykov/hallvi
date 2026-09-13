@@ -304,7 +304,11 @@ export function TunerDirection({
   );
   const [drag, setDrag] = useState<number | null>(null);
   const [fade, setFade] = useState<string | null>(null);
+  // A dial with nothing to point at. The records path draws its own words in
+  // this case, so reaching here means the reference scenario produced no
+  // stations; either way, crashing is not the answer.
   const station = stations[tuned];
+  if (!station) return null;
   const between =
     drag !== null &&
     Math.abs(placeOf(tuned, stations.length) - drag) >= lockOf(stations.length);

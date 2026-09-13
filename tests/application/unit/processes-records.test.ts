@@ -395,3 +395,80 @@ describe("a process a check named but nothing spoke for", () => {
     expect(mentioned().state).toBe("planned");
   });
 });
+
+describe("two processes from the same image", () => {
+  it("does not give them both the same name", () => {
+    // Shop's web and worker run one built image, so both derived "Shop":
+    // two rows with one label, and a reader with no way to tell which is
+    // which. A name that does not distinguish is not a name.
+    const story = processesFromRecords({
+      records: [
+        topology([
+          { id: "shop-web", kind: "web", name: "shop-web" },
+          { id: "shop-worker", kind: "private", name: "shop-worker" },
+        ]),
+        process("shop-web"),
+        process("shop-worker"),
+        record({
+          about: [{ kind: "application", id: APP }],
+          content: {
+            kind: "deployment",
+            repositoryUrl: "https://github.com/o/r",
+            revision: "abc1234",
+            server: "host-1",
+            changes: [],
+            services: [
+              { process: "shop-web", image: "server-guy/shop:1" },
+              { process: "shop-worker", image: "server-guy/shop:1" },
+            ],
+          },
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.processes.map((item) => item.product)).toEqual([
+      "shop-web",
+      "shop-worker",
+    ]);
+  });
+
+  it("keeps a shared name when Pi wrote distinct ones", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([
+          { id: "a", kind: "web", name: "a" },
+          { id: "b", kind: "private", name: "b" },
+        ]),
+        process("a", {
+          facts: [
+            {
+              key: "product",
+              label: "Product",
+              value: "Grafana",
+              claim: "identity",
+              basis: "reported",
+            },
+          ],
+        }),
+        process("b", {
+          facts: [
+            {
+              key: "product",
+              label: "Product",
+              value: "Prometheus",
+              claim: "identity",
+              basis: "reported",
+            },
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.processes.map((item) => item.product)).toEqual([
+      "Grafana",
+      "Prometheus",
+    ]);
+  });
+});

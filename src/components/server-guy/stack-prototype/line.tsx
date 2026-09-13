@@ -23,6 +23,8 @@ import "../deployment-prototype/transit.css";
 import "./line.css";
 
 interface Fact {
+  /** Unique per row: two processes can honestly share a product name. */
+  key: string;
   label: string;
   value: string;
   sub: string;
@@ -144,22 +146,22 @@ export function LineDirection({
   const facts = (items: Fact[]) => (
     <dl className="axm-facts">
       {items.map((item) => (
-        <div key={item.label} className="axm-fact">
+        <div key={item.key} className="axm-fact">
           <dt>{item.label}</dt>
           <dd>
             <button
               type="button"
               className="axm-fact-open"
-              aria-expanded={fact === item.label}
+              aria-expanded={fact === item.key}
               disabled={!item.exact.length}
               onClick={() =>
-                setFact((value) => (value === item.label ? null : item.label))
+                setFact((value) => (value === item.key ? null : item.key))
               }
             >
               <b>{item.value}</b>
               <small>{item.sub}</small>
             </button>
-            {fact === item.label && (
+            {fact === item.key && (
               <div className="axm-pop" role="dialog" aria-label={item.label}>
                 <dl>
                   {item.exact.map((row) => (
@@ -277,6 +279,7 @@ export function LineDirection({
           </button>
           {facts(
             story.processes.map((item) => ({
+              key: item.name,
               label: item.product,
               value:
                 item.role === "web"

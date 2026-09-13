@@ -133,6 +133,26 @@ export function processesFromRecords({
   const doorPort =
     doors.map((facts) => facts.get("port")?.value.value).find(Boolean) ?? null;
 
+  // A name that does not distinguish is not a name. Shop's web and worker run
+  // the same image, so both derived "Shop" — two rows with one label, and a
+  // reader with no way to tell which is which.
+  const named = new Map<string, number>();
+  const distinct = (product: string, id: string) =>
+    (named.get(product) ?? 0) > 1 ? id : product;
+
+  for (const ref of refs) {
+    const facts = currentFacts(live, ref);
+    const part = partOf(ref.id);
+    const service = services.find((item) => item.process === ref.id);
+    const product =
+      facts.get("product")?.value.value ??
+      productFrom(
+        service?.image ?? facts.get("image")?.value.value ?? null,
+        part?.name ?? ref.id,
+      );
+    named.set(product, (named.get(product) ?? 0) + 1);
+  }
+
   const processes: ProcessCard[] = refs.map((ref) => {
     const facts = currentFacts(live, ref);
     const checks = currentChecks(live, ref);
@@ -168,7 +188,10 @@ export function processesFromRecords({
     const probes = [...checks.values()].map(probeOf);
     return {
       name: ref.id,
-      product: fact("product") ?? productFrom(image, part?.name ?? ref.id),
+      product: distinct(
+        fact("product") ?? productFrom(image, part?.name ?? ref.id),
+        ref.id,
+      ),
       role,
       roleWords: roleWords[role],
       port,
