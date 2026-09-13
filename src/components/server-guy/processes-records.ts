@@ -19,6 +19,7 @@ import {
   freshnessOf,
   presenceOf,
   releasedServices,
+  subjectsMentioned,
   subjectsOfKind,
   topologyOf,
   type Held,
@@ -94,7 +95,7 @@ export function processesFromRecords({
   // What is running is what Pi stated, in the order the map draws it — the
   // map is layout, so it may order, but it may not add.
   const order = new Map(map?.parts.map((part, index) => [part.id, index]));
-  const refs = subjectsOfKind(live, "process").sort(
+  const refs = subjectsMentioned(live, "process").sort(
     (a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99),
   );
 
@@ -197,6 +198,9 @@ export function processesFromRecords({
   // Ageing never turns a pass into a failure. A process whose liveness check
   // has gone out of window is not unhealthy — it is unwatched, and the word
   // for that is "may have changed".
+  // A process nothing has spoken for is still drawn — a check named it, so
+  // somebody looked — but it is not counted as present, because no record
+  // said so and a page may not promote a mention into a statement.
   const stated = refs.map((ref) => presenceOf(live, ref));
   const anyPresent = stated.some(
     (item) => item.known && item.presence === "present",

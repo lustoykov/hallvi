@@ -347,3 +347,51 @@ describe("the port, as Pi actually writes it", () => {
     expect(story.from).toBeNull();
   });
 });
+
+describe("a process a check named but nothing spoke for", () => {
+  // A deployment is an event: it legitimately says "the http check passed,
+  // about process:web" and states nothing. Reading only stated subjects made
+  // the page empty for an application whose every check named a process.
+  const mentioned = () =>
+    processesFromRecords({
+      records: [
+        topology([{ id: "web", kind: "web", name: "Web" }]),
+        record({
+          about: [{ kind: "application", id: APP }],
+          checks: [
+            {
+              key: "http",
+              label: "It answered",
+              status: "passed",
+              claim: "liveness",
+              basis: "observed",
+              about: { kind: "process", id: "web" },
+            },
+          ],
+          content: {
+            kind: "deployment",
+            repositoryUrl: "https://github.com/o/r",
+            revision: "abc1234",
+            server: "host-1",
+            changes: [],
+            image: "app:1",
+          },
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+
+  it("draws it, with the check that named it", () => {
+    const story = mentioned();
+    expect(story.processes).toHaveLength(1);
+    expect(story.processes[0].name).toBe("web");
+    expect(story.processes[0].probes[0].name).toBe("It answered");
+  });
+
+  it("does not promote the mention into a statement of presence", () => {
+    // Nothing said the process is there. The page draws what was checked and
+    // stops short of claiming it is running.
+    expect(mentioned().state).toBe("planned");
+  });
+});

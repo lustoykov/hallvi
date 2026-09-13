@@ -17,6 +17,7 @@ import {
   currentChecks,
   currentFacts,
   presenceOf,
+  subjectsMentioned,
   subjectsOfKind,
   topologyOf,
 } from "@/server/record-projection";
@@ -52,7 +53,7 @@ export function storageFromRecords({
 }): ProtectView {
   const live = records.filter((record) => !record.retiredAt);
   const map = topologyOf(live, applicationId)?.value ?? null;
-  const refs = subjectsOfKind(live, "volume");
+  const refs = subjectsMentioned(live, "volume");
 
   // Who owns a volume is the map's `disk` edge, which is the one thing about
   // a volume the map is entitled to say: it is composition, not state.

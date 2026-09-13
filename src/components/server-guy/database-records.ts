@@ -19,7 +19,7 @@ import {
   freshnessOf,
   presenceOf,
   seriesFor,
-  subjectsOfKind,
+  subjectsMentioned,
   topologyOf,
 } from "@/server/record-projection";
 
@@ -37,7 +37,7 @@ export function databaseFromRecords({
 }): DataView {
   const live = records.filter((record) => !record.retiredAt);
   const map = topologyOf(live, applicationId)?.value ?? null;
-  const ref = subjectsOfKind(live, "database")[0] ?? null;
+  const ref = subjectsMentioned(live, "database")[0] ?? null;
   const protection = protectionFromRecords(live, now);
   const marks: Mark[] = [];
 
@@ -176,7 +176,7 @@ export function databaseFromRecords({
 /** Whether anything at all names a database, for the empty state. */
 export function databaseAssessed(records: SavedInformation[]) {
   return (
-    subjectsOfKind(
+    subjectsMentioned(
       records.filter((record) => !record.retiredAt),
       "database",
     ).length > 0

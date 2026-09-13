@@ -116,6 +116,38 @@ export function subjectsOfKind(records: SavedInformation[], kind: SubjectKind) {
   return [...seen.values()];
 }
 
+/**
+ * Every subject of a kind that any record *mentions*: one it speaks for, one
+ * a check was about, or one it lists in `about`.
+ *
+ * A destination needs this rather than only the stated ones, because a
+ * deployment legitimately says "the http check passed, about process:web"
+ * without speaking for that process — the deployment is an event and states
+ * nothing. Reading only stated subjects made the Processes page empty for an
+ * application whose every check named a process by id.
+ *
+ * Mentioning is not presence. A subject found only this way has
+ * `presenceOf` → not known, and the page says nobody has stated whether it is
+ * there, which is exactly the situation.
+ */
+export function subjectsMentioned(
+  records: SavedInformation[],
+  kind: SubjectKind,
+) {
+  const seen = new Map<string, Ref>();
+  const add = (ref: Ref | undefined) => {
+    if (ref?.kind === kind && !seen.has(ref.id)) seen.set(ref.id, ref);
+  };
+  for (const record of records
+    .filter((item) => !item.retiredAt)
+    .sort(newestFirst)) {
+    add(record.presentation?.states?.ref);
+    for (const ref of record.presentation?.about ?? []) add(ref);
+    for (const check of record.presentation?.checks ?? []) add(check.about);
+  }
+  return [...seen.values()];
+}
+
 export type Presence =
   | { known: false }
   | {
