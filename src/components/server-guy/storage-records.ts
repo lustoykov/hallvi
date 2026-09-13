@@ -142,9 +142,25 @@ export function storageFromRecords({
   }
 
   // What the plan says it covers turns a piece from uncopied into copied.
+  //
+  // A plan may name the volume, or it may name a database whose files live in
+  // one — a nightly pg_dump covers the bytes in that volume just as surely as
+  // copying the volume would. Reading only volume names put "One copy off the
+  // server is on record" on one page and "PostgreSQL's data · Not in the
+  // backup plan" on the next.
   const protection = protectionFromRecords(live, now);
+  const throughDatabase = new Map<string, string>();
+  for (const [named, how] of protection.covers) {
+    const disk = map?.edges.find(
+      (edge) => edge.network === "disk" && edge.from === named,
+    );
+    if (disk) throughDatabase.set(disk.to, how);
+  }
   for (const piece of pieces)
-    piece.method = protection.covers.get(piece.volume) ?? null;
+    piece.method =
+      protection.covers.get(piece.volume) ??
+      throughDatabase.get(piece.volume) ??
+      null;
 
   const host = subjectsOfKind(live, "host")[0] ?? null;
   const hostFacts = host ? currentFacts(live, host) : null;

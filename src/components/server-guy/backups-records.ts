@@ -65,8 +65,13 @@ export function protectionFromRecords(
     const destination = fact("destination");
     const at = facts.get("schedule")?.record.establishedAt ?? null;
     keep = Number(fact("keep")) || keep;
-    for (const volume of (fact("covers") ?? "").split(/[,\s]+/).filter(Boolean))
-      covers.set(volume, destination ?? schedule ?? "Copied by the plan");
+    // What the plan covers, as Pi wrote it. Ids are matched by a reader;
+    // prose is kept whole so a page can still print it.
+    const what = fact("covers");
+    if (what)
+      for (const item of what.split(",").map((part) => part.trim()))
+        if (item)
+          covers.set(item, destination ?? schedule ?? "Copied by the plan");
     if (schedule && at) {
       schedules.push({
         id: ref.id,

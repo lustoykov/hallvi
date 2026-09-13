@@ -299,3 +299,68 @@ describe("a replacement that lost the data", () => {
     expect(story.lostAt).toBeNull();
   });
 });
+
+describe("a plan that covers a database, not a volume", () => {
+  it("counts the volume the database's files live in", () => {
+    // Shop's plan takes a nightly pg_dump. Reading only volume names put
+    // "One copy off the server is on record" on Backups and "PostgreSQL's
+    // data · Not in the backup plan" on Storage, about the same bytes.
+    const story = read([
+      topology(
+        [
+          { id: "db", kind: "private", name: "Postgres" },
+          { id: "pgdata", kind: "volume", name: "Data" },
+        ],
+        [{ from: "db", to: "pgdata", network: "disk" }],
+      ),
+      volume("pgdata", { facts: [fact("path", "/var/lib/pg")] }),
+      states(
+        { kind: "backup-plan", id: "nightly" },
+        {
+          facts: [
+            fact("schedule", "Daily at 03:00"),
+            fact("destination", "s3://backups/pg/"),
+            fact("covers", "db"),
+          ],
+        },
+      ),
+    ]);
+    expect(story.pieces[0].method).toBe("s3://backups/pg/");
+  });
+
+  it("leaves a volume nothing covers uncopied", () => {
+    const story = read([
+      topology(
+        [
+          { id: "db", kind: "private", name: "Postgres" },
+          { id: "pgdata", kind: "volume", name: "Data" },
+          { id: "uploads", kind: "volume", name: "Uploads" },
+        ],
+        [{ from: "db", to: "pgdata", network: "disk" }],
+      ),
+      volume("pgdata"),
+      volume("uploads"),
+      states(
+        { kind: "backup-plan", id: "nightly" },
+        { facts: [fact("destination", "s3://backups/"), fact("covers", "db")] },
+      ),
+    ]);
+    const method = Object.fromEntries(
+      story.pieces.map((piece) => [piece.volume, piece.method]),
+    );
+    expect(method.pgdata).toBe("s3://backups/");
+    expect(method.uploads).toBeNull();
+  });
+
+  it("keeps a covers written in prose whole rather than splitting words", () => {
+    // "Shop PostgreSQL orders database" is one description, not four ids.
+    const story = read([
+      volume("data"),
+      states(
+        { kind: "backup-plan", id: "nightly" },
+        { facts: [fact("covers", "Shop PostgreSQL orders database")] },
+      ),
+    ]);
+    expect(story.pieces[0].method).toBeNull();
+  });
+});

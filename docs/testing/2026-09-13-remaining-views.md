@@ -426,3 +426,82 @@ slowly otherwise:
 
 No cache and no abstraction were added, because the measurement did not ask
 for either. The polls were simply always fast.
+
+---
+
+# Backups, proved rather than staged
+
+The gap in the first handoff was that Backups' populated state came from
+scenario data — no journey had taken a copy and put it back. This closes it,
+inside the rig, on the Shop application's real PostgreSQL.
+
+## What ran
+
+A marker order was placed first, so the proof could not be ambiguous:
+
+```
+POST /orders {"item": "restore-proof-widget-a3f9"}   → id 3, priced 2500
+```
+
+Then Pi was asked to back the database up to the rig's S3-compatible store and
+to prove the copy was worth having. It asked for the two credentials it needed
+through `request_secret` — `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` —
+and stopped until they arrived through the masked field. It then installed a
+systemd timer, took a copy, and wrote a restore test that failed twice before
+it debugged it with `bash -x` and got it right.
+
+What the last command printed:
+
+```
+download_size_bytes=2798
+isolation=network:none,ports:none,tmpfs
+restored_order_count=2
+restore_proof=3|restore-proof-widget-a3f9|2500
+restore_seconds=2
+restore_test_container_remaining=0
+production_health={"ok": true}
+production_proof_order=3|restore-proof-widget-a3f9|2500
+```
+
+The marker order came back **out of S3**, into a container with no network and
+no ports, and production was untouched. The restore container and its files
+were removed.
+
+## What Pi recorded, unasked
+
+| subject | what it carries |
+|---|---|
+| `backup-plan:shop-postgres-backup-plan` | schedule, destination, keep 14, covers · `configured` and `tls` passed |
+| `backup-copy:shop-postgres-backup-20260913T122527Z` | size 2,798 bytes, destination, sha256 · `written` and `verified` passed |
+| `restore-test:shop-postgres-restore-test-20260913T122654Z` | covers, took 2 s, order-count 2, proof-order · `restored` and `isolated` passed |
+
+## The contradiction it exposed
+
+With that in place, Backups said "One copy off the server is on record" while
+Storage said "PostgreSQL's data · Not in the backup plan" — about the same
+bytes. The plan named what it covered in prose ("Shop PostgreSQL orders
+database"), and no page can match prose to a volume.
+
+Two things changed. Pi is told that `covers` is a list of subject ids, because
+that is what a reader matches. And the reader joins a covered **database** to
+the volume its files live in, through the map's own `disk` edge — a nightly
+`pg_dump` protects the bytes in that volume as surely as copying the volume
+would.
+
+Asked which volumes the plan actually protects, Pi did better than the fix
+required: it restated the plan with `covers: shop-postgres-volume`, and
+established two more backup plans as **absent** — "Receipts volume has no
+backup plan", "Redis volume has no backup plan". Three volumes, and now each
+one says which of the three states it is in.
+
+## The five views, afterwards
+
+| view | what it says |
+|---|---|
+| Overview | Backups lane: "Checked 6 min ago" — it read "Nobody has looked yet" before |
+| Backups | "One copy off the server is on record." A restore test passed Sep 13, 15:26 |
+| Database | "Shop web's database was last copied off the server on Sep 13" |
+| Storage | "The daily backup copies PostgreSQL's data; it leaves out Shop web's data and Redis's data" |
+| History | the plan, the copy and the restore test, each at its own time |
+
+No scenario data is involved in any of it.
