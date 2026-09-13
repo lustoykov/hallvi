@@ -230,9 +230,20 @@ export function OperatorConsole({
                       ? "Run on server"
                       : item.tool}
                 </strong>
-                <span className="sg-execution-where">
-                  {item.target} ·{" "}
-                  {new Date(item.createdAt).toLocaleTimeString()}
+                {/* "root@192.0.2.10:22" is a login string. The reader is
+                    being asked whether to let something run on their server;
+                    which server, in their words, is the useful half, and the
+                    login stays available on hover. */}
+                <span className="sg-execution-where" title={item.target}>
+                  {item.tool === "server_bash" ? "on your server" : item.target}
+                  {item.tool === "server_bash" &&
+                    item.target.includes("@") &&
+                    ` · ${item.target.split("@").at(-1)?.split(":")[0]}`}
+                  {" · "}
+                  {new Date(item.createdAt).toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
                 <span role="status" className="sg-execution-state">
                   {states[item.status] ? (

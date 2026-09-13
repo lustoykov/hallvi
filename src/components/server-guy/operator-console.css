@@ -226,3 +226,46 @@
     display: none;
   }
 }
+
+/* Asking for a decision.
+   The approval used to be a dark terminal opened by default, with the request
+   itself never stated in words: the reader was shown a shell payload and two
+   buttons. What it wants to do goes first, the command's own first line goes
+   next so it can be read without opening anything, and the full payload waits
+   behind the disclosure. */
+.sg-ask {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 10px;
+}
+.sg-ask-what {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+.sg-ask-command {
+  display: block;
+  overflow-x: auto;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfcfe;
+  color: var(--ink);
+  font-family: var(
+    --font-geist-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace
+  );
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.sg-ask-safe {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
