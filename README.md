@@ -50,7 +50,7 @@ Pi defaults to loopback-only application ports on the remote server and a local 
 
 Stop the web process and worker before applying schema changes. Schema 15 uses four tables: applications, conversations, messages and saved information. Initialize a fresh development database with `npm run db:push`; there is no compatibility migration from the retired schemas. Keep environment and account configuration separate from any application-data reset. `src/server/db-schema.ts` owns the schema.
 
-To read the rows, run `npx drizzle-kit studio` and open <https://local.drizzle.studio>; Settings links to it in development. Studio opens on the whole controller database and has no address for a table or a row, so it cannot be linked per application — filter by the application or conversation ID once inside.
+To read the rows, run `npx drizzle-kit studio` and open <https://local.drizzle.studio>; in development the application top bar carries a **Database** link to it. Studio opens on the whole controller database and has no address for a table or a row, so the link cannot be scoped — find the application by its ID once inside.
 
 Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>.jsonl`. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and execution/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
 

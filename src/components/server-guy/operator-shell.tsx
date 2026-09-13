@@ -618,22 +618,33 @@ export function OperatorShell({
               Terminal
             </button>
           )}
-          {/* Development only: Pi's recorded conversation, opened on the chat
-              you are reading. The viewer is the separate read-only process
-              from `npm run inspect:conversation`. */}
-          {process.env.NODE_ENV === "development" &&
-            applicationId &&
-            activeChat && (
+          {/* Development only, in their own tabs: Pi's recorded conversation
+              for the chat you are reading, from the read-only viewer of
+              `npm run inspect:conversation`, and the controller database in
+              Drizzle Studio. Studio has no address for a table or a row, so
+              it opens whole and you find the application inside it. */}
+          {process.env.NODE_ENV === "development" && applicationId && (
+            <span className="sg-topbar-debug">
+              {activeChat && (
+                <a
+                  href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Pi's recorded conversation, in the local viewer on port 3001"
+                >
+                  Transcript
+                </a>
+              )}
               <a
-                className="sg-topbar-debug"
-                href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
+                href="https://local.drizzle.studio/"
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Pi's recorded conversation, in the local viewer on port 3001"
+                title="The controller database in Drizzle Studio, from npx drizzle-kit studio"
               >
-                Transcript
+                Database
               </a>
-            )}
+            </span>
+          )}
         </header>
 
         <ApplicationNavigation
