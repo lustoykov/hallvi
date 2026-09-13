@@ -234,19 +234,33 @@ export function OperatorShell({
       );
     }
   }, [applicationId, selectedChatId, demo]);
+  // Whether anything is actually happening. An idle page re-read every
+  // record and every execution off disk every 2.5 seconds to learn nothing,
+  // for as long as the tab stayed open.
+  const working =
+    view.messages.some(
+      (message) => message.status === "queued" || message.status === "running",
+    ) ||
+    (view.executions ?? []).some(
+      (execution) =>
+        execution.status === "running" ||
+        execution.status === "awaiting-approval",
+    );
   useEffect(() => {
     const initial = window.setTimeout(() => {
       void refreshDeployment().catch(() => setRecordLoaded(true));
     }, 0);
+    // Fast while Pi is working, because that is when the page changes under
+    // the reader; slow otherwise, because nothing else changes it.
     const timer = setInterval(
       () => void refreshDeployment().catch(() => undefined),
-      2500,
+      working ? 2500 : 15_000,
     );
     return () => {
       window.clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [refreshDeployment]);
+  }, [refreshDeployment, working]);
   const references = recordReferences(view);
   const operations = useMemo(
     () => view.operations ?? applicationOperations(deployment),

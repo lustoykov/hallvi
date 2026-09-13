@@ -77,6 +77,10 @@ export function OperatorConsole({
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
+      // Fast while something is running or waiting on the owner, slow
+      // otherwise. Polling every second at idle read every execution record
+      // off disk 3,600 times an hour to learn that nothing had changed.
+      let again = 10_000;
       try {
         const state = await request<{
           settings: OperatorSettings;
@@ -86,10 +90,18 @@ export function OperatorConsole({
           setSettings(state.settings);
           setExecutions(state.executions);
         }
+        if (
+          state.executions.some(
+            (execution) =>
+              execution.status === "running" ||
+              execution.status === "awaiting-approval",
+          )
+        )
+          again = 1000;
       } catch (error) {
         if (alive) setError((error as Error).message);
       }
-      if (alive) timer = setTimeout(poll, 1000);
+      if (alive) timer = setTimeout(poll, again);
     }
     void poll();
     return () => {
