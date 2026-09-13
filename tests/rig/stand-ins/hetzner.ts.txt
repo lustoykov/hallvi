@@ -138,6 +138,25 @@ export async function hetzner<T>(
       labels: input.labels as Record<string, string>,
     };
     cloud.sshKeys.push(key);
+    // A real provider installs the key it is given; without that the product
+    // authenticates against nothing. Rig B has a real sshd, so the key goes
+    // where sshd will read it — which is what makes a fresh application work
+    // without anybody authorizing it by hand.
+    const container = process.env.SG_RIG_HOST_CONTAINER;
+    const material = typeof input.public_key === "string" ? input.public_key : "";
+    if (container && material.startsWith("ssh-"))
+      try {
+        const { execFileSync } = await import("node:child_process");
+        execFileSync("docker", [
+          "exec",
+          container,
+          "sh",
+          "-c",
+          `mkdir -p /root/.ssh && chmod 700 /root/.ssh && grep -qxF '${material.replace(/'/g, "")}' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' '${material.replace(/'/g, "")}' >> /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys`,
+        ]);
+      } catch {
+        // The proof will fail at the connection instead, which is louder.
+      }
     result = { ssh_key: key };
   } else if (route === "/ssh_keys")
     result = { ssh_keys: labelled(cloud.sshKeys, url.searchParams) };
@@ -159,6 +178,60 @@ export async function hetzner<T>(
     result = { actions: [{ id: cloud.next++, status: "success" }] };
   } else if (/^\/actions\/\d+$/.test(route))
     result = { action: { id: Number(route.split("/")[2]), status: "success" } };
+  else if (route === "/server_types")
+    // Pi reads the catalog before it recommends a size. Without these the
+    // only source of truth was /pricing, which it had to work around.
+    result = {
+      server_types: [
+        {
+          id: 1,
+          name: "cx23",
+          description: "CX23",
+          cores: 2,
+          memory: 4,
+          disk: 40,
+          cpu_type: "shared",
+          architecture: "x86",
+          deprecated: false,
+        },
+      ],
+    };
+  else if (route === "/locations" || route === "/datacenters") {
+    const location = {
+      id: 1,
+      name: "hel1",
+      description: "Helsinki DC Park 1",
+      country: "FI",
+      city: "Helsinki",
+      network_zone: "eu-central",
+    };
+    result =
+      route === "/locations"
+        ? { locations: [location] }
+        : {
+            datacenters: [
+              {
+                id: 1,
+                name: "hel1-dc2",
+                description: "Helsinki 1 DC 2",
+                location,
+                server_types: { supported: [1], available: [1] },
+              },
+            ],
+          };
+  } else if (route === "/images")
+    result = {
+      images: [
+        {
+          id: 1,
+          name: "ubuntu-24.04",
+          description: "Ubuntu 24.04",
+          os_flavor: "ubuntu",
+          architecture: "x86",
+          status: "available",
+        },
+      ],
+    };
   else if (route === "/pricing")
     // A fixed, clearly rig-shaped price. The product records cost as
     // `reported` by the provider, so a stand-in answer is the honest kind of
