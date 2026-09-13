@@ -22,6 +22,7 @@ export function MonitoringPage({
   applicationId,
   applicationName,
   now,
+  reachable = true,
   chrome,
   onAsk,
 }: {
@@ -29,6 +30,8 @@ export function MonitoringPage({
   applicationId: string;
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   onAsk: (draft: string) => void;
 }) {
@@ -45,6 +48,7 @@ export function MonitoringPage({
       name={applicationName}
       openUrl={null}
       restricted={false}
+      reachable={reachable}
     />
   );
 

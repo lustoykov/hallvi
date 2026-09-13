@@ -1082,6 +1082,13 @@
   letter-spacing: -0.025em;
   color: var(--ax-ink);
 }
+.axj3-closed {
+  color: #a4262c;
+}
+/* The link stays, because it is the right address; only the promise goes. */
+.axj3-open[data-unreachable] a {
+  opacity: 0.6;
+}
 .axj3-open {
   display: flex;
   flex-wrap: wrap;

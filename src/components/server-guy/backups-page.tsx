@@ -28,6 +28,7 @@ export function BackupsPage({
   applicationId,
   applicationName,
   now,
+  reachable = true,
   chrome,
   onAsk,
 }: {
@@ -35,6 +36,8 @@ export function BackupsPage({
   applicationId: string;
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   onAsk: (draft: string) => void;
 }) {
@@ -63,6 +66,7 @@ export function BackupsPage({
       name={applicationName}
       openUrl={null}
       restricted={false}
+      reachable={reachable}
     />
   );
 

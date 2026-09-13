@@ -42,6 +42,7 @@ export function SupplyPageView({
   applicationName,
   secrets,
   now,
+  reachable = true,
   chrome,
   onOpenDestination,
   onAsk,
@@ -52,6 +53,8 @@ export function SupplyPageView({
   applicationName: string;
   secrets: SecretRequest[];
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
@@ -75,6 +78,7 @@ export function SupplyPageView({
       name={applicationName}
       openUrl={null}
       restricted={false}
+      reachable={reachable}
     />
   );
   const props = {

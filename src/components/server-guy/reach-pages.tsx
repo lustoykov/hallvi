@@ -26,6 +26,7 @@ export function ReachPageView({
   applicationId,
   applicationName,
   now,
+  reachable = true,
   chrome,
   panel,
   onOpenDestination,
@@ -36,6 +37,8 @@ export function ReachPageView({
   applicationId: string;
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   panel?: React.ReactNode;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -53,6 +56,7 @@ export function ReachPageView({
       name={applicationName}
       openUrl={null}
       restricted={story.audience === "controller"}
+      reachable={reachable}
     />
   );
   const props = {

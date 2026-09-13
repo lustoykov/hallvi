@@ -100,6 +100,7 @@ export function ApplicationSectionView({
   facts = {},
   operations,
   now,
+  reachable = true,
   onRefresh,
   onOpenDestination,
   onOpenConversation,
@@ -119,6 +120,8 @@ export function ApplicationSectionView({
   facts?: ApplicationFacts;
   operations: ApplicationOperation[];
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   onRefresh: () => Promise<void>;
   onOpenDestination: (destination: ApplicationSection) => void;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -151,6 +154,7 @@ export function ApplicationSectionView({
     if (section === "overview")
       return (
         <OverviewPage
+          reachable={reachable}
           records={view.information}
           executions={view.executions ?? []}
           application={app}
@@ -200,6 +204,7 @@ export function ApplicationSectionView({
     if (section === "deployment")
       return (
         <DeploymentPage
+          reachable={reachable}
           records={view.information}
           executions={view.executions ?? []}
           applicationName={app.name}
@@ -218,6 +223,7 @@ export function ApplicationSectionView({
     if (section === "processes")
       return (
         <ProcessesPage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -231,6 +237,7 @@ export function ApplicationSectionView({
     if (section === "storage")
       return (
         <StoragePage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -242,6 +249,7 @@ export function ApplicationSectionView({
     if (section === "domains" || section === "security")
       return (
         <ReachPageView
+          reachable={reachable}
           page={section}
           records={view.information}
           applicationId={app.id}
@@ -256,6 +264,7 @@ export function ApplicationSectionView({
     if (section === "backups")
       return (
         <BackupsPage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -267,6 +276,7 @@ export function ApplicationSectionView({
     if (section === "monitoring")
       return (
         <MonitoringPage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -278,6 +288,7 @@ export function ApplicationSectionView({
     if (section === "database")
       return (
         <DatabasePage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -295,6 +306,7 @@ export function ApplicationSectionView({
     )
       return (
         <SupplyPageView
+          reachable={reachable}
           page={section as SupplyPage}
           records={view.information}
           applicationId={app.id}
@@ -309,6 +321,7 @@ export function ApplicationSectionView({
     if (section === "architecture")
       return (
         <ArchitecturePage
+          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}

@@ -25,6 +25,7 @@ export function DeploymentPage({
   executions,
   applicationName,
   now,
+  reachable = true,
   chrome,
   panel,
   onOpenConversation,
@@ -35,6 +36,8 @@ export function DeploymentPage({
   executions: ExecutionRecord[];
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   panel?: React.ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -102,6 +105,7 @@ export function DeploymentPage({
                 : null
             }
             restricted={restricted}
+            reachable={reachable}
           />
         }
         activity={

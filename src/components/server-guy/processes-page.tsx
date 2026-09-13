@@ -24,6 +24,7 @@ export function ProcessesPage({
   applicationId,
   applicationName,
   now,
+  reachable = true,
   chrome,
   onOpenConversation,
   onOpenDestination,
@@ -33,6 +34,8 @@ export function ProcessesPage({
   applicationId: string;
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -57,6 +60,7 @@ export function ProcessesPage({
         story.state === "running" ? (access?.presentation?.url ?? null) : null
       }
       restricted={story.restricted}
+      reachable={reachable}
     />
   );
 

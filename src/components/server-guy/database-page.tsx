@@ -22,6 +22,7 @@ export function DatabasePage({
   applicationId,
   applicationName,
   now,
+  reachable = true,
   chrome,
   onOpenDestination,
   onAsk,
@@ -30,6 +31,8 @@ export function DatabasePage({
   applicationId: string;
   applicationName: string;
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
@@ -47,6 +50,7 @@ export function DatabasePage({
       name={applicationName}
       openUrl={null}
       restricted={false}
+      reachable={reachable}
     />
   );
 

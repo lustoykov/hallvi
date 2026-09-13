@@ -141,6 +141,7 @@ export interface OperatorView {
    * been supplied. Never values — there is no route that returns one.
    */
   secrets?: import("./application-secrets").SecretRequest[];
+
   operations?: import("./operation-record").ApplicationOperation[];
   /** What Pi ran in this application's conversations, in order. */
   piActivity?: import("./pi-activity").ActivityRecord[];

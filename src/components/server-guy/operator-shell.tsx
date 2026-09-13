@@ -256,6 +256,35 @@ export function OperatorShell({
   // Which hideable destinations the records establish. The stack model above
   // is no longer written to, so without this every one of them stays dark
   // however much Pi records.
+  // Whether the tunnel behind a private access record is still open. The
+  // record is a claim about a moment; the tunnel is a process, and it dies
+  // with a restart.
+  const [reachable, setReachable] = useState<boolean>(true);
+  const applicationIdForAccess = view.application?.id;
+  useEffect(() => {
+    if (!applicationIdForAccess) return;
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const response = await fetch(
+          `/api/applications/${applicationIdForAccess}/access`,
+        );
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!cancelled)
+          setReachable(body.mode !== "private" || body.open === true);
+      } catch {
+        // A page that cannot reach its own controller has louder problems.
+      }
+    };
+    void read();
+    const timer = window.setInterval(read, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applicationIdForAccess]);
+
   const recordedHere = useMemo(
     () =>
       recordedSections(
@@ -683,6 +712,7 @@ export function OperatorShell({
               key={`${applicationId}:${activeSection}`}
               section={activeSection}
               view={view}
+              reachable={reachable}
               deployment={deployment}
               stack={stack}
               operations={operations}

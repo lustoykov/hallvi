@@ -105,3 +105,49 @@ export async function openServerPort(
       "Only on the PC running Server Guy, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
   };
 }
+
+/**
+ * Whether the tunnel this controller opened is still there.
+ *
+ * A private URL is only reachable while an SSH master this process started is
+ * alive, and that master dies with a restart, a reboot, or a lost network. The
+ * record that says "reached at 127.0.0.1:38123" was true when it was written
+ * and the page kept offering the link long after it had stopped working — the
+ * one link on the page a reader will actually click.
+ *
+ * `ssh -O check` against the same control socket is the product's own answer
+ * to its own question, so this is an observation rather than a guess.
+ */
+export async function privateAccessOpen(
+  applicationId: string,
+  remotePort: number,
+  localPort: number,
+) {
+  const host = operatorSettings(applicationId).host;
+  if (!host) return false;
+  const identity = createHash("sha256")
+    .update(JSON.stringify([applicationId, host, remotePort, localPort]))
+    .digest("hex")
+    .slice(0, 24);
+  const socket = join(`/tmp/server-guy-ssh-${process.getuid!()}`, identity);
+  try {
+    await exec(
+      "ssh",
+      [
+        "-F",
+        "/dev/null",
+        "-S",
+        socket,
+        "-o",
+        "BatchMode=yes",
+        "-O",
+        "check",
+        `${host.user}@${host.address}`,
+      ],
+      { timeout: 5000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}

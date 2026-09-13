@@ -52,6 +52,7 @@ export function OverviewPage({
   application,
   chats,
   now,
+  reachable = true,
   chrome,
   reduced,
   onOpenConversation,
@@ -63,6 +64,8 @@ export function OverviewPage({
   application: ApplicationRecord;
   chats: ChatSummary[];
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: boolean;
   chrome: PageChrome;
   reduced: boolean;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
