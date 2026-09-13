@@ -102,3 +102,31 @@ controller, never a message.
 The sweep is `grep -rl` over the whole rig root. Zero is the number that
 matters: the value exists on this machine only inside AES-256-GCM, and reaches
 a command only as it is spawned.
+
+### The whole loop, exercised
+
+The point of a secret flow is that the value arrives where it is needed. It
+did:
+
+```
+POST /orders {"item": "a blue widget"}      → {"id": 2}
+GET  /orders                                 → cents: 1300
+```
+
+Thirteen characters at 100 cents each: the **worker** took the id off the
+Redis list, priced it and wrote a receipt. So web, PostgreSQL, Redis and the
+worker are all real and all talking.
+
+```
+GET /receipts/2                              → "a blue widget — 13.00 EUR"
+GET /admin/summary  (wrong password)         → 401
+GET /admin/summary  (the supplied value)     → 200 {"orders": 2, "cents": 4100}
+```
+
+The receipt came from the volume. The 401 and the 200 are the same endpoint
+with two different passwords, which means the sealed value reached the running
+process — while appearing nowhere in any record, log or artifact.
+
+That is the flow end to end: the owner types it, the controller seals it, the
+execution layer puts it in as the command is spawned, and the process gates on
+it.
