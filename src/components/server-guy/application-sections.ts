@@ -132,15 +132,18 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
  * there. The stack model this used to read is no longer populated, so every
  * hideable destination stayed dark however much Pi recorded.
  *
- * Only what the vocabulary can actually express appears here. A database, a
- * cache, a queue and a job have no subject kind yet, so nothing can
- * establish them and they stay hidden — which is the honest answer, not an
- * oversight.
+ * A destination lights up when a record *speaks for* one of its subjects. The
+ * map alone is not enough for most of them: it draws shapes, and a shape is
+ * not a thing that exists. Processes and Storage are the exception, because a
+ * planned map is worth navigating to before anything runs — and both pages
+ * say plainly that nothing has been looked at yet.
  */
 export function recordedSections(records: SavedInformation[]) {
   const live = records.filter((record) => !record.retiredAt);
-  const states = (kind: string) =>
-    live.some((record) => record.presentation?.states?.ref.kind === kind);
+  const states = (...kinds: string[]) =>
+    live.some((record) =>
+      kinds.includes(record.presentation?.states?.ref.kind ?? ""),
+    );
   const map = live
     .map((record) => record.presentation?.content)
     .find((content) => content?.kind === "topology");
@@ -150,7 +153,7 @@ export function recordedSections(records: SavedInformation[]) {
   return {
     processes: states("process") || has("web", "private"),
     storage: states("volume") || has("volume"),
-    security: states("door") || states("access") || has("gate", "tls"),
+    security: states("door", "access", "firewall") || has("gate", "tls"),
   } as Partial<Record<ApplicationSection, boolean>>;
 }
 

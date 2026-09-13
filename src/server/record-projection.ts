@@ -93,6 +93,26 @@ function stating(records: SavedInformation[], ref: Ref) {
     .sort(newestFirst);
 }
 
+/**
+ * Every subject of a kind that any record speaks for, newest statement
+ * first. This is how a destination finds what it is about: Pi names things,
+ * the page does not have a list of them in advance.
+ *
+ * A subject stated `absent` is still returned — a volume that used to be
+ * there is information, and a page that silently dropped it would be
+ * reporting an absence as if nobody had looked.
+ */
+export function subjectsOfKind(records: SavedInformation[], kind: SubjectKind) {
+  const seen = new Map<string, Ref>();
+  for (const record of records
+    .filter((item) => !item.retiredAt)
+    .sort(newestFirst)) {
+    const ref = record.presentation?.states?.ref;
+    if (ref?.kind === kind && !seen.has(ref.id)) seen.set(ref.id, ref);
+  }
+  return [...seen.values()];
+}
+
 export type Presence =
   | { known: false }
   | {

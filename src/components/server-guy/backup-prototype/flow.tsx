@@ -26,7 +26,7 @@ import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { ago, countWord, when } from "../stack-prototype/stack-model";
-import type { ProtectDirectionProps } from "./index";
+import type { ProtectProps } from "./protect-story";
 import { lasting, listed, soft, type Piece } from "./model";
 import "./flow.css";
 
@@ -66,7 +66,7 @@ export function FlowDirection({
   activity,
   server,
   onAsk,
-}: ProtectDirectionProps) {
+}: ProtectProps) {
   const board = useRef<HTMLDivElement>(null);
   const [geo, setGeo] = useState<Geo | null>(null);
   const [selected, setSelected] = useState(story.pieces[0]?.key ?? "copy");

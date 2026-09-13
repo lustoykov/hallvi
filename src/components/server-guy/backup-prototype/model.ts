@@ -21,34 +21,11 @@ import {
   type StackStory,
 } from "../stack-prototype/stack-model";
 
-/** One piece of the application's data, and how the backup plan copies it. */
-export interface Piece {
-  key: string;
-  label: string;
-  volume: string;
-  /** How the plan copies it; null when the plan leaves it out. */
-  method: string | null;
-}
-export interface Vol {
-  name: string;
-  owner: string;
-  ownerName: string;
-  mount: string;
-  docker: string | null;
-  note: string | null;
-  sizeGb: number | null;
-  measuredAt: string | null;
-  pieces: Piece[];
-}
-export interface Dated {
-  id: string;
-  at: string;
-  detail: string;
-}
-export interface Check {
-  label: string;
-  state: "pass" | "untested";
-}
+// The five the Flow and Calendar designs draw are shared with the records
+// path, so they live beside those designs rather than inside this builder.
+export type { Check, Dated, Piece, Vol } from "./protect-story";
+import type { Check, Dated, Piece, Vol } from "./protect-story";
+
 export interface ProtectStory extends StackStory {
   volumes: Vol[];
   pieces: Piece[];

@@ -25,6 +25,8 @@ import { OverviewPage } from "./overview-page";
 import { DeploymentPage } from "./deployment-page";
 import { HistoryPage } from "./history-page";
 import { LogsPage } from "./logs-page";
+import { ProcessesPage } from "./processes-page";
+import { StoragePage } from "./storage-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -205,6 +207,30 @@ export function ApplicationSectionView({
           panel={children}
           onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "processes")
+      return (
+        <ProcessesPage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "storage")
+      return (
+        <StoragePage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
           onAsk={(draft) => onAsk(null, draft)}
         />
       );

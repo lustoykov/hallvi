@@ -17,8 +17,8 @@ import {
 
 import { Tag } from "../deployment-prototype/tag";
 import { useDismiss } from "../overview-prototype/shared";
-import type { StackDirectionProps } from "./index";
-import { clock, countWord, when, type Change, type Probe } from "./stack-model";
+import { clock, countWord, when } from "./stack-model";
+import type { Change, LineProps, Probe } from "./line-story";
 import "../deployment-prototype/transit.css";
 import "./line.css";
 
@@ -36,7 +36,7 @@ export function LineDirection({
   onAsk,
   onOpenConversation,
   onOpenDestination,
-}: StackDirectionProps) {
+}: LineProps) {
   const [open, setOpen] = useState<string | null>(null);
   const [lit, setLit] = useState<{ line: string; at: number } | null>(null);
   const [fact, setFact] = useState<string | null>(null);

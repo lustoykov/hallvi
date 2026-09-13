@@ -15,8 +15,8 @@ const base = {
   repositoryUrl: "https://github.com/owner/repo",
   revision: "a1b2c3d4e5f6",
   server: "hetzner-165619823",
-  changes: [],
-} as const;
+  changes: [] as string[],
+};
 
 const deployment = (extra: object) =>
   ({ kind: "deployment", ...base, ...extra }) as Deployment;

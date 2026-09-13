@@ -1,0 +1,273 @@
+// Processes, read from records.
+//
+// Every case here is a way the page could quietly say more than the records
+// support: counting a shape on the map as a running process, ageing a pass
+// into a failure, or letting a one-image release claim to be every process's
+// image.
+
+import { describe, expect, it } from "vitest";
+
+import type { SavedInformation } from "@/server/operator-data";
+import { processesFromRecords } from "@/components/server-guy/processes-records";
+
+const APP = "app-1";
+const now = Date.parse("2026-09-13T12:00:00.000Z");
+
+let counter = 0;
+function record(input: {
+  at?: string | null;
+  states?: SavedInformation["presentation"] extends infer P
+    ? P extends { states?: infer S }
+      ? S
+      : never
+    : never;
+  [key: string]: unknown;
+}): SavedInformation {
+  const { at, ...presentation } = input;
+  return {
+    id: `r${++counter}`,
+    applicationId: APP,
+    title: "A record",
+    body: "",
+    evidence: [],
+    establishedAt: at === undefined ? "2026-09-13T11:55:00.000Z" : at,
+    createdAt: "2026-09-13T11:55:00.000Z",
+    updatedAt: "2026-09-13T11:55:00.000Z",
+    retiredAt: null,
+    presentation: {
+      views: ["processes"],
+      role: "status",
+      status: "verified",
+      checks: [],
+      ...presentation,
+    },
+  } as SavedInformation;
+}
+
+const topology = (parts: { id: string; kind: string; name: string }[]) =>
+  record({
+    states: { ref: { kind: "application", id: APP }, presence: "present" },
+    content: {
+      kind: "topology",
+      from: "observed",
+      parts: parts.map((part) => ({
+        ...part,
+        role: "a part",
+        plain: "a part",
+      })),
+      edges: [],
+    },
+  });
+
+const process = (id: string, extra: object = {}) =>
+  record({
+    states: { ref: { kind: "process", id }, presence: "present" },
+    ...extra,
+  });
+
+describe("processesFromRecords", () => {
+  it("says nobody looked when no record names a process", () => {
+    const story = processesFromRecords({
+      records: [],
+      applicationId: APP,
+      now,
+    });
+    expect(story.state).toBe("none");
+    expect(story.processes).toEqual([]);
+  });
+
+  it("does not count a shape on the map as a running process", () => {
+    // The map is composition. Only a record can say a process exists.
+    const story = processesFromRecords({
+      records: [topology([{ id: "web", kind: "web", name: "Web" }])],
+      applicationId: APP,
+      now,
+    });
+    expect(story.state).toBe("none");
+  });
+
+  it("takes the role from the map and the reach from the port", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([
+          { id: "app", kind: "web", name: "Web" },
+          { id: "db", kind: "private", name: "Database" },
+        ]),
+        process("app", {
+          facts: [
+            {
+              key: "port",
+              label: "Port",
+              value: "3000",
+              claim: "configuration",
+              basis: "observed",
+            },
+          ],
+        }),
+        process("db", {
+          facts: [
+            {
+              key: "port",
+              label: "Port",
+              value: "5432",
+              claim: "configuration",
+              basis: "observed",
+            },
+          ],
+        }),
+        record({
+          states: {
+            ref: { kind: "application", id: APP },
+            presence: "present",
+          },
+          url: "http://127.0.0.1:8080",
+          content: {
+            kind: "application-access",
+            mode: "private",
+            server: "host-1",
+            localPort: 8080,
+            remotePort: 3000,
+          },
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    const [app, db] = story.processes;
+    expect(app.role).toBe("web");
+    expect(app.reach).toBe("Port 80 → 3000 · from your network only");
+    expect(db.role).toBe("private");
+    expect(db.reach).toBe("Port 5432 · inside the server only");
+    expect(story.restricted).toBe(true);
+  });
+
+  it("gives each process the image the release says it runs", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([
+          { id: "grafana", kind: "web", name: "Grafana" },
+          { id: "prometheus", kind: "private", name: "Prometheus" },
+        ]),
+        process("grafana"),
+        process("prometheus"),
+        record({
+          about: [{ kind: "application", id: APP }],
+          content: {
+            kind: "deployment",
+            repositoryUrl: "https://github.com/o/r",
+            revision: "abc1234",
+            server: "host-1",
+            changes: [],
+            services: [
+              { process: "grafana", image: "grafana/grafana:11.2.0" },
+              { process: "prometheus", image: "prom/prometheus:v2.54.1" },
+            ],
+          },
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.processes.map((item) => item.image)).toEqual([
+      "grafana/grafana:11.2.0",
+      "prom/prometheus:v2.54.1",
+    ]);
+    expect(story.processes.map((item) => item.product)).toEqual([
+      "Grafana",
+      "Prometheus",
+    ]);
+  });
+
+  it("does not hand a one-image release to a private process", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([
+          { id: "app", kind: "web", name: "App" },
+          { id: "cache", kind: "private", name: "Cache" },
+        ]),
+        process("app"),
+        process("cache"),
+        record({
+          about: [{ kind: "application", id: APP }],
+          content: {
+            kind: "deployment",
+            repositoryUrl: "https://github.com/o/r",
+            revision: "abc1234",
+            server: "host-1",
+            changes: [],
+            image: "docker/getting-started:latest",
+          },
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.processes[0].image).toBe("docker/getting-started:latest");
+    expect(story.processes[1].image).toBe("Not recorded");
+  });
+
+  it("ages a passed check into unwatched, never into unhealthy", () => {
+    const stale = "2026-09-13T09:00:00.000Z"; // three hours ago
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app", {
+          at: stale,
+          checks: [
+            {
+              key: "http",
+              label: "Answered on 3000",
+              status: "passed",
+              claim: "liveness",
+              basis: "observed",
+            },
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.state).toBe("unknown");
+    expect(story.tone).toBe("stale");
+    expect(story.word).toBe("Needs a check");
+  });
+
+  it("reads a failed check as failed, whatever the clock has done", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app", {
+          at: "2026-09-10T09:00:00.000Z",
+          status: "failed",
+          checks: [
+            {
+              key: "http",
+              label: "Did not answer",
+              status: "failed",
+              claim: "liveness",
+              basis: "observed",
+            },
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.tone).toBe("failed");
+    expect(story.word).toBe("A check failed");
+  });
+
+  it("draws a process with no checks rather than hiding it", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app"),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.processes).toHaveLength(1);
+    expect(story.processes[0].probes).toEqual([]);
+    expect(story.processes[0].lastPassed).toBeNull();
+  });
+});
