@@ -426,3 +426,48 @@ an unread policy is an unknown policy.
 **Empty and partial.** No `door` and no `firewall` → the page says nothing has
 been established about what can reach in, and offers to find out. That is
 different from "nothing can reach in", which no record has said.
+
+---
+
+# The external boundary, and where it stops
+
+Domains and CDN are built and tested against records. The provider path is
+wired as far as reading, and stops there.
+
+## What is connected
+
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are read from the
+controller's environment on the server only — never into a record, a fixture,
+or anything a client component receives. `GET /client/v4/user/tokens/verify`
+is asked before anything is claimed, so Settings says *connected* because
+Cloudflare said so, not because a variable is set.
+
+Verified against the real account: the token is `active`, one zone is visible
+(`accountant-agent.com`, active), and 14 R2 buckets are listed.
+
+## The distinction the UI keeps
+
+This token **manages** R2 through Cloudflare's management API: it can list
+buckets and create them. It is **not** an S3 object-upload credential. Writing
+a backup into a bucket still needs an R2 Access Key ID, a Secret Access Key,
+the bucket, and the account's S3 endpoint — four separate things Cloudflare
+issues separately. Settings carries them as their own row, unconnected,
+because a green tick that implied otherwise would send somebody looking for a
+bug in an uploader that was never going to work.
+
+## What has not been done, and needs your say-so
+
+No DNS record has been created, changed or deleted. Nothing has been
+purchased. To take Domains past reading, the following are needed and none of
+them is mine to decide:
+
+| what | which | why it needs you |
+|---|---|---|
+| account | the Cloudflare account holding the zone | it is yours |
+| domain | `accountant-agent.com`, or another you own | a subdomain of a real domain, and the choice of which |
+| credentials | the token already configured, for DNS Edit on that zone | already present; the authorisation to *use* it for writes is not |
+| DNS mutations | one `A` record for a test subdomain, pointed at a server's IPv4 | it changes what a real name on the public internet resolves to |
+| authorisation | explicit, per this document's rule | "No real provider or DNS mutations without explicit authorization" |
+
+Say which subdomain, and whether to proxy it through Cloudflare or leave it
+grey-clouded, and the record path is ready to run against it.
