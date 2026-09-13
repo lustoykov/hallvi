@@ -153,16 +153,16 @@ describe("monitoringFromRecords", () => {
         { kind: "host", id: "hetzner-1" },
         {
           facts: [
-            fact("cpu", "4%", "contents"),
-            fact("memory", "1.2 of 4 GB", "contents"),
+            fact("cpu-used", "4%", "contents"),
+            fact("memory-used", "1.2 of 4 GB", "contents"),
           ],
         },
       ),
     ]);
     const readings = story.looks.filter((look) => look.kind === "output");
     expect(readings.map((look) => look.short)).toEqual([
-      "cpu 4%",
-      "memory 1.2 of 4 GB",
+      "cpu-used 4%",
+      "memory-used 1.2 of 4 GB",
     ]);
     expect(readings.every((look) => look.state === "seen")).toBe(true);
   });
@@ -176,5 +176,30 @@ describe("monitoringFromRecords", () => {
       ),
     ]);
     expect(story.looks.every((look) => !look.invented)).toBe(true);
+  });
+});
+
+describe("capacity is not a reading", () => {
+  it("ignores the spec sheet a host was sold with", () => {
+    // The first real run recorded memory "4 GB" as configuration/reported —
+    // what the machine has. Showing that on a page about whether anything is
+    // watching would be a spec sheet presented as a measurement.
+    const story = monitoringFromRecords({
+      records: [
+        states(
+          { kind: "host", id: "hetzner-4201" },
+          {
+            facts: [
+              fact("memory", "4 GB", "configuration", "reported"),
+              fact("disk", "40 GB", "configuration", "reported"),
+            ],
+          },
+        ),
+      ],
+      applicationId: APP,
+      applicationName: "Shop",
+      now: NOW,
+    });
+    expect(story.looks.filter((look) => look.kind === "output")).toEqual([]);
   });
 });

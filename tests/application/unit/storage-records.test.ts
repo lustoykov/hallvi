@@ -116,7 +116,7 @@ describe("storageFromRecords", () => {
       volume("data"),
       states(
         { kind: "host", id: "hetzner-1" },
-        { at, facts: [fact("disk", "3.1 of 38 GB used", "contents")] },
+        { at, facts: [fact("disk-used", "3.1 of 38 GB used", "contents")] },
       ),
     ]);
     expect(story.disk).toEqual({ usedGb: 3.1, totalGb: 38, measuredAt: at });

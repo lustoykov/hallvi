@@ -106,8 +106,15 @@ decide what a designed page says.
 | `firewall` | `configured` | `provider` `default` `rules` |
 | `monitor` | `answering` | `target` `interval` `notifies` |
 | `certificate` | `valid` | `expires` `issuer` `covers` |
-| `host` (added) | — | `cpu` `memory` `disk` |
-| `process` (added) | — | `restarts` `cpu` `memory` |
+| `host` (added) | — | `cpu` `memory` `disk` (capacity) · `cpu-used` `memory-used` `disk-used` (readings) |
+| `process` (added) | — | `restarts` `cpu-used` `memory-used` |
+
+**Capacity is not a reading.** "4 GB" is what the machine has and never
+changes; "1.2 of 4 GB used" is what it is doing right now. The first is
+`configuration`, `reported`, and belongs under `memory`; the second is
+`contents`, `observed`, and belongs under `memory-used`. One key for both
+would make a Monitoring page show a spec sheet and call it a measurement —
+which the first real run did, before this split.
 
 ## Prerequisite A · a release with more than one image
 
@@ -220,7 +227,7 @@ to it if the container were replaced.
 | size | `volume` fact `size` | observed | `contents` | recorded |
 | "survives replacement" | `volume` check `persistence` | observed | `configuration` | recorded |
 | what is in it | `volume` fact `holds` | reported | `contents` | recorded |
-| disk used / total | `host` facts `disk` | observed | `contents` | recorded |
+| disk used / total | `host` fact `disk-used` | observed | `contents` | recorded |
 | copies, schedule, restores | `backup-plan`, `backup-copy`, `restore-test` (§7) | — | — | recorded |
 
 **Empty and partial.** No `volume` subject → "Not assessed", with the note that
@@ -353,7 +360,7 @@ what is not.
 | what it watches | `monitor` fact `target` | reported | `configuration` | recorded |
 | how often | `monitor` fact `interval` | reported | `configuration` | recorded |
 | who hears about it | `monitor` fact `notifies` | reported | `configuration` | recorded |
-| CPU / memory / disk | `host` facts `cpu` `memory` `disk` | observed | `contents` | recorded |
+| CPU / memory / disk | `host` facts `cpu-used` `memory-used` `disk-used` | observed | `contents` | recorded |
 | the unwatched gaps | parts with no live check, plus a fixed list of what Server Guy cannot watch | — | — | derived |
 
 **The distinction this page exists to make.** A check that ran once and passed

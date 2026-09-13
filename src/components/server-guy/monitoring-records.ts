@@ -190,7 +190,10 @@ export function monitoringFromRecords({
 
   const host = subjectsOfKind(live, "host")[0] ?? null;
   const hostFacts = host ? currentFacts(live, host) : null;
-  for (const key of ["cpu", "memory", "disk"] as const) {
+  // What the machine is doing, not what it has. "4 GB" is a spec sheet and
+  // never changes; "1.2 of 4 GB used" is a reading, and only the second
+  // belongs on a page about whether anything is watching.
+  for (const key of ["cpu-used", "memory-used", "disk-used"] as const) {
     const held = hostFacts?.get(key);
     if (!held || !host) continue;
     looks.push({

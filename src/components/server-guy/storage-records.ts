@@ -125,7 +125,8 @@ export function storageFromRecords({
 
   const host = subjectsOfKind(live, "host")[0] ?? null;
   const hostFacts = host ? currentFacts(live, host) : null;
-  const disk = hostFacts?.get("disk") ?? null;
+  // The reading, not the capacity: `disk` is "40 GB" and never moves.
+  const disk = hostFacts?.get("disk-used") ?? null;
   const used = disk
     ? disk.value.value.match(/([\d.]+)\s*\w*\s*(?:of|\/)\s*([\d.]+)/)
     : null;
