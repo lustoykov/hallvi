@@ -8,7 +8,14 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   Conversation,
@@ -29,19 +36,12 @@ import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
-import { SecretRequests, type SecretRequest } from "./secret-request";
-// PROTOTYPE — remove with secret-request-prototype.{tsx,css} once a
-// variant wins. Inert unless ?secrets=A|B|C is on the URL.
 import {
-  SecretsSwitcher,
-  useSecretsVariant,
-  VariantAChip,
-  VariantATranscript,
-  VariantBComposer,
-  VariantBStrip,
-  VariantCLine,
-  VariantCSheet,
-} from "./secret-request-prototype";
+  SecretRequests,
+  SecretRequestsChip,
+  secretRequestPoint,
+  type SecretRequest,
+} from "./secret-request";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
 
@@ -326,11 +326,11 @@ export function ChatPane({
   // that is when a request appears, and once afterwards so the field goes
   // away when the turn that needed it has finished.
   const [secrets, setSecrets] = useState<SecretRequest[]>([]);
-  // PROTOTYPE state — null when no ?secrets= variant is asked for.
-  const variant = useSecretsVariant();
-  const [secretMode, setSecretMode] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const waitingSecrets = secrets.filter((item) => !item.establishedAt);
+  // The message Pi was on when it first asked. Answering a field must not
+  // move the request, so this is taken from the earliest ask in the group
+  // and re-derived from timestamps after a refresh.
+  const secretsOwnMessage = secretRequestPoint(secrets, view.messages ?? []);
+  const secretsHere = Boolean(view.application) && chatId === view.chats[0]?.id;
 
   /**
    * Where each saved record is shown in full.
@@ -430,204 +430,222 @@ export function ChatPane({
             const engineer =
               message.role === "user" && message.source === "user";
             return (
-              <Message
-                className={
-                  provisional
-                    ? inProgress
-                      ? "sg-message-live"
-                      : "sg-message-failed"
-                    : message.role === "user" && !engineer
-                      ? "sg-message-request"
-                      : ""
-                }
-                from={engineer ? "user" : "assistant"}
-                id={`sg-message-${message.id}`}
-                key={message.id}
-              >
-                <div className="sg-message-heading">
-                  <span
-                    className={`sg-avatar ${engineer ? "user" : ""}`}
-                    aria-hidden="true"
-                  >
-                    {engineer ? "You" : "SG"}
-                  </span>
-                  <strong>{engineer ? "You" : "Server Guy"}</strong>
-                  {message.source === "server-guy" && (
-                    <span className="sg-source-tag">
-                      {message.role === "user"
-                        ? "Started automatically"
-                        : "Recorded event"}
-                    </span>
-                  )}
-                  {provisional && (
+              <Fragment key={message.id}>
+                <Message
+                  className={
+                    provisional
+                      ? inProgress
+                        ? "sg-message-live"
+                        : "sg-message-failed"
+                      : message.role === "user" && !engineer
+                        ? "sg-message-request"
+                        : ""
+                  }
+                  from={engineer ? "user" : "assistant"}
+                  id={`sg-message-${message.id}`}
+                >
+                  <div className="sg-message-heading">
                     <span
-                      className={`sg-source-tag ${inProgress ? "live" : "failed"}`}
+                      className={`sg-avatar ${engineer ? "user" : ""}`}
+                      aria-hidden="true"
                     >
-                      {ATTEMPT_LABELS[message.status]}
+                      {engineer ? "You" : "SG"}
                     </span>
-                  )}
-                  <LocalTime value={message.createdAt} variant="compact" />
-                </div>
-                <MessageContent>
-                  {provisional ? (
-                    <div className="sg-run-progress">
-                      {message.body && inProgress && !view.piActivity && (
-                        <MessageResponse>
-                          <Markdown source={message.body} />
-                        </MessageResponse>
-                      )}
-                      <p className="sg-run-status" role="status">
-                        {inProgress && (
-                          <SpinnerGap className="spin" aria-hidden="true" />
-                        )}
-                        {message.status === "queued"
-                          ? "Waiting to reply"
-                          : message.status === "running"
-                            ? working(run, now)
-                            : run?.error?.startsWith(
-                                  "Conversation history unavailable.",
-                                )
-                              ? run.error
-                              : message.status === "cancelled" ||
-                                  message.status === "interrupted"
-                                ? stopOutcome(view.executions, message.id)
-                                : "Something went wrong. Please retry."}
-                      </p>
-                      {message.body && !inProgress && (
-                        <details className="sg-run-draft">
-                          <summary>Show unfinished draft</summary>
+                    <strong>{engineer ? "You" : "Server Guy"}</strong>
+                    {message.source === "server-guy" && (
+                      <span className="sg-source-tag">
+                        {message.role === "user"
+                          ? "Started automatically"
+                          : "Recorded event"}
+                      </span>
+                    )}
+                    {provisional && (
+                      <span
+                        className={`sg-source-tag ${inProgress ? "live" : "failed"}`}
+                      >
+                        {ATTEMPT_LABELS[message.status]}
+                      </span>
+                    )}
+                    <LocalTime value={message.createdAt} variant="compact" />
+                  </div>
+                  <MessageContent>
+                    {provisional ? (
+                      <div className="sg-run-progress">
+                        {message.body && inProgress && !view.piActivity && (
                           <MessageResponse>
                             <Markdown source={message.body} />
                           </MessageResponse>
-                        </details>
-                      )}
-                      {run && !readOnly && !retried && (
-                        <button
-                          className={
-                            inProgress
-                              ? "sg-run-stop"
-                              : "sg-run-action sg-primary-button"
-                          }
-                          disabled={busy !== null}
-                          onClick={() => {
-                            if (historyUnavailable) onNewChat();
-                            else
-                              onRunAction(
-                                run.id,
-                                inProgress ? "cancel" : "retry",
-                              );
-                          }}
-                          type="button"
-                        >
-                          {!inProgress && (
-                            <ArrowClockwise aria-hidden="true" weight="bold" />
+                        )}
+                        <p className="sg-run-status" role="status">
+                          {inProgress && (
+                            <SpinnerGap className="spin" aria-hidden="true" />
                           )}
-                          {inProgress
-                            ? "Stop"
-                            : historyUnavailable
-                              ? "Start a new chat"
-                              : "Retry reply"}
-                        </button>
-                      )}
-                    </div>
-                  ) : view.piActivity &&
-                    hasActivity(view.piActivity, message.id) ? null : (
-                    // With a transcript the body is drawn inside it, in the
-                    // place it happened, rather than above the calls.
-                    <MessageResponse>
-                      <Markdown source={message.body} />
-                    </MessageResponse>
+                          {message.status === "queued"
+                            ? "Waiting to reply"
+                            : message.status === "running"
+                              ? working(run, now)
+                              : run?.error?.startsWith(
+                                    "Conversation history unavailable.",
+                                  )
+                                ? run.error
+                                : message.status === "cancelled" ||
+                                    message.status === "interrupted"
+                                  ? stopOutcome(view.executions, message.id)
+                                  : "Something went wrong. Please retry."}
+                        </p>
+                        {message.body && !inProgress && (
+                          <details className="sg-run-draft">
+                            <summary>Show unfinished draft</summary>
+                            <MessageResponse>
+                              <Markdown source={message.body} />
+                            </MessageResponse>
+                          </details>
+                        )}
+                        {run && !readOnly && !retried && (
+                          <button
+                            className={
+                              inProgress
+                                ? "sg-run-stop"
+                                : "sg-run-action sg-primary-button"
+                            }
+                            disabled={busy !== null}
+                            onClick={() => {
+                              if (historyUnavailable) onNewChat();
+                              else
+                                onRunAction(
+                                  run.id,
+                                  inProgress ? "cancel" : "retry",
+                                );
+                            }}
+                            type="button"
+                          >
+                            {!inProgress && (
+                              <ArrowClockwise
+                                aria-hidden="true"
+                                weight="bold"
+                              />
+                            )}
+                            {inProgress
+                              ? "Stop"
+                              : historyUnavailable
+                                ? "Start a new chat"
+                                : "Retry reply"}
+                          </button>
+                        )}
+                      </div>
+                    ) : view.piActivity &&
+                      hasActivity(view.piActivity, message.id) ? null : (
+                      // With a transcript the body is drawn inside it, in the
+                      // place it happened, rather than above the calls.
+                      <MessageResponse>
+                        <Markdown source={message.body} />
+                      </MessageResponse>
+                    )}
+                  </MessageContent>
+                  {message.role === "assistant" && view.piActivity && (
+                    <PiActivity
+                      records={view.piActivity}
+                      executions={view.executions}
+                      runId={message.id}
+                      live={
+                        message.status === "running" ||
+                        (message.status === "completed" &&
+                          hasActivity(view.piActivity, message.id))
+                          ? message.body
+                          : null
+                      }
+                      renderExecution={(executionId) =>
+                        view.application && chatId ? (
+                          <OperatorConsole
+                            applicationId={view.application.id}
+                            chatId={chatId}
+                            main={view.chats[0]?.id === chatId}
+                            executionId={executionId}
+                            records={view.executions}
+                          />
+                        ) : null
+                      }
+                    />
                   )}
-                </MessageContent>
-                {message.role === "assistant" && view.piActivity && (
-                  <PiActivity
-                    records={view.piActivity}
-                    executions={view.executions}
-                    runId={message.id}
-                    live={
-                      message.status === "running" ||
-                      (message.status === "completed" &&
-                        hasActivity(view.piActivity, message.id))
-                        ? message.body
-                        : null
-                    }
-                    renderExecution={(executionId) =>
-                      view.application && chatId ? (
+                  {message.blocks?.map((block, index) => {
+                    // A call already drawn in the activity order is not drawn
+                    // again here; the link is by execution id, not by name.
+                    if (
+                      block.type === "execution" &&
+                      view.piActivity?.some(
+                        (record) => record.executionId === block.id,
+                      )
+                    )
+                      return null;
+                    if (block.type === "text")
+                      return <Markdown key={index} source={block.text} />;
+                    if (
+                      block.type === "execution" &&
+                      view.application &&
+                      chatId
+                    )
+                      return (
                         <OperatorConsole
+                          key={block.id}
                           applicationId={view.application.id}
                           chatId={chatId}
                           main={view.chats[0]?.id === chatId}
-                          executionId={executionId}
+                          executionId={block.id}
                           records={view.executions}
                         />
-                      ) : null
+                      );
+                    if (block.type === "saved-information") {
+                      const record = view.information?.find(
+                        (r) => r.id === block.id,
+                      );
+                      return record ? (
+                        <InformationCard
+                          key={block.id}
+                          record={record}
+                          onOpen={openDestination}
+                          superseded={
+                            firstShown.get(record.id) !==
+                            `${message.id}:${index}`
+                          }
+                        />
+                      ) : null;
                     }
+                    return null;
+                  })}
+                  {references?.get(message.id)?.length ? (
+                    <div className="sg-message-refs">
+                      <span>Saved from this reply</span>
+                      {references.get(message.id)!.map((reference) => (
+                        <button
+                          className={`sg-message-ref ${reference.tone}`}
+                          key={reference.key}
+                          onClick={() => onReveal?.()}
+                          title="Open in History"
+                          type="button"
+                        >
+                          {reference.label} <em>{reference.status}</em>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <OperationReferences
+                    operations={mentioned(message.id)}
+                    chats={view.chats}
+                    onOpenConversation={openConversation}
+                    onOpen={openDestination}
+                  />
+                  {receipts(anchored.get(message.id))}
+                </Message>
+                {/* The request Pi raised on this message, drawn at the point
+                    it was asked rather than wherever the reader is now. */}
+                {secretsHere && secretsOwnMessage === message.id && (
+                  <SecretRequests
+                    applicationId={view.application!.id}
+                    secrets={secrets}
+                    onChanged={setSecrets}
                   />
                 )}
-                {message.blocks?.map((block, index) => {
-                  // A call already drawn in the activity order is not drawn
-                  // again here; the link is by execution id, not by name.
-                  if (
-                    block.type === "execution" &&
-                    view.piActivity?.some(
-                      (record) => record.executionId === block.id,
-                    )
-                  )
-                    return null;
-                  if (block.type === "text")
-                    return <Markdown key={index} source={block.text} />;
-                  if (block.type === "execution" && view.application && chatId)
-                    return (
-                      <OperatorConsole
-                        key={block.id}
-                        applicationId={view.application.id}
-                        chatId={chatId}
-                        main={view.chats[0]?.id === chatId}
-                        executionId={block.id}
-                        records={view.executions}
-                      />
-                    );
-                  if (block.type === "saved-information") {
-                    const record = view.information?.find(
-                      (r) => r.id === block.id,
-                    );
-                    return record ? (
-                      <InformationCard
-                        key={block.id}
-                        record={record}
-                        onOpen={openDestination}
-                        superseded={
-                          firstShown.get(record.id) !== `${message.id}:${index}`
-                        }
-                      />
-                    ) : null;
-                  }
-                  return null;
-                })}
-                {references?.get(message.id)?.length ? (
-                  <div className="sg-message-refs">
-                    <span>Saved from this reply</span>
-                    {references.get(message.id)!.map((reference) => (
-                      <button
-                        className={`sg-message-ref ${reference.tone}`}
-                        key={reference.key}
-                        onClick={() => onReveal?.()}
-                        title="Open in History"
-                        type="button"
-                      >
-                        {reference.label} <em>{reference.status}</em>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <OperationReferences
-                  operations={mentioned(message.id)}
-                  chats={view.chats}
-                  onOpenConversation={openConversation}
-                  onOpen={openDestination}
-                />
-                {receipts(anchored.get(message.id))}
-              </Message>
+              </Fragment>
             );
           })}
           {unanchored.length > 0 && (
@@ -680,11 +698,12 @@ export function ChatPane({
               {error}
             </div>
           )}
-          {/* PROTOTYPE A — the request as a message, in the flow. */}
-          {variant === "A" && view.application && (
-            <VariantATranscript
-              applicationId={view.application.id}
-              waiting={waitingSecrets}
+          {/* If the asking message is no longer in the transcript, the
+              request still has to be reachable, so it goes at the end. */}
+          {secretsHere && !secretsOwnMessage && (
+            <SecretRequests
+              applicationId={view.application!.id}
+              secrets={secrets}
               onChanged={setSecrets}
             />
           )}
@@ -697,132 +716,84 @@ export function ChatPane({
           full-bleed 563px wall stacked above every message, pushing the
           transcript down and colliding with the permissions strip. It sits
           with the composer now, on the same measure as the messages. */}
+      {/* The only thing between the transcript and the composer, and only
+          while the request has scrolled out of sight. */}
       {view.application && chatId && view.chats[0]?.id === chatId && (
-        <>
-          {variant === null && (
-            <SecretRequests
-              applicationId={view.application.id}
-              secrets={secrets}
-              onChanged={setSecrets}
-            />
-          )}
-          {/* PROTOTYPE — each variant puts something different here, and A
-              puts almost nothing, which is the point of A. */}
-          {variant === "A" && <VariantAChip waiting={waitingSecrets} />}
-          {variant === "B" && (
-            <VariantBStrip
-              waiting={waitingSecrets}
-              mode={secretMode}
-              onMode={setSecretMode}
-            />
-          )}
-          {variant === "C" && (
-            <VariantCLine
-              waiting={waitingSecrets}
-              onOpen={() => setSheetOpen(true)}
-            />
-          )}
-        </>
+        <SecretRequestsChip secrets={secrets} />
       )}
 
-      {/* PROTOTYPE C — the sheet itself, over the pane. */}
-      {variant === "C" && sheetOpen && view.application && (
-        <VariantCSheet
-          applicationId={view.application.id}
-          waiting={waitingSecrets}
-          onChanged={setSecrets}
-          onClose={() => setSheetOpen(false)}
-        />
-      )}
-
-      {/* PROTOTYPE B — the same box, pointed somewhere else. */}
-      {variant === "B" &&
-      secretMode &&
-      view.application &&
-      waitingSecrets.some((item) => item.name === secretMode) ? (
-        <VariantBComposer
-          key={secretMode}
-          applicationId={view.application.id}
-          secret={waitingSecrets.find((item) => item.name === secretMode)!}
-          onChanged={setSecrets}
-          onDone={() => setSecretMode(null)}
-        />
-      ) : (
-        <form
-          className="sg-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSend();
-          }}
-        >
-          {archived && (
-            <p className="sg-archived-notice">
-              This chat is archived and read-only. Choose an active chat or
-              start a new one.
-            </p>
-          )}
-          {application && !piReady && (
-            <div className="sg-pi-required">
-              <WarningCircle weight="bold" />
-              <div>
-                <strong>Connect ChatGPT to chat</strong>
-                <p>Your applications and chat history are still available.</p>
-              </div>
-              <Link href="/setup/pi">Open Settings</Link>
+      <form
+        className="sg-composer"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSend();
+        }}
+      >
+        {archived && (
+          <p className="sg-archived-notice">
+            This chat is archived and read-only. Choose an active chat or start
+            a new one.
+          </p>
+        )}
+        {application && !piReady && (
+          <div className="sg-pi-required">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>Connect ChatGPT to chat</strong>
+              <p>Your applications and chat history are still available.</p>
             </div>
-          )}
-          <div
-            className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
-          >
-            <textarea
-              disabled={composerDisabled}
-              id="pi-composer"
-              aria-label="Message Server Guy"
-              onChange={(event) => onComposerChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  if (!busy) event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              placeholder={
-                archived
-                  ? "This chat is archived"
-                  : !piReady
-                    ? "Connect ChatGPT in Settings to chat"
-                    : application
-                      ? "Ask Server Guy, correct a decision, or add context…"
-                      : "Add an application to start chatting"
-              }
-              rows={2}
-              value={composer}
-            />
-            <div className="sg-composer-bar">
-              <span className="sg-composer-hint">
-                <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
-              </span>
-              <button
-                className="sg-send"
-                disabled={!composer.trim() || composerDisabled || busy !== null}
-                type="submit"
-              >
-                {busy === "message" ? (
-                  <SpinnerGap className="spin" aria-hidden="true" />
-                ) : (
-                  <PaperPlaneRight weight="fill" aria-hidden="true" />
-                )}
-                Send
-              </button>
-            </div>
+            <Link href="/setup/pi">Open Settings</Link>
           </div>
-        </form>
-      )}
-
-      {variant && <SecretsSwitcher current={variant} />}
+        )}
+        <div
+          className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
+        >
+          <textarea
+            disabled={composerDisabled}
+            id="pi-composer"
+            aria-label="Message Server Guy"
+            onChange={(event) => onComposerChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                if (!busy) event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder={
+              archived
+                ? "This chat is archived"
+                : !piReady
+                  ? "Connect ChatGPT in Settings to chat"
+                  : application
+                    ? "Ask Server Guy, correct a decision, or add context…"
+                    : "Add an application to start chatting"
+            }
+            rows={2}
+            value={composer}
+          />
+          <div className="sg-composer-bar">
+            <span className="sg-composer-hint">
+              <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+            </span>
+            <button
+              className="sg-send"
+              disabled={!composer.trim() || composerDisabled || busy !== null}
+              type="submit"
+            >
+              {busy === "message" ? (
+                <SpinnerGap className="spin" aria-hidden="true" />
+              ) : (
+                <PaperPlaneRight weight="fill" aria-hidden="true" />
+              )}
+              Send
+            </button>
+          </div>
+        </div>
+      </form>
     </section>
   );
 }
