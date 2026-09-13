@@ -197,6 +197,29 @@ export function reachFromRecords({
             detail: "Nobody has read a firewall policy back for this server.",
           };
 
+  // "Everything else", as its own door. A firewall that was read and denies
+  // by default is a wall between the internet and the server, and the design
+  // draws that wall from this door — without it a read, deny-by-default
+  // policy showed the same headline as no policy at all.
+  if (
+    firewall.state === "read" &&
+    /deny|drop|reject|closed/i.test(
+      firewallFacts?.get("default")?.value.value ?? "",
+    )
+  )
+    doors.push({
+      id: "rest",
+      port: "everything else",
+      title: "Everything the rules do not name",
+      serves: null,
+      reach: "closed",
+      sources: [],
+      concern: null,
+      detail:
+        firewallFacts?.get("default")?.value.value ??
+        "Denied unless a rule names it.",
+    });
+
   // ---- SSH, from the host's own check.
   const host = subjectsOfKind(live, "host")[0] ?? null;
   const ssh = host ? currentChecks(live, host).get("ssh") : null;

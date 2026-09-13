@@ -339,3 +339,41 @@ describe("what a way in is called when its ports are in the content", () => {
     expect(story.doors[0].detail).toBe("open");
   });
 });
+
+describe("the wall a deny-by-default firewall makes", () => {
+  const withDefault = (value: string) =>
+    read([
+      states(
+        { kind: "firewall", id: "fw" },
+        {
+          facts: [
+            fact("provider", "Hetzner Cloud"),
+            fact("default", value),
+            fact("rules", "TCP 22 and ICMP from IPv4/IPv6"),
+          ],
+          checks: [check("configured", "passed", "configuration")],
+        },
+      ),
+    ]);
+
+  it("draws everything-else as closed", () => {
+    // Without this door a read, deny-by-default policy showed the same
+    // headline as no policy at all: "nothing stands between the internet
+    // and this server".
+    const rest = withDefault("Deny unless listed").doors.find(
+      (door) => door.id === "rest",
+    );
+    expect(rest?.reach).toBe("closed");
+    expect(rest?.detail).toBe("Deny unless listed");
+  });
+
+  it("does not draw it for a policy that allows by default", () => {
+    expect(
+      withDefault("Allow unless listed").doors.some((d) => d.id === "rest"),
+    ).toBe(false);
+  });
+
+  it("does not draw it when no policy was read", () => {
+    expect(read([]).doors.some((door) => door.id === "rest")).toBe(false);
+  });
+});
