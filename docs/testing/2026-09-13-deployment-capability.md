@@ -129,10 +129,14 @@ until it fits and writes down what it dropped — for Paperless, 81 files go and
 
 *Requirement: waiting for a dependency belongs in the thing that needs it.*
 
-Every server created in this session failed its first `connect_server` with
-`write (…): Broken pipe` from `ssh-keyscan`, and the readiness message beneath
-that scan was unreachable because a failing keyscan throws. The scan now waits
-up to two minutes and says what it was waiting for.
+The first three servers created in this session each failed their first
+`connect_server` with `write (…): Broken pipe` from `ssh-keyscan`, and the
+readiness message beneath that scan was unreachable because a failing keyscan
+throws. The scan now waits up to two minutes and says what it was waiting for.
+
+**Proved on the fourth server.** With the fix live, `connect_server` on
+`89.167.84.129` started at 18:25:05 and succeeded at 18:25:16 — one call, no
+failed execution, no turn spent inventing a sleep-and-retry.
 
 ### A quiet command looked identical to a dead one
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
 function commandText(input: string) {
@@ -26,6 +26,15 @@ function outputText(item: ExecutionRecord) {
   }
   return item.output;
 }
+
+const everySecond = (onChange: () => void) => {
+  const tick = setInterval(onChange, 1000);
+  return () => clearInterval(tick);
+};
+const never = () => () => undefined;
+/** Bucketed, so the snapshot only changes when the second does. */
+const thisSecond = () => Math.floor(Date.now() / 1000) * 1000;
+const zero = () => 0;
 
 const spell = (seconds: number) =>
   seconds < 60
@@ -63,14 +72,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const command = commandText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
-  const [now, setNow] = useState(0);
-
-  useEffect(() => {
-    if (!running) return setNow(0);
-    setNow(Date.now());
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, [running]);
+  // The clock is outside React: it ticks on its own and the component reads
+  // it. Zero on the server and before the first paint, so there is nothing to
+  // mismatch during hydration.
+  const now = useSyncExternalStore(
+    running ? everySecond : never,
+    running ? thisSecond : zero,
+    zero,
+  );
 
   useEffect(() => {
     if (!follow || !open) return;
