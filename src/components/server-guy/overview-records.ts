@@ -445,8 +445,8 @@ export function applicationCondition(
     return {
       certainty: "verified",
       text: newest
-        ? `Every check on the application held, ${when(newest, now)}.`
-        : "Every check on the application held when it was last read.",
+        ? `The application's own checks held, ${when(newest, now)}.`
+        : "The application's own checks held when they were last read.",
     };
   const anyFreshness = held
     .map((item) => freshnessOf(item.value, item.record, now).kind)

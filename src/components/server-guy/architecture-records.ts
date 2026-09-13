@@ -558,7 +558,7 @@ export function architectureFromRecords({
         : readings.includes("verified")
           ? {
               certainty: "verified",
-              text: "Every check on the application held when it was last read.",
+              text: "The application's own checks held when they were last read.",
             }
           : {
               certainty: "unknown",

@@ -4,8 +4,13 @@ import {
   checkAsNow,
   currentChecks,
   presenceOf,
+  subjectsMentioned,
   subjectsOfKind,
 } from "./record-projection";
+import { subjectKinds, type Ref } from "./operator-data";
+
+/** Every kind a record can be about; the list reads checks from all of them. */
+const SUBJECT_KINDS = subjectKinds;
 import type { SavedInformation } from "./operator-data";
 import { listInformation } from "./saved-information";
 
@@ -44,18 +49,27 @@ export function listApplicationItems(): ApplicationListItem[] {
   });
 }
 
-/** Short enough for a card, and never more certain than the record allows. */
+/**
+ * Short enough for a card, and never more certain than the record allows.
+ *
+ * Every check the application's records carry, on any subject — not only the
+ * ones on the application subject itself. Reading the narrow set let the list
+ * show "Checks held" in green for an application whose own Overview said "A
+ * check did not pass" two clicks away, because the failing check belonged to
+ * its domain rather than to the application. The list has no lane beside it to
+ * qualify a green, so it has to account for the same evidence the destination
+ * does.
+ */
 function conditionOf(
   records: SavedInformation[],
   applicationId: string,
   now: number,
 ): ApplicationListItem["condition"] {
-  const held = [
-    ...currentChecks(records, {
-      kind: "application",
-      id: applicationId,
-    }).values(),
+  const refs: Ref[] = [
+    { kind: "application", id: applicationId },
+    ...SUBJECT_KINDS.flatMap((kind) => subjectsMentioned(records, kind)),
   ];
+  const held = refs.flatMap((ref) => [...currentChecks(records, ref).values()]);
   if (!held.length) return { tone: "muted", text: "Not checked yet" };
   const readings = held.map((item) => checkAsNow(item.value, item.record, now));
   if (readings.includes("failed"))
