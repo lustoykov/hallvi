@@ -242,21 +242,29 @@ function GenericInformationCard({
             <LocalTime value={established} variant="compact" />
           </span>
         </div>
-        <details className="sg-result-more sg-result-alone">
-          <summary>
-            {superseded
-              ? `${word} · shown in full above`
-              : passed > 0
+        {superseded ? (
+          /* A repeat of a record already shown. Rather than a second copy of
+             the evidence, it links to the one that holds it — an ordinary
+             anchor, so it survives a reload and works with browser back. */
+          <p className="sg-result-alone">
+            <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+          </p>
+        ) : (
+          <details className="sg-result-more sg-result-alone">
+            <summary>
+              {passed > 0
                 ? `${passed} check${passed === 1 ? "" : "s"} passed · details`
                 : "Details"}
-          </summary>
-          <div className="sg-result-inside">{body}</div>
-        </details>
+            </summary>
+            <div className="sg-result-inside">{body}</div>
+          </details>
+        )}
       </article>
     );
 
   return (
     <article
+      id={`record-${record.id}`}
       className="sg-info"
       data-tone={tone}
       data-role={presentation.role}

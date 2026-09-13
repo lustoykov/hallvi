@@ -8,7 +8,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -54,6 +54,32 @@ const ATTEMPT_LABELS: Record<ChatMessage["status"], string> = {
 };
 
 /**
+ * Where each saved record is shown in full, keyed by the record's own id.
+ *
+ * Identity, and only identity. Pi attaches a record to a reply and the same
+ * record can be attached to more than one, so one transcript drew the
+ * identical Cloudflare failure three times at 653px each and a reader saw
+ * three problems where there was one.
+ *
+ * It deliberately does not group by *subject*. Two different records about
+ * the same thing are two observations, and the later one does not cancel the
+ * earlier: "the domain resolves" and "the domain does not serve the
+ * application" are both true and both still relevant. Folding the earlier one
+ * away because a newer record mentions the same subject would erase a claim
+ * that still holds, which is the opposite of what this is for.
+ */
+export function firstAppearances(
+  messages: { id: string; blocks?: { type: string; id?: string }[] }[],
+) {
+  const seen = new Map<string, string>();
+  for (const message of messages)
+    for (const [index, block] of (message.blocks ?? []).entries())
+      if (block.type === "saved-information" && block.id && !seen.has(block.id))
+        seen.set(block.id, `${message.id}:${index}`);
+  return seen;
+}
+
+/**
  * What stopping actually did.
  *
  * Stopping ends the reply; it does not undo the work. By the time somebody
@@ -67,9 +93,32 @@ export function stopOutcome(
   runId: string,
 ) {
   const mine = (executions ?? []).filter((item) => item.runId === runId);
-  const done = mine.filter((item) => item.status === "succeeded").length;
-  if (!done) return "Stopped. Nothing had run.";
-  return `Stopped. ${done} command${done === 1 ? "" : "s"} had already run and ${done === 1 ? "was" : "were"} not undone.`;
+  // Reached the server and finished there, whatever the result: a command
+  // that failed still ran. Declined and awaiting-approval never started, so
+  // they are not "already run" by any reading.
+  const ran = mine.filter((item) =>
+    ["succeeded", "failed", "interrupted"].includes(item.status),
+  ).length;
+  // Still in flight when the reply ended. Stopping the reply is not a signal
+  // that reaches a command already executing on the far side of an SSH
+  // connection, so this cannot be reported as stopped — only as unconfirmed.
+  const flying = mine.filter((item) => item.status === "running").length;
+
+  const already =
+    ran > 0
+      ? `${ran} command${ran === 1 ? "" : "s"} had already run and ${
+          ran === 1 ? "was" : "were"
+        } not undone.`
+      : "";
+  const unconfirmed =
+    flying > 0
+      ? `${flying === 1 ? "One command was" : `${flying} commands were`} still running on the server; stopping the reply does not confirm ${
+          flying === 1 ? "it" : "they"
+        } stopped.`
+      : "";
+
+  if (!already && !unconfirmed) return "Stopped. Nothing had run.";
+  return ["Stopped.", already, unconfirmed].filter(Boolean).join(" ");
 }
 
 /** "Working for 1m 12s" — Pi is busy, and for how long. */
@@ -167,6 +216,54 @@ export function ChatPane({
   const openDestination = onOpenDestination ?? (() => {});
   const openConversation = onOpenConversation ?? (() => {});
   const messageCount = view.messages.length;
+  /**
+   * Open a record from its own address.
+   *
+   * A repeat of a record links to `#record-<id>`, which the browser handles
+   * while the page is up — but not after a reload. The transcript lives in a
+   * stick-to-bottom container that mounts and scrolls to the live edge after
+   * the hash has already been processed, so a reload on a record link landed
+   * the reader at the bottom of the conversation instead of at the evidence.
+   * This runs once the messages are on the page and puts them where the link
+   * said, with the same brief highlight a message reference gets.
+   */
+  const openedRecord = useRef<string | null>(null);
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id.startsWith("record-") || openedRecord.current === id) return;
+    const element = document.getElementById(id);
+    if (!element) return;
+    openedRecord.current = id;
+    element.scrollIntoView({ block: "center" });
+    element.classList.add("sg-message-highlight");
+    const timer = window.setTimeout(
+      () => element.classList.remove("sg-message-highlight"),
+      2600,
+    );
+    return () => window.clearTimeout(timer);
+  }, [view.messages]);
+
+  // Clicking a second repeat link changes only the hash, which re-renders
+  // nothing, so the effect above would not run again.
+  useEffect(() => {
+    const onHash = () => {
+      openedRecord.current = null;
+      const id = window.location.hash.slice(1);
+      if (!id.startsWith("record-")) return;
+      const element = document.getElementById(id);
+      if (!element) return;
+      openedRecord.current = id;
+      element.scrollIntoView({ block: "center" });
+      element.classList.add("sg-message-highlight");
+      window.setTimeout(
+        () => element.classList.remove("sg-message-highlight"),
+        2600,
+      );
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
   useEffect(() => {
     if (!highlight) return;
     const element = document.getElementById(
@@ -228,14 +325,10 @@ export function ChatPane({
    * appearances keep their place in the order and say what they are in one
    * line, with everything still one click down.
    */
-  const firstShown = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const message of view.messages)
-      for (const [index, block] of (message.blocks ?? []).entries())
-        if (block.type === "saved-information" && !seen.has(block.id))
-          seen.set(block.id, `${message.id}:${index}`);
-    return seen;
-  }, [view.messages]);
+  const firstShown = useMemo(
+    () => firstAppearances(view.messages),
+    [view.messages],
+  );
   const applicationId = view.application?.id;
   useEffect(() => {
     if (!applicationId) return;

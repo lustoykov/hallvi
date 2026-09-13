@@ -19,10 +19,13 @@ export function InformationContent({
   record,
   currentView,
   onOpen,
+  superseded,
 }: {
   record: SavedInformation;
   currentView?: ApplicationSection;
   onOpen?: (view: ApplicationSection) => void;
+  /** Already shown in full earlier in this conversation. */
+  superseded?: boolean;
 }) {
   const presentation = record.presentation!;
   const content = presentation.content!;
@@ -107,9 +110,35 @@ export function InformationContent({
     (check) => check.status === "passed",
   ).length;
 
+  if (superseded)
+    return (
+      <article
+        className="sg-result"
+        data-kind={content.kind}
+        data-tone={tone}
+        data-quiet=""
+        data-information-id={record.id}
+      >
+        <div className="sg-result-head">
+          <span className="sg-result-dot" data-tone={tone} aria-hidden="true" />
+          <h3 title={record.title}>{record.title}</h3>
+          <span className="sg-result-then">
+            <LocalTime
+              value={record.establishedAt ?? record.updatedAt}
+              variant="compact"
+            />
+          </span>
+        </div>
+        <p className="sg-result-alone">
+          <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+        </p>
+      </article>
+    );
+
   if (routine)
     return (
       <article
+        id={`record-${record.id}`}
         className="sg-result"
         data-kind={content.kind}
         data-context="chat"
@@ -181,6 +210,7 @@ export function InformationContent({
 
   return (
     <article
+      id={`record-${record.id}`}
       className="sg-record"
       data-kind={content.kind}
       data-context={currentView ?? "chat"}
