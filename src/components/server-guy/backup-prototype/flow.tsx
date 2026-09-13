@@ -115,7 +115,12 @@ export function FlowDirection({
     now - Date.parse(at) < FRESH_MS ? "verified" : "stale";
   const covered = story.pieces.filter((piece) => piece.method);
   const left = story.pieces.filter((piece) => !piece.method);
-  const n = story.volumes.length;
+  // A volume no record states is a name another record used, not a volume
+  // anybody found. Counting those said "7 volumes hold the application's
+  // data" about an application with four, three of which were the same
+  // three under the ids a later record happened to use.
+  const unstated = story.volumes.filter((item) => item.stated === false);
+  const n = story.volumes.length - unstated.length;
 
   // What lights up: a piece lights its own wire and the way off the server;
   // the copy or the copies light every wire; the restore lights its drop.
@@ -143,6 +148,9 @@ export function FlowDirection({
     covered.length
       ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
       : "Nothing on the server is in a backup plan.",
+    unstated.length
+      ? `${countWord(unstated.length)} more ${unstated.length === 1 ? "name is" : "names are"} used by other records, and nothing states whether ${unstated.length === 1 ? "it is" : "they are"} there.`
+      : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -431,10 +439,22 @@ export function FlowDirection({
                   ? size(item.sizeGb, item.sizeText)
                   : "Size not measured"}
                 {item.note ? ` · ${item.note}` : ""}
-                {story.lostAt
-                  ? ` · lost ${when(story.lostAt)}`
-                  : story.keptAt
-                    ? ` · kept ${when(story.keptAt)}`
+                {/* This volume's own replacement result, not the
+                    application's. The two were the same line, so a card
+                    saying "nobody has tested whether this survives" ended
+                    "· kept 20:29" in the same breath. */}
+                {(
+                  item.stated === undefined
+                    ? story.lostAt
+                    : (item.lostAt ?? null)
+                )
+                  ? ` · lost ${when((item.stated === undefined ? story.lostAt : item.lostAt)!)}`
+                  : (
+                        item.stated === undefined
+                          ? story.keptAt
+                          : (item.keptAt ?? null)
+                      )
+                    ? ` · kept ${when((item.stated === undefined ? story.keptAt : item.keptAt)!)}`
                     : ""}
               </p>
             </div>

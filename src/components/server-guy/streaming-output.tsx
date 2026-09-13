@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
 function commandText(input: string) {
@@ -27,6 +27,40 @@ function outputText(item: ExecutionRecord) {
   return item.output;
 }
 
+const everySecond = (onChange: () => void) => {
+  const tick = setInterval(onChange, 1000);
+  return () => clearInterval(tick);
+};
+const never = () => () => undefined;
+/** Bucketed, so the snapshot only changes when the second does. */
+const thisSecond = () => Math.floor(Date.now() / 1000) * 1000;
+const zero = () => 0;
+
+const spell = (seconds: number) =>
+  seconds < 60
+    ? `${seconds}s`
+    : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+
+/**
+ * What a long command looks like while it says nothing.
+ *
+ * Building Paperless-ngx installs 201 Python packages and prints nothing for
+ * minutes at a stretch. The last line on screen then reads exactly the same
+ * whether the command is working, wedged or gone, and the reader has no way
+ * to tell. The clock can: "running 6m 12s · quiet for 3m 40s" is the same
+ * screen with the missing fact restored.
+ */
+export function pulse(item: ExecutionRecord, now: number) {
+  const started = Date.parse(item.createdAt);
+  if (!now || !Number.isFinite(started) || now < started) return null;
+  const running = `running ${spell(Math.floor((now - started) / 1000))}`;
+  const spoke = item.outputAt ? Date.parse(item.outputAt) : NaN;
+  if (!Number.isFinite(spoke) || now < spoke) return running;
+  const quiet = Math.floor((now - spoke) / 1000);
+  // Under twenty seconds is not a silence, it is the gap between two lines.
+  return quiet < 20 ? running : `${running} · quiet for ${spell(quiet)}`;
+}
+
 export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const [open, setOpen] = useState(
     item.status !== "succeeded" && item.status !== "declined",
@@ -38,6 +72,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const command = commandText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
+  // The clock is outside React: it ticks on its own and the component reads
+  // it. Zero on the server and before the first paint, so there is nothing to
+  // mismatch during hydration.
+  const now = useSyncExternalStore(
+    running ? everySecond : never,
+    running ? thisSecond : zero,
+    zero,
+  );
 
   useEffect(() => {
     if (!follow || !open) return;
@@ -111,6 +153,11 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
           <button type="button" onClick={() => void copy()}>
             Copy
           </button>
+          {running && (
+            <span className="sg-stream-pulse" role="status">
+              {pulse(item, now)}
+            </span>
+          )}
           <span role="status">{copyStatus}</span>
         </div>
       </div>

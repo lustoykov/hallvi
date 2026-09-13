@@ -128,8 +128,18 @@ export function storageFromRecords({
       ownerName: owner?.id ?? "",
       mount: fact("path") ?? "Not recorded",
       docker: fact("docker"),
-      note:
-        persistence === undefined
+      stated: presence.known && presence.presence === "present",
+      keptAt:
+        persistence?.value.status === "passed"
+          ? (persistence.record.establishedAt ?? null)
+          : null,
+      lostAt:
+        persistence?.value.status === "failed"
+          ? (persistence.record.establishedAt ?? null)
+          : null,
+      note: !(presence.known && presence.presence === "present")
+        ? "Another record names this volume; nothing states that it is there."
+        : persistence === undefined
           ? "Nobody has tested whether this survives the container being replaced."
           : persistence.value.status === "failed"
             ? "The data did not survive a container replacement."

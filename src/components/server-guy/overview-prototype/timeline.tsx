@@ -734,7 +734,7 @@ export function TimelineHero({
                     <b>{vital.label}</b>
                     <small>
                       <i aria-hidden="true" />
-                      {vital.status.text}
+                      <span>{vital.status.text}</span>
                     </small>
                   </span>
                 </button>

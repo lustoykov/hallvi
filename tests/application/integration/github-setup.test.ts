@@ -445,6 +445,29 @@ describe("GitHub access renewal", () => {
     },
   );
 
+  it("says a refused renewal is about the renewal token, not the App", async () => {
+    // GitHub answers `incorrect_client_credentials` when the client id is
+    // real and the refresh token is not one it will honour — the same words
+    // it uses for a missing secret, which a device-flow client does not need.
+    // Saying "credentials" sent this session looking for a misconfigured App
+    // for an hour; the cause is a renewal token that another copy of this
+    // connection already spent.
+    const previous = await expiringLogin();
+    device.mockResolvedValueOnce({
+      error: "incorrect_client_credentials",
+      error_description:
+        "The client_id and/or client_secret passed are incorrect.",
+    });
+    await expect(connectedGithubCredential()).rejects.toThrow(
+      /renewal token.*copied between checkouts.*Sign in again/s,
+    );
+    const stored = readGithubConnection()!;
+    expect(stored.id).toBe(previous.id);
+    expect(stored.invalidReason).toMatch(/renewal token/);
+    // Never GitHub's own words: its description names a secret we do not use.
+    expect(stored.invalidReason).not.toMatch(/client_secret/);
+  });
+
   it("a late failed refresh cannot invalidate a replacement connection", async () => {
     await expiringLogin();
     let resolve!: (value: unknown) => void;
@@ -669,12 +692,20 @@ describe("exact repository access", () => {
     });
     expect(JSON.stringify(result)).not.toContain(token);
   });
-  it("does no provider inspection before consent", async () => {
-    expect((await inspectGithubRepository(repository)).status).toBe(
-      "unavailable",
-    );
-    expect(json).not.toHaveBeenCalled();
+  it("reads a public repository without a login, and never borrows one", async () => {
+    // Server Guy exists to deploy software its user did not write, and a
+    // public repository is public. What must not happen is reaching for a
+    // credential the owner did not choose: the host's gh login stays untouched
+    // and the read carries no token.
+    expect(await inspectGithubRepository(repository)).toMatchObject({
+      status: "passed",
+      raw: {
+        credentialSource: "Public repository, read without a login",
+        repositorySelection: "public-anonymous",
+      },
+    });
     expect(cli).not.toHaveBeenCalled();
+    for (const call of json.mock.calls) expect(call[1]).toBeNull();
   });
   it("does not silently accept a deleted-and-recreated repository at the same URL", async () => {
     await reuse();

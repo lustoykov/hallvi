@@ -44,6 +44,8 @@ export interface ExecutionRecord {
   exitCode?: number | null;
   approvalId?: string;
   createdAt: string;
+  /** When output last arrived, so a quiet command can say how quiet it is. */
+  outputAt?: string;
   finishedAt?: string;
 }
 function directory(applicationId: string) {
@@ -218,7 +220,12 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     const clean = (text: string) =>
       redactSecrets(redactHeldSecrets(run.applicationId, text)).text;
     const output = (text: string) => {
-      record.output = clean(text).slice(-100_000);
+      const next = clean(text).slice(-100_000);
+      // Only a change is news. A build that installs 201 packages prints
+      // nothing for minutes at a time, and the difference between "quiet" and
+      // "stopped" is the one thing a reader cannot get from the text itself.
+      if (next !== record.output) record.outputAt = new Date().toISOString();
+      record.output = next;
       save();
     };
     save();

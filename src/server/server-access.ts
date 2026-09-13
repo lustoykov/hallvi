@@ -50,6 +50,59 @@ export async function serverPublicKey(
   return { publicKey: stdout.trim() };
 }
 
+/**
+ * A machine the provider calls "running" is still booting, and its sshd
+ * answers somewhere between ten seconds and a minute later. Scanning once
+ * failed every first attempt with `write (…): Broken pipe` — a raw exec
+ * failure, not the readiness message below it, which a thrown keyscan can
+ * never reach — and left the operator to invent its own sleep-and-retry.
+ *
+ * Waiting for a dependency to come up belongs in the thing that needs it.
+ */
+export async function scanHostKey(
+  address: string,
+  port: number,
+  signal?: AbortSignal,
+  options: {
+    scan?: (address: string, port: number) => Promise<string>;
+    waitMs?: number;
+    intervalMs?: number;
+  } = {},
+) {
+  const scan =
+    options.scan ??
+    (async (address: string, port: number) =>
+      (
+        await exec(
+          "ssh-keyscan",
+          ["-T", "10", "-p", String(port), "-t", "ed25519", address],
+          { signal, timeout: 15000 },
+        )
+      ).stdout);
+  const deadline = Date.now() + (options.waitMs ?? 120_000);
+  let last = "";
+  for (;;) {
+    signal?.throwIfAborted();
+    try {
+      const keys = await scan(address, port);
+      if (keys.trim()) return keys;
+      last = "it accepted the connection and offered no host key";
+    } catch (error) {
+      last =
+        error instanceof Error && error.message
+          ? error.message.split("\n").filter(Boolean).pop()!
+          : "the connection was refused";
+    }
+    if (Date.now() >= deadline) break;
+    await new Promise((resolve) =>
+      setTimeout(resolve, options.intervalMs ?? 5_000),
+    );
+  }
+  throw new Error(
+    `SSH did not answer at ${address}:${port} while waiting for it: ${last}. Inspect the server's status and console, then connect again.`,
+  );
+}
+
 export const connectServerSchema = z
   .object({
     serverId: z.number().int().positive().optional(),
@@ -117,18 +170,7 @@ export async function connectServer(
   let hostKeys = existsSync(knownHostsPath)
     ? readFileSync(knownHostsPath, "utf8")
     : "";
-  if (!hostKeys) {
-    const scan = await exec(
-      "ssh-keyscan",
-      ["-T", "10", "-p", String(params.port), "-t", "ed25519", address],
-      { signal, timeout: 15000 },
-    );
-    hostKeys = scan.stdout;
-    if (!hostKeys.trim())
-      throw new Error(
-        "SSH is not ready. Inspect the server and try connecting again when it is ready.",
-      );
-  }
+  if (!hostKeys) hostKeys = await scanHostKey(address, params.port, signal);
   const keyLines = hostKeys
     .trim()
     .split("\n")

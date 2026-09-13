@@ -80,7 +80,7 @@ export function NewApplicationScreen({
   }
 
   async function createApplication() {
-    if (busy || !githubLogin) return;
+    if (busy) return;
     if (preview) {
       router.push("/prototype/app?scenario=simple&step=0");
       return;
@@ -155,14 +155,12 @@ export function NewApplicationScreen({
           <div className={s.githubConnection}>
             <div>
               <strong>
-                {githubLogin
-                  ? `GitHub · ${githubLogin}`
-                  : "Connect GitHub first"}
+                {githubLogin ? `GitHub · ${githubLogin}` : "No GitHub login"}
               </strong>
               <p className={s.helper}>
                 {githubLogin
                   ? "Repository access is verified when you add the application."
-                  : "Choose the login Server Guy should use for this repository."}
+                  : "Public repositories are read without one. Connect a login for private repositories."}
               </p>
             </div>
             <Link
@@ -231,7 +229,7 @@ export function NewApplicationScreen({
             </Link>
             <button
               className={s.primary}
-              disabled={!ready || busy || !repositoryUrl.trim() || !githubLogin}
+              disabled={!ready || busy || !repositoryUrl.trim()}
               type="submit"
             >
               {busy && <SpinnerGap className="spin" />}

@@ -103,6 +103,14 @@ export async function openServerPort(
     reused,
     access:
       "Only on the PC running Server Guy, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
+    // 127.0.0.1 means a different machine in each of the three places this
+    // operator works, and the workspace is the one that looks most like the
+    // controller and is least like it. Saying so here costs nothing; finding
+    // out by running curl costs a turn and reads as a broken tunnel.
+    verifiedFrom:
+      httpStatus === null
+        ? "The controller asked this URL and got no answer. Your workspace shell cannot test it either — the workspace has its own loopback, not this PC's. Check the application on the server with server_bash."
+        : `The controller asked this URL itself and got HTTP ${httpStatus}. Do not check it from your workspace shell: the workspace has its own loopback, not this PC's, so curl there fails however well the tunnel works.`,
   };
 }
 

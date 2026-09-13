@@ -18,7 +18,8 @@ export class GithubAccessError extends Error {
  */
 export async function githubJson(
   path: string,
-  token: string,
+  /** A login's token, or null to read a public repository as anyone can. */
+  token: string | null,
   options: {
     signal?: AbortSignal;
     /** A write: POST/PATCH with a JSON body. Reads never send one. */
@@ -33,7 +34,7 @@ export async function githubJson(
     const response = await fetch(`https://api.github.com${path}`, {
       method: options.method ?? "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         ...(options.body !== undefined
@@ -63,7 +64,9 @@ export async function githubJson(
         response.headers.get("x-ratelimit-remaining") === "0")
     )
       throw new GithubAccessError(
-        "GitHub’s rate limit was reached. Try again later.",
+        token
+          ? "GitHub’s rate limit was reached. Try again later."
+          : "GitHub’s rate limit for anonymous reads was reached. Connect GitHub in Settings for a much higher limit, or try again later.",
       );
     if (response.status === 403)
       throw new GithubAccessError(
@@ -72,7 +75,9 @@ export async function githubJson(
       );
     if (response.status === 404)
       throw new GithubAccessError(
-        "The repository is missing or this login cannot access it. Check its URL and repository access on GitHub.",
+        token
+          ? "The repository is missing or this login cannot access it. Check its URL and repository access on GitHub."
+          : "No public repository answers at this URL. A private repository needs a GitHub login: connect one in Settings → GitHub.",
         "access",
       );
     if (response.status === 422)
@@ -107,7 +112,8 @@ export async function githubJson(
 export async function githubArchive(
   fullName: string,
   sha: string,
-  token: string,
+  /** A login's token, or null to read a public repository as anyone can. */
+  token: string | null,
   options: { signal?: AbortSignal; maxBytes: number },
 ): Promise<Buffer> {
   const timeout = AbortSignal.timeout(120_000);
@@ -116,7 +122,7 @@ export async function githubArchive(
       `https://api.github.com/repos/${fullName}/tarball/${sha}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
         },
@@ -134,7 +140,9 @@ export async function githubArchive(
       );
     if (response.status === 403 || response.status === 404)
       throw new GithubAccessError(
-        "The repository archive could not be read with this login. Check repository access on GitHub.",
+        token
+          ? "The repository archive could not be read with this login. Check repository access on GitHub."
+          : "The repository archive could not be read without a login. Connect GitHub in Settings if this repository is private or the anonymous rate limit was reached.",
         "access",
       );
     if (!response.ok || !response.body)
