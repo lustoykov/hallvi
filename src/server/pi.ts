@@ -2,6 +2,11 @@ import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
 import { openServerPort } from "./private-access";
 import {
+  listSecrets,
+  requestSecret,
+  resolveSecretHandles,
+} from "./application-secrets";
+import {
   listInformation,
   saveInformation,
   retireInformation,
@@ -61,7 +66,7 @@ Permissions are independent of the task. In Always ask, the executor requests ap
 
 Use judgment to avoid unnecessary downtime, data loss and spending. Inspect before making assumptions. If a command fails or its outcome is unknown, investigate using your general tools and decide how to proceed. A successful command does not prove the application works: check the result.
 
-Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat.
+Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold — an admin password, an API key, a token — call request_secret and use the handle it returns wherever the value would go. The privileged layer substitutes it as the command runs, so what is recorded, shown and logged keeps the handle. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
 
 Save information worth preserving with save_information: discoveries costly to rediscover, preferences, recommendations and consequential outcomes. Search saved information when needed. Omit presentation for working knowledge. To surface a record, provide presentation.views and role; the product renders the same record in those views and, when showInChat is true, in this reply. Use a separate outcome for each historical event; update ordinary knowledge in place. Retire stale records. A deployment handover should save the application URL and verification evidence. Saved preferences never change permission settings. Never save secrets. Sidebar destinations are overview, architecture, deployment, history, processes, database, cache, jobs, storage, backups, logs, monitoring, domains, security, variables.
 
@@ -465,7 +470,13 @@ export async function askPi(
                   (output) =>
                     runHostCommand(
                       host,
-                      params.command,
+                      // Handles become values here and nowhere earlier: the
+                      // record above was already written with the handle, so
+                      // what is stored, shown and logged never holds one.
+                      resolveSecretHandles(
+                        input.run.applicationId,
+                        params.command,
+                      ),
                       signal ?? options.signal,
                       output,
                       params.timeoutSeconds,
@@ -474,6 +485,38 @@ export async function askPi(
                   id,
                 ),
               );
+            },
+          }),
+          defineTool({
+            name: "request_secret",
+            executionMode: "parallel",
+            label: "Ask for a secret",
+            description:
+              "Ask the owner for a value you must never see: a password, an API key, a token the application needs. Returns a handle such as {{secret:GF_SECURITY_ADMIN_PASSWORD}}. Put the handle in server_bash commands and compose files exactly where the value would go; the privileged layer substitutes it when the command runs, and what is recorded, shown and logged keeps the handle. There is no tool that reads a value back. Name it after the environment variable the application reads, in capitals with underscores, and say plainly in `why` what it is for so the owner can judge it. If no value has been supplied yet, the command fails rather than running with a blank — say what you are waiting for and stop.",
+            parameters: Type.Object({
+              name: Type.String(),
+              why: Type.String(),
+              process: Type.Optional(Type.String()),
+            }),
+            async execute(_id, params) {
+              const asked = requestSecret(input.run.applicationId, params);
+              return json({
+                ...asked,
+                waiting: asked.established
+                  ? null
+                  : "The owner has not supplied it yet. It appears as a masked field in the conversation.",
+              });
+            },
+          }),
+          defineTool({
+            name: "list_secrets",
+            executionMode: "parallel",
+            label: "List secrets",
+            description:
+              "The secrets this application has asked for: each name, why it was asked for, and whether the owner has supplied a value. Never values — nothing returns those.",
+            parameters: Type.Object({}),
+            async execute() {
+              return json({ secrets: listSecrets(input.run.applicationId) });
             },
           }),
           defineTool({

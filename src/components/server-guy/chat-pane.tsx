@@ -8,7 +8,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   Conversation,
@@ -29,6 +29,7 @@ import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
+import { SecretRequests, type SecretRequest } from "./secret-request";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
 
@@ -190,6 +191,35 @@ export function ChatPane({
     (message) => message.status === "queued" || message.status === "running",
   );
 
+  // What Pi has asked the owner for. Read while a turn is running, because
+  // that is when a request appears, and once afterwards so the field goes
+  // away when the turn that needed it has finished.
+  const [secrets, setSecrets] = useState<SecretRequest[]>([]);
+  const applicationId = view.application?.id;
+  useEffect(() => {
+    if (!applicationId) return;
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const response = await fetch(
+          `/api/applications/${applicationId}/secrets`,
+        );
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!cancelled) setSecrets(body.secrets ?? []);
+      } catch {
+        // A page that cannot reach its own controller has louder problems.
+      }
+    };
+    void read();
+    if (!requestPending) return;
+    const timer = window.setInterval(read, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applicationId, requestPending]);
+
   return (
     <section className="sg-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
@@ -213,6 +243,13 @@ export function ChatPane({
         <div className="sg-busy-bar" aria-hidden="true" />
       )}
 
+      {view.application && chatId && view.chats[0]?.id === chatId && (
+        <SecretRequests
+          applicationId={view.application.id}
+          secrets={secrets}
+          onChanged={setSecrets}
+        />
+      )}
       {view.application && chatId && view.chats[0]?.id === chatId && (
         <OperatorConsole
           key={`settings:${view.application.id}:${chatId}`}

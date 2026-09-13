@@ -15,6 +15,7 @@ import { z } from "zod";
 import { loadApplication, loadChat } from "./applications";
 import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
+import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import type { PiRun } from "./types";
 
@@ -170,8 +171,14 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       runId: run.id,
       tool,
       target,
+      // What Pi wrote, which carries {{secret:NAME}} handles and not values.
+      // Resolution happens later and to a different string, so the record,
+      // the activity and the log all keep the handle.
       input: redactSecrets(
-        typeof input === "string" ? input : JSON.stringify(input),
+        redactHeldSecrets(
+          run.applicationId,
+          typeof input === "string" ? input : JSON.stringify(input),
+        ),
       ).text,
       mode,
       status: needsApproval ? "awaiting-approval" : "running",
@@ -186,7 +193,12 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     const path = recordPath(run.applicationId, record.id);
     const save = () => write(path, record);
     const output = (text: string) => {
-      record.output = redactSecrets(text).text.slice(-100_000);
+      // Held values as well as credential-shaped ones: a command should not
+      // print its own secret, but "should" is not a property a log can rely
+      // on, and this record is shown to the owner and kept forever.
+      record.output = redactSecrets(
+        redactHeldSecrets(run.applicationId, text),
+      ).text.slice(-100_000);
       save();
     };
     save();
