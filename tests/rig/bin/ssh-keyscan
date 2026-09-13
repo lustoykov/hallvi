@@ -12,6 +12,37 @@
 const { appendFileSync } = require("node:fs");
 const { join } = require("node:path");
 
+const sshPort = process.env.SG_RIG_SSH_PORT;
+if (sshPort) {
+  // A real sshd is listening, so scan it: the product pins the key the
+  // container actually presents, exactly as it would with a real host.
+  const { execFileSync } = require("node:child_process");
+  const argv = process.argv.slice(2);
+  const out = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "-p") {
+      out.push("-p", sshPort);
+      i++;
+      continue;
+    }
+    if (argv[i].startsWith("-")) {
+      out.push(argv[i]);
+      if (argv[i] === "-T" || argv[i] === "-t" || argv[i] === "-f")
+        out.push(argv[++i]);
+      continue;
+    }
+    out.push("127.0.0.1");
+  }
+  try {
+    process.stdout.write(
+      execFileSync("/usr/bin/ssh-keyscan", out, { encoding: "utf8" }),
+    );
+  } catch (error) {
+    process.exit(typeof error.status === "number" ? error.status : 1);
+  }
+  process.exit(0);
+}
+
 const root = process.env.SG_RIG_HOST_ROOT;
 const args = process.argv.slice(2);
 // The address is the last argument; the flags before it are ssh-keyscan's.
