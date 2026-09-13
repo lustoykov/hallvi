@@ -215,3 +215,25 @@ describe("backups, from the same records", () => {
     ).toEqual([]);
   });
 });
+
+describe("what a measurement is worth", () => {
+  it("keeps the words Pi measured in, for a volume too small to round", () => {
+    // 8 KiB rounded to "0 MB", which says empty when it means small.
+    const story = read([
+      volume("data", { facts: [fact("size", "8 KiB", "contents")] }),
+    ]);
+    expect(story.volumes[0].sizeText).toBe("8 KiB");
+    expect(story.volumes[0].sizeGb).toBeCloseTo(8e-6, 9);
+  });
+
+  it("reads megabytes and gigabytes alike", () => {
+    expect(
+      read([volume("a", { facts: [fact("size", "220 MB", "contents")] })])
+        .volumes[0].sizeGb,
+    ).toBeCloseTo(0.22, 5);
+    expect(
+      read([volume("b", { facts: [fact("size", "1.5 GB", "contents")] })])
+        .volumes[0].sizeGb,
+    ).toBeCloseTo(1.5, 5);
+  });
+});

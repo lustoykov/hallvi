@@ -16,6 +16,12 @@ export interface Probe {
   /** Checked from inside the server, on the private network. */
   inside: boolean;
   at: string | null;
+  /**
+   * Whether it passed. Having a time is not the same thing: a check that ran
+   * and failed has one too, and counting times as passes made a process with
+   * a failing check read "6 of 6 checks".
+   */
+  passed?: boolean;
 }
 
 export interface ProcessCard {

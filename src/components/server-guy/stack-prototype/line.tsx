@@ -125,10 +125,14 @@ export function LineDirection({
         <div
           key={probe.name}
           className="axm-rec"
-          data-tone={probe.at ? "pass" : "info"}
+          data-tone={
+            probe.passed === false ? "fail" : probe.at ? "pass" : "info"
+          }
         >
           <time>{probe.at ? clock(probe.at) : "—"}</time>
-          <b aria-hidden="true">{probe.at ? "✓" : "·"}</b>
+          <b aria-hidden="true">
+            {probe.passed === false ? "✕" : probe.at ? "✓" : "·"}
+          </b>
           <span>
             {probe.name} · {probe.probe} ·{" "}
             {probe.inside ? "inside the server" : "from your network"}
@@ -221,7 +225,10 @@ export function LineDirection({
     at: number,
     then?: string,
   ) => {
-    const passed = item.probes.filter((probe) => probe.at).length;
+    // Passed, not merely dated: a failed check has a time too.
+    const passed = item.probes.filter(
+      (probe) => probe.passed ?? Boolean(probe.at),
+    ).length;
     return stop({
       id: `process:${item.name}`,
       line,
@@ -229,8 +236,9 @@ export function LineDirection({
       then,
       className: item.role === "private" ? "axsl-private" : undefined,
       dot: item.role === "private" ? <Lock weight="bold" /> : undefined,
-      tone:
-        item.probes.length && passed === item.probes.length
+      tone: item.probes.some((probe) => probe.passed === false)
+        ? "fail"
+        : item.probes.length && passed === item.probes.length
           ? "pass"
           : undefined,
       title: (

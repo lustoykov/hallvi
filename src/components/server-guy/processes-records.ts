@@ -74,6 +74,7 @@ function probeOf(held: Held<RecordCheck>): Probe {
     // claim is only made where the key says it.
     inside: held.value.key === "reachable" || held.value.key === "container",
     at: held.record.establishedAt,
+    passed: held.value.status === "passed",
   };
 }
 
@@ -186,7 +187,7 @@ export function processesFromRecords({
       probes,
       lastPassed:
         probes
-          .filter((probe) => probe.at)
+          .filter((probe) => probe.passed && probe.at)
           .map((probe) => probe.at!)
           .sort()
           .at(-1) ?? null,

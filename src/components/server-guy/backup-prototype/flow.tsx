@@ -37,8 +37,14 @@ const moodOf: Record<Tone, MascotMood> = {
   planned: "ready",
   checking: "working",
 };
-const size = (gb: number) =>
-  gb < 1 ? `${Math.round(gb * 1024)} MB` : `${gb.toFixed(1)} GB`;
+// A volume of 8 KiB rounded to "0 MB", which says empty when it means small.
+// Below a megabyte the recorded measurement is shown as it was written.
+const size = (gb: number, text?: string | null) =>
+  gb < 1 / 1024
+    ? (text ?? "under 1 MB")
+    : gb < 1
+      ? `${Math.round(gb * 1024)} MB`
+      : `${gb.toFixed(1)} GB`;
 
 interface Box {
   x: number;
@@ -168,7 +174,7 @@ export function FlowDirection({
         label: "Size",
         value:
           volume.sizeGb != null
-            ? `${size(volume.sizeGb)}, measured ${ago(volume.measuredAt!, now)}`
+            ? `${size(volume.sizeGb, volume.sizeText)}, measured ${ago(volume.measuredAt!, now)}`
             : "Not measured",
       },
       {
@@ -403,7 +409,9 @@ export function FlowDirection({
                 </button>
               ))}
               <p className="axbf-vol-foot">
-                {item.sizeGb != null ? size(item.sizeGb) : "Size not measured"}
+                {item.sizeGb != null
+                  ? size(item.sizeGb, item.sizeText)
+                  : "Size not measured"}
                 {item.note ? ` · ${item.note}` : ""}
                 {story.keptAt ? ` · kept ${when(story.keptAt)}` : ""}
               </p>

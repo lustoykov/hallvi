@@ -114,6 +114,7 @@ export function storageFromRecords({
             ? "The data did not survive a container replacement."
             : null,
       sizeGb: gigabytes(fact("size")),
+      sizeText: fact("size"),
       measuredAt: facts.get("size")?.record.establishedAt ?? null,
       pieces: [piece],
     });

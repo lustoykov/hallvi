@@ -26,6 +26,13 @@ import {
 import { protectionFromRecords } from "./backups-records";
 import type { DataStore, DataView, Mark } from "./data-prototype/data-story";
 
+/** A fact naming a process the records know, or nothing. */
+function namedProcess(records: SavedInformation[], value: string | null) {
+  if (!value) return null;
+  const known = subjectsMentioned(records, "process");
+  return known.some((ref) => ref.id === value) ? value : null;
+}
+
 export function databaseFromRecords({
   records,
   applicationId,
@@ -77,7 +84,14 @@ export function databaseFromRecords({
             label: [fact("engine") ?? "The database", version]
               .filter(Boolean)
               .join(" "),
-            owner: owner?.name ?? fact("owner") ?? "The application",
+            // Who runs it, not who owns the file. Pi reasonably wrote
+            // "UID 1000:GID 1000" under `owner`, and a headline reading
+            // "UID 1000:GID 1000's database" is nobody's idea of a name. A
+            // name is used only when it names a process the records know.
+            owner:
+              owner?.name ??
+              namedProcess(live, fact("owner")) ??
+              "The application",
             ownerName: owner?.id ?? "",
             file: path,
             volume: volume

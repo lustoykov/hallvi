@@ -25,6 +25,8 @@ export interface Vol {
   docker: string | null;
   note: string | null;
   sizeGb: number | null;
+  /** As Pi measured it. Shown when it is too small to round to a megabyte. */
+  sizeText?: string | null;
   measuredAt: string | null;
   pieces: Piece[];
 }
