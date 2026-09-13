@@ -112,12 +112,12 @@ function share(
 ) {
   if (count < 1) return [];
   const room = span.end - span.start;
-  const step = Math.min(
-    thickness + gap,
-    count > 1 ? (room - thickness) / (count - 1) : room,
+  const size = Math.min(
+    thickness,
+    Math.max(28, (room - gap * (count - 1)) / count),
   );
-  const size = Math.min(thickness, Math.max(28, step - Math.min(gap, 8)));
-  const used = step * (count - 1) + size;
+  const step = size + gap;
+  const used = size * count + gap * (count - 1);
   const start = span.start + Math.max(0, (room - used) / 2);
   return Array.from({ length: count }, (_, index) => ({
     at: start + index * step,
@@ -142,11 +142,21 @@ function layoutFor(model: ArchitectureModel): Layout {
     "gate:ssh": BOX.ssh,
     tls: { x: 222, y: 315, w: 80, h: 17 },
   };
-  // One service sits exactly where the design drew it; several share the zone.
+  // One service sits exactly where the design drew it; several share the
+  // zone, which reaches down to just above the disk shelf to make room —
+  // two full-height cards fit in it exactly.
+  rects.private =
+    services.length > 1 ? { ...BOX.private, h: 186 } : BOX.private;
   const serviceRows =
     services.length === 1
       ? [{ at: BOX.svc.y, size: BOX.svc.h }]
-      : share(services.length, { start: 226, end: 366 }, BOX.svc.h);
+      : share(
+          services.length,
+          // Below the zone's own label, down to just inside its bottom edge.
+          { start: 240, end: rects.private.y + rects.private.h - 4 },
+          BOX.svc.h,
+          10,
+        );
   services.forEach((service, index) => {
     rects[service.id] = {
       x: BOX.svc.x,
@@ -961,7 +971,10 @@ export function JourneyDirection({
           </button>
         </div>
         {services.length > 0 && (
-          <div className="axj2-region axj2-private" style={place(BOX.private)}>
+          <div
+            className="axj2-region axj2-private"
+            style={place(layout.rects.private ?? BOX.private)}
+          >
             <span>Private network · no ports open</span>
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { clip, commandOf, essence, plainText } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
@@ -17,6 +17,15 @@ function outputText(item: ExecutionRecord) {
   }
   return item.output;
 }
+
+const everySecond = (onChange: () => void) => {
+  const tick = setInterval(onChange, 1000);
+  return () => clearInterval(tick);
+};
+const never = () => () => undefined;
+/** Bucketed, so the snapshot only changes when the second does. */
+const thisSecond = () => Math.floor(Date.now() / 1000) * 1000;
+const zero = () => 0;
 
 const spell = (seconds: number) =>
   seconds < 60
@@ -62,17 +71,14 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   const command = plainText(item.input);
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
-  // Set once at mount and kept fresh by the ticker. Seeding it inside the
-  // effect meant a synchronous setState on every render that started or
-  // finished a command, which cascades; the pulse only draws while something
-  // is running, so there is nothing to reset when it stops either.
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!running) return;
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, [running]);
+  // The clock is outside React: it ticks on its own and the component reads
+  // it. Zero on the server and before the first paint, so there is nothing to
+  // mismatch during hydration.
+  const now = useSyncExternalStore(
+    running ? everySecond : never,
+    running ? thisSecond : zero,
+    zero,
+  );
 
   useEffect(() => {
     if (!follow || !open) return;

@@ -197,8 +197,11 @@ function renderInline(text: string, insideLink = false): ReactNode[] {
         </strong>,
       );
     } else if (emphasis !== undefined || emphasisAlt !== undefined) {
-      const inner = emphasis ?? emphasisAlt;
-      nodes.push(<em key={key++}>{renderInline(inner, insideLink)}</em>);
+      nodes.push(
+        <em key={key++}>
+          {renderInline(emphasis ?? emphasisAlt, insideLink)}
+        </em>,
+      );
     } else if (linkText !== undefined) {
       const inner = renderInline(linkText, true);
       nodes.push(

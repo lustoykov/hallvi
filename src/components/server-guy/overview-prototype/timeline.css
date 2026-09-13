@@ -244,15 +244,20 @@
   align-items: center;
   gap: 6px;
   overflow: hidden;
-  /* The column is narrow and the phrase is Pi's clock, so it will sometimes
-     not fit. Cutting it mid-word gave "Last checked 11 min ag", which reads
-     as a typo rather than as a truncation. */
-  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 560;
   white-space: nowrap;
-  text-overflow: ellipsis;
   color: var(--ax-muted);
+}
+/* The column is narrow and the phrase is Pi's clock, so it will sometimes not
+   fit. Cutting it mid-word gave "Last checked 11 min ag", which reads as a
+   typo rather than as a truncation — and ellipsis on the flex container never
+   applied, because the text inside it is an anonymous flex item that CSS
+   cannot reach. The ellipsis belongs on the box that holds the words. */
+.axt-lane-text small > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .axt-lane-text small i {
   flex: none;

@@ -252,9 +252,11 @@ export function RecordOverview({
                             <b>{lane.label}</b>
                             <small>
                               <i aria-hidden="true" />
-                              {latest
-                                ? `${result === "verified" ? "Passed" : result === "failed" ? "Failed" : "Recorded"} · ${clock(latest.at)}`
-                                : "Not established"}
+                              <span>
+                                {latest
+                                  ? `${result === "verified" ? "Passed" : result === "failed" ? "Failed" : "Recorded"} · ${clock(latest.at)}`
+                                  : "Not established"}
+                              </span>
                             </small>
                           </span>
                         </button>
