@@ -114,6 +114,7 @@ export function OperatorShell({
   initialPiSetup,
   applications,
   demo = false,
+  studioPort,
   identityVariant = "navigation",
 }: {
   initialView: OperatorView;
@@ -124,6 +125,8 @@ export function OperatorShell({
   >[];
   /** The repository is synthetic: GitHub links are shown, never followed. */
   demo?: boolean;
+  /** The Drizzle Studio `npm run dev` started on this database, if it did. */
+  studioPort?: number;
   /** Where the application identity sits; the prototype compares placements. */
   identityVariant?: IdentityVariant;
 }) {
@@ -620,9 +623,10 @@ export function OperatorShell({
           )}
           {/* Development only, in their own tabs: Pi's recorded conversation
               for the chat you are reading, from the read-only viewer of
-              `npm run inspect:conversation`, and the controller database in
-              Drizzle Studio. Studio has no address for a table or a row, so
-              it opens whole and you find the application inside it. */}
+              `npm run inspect:conversation`, and this application's database
+              in the Drizzle Studio that `npm run dev` started beside it.
+              Studio has no address for a table or a row, so it opens whole
+              and you find the application inside it. */}
           {process.env.NODE_ENV === "development" && applicationId && (
             <span className="sg-topbar-debug">
               {activeChat && (
@@ -635,14 +639,16 @@ export function OperatorShell({
                   Transcript
                 </a>
               )}
-              <a
-                href="https://local.drizzle.studio/"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="The controller database in Drizzle Studio, from npx drizzle-kit studio"
-              >
-                Database
-              </a>
+              {studioPort && (
+                <a
+                  href={`https://local.drizzle.studio/?port=${studioPort}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`This application's database, in the Drizzle Studio on port ${studioPort}`}
+                >
+                  Database
+                </a>
+              )}
             </span>
           )}
         </header>

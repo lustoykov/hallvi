@@ -40,7 +40,7 @@ Open <http://127.0.0.1:3000>. In another terminal from the same checkout:
 npm run worker
 ```
 
-Both processes must use the same database/configuration. The worker loads `.env` and `.env.local`. `SERVER_GUY_DB_PATH` overrides the default `.server-guy/server-guy.db`. Without the worker, accepted requests remain queued. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
+Both processes must use the same database/configuration. The worker loads `.env` and `.env.local`. `SERVER_GUY_DB_PATH` overrides the default `.server-guy/server-guy.db`. `npm run dev` also starts a Drizzle Studio on that same database, taking the first free port from 4983 or from `SERVER_GUY_STUDIO_PORT`, and tells the application which port it chose. Without the worker, accepted requests remain queued. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
 
 ### Private application access
 
@@ -50,7 +50,7 @@ Pi defaults to loopback-only application ports on the remote server and a local 
 
 Stop the web process and worker before applying schema changes. Schema 15 uses four tables: applications, conversations, messages and saved information. Initialize a fresh development database with `npm run db:push`; there is no compatibility migration from the retired schemas. Keep environment and account configuration separate from any application-data reset. `src/server/db-schema.ts` owns the schema.
 
-To read the rows, run `npx drizzle-kit studio` and open <https://local.drizzle.studio>; in development the application top bar carries a **Database** link to it. Studio opens on the whole controller database and has no address for a table or a row, so the link cannot be scoped — find the application by its ID once inside.
+To read the rows, use the **Database** link in the application top bar in development. It addresses the Drizzle Studio that `npm run dev` started on this database (`https://local.drizzle.studio/?port=<port>`), which is the point: SQLite is a file rather than a service, and a Studio started by hand serves whichever database its own working directory resolves, so one left running in another checkout will show that checkout's rows. Studio takes `host`, `port`, `vendor` and `themeId` from its URL and has no address for a table or a row, so the link opens the whole controller database — find the application by its ID once inside. The link is absent when no Studio was started beside the application.
 
 Native conversation histories live beside the database in `pi-sessions/<application-id>/<chat-id>.jsonl`. For a consistent offline controller backup, stop both processes and preserve SQLite, native sessions, configuration and execution/credential material privately. Restoring SQLite alone cannot restore missing native history. This developer procedure is not the planned automated application-backup feature.
 
