@@ -29,6 +29,7 @@ import {
   currentFacts,
   freshnessOf,
   presenceOf,
+  subjectsOfKind,
   topologyOf,
   type RecordCheck,
 } from "@/server/record-projection";
@@ -500,6 +501,27 @@ export function architectureFromRecords({
     new Set(of("source").map((part) => part.id)),
   );
 
+  /**
+   * Whether anything copies the data off the server — and the difference
+   * between nobody having looked and somebody having established that nothing
+   * does.
+   *
+   * Architecture said "has not been assessed" for an application whose records
+   * carried a nightly export job, two backup copies and a verified restore.
+   * Nobody had failed to look; what they found was that every copy lands on the
+   * same host, which is why Storage says nothing is off the server and the
+   * application list says "A backup plan, no copy yet". Reporting that as an
+   * open question is the softer of the two readings and the wrong one.
+   */
+  function offServer(records: SavedInformation[]) {
+    const looked = ["backup-copy", "backup-plan", "offsite"].some(
+      (kind) => subjectsOfKind(records, kind as "backup-copy").length > 0,
+    );
+    return looked
+      ? "Nothing on record copies them off it."
+      : "Whether anything copies them off it has not been assessed.";
+  }
+
   const stops = (kinds: Part["kind"][]) =>
     kinds.flatMap((kind) => of(kind).map((part) => part.id));
   const journeys: Journey[] = (
@@ -522,7 +544,7 @@ export function architectureFromRecords({
         summary: volumes.length
           ? offsite.length
             ? `${list(volumes.map((part) => part.name))} live on the server and are copied to ${list(offsite.map((part) => part.name))}.`
-            : `${list(volumes.map((part) => part.name))} live on the server. Whether anything copies them off it has not been assessed.`
+            : `${list(volumes.map((part) => part.name))} live on the server. ${offServer(records)}`
           : "No stored data is on record for this application.",
       },
       {
