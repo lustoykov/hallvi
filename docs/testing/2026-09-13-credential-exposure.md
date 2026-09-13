@@ -172,6 +172,13 @@ pushed material, not with a value assumed to be equivalent.
 - **Every exposed credential was retired at the service that honoured it**, as
   the table records, and each was re-probed afterwards with its own recovered
   plaintext.
+- **No credential-shaped material is in any tracked file.** Swept the working
+  tree for provider key prefixes, PEM headers, literal `*_PASSWORD=` and
+  `MC_HOST` assignments, and for the exposed MinIO pair specifically. What the
+  sweep returns is a schema validator (`z.string().startsWith("ghu_")`), the
+  redaction pattern itself (`/AKIA[0-9A-Z]{16}/g`), obviously-fabricated test
+  fixtures, and Git commit SHAs in prose. Runtime state directories are
+  ignored and staged paths are read before every commit.
 - `scripts/rotate-rig-credentials.mjs` previously wrote
   `authorized_keys` wholesale. That is not rotation; it is a lockout, and it
   removed the authorisation of three applications whose controllers held their
