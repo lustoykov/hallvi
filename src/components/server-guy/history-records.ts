@@ -44,8 +44,11 @@ const executionState: Record<
   running: "working",
   succeeded: "verified",
   failed: "failed",
-  declined: "cancelled",
-  interrupted: "cancelled",
+  // Two different facts. Declined means nothing ran; interrupted means
+  // something was running and may have got part of the way, which is the
+  // more important of the two to say out loud.
+  declined: "declined",
+  interrupted: "stopped",
 };
 
 /** A command's own name in a list of past work, by where it ran. */

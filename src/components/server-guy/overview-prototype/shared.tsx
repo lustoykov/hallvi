@@ -234,6 +234,10 @@ export function OpChip({ state }: { state: OperationState }) {
       tone: "checking",
       icon: <SpinnerGap weight="bold" className="ax-spin" />,
     },
+    declined: { tone: "absent", icon: <MinusCircle weight="bold" /> },
+    // Amber, not grey: something was running, and how far it got is not
+    // known. "Cancelled" in grey read as "nothing happened".
+    stopped: { tone: "stale", icon: <MinusCircle weight="bold" /> },
     cancelled: { tone: "absent", icon: <MinusCircle weight="bold" /> },
   };
   const item = look[state];

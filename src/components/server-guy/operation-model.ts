@@ -15,6 +15,8 @@ export const stateLabel: Record<OperationState, string> = {
   proposed: "Waiting for you",
   working: "Working",
   queued: "Queued",
+  declined: "Not run",
+  stopped: "Stopped",
   cancelled: "Cancelled",
   inspected: "Inspected",
   verified: "Verified",

@@ -330,3 +330,44 @@ describe("planned and reported are not observed", () => {
     expect(story.state).not.toBe("running");
   });
 });
+
+describe("work that did not run, and work that was stopped", () => {
+  it("keeps them apart", async () => {
+    // Both were "Cancelled" — one word for "you said no, nothing happened"
+    // and for "it was running and was stopped, and how far it got is not
+    // known". The second is the more important thing to say.
+    const { stateLabel } =
+      await import("@/components/server-guy/operation-model");
+    expect(stateLabel.declined).toBe("Not run");
+    expect(stateLabel.stopped).toBe("Stopped");
+  });
+
+  it("maps an execution's own status to the right one", async () => {
+    const { historyFromRecords } =
+      await import("@/components/server-guy/history-records");
+    const execution = (id: string, status: string) =>
+      ({
+        id,
+        applicationId: APP,
+        chatId: "c",
+        runId: "r",
+        tool: "server_bash",
+        target: "root@host:22",
+        input: "hostname",
+        mode: "always-ask",
+        status,
+        output: "",
+        createdAt: at(0),
+        finishedAt: at(1000),
+      }) as never;
+    const operations = historyFromRecords({
+      records: [],
+      executions: [execution("a", "declined"), execution("b", "interrupted")],
+    });
+    const states = Object.fromEntries(
+      operations.map((item) => [item.source.id, item.state]),
+    );
+    expect(states.a).toBe("declined");
+    expect(states.b).toBe("stopped");
+  });
+});
