@@ -52,7 +52,11 @@ describe("a record that can be drawn", () => {
 
   it("says nothing about working knowledge, which no view draws", () => {
     expect(
-      review({ title: "A preference", body: "Keep it private.", presentation: null }),
+      review({
+        title: "A preference",
+        body: "Keep it private.",
+        presentation: null,
+      }),
     ).toEqual([]);
   });
 });
@@ -77,9 +81,14 @@ describe("what would make a record unreadable", () => {
     const check = good.presentation.checks[0];
     const found = review({
       ...good,
-      presentation: { ...good.presentation, checks: [check, { ...check, label: "Also SSH" }] },
+      presentation: {
+        ...good.presentation,
+        checks: [check, { ...check, label: "Also SSH" }],
+      },
     });
-    expect(found.some((item) => item.includes('share the key "ssh"'))).toBe(true);
+    expect(found.some((item) => item.includes('share the key "ssh"'))).toBe(
+      true,
+    );
   });
 
   it("replaces the authored lane with the thing that was checked", () => {
@@ -98,9 +107,7 @@ describe("what would make a record unreadable", () => {
   it("will not let facts float free of the thing they describe", () => {
     const { states, about, ...rest } = good.presentation;
     const found = review({ ...good, presentation: rest });
-    expect(
-      found.some((item) => item.includes("does not say what")),
-    ).toBe(true);
+    expect(found.some((item) => item.includes("does not say what"))).toBe(true);
   });
 
   it("will not let a check float free either", () => {
@@ -113,19 +120,23 @@ describe("what would make a record unreadable", () => {
         checks: [{ ...good.presentation.checks[0], about: undefined }],
       },
     });
-    expect(
-      found.some((item) => item.includes("nothing to attach to")),
-    ).toBe(true);
+    expect(found.some((item) => item.includes("nothing to attach to"))).toBe(
+      true,
+    );
   });
 
   it("accepts a check that names what it checked on a record stating nothing", () => {
     const { states, ...rest } = good.presentation;
-    expect(review({ ...good, presentation: { ...rest, facts: undefined } })).toEqual([]);
+    expect(
+      review({ ...good, presentation: { ...rest, facts: undefined } }),
+    ).toEqual([]);
   });
 
   it("will not let a record claim verified with no time behind it", () => {
     const found = review({ ...good, establishedAt: null });
-    expect(found.some((item) => item.includes("establishedAt is missing"))).toBe(true);
+    expect(
+      found.some((item) => item.includes("establishedAt is missing")),
+    ).toBe(true);
   });
 
   it("will not let an absence describe the thing it says is gone", () => {
@@ -137,7 +148,9 @@ describe("what would make a record unreadable", () => {
         checks: [],
       },
     });
-    expect(found.some((item) => item.includes("is absent and then carries facts"))).toBe(true);
+    expect(
+      found.some((item) => item.includes("is absent and then carries facts")),
+    ).toBe(true);
   });
 
   it("will not let a planned check report an outcome", () => {
@@ -148,7 +161,11 @@ describe("what would make a record unreadable", () => {
         checks: [{ ...good.presentation.checks[0], basis: "planned" }],
       },
     });
-    expect(found.some((item) => item.includes("is planned, so it cannot have passed"))).toBe(true);
+    expect(
+      found.some((item) =>
+        item.includes("is planned, so it cannot have passed"),
+      ),
+    ).toBe(true);
   });
 });
 
@@ -157,8 +174,20 @@ describe("the map", () => {
     kind: "topology",
     from: "observed",
     parts: [
-      { id: "host", kind: "host", name: "The server", role: "Runs the container", plain: "The machine your app runs on" },
-      { id: "web", kind: "web", name: "The app", role: "Serves requests", plain: "Your application itself" },
+      {
+        id: "host",
+        kind: "host",
+        name: "The server",
+        role: "Runs the container",
+        plain: "The machine your app runs on",
+      },
+      {
+        id: "web",
+        kind: "web",
+        name: "The app",
+        role: "Serves requests",
+        plain: "Your application itself",
+      },
     ],
     edges: [{ from: "host", to: "web", network: "loopback" }],
   };
@@ -169,7 +198,10 @@ describe("the map", () => {
         ...good,
         presentation: {
           ...good.presentation,
-          states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
+          states: {
+            ref: { kind: "application", id: "app-1" },
+            presence: "present",
+          },
           content: topology,
         },
       }),
@@ -181,7 +213,9 @@ describe("the map", () => {
       ...good,
       presentation: { ...good.presentation, content: topology },
     });
-    expect(found.some((item) => item.includes("has to speak for it"))).toBe(true);
+    expect(found.some((item) => item.includes("has to speak for it"))).toBe(
+      true,
+    );
   });
 
   it("refuses an edge that joins something the map never draws", () => {
@@ -189,7 +223,10 @@ describe("the map", () => {
       ...good,
       presentation: {
         ...good.presentation,
-        states: { ref: { kind: "application", id: "app-1" }, presence: "present" },
+        states: {
+          ref: { kind: "application", id: "app-1" },
+          presence: "present",
+        },
         content: {
           ...topology,
           edges: [{ from: "host", to: "database", network: "private" }],
@@ -197,5 +234,88 @@ describe("the map", () => {
       },
     });
     expect(found.some((item) => item.includes('names "database"'))).toBe(true);
+  });
+});
+
+describe("a variable never carries its value", () => {
+  const variable = {
+    kind: "variable",
+    id: "GF_SECURITY_ADMIN_PASSWORD",
+  } as const;
+  const record = (facts: object[]) =>
+    review({
+      title: "Grafana has an admin password",
+      body: "",
+      establishedAt: "2026-09-13T07:00:00.000Z",
+      presentation: {
+        states: { ref: variable, presence: "present" },
+        views: ["variables"],
+        role: "status",
+        status: "verified",
+        checks: [],
+        facts,
+      },
+    });
+
+  it("refuses a value key", () => {
+    const found = record([
+      {
+        key: "value",
+        label: "Value",
+        value: "hunter2",
+        claim: "configuration",
+        basis: "reported",
+      },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("never the value itself");
+    expect(found[0]).toContain("request_secret");
+  });
+
+  it("accepts where it came from", () => {
+    expect(
+      record([
+        {
+          key: "source",
+          label: "Source",
+          value: "Supplied by you",
+          claim: "configuration",
+          basis: "reported",
+        },
+        {
+          key: "established",
+          label: "Established",
+          value: "Yes",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("catches a credential pasted into any fact, on any subject", () => {
+    const found = review({
+      title: "Connected",
+      body: "",
+      establishedAt: "2026-09-13T07:00:00.000Z",
+      presentation: {
+        states: { ref: host, presence: "present" },
+        views: ["deployment"],
+        role: "status",
+        status: "verified",
+        checks: [],
+        facts: [
+          {
+            key: "token",
+            label: "Token",
+            value: `ghp_${"a".repeat(36)}`,
+            claim: "identity",
+            basis: "reported",
+          },
+        ],
+      },
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("credential-shaped");
   });
 });

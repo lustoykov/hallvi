@@ -12,7 +12,7 @@
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
-import { tagFor } from "@/server/record-projection";
+import { releasedServices, tagFor } from "@/server/record-projection";
 
 import type {
   Check,
@@ -87,7 +87,10 @@ function lines(output: string): StoryLine[] {
  * saved, so its message evidence names the run; without that, the newest run
  * on record is the best the controller can offer and is labelled as such.
  */
-function runFor(record: SavedInformation | undefined, executions: ExecutionRecord[]) {
+function runFor(
+  record: SavedInformation | undefined,
+  executions: ExecutionRecord[],
+) {
   const cited = record?.evidence.find((item) => item.type === "message");
   if (cited && "id" in cited) {
     const mine = executions.filter((item) => item.runId === cited.id);
@@ -109,7 +112,9 @@ function readableImage(image: string) {
   const tag = reference.includes(":") ? reference.split(":").at(-1) : null;
   if (tag) return tag;
   const name = reference.split("/").at(-1) ?? reference;
-  return digest ? `${name} · ${digest.replace("sha256:", "").slice(0, 12)}` : name;
+  return digest
+    ? `${name} · ${digest.replace("sha256:", "").slice(0, 12)}`
+    : name;
 }
 
 export function deploymentFromRecords({
@@ -183,16 +188,31 @@ export function deploymentFromRecords({
               : "Verified";
 
   const facts: LiveFact[] = [];
+  const services = content ? releasedServices(content) : [];
   if (content)
     facts.push({
       label: "Running",
       // A tag reads as a version; a digest-pinned reference does not. Taking
       // the text after the last colon gives "13.2.1" for one and a bare
       // 64-character hash for the other, so the two are read apart.
-      value: readableImage(content.image),
+      //
+      // Two services are two things running, so the headline counts them
+      // rather than picking one and implying it is the whole release.
+      value:
+        services.length > 1
+          ? `${services.length} services`
+          : services.length === 1
+            ? readableImage(services[0].image)
+            : "Not recorded",
       sub: content.server,
       exact: [
-        { label: "Image", value: content.image, mono: true },
+        ...services.map((service) => ({
+          label: service.process ? service.process : "Image",
+          value: service.digest
+            ? `${service.image.split("@")[0]} · ${service.digest.replace("sha256:", "").slice(0, 12)}`
+            : service.image,
+          mono: true,
+        })),
         { label: "Revision", value: content.revision.slice(0, 12), mono: true },
         { label: "Server", value: content.server },
       ],
@@ -204,12 +224,27 @@ export function deploymentFromRecords({
         access.mode === "private" ? "Only from this PC" : "On the internet",
       sub: accessRecord?.presentation?.url ?? "",
       exact: [
-        { label: "How", value: access.mode === "private" ? "SSH tunnel" : "Public address" },
+        {
+          label: "How",
+          value: access.mode === "private" ? "SSH tunnel" : "Public address",
+        },
         ...(access.localPort
-          ? [{ label: "Here", value: `127.0.0.1:${access.localPort}`, mono: true }]
+          ? [
+              {
+                label: "Here",
+                value: `127.0.0.1:${access.localPort}`,
+                mono: true,
+              },
+            ]
           : []),
         ...(access.remotePort
-          ? [{ label: "On the server", value: `${access.remotePort}`, mono: true }]
+          ? [
+              {
+                label: "On the server",
+                value: `${access.remotePort}`,
+                mono: true,
+              },
+            ]
           : []),
       ],
     });

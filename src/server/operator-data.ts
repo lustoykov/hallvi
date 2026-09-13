@@ -41,10 +41,31 @@ export const subjectKinds = [
   "monitor",
   "access",
   // Earned by Overview's Backups lane: without it nothing can say whether a
-  // copy exists, and "not assessed" would be the only reading forever. The
-  // kind is the whole addition — schedules, copies and restore tests stay
-  // deferred with the Backups destination.
+  // copy exists, and "not assessed" would be the only reading forever.
   "backup-plan",
+  // Earned by the Backups destination: a plan is not a copy, and a copy
+  // nobody restored is not protection. Each is separately absent-able.
+  "backup-copy",
+  "restore-test",
+  // Earned by Database, Cache & queue and Jobs. A volume is where bytes
+  // survive a restart; an engine that answers queries is a different thing,
+  // and a broker holds state it is allowed to lose. A queue has a depth and
+  // an age that the broker holding it does not.
+  "database",
+  "cache",
+  "queue",
+  "job",
+  // Earned by Environment Variables: the one subject whose value must never
+  // be recorded. It carries where the value came from and whether one is
+  // established, and the contract refuses a `value` key on it.
+  "variable",
+  // Earned by Domains, CDN and Security. A name resolves and is delegated,
+  // which a certificate only proves; caching is a claim about somebody
+  // else's edge; one firewall policy governs many doors and can itself be
+  // absent while the doors are known.
+  "domain",
+  "cdn",
+  "firewall",
 ] as const;
 export type SubjectKind = (typeof subjectKinds)[number];
 export const refSchema = z.strictObject({
@@ -93,7 +114,37 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
     kind: z.literal("deployment"),
     repositoryUrl: z.url().regex(/^https:\/\//),
     revision: z.string().regex(/^[0-9a-f]{7,64}$/),
-    image: z.string().min(1).max(300),
+    /**
+     * The one image, for a release that has one. Optional since `services`
+     * arrived, and required by the contract when `services` is absent: a
+     * release still has to say what it deployed. Every record written
+     * before `services` carries this and reads unchanged.
+     */
+    image: z.string().min(1).max(300).optional(),
+    /**
+     * A release with more than one image, said properly. A Grafana and
+     * Prometheus release has two, and one `image` field meant recording
+     * one of them against both — a false statement about what is running,
+     * not a rounding error.
+     *
+     * `image` is what was asked for and can change under you;`digest` is
+     * what actually ran. The first is configuration, the second identity.
+     */
+    services: z
+      .array(
+        z.strictObject({
+          /** The id of the `process` subject this image runs as. */
+          process: z.string().trim().min(1).max(120),
+          image: z.string().min(1).max(300),
+          digest: z
+            .string()
+            .regex(/^sha256:[0-9a-f]{64}$/)
+            .optional(),
+        }),
+      )
+      .min(1)
+      .max(12)
+      .optional(),
     server: z.string().min(1).max(200),
     changes: z.array(z.string().min(1).max(500)).max(10).default([]),
   }),

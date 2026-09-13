@@ -351,3 +351,49 @@ export function topologyOf(
   }
   return null;
 }
+
+export type Deployment = Extract<
+  NonNullable<Presentation["content"]>,
+  { kind: "deployment" }
+>;
+export interface ReleasedService {
+  /** The `process` subject this image runs as, when the record says. */
+  process: string | null;
+  /** What was asked for: a tag, which can change under you. */
+  image: string;
+  /** What actually ran, when it is known. */
+  digest: string | null;
+}
+
+/**
+ * What a release put on the server, in one shape.
+ *
+ * A release used to name one image, so a two-service release could only be
+ * recorded as one of them — Prometheus's digest stored against a Grafana
+ * deployment. `services` says it properly. This reads either, so no view has
+ * to know which shape it got, and a record written before `services` existed
+ * still answers the question it was always answering.
+ */
+export function releasedServices(content: Deployment): ReleasedService[] {
+  if (content.services?.length)
+    return content.services.map((service) => ({
+      process: service.process,
+      image: service.image,
+      digest: service.digest ?? digestIn(service.image),
+    }));
+  if (content.image)
+    return [
+      {
+        process: null,
+        image: content.image,
+        digest: digestIn(content.image),
+      },
+    ];
+  return [];
+}
+
+/** A digest pinned inside a reference — `name@sha256:…` — is still a digest. */
+function digestIn(image: string) {
+  const [, digest] = image.split("@");
+  return digest?.startsWith("sha256:") ? digest : null;
+}
