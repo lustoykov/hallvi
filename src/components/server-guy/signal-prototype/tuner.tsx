@@ -19,7 +19,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { lasting } from "../backup-prototype/model";
 import { ago, countWord, when } from "../stack-prototype/stack-model";
-import type { SignalDirectionProps } from "./index";
+import type { TunerProps } from "./signal-story";
 import { toneOf, type Look } from "./signal-model";
 import "./tuner.css";
 
@@ -257,7 +257,7 @@ export function TunerDirection({
   head,
   activity,
   onAsk,
-}: SignalDirectionProps) {
+}: TunerProps) {
   const failing = story.looks.find((look) => look.state === "failing") ?? null;
   const watching = story.watcher?.state === "running";
   const roles = new Map(

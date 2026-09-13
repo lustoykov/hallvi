@@ -168,6 +168,9 @@ export function recordedSections(
     // including a value Pi has asked the owner for and not yet been given.
     variables: secrets || waiting,
     cdn: states("cdn"),
+    // Backups and Monitoring are always listed: "nothing is watching" and
+    // "nothing has been established about copies" are the answers a reader
+    // most needs, and a destination that hides them says the opposite.
   } as Partial<Record<ApplicationSection, boolean>>;
 }
 

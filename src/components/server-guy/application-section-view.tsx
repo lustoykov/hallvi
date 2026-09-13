@@ -25,7 +25,9 @@ import { OverviewPage } from "./overview-page";
 import { DeploymentPage } from "./deployment-page";
 import { HistoryPage } from "./history-page";
 import { LogsPage } from "./logs-page";
+import { BackupsPage } from "./backups-page";
 import { DatabasePage } from "./database-page";
+import { MonitoringPage } from "./monitoring-page";
 import { ProcessesPage } from "./processes-page";
 import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
@@ -228,6 +230,28 @@ export function ApplicationSectionView({
     if (section === "storage")
       return (
         <StoragePage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "backups")
+      return (
+        <BackupsPage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "monitoring")
+      return (
+        <MonitoringPage
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}

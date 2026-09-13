@@ -55,6 +55,9 @@ const expiry: Record<Claim, number> = {
   liveness: 15 * 60 * 1000,
 };
 
+/** The subject kinds, re-exported so components can name one in a table. */
+export type SubjectKindOf = SubjectKind;
+
 export function refKey(ref: Ref) {
   return `${ref.kind}:${ref.id}`;
 }

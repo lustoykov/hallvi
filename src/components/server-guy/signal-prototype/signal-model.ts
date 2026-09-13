@@ -57,30 +57,11 @@ export interface Collection {
   lines: LogLine[];
   speakers: Speaker[];
 }
-export interface Look {
-  id: string;
-  /** What it looked at: a process's product name, or "Backups". */
-  part: string;
-  name: string;
-  /** The name without its product, for tight places: "Login page". */
-  short: string;
-  how: string;
-  kind: "check" | "output" | "backup";
-  at: string | null;
-  state: "passing" | "failing" | "unknown" | "seen";
-  detail: string | null;
-  /** Every time the record shows it, oldest first. */
-  evidence: { at: string; text: string }[];
-  invented: boolean;
-}
-export interface Unwatched {
-  id: string;
-  /** Where it belongs; null for the application as a whole. */
-  part: string | null;
-  title: string;
-  short: string;
-  detail: string;
-}
+// The two the Tuner design draws are shared with the records path, so they
+// live beside it rather than inside this builder.
+export type { Look, Unwatched } from "./signal-story";
+import type { Look, Unwatched } from "./signal-story";
+
 export interface SignalStory extends StackStory {
   /** Reads of the output, newest first. */
   collections: Collection[];

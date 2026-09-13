@@ -308,3 +308,59 @@ The Manifest design. The only page whose subject must never carry its value.
 There is no reveal control, because there is nothing behind it: a requested
 value is in the sealed store that has no read path to a page, and an ordinary
 variable's value was never recorded at all.
+
+# 7 · Backups
+
+The Calendar design. Three subjects, and the page is wrong if it merges any
+two of them: a **plan** says copies are meant to happen, a **copy** is one
+dated copy that exists, a **restore test** is the only evidence a copy is
+worth anything. A plan with no copies is a promise. Copies with no restore
+test are files nobody has opened.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| the schedule, in words | `backup-plan` fact `schedule` | planned | `configuration` | recorded |
+| where copies go | `backup-plan` fact `destination` | reported | `configuration` | recorded |
+| how many are kept | `backup-plan` fact `keep` | planned | `configuration` | recorded |
+| what the plan covers | `backup-plan` fact `covers` (volume ids) | planned | `configuration` | recorded |
+| each dot on the calendar | one `backup-copy` subject, at its `establishedAt` | observed | `identity` | recorded — **counted, never incremented** |
+| a copy's size and destination | `backup-copy` facts `size` `destination` | observed | `contents` | recorded |
+| the restore ticks | `restore-test` checks | observed | `identity` | recorded |
+| "kept through a replacement" | `volume` check `persistence` | observed | `configuration` | recorded |
+
+**Empty and partial.** Nothing at all → "Not assessed", and specifically *not*
+"no backups": Server Guy not having looked is not the same as there being
+none. A plan and no copies → the plan is drawn with an empty calendar and the
+page says the promise has not produced anything yet. Copies and no restore
+test → the copies are drawn and the restore tick is explicitly untested, which
+is the state most systems are actually in and the one worth naming.
+
+**Never inferred.** That a copy is good. Only a `restore-test` says that, and
+its absence is drawn as an absence rather than left out.
+
+# 8 · Monitoring
+
+The Tuner design: one station per part, each showing what is watched there and
+what is not.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| a station | one part of the map that has a subject | — | — | derived |
+| what is watched there | every check on that part's subject | observed | the check's own claim | recorded |
+| when it was last looked at | that check's record `establishedAt` | — | — | derived |
+| pass / fail / unknown | the check's status, aged by its claim | observed | per claim | derived from both |
+| the watcher | `monitor:<id>` presence + check `answering` | observed | `liveness` | recorded |
+| what it watches | `monitor` fact `target` | reported | `configuration` | recorded |
+| how often | `monitor` fact `interval` | reported | `configuration` | recorded |
+| who hears about it | `monitor` fact `notifies` | reported | `configuration` | recorded |
+| CPU / memory / disk | `host` facts `cpu` `memory` `disk` | observed | `contents` | recorded |
+| the unwatched gaps | parts with no live check, plus a fixed list of what Server Guy cannot watch | — | — | derived |
+
+**The distinction this page exists to make.** A check that ran once and passed
+is not monitoring. Without a `monitor` subject stating something is watching,
+every station reads "looked at once, not watched" however green its last
+result was — because that is the truth, and the page whose job is to say
+whether you would hear about a problem must not imply you would.
+
+**Never inferred.** That anything is being watched continuously. `invented` is
+always null on records; it exists only in the isolated visual reference.

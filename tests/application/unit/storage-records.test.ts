@@ -6,6 +6,7 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 
+import { protectionFromRecords } from "@/components/server-guy/backups-records";
 import { storageFromRecords } from "@/components/server-guy/storage-records";
 import {
   APP,
@@ -127,5 +128,90 @@ describe("storageFromRecords", () => {
     ]);
     expect(story.disk).toBeNull();
     expect(story.volumes[0].sizeGb).toBeCloseTo(0.22, 5);
+  });
+});
+
+describe("backups, from the same records", () => {
+  const read2 = (
+    records: Parameters<typeof storageFromRecords>[0]["records"],
+  ) => protectionFromRecords(records, NOW);
+
+  it("nothing recorded is not assessed, and never 'no backups'", () => {
+    const protection = read2([]);
+    expect(protection.assessed).toBe(false);
+    expect(protection.copies).toEqual([]);
+    expect(protection.summary.backup).toBeNull();
+  });
+
+  it("a plan with no copies is a promise that has produced nothing", () => {
+    const protection = read2([
+      states(
+        { kind: "backup-plan", id: "nightly" },
+        { facts: [fact("schedule", "Daily at 03:30"), fact("keep", "7")] },
+      ),
+    ]);
+    expect(protection.assessed).toBe(true);
+    expect(protection.summary.schedule?.words).toBe("Daily at 03:30");
+    expect(protection.summary.keep).toBe(7);
+    expect(protection.copies).toEqual([]);
+    expect(protection.summary.backup).toBeNull();
+  });
+
+  it("counts copies as records rather than a number someone incremented", () => {
+    const protection = read2([
+      states(
+        { kind: "backup-copy", id: "c1" },
+        {
+          at: "2026-09-12T03:30:00.000Z",
+          facts: [fact("size", "11 MB", "contents")],
+        },
+      ),
+      states(
+        { kind: "backup-copy", id: "c2" },
+        {
+          at: "2026-09-13T03:30:00.000Z",
+          facts: [fact("size", "12 MB", "contents")],
+        },
+      ),
+    ]);
+    expect(protection.copies.map((copy) => copy.id)).toEqual(["c2", "c1"]);
+    expect(protection.summary.backup?.at).toBe("2026-09-13T03:30:00.000Z");
+  });
+
+  it("never lets a copy imply it is any good", () => {
+    const protection = read2([
+      states(
+        { kind: "backup-copy", id: "c1" },
+        { at: "2026-09-13T03:30:00.000Z" },
+      ),
+    ]);
+    expect(protection.restores).toEqual([]);
+    expect(protection.checks).toEqual([]);
+    expect(protection.summary.restore).toBeNull();
+  });
+
+  it("marks a restore's own checks as proof, and anything else as untested", () => {
+    const protection = read2([
+      states(
+        { kind: "restore-test", id: "t1" },
+        {
+          at: "2026-09-13T04:00:00.000Z",
+          checks: [
+            check("restored", "passed"),
+            check("started", "info", "liveness"),
+          ],
+        },
+      ),
+    ]);
+    expect(protection.checks).toEqual([
+      { label: "restored", state: "pass" },
+      { label: "started", state: "untested" },
+    ]);
+  });
+
+  it("a copy with no time established nothing, so it is not a dot", () => {
+    expect(
+      read2([states({ kind: "backup-copy", id: "c1" }, { at: null })]).copies,
+    ).toEqual([]);
   });
 });
