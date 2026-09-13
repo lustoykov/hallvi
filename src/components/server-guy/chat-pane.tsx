@@ -30,6 +30,18 @@ import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
 import { OperatorConsole } from "./operator-console";
 import { SecretRequests, type SecretRequest } from "./secret-request";
+// PROTOTYPE — remove with secret-request-prototype.{tsx,css} once a
+// variant wins. Inert unless ?secrets=A|B|C is on the URL.
+import {
+  SecretsSwitcher,
+  useSecretsVariant,
+  VariantAChip,
+  VariantATranscript,
+  VariantBComposer,
+  VariantBStrip,
+  VariantCLine,
+  VariantCSheet,
+} from "./secret-request-prototype";
 import { OperationReceipt, OperationReferences } from "./operation-receipt";
 import type { RecordReference } from "./record-references";
 
@@ -314,6 +326,11 @@ export function ChatPane({
   // that is when a request appears, and once afterwards so the field goes
   // away when the turn that needed it has finished.
   const [secrets, setSecrets] = useState<SecretRequest[]>([]);
+  // PROTOTYPE state — null when no ?secrets= variant is asked for.
+  const variant = useSecretsVariant();
+  const [secretMode, setSecretMode] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const waitingSecrets = secrets.filter((item) => !item.establishedAt);
 
   /**
    * Where each saved record is shown in full.
@@ -377,13 +394,6 @@ export function ChatPane({
         <div className="sg-busy-bar" aria-hidden="true" />
       )}
 
-      {view.application && chatId && view.chats[0]?.id === chatId && (
-        <SecretRequests
-          applicationId={view.application.id}
-          secrets={secrets}
-          onChanged={setSecrets}
-        />
-      )}
       {view.application && chatId && view.chats[0]?.id === chatId && (
         <OperatorConsole
           key={`settings:${view.application.id}:${chatId}`}
@@ -670,82 +680,149 @@ export function ChatPane({
               {error}
             </div>
           )}
+          {/* PROTOTYPE A — the request as a message, in the flow. */}
+          {variant === "A" && view.application && (
+            <VariantATranscript
+              applicationId={view.application.id}
+              waiting={waitingSecrets}
+              onChanged={setSecrets}
+            />
+          )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
-      <form
-        className="sg-composer"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSend();
-        }}
-      >
-        {archived && (
-          <p className="sg-archived-notice">
-            This chat is archived and read-only. Choose an active chat or start
-            a new one.
-          </p>
-        )}
-        {application && !piReady && (
-          <div className="sg-pi-required">
-            <WarningCircle weight="bold" />
-            <div>
-              <strong>Connect ChatGPT to chat</strong>
-              <p>Your applications and chat history are still available.</p>
-            </div>
-            <Link href="/setup/pi">Open Settings</Link>
-          </div>
-        )}
-        <div
-          className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
+      {/* A request for a value belongs where you act on it, not above the
+          conversation. It used to be the first thing in the chat pane — a
+          full-bleed 563px wall stacked above every message, pushing the
+          transcript down and colliding with the permissions strip. It sits
+          with the composer now, on the same measure as the messages. */}
+      {view.application && chatId && view.chats[0]?.id === chatId && (
+        <>
+          {variant === null && (
+            <SecretRequests
+              applicationId={view.application.id}
+              secrets={secrets}
+              onChanged={setSecrets}
+            />
+          )}
+          {/* PROTOTYPE — each variant puts something different here, and A
+              puts almost nothing, which is the point of A. */}
+          {variant === "A" && <VariantAChip waiting={waitingSecrets} />}
+          {variant === "B" && (
+            <VariantBStrip
+              waiting={waitingSecrets}
+              mode={secretMode}
+              onMode={setSecretMode}
+            />
+          )}
+          {variant === "C" && (
+            <VariantCLine
+              waiting={waitingSecrets}
+              onOpen={() => setSheetOpen(true)}
+            />
+          )}
+        </>
+      )}
+
+      {/* PROTOTYPE C — the sheet itself, over the pane. */}
+      {variant === "C" && sheetOpen && view.application && (
+        <VariantCSheet
+          applicationId={view.application.id}
+          waiting={waitingSecrets}
+          onChanged={setSecrets}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
+
+      {/* PROTOTYPE B — the same box, pointed somewhere else. */}
+      {variant === "B" &&
+      secretMode &&
+      view.application &&
+      waitingSecrets.some((item) => item.name === secretMode) ? (
+        <VariantBComposer
+          key={secretMode}
+          applicationId={view.application.id}
+          secret={waitingSecrets.find((item) => item.name === secretMode)!}
+          onChanged={setSecrets}
+          onDone={() => setSecretMode(null)}
+        />
+      ) : (
+        <form
+          className="sg-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSend();
+          }}
         >
-          <textarea
-            disabled={composerDisabled}
-            id="pi-composer"
-            aria-label="Message Server Guy"
-            onChange={(event) => onComposerChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                if (!busy) event.currentTarget.form?.requestSubmit();
+          {archived && (
+            <p className="sg-archived-notice">
+              This chat is archived and read-only. Choose an active chat or
+              start a new one.
+            </p>
+          )}
+          {application && !piReady && (
+            <div className="sg-pi-required">
+              <WarningCircle weight="bold" />
+              <div>
+                <strong>Connect ChatGPT to chat</strong>
+                <p>Your applications and chat history are still available.</p>
+              </div>
+              <Link href="/setup/pi">Open Settings</Link>
+            </div>
+          )}
+          <div
+            className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
+          >
+            <textarea
+              disabled={composerDisabled}
+              id="pi-composer"
+              aria-label="Message Server Guy"
+              onChange={(event) => onComposerChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  if (!busy) event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder={
+                archived
+                  ? "This chat is archived"
+                  : !piReady
+                    ? "Connect ChatGPT in Settings to chat"
+                    : application
+                      ? "Ask Server Guy, correct a decision, or add context…"
+                      : "Add an application to start chatting"
               }
-            }}
-            placeholder={
-              archived
-                ? "This chat is archived"
-                : !piReady
-                  ? "Connect ChatGPT in Settings to chat"
-                  : application
-                    ? "Ask Server Guy, correct a decision, or add context…"
-                    : "Add an application to start chatting"
-            }
-            rows={2}
-            value={composer}
-          />
-          <div className="sg-composer-bar">
-            <span className="sg-composer-hint">
-              <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
-            </span>
-            <button
-              className="sg-send"
-              disabled={!composer.trim() || composerDisabled || busy !== null}
-              type="submit"
-            >
-              {busy === "message" ? (
-                <SpinnerGap className="spin" aria-hidden="true" />
-              ) : (
-                <PaperPlaneRight weight="fill" aria-hidden="true" />
-              )}
-              Send
-            </button>
+              rows={2}
+              value={composer}
+            />
+            <div className="sg-composer-bar">
+              <span className="sg-composer-hint">
+                <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
+              </span>
+              <button
+                className="sg-send"
+                disabled={!composer.trim() || composerDisabled || busy !== null}
+                type="submit"
+              >
+                {busy === "message" ? (
+                  <SpinnerGap className="spin" aria-hidden="true" />
+                ) : (
+                  <PaperPlaneRight weight="fill" aria-hidden="true" />
+                )}
+                Send
+              </button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      )}
+
+      {variant && <SecretsSwitcher current={variant} />}
     </section>
   );
 }
