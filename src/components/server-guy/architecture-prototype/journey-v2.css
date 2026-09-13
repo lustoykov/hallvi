@@ -551,7 +551,9 @@
   font-size: 11.5px;
   font-weight: 560;
   color: var(--ax-muted);
-  white-space: nowrap;
+  /* "Helsinki (hel1)" was cut at the narrower desktop width. It is three
+     words, not an identifier, so it wraps rather than losing its region. */
+  text-wrap: pretty;
   transition: color 600ms;
 }
 .axj2-status i {

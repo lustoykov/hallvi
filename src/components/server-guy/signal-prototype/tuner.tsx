@@ -129,6 +129,14 @@ function Radio({
         className="axtu-glass"
         role="radiogroup"
         aria-label="Stations"
+        /* Stations sit at fixed points along the dial but were sized by their
+           own labels, so seven of them overlapped each other by as much as
+           44px — two controls on the same pixels, which is the one thing a
+           diagram must never do. Each one is now given the slot it actually
+           has, and keeps its full name for hover. */
+        style={{
+          ["--axtu-slot" as string]: count > 1 ? `${84 / (count - 1)}%` : "60%",
+        }}
         onKeyDown={(event) => {
           const next = {
             ArrowRight: tuned + 1,
@@ -163,6 +171,7 @@ function Radio({
               tabIndex={index === tuned ? 0 : -1}
               className="axtu-station"
               data-state={station.state}
+              title={station.name}
               style={{ left: `${placeOf(index, count)}%` }}
               onClick={() => onTune(index)}
             >

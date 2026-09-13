@@ -120,12 +120,41 @@
   width: auto;
   padding: 5px;
 }
+/* The destinations and conversations scroll; identity and Settings stay put.
+   Without this the column simply grew past the window: on an application with
+   the full set of destinations, the conversations list came to rest 27px on
+   top of the Settings link, so two controls occupied the same pixels on every
+   page of that application. The information architecture is untouched — the
+   groups, their order and "Show more" are exactly as they were; the column
+   they live in can now be scrolled when it is taller than the screen. */
+.sg-application-navigation > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d3d9e4 transparent;
+}
+.sg-application-navigation > nav::-webkit-scrollbar {
+  width: 8px;
+}
+.sg-application-navigation > nav::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  background-color: #d3d9e4;
+}
+.sg-application-navigation > nav::-webkit-scrollbar-thumb:hover {
+  background-color: #bcc5d4;
+}
 .sg-navigation-settings {
   display: flex;
+  flex: none;
   gap: 10px;
   align-items: center;
-  padding: 16px 10px 0;
+  padding: 14px 10px 0;
   margin-top: auto;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   text-decoration: none;
 }

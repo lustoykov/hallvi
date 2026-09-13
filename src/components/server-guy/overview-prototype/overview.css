@@ -361,12 +361,19 @@
 .axo-recent-row:disabled {
   cursor: default;
 }
+/* A record's title is the row's whole meaning, so it wraps rather than being
+   cut. On one line at this width it produced "AWS_SECRET_ACCESS_KEY is
+   established for bac…" and "Daily backup protects only PostgreSQL volume…",
+   where the missing word is the one that says what the record is about. */
 .axo-recent-row b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   font-size: 13px;
   font-weight: 560;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 .axo-recent-row small {
   grid-column: 2;
