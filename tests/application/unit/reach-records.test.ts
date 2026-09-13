@@ -377,3 +377,184 @@ describe("the wall a deny-by-default firewall makes", () => {
     expect(read([]).doors.some((door) => door.id === "rest")).toBe(false);
   });
 });
+
+// A configured name and a working application are two different claims, and
+// the gap between them is where a proxied name lives: it resolves, it serves
+// a valid certificate, and the origin behind it is dead. Every case here is
+// one that used to read as success.
+describe("a name, and whether anything answers on it", () => {
+  const domain = { kind: "domain" as const, id: "shop-name" };
+
+  const named = (
+    checks: ReturnType<typeof check>[],
+    facts: ReturnType<typeof fact>[] = [],
+    at = "2026-09-13T12:00:00.000Z",
+  ) =>
+    read([
+      states(domain, {
+        at,
+        facts: [
+          fact("name", "shop.example.com", "identity"),
+          fact("registrar", "Cloudflare"),
+          ...facts,
+        ],
+        checks,
+      }),
+    ]);
+
+  it("a record nobody has resolved is not a resolving name", () => {
+    const story = named(
+      [check("configured", "passed", "configuration")],
+      [fact("origin", "203.0.113.7")],
+    );
+    expect(story.domain?.state).toBe("pending-dns");
+    expect(story.domain?.detail).toMatch(/holds the record/);
+    expect(story.domain?.detail).toMatch(/Nobody has resolved/);
+  });
+
+  it("a name that resolves does not mean the application answers", () => {
+    const story = named([check("resolves", "passed")]);
+    expect(story.domain?.state).toBe("resolving");
+    expect(story.domain?.detail).toMatch(/Nothing has checked what answers/);
+    const caller = story.callers.find((item) => item.id === "domain");
+    expect(caller?.outcome).not.toBe("loads");
+    expect(caller?.sure).toBe("asked");
+  });
+
+  it("a valid certificate is not evidence the application answers", () => {
+    // The case that mattered: under a proxy the certificate belongs to the
+    // proxy and is valid while the origin is down.
+    const story = read([
+      states(domain, {
+        at: "2026-09-13T12:00:00.000Z",
+        facts: [
+          fact("name", "shop.example.com", "identity"),
+          fact("proxied", "true"),
+        ],
+        checks: [check("resolves", "passed")],
+      }),
+      states(
+        { kind: "certificate", id: "shop-cert" },
+        {
+          at: "2026-09-13T12:00:00.000Z",
+          facts: [fact("issuer", "Cloudflare Inc ECC CA-3")],
+          checks: [check("valid", "passed", "configuration")],
+        },
+      ),
+    ]);
+    expect(story.tls.state).toBe("valid");
+    expect(story.domain?.state).toBe("resolving");
+    expect(
+      story.callers.find((item) => item.id === "domain")?.outcome,
+    ).not.toBe("loads");
+  });
+
+  it("a configured, proxied name whose application does not answer is unreachable", () => {
+    const story = named(
+      [
+        check("configured", "passed", "configuration"),
+        check("resolves", "passed"),
+        check("serves", "failed", "reachability", {
+          detail:
+            "Cloudflare returned 522 after 15s; the origin never answered.",
+        }),
+      ],
+      [fact("origin", "46.62.253.6"), fact("proxied", "true")],
+    );
+    expect(story.domain?.state).toBe("unreachable");
+    expect(story.domain?.proxied).toBe(true);
+    expect(story.domain?.origin).toBe("46.62.253.6");
+    const caller = story.callers.find((item) => item.id === "domain");
+    expect(caller?.outcome).toBe("no-answer");
+    expect(caller?.headline).toMatch(/does not/i);
+    expect(caller?.detail).toMatch(/522/);
+  });
+
+  it("only a serves check makes the name read as working", () => {
+    const story = named([
+      check("resolves", "passed"),
+      check("serves", "passed", "reachability", {
+        detail: "HTTP 200 in 120ms.",
+      }),
+    ]);
+    expect(story.domain?.state).toBe("serving");
+    expect(story.callers.find((item) => item.id === "domain")?.outcome).toBe(
+      "loads",
+    );
+  });
+
+  it("a name that served a week ago is not serving now", () => {
+    // Reachability ages. The reading keeps its detail and loses its green.
+    const story = named(
+      [check("resolves", "passed"), check("serves", "passed")],
+      [],
+      "2026-09-01T12:00:00.000Z",
+    );
+    expect(story.domain?.state).toBe("resolving");
+    expect(story.domain?.detail).toMatch(/last checked/);
+  });
+
+  it("a failure survives ageing, and stays a failure", () => {
+    const story = named(
+      [check("resolves", "passed"), check("serves", "failed")],
+      [],
+      "2026-08-01T12:00:00.000Z",
+    );
+    expect(story.domain?.state).toBe("unreachable");
+  });
+
+  it("a name that does not resolve says so, above everything else", () => {
+    const story = named([
+      check("configured", "passed", "configuration"),
+      check("resolves", "failed", "reachability", {
+        detail: "NXDOMAIN from 1.1.1.1.",
+      }),
+    ]);
+    expect(story.domain?.state).toBe("failed");
+    expect(story.callers.find((item) => item.id === "domain")?.outcome).toBe(
+      "no-name",
+    );
+  });
+
+  it("says when the record points somewhere this application is not", () => {
+    const story = read([
+      states(
+        { kind: "host", id: "host-1" },
+        { facts: [fact("address", "192.0.2.10")] },
+      ),
+      states(domain, {
+        at: "2026-09-13T12:00:00.000Z",
+        facts: [
+          fact("name", "shop.example.com", "identity"),
+          fact("origin", "46.62.253.6"),
+        ],
+        checks: [check("resolves", "passed")],
+      }),
+    ]);
+    expect(story.domain?.concern).toMatch(/46\.62\.253\.6/);
+    expect(story.domain?.concern).toMatch(/192\.0\.2\.10/);
+  });
+
+  it("says nothing about a mismatch when the origin is this server", () => {
+    const story = read([
+      states(
+        { kind: "host", id: "host-1" },
+        { facts: [fact("address", "192.0.2.10")] },
+      ),
+      states(domain, {
+        at: "2026-09-13T12:00:00.000Z",
+        facts: [
+          fact("name", "shop.example.com", "identity"),
+          fact("origin", "192.0.2.10"),
+        ],
+        checks: [check("resolves", "passed")],
+      }),
+    ]);
+    expect(story.domain?.concern).toBeNull();
+  });
+
+  it("an absent domain is an absence, and a missing one is nobody looking", () => {
+    expect(read([]).domain).toBeNull();
+    expect(read([states(domain, { presence: "absent" })]).domain).toBeNull();
+  });
+});

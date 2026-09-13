@@ -15,6 +15,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import type { ReachProps } from "./reach-story";
 import { countWord } from "../stack-prototype/stack-model";
+import type { Tone } from "../deployment-prototype/deployment-model";
 import { ago, when, type Caller } from "./reach-model";
 import "./callers.css";
 
@@ -39,6 +40,12 @@ const screen: Record<Caller["outcome"], { title: string; body: string }> = {
     title: "Nothing answers securely",
     body: "No certificate, and nothing listening on the secure port.",
   },
+  // The name worked and the application did not. Said in the browser's voice
+  // because that is what a visitor gets: a page, just not this application's.
+  "no-answer": {
+    title: "This page isn’t working",
+    body: "The name resolved and the connection was made. Nothing came back from the application.",
+  },
 };
 
 export function CallersDirection({
@@ -56,6 +63,31 @@ export function CallersDirection({
     (caller) => caller.outcome === "loads",
   ).length;
 
+  // The headline tag is the most prominent claim on the page, so it is the
+  // one that must not overstate. A domain record existing means somebody
+  // wrote a name down; only the serves check means the application answers
+  // on it. These were the same sentence once, and a proxied name that timed
+  // out read as "Answering on ..." in green.
+  const domain = story.domain;
+  const domainTone: Tone = !domain
+    ? "planned"
+    : domain.state === "serving"
+      ? "verified"
+      : domain.state === "failed" || domain.state === "unreachable"
+        ? "failed"
+        : "planned";
+  const domainWord = !domain
+    ? "No name, no certificate"
+    : domain.state === "serving"
+      ? `Answering on ${domain.name}`
+      : domain.state === "unreachable"
+        ? `${domain.name} does not answer`
+        : domain.state === "failed"
+          ? `${domain.name} does not resolve`
+          : domain.state === "resolving"
+            ? `${domain.name} resolves; what answers is unchecked`
+            : `${domain.name} is on record; nobody has resolved it`;
+
   return (
     <section className="axca" aria-label="Domains">
       {head}
@@ -64,25 +96,38 @@ export function CallersDirection({
         <div>
           <h2>
             {named
-              ? `Four ways to knock, and ${
+              ? `${countWord(story.callers.length)} way${story.callers.length === 1 ? "" : "s"} to knock, and ${
                   reachable === story.callers.length
                     ? "every one of them gets"
-                    : `${countWord(reachable).toLowerCase()} of them get`
+                    : reachable === 1
+                      ? "one of them gets"
+                      : `${countWord(reachable).toLowerCase()} of them get`
                 } ${story.name}.`
               : `Only one kind of visitor reaches ${story.name} today.`}
           </h2>
           <p>
-            <Tag tone={named ? "verified" : "planned"}>
-              {named
-                ? `Answering on ${story.domain!.name}`
-                : "No name, no certificate"}
-            </Tag>
+            <Tag tone={domainTone}>{domainWord}</Tag>
             <span>
               Each window is what the record says a visitor would meet. None of
               it is being tried now: the only knocks on record are the
               deployment’s own checks.
             </span>
           </p>
+          {domain && (domain.origin || domain.concern) && (
+            <p className="axca-record">
+              {domain.origin && (
+                <span className="axca-record-line">
+                  The record sends {domain.name} to <code>{domain.origin}</code>
+                  {domain.proxied
+                    ? `, and ${domain.provider === "cloudflare" ? "Cloudflare" : "the provider"} answers for the name rather than handing that address out.`
+                    : "."}
+                </span>
+              )}
+              {domain.concern && (
+                <span className="axca-record-concern">{domain.concern}</span>
+              )}
+            </p>
+          )}
         </div>
         <button
           type="button"

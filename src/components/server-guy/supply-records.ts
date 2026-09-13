@@ -250,7 +250,12 @@ export function supplyFromRecords({
   const cdnRef = subjectsOfKind(live, "cdn")[0] ?? null;
   const cdnPresence = cdnRef ? presenceOf(live, cdnRef) : null;
   const cdnFacts = cdnRef ? currentFacts(live, cdnRef) : null;
-  const caching = cdnRef ? currentChecks(live, cdnRef).get("caching") : null;
+  const cdnChecks = cdnRef ? currentChecks(live, cdnRef) : null;
+  const caching = cdnChecks?.get("caching") ?? null;
+  // A cache in front and a working origin behind it are two facts, and only
+  // the second one decides what a visitor gets. Kept apart so a page cannot
+  // report "cached by Cloudflare" as though it meant the site is up.
+  const originCheck = cdnChecks?.get("origin-reachable") ?? null;
 
   const protection = protectionFromRecords(live, now);
   const recurring: Recurring[] = protection.schedules.map((schedule) => ({
@@ -281,13 +286,22 @@ export function supplyFromRecords({
         Boolean(cdnPresence?.known && cdnPresence.presence === "present") &&
         caching?.value.status !== "failed",
       provider: cdnFacts?.get("provider")?.value.value ?? null,
+      origin: cdnFacts?.get("origin")?.value.value ?? null,
+      originReachable: !originCheck
+        ? "unchecked"
+        : originCheck.value.status === "failed"
+          ? "no"
+          : "yes",
       detail:
         cdnPresence?.known && cdnPresence.presence === "absent"
           ? "Nothing caches in front of this application."
-          : cdnRef
-            ? (cdnFacts?.get("covers")?.value.value ??
-              "What it covers has not been recorded.")
-            : "Nobody has looked at whether a cache sits in front.",
+          : !cdnRef
+            ? "Nobody has looked at whether a cache sits in front."
+            : originCheck?.value.status === "failed"
+              ? (originCheck.value.detail ??
+                "The cache is in front, and it cannot get an answer out of the origin behind it.")
+              : (cdnFacts?.get("covers")?.value.value ??
+                "What it covers has not been recorded."),
     },
     brokers,
     queues,

@@ -27,6 +27,7 @@ import { processesFromRecords } from "./processes-records";
 import { databaseFromRecords } from "./database-records";
 import type {
   Caller,
+  DomainState,
   Door,
   Guard,
   Hole,
@@ -226,12 +227,82 @@ export function reachFromRecords({
   const sshRead = ssh ? checkAsNow(ssh.value, ssh.record, now) : null;
 
   // ---- The name and the certificate.
+  //
+  // Three checks, three different questions, and the whole point of keeping
+  // them apart: `configured` is what the provider holds, `resolves` is what
+  // public DNS returns, and `serves` is whether the application answers when
+  // somebody asks for the name. Only the third one is about the application.
+  // A proxied name resolves to the provider and serves the provider's
+  // certificate while the origin behind it is dead, so inferring "it loads"
+  // from a name that resolves, or from a valid certificate, reports a broken
+  // site as a working one.
   const domainRef = subjectsOfKind(live, "domain")[0] ?? null;
   const domainPresence = domainRef ? presenceOf(live, domainRef) : null;
   const domainFacts = domainRef ? currentFacts(live, domainRef) : null;
   const domainChecks = domainRef ? currentChecks(live, domainRef) : null;
+  const recordHeld = domainChecks?.get("configured");
   const resolves = domainChecks?.get("resolves");
   const serves = domainChecks?.get("serves");
+  const servesRead = serves
+    ? checkAsNow(serves.value, serves.record, now)
+    : null;
+  const resolvesRead = resolves
+    ? checkAsNow(resolves.value, resolves.record, now)
+    : null;
+  const proxied = /^(true|yes|proxied)$/i.test(
+    domainFacts?.get("proxied")?.value.value ?? "",
+  );
+  const origin = domainFacts?.get("origin")?.value.value ?? null;
+
+  /**
+   * A stale `serves` deliberately falls back to "resolves, and what answers
+   * was last seen a while ago" rather than keeping a green state: the reading
+   * ages, and the detail line carries when it was taken.
+   */
+  const domainState: DomainState["state"] =
+    servesRead === "verified"
+      ? "serving"
+      : resolvesRead === "failed"
+        ? "failed"
+        : servesRead === "failed"
+          ? "unreachable"
+          : resolvesRead === "verified" || resolvesRead === "stale"
+            ? "resolving"
+            : "pending-dns";
+
+  const domainDetail = () => {
+    if (domainState === "serving")
+      return serves!.value.detail ?? serves!.value.label;
+    if (domainState === "failed")
+      return resolves!.value.detail ?? resolves!.value.label;
+    if (domainState === "unreachable")
+      return (
+        serves!.value.detail ??
+        `The name is configured${proxied ? " and proxied" : ""}, and the application did not answer through it.`
+      );
+    if (domainState === "resolving")
+      return servesRead === "stale"
+        ? `It resolved, and what answers behind it was last checked ${(serves!.record.establishedAt ?? "").slice(0, 10) || "at an unrecorded time"}.`
+        : (resolves?.value.detail ??
+            "It resolves. Nothing has checked what answers behind it.");
+    return recordHeld?.value.status === "passed"
+      ? `The provider holds the record${origin ? `, pointing at ${origin}` : ""}. Nobody has resolved the name yet.`
+      : (domainFacts?.get("records")?.value.value ??
+          "Nothing has checked whether it resolves.");
+  };
+
+  /**
+   * The record can be in perfect order and point somewhere this application
+   * is not. Nothing else on the page would ever say so, and a reader would
+   * spend the afternoon on DNS.
+   */
+  const hostAddress = host
+    ? (currentFacts(live, host).get("address")?.value.value ?? null)
+    : null;
+  const concern =
+    origin && hostAddress && origin !== hostAddress
+      ? `The record points at ${origin}. This application's server is ${hostAddress}.`
+      : null;
 
   const certRef = subjectsOfKind(live, "certificate")[0] ?? null;
   const certFacts = certRef ? currentFacts(live, certRef) : null;
@@ -274,28 +345,40 @@ export function reachFromRecords({
         at:
           guards.find((guard) => guard.id === `refused:${door.id}`)?.at ?? null,
       });
-  if (domainRef && resolves)
+  // What a visitor typing the name actually gets. `loads` is reachable only
+  // from the serves check: a resolving name proves the internet can find the
+  // provider, and a valid certificate proves the provider has one. Neither is
+  // the application. Under a proxy both are true of a site that is down.
+  if (domainRef && (resolves || serves))
     callers.push({
       id: "domain",
       who: "Anyone typing the name",
       from: "the internet",
       typed: domainFacts?.get("name")?.value.value ?? domainRef.id,
       outcome:
-        resolves.value.status === "failed"
+        domainState === "failed"
           ? "no-name"
-          : validRead === "verified"
-            ? "loads"
-            : "insecure",
+          : domainState === "unreachable"
+            ? "no-answer"
+            : domainState === "serving"
+              ? validRead === "verified" || !certRef
+                ? "loads"
+                : "insecure"
+              : "no-answer",
       secure: validRead === "verified",
       headline:
-        resolves.value.status === "failed"
+        domainState === "failed"
           ? "The name does not resolve"
-          : serves?.value.status === "passed"
+          : domainState === "serving"
             ? "The name reaches this application"
-            : "The name resolves; nothing has checked what answers",
-      detail: resolves.value.detail ?? resolves.value.label,
-      sure: "proved",
-      at: resolves.record.establishedAt,
+            : domainState === "unreachable"
+              ? proxied
+                ? `${domainFacts?.get("registrar")?.value.value ?? "The provider"} answers; the application does not`
+                : "The name resolves; the application does not answer"
+              : "The name resolves; nothing has checked what answers",
+      detail: domainDetail(),
+      sure: domainState === "resolving" && !serves ? "asked" : "proved",
+      at: (serves ?? resolves)!.record.establishedAt,
     });
 
   // ---- What is unguarded. Only what a record supports, plus what nothing
@@ -347,16 +430,11 @@ export function reachFromRecords({
             )
               ? "cloudflare"
               : "external",
-            state:
-              resolves?.value.status === "failed"
-                ? "failed"
-                : resolves?.value.status === "passed"
-                  ? "resolving"
-                  : "pending-dns",
-            detail:
-              resolves?.value.detail ??
-              domainFacts?.get("records")?.value.value ??
-              "Nothing has checked whether it resolves.",
+            state: domainState,
+            detail: domainDetail(),
+            origin,
+            proxied,
+            concern,
           }
         : null,
     tls: certRef

@@ -199,3 +199,61 @@ export function r2UploadGaps() {
     "The account's S3 endpoint",
   ];
 }
+
+export interface DomainReading {
+  name: string;
+  /** The zone the name belongs to, when the token can see one. */
+  zone: string | null;
+  /** The record as the provider holds it, or null when there is none. */
+  record: CloudflareRecord | null;
+  /**
+   * Whether the provider answers on the name's behalf. Kept separate from
+   * `record` because a proxied name and a direct name fail in different
+   * ways, and a reader has to be told which one they have.
+   */
+  proxied: boolean;
+}
+
+/**
+ * What the provider holds for one name. This is a *configuration* reading and
+ * nothing more: it says a record exists and where it points, and it is never
+ * evidence that anything answers at the other end. A proxied name in
+ * particular resolves, serves a valid certificate and returns an error page
+ * while the origin behind it is entirely dead.
+ *
+ * Returns a reading with a null record when the zone is visible and the name
+ * is simply not in it — that is an established absence, not a failure — and
+ * throws only when the provider could not be asked.
+ */
+export async function cloudflareDomain(name: string): Promise<DomainReading> {
+  const wanted = name.trim().toLowerCase().replace(/\.$/, "");
+  if (
+    !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(
+      wanted,
+    )
+  )
+    throw new Error(`"${name}" is not a domain name.`);
+  const zones = await cloudflareZones();
+  // The longest matching zone wins: a name can sit under both example.com
+  // and a delegated sub.example.com, and the more specific one holds it.
+  const zone = zones
+    .filter((item) => wanted === item.name || wanted.endsWith(`.${item.name}`))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  if (!zone)
+    throw new Error(
+      `No zone this token can see covers ${wanted}. The name may be at another provider, or the token may not reach its zone.`,
+    );
+  const records = await cloudflareRecords(zone.id);
+  const record =
+    records.find(
+      (item) =>
+        item.name.toLowerCase() === wanted &&
+        /^(A|AAAA|CNAME)$/.test(item.type),
+    ) ?? null;
+  return {
+    name: wanted,
+    zone: zone.name,
+    record,
+    proxied: Boolean(record?.proxied),
+  };
+}

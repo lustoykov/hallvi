@@ -130,3 +130,98 @@ describe("R2", () => {
     ]);
   });
 });
+
+describe("reading one name", () => {
+  const ZONE = "b".repeat(32);
+  /** Zones first, then that zone's records: one body per call, in order. */
+  function sequence(bodies: unknown[]) {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        fetched.push(url);
+        headers.push(init.headers as Record<string, string>);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => bodies[call++],
+        } as Response;
+      }),
+    );
+  }
+  const zones = (names: string[]) => ({
+    success: true,
+    result: names.map((name, index) => ({
+      id: index === 0 ? ZONE : `${index}`.repeat(32),
+      name,
+      status: "active",
+    })),
+  });
+  const records = (rows: object[]) => ({ success: true, result: rows });
+
+  it("finds the record and says whether the provider stands in front", async () => {
+    sequence([
+      zones(["example.com"]),
+      records([
+        {
+          id: "1",
+          type: "A",
+          name: "app.example.com",
+          content: "203.0.113.7",
+          proxied: true,
+        },
+      ]),
+    ]);
+    const reading = await cloudflare.cloudflareDomain("app.example.com");
+    expect(reading.zone).toBe("example.com");
+    expect(reading.record?.content).toBe("203.0.113.7");
+    expect(reading.proxied).toBe(true);
+  });
+
+  it("a visible zone without the name is an absence, not a failure", async () => {
+    // The difference decides whether a page may write presence:"absent".
+    sequence([zones(["example.com"]), records([])]);
+    const reading = await cloudflare.cloudflareDomain("app.example.com");
+    expect(reading.zone).toBe("example.com");
+    expect(reading.record).toBeNull();
+    expect(reading.proxied).toBe(false);
+  });
+
+  it("a zone this token cannot see is a failure, not an absence", async () => {
+    sequence([zones(["other.com"])]);
+    await expect(
+      cloudflare.cloudflareDomain("app.example.com"),
+    ).rejects.toThrow(/No zone this token can see/);
+  });
+
+  it("the most specific zone holds the name", async () => {
+    sequence([
+      zones(["sub.example.com", "example.com"]),
+      records([
+        {
+          id: "1",
+          type: "A",
+          name: "app.sub.example.com",
+          content: "203.0.113.9",
+        },
+      ]),
+    ]);
+    const reading = await cloudflare.cloudflareDomain("app.sub.example.com");
+    expect(reading.zone).toBe("sub.example.com");
+  });
+
+  it("refuses anything that is not a domain name", async () => {
+    for (const bad of ["not a name", "../zones", "http://x.com", "x"])
+      await expect(cloudflare.cloudflareDomain(bad)).rejects.toThrow(
+        /is not a domain name/,
+      );
+  });
+
+  it("never puts the name in the path unescaped", async () => {
+    sequence([zones(["example.com"]), records([])]);
+    await cloudflare.cloudflareDomain("APP.Example.com.");
+    // The name is matched in memory; only the zone id reaches the URL.
+    expect(fetched.every((url) => !url.includes("app.example.com"))).toBe(true);
+    expect(fetched[1]).toContain(`/zones/${ZONE}/dns_records`);
+  });
+});

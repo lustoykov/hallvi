@@ -223,6 +223,8 @@ describe("cdn", () => {
     expect(read([]).cdn).toEqual({
       on: false,
       provider: null,
+      origin: null,
+      originReachable: "unchecked",
       detail: "Nobody has looked at whether a cache sits in front.",
     });
   });
@@ -253,8 +255,56 @@ describe("cdn", () => {
     expect(story.cdn).toEqual({
       on: true,
       provider: "Cloudflare",
+      origin: null,
+      originReachable: "unchecked",
       detail: "Static assets",
     });
+  });
+
+  // A cache in front and a working site behind it are two claims. Cloudflare
+  // proxying a dead origin is still, accurately, caching in front — and every
+  // visitor gets its error page. The page has to be able to say both.
+  it("a cache in front is not evidence the origin answers", () => {
+    const story = read([
+      states(
+        { kind: "cdn", id: "front" },
+        {
+          facts: [
+            fact("provider", "Cloudflare"),
+            fact("origin", "46.62.253.6"),
+            fact("covers", "Everything on the name"),
+          ],
+          checks: [
+            check("caching", "passed"),
+            check("origin-reachable", "failed", "reachability", {
+              detail:
+                "522 from Cloudflare; the origin never completed a connection.",
+            }),
+          ],
+        },
+      ),
+    ]);
+    expect(story.cdn.on).toBe(true);
+    expect(story.cdn.originReachable).toBe("no");
+    expect(story.cdn.origin).toBe("46.62.253.6");
+    expect(story.cdn.detail).toMatch(/522/);
+  });
+
+  it("an origin that answers is said to answer", () => {
+    const story = read([
+      states(
+        { kind: "cdn", id: "front" },
+        {
+          facts: [fact("provider", "Cloudflare"), fact("covers", "Images")],
+          checks: [
+            check("caching", "passed"),
+            check("origin-reachable", "passed"),
+          ],
+        },
+      ),
+    ]);
+    expect(story.cdn.originReachable).toBe("yes");
+    expect(story.cdn.detail).toBe("Images");
   });
 });
 

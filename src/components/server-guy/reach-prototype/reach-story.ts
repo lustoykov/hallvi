@@ -38,7 +38,7 @@ export interface Caller {
   who: string;
   from: string;
   typed: string;
-  outcome: "loads" | "refused" | "no-name" | "insecure";
+  outcome: "loads" | "refused" | "no-name" | "insecure" | "no-answer";
   secure: boolean;
   headline: string;
   detail: string;
@@ -50,8 +50,25 @@ export interface Caller {
 export interface DomainState {
   name: string;
   provider: "cloudflare" | "external";
-  state: "resolving" | "pending-dns" | "failed";
+  /**
+   * Five states, because a name can be wrong in four different ways and a
+   * page that collapses them tells a reader to go and look somewhere else.
+   *
+   * `serving` is the only one that says the application answers, and it is
+   * reachable only from a check that actually asked for the name over HTTP.
+   * `resolving` is the honest middle: the name works and nobody has found
+   * out what is behind it. A proxied name sits in `unreachable` while it
+   * resolves perfectly and serves a valid certificate, which is exactly the
+   * case that used to read as success.
+   */
+  state: "serving" | "unreachable" | "resolving" | "pending-dns" | "failed";
   detail: string;
+  /** What the record points at, as the provider holds it. */
+  origin?: string | null;
+  /** Whether the provider answers for the name instead of the origin. */
+  proxied?: boolean;
+  /** Something true and awkward about the record, said rather than hidden. */
+  concern?: string | null;
   userStep?: string | null;
 }
 

@@ -94,6 +94,14 @@ export interface SupplyView {
     provider: string | null;
     /** One line about what is and is not cached. */
     detail: string;
+    /** The address the cache forwards to, when a record names one. */
+    origin?: string | null;
+    /**
+     * Whether the cache can get an answer out of the origin. Separate from
+     * `on` on purpose: a cache in front of a dead origin is still in front,
+     * and still serves an error page to every visitor.
+     */
+    originReachable?: "yes" | "no" | "unchecked";
   };
   brokers: Broker[];
   queues: QueueLine[];
