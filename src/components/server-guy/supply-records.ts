@@ -112,13 +112,23 @@ export function supplyFromRecords({
       };
     });
 
+  // A worker is a process whose recorded role says it does work in the
+  // background. "Private in the topology" is not that: a database is private
+  // and is not a worker, and reading it that way put PostgreSQL and Valkey on
+  // the page as the two things taking from Paperless's Celery queue.
   const workers = subjectsOfKind(live, "process")
-    .filter(
-      (ref) =>
-        currentFacts(live, ref).get("role")?.value.value === "worker" ||
-        partOf(ref.id)?.kind === "private",
+    .filter((ref) =>
+      /\b(worker|workers|background|queue|jobs?)\b/i.test(
+        currentFacts(live, ref).get("role")?.value.value ?? "",
+      ),
     )
-    .map((ref) => ref.id);
+    // The owner's word for it, not the reference Pi reuses between records.
+    .map(
+      (ref) =>
+        currentFacts(live, ref).get("product")?.value.value ??
+        partOf(ref.id)?.name ??
+        ref.id,
+    );
 
   const queues: QueueLine[] = subjectsOfKind(live, "queue")
     .filter((ref) => {

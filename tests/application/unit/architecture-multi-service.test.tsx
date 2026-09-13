@@ -113,11 +113,6 @@ describe("a map with two backing services and three volumes", () => {
       <JourneyDirection
         model={model}
         recheck={idle}
-        chrome={{
-          onBack: () => undefined,
-          onOpen: () => undefined,
-          openHref: null,
-        }}
         onOpenDestination={() => undefined}
         onAsk={() => undefined}
       />,
@@ -168,11 +163,6 @@ describe("a map with two backing services and three volumes", () => {
       <JourneyDirection
         model={single}
         recheck={idle}
-        chrome={{
-          onBack: () => undefined,
-          onOpen: () => undefined,
-          openHref: null,
-        }}
         onOpenDestination={() => undefined}
         onAsk={() => undefined}
       />,

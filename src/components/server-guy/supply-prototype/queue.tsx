@@ -111,7 +111,7 @@ export function QueueDirection({
         </div>
         <span className="axqu-tail">
           {measured
-            ? `${story.workers.length ? listed(story.workers) : "No worker"} takes from it`
+            ? `${story.workers.length ? listed(story.workers) : "No worker"} ${story.workers.length > 1 ? "take" : "takes"} from it`
             : "Nothing puts work here"}
         </span>
       </div>
@@ -163,8 +163,8 @@ export function QueueDirection({
             <p>
               {listed(story.workers)}
               {queue
-                ? ` takes from ${queue.library}, backed by ${queue.backedBy}.`
-                : " is declared by the release, with nothing recorded about what it consumes."}
+                ? `${story.workers.length > 1 ? " take" : " takes"} from ${queue.library}, backed by ${queue.backedBy}.`
+                : `${story.workers.length > 1 ? " are" : " is"} declared by the release, with nothing recorded about what ${story.workers.length > 1 ? "they consume" : "it consumes"}.`}
             </p>
           ) : (
             <p>
