@@ -118,6 +118,12 @@ function subline(model: HeroProps["model"], overview: Overview) {
     return `A check on ${model.headline} did not pass.${server}`;
   if (model.condition.certainty === "stale")
     return `${model.condition.text}${server}`;
+  // Verified takes its words and its time from the same place as the verdict.
+  // Reading the sentence off the web part while the verdict came from the
+  // application's own condition let the page say "passed its checks 10 h ago"
+  // about evidence gathered eight minutes earlier.
+  if (model.condition.certainty === "verified")
+    return `${model.condition.text}${server}`;
   if (app?.evidence.certainty === "stale" && app.evidence.at)
     return `${model.headline} hasn't been checked for ${span(model.now - Date.parse(app.evidence.at))}, so it may have changed.${server}`;
   return `${model.headline} passed its checks ${ago(app?.evidence.at, model.now)}.`;
