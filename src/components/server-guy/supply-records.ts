@@ -183,7 +183,9 @@ export function supplyFromRecords({
         id: ref.id,
         name: ref.id,
         service: scope ?? "",
-        product: scope ? (partOf(scope)?.name ?? scope) : applicationName,
+        // The application when the map does not know the scope: echoing the
+        // id back reads "shop-web · shop-web", which says nothing twice.
+        product: (scope ? partOf(scope)?.name : null) ?? applicationName,
         who: asked
           ? ("you" as const)
           : source && /generat/i.test(source)
@@ -214,9 +216,9 @@ export function supplyFromRecords({
         id: secret.name,
         name: secret.name,
         service: secret.process ?? "",
-        product: secret.process
-          ? (partOf(secret.process)?.name ?? secret.process)
-          : applicationName,
+        product:
+          (secret.process ? partOf(secret.process)?.name : null) ??
+          applicationName,
         who: "you",
         held: true,
         where: secret.establishedAt
