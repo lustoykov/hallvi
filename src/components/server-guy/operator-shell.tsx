@@ -280,14 +280,23 @@ export function OperatorShell({
   // every page claimed a working way in for the frame before the answer
   // arrived — a false frame on every single load, and the loudest one, since
   // it is the link a reader is most likely to click.
-  const [reachable, setReachable] = useState<Reachability>("checking");
+  //
+  // The answer is stored with the application it is about, so switching
+  // applications reads as "checking" without the effect having to set state
+  // on the way in — the last one's answer simply is not an answer to this
+  // one's question.
+  const [answered, setAnswered] = useState<{
+    id: string;
+    state: Reachability;
+  } | null>(null);
   const applicationIdForAccess = view.application?.id;
+  const reachable: Reachability =
+    answered && answered.id === applicationIdForAccess
+      ? answered.state
+      : "checking";
   useEffect(() => {
     if (!applicationIdForAccess) return;
     let cancelled = false;
-    // A different application is a different question, and the last one's
-    // answer must not stand in for it.
-    setReachable("checking");
     const read = async () => {
       try {
         const response = await fetch(
@@ -298,9 +307,11 @@ export function OperatorShell({
         if (cancelled) return;
         // Anything that is not a private tunnel is reached directly, and
         // there is nothing of ours to be closed.
-        setReachable(
-          body.mode !== "private" || body.open === true ? "open" : "closed",
-        );
+        setAnswered({
+          id: applicationIdForAccess,
+          state:
+            body.mode !== "private" || body.open === true ? "open" : "closed",
+        });
       } catch {
         // A page that cannot reach its own controller has louder problems,
         // and saying the tunnel is open is not one of the answers.
