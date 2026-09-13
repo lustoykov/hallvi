@@ -9,9 +9,15 @@ and [ROADMAP.md](ROADMAP.md) for the checkpoint currently being built.
 ## Environment
 
 Node.js 22 with the locked dependencies. `npm ci`, never `npm install <pkg>@latest`.
-The container needs no credentials: tests use disposable databases and synthetic
-provider responses. Never add a Pi/ChatGPT login, GitHub App secret, Hetzner
-token or SSH key to this environment.
+The checks need no credentials: tests use disposable databases and synthetic
+provider responses.
+
+A cloud container may carry a Hetzner and a Cloudflare connection, scoped to a
+project and zone kept for this purpose. Resources created through them are real
+and are billed. Create or destroy nothing unless the task says so, name in the
+final message anything you left running, and never copy a token out of
+`.env.local` or `.server-guy/hetzner-connection.json` into code, output or a
+commit.
 
 ## Checks
 
@@ -30,11 +36,13 @@ commands.
 
 ## What this container cannot verify
 
-No model calls, no GitHub connection, no provisioning, and no SSH to a real
-server. The Docker workspace test is opt-in and needs a reachable engine. Those
-proofs happen on the owner's machine against real infrastructure, so do not
-claim a deployment, provider or model behaviour is verified from here — say
-which checks you actually ran.
+No model calls, no GitHub connection, and no SSH: outbound traffic goes through
+an HTTP proxy, so `ssh` to a server cannot connect even when the Hetzner API
+can. A cloud task can therefore create a machine but not configure it. The
+Docker workspace test is opt-in and needs a reachable engine.
+
+Deployment, provider and model proofs happen on the owner's machine against real
+infrastructure. Do not claim one from here — say which checks you actually ran.
 
 ## Conventions
 

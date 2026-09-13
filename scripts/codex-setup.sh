@@ -20,6 +20,31 @@ npx playwright install --with-deps chromium || npx playwright install chromium
 # A fresh development database, so the application and the inspector start.
 npm run db:push
 
+# Provider credentials arrive as Codex secrets, which exist only while this
+# script runs: they are removed before the agent phase. Anything a task needs
+# must be written down here, into the files the application already reads.
+if [ -n "${HETZNER_API_TOKEN:-}" ]; then
+  # connectHetzner verifies the token against the Cloud API and writes
+  # .server-guy/hetzner-connection.json, exactly as Settings does.
+  npx tsx -e 'import("./src/server/hetzner.ts").then((m) => m.connectHetzner(process.env.HETZNER_API_TOKEN))'
+  echo "Hetzner connected for this container."
+else
+  echo "No HETZNER_API_TOKEN: server inspection and provisioning are unavailable." >&2
+fi
+
+if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+  # The controller reads Cloudflare from the environment. .env.local is
+  # gitignored, and is loaded by the worker, next dev and next build.
+  printf 'CLOUDFLARE_API_TOKEN=%s\n' "$CLOUDFLARE_API_TOKEN" > .env.local
+  if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+    printf 'CLOUDFLARE_ACCOUNT_ID=%s\n' "$CLOUDFLARE_ACCOUNT_ID" >> .env.local
+  fi
+  chmod 600 .env.local
+  echo "Cloudflare written to .env.local."
+else
+  echo "No CLOUDFLARE_API_TOKEN: DNS and R2 work are unavailable." >&2
+fi
+
 # Record which lockfile these modules came from; codex-maintenance.sh reinstalls
 # only when the lockfile has changed since.
 stamp="$HOME/.cache/server-guy/lock.sha"
