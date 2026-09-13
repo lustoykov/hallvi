@@ -54,7 +54,12 @@ export function sentenceOf(history: HistoryRecord) {
         // a fact; what it means for you is not yet knowable.
         `; ${unresolved} failed`
       : `; ${history.failed} failed and ${history.failed === 1 ? "was" : "were"} resolved`;
-  return `${history.total} ${history.total === 1 ? "operation" : "operations"}${since ? ` since ${since}` : ""}. ${history.verified} verified${failures}.`;
+  // 57 operations, 49 verified, 3 failed — and five a reader is left to
+  // wonder about. They are the ones nobody established either way, and
+  // naming them is cheaper than a sentence that does not add up.
+  const rest = history.total - history.verified - history.failed;
+  const unsettled = rest > 0 ? `; ${rest} neither` : "";
+  return `${history.total} ${history.total === 1 ? "operation" : "operations"}${since ? ` since ${since}` : ""}. ${history.verified} verified${failures}${unsettled}.`;
 }
 
 /** Following a thread shows everything, then lands on the work it names. */
