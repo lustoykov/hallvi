@@ -119,6 +119,12 @@ export const applicationSections = [
     label: "Environment Variables",
     icon: SlidersHorizontal,
     group: "care",
+    // Gated like the rest: it appears once a variable or a pending request
+    // names one. It has to be `hideable` to say so, because a gated section
+    // without it is dropped by both lists and the destination simply
+    // disappears rather than waiting under "Show more".
+    hideable: true,
+    available: true,
   },
 ] as const;
 export type ApplicationSection = (typeof applicationSections)[number]["id"];
