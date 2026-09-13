@@ -172,3 +172,44 @@ was **told**, not one computed from a cron string.
 
 The size one is the worst of the set: a volume drawn a thousand times the size
 of the disk under it, from a number Pi got exactly right.
+
+## Accessible while these servers stay up
+
+| | |
+|---|---|
+| Getting Started | `http://127.0.0.1:38123` |
+| Shop | `http://127.0.0.1:8000` |
+| the controller that drew these pages | `http://127.0.0.1:3410` |
+| the rig's own controller | `http://127.0.0.1:3420` |
+
+Both application URLs are the product's own SSH tunnels into the rig host
+container, opened by `open_server_port` and verified by it.
+
+## Resources, and what they cost
+
+| | |
+|---|---|
+| created in the cloud | **none** |
+| Hetzner servers | none — the rig's provider stand-in "creates" them at a TEST-NET-1 address |
+| running cost | **€0.00** |
+| left running locally | `sg-rig-views` (host container, port 8092), its sshd on 2224, the rig controller on 3420, a dev server on 3410 |
+
+`docker stop sg-rig-views` and killing the two node processes ends all of it.
+Nothing outside this machine is affected, and the two applications and their
+records disappear with the containers.
+
+## Honest gaps
+
+- **Domains and CDN have no acceptance application.** Both read records and
+  both have tests, but neither has been driven by a real name, because that
+  needs a DNS mutation on a domain the owner owns. The boundary and what
+  crossing it needs are in the contract document.
+- **A restore test has never run** in these journeys, so the Backups page's
+  populated state is proved by fixtures rather than by a real copy.
+- **`pi-activity.tsx` reads a ref during render** (2 lint errors, pre-existing
+  on main). It works, and the fix risks reintroducing the flashing-card bug
+  that reading during render was added to solve. Left alone deliberately.
+- **Pi recorded Shop as one image** rather than using `services[]`, because it
+  built one image for its own three processes and treated PostgreSQL and Redis
+  as infrastructure. That is a defensible reading, so the multi-service shape
+  is proved by tests rather than by this journey.
