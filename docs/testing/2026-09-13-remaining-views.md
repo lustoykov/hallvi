@@ -359,3 +359,37 @@ collects nothing itself, so it has no failure of its own.
 - **Exact-value redaction is exact.** Output containing a secret verbatim is
   replaced. A command that base64s it, or prints its first eight characters,
   is not something the product can promise to catch, and it does not claim to.
+
+## What is running, and what it costs
+
+| | |
+|---|---|
+| `http://127.0.0.1:3410` | the branch, on the three real applications |
+| `http://127.0.0.1:3411` | the six isolated scenarios |
+| `http://127.0.0.1:3430` | the rig's own controller and worker |
+| `http://127.0.0.1:38123` | Getting Started, through the product's tunnel |
+| `http://127.0.0.1:8000` | Shop |
+| `http://127.0.0.1:3100` | Metrics (Grafana) |
+| containers | `sg-rig-views` (Linux host with systemd and its own dockerd), `sg-rig-ssh-2224` |
+| **cloud resources created** | **none** |
+| **cost** | **€0.00** |
+
+The rig's Hetzner stand-in fakes servers at TEST-NET-1 addresses, so no
+provider resource exists for any of this. `docker stop sg-rig-views` and
+killing the three node processes ends all of it.
+
+One Hetzner server does exist and is not mine: `165619823
+getting-started-b2184a72`, from the owner's own "Test 2 eqw" application on
+12 September, with a live tunnel held by another session's worktree. It has
+been left alone throughout.
+
+## Rebuilding the scenarios
+
+```bash
+node --import tsx scripts/load-scenarios.mjs /private/tmp/sg-scenarios
+```
+
+Their readings age from the moment they are written, which is the point — a
+fifteen-minute liveness claim is meant to go stale — and also means the
+database has to be rebuilt before a visual pass, or the page will be right
+about something nobody meant to test.
