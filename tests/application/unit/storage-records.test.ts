@@ -262,3 +262,40 @@ describe("reading a size Pi wrote in words", () => {
     expect(gb("not measured")).toBeNull();
   });
 });
+
+describe("a replacement that lost the data", () => {
+  it("is not the same as never having been tested", () => {
+    // "Kept: volumes stay when containers are replaced" was printed whenever
+    // nothing had been tested. It is true of a named volume and false of a
+    // bind mount to a temporary path, and the page cannot tell which.
+    const untested = read([volume("data")]);
+    expect(untested.keptAt).toBeNull();
+    expect(untested.lostAt).toBeNull();
+
+    const at = "2026-09-13T10:00:00.000Z";
+    const lost = read([
+      volume("data", {
+        at,
+        checks: [check("persistence", "failed", "configuration")],
+      }),
+    ]);
+    expect(lost.keptAt).toBeNull();
+    expect(lost.lostAt).toBe(at);
+  });
+
+  it("lets a later success replace an earlier loss", () => {
+    const story = read([
+      volume("data", {
+        at: "2026-09-13T09:00:00.000Z",
+        checks: [check("persistence", "failed", "configuration")],
+      }),
+      volume("data", {
+        at: "2026-09-13T11:00:00.000Z",
+        checks: [check("persistence", "passed", "configuration")],
+      }),
+    ]);
+    // Current state recovers; the older failure is History's business.
+    expect(story.keptAt).toBe("2026-09-13T11:00:00.000Z");
+    expect(story.lostAt).toBeNull();
+  });
+});

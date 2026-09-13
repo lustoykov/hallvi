@@ -49,6 +49,11 @@ export interface ProtectView {
   createdAt: string | null;
   /** When the data was last proved to survive a container replacement. */
   keptAt: string | null;
+  /**
+   * When a replacement was tried and the data did not survive. Distinct from
+   * keptAt being null, which only means nobody has tried.
+   */
+  lostAt: string | null;
   disk: { usedGb: number; totalGb: number; measuredAt: string } | null;
   copies: Dated[];
   schedules: Dated[];

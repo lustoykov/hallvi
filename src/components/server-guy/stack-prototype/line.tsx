@@ -218,9 +218,13 @@ export function LineDirection({
   const say =
     story.state === "running"
       ? `${countWord(n)} ${n === 1 ? "process is" : "processes are"} running.`
-      : story.state === "unknown"
-        ? `${countWord(n)} ${n === 1 ? "process" : "processes"} may have changed.`
-        : `${countWord(n)} ${n === 1 ? "process is" : "processes are"} planned.`;
+      : story.state === "failed"
+        ? // Nothing here passed and something failed. Saying "running" over a
+          // red tag was the page arguing with itself.
+          `${countWord(n)} ${n === 1 ? "process is" : "processes are"} not answering.`
+        : story.state === "unknown"
+          ? `${countWord(n)} ${n === 1 ? "process" : "processes"} may have changed.`
+          : `${countWord(n)} ${n === 1 ? "process is" : "processes are"} planned.`;
   const processStop = (
     item: (typeof story.processes)[number],
     line: string,

@@ -249,15 +249,25 @@ export function processesFromRecords({
       .sort()
       .at(-1) ?? null;
 
+  // A process whose only check failed is not running. Mapping a failure to
+  // "running" so the design would still draw the list produced "One process
+  // is running" over a red tag, which is the page arguing with itself.
+  const anyPassing = refs.some((ref) =>
+    [...currentChecks(live, ref).values()].some(
+      (held) => held.value.status === "passed",
+    ),
+  );
   const state: LineStory["state"] = !refs.length
     ? "none"
-    : failing
-      ? "running"
-      : !anyPresent
-        ? "planned"
-        : anyFresh
-          ? "running"
-          : "unknown";
+    : failing && !anyPassing
+      ? "failed"
+      : failing
+        ? "running"
+        : !anyPresent
+          ? "planned"
+          : anyFresh
+            ? "running"
+            : "unknown";
 
   return {
     state,

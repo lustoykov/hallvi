@@ -472,3 +472,52 @@ describe("two processes from the same image", () => {
     ]);
   });
 });
+
+describe("a process whose only check failed", () => {
+  const check = (key: string, status: "passed" | "failed", claim: string) => ({
+    key,
+    label: key,
+    status,
+    claim,
+    basis: "observed",
+  });
+
+  const failing = (extra: object = {}) =>
+    processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app", {
+          status: "failed",
+          checks: [check("http", "failed", "liveness")],
+          ...extra,
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+
+  it("is not running", () => {
+    // "One process is running" over a red tag is the page arguing with
+    // itself.
+    expect(failing().state).toBe("failed");
+    expect(failing().tone).toBe("failed");
+  });
+
+  it("is still running when something else about it passed", () => {
+    const story = processesFromRecords({
+      records: [
+        topology([{ id: "app", kind: "web", name: "App" }]),
+        process("app", {
+          checks: [
+            check("http", "passed", "liveness"),
+            check("dependency-audit", "failed", "configuration"),
+          ],
+        }),
+      ],
+      applicationId: APP,
+      now,
+    });
+    expect(story.state).toBe("running");
+    expect(story.tone).toBe("failed");
+  });
+});

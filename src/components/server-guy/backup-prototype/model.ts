@@ -32,6 +32,8 @@ export interface ProtectStory extends StackStory {
   createdAt: string | null;
   /** When the containers were replaced and the volumes kept. */
   keptAt: string | null;
+  /** The isolated reference never draws a loss; the records path can. */
+  lostAt: string | null;
   disk: { usedGb: number; totalGb: number; measuredAt: string } | null;
   /** Copies off the server on record, newest first. */
   copies: Dated[];
@@ -228,6 +230,7 @@ export function buildProtectStory(input: {
     volumes,
     pieces: volumes.flatMap((volume) => volume.pieces),
     createdAt: created,
+    lostAt: null,
     keptAt: recreated ? settledAt(recreated) : null,
     disk: facts.storage?.hostDisk ?? null,
     copies:

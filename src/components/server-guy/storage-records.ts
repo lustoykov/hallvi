@@ -83,6 +83,7 @@ export function storageFromRecords({
   const volumes: Vol[] = [];
   const pieces: Piece[] = [];
   let keptAt: string | null = null;
+  let lostAt: string | null = null;
   let createdAt: string | null = null;
   const later = (a: string | null, b: string) => (!a || b > a ? b : a);
 
@@ -100,6 +101,11 @@ export function storageFromRecords({
       persistence.record.establishedAt
     )
       keptAt = later(keptAt, persistence.record.establishedAt);
+    if (
+      persistence?.value.status === "failed" &&
+      persistence.record.establishedAt
+    )
+      lostAt = later(lostAt, persistence.record.establishedAt);
     const created = facts.get("created")?.record.establishedAt ?? null;
     if (created && (!createdAt || created < createdAt)) createdAt = created;
 
@@ -153,6 +159,7 @@ export function storageFromRecords({
     pieces,
     createdAt,
     keptAt,
+    lostAt,
     disk:
       used && disk?.record.establishedAt
         ? {

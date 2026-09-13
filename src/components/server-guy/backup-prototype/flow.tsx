@@ -135,8 +135,11 @@ export function FlowDirection({
   const [cadence, keeping] = (guard.schedule?.words ?? "").split(", ");
   const say = `${countWord(n)} ${n === 1 ? "volume holds" : "volumes hold"} the application's data on the server.`;
   const sub = [
-    story.keptAt &&
-      `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`,
+    story.lostAt
+      ? `${n === 1 ? "It did" : "They did"} not come through a container replacement ${when(story.lostAt)}.`
+      : story.keptAt
+        ? `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`
+        : "Nobody has tested whether it survives a container replacement.",
     covered.length
       ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
       : "Nothing on the server is in a backup plan.",
@@ -185,9 +188,14 @@ export function FlowDirection({
       },
       {
         label: "Containers replaced",
-        value: story.keptAt
-          ? `Kept, as it was ${when(story.keptAt)}`
-          : "Kept: volumes stay when containers are replaced",
+        // "Volumes stay when containers are replaced" is true of a named
+        // volume and false of a bind mount to a temporary path, and this
+        // page cannot tell which without a test that has run.
+        value: story.lostAt
+          ? `The data was lost, ${when(story.lostAt)}`
+          : story.keptAt
+            ? `Kept, as it was ${when(story.keptAt)}`
+            : "Not tested",
       },
       {
         label: "Server lost",
@@ -341,10 +349,20 @@ export function FlowDirection({
         <div>
           <h2 className="axbf-say">{say}</h2>
           <p className="axbf-sure">
-            <Tag tone={story.keptAt ? toneOf(story.keptAt) : "planned"}>
-              {story.keptAt
-                ? `Kept through a replacement ${ago(story.keptAt, now)}`
-                : "Not replaced yet"}
+            <Tag
+              tone={
+                story.lostAt
+                  ? "failed"
+                  : story.keptAt
+                    ? toneOf(story.keptAt)
+                    : "planned"
+              }
+            >
+              {story.lostAt
+                ? `Did not survive a replacement ${ago(story.lostAt, now)}`
+                : story.keptAt
+                  ? `Kept through a replacement ${ago(story.keptAt, now)}`
+                  : "Never tested"}
             </Tag>
             <span>{sub}</span>
           </p>
@@ -413,7 +431,11 @@ export function FlowDirection({
                   ? size(item.sizeGb, item.sizeText)
                   : "Size not measured"}
                 {item.note ? ` · ${item.note}` : ""}
-                {story.keptAt ? ` · kept ${when(story.keptAt)}` : ""}
+                {story.lostAt
+                  ? ` · lost ${when(story.lostAt)}`
+                  : story.keptAt
+                    ? ` · kept ${when(story.keptAt)}`
+                    : ""}
               </p>
             </div>
           ))}

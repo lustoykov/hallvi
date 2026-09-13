@@ -72,7 +72,7 @@ export interface LineStory {
    * and a firewall that a tunnelled deployment has neither of.
    */
   entry?: Entry;
-  state: "none" | "planned" | "running" | "unknown";
+  state: "none" | "planned" | "running" | "unknown" | "failed";
   tone: "verified" | "stale" | "planned" | "failed" | "checking";
   word: string;
   verifiedAt: string | null;
