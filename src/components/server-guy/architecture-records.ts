@@ -33,6 +33,7 @@ import {
   type RecordCheck,
 } from "@/server/record-projection";
 
+import { ago } from "./architecture-prototype/model";
 import type { ApplicationSection } from "./application-sections";
 import type {
   ArchitectureModel,
@@ -101,12 +102,13 @@ const destinations: Partial<Record<Part["kind"], ApplicationSection>> = {
   offsite: "backups",
 };
 
-function localTime(at: string) {
-  return new Date(at).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+/**
+ * Architecture used to date its evidence with a bare clock time — "Checked
+ * 11:43 AM" — while every other destination says "7 h ago". Two things wrong
+ * with that: the product spoke two time languages on adjacent pages, and a
+ * clock time with no date cannot tell today from last Tuesday, which is
+ * exactly the distinction a current-state view exists to make.
+ */
 
 /**
  * The check a part's tag should draw: the first declared key it carries.
@@ -161,7 +163,7 @@ function evidenceFor(
     return {
       certainty: "absent",
       short: "Established absent",
-      detail: `${presence.record.title}${presence.record.establishedAt ? `, recorded at ${localTime(presence.record.establishedAt)}` : ""}.`,
+      detail: `${presence.record.title}${presence.record.establishedAt ? `, recorded ${ago(presence.record.establishedAt, now)}` : ""}.`,
       at: presence.record.establishedAt,
     };
 
@@ -207,9 +209,9 @@ function evidenceFor(
           : "unknown";
   const short =
     reading === "verified"
-      ? `Checked ${at ? localTime(at) : "recently"}`
+      ? `Checked ${at ? ago(at, now) : "recently"}`
       : reading === "stale"
-        ? `Last checked ${at ? localTime(at) : "some time ago"}`
+        ? `Last checked ${at ? ago(at, now) : "some time ago"}`
         : reading === "failed"
           ? "A check failed"
           : freshness.kind === "never-established"
