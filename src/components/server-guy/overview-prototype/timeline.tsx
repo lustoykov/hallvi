@@ -115,10 +115,10 @@ function subline(model: HeroProps["model"], overview: Overview) {
       : "Nothing runs yet. Once you approve, Server Guy builds it, checks it and starts copying its data off the server.";
   const app = model.byId.app;
   const host = model.byId.host;
-  const server =
-    host?.evidence.certainty === "verified"
-      ? ` The server answered ${ago(host.evidence.at, model.now)}.`
-      : "";
+  // The Server lane directly below says "Checked 7 h ago" in its own caption,
+  // so repeating it in the verdict spent a third of the sentence on something
+  // already on screen — and pushed the part that matters onto another line.
+  const server = "";
   // The application's own condition, when a record states it. Reading this
   // off the web part instead would let the page say "passed its checks" about
   // the process while nothing had been established about the application.

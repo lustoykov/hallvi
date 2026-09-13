@@ -320,9 +320,11 @@ export function TransitDirection({
               <span className="axm-dot" aria-hidden="true" />
               <div className="axm-stop-main">
                 <b>Now</b>
-                <small>
-                  {story.word}. {story.detail}
-                </small>
+                {/* The summary beside this timeline is the same sentence. It
+                    was printed in both places, so the page said what the
+                    release is twice on one screen; the spine says where the
+                    sequence has got to, and the summary says what it means. */}
+                <small>{story.word}.</small>
               </div>
               <LittleServer mood={moodOf[story.tone]} className="axm-guy" />
             </li>

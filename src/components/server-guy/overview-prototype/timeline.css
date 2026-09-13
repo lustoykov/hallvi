@@ -44,6 +44,7 @@
   text-wrap: pretty;
   animation: axj2-fade 520ms var(--ax-ease-out);
 }
+
 .axt-sub {
   margin: 8px 0 0;
   max-width: 68ch;

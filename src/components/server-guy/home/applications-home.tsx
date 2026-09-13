@@ -16,11 +16,7 @@ import {
 import type { ApplicationListItem } from "../applications-screen";
 import type { MascotDance } from "./mascot-scene";
 import { mascotColors } from "./mascot-palette";
-import {
-  applicationKind,
-  ApplicationIllustration,
-  ApplicationSymbol,
-} from "./application-illustration";
+import { applicationKind, ApplicationSymbol } from "./application-illustration";
 import s from "./home.module.css";
 
 const Mascot = dynamic(
@@ -240,7 +236,14 @@ export function ApplicationsHome({
                           </div>
                           <ArrowUpRight aria-hidden="true" />
                         </div>
-                        <ApplicationIllustration kind={kind} />
+                        {/* The card used to carry a mock browser window with
+                            an invented heartbeat chart in it. It was the same
+                            on every application, it said nothing about any of
+                            them, it pushed the condition and the attention
+                            count below the fold — and on a product whose
+                            first rule is not to manufacture healthy states, a
+                            decorative heartbeat is the wrong ornament. What
+                            the card is for is underneath it. */}
                         <div className={s.appFacts}>
                           <strong className={s[`tone_${item.condition.tone}`]}>
                             <i aria-hidden="true" />
