@@ -105,7 +105,8 @@ export function fitToBudget(
   let total = files.reduce((sum, file) => sum + file.content.length, 0);
   if (total <= budget) return { files, omitted: [] };
   const bySize = [...files].sort(
-    (a, b) => b.content.length - a.content.length || a.path.localeCompare(b.path),
+    (a, b) =>
+      b.content.length - a.content.length || a.path.localeCompare(b.path),
   );
   const dropped = new Set<TreeFile>();
   const omitted: OmittedFile[] = [];

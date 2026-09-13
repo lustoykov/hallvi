@@ -43,11 +43,10 @@ export async function applicationWorkspaceSource(
       (snapshot.omitted.length
         ? `\nToo large to carry, so left out of this copy (${snapshot.omitted.length} files, largest first): ${snapshot.omitted
             .slice(0, 12)
-            .map(
-              (file) =>
-                `${file.path} (${Math.round(file.bytes / 1024)} KB)`,
-            )
-            .join(", ")}${snapshot.omitted.length > 12 ? ", …" : ""}. These paths exist upstream; read them on GitHub or on the server if you need them.`
+            .map((file) => `${file.path} (${Math.round(file.bytes / 1024)} KB)`)
+            .join(
+              ", ",
+            )}${snapshot.omitted.length > 12 ? ", …" : ""}. These paths exist upstream; read them on GitHub or on the server if you need them.`
         : ""),
     files: snapshot.files,
   };
