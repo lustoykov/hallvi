@@ -10,7 +10,15 @@
 // using.
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { resolve } from "node:path";
 
+// `.server-guy/server-guy.db` unless this controller was pointed elsewhere.
+// Naming the file rather than letting the studio resolve its own is what
+// makes the two agree: the studio opens what the application opened, and the
+// line printed below says which file that was.
+const database = resolve(
+  process.env.SERVER_GUY_DB_PATH ?? ".server-guy/server-guy.db",
+);
 const preferred = Number(process.env.SERVER_GUY_STUDIO_PORT ?? 4983);
 
 function available(port) {
@@ -27,23 +35,15 @@ function available(port) {
 async function studioPort() {
   for (let port = preferred; port < preferred + 20; port++)
     if (await available(port)) return port;
-  throw new Error(`No free studio port from ${preferred}.`);
+  return undefined;
 }
 
+// A studio is a convenience; the application is the point. Without a port the
+// application starts anyway and simply offers no Database link.
 const port = await studioPort();
+if (port) console.log(`Studio on port ${port}, reading ${database}`);
+else console.warn(`No free studio port from ${preferred}: no Database link.`);
 const children = [
-  spawn(
-    process.execPath,
-    [
-      "node_modules/drizzle-kit/bin.cjs",
-      "studio",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      String(port),
-    ],
-    { stdio: "inherit" },
-  ),
   spawn(
     process.execPath,
     [
@@ -55,10 +55,31 @@ const children = [
     ],
     {
       stdio: "inherit",
-      env: { ...process.env, SERVER_GUY_STUDIO_PORT: String(port) },
+      env: {
+        ...process.env,
+        SERVER_GUY_STUDIO_PORT: port ? String(port) : "",
+      },
     },
   ),
 ];
+if (port)
+  children.push(
+    spawn(
+      process.execPath,
+      [
+        "node_modules/drizzle-kit/bin.cjs",
+        "studio",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        String(port),
+      ],
+      {
+        stdio: "inherit",
+        env: { ...process.env, SERVER_GUY_DB_PATH: database },
+      },
+    ),
+  );
 
 let stopping = false;
 function stop(signal) {
