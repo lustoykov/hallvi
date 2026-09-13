@@ -838,6 +838,23 @@
   justify-content: space-between;
   gap: 16px;
 }
+/* Development only, and quieter than the actions beside them: the recorded
+   conversation and the database are a developer's errands, not an
+   operator's. */
+.sg-topbar-debug {
+  display: flex;
+  flex: none;
+  gap: 14px;
+  font-size: 12.5px;
+}
+.sg-topbar-debug a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.sg-topbar-debug a:hover {
+  color: var(--ink);
+}
 .sg-workstrip {
   display: flex;
   align-items: center;
