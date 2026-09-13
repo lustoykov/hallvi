@@ -117,6 +117,7 @@ export function OperatorShell({
   initialPiSetup,
   applications,
   demo = false,
+  studioPort,
   identityVariant = "navigation",
 }: {
   initialView: OperatorView;
@@ -127,6 +128,8 @@ export function OperatorShell({
   >[];
   /** The repository is synthetic: GitHub links are shown, never followed. */
   demo?: boolean;
+  /** The Drizzle Studio `npm run dev` started on this database, if it did. */
+  studioPort?: number;
   /** Where the application identity sits; the prototype compares placements. */
   identityVariant?: IdentityVariant;
 }) {
@@ -731,6 +734,36 @@ export function OperatorShell({
               <TerminalWindow weight="bold" aria-hidden="true" />
               Terminal
             </button>
+          )}
+          {/* Development only, in their own tabs: Pi's recorded conversation
+              for the chat you are reading, from the read-only viewer of
+              `npm run inspect:conversation`, and this application's database
+              in the Drizzle Studio that `npm run dev` started beside it.
+              Studio has no address for a table or a row, so it opens whole
+              and you find the application inside it. */}
+          {process.env.NODE_ENV === "development" && applicationId && (
+            <span className="sg-topbar-debug">
+              {activeChat && (
+                <a
+                  href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Pi's recorded conversation, in the local viewer on port 3001"
+                >
+                  Transcript
+                </a>
+              )}
+              {studioPort && (
+                <a
+                  href={`https://local.drizzle.studio/?port=${studioPort}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`This application's database, in the Drizzle Studio on port ${studioPort}`}
+                >
+                  Database
+                </a>
+              )}
+            </span>
           )}
         </header>
 

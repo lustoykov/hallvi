@@ -29,15 +29,26 @@ export function SettingsNav({
         GitHub
       </Link>
       {process.env.NODE_ENV === "development" && (
-        <a
-          className={s.testingLink}
-          href="http://127.0.0.1:4317/"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Testing dashboard (opens in a new tab)"
-        >
-          Testing dashboard
-        </a>
+        <span className={s.developerLinks}>
+          <a
+            href="http://127.0.0.1:4317/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Testing dashboard (opens in a new tab)"
+          >
+            Testing dashboard
+          </a>
+          {/* Studio opens on the whole controller database: it has no URL for
+              a table or a row, so this cannot be scoped to one application. */}
+          <a
+            href="https://local.drizzle.studio/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Database in Drizzle Studio (opens in a new tab)"
+          >
+            Database
+          </a>
+        </span>
       )}
     </nav>
   );
