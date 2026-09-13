@@ -287,6 +287,39 @@ there. Pi tried the URL from its workspace shell, whose loopback is a
 different machine's, got "Couldn't connect", and reopened a tunnel that was
 already fine. The result now names the machine that answered.
 
+### "GitHub could not renew this login" pointed at the wrong thing
+
+*Requirement: an error message must name the cause, not the symptom it shares
+with another cause.*
+
+GitHub answers `incorrect_client_credentials` — "The client_id and/or
+client_secret passed are incorrect" — when a refresh is refused, and the
+product passed that straight through as "GitHub could not renew this login."
+Both readings point at the App registration, and both are wrong. GitHub
+documents `client_secret` as **required unless the user access token was
+generated using the device flow**, and the device flow is the only flow this
+product uses.
+
+Established with three requests carrying no real credential, using only the
+public client id:
+
+| asked with | answer |
+|---|---|
+| our real client id + a refresh token GitHub never issued | 200 `incorrect_client_credentials` |
+| no client id at all | 404 |
+| a client id that is not ours | 404 |
+
+So the client id is recognised, and `incorrect_client_credentials` means *this
+refresh token is not one I will honour for you* — nothing about a secret. The
+usual way to arrive there is that **renewing replaces the refresh token**: the
+moment one copy of `github-connection.json` renews, every other copy holds a
+dead one. This machine has several, copied between checkouts, and the owner's
+own connection was already latched invalid on 12 September, before this
+session touched it.
+
+The message now says that. The refresh request itself was correct and is
+unchanged.
+
 ### The facts cap refused the vocabulary the guidance asks for
 
 A host is told to carry eleven keys and then has a cost to state; the limit
@@ -339,19 +372,58 @@ volumes; volumes that only another record names.
 - The architecture canvas overflows its column below about 1180px: "Nothing is
   watching this" and "Where the code came from" are clipped.
 
+### The false backup claim, corrected by the operator
+
+Pi asked Hetzner to create Paper's server with `backups: true`. That is not a
+field the create endpoint defines, so it was dropped, the call returned 201,
+and three records went on to say backups were on — the host ("Paper has a
+dedicated backed-up host", check "Provider backups enabled · passed"), a
+`backup-plan` subject ("Hetzner server backups are enabled", cost €1.10/month
+"reported"), and a borrowed check on the nightly-export plan. The monthly
+total the owner was given, €7.09, included €1.10 for something that did not
+exist.
+
+Reported to Server Guy as a user would — *"I can't see any backup charge on my
+bill… correct the records to match, and do not turn paid backups on"* — and
+corrected by Pi from the provider's own answer, with nothing enabled and
+nothing bought:
+
+| before | after |
+|---|---|
+| host: "Paper has a dedicated backed-up host" · Provider backups enabled **passed** | host: "Paper runs on a dedicated Hetzner host" · that check gone |
+| host: Estimated total €7.09/month | host: Estimated total **€5.99/month** |
+| backup-plan `hetzner-server-backups` **present**: "enabled" | the same subject **absent**: "Hetzner server backups are not enabled", with *Provider backup service is disabled* and *No provider backup images exist* both passed |
+| export plan carried "Provider server backups are enabled · passed" | gone; the export plan speaks only for the export |
+
+The absence is now *established* rather than merely unclaimed, which is the
+contract's own distinction. The other three applications needed nothing: Todo
+baseline already recorded a local plan present and an off-server plan absent,
+Counter recorded its backup plan absent, and Blog claimed no provider backup
+at all.
+
+The guidance change above only affects what Pi does next time. This is what
+happened to the records already written.
+
 ## Still open
 
-- **GitHub login cannot renew itself.** GitHub answers
-  `incorrect_client_credentials` to the refresh grant, because refreshing a
-  user access token needs a client secret the product deliberately does not
-  hold. The connection is then latched invalid and the owner is told to sign in
-  again — every eight hours. This session ran with no login at all, which the
-  first change above made possible; a private repository would have been stuck.
-  The question is in the pull request.
-- **Provider backups are still off** on all four servers. Nothing here enabled
-  them; the guidance change makes the next attempt read the setting back.
-- Off-server backups exist for none of the four. Paperless and Ghost both take
-  local copies and both said so.
+- **Provider backups are off on all four servers**, and were never on. Nothing
+  here enabled them — the owner asked explicitly not to buy backups to make a
+  claim true — and the records that said otherwise were corrected by Pi from
+  the provider's own answer; see "The false backup claim" below.
+- **No off-server backup exists for any of the four.** Todo baseline,
+  Paperless and Ghost each take a **local** copy: a file on the same disk as
+  the thing it protects. That survives a container replacement or a bad
+  configuration and does not survive losing the server. All three said so
+  unprompted. Both restore tests — Paperless's and Ghost's — read their copy
+  from that same local path, so what they prove is that the copy is
+  restorable, not that it is anywhere else. Plausible has no backup of any
+  kind, and no record claims one.
+- **Ghost cannot take a fresh sign-in** while it has no SMTP. Staff-device
+  verification emails a six-digit code and Ghost aborts the login when
+  delivery fails; the existing browser session keeps working. Pi found this in
+  the running image when asked, and said plainly that a second browser, a
+  cleared cookie or a sign-out would lock the owner out until SMTP exists or
+  device verification is turned off.
 
 ## Resources
 

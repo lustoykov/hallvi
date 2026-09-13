@@ -297,8 +297,22 @@ async function refreshGithubConnection(
             "access_denied",
           ].includes(failure.data.error)
         ) {
+          // `incorrect_client_credentials` reads like a misconfigured App and
+          // is not one. A device-flow token refreshes with `client_id` alone —
+          // GitHub documents `client_secret` as required *unless* the token
+          // came from the device flow, which is the only flow this product
+          // uses. Asked with our real client id and a refresh token GitHub
+          // never issued, it answers `incorrect_client_credentials`; asked
+          // with an unknown client id it answers 404. So this error means the
+          // refresh token is not one GitHub will honour for us, not that a
+          // secret is missing.
+          //
+          // The usual way to get there: renewing *replaces* the refresh token,
+          // so the moment one copy of this file renews, every other copy holds
+          // a dead one. Copying a connection between checkouts is what makes
+          // that happen.
           throw new GithubAccessError(
-            "GitHub could not renew this login. Sign in again.",
+            "GitHub would not accept this login's renewal token. Renewing replaces it, so a connection copied between checkouts stops working once either copy renews. Sign in again.",
             "auth",
           );
         }
