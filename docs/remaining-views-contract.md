@@ -234,3 +234,77 @@ did **not** survive.
 
 **Never inferred.** That a volume is backed up. Storage and Backups are
 different questions and the answer to one is not evidence for the other.
+
+# 3 · Database
+
+The Timeline design: one lane each for health, copies and restores, so "when
+was it last known good" is a glance rather than an inference.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| engine ("PostgreSQL 16") | `database` facts `engine` + `version` | reported | `identity` | derived (joined) |
+| where it lives | `database` fact `path`, or the `disk` edge to a `volume` | observed | `configuration` | recorded |
+| owner | `topology` edge from a process, else fact `owner` | — | — | derived |
+| size | `database` fact `size` | observed | `contents` | recorded |
+| the health lane | `database` checks keyed `answering`, one mark per record | observed | `liveness` | recorded |
+| the copies lane | `backup-copy` subjects (§7) | observed | `identity` | recorded |
+| the restores lane | `restore-test` subjects (§7) | observed | `identity` | recorded |
+| "last known good" | newest passed `answering` | — | — | derived |
+
+**Empty and partial.** No `database` subject → "Not assessed". This is where
+the distinction earns itself: an application may genuinely have no database,
+and only a record stating `database` `absent` may say so. A SQLite file inside
+a volume is a `database` whose `path` is inside that volume — the two subjects
+are both real and the `disk` edge joins them.
+
+# 4 · Cache & queue
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| broker name and product | `cache:<id>` + fact `engine` | reported | `identity` | recorded |
+| version | `cache` fact `version` | reported | `identity` | recorded |
+| persistence | `cache` fact `persistence` | reported | `configuration` | recorded |
+| reach | `cache` fact `port` + the map's part kind | observed | `configuration` | derived |
+| queue name and library | `queue:<id>` + fact `library` | reported | `configuration` | recorded |
+| what backs it | `queue` fact `backend` | reported | `configuration` | recorded |
+| depth, oldest, failed | `queue` facts `depth` `oldest` `failed` | observed | `contents` | recorded |
+| which workers take from it | `queue` fact `workers`, matched to `process` subjects | reported | `configuration` | derived (the matching) |
+
+**Empty and partial.** No `cache` and no `queue` → "Not assessed", and the page
+offers to ask whether one would help. A `cache` with no `depth` reading → the
+broker is drawn and the numbers are ghosts: a broker nobody has measured is not
+a broker with an empty queue.
+
+# 5 · Jobs
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| job name | `job:<id>` | — | — | recorded |
+| what it runs | `job` fact `command` | reported | `configuration` | recorded |
+| schedule and timezone | `job` facts `schedule` `timezone` | reported | `configuration` | recorded |
+| next run | `job` fact `next-run` | planned | `configuration` | recorded — **never computed** from the cron string |
+| last outcome | newest `job` check `ran` | observed | `liveness` | recorded |
+| run history | the series of records stating that `job` | observed | — | derived from the series |
+| recurring work elsewhere | `backup-plan` schedules (§7) | planned | `configuration` | derived |
+
+**Never computed.** The next run. Parsing a cron expression against a timezone
+the controller is guessing at produces a confident time that is wrong twice a
+year, and the page has no way to show that it guessed.
+
+# 6 · Environment Variables
+
+The Manifest design. The only page whose subject must never carry its value.
+
+| field in the design | supplies it | basis | refreshed by | derived / recorded |
+|---|---|---|---|---|
+| name | `variable:<NAME>` | — | — | recorded |
+| which process reads it | `variable` fact `scope`, else the map | reported | `configuration` | recorded |
+| where the value came from | `variable` fact `source` | reported | `configuration` | recorded |
+| whether a value is established | the secret store for a requested one; fact `established` otherwise | observed | `configuration` | derived |
+| **the value** | — | — | — | **never, from anywhere** |
+| still waiting | a `request_secret` with no value supplied | — | — | derived |
+| applied at | the newest release's `establishedAt` | observed | `identity` | derived |
+
+There is no reveal control, because there is nothing behind it: a requested
+value is in the sealed store that has no read path to a page, and an ordinary
+variable's value was never recorded at all.

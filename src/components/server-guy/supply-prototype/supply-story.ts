@@ -1,0 +1,118 @@
+// What the Manifest, Origin, Queue and Rota designs draw, and nothing else.
+// SupplyStory satisfies it structurally, so the visual reference is untouched.
+
+/** Who decided a value: the release plan, the owner, us, or a connection. */
+export type Decider = "plan" | "you" | "generated" | "connection";
+
+export interface Value {
+  id: string;
+  name: string;
+  /** The process it is given to. */
+  service: string;
+  product: string;
+  who: Decider;
+  /** Held on the host rather than stated in the repository. */
+  held: boolean;
+  /** Where the value lives, in words. Never the value itself. */
+  where: string;
+  /** Why it was asked for, when the request recorded a reason. */
+  why: string | null;
+  /** Recorded but not yet reached the running processes. */
+  pending: boolean;
+}
+
+export interface ConfigFile {
+  id: string;
+  name: string;
+  service: string;
+  product: string;
+  /** Where the process reads it. */
+  target: string;
+  readOnly: boolean;
+  bytes: number;
+  mode: string;
+  sha: string;
+}
+
+/** Something asked for that nobody has supplied yet. */
+export interface Waiting {
+  name: string;
+  reason: string;
+}
+
+export interface Broker {
+  name: string;
+  product: string;
+  role: string;
+  persistence: string | null;
+  reach: string;
+}
+
+export interface QueueLine {
+  library: string;
+  backedBy: string;
+  workers: string[];
+  backlog: number | null;
+  oldestSeconds: number | null;
+  failedLastHour: number | null;
+  at: string | null;
+}
+
+export interface JobLine {
+  name: string;
+  command: string;
+  schedule: string;
+  timezone: string;
+  nextAt: string | null;
+  paused: boolean;
+  last: { outcome: string; at: string; seconds: number | null } | null;
+}
+
+/** Work that repeats, owned by another destination. */
+export interface Recurring {
+  id: string;
+  title: string;
+  words: string;
+  detail: string;
+  at: string | null;
+  where: "backups" | "deployment" | "domains";
+}
+
+export interface SupplyView {
+  /** What the application is called, for the pages' sentences. */
+  name: string;
+  revision: string | null;
+  appliedAt: string | null;
+  values: Value[];
+  files: ConfigFile[];
+  waiting: Waiting[];
+  place: string | null;
+  machine: string | null;
+  address: string | null;
+  cdn: {
+    on: boolean;
+    provider: string | null;
+    /** One line about what is and is not cached. */
+    detail: string;
+  };
+  brokers: Broker[];
+  queues: QueueLine[];
+  workers: string[];
+  jobs: JobLine[];
+  runs: { id: string; jobName: string; outcome: string; at: string }[];
+  recurring: Recurring[];
+  /** Set only in the isolated visual reference; always null on records. */
+  invented: string | null;
+}
+
+export interface SupplyProps {
+  story: SupplyView;
+  now: number;
+  head: import("react").ReactNode;
+  /** Work in progress on this destination, as the shell shows it. */
+  activity: import("react").ReactNode;
+  onAsk: (draft: string) => void;
+  onOpenDestination: (
+    destination: import("../application-sections").ApplicationSection,
+  ) => void;
+}

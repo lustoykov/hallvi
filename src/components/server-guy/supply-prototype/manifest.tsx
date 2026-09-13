@@ -18,7 +18,7 @@ import { useState } from "react";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
-import type { SupplyDirectionProps } from "./index";
+import type { SupplyProps } from "./supply-story";
 import { ago, sizeWords, when, type Value } from "./supply-model";
 import "./manifest.css";
 
@@ -52,7 +52,7 @@ export function ManifestDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: SupplyDirectionProps) {
+}: SupplyProps) {
   const [open, setOpen] = useState<string | null>(null);
   const groups = deciders
     .map((group) => ({
@@ -269,7 +269,7 @@ function Opened({
   now,
 }: {
   value: Value;
-  story: SupplyDirectionProps["story"];
+  story: SupplyProps["story"];
   now: number;
 }) {
   const held = value.held;

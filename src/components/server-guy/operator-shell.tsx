@@ -257,8 +257,12 @@ export function OperatorShell({
   // is no longer written to, so without this every one of them stays dark
   // however much Pi records.
   const recordedHere = useMemo(
-    () => recordedSections(view.information ?? []),
-    [view.information],
+    () =>
+      recordedSections(
+        view.information ?? [],
+        (view.secrets ?? []).some((secret) => !secret.establishedAt),
+      ),
+    [view.information, view.secrets],
   );
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.

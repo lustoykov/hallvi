@@ -12,7 +12,7 @@ import { ChatCircleText, MapPin } from "@phosphor-icons/react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { SupplyDirectionProps } from "./index";
+import type { SupplyProps } from "./supply-story";
 import "./origin.css";
 
 const questions = [
@@ -42,7 +42,7 @@ export function OriginDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: SupplyDirectionProps) {
+}: SupplyProps) {
   const { cdn } = story;
   return (
     <section className="axog" aria-label="CDN">

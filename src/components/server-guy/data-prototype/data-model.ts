@@ -15,15 +15,11 @@ import {
   type StackStory,
 } from "../stack-prototype/stack-model";
 
-export type Lane = "health" | "copies" | "restores";
-export interface Mark {
-  id: string;
-  lane: Lane;
-  at: string;
-  tone: "pass" | "fail" | "set";
-  title: string;
-  detail: string;
-}
+// The two the Timeline design draws are shared with the records path, so
+// they live beside it rather than inside this builder.
+export type { Lane, Mark } from "./data-story";
+import type { Mark } from "./data-story";
+
 export interface DataStory extends StackStory {
   marks: Mark[];
   newestCopyAt: string | null;

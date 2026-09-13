@@ -31,7 +31,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { useDismiss } from "../overview-prototype/shared";
 import { ago, when } from "../stack-prototype/stack-model";
 import type { Mark } from "./data-model";
-import type { DataDirectionProps } from "./index";
+import type { DataProps } from "./data-story";
 import "./timeline.css";
 
 const HOUR = 3_600_000;
@@ -188,7 +188,7 @@ export function TimelineDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: DataDirectionProps) {
+}: DataProps) {
   const [toScale, setToScale] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [lit, setLit] = useState<number | null>(null);

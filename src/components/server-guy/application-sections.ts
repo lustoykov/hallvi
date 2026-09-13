@@ -76,7 +76,7 @@ export const applicationSections = [
     icon: Lightning,
     group: "stack",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "jobs",
@@ -84,7 +84,7 @@ export const applicationSections = [
     icon: CalendarCheck,
     group: "stack",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "storage",
@@ -104,7 +104,7 @@ export const applicationSections = [
     icon: StackSimple,
     group: "care",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "security",
@@ -138,7 +138,11 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
  * planned map is worth navigating to before anything runs — and both pages
  * say plainly that nothing has been looked at yet.
  */
-export function recordedSections(records: SavedInformation[]) {
+export function recordedSections(
+  records: SavedInformation[],
+  /** Whether Pi has asked the owner for a value it has not been given. */
+  waiting = false,
+) {
   const live = records.filter((record) => !record.retiredAt);
   const states = (...kinds: string[]) =>
     live.some((record) =>
@@ -150,10 +154,20 @@ export function recordedSections(records: SavedInformation[]) {
   const parts = map?.kind === "topology" ? map.parts : [];
   const has = (...kinds: string[]) =>
     parts.some((part) => kinds.includes(part.kind));
+  const secrets = live.some(
+    (record) => record.presentation?.states?.ref.kind === "variable",
+  );
   return {
     processes: states("process") || has("web", "private"),
     storage: states("volume") || has("volume"),
     security: states("door", "access", "firewall") || has("gate", "tls"),
+    database: states("database"),
+    cache: states("cache", "queue"),
+    jobs: states("job"),
+    // Configuration is worth a destination the moment anything names one,
+    // including a value Pi has asked the owner for and not yet been given.
+    variables: secrets || waiting,
+    cdn: states("cdn"),
   } as Partial<Record<ApplicationSection, boolean>>;
 }
 

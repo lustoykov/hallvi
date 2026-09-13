@@ -136,6 +136,11 @@ export interface ChatRunSnapshot {
 export interface OperatorView {
   executions?: import("./operator-execution").ExecutionRecord[];
   information?: import("./operator-data").SavedInformation[];
+  /**
+   * What Pi has asked the owner for: names, reasons, and whether a value has
+   * been supplied. Never values — there is no route that returns one.
+   */
+  secrets?: import("./application-secrets").SecretRequest[];
   operations?: import("./operation-record").ApplicationOperation[];
   /** What Pi ran in this application's conversations, in order. */
   piActivity?: import("./pi-activity").ActivityRecord[];

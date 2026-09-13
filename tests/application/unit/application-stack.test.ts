@@ -172,7 +172,9 @@ describe("stackOf", () => {
     const notes = Object.fromEntries(
       hiddenSections(stack, null).map((section) => [section.id, section.note]),
     );
-    expect(notes.cdn).toBe("nothing recorded yet");
+    // A CDN can be recorded now, so a deployment that has one and does not
+    // use it reads "not used" rather than "nothing can record this".
+    expect(notes.cdn).toBe("not used");
     expect(notes.security).toBe("check firewall rules");
     expect(
       visibleSections(stack, null, {}, true).some(

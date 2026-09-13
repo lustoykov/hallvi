@@ -12,7 +12,7 @@ import { ChatCircleText, Repeat } from "@phosphor-icons/react";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
-import type { SupplyDirectionProps } from "./index";
+import type { SupplyProps } from "./supply-story";
 import { ago, when } from "./supply-model";
 import "./rota.css";
 
@@ -32,7 +32,7 @@ export function RotaDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: SupplyDirectionProps) {
+}: SupplyProps) {
   const mine = story.jobs;
   const troubled = mine.filter(
     (job) => job.last && job.last.outcome !== "succeeded",

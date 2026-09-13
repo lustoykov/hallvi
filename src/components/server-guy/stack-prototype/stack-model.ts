@@ -25,17 +25,9 @@ import { settledAt } from "../history-prototype/history-model";
 // live beside it rather than inside this builder.
 export type { Change, Gap, ProcessCard, Probe } from "./line-story";
 import type { Change, Gap, ProcessCard, Probe } from "./line-story";
-export interface DataStore {
-  kind: "sqlite" | "postgres";
-  label: string;
-  owner: string;
-  ownerName: string;
-  file: string | null;
-  volume: { name: string; docker: string | null; mount: string } | null;
-  /** The check that read the database, when the deployment has one. */
-  probe: Probe | null;
-  firstFailure: { at: string; detail: string } | null;
-}
+export type { DataStore } from "../data-prototype/data-story";
+import type { DataStore } from "../data-prototype/data-story";
+
 export interface Protection {
   schedule: { words: string; at: string } | null;
   backup: { at: string; detail: string } | null;

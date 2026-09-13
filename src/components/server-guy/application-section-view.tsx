@@ -25,7 +25,9 @@ import { OverviewPage } from "./overview-page";
 import { DeploymentPage } from "./deployment-page";
 import { HistoryPage } from "./history-page";
 import { LogsPage } from "./logs-page";
+import { DatabasePage } from "./database-page";
 import { ProcessesPage } from "./processes-page";
+import { SupplyPageView, type SupplyPage } from "./supply-pages";
 import { StoragePage } from "./storage-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
@@ -231,6 +233,37 @@ export function ApplicationSectionView({
           applicationName={app.name}
           now={now}
           chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "database")
+      return (
+        <DatabasePage
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (
+      section === "cache" ||
+      section === "jobs" ||
+      section === "variables" ||
+      section === "cdn"
+    )
+      return (
+        <SupplyPageView
+          page={section as SupplyPage}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          secrets={view.secrets ?? []}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenDestination={onOpenDestination}
           onAsk={(draft) => onAsk(null, draft)}
         />
       );

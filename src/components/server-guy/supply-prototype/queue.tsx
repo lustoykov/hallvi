@@ -14,7 +14,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
 import { countWord } from "../stack-prototype/stack-model";
-import type { SupplyDirectionProps } from "./index";
+import type { SupplyProps } from "./supply-story";
 import { ago, waitWords } from "./supply-model";
 import "./queue.css";
 
@@ -27,7 +27,7 @@ export function QueueDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: SupplyDirectionProps) {
+}: SupplyProps) {
   const queue = story.queues[0] ?? null;
   const broker = story.brokers[0] ?? null;
   const measured = queue?.at ? queue : null;
