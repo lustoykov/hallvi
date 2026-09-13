@@ -90,7 +90,7 @@ export function OverviewDirection({
   );
 
   return (
-    <section className="axo" aria-label="Overview">
+    <section className="ax-root axo" aria-label="Overview">
       <header className="axj3-head">
         {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">

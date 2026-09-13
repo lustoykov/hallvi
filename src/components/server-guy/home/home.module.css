@@ -240,9 +240,11 @@
 .selected .selectMascot > span {
   color: var(--blue-text);
 }
-.page :global(.mascot-scene) {
-  height: 235px;
-  width: 100%;
+/* The caretaker used to stand 235px tall above every card. There is one now,
+   beside the heading, at the size of a thought. */
+.pageMascot :global(.mascot-scene) {
+  height: 96px;
+  width: 96px;
 }
 .page :global(.mascot-scene canvas) {
   display: block;
@@ -829,4 +831,15 @@
   .conversationAction > small {
     text-align: left;
   }
+}
+
+/* The page's one caretaker. Small enough to sit beside the heading rather
+   than above the facts, and its mood follows whether anything is waiting. */
+.pageMascot {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  align-self: flex-end;
+  margin: 0 8px 0 auto;
+  pointer-events: none;
 }

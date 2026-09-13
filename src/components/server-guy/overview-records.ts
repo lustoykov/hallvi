@@ -12,6 +12,7 @@
 // was about, and its headline condition comes from the one record that states
 // the application itself.
 
+import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
@@ -264,7 +265,17 @@ export function overviewFromRecords({
             "A check on this application did not pass.",
           primary: {
             label: "Ask about it",
-            draft: `${item.check.label} is failing. Look into why and tell me what you find.`,
+            // A check's label is a sentence Pi wrote, not a noun phrase, so
+            // `${label} is failing` produced "Dependency audit found
+            // vulnerabilities is failing." Quoting it works whatever Pi
+            // called it, "did not pass" is what the check actually says, and
+            // carrying the detail means the reader is not retyping evidence
+            // the page is already showing them.
+            draft: [
+              `The check "${item.check.label}" did not pass`,
+              item.check.detail ? `: ${item.check.detail}` : ".",
+              " Look into why, and tell me what you find.",
+            ].join(""),
           },
           secondary: {
             label: chrome[id].label,
@@ -277,7 +288,7 @@ export function overviewFromRecords({
         id: `approval:${execution.id}`,
         tone: "waiting",
         title: "A decision is waiting",
-        detail: execution.input.split("\n")[0].slice(0, 200),
+        detail: clip(essence(commandOf(execution.input)), 200),
         primary: {
           label: "Open the conversation",
           open: () => onOpenConversation(execution.chatId, null),
@@ -434,8 +445,8 @@ export function applicationCondition(
     return {
       certainty: "verified",
       text: newest
-        ? `Every check on the application held, ${when(newest, now)}.`
-        : "Every check on the application held when it was last read.",
+        ? `The application's own checks held, ${when(newest, now)}.`
+        : "The application's own checks held when they were last read.",
     };
   const anyFreshness = held
     .map((item) => freshnessOf(item.value, item.record, now).kind)

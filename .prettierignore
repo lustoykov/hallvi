@@ -19,3 +19,6 @@ tests/browser-fixtures
 # Prose, design documents, and hand-built HTML pages keep their own layout
 *.md
 *.html
+
+.state/
+.review/

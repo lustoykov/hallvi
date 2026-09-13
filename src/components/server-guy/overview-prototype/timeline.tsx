@@ -97,18 +97,28 @@ const nothing: Record<Lane["id"], string> = {
   access: "Never read",
 };
 
+/**
+ * The page's verdict, and the evidence behind it.
+ *
+ * This used to return null the moment anything needed attention, on the
+ * reasoning that the attention cards would say it instead. The effect was
+ * that Overview stopped stating its own condition exactly when the condition
+ * was worth stating, leaving a process name as the largest text on the page
+ * and no answer at all to "what is true right now". It answers in every
+ * state now; the attention cards say what to do about it, which is a
+ * different question.
+ */
 function subline(model: HeroProps["model"], overview: Overview) {
   if (model.status !== "live")
     return model.status === "none"
       ? "Ask Server Guy in the conversation to deploy it; this fills in as it runs."
       : "Nothing runs yet. Once you approve, Server Guy builds it, checks it and starts copying its data off the server.";
-  if (overview.needs.length) return null;
   const app = model.byId.app;
   const host = model.byId.host;
-  const server =
-    host?.evidence.certainty === "verified"
-      ? ` The server answered ${ago(host.evidence.at, model.now)}.`
-      : "";
+  // The Server lane directly below says "Checked 7 h ago" in its own caption,
+  // so repeating it in the verdict spent a third of the sentence on something
+  // already on screen — and pushed the part that matters onto another line.
+  const server = "";
   // The application's own condition, when a record states it. Reading this
   // off the web part instead would let the page say "passed its checks" about
   // the process while nothing had been established about the application.
@@ -356,7 +366,17 @@ export function TimelineHero({
     .map((at, i, all) => ({ at, width: x(all[i + 1] ?? end) - x(at) }))
     .filter((day) => day.width > 9);
 
-  const sub = subline(model, overview);
+  // Attention first. The condition sentence is scoped to the application's
+  // own record, so it can honestly say every check held while a domain check
+  // on the same page did not — which reads as reassurance the page has not
+  // earned. When something needs the reader, the verdict says so before it
+  // says anything reassuring, and the cards below say what it is.
+  const verdict = subline(model, overview);
+  const waiting = overview.needs.length;
+  const sub =
+    verdict && waiting
+      ? `${waiting === 1 ? "One thing needs you" : `${waiting} things need you`}. ${verdict}`
+      : verdict;
   const showLog = !planned && logOpen;
   const lines = guy.lines.slice(-6);
   const newest = lines.at(-1);
@@ -651,10 +671,15 @@ export function TimelineHero({
     >
       <div className="axt-top">
         <div className="axt-words">
-          <h2 className="axt-say" key={overview.headline}>
-            {overview.headline}
+          {/* The verdict is the headline. The application's name is already
+              in the sidebar, the switcher and the top bar; printing the web
+              process's name at 30px said nothing three people had not said
+              already, while the sentence that answers "what is true right
+              now" sat underneath it in muted 15px — or, when anything needed
+              attention, was not rendered at all. */}
+          <h2 className="axt-say" key={sub ?? overview.headline}>
+            {sub ?? overview.headline}
           </h2>
-          {sub && <p className="axt-sub">{sub}</p>}
         </div>
       </div>
 
@@ -695,7 +720,14 @@ export function TimelineHero({
           <div className="axt-now" />
         </div>
         <div className="axt-over">
-          <div className="axt-stand" style={{ left: `${nowX}%` }}>
+          {/* Little Server stands at "now", which is the right-hand edge of
+              the field — and it is centred on that point, so half of it hung
+              off the side of the window. Clamped to half its own width from
+              either edge it still stands at now, and all of it shows. */}
+          <div
+            className="axt-stand"
+            style={{ left: `clamp(46px, ${nowX}%, calc(100% - 46px))` }}
+          >
             <Mascot
               guy={guy}
               mascotRef={mascot}

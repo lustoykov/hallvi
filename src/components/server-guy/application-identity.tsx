@@ -73,8 +73,8 @@ export function ApplicationIdentity({
       <div className="sg-identity-breadcrumb">
         <Link href={listHref}>Applications</Link>
         <span aria-hidden="true">/</span>
-        <strong>{nameOf(application)}</strong>
-        <small>{repository}</small>
+        <strong title={nameOf(application)}>{nameOf(application)}</strong>
+        <small title={repository}>{repository}</small>
       </div>
     );
 
@@ -91,9 +91,13 @@ export function ApplicationIdentity({
         <span className="sg-identity-mark" aria-hidden="true">
           {initial(application)}
         </span>
+        {/* Both of these truncate in a 240px column — which is right — so
+            each carries its full value for hover and assistive technology.
+            "docker/getting-started-app" was cut to "docker/getting-started-"
+            on every page of that application with no way to read the rest. */}
         <span className="sg-identity-text">
-          <strong>{nameOf(application)}</strong>
-          <small>{repository}</small>
+          <strong title={nameOf(application)}>{nameOf(application)}</strong>
+          <small title={repository}>{repository}</small>
         </span>
         <CaretUpDown aria-hidden="true" weight="bold" />
       </button>

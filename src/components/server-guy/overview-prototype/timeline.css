@@ -29,16 +29,22 @@
   align-items: start;
   gap: 24px;
 }
+/* A verdict is a sentence, not a title. At 30px semibold it competed with
+   the page heading directly above it and wrapped to three lines; at this
+   size it reads as the page's first and most important statement without
+   turning into a second heading. */
 .axt-say {
   margin: 0;
-  font-size: 30px;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.026em;
+  max-width: 62ch;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.38;
+  letter-spacing: -0.014em;
   color: var(--ax-ink);
-  text-wrap: balance;
+  text-wrap: pretty;
   animation: axj2-fade 520ms var(--ax-ease-out);
 }
+
 .axt-sub {
   margin: 8px 0 0;
   max-width: 68ch;

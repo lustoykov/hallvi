@@ -29,10 +29,12 @@ import {
   currentFacts,
   freshnessOf,
   presenceOf,
+  subjectsOfKind,
   topologyOf,
   type RecordCheck,
 } from "@/server/record-projection";
 
+import { ago } from "./architecture-prototype/model";
 import type { ApplicationSection } from "./application-sections";
 import type {
   ArchitectureModel,
@@ -101,12 +103,13 @@ const destinations: Partial<Record<Part["kind"], ApplicationSection>> = {
   offsite: "backups",
 };
 
-function localTime(at: string) {
-  return new Date(at).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+/**
+ * Architecture used to date its evidence with a bare clock time — "Checked
+ * 11:43 AM" — while every other destination says "7 h ago". Two things wrong
+ * with that: the product spoke two time languages on adjacent pages, and a
+ * clock time with no date cannot tell today from last Tuesday, which is
+ * exactly the distinction a current-state view exists to make.
+ */
 
 /**
  * The check a part's tag should draw: the first declared key it carries.
@@ -161,7 +164,7 @@ function evidenceFor(
     return {
       certainty: "absent",
       short: "Established absent",
-      detail: `${presence.record.title}${presence.record.establishedAt ? `, recorded at ${localTime(presence.record.establishedAt)}` : ""}.`,
+      detail: `${presence.record.title}${presence.record.establishedAt ? `, recorded ${ago(presence.record.establishedAt, now)}` : ""}.`,
       at: presence.record.establishedAt,
     };
 
@@ -207,9 +210,9 @@ function evidenceFor(
           : "unknown";
   const short =
     reading === "verified"
-      ? `Checked ${at ? localTime(at) : "recently"}`
+      ? `Checked ${at ? ago(at, now) : "recently"}`
       : reading === "stale"
-        ? `Last checked ${at ? localTime(at) : "some time ago"}`
+        ? `Last checked ${at ? ago(at, now) : "some time ago"}`
         : reading === "failed"
           ? "A check failed"
           : freshness.kind === "never-established"
@@ -498,6 +501,27 @@ export function architectureFromRecords({
     new Set(of("source").map((part) => part.id)),
   );
 
+  /**
+   * Whether anything copies the data off the server — and the difference
+   * between nobody having looked and somebody having established that nothing
+   * does.
+   *
+   * Architecture said "has not been assessed" for an application whose records
+   * carried a nightly export job, two backup copies and a verified restore.
+   * Nobody had failed to look; what they found was that every copy lands on the
+   * same host, which is why Storage says nothing is off the server and the
+   * application list says "A backup plan, no copy yet". Reporting that as an
+   * open question is the softer of the two readings and the wrong one.
+   */
+  function offServer(records: SavedInformation[]) {
+    const looked = ["backup-copy", "backup-plan", "offsite"].some(
+      (kind) => subjectsOfKind(records, kind as "backup-copy").length > 0,
+    );
+    return looked
+      ? "Nothing on record copies them off it."
+      : "Whether anything copies them off it has not been assessed.";
+  }
+
   const stops = (kinds: Part["kind"][]) =>
     kinds.flatMap((kind) => of(kind).map((part) => part.id));
   const journeys: Journey[] = (
@@ -520,7 +544,7 @@ export function architectureFromRecords({
         summary: volumes.length
           ? offsite.length
             ? `${list(volumes.map((part) => part.name))} live on the server and are copied to ${list(offsite.map((part) => part.name))}.`
-            : `${list(volumes.map((part) => part.name))} live on the server. Whether anything copies them off it has not been assessed.`
+            : `${list(volumes.map((part) => part.name))} live on the server. ${offServer(records)}`
           : "No stored data is on record for this application.",
       },
       {
@@ -556,7 +580,7 @@ export function architectureFromRecords({
         : readings.includes("verified")
           ? {
               certainty: "verified",
-              text: "Every check on the application held when it was last read.",
+              text: "The application's own checks held when they were last read.",
             }
           : {
               certainty: "unknown",

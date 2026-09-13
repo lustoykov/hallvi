@@ -8,19 +8,12 @@ import {
   ChatCircle,
   GearSix,
   MagnifyingGlass,
-  Pause,
-  Play,
   Plus,
   ShieldCheck,
 } from "@phosphor-icons/react";
 import type { ApplicationListItem } from "../applications-screen";
-import type { MascotDance } from "./mascot-scene";
 import { mascotColors } from "./mascot-palette";
-import {
-  applicationKind,
-  ApplicationIllustration,
-  ApplicationSymbol,
-} from "./application-illustration";
+import { applicationKind, ApplicationSymbol } from "./application-illustration";
 import s from "./home.module.css";
 
 const Mascot = dynamic(
@@ -59,20 +52,18 @@ export function ApplicationsHome({
 }) {
   const [selectedId, setSelectedId] = useState(applications[0]?.id);
   const [query, setQuery] = useState("");
-  const [greeting, setGreeting] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [dance, setDance] = useState<MascotDance>("shuffle");
-  const [performance, setPerformance] = useState({
-    target: "",
-    request: 0,
-    dance: "shuffle" as MascotDance,
-  });
+  const [paused] = useState(false);
   const visible = applications.filter((item) =>
     `${item.name} ${item.source}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
   const selected = visible.find((item) => item.id === selectedId) ?? visible[0];
+  // What a return visit is for. Attention only — a recovered failure is not
+  // carried forward, because the condition is read from the current checks.
+  const waiting = applications.filter(
+    (item) => item.attention > 0 || item.condition.tone === "bad",
+  );
   const addHref = preview ? "/prototype/new" : "/applications/new";
   const unprotected = applications.filter(
     (item) =>
@@ -93,7 +84,6 @@ export function ApplicationsHome({
   );
   function greet(id: string) {
     setSelectedId(id);
-    setGreeting((value) => value + 1);
   }
   return (
     <main className={s.page}>
@@ -121,12 +111,63 @@ export function ApplicationsHome({
       <div className={s.content}>
         <section className={s.greeting} aria-labelledby="home-heading">
           <div>
+            {/* Somebody opening this page has come back to find out whether
+                their software is all right. It used to open with a marketing
+                line and three large caretakers, and the only real facts were
+                below them. The heading answers the question the visit is
+                about, from the records; the personality stays, smaller, and
+                beside it rather than on top of it. */}
             <h1 id="home-heading">
-              Your apps are
-              <br />
-              <em>in good company.</em>
+              {waiting.length === 0 ? (
+                <>
+                  Nothing needs you
+                  <br />
+                  <em>right now.</em>
+                </>
+              ) : waiting.length === 1 ? (
+                <>
+                  {waiting[0].name}
+                  <br />
+                  <em>needs you.</em>
+                </>
+              ) : (
+                <>
+                  {waiting.length} applications
+                  <br />
+                  <em>need you.</em>
+                </>
+              )}
             </h1>
-            <p>A home for your software. A little help looking after it.</p>
+            <p>
+              {waiting.length === 0
+                ? "Nothing on record is waiting. Open an application to see what it has been doing."
+                : `${
+                    waiting.length === 1
+                      ? waiting[0].name
+                      : `${waiting
+                          .slice(0, -1)
+                          .map((item) => item.name)
+                          .join(", ")} and ${waiting.at(-1)!.name}`
+                  }${
+                    waiting.length === 1
+                      ? " has something waiting."
+                      : " have something waiting."
+                  }`}
+            </p>
+          </div>
+          {/* One caretaker, at the size of a thought rather than a poster,
+              and its mood is the page's answer: it is attentive when
+              something is waiting and at rest when nothing is. Personality
+              that carries meaning survives; three identical figures taking a
+              scroll's worth of room did not. */}
+          <div className={s.pageMascot} aria-hidden="true">
+            <Mascot
+              color={0}
+              mood={waiting.length ? "attention" : "resting"}
+              paused={paused}
+              ambient
+              slot={0}
+            />
           </div>
           {selected && (
             <div className={s.conversationAction}>
@@ -180,7 +221,7 @@ export function ApplicationsHome({
           ) : (
             <>
               <ul className={s.collection} aria-label="Applications">
-                {visible.map((item, index) => {
+                {visible.map((item) => {
                   const color = colorFor(item);
                   const kind = applicationKind(item.source, item.name);
                   const active = selected?.id === item.id;
@@ -197,38 +238,11 @@ export function ApplicationsHome({
                         if (!active) greet(item.id);
                       }}
                     >
-                      <button
-                        className={s.selectMascot}
-                        aria-label={`Select ${item.name} caretaker`}
-                        aria-pressed={active}
-                        onClick={() => greet(item.id)}
-                      >
-                        <Mascot
-                          color={color}
-                          mood={active ? "waving" : "ready"}
-                          paused={paused}
-                          gesture={active ? greeting : 0}
-                          ambient
-                          slot={index % 3}
-                          dance={
-                            performance.target === item.id
-                              ? performance.dance
-                              : (["shuffle", "robot", "floss"] as const)[
-                                  index % 3
-                                ]
-                          }
-                          danceRequest={
-                            performance.target === item.id
-                              ? performance.request
-                              : 0
-                          }
-                        />
-                        <span>
-                          {active
-                            ? "Ready when you are."
-                            : "A little company for your app."}
-                        </span>
-                      </button>
+                      {/* The caretaker that used to stand above each
+                          card is gone: three identical figures at 250px
+                          each, with the application's own condition
+                          underneath them. Personality moved to the page
+                          head, where it costs nobody a scroll. */}
                       <Link className={s.application} href={item.href}>
                         <div className={s.appIdentity}>
                           <span className={s.appSymbol}>
@@ -240,7 +254,14 @@ export function ApplicationsHome({
                           </div>
                           <ArrowUpRight aria-hidden="true" />
                         </div>
-                        <ApplicationIllustration kind={kind} />
+                        {/* The card used to carry a mock browser window with
+                            an invented heartbeat chart in it. It was the same
+                            on every application, it said nothing about any of
+                            them, it pushed the condition and the attention
+                            count below the fold — and on a product whose
+                            first rule is not to manufacture healthy states, a
+                            decorative heartbeat is the wrong ornament. What
+                            the card is for is underneath it. */}
                         <div className={s.appFacts}>
                           <strong className={s[`tone_${item.condition.tone}`]}>
                             <i aria-hidden="true" />
@@ -278,56 +299,6 @@ export function ApplicationsHome({
             </>
           )}
         </section>
-        {applications.length > 0 && (
-          <div className={s.controls}>
-            <span>
-              Select a caretaker to say hello. Open its application to get to
-              work.
-            </span>
-            <div>
-              <label className={s.visuallyHidden} htmlFor="mascot-dance">
-                Dance or trick
-              </label>
-              <select
-                id="mascot-dance"
-                value={dance}
-                onChange={(e) => setDance(e.target.value as MascotDance)}
-              >
-                <option value="shuffle">Shuffle</option>
-                <option value="robot">The robot</option>
-                <option value="floss">Floss</option>
-                <option value="backflip">Backflip</option>
-                <option value="cartwheel">Cartwheel</option>
-              </select>
-              <button
-                disabled={!selected}
-                onClick={() => {
-                  if (selected) {
-                    setPaused(false);
-                    setPerformance({
-                      target: selected.id,
-                      request: performance.request + 1,
-                      dance,
-                    });
-                  }
-                }}
-              >
-                {dance === "backflip" || dance === "cartwheel"
-                  ? "Show me a trick"
-                  : "Show me a dance"}
-                <Play aria-hidden="true" />
-              </button>
-              <button onClick={() => setPaused((value) => !value)}>
-                {paused ? (
-                  <Play aria-hidden="true" />
-                ) : (
-                  <Pause aria-hidden="true" />
-                )}
-                {paused ? "Resume animations" : "Pause animations"}
-              </button>
-            </div>
-          </div>
-        )}
         {unprotected.length > 0 && (
           <aside className={s.protection}>
             <ShieldCheck aria-hidden="true" />

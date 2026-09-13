@@ -43,6 +43,7 @@ export function ConversationScrollButton() {
       type="button"
     >
       <ArrowDown weight="bold" />
+      Latest
     </button>
   );
 }

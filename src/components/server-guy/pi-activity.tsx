@@ -38,6 +38,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
+import { plainText } from "./execution-text";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -166,41 +167,6 @@ function subject(record: ActivityRecord) {
   return null;
 }
 
-/**
- * What a call actually said, rather than the envelope it arrived in. Tool
- * arguments and results are stored as JSON, and a shell script read through
- * JSON escaping — `set -eu\nprintf ...` on one line — is not readable. So the
- * longest string in the object is printed as itself, and the small scalars
- * that came with it follow on one line.
- */
-function plain(stored: string) {
-  const trimmed = stored.trim();
-  if (!trimmed || (trimmed[0] !== "{" && trimmed[0] !== "[")) return stored;
-  let value: unknown;
-  try {
-    value = JSON.parse(trimmed);
-  } catch {
-    // Text cut at its limit is no longer valid JSON; show it as it is.
-    return stored;
-  }
-  if (typeof value === "string") return value;
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    return stored;
-  const entries = Object.entries(value as Record<string, unknown>);
-  const strings = entries.filter(
-    (entry): entry is [string, string] => typeof entry[1] === "string",
-  );
-  if (!strings.length) return stored;
-  const main = strings.reduce((a, b) => (b[1].length > a[1].length ? b : a));
-  const rest = entries
-    .filter(([key]) => key !== main[0])
-    .map(
-      ([key, item]) =>
-        `${key}: ${typeof item === "string" ? item : JSON.stringify(item)}`,
-    );
-  return rest.length ? `${main[1]}\n\n${rest.join("\n")}` : main[1];
-}
-
 function duration(record: { startedAt: string; finishedAt?: string }) {
   if (!record.finishedAt) return null;
   const ms = Date.parse(record.finishedAt) - Date.parse(record.startedAt);
@@ -208,7 +174,14 @@ function duration(record: { startedAt: string; finishedAt?: string }) {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-/** "Read files, ran commands" — what a run of quiet calls amounts to. */
+/**
+ * "Two file reads and a command" — what a run of quiet calls amounts to.
+ *
+ * Count-aware and written as a phrase, because the old form put the noun in
+ * the label and the number in a separate column at the far end of the row
+ * ("Commands · 1"), so a reader assembled the sentence themselves. Past three
+ * kinds it stops listing and says how many calls there were; the row opens.
+ */
 function summarise(records: ActivityRecord[]) {
   const order: Kind[] = [
     "read",
@@ -219,20 +192,40 @@ function summarise(records: ActivityRecord[]) {
     "called",
     "asked",
   ];
-  const words: Record<Kind, string> = {
-    read: "file reads",
-    search: "searches",
-    ran: "commands",
-    wrote: "file changes",
-    saved: "records",
-    called: "requests",
-    asked: "approvals",
+  const words: Record<Kind, [string, string]> = {
+    read: ["file read", "file reads"],
+    search: ["search", "searches"],
+    ran: ["command", "commands"],
+    wrote: ["file change", "file changes"],
+    saved: ["record", "records"],
+    called: ["request", "requests"],
+    asked: ["approval", "approvals"],
   };
-  const present = order.filter((kind) =>
-    records.some((record) => describe(record).kind === kind),
+  const counts = order
+    .map((kind) => ({
+      kind,
+      n: records.filter((record) => describe(record).kind === kind).length,
+    }))
+    .filter((entry) => entry.n > 0);
+  if (!counts.length) return "Worked";
+  if (counts.length > 3) return `${records.length} calls`;
+  const said = counts.map(
+    ({ kind, n }) => `${n} ${words[kind][n === 1 ? 0 : 1]}`,
   );
-  const phrase = present.map((kind) => words[kind]).join(", ");
-  return phrase ? phrase[0].toUpperCase() + phrase.slice(1) : "Worked";
+  const phrase =
+    said.length === 1
+      ? said[0]
+      : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;
+  return phrase[0].toUpperCase() + phrase.slice(1);
+}
+
+/** What became of one call, for a mark that can be seen without reading. */
+function outcomeOf(record: ActivityRecord) {
+  if (record.status === "failed") return "failed";
+  if (record.status === "declined") return "declined";
+  if (record.status === "interrupted") return "stopped";
+  if (record.status === "running") return "running";
+  return "done";
 }
 
 type Item =
@@ -379,8 +372,19 @@ function Quiet({
       .filter((host): host is string => host !== null),
   );
   const host = hosts.size === 1 ? [...hosts][0] : null;
+  // The row a failure used to hide in looked exactly like the five beside it,
+  // and "1 · 1 failed" in the same grey as the count is not a way of telling
+  // somebody something went wrong. The marks and the tone say it while the
+  // group is still closed — opening five historical groups on load would bury
+  // the conversation under its own machinery, which is the other half of the
+  // same problem.
+  const failed = count("failed") > 0;
   return (
-    <div className="sg-did-quiet" data-open={open || undefined}>
+    <div
+      className="sg-did-quiet"
+      data-open={open || undefined}
+      data-wrong={failed || undefined}
+    >
       <button
         type="button"
         className="sg-did-head"
@@ -395,11 +399,20 @@ function Quiet({
             {host && place === "server" && <code>{host}</code>}
           </span>
         )}
+        {/* One mark per call, in order. Six green ticks and one red is a
+            shape; "7 · 1 failed" is a sentence you have to finish reading. */}
+        <span className="sg-did-marks" aria-hidden="true">
+          {records.slice(0, 12).map((record) => (
+            <i key={record.id} data-outcome={outcomeOf(record)} />
+          ))}
+          {records.length > 12 && <b>+{records.length - 12}</b>}
+        </span>
+        {/* Without this the overflow count and the outcome run together:
+            "+1" beside "2 failed" reads as twelve failures. */}
+        <span className="sg-did-gap" aria-hidden="true" />
         <em>
-          {records.length}
           {working ? (
             <>
-              {" · "}
               <SpinnerGap
                 weight="bold"
                 aria-hidden="true"
@@ -408,7 +421,15 @@ function Quiet({
               working
             </>
           ) : wrong ? (
-            ` · ${wrong}`
+            // A decline is the reader's own decision and a stop is their
+            // interruption; neither is an error, and colouring them like one
+            // would teach them to distrust the colour.
+            <span
+              className="sg-did-wrong"
+              data-tone={count("failed") ? "failed" : "chosen"}
+            >
+              {wrong}
+            </span>
           ) : (
             ""
           )}
@@ -467,9 +488,9 @@ function Row({ record }: { record: ActivityRecord }) {
       </button>
       {open && (
         <div className="sg-did-detail">
-          <pre>{plain(record.args) || "Nothing recorded."}</pre>
+          <pre>{plainText(record.args) || "Nothing recorded."}</pre>
           <pre data-wrong={wrong || undefined}>
-            {plain(shown) ||
+            {plainText(shown) ||
               (record.status === "running"
                 ? "Nothing yet."
                 : "Nothing was recorded for this call.")}

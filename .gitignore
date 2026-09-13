@@ -14,3 +14,8 @@ tests/results/
 
 # Python operator proof helpers
 __pycache__/
+
+# Local runtime state and review captures for this branch — never committed.
+.state/
+.review/
+.state-caps/

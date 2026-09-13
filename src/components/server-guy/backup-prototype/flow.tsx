@@ -401,7 +401,9 @@ export function FlowDirection({
             <div key={item.name} className="axbf-vol">
               <div className="axbf-vol-head">
                 <code>{item.name}</code>
-                <small>
+                {/* A container path is long and truncating it is right in
+                    this column; losing it is not. */}
+                <small title={`${item.owner} · ${item.mount}`}>
                   {item.owner} · {item.mount}
                 </small>
               </div>

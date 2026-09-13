@@ -1,5 +1,7 @@
 "use client";
+import { Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
+import { plainText } from "./execution-text";
 import type {
   ExecutionRecord,
   OperatorSettings,
@@ -8,10 +10,32 @@ import "./operator-console.css";
 import { Tag, Working, type Tone } from "./presentation";
 import { StreamingOutput } from "./streaming-output";
 
+/**
+ * The permission boundary, and what each setting actually does.
+ *
+ * The control used to be three words in a segmented pill with nothing saying
+ * what any of them meant. "Bypass" was selected on a real application and
+ * looked exactly like a view filter — the most consequential setting in the
+ * product, styled as a preference. The words do not change; what changes is
+ * that the current one states its consequence, because a reader should not
+ * have to try a setting to find out what it does.
+ */
 const modes = [
-  { id: "always-ask", label: "Always ask" },
-  { id: "pi-decides", label: "Pi decides" },
-  { id: "bypass", label: "Bypass" },
+  {
+    id: "always-ask",
+    label: "Always ask",
+    means: "Every command waits for you.",
+  },
+  {
+    id: "pi-decides",
+    label: "Pi decides",
+    means: "Pi asks before anything consequential.",
+  },
+  {
+    id: "bypass",
+    label: "Bypass",
+    means: "Pi runs commands without asking.",
+  },
 ] as const;
 
 /** What a command's state is called, and how sure that state is. */
@@ -21,7 +45,9 @@ const states: Record<
 > = {
   succeeded: { tone: "verified", word: "Completed" },
   failed: { tone: "failed", word: "Failed" },
-  declined: { tone: "absent", word: "Not run" },
+  // Declining is a decision the product supports, not a thing that failed to
+  // happen. The receipt says whose decision it was.
+  declined: { tone: "absent", word: "You declined" },
   interrupted: { tone: "stale", word: "Interrupted" },
   "awaiting-approval": { tone: "stale", word: "Waiting for you" },
   running: null,
@@ -169,6 +195,16 @@ export function OperatorConsole({
                     </button>
                   ))}
                 </div>
+                <span
+                  className="sg-modes-means"
+                  data-loud={settings.permissionMode === "bypass" || undefined}
+                >
+                  {settings.permissionMode === "bypass" && (
+                    <Warning weight="fill" aria-hidden="true" />
+                  )}
+                  {modes.find((mode) => mode.id === settings.permissionMode)
+                    ?.means ?? ""}
+                </span>
               </div>
             )}
           </div>
@@ -196,9 +232,20 @@ export function OperatorConsole({
                       ? "Run on server"
                       : item.tool}
                 </strong>
-                <span className="sg-execution-where">
-                  {item.target} ·{" "}
-                  {new Date(item.createdAt).toLocaleTimeString()}
+                {/* "root@192.0.2.10:22" is a login string. The reader is
+                    being asked whether to let something run on their server;
+                    which server, in their words, is the useful half, and the
+                    login stays available on hover. */}
+                <span className="sg-execution-where" title={item.target}>
+                  {item.tool === "server_bash" ? "on your server" : item.target}
+                  {item.tool === "server_bash" &&
+                    item.target.includes("@") &&
+                    ` · ${item.target.split("@").at(-1)?.split(":")[0]}`}
+                  {" · "}
+                  {new Date(item.createdAt).toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
                 <span role="status" className="sg-execution-state">
                   {states[item.status] ? (
@@ -227,7 +274,7 @@ export function OperatorConsole({
                       ? "Review this action"
                       : "Command and output"}
                   </summary>
-                  <pre>{item.input}</pre>
+                  <pre>{plainText(item.input)}</pre>
                   {item.output && <pre>{item.output}</pre>}
                 </details>
               )}

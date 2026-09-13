@@ -27,7 +27,8 @@ interface Fact {
   key: string;
   label: string;
   value: string;
-  sub: string;
+  /** A second line, where there is one the row's neighbours do not carry. */
+  sub?: string;
   exact: { label: string; value: string; mono?: boolean }[];
 }
 
@@ -249,7 +250,17 @@ export function LineDirection({
           : undefined,
       title: (
         <>
-          {item.product} <code className="axsl-code">{item.name}</code>
+          {item.product}
+          {/* Pi names a process after what it is, so the product and the
+              container id are often the same word — and the node read
+              "shop-web shop-web". An identifier earns its place beside a
+              name only when it says something the name does not. */}
+          {item.name !== item.product && (
+            <>
+              {" "}
+              <code className="axsl-code">{item.name}</code>
+            </>
+          )}
         </>
       ),
       detail: `${item.roleWords} · ${item.reach}`,
@@ -293,7 +304,9 @@ export function LineDirection({
                     : item.role === "worker"
                       ? "Worker"
                       : "Service",
-              sub: item.reach,
+              // The spine beside this list draws exactly this: where each
+              // process sits and what can reach it. Saying it again here
+              // made the page state the same fact twice on one screen.
               exact: [
                 { label: "Process", value: item.name, mono: true },
                 { label: "Image", value: item.image, mono: true },

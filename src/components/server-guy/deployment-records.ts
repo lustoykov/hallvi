@@ -10,6 +10,7 @@
 // Nothing here re-runs anything to fill a panel. The output shown is the
 // output that was captured, with the time it was captured.
 
+import { clip, commandOf, essence } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import { releasedServices, tagFor } from "@/server/record-projection";
@@ -140,7 +141,7 @@ export function deploymentFromRecords({
   const phases: Phase[] = ordered.map((execution) => ({
     id: execution.id,
     title: titleOf(execution),
-    detail: execution.input.split("\n")[0].slice(0, 140),
+    detail: clip(essence(commandOf(execution.input)), 140),
     start: execution.createdAt,
     end: execution.finishedAt ?? execution.createdAt,
     tone: phaseTone[execution.status] ?? "work",

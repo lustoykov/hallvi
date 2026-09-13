@@ -219,3 +219,72 @@
     animation-duration: 2.4s;
   }
 }
+
+/* One mark per call, in the order they ran.
+   The group head used to end with "7 · 1 failed" in a single muted run, so a
+   reader learned that something had failed only by finishing the row — and
+   the row was identical to the five beside it. Marks give the outcome a
+   shape: six quiet ticks and one red one is seen, not read. */
+.sg-did-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+}
+.sg-did-marks i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--line-strong, #ccd5e3);
+}
+.sg-did-marks i[data-outcome="done"] {
+  background: var(--verified-line, #b8e0cc);
+}
+.sg-did-marks i[data-outcome="failed"] {
+  width: 6px;
+  height: 6px;
+  background: var(--failed, #a6312b);
+}
+.sg-did-marks i[data-outcome="declined"],
+.sg-did-marks i[data-outcome="stopped"] {
+  background: var(--waiting-line, #ecd6b8);
+}
+.sg-did-marks i[data-outcome="running"] {
+  background: var(--working-text, #2852a6);
+  animation: sg-did-pulse 1.6s ease-in-out infinite;
+}
+.sg-did-marks b {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--faint, #8b95a5);
+}
+@keyframes sg-did-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-did-marks i[data-outcome="running"] {
+    animation: none;
+  }
+}
+
+/* A failure says so in its own colour, and its group opens itself. A decline
+   or a stop is the reader's own decision, so it is marked, not alarmed. */
+.sg-did-wrong {
+  font-weight: 600;
+  font-style: normal;
+}
+.sg-did-wrong[data-tone="failed"] {
+  color: var(--failed, #a6312b);
+}
+.sg-did-wrong[data-tone="chosen"] {
+  color: var(--waiting-text, #9a4b10);
+}
+.sg-did-quiet[data-wrong] > .sg-did-head > svg {
+  color: var(--failed, #a6312b);
+}
+
+.sg-did-gap {
+  width: 2px;
+}

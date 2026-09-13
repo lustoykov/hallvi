@@ -107,7 +107,9 @@ describe("conversation recovery and assistant branding", () => {
     ["queued", "Waiting to reply"],
     ["running", "Working"],
     ["failed", "Something went wrong. Please retry."],
-    ["cancelled", "Reply cancelled."],
+    // Stopping ends the reply and does not undo work that already ran, so
+    // the line reports what happened rather than naming the reply.
+    ["cancelled", "Stopped."],
   ] as const)("keeps %s status user-facing", (status, expected) => {
     const html = render({
       status,
@@ -180,8 +182,14 @@ it("renders streaming text once after earlier tool calls, including before the f
       const html = render({ status, body, piActivity });
       expect(html.split(body)).toHaveLength(2);
       if (piActivity.length) {
-        expect(html).toContain("File reads");
-        expect(html.indexOf("File reads")).toBeLessThan(html.indexOf(body));
+        // The point is the order — what Pi did comes before what Pi is
+        // saying — not the exact phrase. The group summary counts now, so a
+        // single call reads "1 file read" rather than "File reads".
+        const summary = "file read";
+        expect(html.toLowerCase()).toContain(summary);
+        expect(html.toLowerCase().indexOf(summary)).toBeLessThan(
+          html.indexOf(body),
+        );
       }
     }
     const html = render({

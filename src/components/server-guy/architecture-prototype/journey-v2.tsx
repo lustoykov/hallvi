@@ -431,8 +431,15 @@ function Card({
         {iconFor(part, model.openness)}
       </span>
       <span className="axj2-text">
-        <b>{titleFor(part)}</b>
-        {!compact && <small>{subtitleFor(part, model)}</small>}
+        {/* Container and volume names are Pi's, and some are sixty characters.
+            Two lines is the right budget for a node in a map, so the full
+            value stays available rather than being lost to the clamp. */}
+        <b title={titleFor(part)}>{titleFor(part)}</b>
+        {!compact && (
+          <small title={subtitleFor(part, model)}>
+            {subtitleFor(part, model)}
+          </small>
+        )}
         {!part.quiet && (
           <span className="axj2-status">
             <i aria-hidden="true" />

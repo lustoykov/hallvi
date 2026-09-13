@@ -16,6 +16,7 @@
 // adjacency would put a claim on the page that nobody made.
 
 import type { ApplicationOperation } from "@/server/operation-record";
+import { executionLine, plainText } from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
@@ -53,20 +54,7 @@ const executionState: Record<
 
 /** A command's own name in a list of past work, by where it ran. */
 function commandTitle(execution: ExecutionRecord) {
-  const first = execution.input.split("\n")[0].trim().slice(0, 90);
-  switch (execution.tool) {
-    case "server_bash":
-      return `On the server · ${first}`;
-    case "request_approval":
-      return `Your decision · ${first}`;
-    case "bash":
-    case "powershell":
-      return `In the repository copy · ${first}`;
-    case "hetzner_request":
-      return `Asked the provider · ${first}`;
-    default:
-      return `${execution.tool.replaceAll("_", " ")} · ${first}`;
-  }
+  return executionLine(execution, 90);
 }
 
 export function historyFromRecords({
@@ -127,7 +115,7 @@ export function historyFromRecords({
           : execution.target,
       approval:
         execution.status === "awaiting-approval"
-          ? { note: execution.input.slice(0, 300), action: "Run it" }
+          ? { note: plainText(execution.input).slice(0, 300), action: "Run it" }
           : undefined,
     }),
   );
