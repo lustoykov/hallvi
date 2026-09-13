@@ -215,3 +215,37 @@ test.describe("operating the destinations", () => {
     },
   );
 });
+
+test.describe("the logs filter", () => {
+  test(
+    "says what it searched when it finds nothing",
+    journey("record-destinations"),
+    async ({ page }) => {
+      const app = await firstApplication(page, ACCEPTANCE);
+      test.skip(!app, "no acceptance server");
+      await page.goto(`${ACCEPTANCE}/applications/${app}#logs`);
+      await page.waitForLoadState("networkidle").catch(() => {});
+
+      const box = page.getByPlaceholder(/filter captured lines/i);
+      test.skip(
+        !(await box.isVisible().catch(() => false)),
+        "nothing captured",
+      );
+      const before = await page.locator(".sg-logs-output").count();
+      expect(before).toBeGreaterThan(0);
+
+      await box.fill("zzz-no-such-thing-anywhere");
+      await page.waitForTimeout(300);
+      // A blank page below the box reads as a page that broke, not as a search
+      // that found nothing.
+      expect(await page.locator(".sg-logs-output").count()).toBe(0);
+      const said = await page.locator("main").innerText();
+      expect(said).toMatch(/Nothing captured contains/i);
+      expect(said).toMatch(/Clear the filter/i);
+
+      await box.fill("");
+      await page.waitForTimeout(300);
+      expect(await page.locator(".sg-logs-output").count()).toBe(before);
+    },
+  );
+});

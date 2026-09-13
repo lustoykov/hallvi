@@ -84,6 +84,14 @@ export function LogsPage({
   );
   const matching = (line: string) =>
     !query || line.toLowerCase().includes(query.toLowerCase());
+  // The captures that still have a line to show once the filter has run.
+  const matched = shown.filter(
+    (execution) =>
+      !query ||
+      (execution.output ?? "")
+        .split("\n")
+        .some((line) => line.trim() && matching(line)),
+  );
 
   return (
     <div className="sg-section-page sg-section-logs">
@@ -164,11 +172,27 @@ export function LogsPage({
           </div>
         )}
 
-        {shown.map((execution) => {
+        {/* A filter that matches nothing left the page blank below the box,
+            which reads as a page that broke rather than as a search that
+            found nothing. */}
+        {shown.length > 0 && query && !matched.length && (
+          <div className="sg-section-none">
+            <h2>Nothing captured contains “{query}”.</h2>
+            <p>
+              {shown.length} captured run{shown.length === 1 ? "" : "s"}{" "}
+              {shown.length === 1 ? "was" : "were"} searched, from{" "}
+              {new Set(shown.map((item) => placeOf(item.tool))).size === 1
+                ? "one place"
+                : `${new Set(shown.map((item) => placeOf(item.tool))).size} places`}
+              . Clear the filter to see them.
+            </p>
+          </div>
+        )}
+
+        {matched.map((execution) => {
           const lines = (execution.output ?? "")
             .split("\n")
             .filter((line) => line.trim() && matching(line));
-          if (query && !lines.length) return null;
           const at = execution.finishedAt ?? execution.createdAt;
           return (
             <section className="sg-captured" key={execution.id}>

@@ -557,7 +557,9 @@
 .sg-logs-output {
   margin: 0;
   padding: 20px;
-  min-height: 300px;
+  /* A four-line command left two hundred pixels of white below it, and a
+     page of them read as if something had failed to load. The ceiling still
+     stops one long capture from filling the screen. */
   max-height: 600px;
   overflow: auto;
   white-space: pre-wrap;
