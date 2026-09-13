@@ -156,6 +156,40 @@ last colon, which is a tag for `name:tag` and a bare 64-character hash for a
 digest-pinned reference. Fixed: the name carries the line and the digest sits
 in the rows underneath.
 
+## The same journey on real Hetzner hardware — passes
+
+The owner authorised buying a server, which closed the last gap: everything
+above is real except the provider, and this run has no stand-in at all. The
+`:3397` preview with a normal PATH — no rig, no shims — against a genuine
+Hetzner host.
+
+| Step | Result |
+| --- | --- |
+| Catalog and cost | **pass** — asked for the cheapest, Pi found `cx22` retired after 2025-12-31 and chose `cx23`, which the availability API confirms is the cheapest type still purchasable in hel1 |
+| Exactly one server created | **pass** — `real-host-proof-38e37237` (165658707); the accepted deployment and the other server untouched |
+| Host key scanned and pinned, SSH verified | **pass** — system `ssh`, real host |
+| Deploy, non-root container, host-mounted SQLite | **pass** |
+| Restart persistence | **pass** |
+| Private tunnel and use | **pass** — `http://127.0.0.1:18080` returned 200 and took a new item |
+| Public port refused | **pass** — `http://204.168.248.155:3000` does not answer |
+| Cost | €5.49 server + €0.50 IPv4 = **€5.99/month ≈ €0.008/hour** |
+
+Seven records, the fullest set of the three runs, and the only one to include
+a `process` subject:
+
+| Record | Carries |
+| --- | --- |
+| A private-deployment host is ready on Hetzner | `states: host` |
+| Revision 6b025fc5 is deployed in a hardened container | `deployment` |
+| The application is healthy through private access | `topology` + `states: application` |
+| The application opens privately through this PC | `application-access` + `states: access` |
+| SQLite data persists across container restarts | `states: volume` |
+| Application port 3000 accepts only loopback traffic | `states: door` |
+| The web container is healthy and restart-managed | `states: process` |
+
+Pi also volunteered what it had not done: "SQLite is persistent but not yet
+backed up."
+
 ## Resources left running
 
 - `sg-rig-opus` — the host container, with `getting-started-app` deployed and
