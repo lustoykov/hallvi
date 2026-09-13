@@ -49,6 +49,31 @@ export function SecretRequests({
           onChanged={onChanged}
         />
       ))}
+      {/* Said once for however many values are being asked for, rather than
+          five lines of the same security explanation under each field. */}
+      <details className="sg-secret-how">
+        <summary>How Server Guy handles these</summary>
+        <p>
+          The value posts straight to the controller, so it never becomes a
+          message and is never part of the model&rsquo;s context. It is stored
+          encrypted, and nothing reads it back for display — there is no reveal
+          control because there is nothing to reveal it from.
+        </p>
+        <p>
+          When a command needs it, the privileged layer exports it into that
+          command&rsquo;s environment as it runs. The name appears in the saved
+          command; the value does not, in the record, the activity or the log.
+          Exact matches are removed from captured output.
+        </p>
+        <p>
+          What that does not cover: a command Pi writes can read the value from
+          its own environment and transform or send it somewhere, and redaction
+          cannot recognise it once it has been changed. Encryption keeps
+          plaintext out of casual file inspection; it does not protect a copy of
+          the whole Server Guy configuration, or anyone who can read this
+          computer.
+        </p>
+      </details>
     </div>
   );
 }
@@ -143,14 +168,17 @@ function SecretField({
           useful, so Server Guy will not accept it.
         </p>
       )}
+      {/* This used to describe a `{{secret:NAME}}` handle substituted into
+          the command text. That mechanism was replaced — the privileged layer
+          exports the value into the command's environment instead, and the
+          server now refuses a command containing that pattern — so the
+          sentence described something the product does not do. The limit
+          stays on the face: it is the part that decides whether supplying a
+          value here is safe enough for the reader's purpose. */}
       <p className="sg-secret-note">
         <Eye weight="bold" aria-hidden="true" />
-        This does not become a message. Pi is given a handle,{" "}
-        <code>{`{{secret:${secret.name}}}`}</code>, and the value is put in only
-        as a command is run. Its exact value is removed from captured output,
-        but a command can still read, transform or transmit it. Encryption keeps
-        plaintext out of casual file inspection; it does not protect a copy of
-        the full Server Guy configuration or anyone who can read this computer.
+        Never a message, and never in a saved command — but a command Pi writes
+        can still use it.
       </p>
     </form>
   );

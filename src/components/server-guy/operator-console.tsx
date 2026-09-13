@@ -45,7 +45,9 @@ const states: Record<
 > = {
   succeeded: { tone: "verified", word: "Completed" },
   failed: { tone: "failed", word: "Failed" },
-  declined: { tone: "absent", word: "Not run" },
+  // Declining is a decision the product supports, not a thing that failed to
+  // happen. The receipt says whose decision it was.
+  declined: { tone: "absent", word: "You declined" },
   interrupted: { tone: "stale", word: "Interrupted" },
   "awaiting-approval": { tone: "stale", word: "Waiting for you" },
   running: null,

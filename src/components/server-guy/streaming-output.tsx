@@ -66,8 +66,12 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
           <code className="sg-ask-command">
             {clip(essence(commandOf(item.input)), 120)}
           </code>
+          {/* Scoped to this command, and only this command. "Nothing has
+              run yet" is a claim about the whole turn, and it is false the
+              moment an earlier command in the same turn has already
+              executed — which is the ordinary case by the time Pi asks. */}
           <p className="sg-ask-safe">
-            Nothing has run yet. It starts only when you approve.
+            This command has not run. It starts only if you approve.
           </p>
         </div>
       )}
@@ -110,7 +114,7 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
                   : running
                     ? "Waiting for command output…"
                     : item.status === "declined"
-                      ? "Command was not run."
+                      ? "You declined this command, so it did not run."
                       : "No output recorded."}
               </span>
             )}
