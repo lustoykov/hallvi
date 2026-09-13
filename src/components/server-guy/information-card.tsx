@@ -220,6 +220,13 @@ function GenericInformationCard({
   if (superseded || routine)
     return (
       <article
+        /* The first appearance carries the anchor even when it is compact.
+           This branch serves both cases, and setting no id at all meant a
+           record whose first appearance was routine never mounted the target
+           its later copies link to — every "see it in full above" on such a
+           record went nowhere, including after a reload. A superseded copy
+           must not claim it either, or the link would scroll to itself. */
+        id={superseded ? undefined : `record-${record.id}`}
         className="sg-result"
         data-tone={tone}
         data-quiet=""
