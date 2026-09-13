@@ -12,6 +12,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
+| [Codex cloud environment](development/codex-cloud.md) | The cloud container for checks and pull requests: what to configure, and which proofs still need the owner's machine. |
 | [Testing and evidence](testing/README.md) | What has actually been proved, coverage gaps and links to dated source accounts. |
 | [Dashboard acceptance guide](testing/phase-one-acceptance.md) | Small reference retained at the path the test dashboard loads. |
 
