@@ -40,9 +40,22 @@ import type {
   Waiting,
 } from "./supply-prototype/supply-story";
 
+/**
+ * A count Pi wrote, which may carry thousands separators or a word after it.
+ * `Number("1,204")` is NaN, and the page printed "NaN tasks waiting".
+ * Anything that is not a number reads as unmeasured, never as zero.
+ */
+const count = (value: string | null) => {
+  if (value === null) return null;
+  const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const size = Number(match[0]);
+  return Number.isFinite(size) ? size : null;
+};
+
 const seconds = (value: string | null) => {
   if (!value) return null;
-  const match = value.match(/([\d.]+)\s*(s|m|min|h)?/i);
+  const match = value.replace(/,/g, "").match(/([\d.]+)\s*(s|m|min|h)?/i);
   if (!match) return null;
   const size = Number(match[1]);
   const unit = (match[2] ?? "s").toLowerCase();
@@ -121,9 +134,9 @@ export function supplyFromRecords({
         backedBy: fact("backend") ?? brokers[0]?.product ?? "Not recorded",
         workers: (fact("workers") ?? "").split(/[,\s]+/).filter(Boolean),
         // A queue nobody has measured is not a queue with nothing in it.
-        backlog: depth ? Number(depth.value.value) : null,
+        backlog: depth ? count(depth.value.value) : null,
         oldestSeconds: seconds(fact("oldest")),
-        failedLastHour: fact("failed") ? Number(fact("failed")) : null,
+        failedLastHour: count(fact("failed")),
         at: depth?.record.establishedAt ?? null,
       };
     });

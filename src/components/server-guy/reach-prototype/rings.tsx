@@ -281,9 +281,11 @@ export function RingsDirection({
           <>
             <h3>Pick a ring to see what someone standing there can reach.</h3>
             <p>
-              {story.firewall.detail}{" "}
+              {/* Pi's own sentence rarely ends in a stop, and the next one
+                  ran straight into it. */}
+              {story.firewall.detail.replace(/[.;]?\s*$/, ".")}{" "}
               {story.firewall.state === "read"
-                ? "The rules are the provider’s own, read just now."
+                ? `The rules are the provider’s own, read ${story.firewall.at ? ago(story.firewall.at, now) : "at some point"}.`
                 : story.firewall.state === "none"
                   ? "What the rings show is the deployment's own arrangement, which is all that is holding."
                   : "These are the rules the deployment asked for, not a read of what is in place."}

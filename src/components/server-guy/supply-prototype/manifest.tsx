@@ -62,6 +62,7 @@ export function ManifestDirection({
     .filter((group) => group.items.length);
   const pending = story.values.filter((value) => value.pending);
   const held = story.values.filter((value) => value.held);
+  const plan = story.values.filter((value) => !value.held);
   const shown = story.values.find((value) => value.id === open) ?? null;
 
   const say = story.waiting.length
@@ -107,9 +108,14 @@ export function ManifestDirection({
             <span>
               No value appears on this page.{" "}
               {held.length
-                ? `${held.length === 1 ? "One is" : `${held.length} are`} held on the host, where only the process that needs it can read it; the rest`
-                : "They"}{" "}
-              live in the repository at revision{" "}
+                ? `${held.length === 1 ? "One is" : `${held.length} are`} held on the host, where only the process that needs it can read it. `
+                : ""}
+              {/* Where the rest live is each value's own source fact, and
+                  saying "the repository" for all of them was a guess about
+                  values written by a release, a connection or Server Guy. */}
+              {plan.length
+                ? `${held.length ? "The rest come" : "They come"} from where each row says, in the release at revision `
+                : "The release is at revision "}
               <code>{story.revision?.slice(0, 12) ?? "not recorded"}</code>.
             </span>
           </p>

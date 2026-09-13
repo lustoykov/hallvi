@@ -224,7 +224,9 @@ export function CallersDirection({
         />
         <p>
           {story.audience === "controller"
-            ? `HTTP is held to your network${story.controllerIp ? ` (${story.controllerIp})` : ""} while ${story.name} is being set up, so a stranger gets nothing. `
+            ? // "While it is being set up" was a phase nothing recorded.
+              // What is on record is that access is private.
+              `HTTP is held to your network${story.controllerIp ? ` (${story.controllerIp})` : ""}, so a stranger gets nothing. `
             : `Port 80 is open to every network, which is what a public application is for. `}
           {named
             ? story.tls.state === "valid"

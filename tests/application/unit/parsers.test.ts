@@ -216,3 +216,29 @@ describe("queue depths and durations", () => {
     expect(queueOf([fact("depth", "0")]).backlog).toBe(0);
   });
 });
+
+describe("counts", () => {
+  const queueOf = (facts: object[]) =>
+    supplyFromRecords({
+      records: [states({ kind: "queue", id: "q" }, { facts } as never)],
+      applicationId: APP,
+      applicationName: "App",
+      secrets: [],
+      now: NOW,
+    }).queues[0];
+
+  it("reads a thousands separator", () => {
+    // Number("1,204") is NaN, and the page printed "NaN tasks waiting".
+    expect(queueOf([fact("depth", "1,204")]).backlog).toBe(1204);
+    expect(queueOf([fact("failed", "1,024")]).failedLastHour).toBe(1024);
+  });
+
+  it("reads a count with words after it", () => {
+    expect(queueOf([fact("depth", "12 jobs")]).backlog).toBe(12);
+  });
+
+  it("reads no number as unmeasured, never as zero", () => {
+    for (const value of ["unknown", "", "several"])
+      expect(queueOf([fact("depth", value)]).backlog, value).toBeNull();
+  });
+});
