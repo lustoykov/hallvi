@@ -462,19 +462,80 @@ issues separately. Settings carries them as their own row, unconnected,
 because a green tick that implied otherwise would send somebody looking for a
 bug in an uploader that was never going to work.
 
-## What has not been done, and needs your say-so
+## Domains and CDN · the contract
 
-No DNS record has been created, changed or deleted. Nothing has been
-purchased. To take Domains past reading, the following are needed and none of
-them is mine to decide:
+Three checks on a `domain`, because they are three questions and only the
+third is about the application:
 
-| what | which | why it needs you |
+| check | claim | asks | answered by |
+|---|---|---|---|
+| `configured` | configuration (7d) | does the provider hold a record for this name? | `check_domain`, server-side |
+| `resolves` | reachability (3d) | does public DNS return anything for it? | Pi, from the server |
+| `serves` | reachability (3d) | does the **application** answer when someone asks for the name? | Pi, from the server |
+
+**A configured record is never evidence that the application answers.** A
+proxied name makes the gap visible: it resolves to the provider's addresses,
+serves the provider's certificate, and returns the provider's error page while
+the origin behind it is dead. Every one of those is a success signal that says
+nothing about the application.
+
+The five states a reader is given, one of which is always true:
+
+| state | means | drawn from |
 |---|---|---|
-| account | the Cloudflare account holding the zone | it is yours |
-| domain | `accountant-agent.com`, or another you own | a subdomain of a real domain, and the choice of which |
-| credentials | the token already configured, for DNS Edit on that zone | already present; the authorisation to *use* it for writes is not |
-| DNS mutations | one `A` record for a test subdomain, pointed at a server's IPv4 | it changes what a real name on the public internet resolves to |
-| authorisation | explicit, per this document's rule | "No real provider or DNS mutations without explicit authorization" |
+| `pending-dns` | the record is held, and nobody has resolved the name | `configured` alone |
+| `failed` | the name does not resolve | `resolves` failed |
+| `resolving` | it resolves, and nothing has checked what answers | `resolves` passed, no `serves` |
+| `unreachable` | it resolves, and the application does not answer | `serves` failed |
+| `serving` | the application answers on the name | `serves` passed and fresh |
 
-Say which subdomain, and whether to proxy it through Cloudflare or leave it
-grey-clouded, and the record path is ready to run against it.
+A `serves` that passed but has aged past its claim drops to `resolving` with
+the date of the reading, rather than keeping a green it can no longer support.
+A `serves` that failed keeps failing, because an outcome survives ageing.
+
+`domain` facts: `name`, `type`, `origin`, `proxied`, `registrar`, `records`.
+`proxied` is read as a family of words — Pi writes `Enabled`, `Yes`, `on`,
+`Proxied` — and **an unrecorded proxy state is unknown, not direct**, because
+"this name hands out its origin address" is a claim.
+
+CDN splits the same way: `caching` says a cache is in front, and
+`origin-reachable` says whether anything answers behind it. A cache in front
+of a dead origin is still a cache in front, and every visitor gets the
+provider's error page.
+
+Both pages say when the record's origin is **not this application's server**,
+because nothing else on either page would.
+
+An unread certificate is `unknown`, not `not-configured`. A proxied name is
+almost always served over a certificate the provider issued and nothing here
+has read; `not-configured` needs a written absence.
+
+## What that was proved against
+
+`server-guy-getting-started-b2184a72.accountant-agent.com`, an `A` record to
+`46.62.253.6`, proxied — created by the owner, read but never written by
+Server Guy. Pi checked it from the application's own server:
+
+```
+configured  passed   the provider reports a proxied A record
+resolves    passed   two Cloudflare IPv4 and two Cloudflare IPv6 addresses
+serves      failed   HTTP redirected to HTTPS; HTTPS returned 522 after ~19s
+origin-reachable failed   both request paths ended in a 522 origin timeout
+```
+
+The 522 carried `private, no-store, no-cache`, so it is not a cached copy of
+anything. **The origin was never exposed**: a private origin behind a proxied
+name is exactly this, and it is the distinction the design exists to draw.
+
+## What has still not been done
+
+No DNS record has been created, changed or deleted — the record above was
+already in place. Nothing has been purchased. Proving `serving` rather than
+`unreachable` needs the origin to accept public HTTP, which is a separate
+decision:
+
+| what | why it needs you |
+|---|---|
+| public ingress on the origin | it makes a deployment reachable from the internet, which is the opposite of the private-by-default rule |
+| a firewall rule for 80/443 | same |
+| DNS writes | still unauthorised, and still not needed for the read path |

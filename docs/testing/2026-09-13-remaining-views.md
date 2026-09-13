@@ -200,12 +200,10 @@ records disappear with the containers.
 
 ## Honest gaps
 
-- **Domains and CDN have no acceptance application.** Both read records and
-  both have tests, but neither has been driven by a real name, because that
-  needs a DNS mutation on a domain the owner owns. The boundary and what
-  crossing it needs are in the contract document.
-- **A restore test has never run** in these journeys, so the Backups page's
-  populated state is proved by fixtures rather than by a real copy.
+- ~~Domains and CDN have no acceptance application.~~ Closed: driven by a
+  real proxied name on 13 Sep; see below.
+- ~~A restore test has never run.~~ Closed: a real backup and an isolated
+  restore, proved by a marker row; see below.
 - **`pi-activity.tsx` reads a ref during render** (2 lint errors, pre-existing
   on main). It works, and the fix risks reintroducing the flashing-card bug
   that reading during render was added to solve. Left alone deliberately.
@@ -505,3 +503,48 @@ one says which of the three states it is in.
 | History | the plan, the copy and the restore test, each at its own time |
 
 No scenario data is involved in any of it.
+
+
+## Journey 4 · a real name, and the distinction it forces
+
+The owner created `server-guy-getting-started-b2184a72.accountant-agent.com`
+as an `A` record to `46.62.253.6`, proxied through Cloudflare, and asked for
+the record path to be proved against it without exposing the origin.
+
+Asked only *"find out what is actually configured for that name and whether
+someone typing it into a browser would reach the application"*, Pi read the
+provider's record through `check_domain`, resolved the name from the
+application's own server, and asked for it over HTTP and HTTPS:
+
+| check | result |
+|---|---|
+| `configured` | passed — the provider reports a proxied A record |
+| `resolves` | passed — two Cloudflare IPv4 and two Cloudflare IPv6 addresses |
+| `serves` | **failed** — HTTP 301 to HTTPS, then Cloudflare 522 after ~19s |
+| `origin-reachable` | **failed** — both paths ended in a 522 origin timeout |
+
+Pi titled it *"Domain resolves, but Cloudflare cannot reach the application"*,
+noted the 522 was `private, no-store` so it is not a cached copy of anything,
+and recorded a `cdn` subject alongside without being asked for one.
+
+Three defects only a real name could have found:
+
+1. **`proxied = "Enabled"`.** The parser accepted `true|yes|proxied` only, so
+   the first real proxied name would have been drawn as a direct one. It now
+   reads the family of words, and an unrecorded proxy state is *unknown*
+   rather than direct.
+2. **"There is still no certificate."** Printed whenever no certificate record
+   existed — false here, since Cloudflare serves one and HTTPS reached a 522
+   through it. An unread certificate is now `unknown`.
+3. **Two machines read as one.** CDN put "The cache forwards to 46.62.253.6"
+   under a card titled `hetzner-4201`. Both pages now name the gap.
+
+Two earlier turns are worth keeping as evidence of the rules holding. When SSH
+to the server was down, Pi **downgraded** `serves` from `failed` to `info` —
+"could not check" rather than "the application is gone" — and put it back to
+`failed` only once it had actually asked. And it never wrote an absence it had
+not established.
+
+The origin was never exposed, no DNS record was created or changed, and
+`serving` remains unproved by design: reaching it needs public ingress on the
+origin, which is the owner's decision and the opposite of private-by-default.

@@ -284,3 +284,114 @@ test.describe("what the pages must never stop saying", () => {
     },
   );
 });
+
+// A name being configured and an application answering on it are different
+// claims, and the gap between them is where a proxied name lives: it
+// resolves, it serves the provider's certificate, and the origin behind it
+// is unreachable. These run against whichever acceptance application has
+// actually had a name checked, and skip when none has.
+test.describe("a name that is set up, and an application that does not answer", () => {
+  async function named(page: Page) {
+    await page.goto(`${ACCEPTANCE}/applications`, {
+      waitUntil: "domcontentloaded",
+    });
+    const ids = await page.evaluate(() =>
+      [
+        ...document.querySelectorAll<HTMLAnchorElement>(
+          "a[href*='/applications/']",
+        ),
+      ]
+        .map((a) => a.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0])
+        .filter(
+          (id, at, all): id is string => Boolean(id) && all.indexOf(id) === at,
+        ),
+    );
+    for (const id of ids) {
+      const response = await page.request.get(
+        `${ACCEPTANCE}/api/applications/${id}`,
+      );
+      if (!response.ok()) continue;
+      const view = await response.json();
+      const domain = (view.information ?? []).find(
+        (record: { presentation?: { states?: { ref: { kind: string } } } }) =>
+          record.presentation?.states?.ref.kind === "domain",
+      );
+      if (domain) return { id, domain };
+    }
+    return null;
+  }
+
+  test(
+    "a configured name is never reported as a working one",
+    journey("record-destinations"),
+    async ({ page }) => {
+      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
+      const found = await named(page);
+      test.skip(!found, "no application has had a name checked");
+      const serves = (found!.domain.presentation.checks ?? []).find(
+        (check: { key: string }) => check.key === "serves",
+      );
+      test.skip(serves?.status !== "failed", "the name does serve");
+
+      const said = await open(page, ACCEPTANCE, found!.id, "domains");
+      expect(said).toMatch(/does not answer/i);
+      // The sentence that would be the lie.
+      expect(said).not.toMatch(/answering on/i);
+      // And the browser window a visitor would actually get.
+      expect(said).toMatch(/isn’t working|isn't working/i);
+      expect(said).toMatch(/nothing came back from the application/i);
+    },
+  );
+
+  test(
+    "a cache in front is not reported as a working site",
+    journey("record-destinations"),
+    async ({ page }) => {
+      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
+      const found = await named(page);
+      test.skip(!found, "no application has had a name checked");
+      const response = await page.request.get(
+        `${ACCEPTANCE}/api/applications/${found!.id}`,
+      );
+      const view = await response.json();
+      const cdn = (view.information ?? []).find(
+        (record: { presentation?: { states?: { ref: { kind: string } } } }) =>
+          record.presentation?.states?.ref.kind === "cdn",
+      );
+      test.skip(!cdn, "no cache has been looked at");
+      const reachable = (cdn.presentation.checks ?? []).find(
+        (check: { key: string }) => check.key === "origin-reachable",
+      );
+      test.skip(reachable?.status !== "failed", "the origin does answer");
+
+      const said = await open(page, ACCEPTANCE, found!.id, "cdn");
+      expect(said).toMatch(/the origin is not answering/i);
+      expect(said).toMatch(/the machine behind it does not/i);
+      // The cache is genuinely in front; the page must not deny that either.
+      expect(said).not.toMatch(/no cache in front/i);
+    },
+  );
+
+  test(
+    "an unread certificate is not called a missing one",
+    journey("record-destinations"),
+    async ({ page }) => {
+      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
+      const found = await named(page);
+      test.skip(!found, "no application has had a name checked");
+      const response = await page.request.get(
+        `${ACCEPTANCE}/api/applications/${found!.id}`,
+      );
+      const view = await response.json();
+      const certificate = (view.information ?? []).find(
+        (record: { presentation?: { states?: { ref: { kind: string } } } }) =>
+          record.presentation?.states?.ref.kind === "certificate",
+      );
+      test.skip(Boolean(certificate), "a certificate has been recorded");
+
+      const said = await open(page, ACCEPTANCE, found!.id, "domains");
+      expect(said).toMatch(/nothing has read a certificate/i);
+      expect(said).not.toMatch(/there is (still )?no certificate/i);
+    },
+  );
+});
