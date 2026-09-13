@@ -65,7 +65,7 @@ looked. These are different pages and they must read differently.
 ### Subject kinds
 
 `application` · `host` · `process` · `volume` · `door` · `certificate` ·
-`monitor` · `access`
+`monitor` · `access` · `backup-plan`
 
 Bounded on purpose: these are what Architecture reads. A kind is added when a
 concrete view needs it. A vocabulary nothing consumes is a second
@@ -247,6 +247,149 @@ Implemented as `tests/application/integration/record-projection.test.ts`.
 
 ---
 
+## 6. Overview: the state the page needs
+
+Built by `overviewFromRecords`, drawn by the accepted Overview design. It
+reads the same projection as Architecture and adds no vocabulary of its own
+except the one claim below.
+
+| Field | Source | Refreshed when |
+| --- | --- | --- |
+| headline | the `web` part's name, else the application's | Pi records a new map |
+| **needs** — a failed check | any check read as evidence about now that says `failed` | Pi observes |
+| **needs** — a decision | an execution awaiting approval | immediately; the controller owns it |
+| **needs** — a failed outcome | a record whose `status` is `failed` | Pi records one |
+| **ideas** | records with `role: "recommendation"`, using Pi's own `nextStep` as the draft | Pi recommends something |
+| **vitals** — lane state | that lane's checks, read as evidence about now, worst first | Pi observes, or the clock passes a claim's horizon |
+| **vitals** — lane facts | `currentFacts` of the subjects in that lane | Pi observes them |
+| **vitals** — plain words | the lane subject's `plain` or the record's title, as Pi wrote it | Pi rewrites it |
+| **recent** | executions and established records, newest first | any work happens |
+| Tomorrow, countdowns | **deferred** — needs `schedule`; the hero ships with history and now | — |
+
+### Lanes
+
+`lane(check) = laneOf(check.about ?? record.states.ref)`, restored to the
+projection now that a view consumes it. `record.about` is never consulted: it
+is unordered, so no element of it is privileged.
+
+```
+process, database, volume, application → checks
+backup-plan                            → backups
+host                                   → server
+access, door, domain, certificate      → access
+anything else                          → no lane, and no timeline
+```
+
+**A volume belongs to the application, not to Backups.** The design's own
+slot-based mapping put volumes under Backups, which would have read "backups
+are fine" on the strength of a restart test that never copied anything
+anywhere. Surviving a restart is the application keeping its own data. Only a
+`backup-plan` — and the copies and restores that reference one — speaks to
+whether a copy exists somewhere else.
+
+### The application's own health
+
+The `checks` lane, and Overview's headline condition, ask what is true of the
+application itself. No record answered that: a deployment event speaks for
+none of the four subjects it touches, by design.
+
+So Pi records a health claim **stating the application**, carrying the checks
+the evidence establishes, with `establishedAt` set to when that evidence was
+gathered rather than when the record is written. That single rule is what lets
+one lane distinguish four readings without any of them being guessed:
+
+| Overview reads | Because |
+| --- | --- |
+| healthy | a check passed and its claim is still in window |
+| stale | it passed, and enough time has passed that it may have changed |
+| failed | a check ran and did not pass |
+| unassessed | no record states the application |
+
+Preserving the original timestamp is the whole point. A record written now
+about evidence gathered an hour ago is stale, and saying so is the difference
+between a page that reports and a page that reassures.
+
+---
+
+## 7. Deployment: the state the page needs
+
+The accepted Transit design tells the story of one release: what was
+deployed, what changed, what was verified, and how it is reached. Its model
+is the first that needs **execution evidence as much as records** — the
+phases are what actually ran, and the controller owns those.
+
+| Field | Source | Refreshed when |
+| --- | --- | --- |
+| revision, image, server, changes | the newest `deployment` content | Pi deploys |
+| repository | that content's `repositoryUrl` | with it |
+| statement, detail | the record's title and body, as Pi wrote them | with it |
+| tone, word | `tagFor(record, shown, now)` — the record's status aged by the claims the page shows | with it, or the clock |
+| checks | that record's checks: label, `detail` as the probe, `establishedAt` as the time | with it |
+| `check.inside` | derived: a check about a `process` or `volume` was made on the server; one about `access` was made from this PC | with it |
+| phases, lines | **executions** of the run that produced the record, in order, with their output | as they run |
+| started, took | the run's first execution to its last | as they run |
+| attempts | how many `deployment` records exist — each release is its own event | Pi deploys again |
+| state | `awaiting` from an execution awaiting approval, `working` from a running one, then the record's own status | immediately for the first two |
+| access | the newest `application-access` record: mode, ports, and its URL | Pi records access |
+| gaps | recommendations whose views include deployment | Pi recommends |
+
+**Attempts are records, not a counter.** A deployment is a historical event
+and each one is written once, so "the third attempt" is the third record
+rather than a number anybody increments. That is also what lets History show
+the failures: they are still there.
+
+`logs` is the newest execution's captured output, with the time it was
+captured — never re-run to fill the panel.
+
+---
+
+## 8. History and Logs
+
+Both are mostly **controller evidence**, which is why they came last and
+cost least: the controller already records what ran, and Pi never re-types
+what a command proves.
+
+### History
+
+| Field | Source |
+| --- | --- |
+| an event | every record with an `establishedAt`, and every execution |
+| its kind | `change` for a release or an access record and for commands that alter; `inspection` for everything else |
+| its state | the record's status, or the execution's |
+| where it came from | the record's cited message, or the execution's conversation |
+| what it touched | the record's `views` |
+| its words | the record's title and body, or the command and its exit |
+| a withdrawal | a retired record stays visible and says Pi took it back |
+
+A record with no `establishedAt` is left out: it would be dated to the
+moment somebody wrote it rather than to an event.
+
+**`resolves` stays deferred.** Nothing Pi writes says which later work
+addressed an earlier failure, and inferring it from adjacency would put a
+claim on the page nobody made. The consequence is named rather than hidden:
+every failure reads as still wanting you, which is true and coarse.
+
+### Logs
+
+| Field | Source |
+| --- | --- |
+| a captured run | an execution with output |
+| its place | the server, the repository copy, the provider, or Server Guy — from the tool |
+| when it was captured | `finishedAt`, else `createdAt` |
+| its outcome | the exit code, where there is one |
+| streams | those places, with line counts and the newest capture |
+
+**Logs collects nothing.** Re-running a command to fill a panel would make
+the page a cause of work rather than a record of it, and this page gets
+Navigate and Ask only. Asking is a message; the next captured output is what
+changes the page.
+
+Streams are places, not services, because a line's meaning depends on where
+it was read — a port bound on the server is not the same claim as a port
+bound in a throwaway copy of the repository.
+
+---
+
 ## 6. Refused at the door
 
 `src/server/record-contract.ts` runs at save. Zod settles shape; this settles
@@ -270,6 +413,35 @@ what change the page.
 
 ---
 
+## What the old facts model carried, and where it landed
+
+Traced against `buildModel` in `architecture-prototype/model.ts`, which is
+what the accepted designs were built on. The design is unchanged; this is
+only where each of its inputs now comes from.
+
+| Original input | Now | State |
+| --- | --- | --- |
+| `facts.services` | `topology` parts of kind `private`, state from `process:<id>` | covered |
+| `facts.security` | parts of kind `gate`, with `port` and `sources` facts from the `door` or `access` record | covered, proved on the real deployment |
+| `facts.monitoring` | a `monitor` subject, and a `monitor` part when one exists | covered, proved |
+| `deployment.address`, `serverId` | the host's `address` and `server-id` facts | covered, proved |
+| `deployment.bundleHashes` | `deployment` content's `image` and `revision` | covered, proved |
+| `deployment.events` | controller executions, read directly | covered, proved |
+| `facts.domains.tls.*` | a `certificate` subject, keys `valid` and `expires` | **in the vocabulary, unexercised** — this deployment has no domain, so nothing proves it |
+| `facts.protection.*` — coverage, history, restore tests | nothing | **deliberate gap.** `backup-plan` is deferred, so an `offsite` part draws with no state and the Backups lane reads "Not assessed" until it lands. That is honest, and it is also permanent until then: no record can currently say a copy exists. |
+
+Two mis-mappings found while tracing, both fixed in the components rather
+than in the data:
+
+- Overview's subline read the **web part's** check, so the page could say
+  "passed its checks" about the process while nothing had been established
+  about the application. It reads `condition` now.
+- A lane with nothing on record borrowed the timeline window's edge and
+  printed a duration — "No copy for 36 h" for something nobody had looked at.
+  An empty lane says so instead.
+- The design's own part-to-lane map put volumes under Backups. One rule now:
+  only an off-site copy speaks to Backups.
+
 ## Deferred
 
 Proposals, not contract. Each arrives when a concrete view needs it, and each
@@ -286,8 +458,6 @@ brings its own read rules and its own worked example.
 - **`measurement`** — numbers with units. A number is not a pass or a fail and
   is never coloured.
 - **`resolves`** — pairing a failure with its repair, for History.
-- **Lane derivation** — `laneOf(check.about ?? states.ref)`, for Overview's
-  timeline. `check.about` is already written and read; only the lanes wait.
 - **Withdrawing a fact without replacing it.** Write a new observation, or an
   `absent`.
 - **Ongoing synchronisation** — a deterministic check that re-reads the

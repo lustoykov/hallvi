@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ApplicationFacts } from "@/server/application-facts";
 import type { ApplicationStack } from "@/server/application-stack";
+import type { SavedInformation } from "@/server/operator-data";
 
 /**
  * The stable destinations. The application group is always there; the
@@ -126,13 +127,43 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
   return applicationSections.find((s) => `#${s.id}` === hash)?.id ?? null;
 }
 
+/**
+ * What the records establish, for destinations that hide until something is
+ * there. The stack model this used to read is no longer populated, so every
+ * hideable destination stayed dark however much Pi recorded.
+ *
+ * Only what the vocabulary can actually express appears here. A database, a
+ * cache, a queue and a job have no subject kind yet, so nothing can
+ * establish them and they stay hidden — which is the honest answer, not an
+ * oversight.
+ */
+export function recordedSections(records: SavedInformation[]) {
+  const live = records.filter((record) => !record.retiredAt);
+  const states = (kind: string) =>
+    live.some((record) => record.presentation?.states?.ref.kind === kind);
+  const map = live
+    .map((record) => record.presentation?.content)
+    .find((content) => content?.kind === "topology");
+  const parts = map?.kind === "topology" ? map.parts : [];
+  const has = (...kinds: string[]) =>
+    parts.some((part) => kinds.includes(part.kind));
+  return {
+    processes: states("process") || has("web", "private"),
+    storage: states("volume") || has("volume"),
+    security: states("door") || states("access") || has("gate", "tls"),
+  } as Partial<Record<ApplicationSection, boolean>>;
+}
+
 /** Whether a hideable destination has anything recorded to show. */
 export function sectionRecorded(
   section: ApplicationSection,
   stack: ApplicationStack,
   facts: ApplicationFacts = {},
   hasHost = false,
+  /** What the records establish; preferred over the retired stack model. */
+  recorded: Partial<Record<ApplicationSection, boolean>> = {},
 ) {
+  if (recorded[section] !== undefined) return recorded[section];
   switch (section) {
     case "processes":
       return stack.recorded;
@@ -164,11 +195,12 @@ export function visibleSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
+  recorded: Partial<Record<ApplicationSection, boolean>> = {},
 ) {
   return applicationSections.filter(
     (section) =>
       section.id === active ||
-      sectionRecorded(section.id, stack, facts, hasHost),
+      sectionRecorded(section.id, stack, facts, hasHost, recorded),
   );
 }
 
@@ -182,6 +214,7 @@ export function hiddenSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
+  recorded: Partial<Record<ApplicationSection, boolean>> = {},
 ) {
   return applicationSections
     .filter(
@@ -189,7 +222,7 @@ export function hiddenSections(
         "hideable" in section &&
         section.hideable &&
         section.id !== active &&
-        !sectionRecorded(section.id, stack, facts, hasHost),
+        !sectionRecorded(section.id, stack, facts, hasHost, recorded),
     )
     .map((section) => ({
       ...section,
