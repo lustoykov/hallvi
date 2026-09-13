@@ -90,7 +90,9 @@ export function monitoringFromRecords({
         part: station.part,
         name: held.value.label,
         short: held.value.label,
-        how: held.value.detail ?? held.value.label,
+        // What was checked, when Pi said. Falling back to the label printed
+        // the same words twice, one above the other.
+        how: held.value.detail ?? "No detail was recorded.",
         kind: "check",
         at,
         // Ageing never turns a pass into a failure. A reading past its

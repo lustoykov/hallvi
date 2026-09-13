@@ -171,10 +171,16 @@
     background var(--ax-fast);
 }
 .axtu-station b {
+  /* A station is positioned by its centre, so a long name grew in both
+     directions and was cut on the left by the dial's own edge. Container
+     names are Pi's, and one of them is sixty characters. */
+  max-width: 15ch;
+  overflow: hidden;
   font-size: 14.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .axtu-station small {
   font-size: 11px;
