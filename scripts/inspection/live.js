@@ -3,7 +3,11 @@
   const follow = document.getElementById("follow-latest");
   const pause = document.getElementById("pause-live");
   const content = document.getElementById("content");
-  const key = "server-guy-live-view";
+  const applicationPick = document.getElementById("pick-application");
+  const chatPick = document.getElementById("pick-chat");
+  const viewing = document.body.dataset;
+  // Reading position belongs to a conversation, not to the viewer.
+  const key = `server-guy-live-view:${viewing.chat}`;
   const remembered = JSON.parse(sessionStorage.getItem(key) || "null");
   let paused = remembered?.paused ?? false;
   follow.checked = remembered?.follow ?? true;
@@ -44,6 +48,20 @@
     if (follow.checked) bottom();
     remember();
   };
+  function show(application, chat) {
+    remember();
+    const url = new URL(location.href);
+    url.searchParams.set("application", application);
+    if (chat) url.searchParams.set("chat", chat);
+    else url.searchParams.delete("chat");
+    // Message anchors belong to the conversation being left.
+    url.searchParams.delete("leafId");
+    url.searchParams.delete("targetId");
+    location.assign(url);
+  }
+  // Choosing an application lands on its main conversation.
+  applicationPick.onchange = () => show(applicationPick.value, "");
+  chatPick.onchange = () => show(applicationPick.value, chatPick.value);
   content.addEventListener(
     "wheel",
     (event) => {
@@ -119,7 +137,10 @@
         status.textContent = "Paused";
         return;
       }
-      const response = await fetch("/state", { cache: "no-store" });
+      const response = await fetch(
+        `/state?application=${viewing.application}&chat=${viewing.chat}`,
+        { cache: "no-store" },
+      );
       if (!response.ok) throw new Error("read failed");
       const state = await response.json();
       status.textContent = `Live · ${state.status.replaceAll("-", " ")} · ${new Date().toLocaleTimeString()}`;

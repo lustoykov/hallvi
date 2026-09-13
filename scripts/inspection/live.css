@@ -27,6 +27,20 @@
   align-items: center;
   white-space: nowrap;
 }
+#live-bar .live-pick {
+  gap: 6px;
+  color: #c9c9d2;
+}
+#live-bar select {
+  font: inherit;
+  max-width: 220px;
+  padding: 4px 8px;
+  border: 1px solid #777782;
+  border-radius: 5px;
+  background: #303039;
+  color: #eeeeef;
+  cursor: pointer;
+}
 #live-bar button {
   font: inherit;
   background: #303039;

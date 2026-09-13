@@ -52,8 +52,14 @@
 .settingsNav a:hover {
   color: #2852a6;
 }
-.settingsNav .testingLink {
+/* Development-only doors to the local viewers, kept together and apart from
+   the settings they sit beside. */
+.settingsNav .developerLinks {
+  display: flex;
+  gap: 28px;
   margin-left: auto;
+}
+.settingsNav .developerLinks a {
   text-decoration: underline;
   text-underline-offset: 4px;
 }

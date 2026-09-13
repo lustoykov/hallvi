@@ -618,6 +618,22 @@ export function OperatorShell({
               Terminal
             </button>
           )}
+          {/* Development only: Pi's recorded conversation, opened on the chat
+              you are reading. The viewer is the separate read-only process
+              from `npm run inspect:conversation`. */}
+          {process.env.NODE_ENV === "development" &&
+            applicationId &&
+            activeChat && (
+              <a
+                className="sg-topbar-debug"
+                href={`http://127.0.0.1:3001/?application=${applicationId}&chat=${activeChat.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Pi's recorded conversation, in the local viewer on port 3001"
+              >
+                Transcript
+              </a>
+            )}
         </header>
 
         <ApplicationNavigation

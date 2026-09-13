@@ -838,6 +838,18 @@
   justify-content: space-between;
   gap: 16px;
 }
+/* Development only, and quieter than the actions beside it: opening Pi's
+   recorded conversation is a developer's errand, not an operator's. */
+.sg-topbar-debug {
+  flex: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.sg-topbar-debug:hover {
+  color: var(--ink);
+}
 .sg-workstrip {
   display: flex;
   align-items: center;
