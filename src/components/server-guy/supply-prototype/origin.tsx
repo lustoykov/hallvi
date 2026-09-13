@@ -101,7 +101,11 @@ export function OriginDirection({
           <span>Visitors, wherever they are</span>
           <i aria-hidden="true" />
         </div>
-        <div className="axog-shelf" data-on={cdn.on || undefined}>
+        <div
+          className="axog-shelf"
+          data-on={cdn.on || undefined}
+          data-dark={dark || undefined}
+        >
           {cdn.on ? (
             <>
               <b>{cdn.provider}</b>
@@ -134,6 +138,7 @@ export function OriginDirection({
               ? `${cdn.origin ? `The cache forwards to ${cdn.origin}, and nothing` : "Nothing"} came back from it. Every request the cache cannot answer from a copy ends here.`
               : "One machine answers everything: the pages, the images and the API. It is the only copy there is."}
           </p>
+          {cdn.concern && <p className="axog-concern">{cdn.concern}</p>}
         </div>
       </div>
 

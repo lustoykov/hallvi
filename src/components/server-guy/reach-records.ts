@@ -249,9 +249,21 @@ export function reachFromRecords({
   const resolvesRead = resolves
     ? checkAsNow(resolves.value, resolves.record, now)
     : null;
-  const proxied = /^(true|yes|proxied)$/i.test(
-    domainFacts?.get("proxied")?.value.value ?? "",
-  );
+  /**
+   * Three answers, not two. Pi writes this word itself and reaches for
+   * whichever one fits the sentence — "Enabled", "Yes", "on", "Proxied" —
+   * so the reader accepts the family rather than one spelling. And a value
+   * nobody recorded is *unknown*, never "direct": saying a name hands out
+   * its origin address is a claim, and an unread field does not support it.
+   */
+  const proxied = ((): boolean | null => {
+    const said = domainFacts?.get("proxied")?.value.value?.trim();
+    if (!said) return null;
+    if (/^(true|yes|on|proxied|enabled?|orange)/i.test(said)) return true;
+    if (/^(false|no|off|direct|disabled?|dns[- ]only|grey|gray)/i.test(said))
+      return false;
+    return null;
+  })();
   const origin = domainFacts?.get("origin")?.value.value ?? null;
 
   /**
@@ -305,6 +317,7 @@ export function reachFromRecords({
       : null;
 
   const certRef = subjectsOfKind(live, "certificate")[0] ?? null;
+  const certPresence = certRef ? presenceOf(live, certRef) : null;
   const certFacts = certRef ? currentFacts(live, certRef) : null;
   const valid = certRef ? currentChecks(live, certRef).get("valid") : null;
   const validRead = valid ? checkAsNow(valid.value, valid.record, now) : null;
@@ -437,24 +450,34 @@ export function reachFromRecords({
             concern,
           }
         : null,
-    tls: certRef
+    tls: !certRef
       ? {
-          state:
-            validRead === "verified"
-              ? "valid"
-              : validRead === "failed"
-                ? "failed"
-                : validRead === "stale"
-                  ? "pending"
-                  : "not-configured",
-          issuer: certFacts?.get("issuer")?.value.value ?? null,
-          expiresAt: certFacts?.get("expires")?.value.value ?? null,
-          detail: valid?.value.detail ?? null,
+          // No certificate subject at all. That is nobody having looked, and
+          // a proxied name in particular is almost always served over a
+          // certificate the provider issued and nothing here has read.
+          state: "unknown",
+          detail: "Nothing has checked whether the name has a certificate.",
         }
-      : {
-          state: "not-configured",
-          detail: "No certificate has been recorded.",
-        },
+      : certPresence?.known && certPresence.presence === "absent"
+        ? {
+            state: "not-configured",
+            detail:
+              valid?.value.detail ??
+              "A record says there is no certificate for this name.",
+          }
+        : {
+            state:
+              validRead === "verified"
+                ? "valid"
+                : validRead === "failed"
+                  ? "failed"
+                  : validRead === "stale"
+                    ? "pending"
+                    : "unknown",
+            issuer: certFacts?.get("issuer")?.value.value ?? null,
+            expiresAt: certFacts?.get("expires")?.value.value ?? null,
+            detail: valid?.value.detail ?? null,
+          },
     audience,
     controllerIp: null,
     callers,

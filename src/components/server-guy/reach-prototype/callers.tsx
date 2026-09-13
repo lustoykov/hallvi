@@ -118,9 +118,11 @@ export function CallersDirection({
               {domain.origin && (
                 <span className="axca-record-line">
                   The record sends {domain.name} to <code>{domain.origin}</code>
-                  {domain.proxied
+                  {domain.proxied === true
                     ? `, and ${domain.provider === "cloudflare" ? "Cloudflare" : "the provider"} answers for the name rather than handing that address out.`
-                    : "."}
+                    : domain.proxied === false
+                      ? ", and that address is what a visitor is handed."
+                      : "."}
                 </span>
               )}
               {domain.concern && (
@@ -276,7 +278,13 @@ export function CallersDirection({
           {named
             ? story.tls.state === "valid"
               ? `The certificate ${story.tls.expiresAt ? `expires ${when(story.tls.expiresAt)}` : "is valid"}.`
-              : "There is still no certificate, so even the name is served over plain HTTP."
+              : story.tls.state === "failed"
+                ? "Its certificate did not check out."
+                : story.tls.state === "pending"
+                  ? "Its certificate was valid when it was last looked at, and nothing has looked since."
+                  : story.tls.state === "not-configured"
+                    ? "There is no certificate for it, so even the name is served over plain HTTP."
+                    : "Nothing has read a certificate for it either way."
             : "Connecting a name is not implemented yet; until then the server’s address is the only way in."}
         </p>
       </footer>

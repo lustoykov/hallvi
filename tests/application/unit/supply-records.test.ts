@@ -224,6 +224,7 @@ describe("cdn", () => {
       on: false,
       provider: null,
       origin: null,
+      concern: null,
       originReachable: "unchecked",
       detail: "Nobody has looked at whether a cache sits in front.",
     });
@@ -256,6 +257,7 @@ describe("cdn", () => {
       on: true,
       provider: "Cloudflare",
       origin: null,
+      concern: null,
       originReachable: "unchecked",
       detail: "Static assets",
     });
@@ -288,6 +290,27 @@ describe("cdn", () => {
     expect(story.cdn.originReachable).toBe("no");
     expect(story.cdn.origin).toBe("46.62.253.6");
     expect(story.cdn.detail).toMatch(/522/);
+  });
+
+  it("says when the cache forwards somewhere this application is not", () => {
+    const story = read([
+      states(
+        { kind: "host", id: "h" },
+        { facts: [fact("address", "192.0.2.10")] },
+      ),
+      states(
+        { kind: "cdn", id: "front" },
+        {
+          facts: [
+            fact("provider", "Cloudflare"),
+            fact("origin", "46.62.253.6"),
+          ],
+          checks: [check("caching", "passed")],
+        },
+      ),
+    ]);
+    expect(story.cdn.concern).toMatch(/46\.62\.253\.6/);
+    expect(story.cdn.concern).toMatch(/192\.0\.2\.10/);
   });
 
   it("an origin that answers is said to answer", () => {

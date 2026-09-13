@@ -102,6 +102,8 @@ export interface SupplyView {
      * and still serves an error page to every visitor.
      */
     originReachable?: "yes" | "no" | "unchecked";
+    /** Said when the cache forwards somewhere this application is not. */
+    concern?: string | null;
   };
   brokers: Broker[];
   queues: QueueLine[];

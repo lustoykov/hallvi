@@ -287,6 +287,16 @@ export function supplyFromRecords({
         caching?.value.status !== "failed",
       provider: cdnFacts?.get("provider")?.value.value ?? null,
       origin: cdnFacts?.get("origin")?.value.value ?? null,
+      // The machine card underneath names this application's own server, so
+      // an origin that is a different address has to be called out or the
+      // two read as one.
+      concern: (() => {
+        const origin = cdnFacts?.get("origin")?.value.value ?? null;
+        const address = hostFacts?.get("address")?.value.value ?? null;
+        return origin && address && origin !== address
+          ? `It forwards to ${origin}, which is not ${address} — this application's server.`
+          : null;
+      })(),
       originReachable: !originCheck
         ? "unchecked"
         : originCheck.value.status === "failed"

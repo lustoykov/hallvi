@@ -65,15 +65,24 @@ export interface DomainState {
   detail: string;
   /** What the record points at, as the provider holds it. */
   origin?: string | null;
-  /** Whether the provider answers for the name instead of the origin. */
-  proxied?: boolean;
+  /**
+   * Whether the provider answers for the name instead of the origin. Null
+   * when nothing recorded it: an unread field is not a direct record.
+   */
+  proxied?: boolean | null;
   /** Something true and awkward about the record, said rather than hidden. */
   concern?: string | null;
   userStep?: string | null;
 }
 
 export interface TlsState {
-  state: "valid" | "pending" | "failed" | "not-configured";
+  /**
+   * `not-configured` means a record established there is no certificate.
+   * `unknown` means nobody has looked, which is a different answer and the
+   * far more common one — saying "there is no certificate" because no record
+   * mentions one is the same mistake as calling an unchecked server dead.
+   */
+  state: "valid" | "pending" | "failed" | "not-configured" | "unknown";
   issuer?: string | null;
   expiresAt?: string | null;
   renewal?: string | null;

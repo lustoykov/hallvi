@@ -180,8 +180,8 @@ describe("domains", () => {
     ]);
     expect(story.domain?.state).toBe("resolving");
     expect(story.domain?.provider).toBe("cloudflare");
-    // No certificate subject, so no claim about HTTPS.
-    expect(story.tls.state).toBe("not-configured");
+    // No certificate subject, so no claim about HTTPS either way.
+    expect(story.tls.state).toBe("unknown");
     expect(story.callers.at(-1)?.secure).toBe(false);
   });
 
@@ -551,6 +551,61 @@ describe("a name, and whether anything answers on it", () => {
       }),
     ]);
     expect(story.domain?.concern).toBeNull();
+  });
+
+  // Pi writes this word itself, and picked "Enabled" the first time a real
+  // name was checked. A parser that knew only "true" would have drawn a
+  // proxied name as a direct one.
+  it.each([
+    ["Enabled", true],
+    ["enabled", true],
+    ["true", true],
+    ["Yes", true],
+    ["on", true],
+    ["Proxied", true],
+    ["Orange cloud", true],
+    ["Disabled", false],
+    ["false", false],
+    ["No", false],
+    ["DNS only", false],
+    ["Grey cloud", false],
+  ])("reads %s as proxied=%s", (said, expected) => {
+    const story = named([check("resolves", "passed")], [fact("proxied", said)]);
+    expect(story.domain?.proxied).toBe(expected);
+  });
+
+  it("a proxy state nobody recorded is unknown, not direct", () => {
+    const story = named(
+      [check("resolves", "passed")],
+      [fact("origin", "203.0.113.7")],
+    );
+    expect(story.domain?.proxied).toBeNull();
+  });
+
+  // A proxied name is served over the provider's certificate. Nothing here
+  // has read it, and saying "there is no certificate" from that silence is
+  // the same mistake as calling an unchecked server dead.
+  it("no certificate record means nobody looked, not that there is none", () => {
+    const story = named([check("resolves", "passed")]);
+    expect(story.tls.state).toBe("unknown");
+    expect(story.tls.detail).toMatch(/Nothing has checked/);
+  });
+
+  it("a certificate subject with no check is also unknown", () => {
+    const story = read([
+      states(
+        { kind: "certificate", id: "c" },
+        { facts: [fact("issuer", "R10")] },
+      ),
+    ]);
+    expect(story.tls.state).toBe("unknown");
+  });
+
+  it("only a written absence says there is no certificate", () => {
+    const story = read([
+      states({ kind: "certificate", id: "c" }, { presence: "absent" }),
+    ]);
+    expect(story.tls.state).toBe("not-configured");
   });
 
   it("an absent domain is an absence, and a missing one is nobody looking", () => {
