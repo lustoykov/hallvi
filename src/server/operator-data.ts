@@ -324,7 +324,13 @@ export const informationInputSchema = z.object({
             freshFor: z.number().int().min(1).optional(),
           }),
         )
-        .max(10)
+        // Wide enough for the keys the guidance itself names: a host is
+        // address, region, size, server-id, os, cpu, memory, disk and their
+        // three readings, and it still has a cost to state. Ten refused that
+        // record, and a schema that refuses its own vocabulary teaches the
+        // writer to drop a fact a page needs. Taste stays where it belongs,
+        // in the guidance: keep to the handful that matter.
+        .max(16)
         // Optional, not defaulted: the presentation column is stored as JSON
         // and read back by cast rather than parse, so every record written
         // before this field existed has no facts at all. A reader must cope
