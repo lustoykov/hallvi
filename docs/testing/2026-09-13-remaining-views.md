@@ -307,6 +307,7 @@ reader.
 | Logs | 200px of white under every capture | a 300px floor under four-line commands |
 | History | "57 operations. 49 verified; 3 failed" | five neither |
 | the whole app | 1.4 requests a second at idle, forever | nothing was happening |
+| History | "Cancelled" | one word for work you declined and work stopped mid-run |
 
 ## What passed first time
 
@@ -320,6 +321,13 @@ Worth saying, because a list of defects reads as if nothing worked.
   and durations — all correct after the earlier size fix.
 - **Restart**: records, subjects, secrets, executions and conversations came
   back byte for byte across three applications.
+- **Reload during a live turn**: three reloads while Pi was working left 26
+  executions at 26, added no messages, reran nothing, and left no spinner
+  behind.
+- **Declining a real command** through the approval flow: the execution reads
+  `declined`, the turn settles, and the page says so.
+- **The terminal** opens, minimises, closes and reopens, and is never confused
+  with Pi activity.
 - **Layout**: no horizontal overflow and no clipped text at 1440 or 1180, on
   96 page visits.
 
