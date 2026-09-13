@@ -318,7 +318,25 @@ own connection was already latched invalid on 12 September, before this
 session touched it.
 
 The message now says that. The refresh request itself was correct and is
-unchanged.
+unchanged, and the existing test already pins its shape: `client_id`,
+`grant_type`, `refresh_token`, and nothing else.
+
+The three things worth checking, checked:
+
+| | |
+|---|---|
+| provenance | only `pollGithubLogin` writes an `app` connection, and it writes one only from the device-code grant. There is no other way for this token to exist. |
+| client id | `.env.local` and the stored connection both say `Iv23likHtcclbuys1lVG`, and GitHub answers 200 for it and 404 for anything else, so it is the real one. |
+| persistence and rotation | the cause. Renewal replaces the refresh token and the replacement is written to one file; every other copy of that file is dead from that moment, and a crash between GitHub's answer and the write loses the only live one. |
+
+**Not yet proved end to end:** a live device-flow connection renewing itself.
+That needs a fresh sign-in, which is the owner's to authorise. The proof is
+written and waiting — sign in at Settings → GitHub, then run
+`node tests/results/caps/prove-refresh.mjs`, which moves this controller's own
+saved expiry into the past and asks the product to read a repository, so the
+renewal runs through `connectedGithubCredential` exactly as an eight-hour-old
+login would. It prints digests and timestamps, never a credential. Nothing
+about the authentication architecture should change before that run.
 
 ### The facts cap refused the vocabulary the guidance asks for
 
@@ -336,6 +354,31 @@ selector can reach. The words now sit in a box of their own.
 
 The guidance describes the file that says what the workspace holds without
 naming it, so Pi reached for `source-manifest.json` and got ENOENT every run.
+
+## Which actions were the browser's, and which were an API's
+
+Worth separating, because "used it in the browser" and "called its API" are
+different claims.
+
+| | |
+|---|---|
+| **Browser** | every Server Guy action — adding the four applications, sending each message, Approve and Decline, switching to Always ask; the todo created and re-read in the Todo app; Paperless's signup, its search, its document thumbnail; Ghost's setup form; Plausible's registration, its site form and its dashboard reading 1/1/1 |
+| **Ghost's own admin API, from the browser's own session** | uploading the PNG and creating the post. The Browser pane cannot open a native file dialog, so the image went to `/ghost/api/admin/images/upload/` and the post to `/ghost/api/admin/posts/` with `credentials: same-origin` — the same endpoints the editor calls, with the session the setup form created. |
+| **HTTP from this session, through the product's tunnel** | uploading the invoice to Paperless (`/api/documents/post_document/`), reading its search results back, downloading it and taking its SHA-256, and the status checks quoted throughout. These verify the product's claims from outside; none of them is a Server Guy action. |
+| **SSH by hand** | exactly two commands, both to break something on purpose: `docker stop paperless-db-1`, and editing `DATABASE_PASSWORD` in Ghost's `.env` before recreating it. Both are named where they happen. |
+
+## Which applications had which tests
+
+| | restore test | update test |
+|---|---|---|
+| Todo baseline | Pi's own, on its local SQLite copy, unasked | **yes** — Node 22 → 26 under Always ask, data verified after |
+| Paperless-ngx | **yes** — asked for, into an isolated stack on fresh volumes | no |
+| Ghost | **yes** — asked for, 97 tables into separate storage | no |
+| Plausible CE | no — and no backup of any kind exists | no |
+
+Container recreation, which is not the same as either, was exercised on all
+four: Todo baseline, Paperless (all three), Ghost (both), Plausible (all
+three, as a restart).
 
 ## The combined product
 
