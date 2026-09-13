@@ -188,8 +188,11 @@ test(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
+    // Backups is a designed destination now, and its own empty state says the
+    // same thing in its own words: nobody has looked, which is never the same
+    // as there being nothing to find.
     await expect(
-      page.getByText(/Nothing has been established here yet/),
+      page.getByText(/Nothing here has been looked at yet/),
     ).toBeVisible();
     await page.goBack();
     await expect(
