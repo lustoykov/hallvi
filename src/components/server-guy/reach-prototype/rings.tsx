@@ -198,19 +198,35 @@ export function RingsDirection({
       <div className="axri-lede">
         <div>
           <h2>
-            {!walled
-              ? "Nothing stands between the internet and this server."
-              : pierce
-                ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
-                : "Four rings in, and each wall needs something different to pass."}
+            {/* An unread policy is an unknown policy. "Nothing stands
+                between the internet and this server" is a finding, and
+                only a policy somebody read can support it. */}
+            {story.firewall.state === "asked"
+              ? "Nobody has read what stands between the internet and this server."
+              : !walled
+                ? "Nothing stands between the internet and this server."
+                : pierce
+                  ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
+                  : "Four rings in, and each wall needs something different to pass."}
           </h2>
           <p>
+            {/* Three states, not two. "There is no firewall" established by
+                a record is a finding and reads as one; nobody having looked
+                is the only case that deserves "never read back". */}
             <Tag
-              tone={story.firewall.state === "read" ? "verified" : "planned"}
+              tone={
+                story.firewall.state === "read"
+                  ? "verified"
+                  : story.firewall.state === "none"
+                    ? "failed"
+                    : "planned"
+              }
             >
               {story.firewall.state === "read"
                 ? `Read from ${story.firewall.provider} ${ago(story.firewall.at, now)}`
-                : "Asked for, never read back"}
+                : story.firewall.state === "none"
+                  ? `Established as absent ${ago(story.firewall.at, now)}`
+                  : "Asked for, never read back"}
             </Tag>
             <span>
               Standing in a ring means you can reach everything drawn in it.
@@ -268,7 +284,9 @@ export function RingsDirection({
               {story.firewall.detail}{" "}
               {story.firewall.state === "read"
                 ? "The rules are the provider’s own, read just now."
-                : "These are the rules the deployment asked for, not a read of what is in place."}
+                : story.firewall.state === "none"
+                  ? "What the rings show is the deployment's own arrangement, which is all that is holding."
+                  : "These are the rules the deployment asked for, not a read of what is in place."}
             </p>
           </>
         )}

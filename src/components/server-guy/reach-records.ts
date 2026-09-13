@@ -39,6 +39,21 @@ import type {
  * tunnel" is one source described in words, and splitting it on spaces
  * turned it into five imaginary networks.
  */
+/**
+ * A tunnel's ports live in the application-access content rather than in
+ * facts, because that content is what the product itself wrote. An `access`
+ * subject with no port facts is still a way in with two known ends.
+ */
+function tunnelPort(
+  access: { kind: string; localPort?: number; remotePort?: number } | undefined,
+  kind: string,
+) {
+  if (kind !== "access" || access?.kind !== "application-access") return null;
+  if (access.localPort && access.remotePort)
+    return `${access.localPort} → ${access.remotePort}`;
+  return null;
+}
+
 const listOf = (value: string | null) =>
   (value ?? "")
     .split(",")
@@ -110,7 +125,7 @@ export function reachFromRecords({
               : "private";
 
       const edge = map?.edges.find((item) => item.from === ref.id);
-      const port = portOf(fact);
+      const port = portOf(fact) ?? tunnelPort(access, ref.kind);
       doors.push({
         id: ref.id,
         port: port ?? "not recorded",
@@ -125,10 +140,13 @@ export function reachFromRecords({
             ? "Anyone on the internet can reach this port."
             : null,
         detail:
+          // Pi's own detail, else the label of the check that ran: saying
+          // "checked, with no detail recorded" tells a reader about our
+          // bookkeeping instead of about their server.
           (refused ?? open)?.value.detail ??
-          (checks.size
-            ? "Checked, with no detail recorded."
-            : "Nobody has checked this port."),
+          (refused ?? open)?.value.label ??
+          [...checks.values()][0]?.value.label ??
+          "Nobody has checked this port.",
         unasked: checks.size === 0 || undefined,
       });
 
@@ -168,7 +186,8 @@ export function reachFromRecords({
             provider: "none",
             name: null,
             at: firewallPresence.record.establishedAt,
-            detail: "There is no firewall in front of this server.",
+            detail:
+              "A record says there is no firewall in front of this server.",
           }
         : {
             state: "asked",

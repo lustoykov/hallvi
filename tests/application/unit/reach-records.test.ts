@@ -306,3 +306,36 @@ describe("how a way in is described", () => {
     }
   });
 });
+
+describe("what a way in is called when its ports are in the content", () => {
+  it("reads a tunnel's two ends from the access record", () => {
+    // The product itself wrote those ports into application-access content,
+    // not into facts. An access subject with no port facts is still a way in
+    // with two known ends, and "port not recorded" was wrong about it.
+    const story = read([
+      privateAccess(),
+      states(
+        { kind: "access", id: "private-tunnel" },
+        {
+          checks: [check("http", "passed")],
+        },
+      ),
+    ]);
+    expect(story.doors[0].port).toBe("8080 → 3000");
+  });
+
+  it("uses the check's own label when Pi wrote no detail", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "app" },
+        {
+          facts: [fact("port", "3000")],
+          checks: [check("open", "passed")],
+        },
+      ),
+    ]);
+    // "Checked, with no detail recorded" told a reader about our bookkeeping
+    // rather than about their server.
+    expect(story.doors[0].detail).toBe("open");
+  });
+});
