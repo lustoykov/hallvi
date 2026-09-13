@@ -20,17 +20,14 @@ import {
   currentChecks,
   currentFacts,
   freshnessOf,
-  lane,
+  laneOf,
   presenceOf,
   type Lane,
   type RecordCheck,
 } from "@/server/record-projection";
 
 import type { ApplicationSection } from "./application-sections";
-import type {
-  Certainty,
-  Fact,
-} from "./architecture-prototype/model";
+import type { Certainty, Fact } from "./architecture-prototype/model";
 import type {
   Idea,
   NeedItem,
@@ -93,26 +90,47 @@ interface Held {
   record: SavedInformation;
 }
 
+interface GatheredLane {
+  held: Held[];
+  subjects: Ref[];
+}
+
 /**
  * Every check anyone has recorded, gathered into its lane. A check with
  * nothing to place it has no lane and is not counted anywhere — which is
  * exactly what a check with no subject did before lanes were authored.
  */
 function byLane(records: SavedInformation[]) {
-  const gathered: Record<Lane, Held[]> = {
-    checks: [],
-    backups: [],
-    server: [],
-    access: [],
+  const subjects: Record<Lane, Map<string, Ref>> = {
+    checks: new Map(),
+    backups: new Map(),
+    server: new Map(),
+    access: new Map(),
   };
   for (const record of records) {
     if (record.retiredAt) continue;
+    const stated = record.presentation?.states?.ref;
+    const statedLane = laneOf(stated);
+    if (stated && statedLane)
+      subjects[statedLane].set(`${stated.kind}:${stated.id}`, stated);
     for (const check of record.presentation?.checks ?? []) {
-      const id = lane(check, record);
-      if (id) gathered[id].push({ check, record });
+      const ref = check.about ?? stated;
+      const id = laneOf(ref);
+      if (ref && id) subjects[id].set(`${ref.kind}:${ref.id}`, ref);
     }
   }
-  return gathered;
+  return Object.fromEntries(
+    (Object.keys(subjects) as Lane[]).map((id) => {
+      const refs = [...subjects[id].values()];
+      const held = refs.flatMap((ref) =>
+        [...currentChecks(records, ref).values()].map((item) => ({
+          check: item.value,
+          record: item.record,
+        })),
+      );
+      return [id, { held, subjects: refs } satisfies GatheredLane];
+    }),
+  ) as Record<Lane, GatheredLane>;
 }
 
 /**
@@ -122,9 +140,7 @@ function byLane(records: SavedInformation[]) {
  */
 function readLane(held: Held[], now: number): Certainty {
   if (!held.length) return "unknown";
-  const readings = held.map((item) =>
-    checkAsNow(item.check, item.record, now),
-  );
+  const readings = held.map((item) => checkAsNow(item.check, item.record, now));
   if (readings.includes("failed")) return "failed";
   if (readings.includes("stale")) return "stale";
   if (readings.includes("verified")) return "verified";
@@ -174,16 +190,6 @@ export function logFromRecords(records: SavedInformation[]) {
     .slice(-12);
 }
 
-/** The subjects a lane's records speak for, so the lane can show their facts. */
-function subjectsOf(held: Held[]) {
-  const refs = new Map<string, Ref>();
-  for (const item of held) {
-    const ref = item.check.about ?? item.record.presentation?.states?.ref;
-    if (ref) refs.set(`${ref.kind}:${ref.id}`, ref);
-  }
-  return [...refs.values()];
-}
-
 /**
  * What an execution is called in a list of past work. The tool name alone is
  * not a reading: "bash" says nothing about whether it touched the server or a
@@ -222,7 +228,6 @@ export function overviewFromRecords({
   records,
   executions,
   chats,
-  applicationId,
   applicationName,
   headline,
   now,
@@ -243,8 +248,11 @@ export function overviewFromRecords({
 
   // ---- what wants you -------------------------------------------------
   const needs: NeedItem[] = [];
-  for (const [id, held] of Object.entries(gathered) as [Lane, Held[]][])
-    for (const item of held)
+  for (const [id, gatheredLane] of Object.entries(gathered) as [
+    Lane,
+    GatheredLane,
+  ][])
+    for (const item of gatheredLane.held)
       if (checkAsNow(item.check, item.record, now) === "failed")
         needs.push({
           id: `check:${item.record.id}:${item.check.key ?? item.check.label}`,
@@ -258,7 +266,10 @@ export function overviewFromRecords({
             label: "Ask about it",
             draft: `${item.check.label} is failing. Look into why and tell me what you find.`,
           },
-          secondary: { label: chrome[id].label, destination: chrome[id].destination },
+          secondary: {
+            label: chrome[id].label,
+            destination: chrome[id].destination,
+          },
         });
   for (const execution of executions)
     if (execution.status === "awaiting-approval")
@@ -291,10 +302,8 @@ export function overviewFromRecords({
     }));
 
   // ---- what is true now ------------------------------------------------
-  const application: Ref = { kind: "application", id: applicationId };
   const vitals: Vital[] = (Object.keys(chrome) as Lane[]).map((id) => {
-    const held = gathered[id];
-    const subjects = subjectsOf(held);
+    const { held, subjects } = gathered[id];
     // An absence someone wrote outranks a lane with nothing in it.
     const declared = subjects
       .map((ref) => presenceOf(live, ref))
@@ -393,16 +402,17 @@ export function applicationCondition(
       certainty: "unknown",
       text: "Nothing on record says whether the application is working.",
     };
-  const readings = held.map((item) =>
-    checkAsNow(item.value, item.record, now),
-  );
+  const readings = held.map((item) => checkAsNow(item.value, item.record, now));
   const newest = held
     .map((item) => item.record.establishedAt)
     .filter((at): at is string => Boolean(at))
     .sort()
     .at(-1);
   if (readings.includes("failed"))
-    return { certainty: "failed", text: "A check on the application did not pass." };
+    return {
+      certainty: "failed",
+      text: "A check on the application did not pass.",
+    };
   if (readings.includes("stale"))
     return {
       certainty: "stale",

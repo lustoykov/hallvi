@@ -150,6 +150,27 @@ describe("what wants you", () => {
     expect(overview([healthy], TEN_MINUTES_ON).needs).toEqual([]);
   });
 
+  it("lets a newer result replace an older failure with the same key", () => {
+    const failed = record({
+      id: "rec-old-failure",
+      at: "2026-09-12T15:00:00.000Z",
+      status: "failed",
+      states: { ref: application, presence: "present" },
+      checks: [{ ...httpCheck, status: "failed" }],
+    });
+    const recovered = record({
+      id: "rec-recovered",
+      states: { ref: application, presence: "present" },
+      checks: [httpCheck],
+    });
+
+    const result = overview([failed, recovered], TEN_MINUTES_ON);
+    expect(result.needs).toEqual([]);
+    expect(result.vitals.find((v) => v.id === "checks")!.status.certainty).toBe(
+      "verified",
+    );
+  });
+
   it("offers Pi's recommendation as an idea, in Pi's words", () => {
     const suggestion = record({
       id: "rec-idea",
@@ -182,8 +203,12 @@ describe("what is true now", () => {
     // Surviving a restart copied nothing anywhere.
     expect(lane(volume.presentation!.checks[0], volume)).toBe("checks");
     const vitals = overview([volume], TEN_MINUTES_ON).vitals;
-    expect(vitals.find((v) => v.id === "checks")!.status.certainty).toBe("verified");
-    expect(vitals.find((v) => v.id === "backups")!.status.certainty).toBe("unknown");
+    expect(vitals.find((v) => v.id === "checks")!.status.certainty).toBe(
+      "verified",
+    );
+    expect(vitals.find((v) => v.id === "backups")!.status.certainty).toBe(
+      "unknown",
+    );
     expect(vitals.find((v) => v.id === "backups")!.status.text).toBe(
       "Nobody has looked yet",
     );
@@ -194,7 +219,13 @@ describe("what is true now", () => {
       id: "rec-host",
       states: { ref: { kind: "host", id: "h1" }, presence: "present" },
       checks: [
-        { key: "ssh", label: "SSH connected", status: "passed", claim: "reachability", basis: "observed" },
+        {
+          key: "ssh",
+          label: "SSH connected",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+        },
       ],
     });
     const server = (now: number) =>
@@ -207,10 +238,35 @@ describe("what is true now", () => {
     const none = record({
       id: "rec-none",
       title: "Nothing copies this data off the server",
-      states: { ref: { kind: "backup-plan", id: "daily" } as Ref, presence: "absent" },
+      states: {
+        ref: { kind: "backup-plan", id: "daily" } as Ref,
+        presence: "absent",
+      },
       checks: [
-        { key: "copies", label: "No copy exists", status: "info", claim: "contents", basis: "observed", about: { kind: "backup-plan", id: "daily" } as Ref },
+        {
+          key: "copies",
+          label: "No copy exists",
+          status: "info",
+          claim: "contents",
+          basis: "observed",
+          about: { kind: "backup-plan", id: "daily" } as Ref,
+        },
       ],
+    });
+    const vital = overview([none], TEN_MINUTES_ON).vitals.find(
+      (v) => v.id === "backups",
+    )!;
+    expect(vital.status.certainty).toBe("absent");
+    expect(vital.status.text).toBe("Not set up");
+  });
+
+  it("reads a declared absence even when it has no check", () => {
+    const none = record({
+      id: "rec-none-without-check",
+      states: {
+        ref: { kind: "backup-plan", id: "daily" } as Ref,
+        presence: "absent",
+      },
     });
     const vital = overview([none], TEN_MINUTES_ON).vitals.find(
       (v) => v.id === "backups",
@@ -230,8 +286,16 @@ describe("what is true now", () => {
 
 describe("what happened", () => {
   it("lists established records newest first", () => {
-    const older = record({ id: "rec-older", at: "2026-09-12T15:00:00.000Z", title: "The server answered" });
-    const newer = record({ id: "rec-newer", at: "2026-09-12T16:00:00.000Z", title: "The application answered" });
+    const older = record({
+      id: "rec-older",
+      at: "2026-09-12T15:00:00.000Z",
+      title: "The server answered",
+    });
+    const newer = record({
+      id: "rec-newer",
+      at: "2026-09-12T16:00:00.000Z",
+      title: "The application answered",
+    });
     expect(
       overview([older, newer], TEN_MINUTES_ON).recent.map((item) => item.title),
     ).toEqual(["The application answered", "The server answered"]);

@@ -78,7 +78,6 @@ export function historyFromRecords({
     // be dated to the moment someone wrote it rather than to an event.
     .filter((record) => record.establishedAt)
     .map((record) => {
-      const cited = record.evidence.find((item) => item.type === "message");
       return {
         id: `record:${record.id}`,
         source: { type: "inspection" as const, id: record.id },
@@ -87,11 +86,10 @@ export function historyFromRecords({
         state: stateOf(record),
         destinations: (record.presentation?.views ??
           []) as ApplicationSection[],
-        // A record cites the reply it was saved from; that is its origin.
-        origin:
-          cited && "id" in cited
-            ? { chatId: "", messageId: cited.id }
-            : null,
+        // Saved information retains the source message id, but not its chat
+        // id. Until the projection receives a resolvable pair, rendering a
+        // conversation action would send the reader to an empty chat id.
+        origin: null,
         mentions: [],
         startedAt: record.establishedAt!,
         updatedAt: record.establishedAt!,
