@@ -24,6 +24,16 @@ export interface Vol {
   mount: string;
   docker: string | null;
   note: string | null;
+  /**
+   * Whether a record says this volume is there. A subject can also be reached
+   * by a check or an `about` that names it without stating it, which is how
+   * an event's checks find their subject — but it is not evidence that the
+   * thing exists, and a page must not count it as one that does.
+   */
+  stated?: boolean;
+  /** When this volume itself came through a replacement, or did not. */
+  keptAt?: string | null;
+  lostAt?: string | null;
   sizeGb: number | null;
   /** As Pi measured it. Shown when it is too small to round to a megabyte. */
   sizeText?: string | null;
