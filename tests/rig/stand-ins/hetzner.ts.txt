@@ -89,9 +89,12 @@ export async function hetzner<T>(
   path: string,
   body?: unknown,
   _token?: string,
+  // The product asks for a method explicitly — a POST with no body, a DELETE
+  // — so the stand-in has to take one rather than guess from the body.
+  method = body === undefined ? "GET" : "POST",
+  _signal?: AbortSignal,
 ): Promise<T> {
   const url = new URL(path, "https://provider.invalid");
-  const method = body === undefined ? "GET" : "POST";
   const input = (body ?? {}) as Record<string, unknown>;
   log({ method, path, bodyKeys: Object.keys(input) });
   const cloud = load();
@@ -111,7 +114,12 @@ export async function hetzner<T>(
       server_type: { name: input.server_type },
       datacenter: { location: { name: input.location } },
       public_net: {
-        ipv4: { ip: "127.0.0.1" },
+        // TEST-NET-1 (RFC 5737): reserved for documentation and not routable,
+        // so nothing can leave the machine, while still being something the
+        // product and the model can treat as a public address. bin/ssh never
+        // reads it — every host command runs locally or in the host
+        // container — so this is the fiction's address, not a destination.
+        ipv4: { ip: "192.0.2.10" },
         firewalls: ((input.firewalls ?? []) as { firewall: number }[]).map(
           (item) => ({ id: item.firewall, status: "applied" }),
         ),
@@ -151,6 +159,46 @@ export async function hetzner<T>(
     result = { actions: [{ id: cloud.next++, status: "success" }] };
   } else if (/^\/actions\/\d+$/.test(route))
     result = { action: { id: Number(route.split("/")[2]), status: "success" } };
+  else if (route === "/pricing")
+    // A fixed, clearly rig-shaped price. The product records cost as
+    // `reported` by the provider, so a stand-in answer is the honest kind of
+    // input for it: nothing here was measured.
+    result = {
+      pricing: {
+        currency: "EUR",
+        vat_rate: "0.000",
+        primary_ips: [
+          {
+            type: "ipv4",
+            prices: [
+              {
+                location: "hel1",
+                price_monthly: { net: "0.5000000000", gross: "0.5000000000" },
+                price_hourly: { net: "0.0008000000", gross: "0.0008000000" },
+              },
+            ],
+          },
+        ],
+        server_types: [
+          {
+            id: 1,
+            name: "cx23",
+            prices: [
+              {
+                location: "hel1",
+                price_monthly: { net: "5.4900000000", gross: "5.4900000000" },
+                price_hourly: { net: "0.0089000000", gross: "0.0089000000" },
+                included_traffic: 21990232555520,
+                price_per_tb_traffic: {
+                  net: "1.0000000000",
+                  gross: "1.0000000000",
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
   else throw new Error(`Unexpected provider request ${path}`);
   save(cloud);
   return result as T;
