@@ -31,15 +31,30 @@ import type {
 } from "./backup-prototype/protect-story";
 import { protectionFromRecords } from "./backups-records";
 
-/** "4.2 GB" → 4.2. A size Pi wrote in words is still a number to a bar. */
-function gigabytes(value: string | null) {
+/**
+ * "4.2 GB" → 4.2, so a bar has a number to draw. A size Pi wrote in words is
+ * still a size.
+ *
+ * The unit is required. Reading a missing prefix as gigabytes turned Pi's
+ * "534 bytes" into 534 GB — a Redis volume drawn a thousand times the size of
+ * the disk it sits on. A number with no unit is not a size and reads as one
+ * that was never measured.
+ */
+export function gigabytes(value: string | null) {
   if (!value) return null;
-  const match = value.match(/([\d.]+)\s*(k|m|g|t)?b?/i);
+  const match = value.match(
+    /(\d[\d,]*(?:\.\d+)?)\s*(k|m|g|t)?(i?)b(?:ytes?)?\b/i,
+  );
   if (!match) return null;
-  const size = Number(match[1]);
+  const size = Number(match[1].replace(/,/g, ""));
   if (!Number.isFinite(size)) return null;
-  const scale = { k: 1 / 1e6, m: 1 / 1000, g: 1, t: 1000 } as const;
-  return size * (scale[match[2]?.toLowerCase() as keyof typeof scale] ?? 1);
+  // KiB is 1024 and KB is 1000. Both round to the same picture, but using
+  // the one that was written keeps the number the reader can check.
+  const step = match[3] ? 1024 : 1000;
+  const power = { k: 1, m: 2, g: 3, t: 4 } as const;
+  const bytes =
+    size * step ** (power[match[2]?.toLowerCase() as keyof typeof power] ?? 0);
+  return bytes / step ** 3;
 }
 
 export function storageFromRecords({
