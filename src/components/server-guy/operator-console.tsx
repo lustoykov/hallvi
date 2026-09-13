@@ -1,4 +1,5 @@
 "use client";
+import { Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
 import { plainText } from "./execution-text";
 import type {
@@ -9,10 +10,32 @@ import "./operator-console.css";
 import { Tag, Working, type Tone } from "./presentation";
 import { StreamingOutput } from "./streaming-output";
 
+/**
+ * The permission boundary, and what each setting actually does.
+ *
+ * The control used to be three words in a segmented pill with nothing saying
+ * what any of them meant. "Bypass" was selected on a real application and
+ * looked exactly like a view filter — the most consequential setting in the
+ * product, styled as a preference. The words do not change; what changes is
+ * that the current one states its consequence, because a reader should not
+ * have to try a setting to find out what it does.
+ */
 const modes = [
-  { id: "always-ask", label: "Always ask" },
-  { id: "pi-decides", label: "Pi decides" },
-  { id: "bypass", label: "Bypass" },
+  {
+    id: "always-ask",
+    label: "Always ask",
+    means: "Every command waits for you.",
+  },
+  {
+    id: "pi-decides",
+    label: "Pi decides",
+    means: "Pi asks before anything consequential.",
+  },
+  {
+    id: "bypass",
+    label: "Bypass",
+    means: "Pi runs commands without asking.",
+  },
 ] as const;
 
 /** What a command's state is called, and how sure that state is. */
@@ -170,6 +193,16 @@ export function OperatorConsole({
                     </button>
                   ))}
                 </div>
+                <span
+                  className="sg-modes-means"
+                  data-loud={settings.permissionMode === "bypass" || undefined}
+                >
+                  {settings.permissionMode === "bypass" && (
+                    <Warning weight="fill" aria-hidden="true" />
+                  )}
+                  {modes.find((mode) => mode.id === settings.permissionMode)
+                    ?.means ?? ""}
+                </span>
               </div>
             )}
           </div>

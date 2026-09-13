@@ -200,3 +200,29 @@
     max-height: 180px;
   }
 }
+
+/* What the current permission setting actually does.
+   Three words in a segmented pill said which mode was chosen and nothing
+   about what it meant, so "Bypass" — Pi executing without asking — looked
+   exactly like a view filter. Bypass is not an error and does not get the
+   failure colour; it is the one mode where nothing will stop to ask, and it
+   is marked so that reading the header tells you so. */
+.sg-modes-means {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.sg-modes-means[data-loud] {
+  color: var(--waiting-text, #9a4b10);
+  font-weight: 560;
+}
+.sg-modes-means svg {
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .sg-modes-means {
+    display: none;
+  }
+}
