@@ -95,7 +95,7 @@ export function LogsPage({
   );
 
   return (
-    <div className="sg-section-page sg-section-logs">
+    <div className="ax-root sg-section-page sg-section-logs">
       {bar}
       <header className="sg-section-header">
         <div>

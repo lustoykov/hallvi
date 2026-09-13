@@ -516,20 +516,32 @@
   gap: 1px;
   min-width: 0;
 }
+/* A node's own words wrap before they are cut.
+   These were one-line-with-an-ellipsis, so the monitoring node on a real
+   application read "Nothing is wa…" above "nobody has look…" — the two lines
+   whose whole purpose is to say nothing is watching, both cut mid-word. Two
+   lines each is enough for every label the product produces, and a long
+   identifier still truncates rather than forcing the node wider. */
 .axj2-text b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.3;
   letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .axj2-text small {
-  font-size: 12px;
-  color: var(--ax-muted);
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ax-muted);
+  overflow-wrap: anywhere;
 }
 .axj2-status {
   display: inline-flex;

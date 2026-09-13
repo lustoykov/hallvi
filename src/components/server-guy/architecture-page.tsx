@@ -60,7 +60,7 @@ export function ArchitecturePage({
 
   if (!model)
     return (
-      <div className="sg-section-page sg-section-architecture">
+      <div className="ax-root sg-section-page sg-section-architecture">
         {chrome.bar}
         {chrome.header}
         <div className="sg-section-content">
@@ -93,7 +93,7 @@ export function ArchitecturePage({
     );
 
   return (
-    <div className="sg-section-page sg-section-architecture">
+    <div className="ax-root sg-section-page sg-section-architecture">
       <JourneyDirection
         model={model}
         recheck={idle}
