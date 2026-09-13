@@ -29,6 +29,9 @@ export default defineConfig([
   globalIgnores([
     ".claude/**",
     ".server-guy/**",
+    // Local runtime state and the throwaway review scripts for this branch.
+    ".state/**",
+    ".review/**",
     ".next/**",
     "node_modules/**",
     "coverage/**",

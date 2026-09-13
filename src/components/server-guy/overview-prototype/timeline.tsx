@@ -723,7 +723,7 @@ export function TimelineHero({
           {/* Little Server stands at "now", which is the right-hand edge of
               the field — and it is centred on that point, so half of it hung
               off the side of the window. Clamped to half its own width from
-              either edge it still stands at now, and all of it is on screen. */}
+              either edge it still stands at now, and all of it shows. */}
           <div
             className="axt-stand"
             style={{ left: `clamp(46px, ${nowX}%, calc(100% - 46px))` }}
