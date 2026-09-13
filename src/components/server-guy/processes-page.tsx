@@ -13,7 +13,7 @@ import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./architecture-prototype/index";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { processesFromRecords } from "./processes-records";
 import { LineDirection } from "./stack-prototype/line";
 import "./deployment-prototype/transit.css";
@@ -24,7 +24,8 @@ export function ProcessesPage({
   applicationId,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   onOpenConversation,
   onOpenDestination,
@@ -35,7 +36,9 @@ export function ProcessesPage({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -61,6 +64,7 @@ export function ProcessesPage({
       }
       restricted={story.restricted}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
 

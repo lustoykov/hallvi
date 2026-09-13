@@ -10,6 +10,7 @@ import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
+import type { Reachability } from "./deployment-prototype/page-head";
 import { InformationCard } from "./information-card";
 import { LocalTime } from "./local-time";
 import { rank } from "./presentation";
@@ -100,7 +101,8 @@ export function ApplicationSectionView({
   facts = {},
   operations,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   onRefresh,
   onOpenDestination,
   onOpenConversation,
@@ -121,7 +123,9 @@ export function ApplicationSectionView({
   operations: ApplicationOperation[];
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   onRefresh: () => Promise<void>;
   onOpenDestination: (destination: ApplicationSection) => void;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -204,6 +208,7 @@ export function ApplicationSectionView({
       return (
         <DeploymentPage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           executions={view.executions ?? []}
           applicationName={app.name}
@@ -223,6 +228,7 @@ export function ApplicationSectionView({
       return (
         <ProcessesPage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -237,6 +243,7 @@ export function ApplicationSectionView({
       return (
         <StoragePage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -249,6 +256,7 @@ export function ApplicationSectionView({
       return (
         <ReachPageView
           reachable={reachable}
+          onReopen={onReopen}
           page={section}
           records={view.information}
           applicationId={app.id}
@@ -264,6 +272,7 @@ export function ApplicationSectionView({
       return (
         <BackupsPage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -276,6 +285,7 @@ export function ApplicationSectionView({
       return (
         <MonitoringPage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -288,6 +298,7 @@ export function ApplicationSectionView({
       return (
         <DatabasePage
           reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}
@@ -306,6 +317,7 @@ export function ApplicationSectionView({
       return (
         <SupplyPageView
           reachable={reachable}
+          onReopen={onReopen}
           page={section as SupplyPage}
           records={view.information}
           applicationId={app.id}

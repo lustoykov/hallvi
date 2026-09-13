@@ -13,7 +13,7 @@ import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./architecture-prototype/index";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { CallersDirection } from "./reach-prototype/callers";
 import { RingsDirection } from "./reach-prototype/rings";
 import { reachFromRecords } from "./reach-records";
@@ -26,7 +26,8 @@ export function ReachPageView({
   applicationId,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   panel,
   onOpenDestination,
@@ -38,7 +39,9 @@ export function ReachPageView({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   panel?: React.ReactNode;
   onOpenDestination: (destination: ApplicationSection) => void;
@@ -57,6 +60,7 @@ export function ReachPageView({
       openUrl={null}
       restricted={story.audience === "controller"}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
   const props = {

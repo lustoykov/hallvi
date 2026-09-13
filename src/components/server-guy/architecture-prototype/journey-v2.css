@@ -1085,9 +1085,30 @@
 .axj3-closed {
   color: #a4262c;
 }
-/* The link stays, because it is the right address; only the promise goes. */
-.axj3-open[data-unreachable] a {
-  opacity: 0.6;
+.axj3-checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ax-muted, #667085);
+}
+/* The one thing a reader can still do about a closed tunnel. */
+.axj3-reopen {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--ax-line, #dfe4ec);
+  border-radius: 9px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.axj3-reopen:hover {
+  border-color: #b9c2d2;
+  background: #f6f8fc;
 }
 .axj3-open {
   display: flex;

@@ -12,7 +12,7 @@ import { useMemo } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./architecture-prototype/index";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { monitoringFromRecords } from "./monitoring-records";
 import { TunerDirection } from "./signal-prototype/tuner";
 import "./signal-prototype/tuner.css";
@@ -22,7 +22,8 @@ export function MonitoringPage({
   applicationId,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   onAsk,
 }: {
@@ -31,7 +32,9 @@ export function MonitoringPage({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   onAsk: (draft: string) => void;
 }) {
@@ -49,6 +52,7 @@ export function MonitoringPage({
       openUrl={null}
       restricted={false}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
 

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { Reachability } from "./deployment-prototype/page-head";
+
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -273,11 +275,19 @@ export function OperatorShell({
   // Whether the tunnel behind a private access record is still open. The
   // record is a claim about a moment; the tunnel is a process, and it dies
   // with a restart.
-  const [reachable, setReachable] = useState<boolean>(true);
+  //
+  // It starts as "checking" rather than as "open". Starting at open meant
+  // every page claimed a working way in for the frame before the answer
+  // arrived — a false frame on every single load, and the loudest one, since
+  // it is the link a reader is most likely to click.
+  const [reachable, setReachable] = useState<Reachability>("checking");
   const applicationIdForAccess = view.application?.id;
   useEffect(() => {
     if (!applicationIdForAccess) return;
     let cancelled = false;
+    // A different application is a different question, and the last one's
+    // answer must not stand in for it.
+    setReachable("checking");
     const read = async () => {
       try {
         const response = await fetch(
@@ -285,10 +295,15 @@ export function OperatorShell({
         );
         if (!response.ok) return;
         const body = await response.json();
-        if (!cancelled)
-          setReachable(body.mode !== "private" || body.open === true);
+        if (cancelled) return;
+        // Anything that is not a private tunnel is reached directly, and
+        // there is nothing of ours to be closed.
+        setReachable(
+          body.mode !== "private" || body.open === true ? "open" : "closed",
+        );
       } catch {
-        // A page that cannot reach its own controller has louder problems.
+        // A page that cannot reach its own controller has louder problems,
+        // and saying the tunnel is open is not one of the answers.
       }
     };
     void read();
@@ -298,6 +313,24 @@ export function OperatorShell({
       window.clearInterval(timer);
     };
   }, [applicationIdForAccess]);
+
+  /** Asks Pi, in the main conversation, to open private access again. */
+  const askToReopen = useCallback(() => {
+    const url =
+      view.information
+        ?.filter((record) => !record.retiredAt)
+        .find(
+          (record) =>
+            record.presentation?.content?.kind === "application-access",
+        )?.presentation?.url ?? null;
+    askInConversation(
+      view.chats[0]?.id ?? null,
+      `The tunnel to ${application?.name ?? "this application"} is closed${
+        url ? ` — ${url} does not answer` : ""
+      }. Reopen private access and tell me the URL.`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.information, view.chats, application?.name]);
 
   const recordedHere = useMemo(
     () =>
@@ -727,6 +760,7 @@ export function OperatorShell({
               section={activeSection}
               view={view}
               reachable={reachable}
+              onReopen={askToReopen}
               deployment={deployment}
               stack={stack}
               operations={operations}

@@ -14,7 +14,7 @@ import type { PageChrome } from "./architecture-prototype/index";
 import type { ApplicationSection } from "./application-sections";
 import { databaseAssessed, databaseFromRecords } from "./database-records";
 import { TimelineDirection } from "./data-prototype/timeline";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import "./data-prototype/timeline.css";
 
 export function DatabasePage({
@@ -22,7 +22,8 @@ export function DatabasePage({
   applicationId,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   onOpenDestination,
   onAsk,
@@ -32,7 +33,9 @@ export function DatabasePage({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
@@ -51,6 +54,7 @@ export function DatabasePage({
       openUrl={null}
       restricted={false}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
 

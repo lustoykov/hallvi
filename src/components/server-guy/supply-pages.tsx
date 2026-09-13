@@ -14,7 +14,7 @@ import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./architecture-prototype/index";
 import type { ApplicationSection } from "./application-sections";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import type { SecretRequest } from "./secret-request";
 import { supplyFromRecords } from "./supply-records";
 import { ManifestDirection } from "./supply-prototype/manifest";
@@ -42,7 +42,8 @@ export function SupplyPageView({
   applicationName,
   secrets,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   onOpenDestination,
   onAsk,
@@ -54,7 +55,9 @@ export function SupplyPageView({
   secrets: SecretRequest[];
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
@@ -79,6 +82,7 @@ export function SupplyPageView({
       openUrl={null}
       restricted={false}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
   const props = {

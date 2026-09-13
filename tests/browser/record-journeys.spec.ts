@@ -169,13 +169,84 @@ test.describe("what the pages must never stop saying", () => {
 
       await open(page, ACCEPTANCE, id!, "deployment");
       const header = page.locator(".axj3-open");
-      if (state.open)
-        await expect(header).not.toHaveAttribute("data-unreachable");
+      // It settles on one of the two answers; "checking" is only the frame
+      // before the answer arrives, and has its own case below.
+      await expect(header).toHaveAttribute(
+        "data-reach",
+        state.open ? "open" : "closed",
+      );
+      if (state.open) await expect(header.locator("a")).toBeVisible();
       else {
-        // React renders a boolean data attribute as the string "true".
-        await expect(header).toHaveAttribute("data-unreachable", "true");
         expect(await header.innerText()).toMatch(/tunnel is closed/i);
+        // No anchor at all: a dead link that looks alive costs the reader a
+        // click, a wait and a browser error before it says anything.
+        await expect(header.locator("a")).toHaveCount(0);
+        await expect(
+          header.getByRole("button", { name: /reopen/i }),
+        ).toBeVisible();
       }
+    },
+  );
+
+  test(
+    "never claims a way in before it knows",
+    journey("record-destinations"),
+    async ({ page }) => {
+      test.skip(!(await up(page, ACCEPTANCE)), "no acceptance server");
+      await page.goto(`${ACCEPTANCE}/applications`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.waitForLoadState("networkidle").catch(() => {});
+      const id = await page.evaluate(
+        () =>
+          document
+            .querySelector<HTMLAnchorElement>("a[href*='/applications/']")
+            ?.getAttribute("href")
+            ?.match(/[0-9a-f-]{36}/)?.[0] ?? null,
+      );
+      test.skip(!id, "no application");
+
+      // Hold the answer back, so the frame before it arrives is the one under
+      // test. Starting at "open" made that frame claim a working way in on
+      // every single load.
+      let released: (() => void) | null = null;
+      const held = new Promise<void>((resolve) => {
+        released = resolve;
+      });
+      await page.route(`**/api/applications/${id}/access`, async (route) => {
+        await held;
+        await route.continue();
+      });
+
+      const seen: string[] = [];
+      await page.goto(`${ACCEPTANCE}/applications/${id}#deployment`, {
+        waitUntil: "domcontentloaded",
+      });
+      for (let tick = 0; tick < 12; tick++) {
+        seen.push(
+          ...(await page
+            .locator(".axj3-open")
+            .evaluateAll((nodes) =>
+              nodes.map((node) => node.getAttribute("data-reach") ?? "none"),
+            )),
+        );
+        // Nothing may be clickable while the answer is outstanding.
+        expect(
+          await page.locator(".axj3-open a").count(),
+          "an Open link before the answer arrived",
+        ).toBe(0);
+        await page.waitForTimeout(250);
+      }
+      expect(new Set(seen.filter((value) => value !== "none"))).toEqual(
+        new Set(["checking"]),
+      );
+
+      // Let it through, and the header settles on a real answer.
+      released!();
+      await expect(page.locator(".axj3-open")).not.toHaveAttribute(
+        "data-reach",
+        "checking",
+      );
     },
   );
 

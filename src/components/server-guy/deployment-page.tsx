@@ -16,7 +16,7 @@ import type { SavedInformation } from "@/server/operator-data";
 import type { PageChrome } from "./architecture-prototype/index";
 import type { ApplicationSection } from "./application-sections";
 import { deploymentFromRecords } from "./deployment-records";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { TransitDirection } from "./deployment-prototype/transit";
 import "./deployment-prototype/transit.css";
 
@@ -25,7 +25,8 @@ export function DeploymentPage({
   executions,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   panel,
   onOpenConversation,
@@ -37,7 +38,9 @@ export function DeploymentPage({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   panel?: React.ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -106,6 +109,7 @@ export function DeploymentPage({
             }
             restricted={restricted}
             reachable={reachable}
+            onReopen={onReopen}
           />
         }
         activity={

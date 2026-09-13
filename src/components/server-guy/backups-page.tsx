@@ -19,7 +19,7 @@ import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 import type { PageChrome } from "./architecture-prototype/index";
 import { protectionFromRecords } from "./backups-records";
 import { CalendarDirection } from "./backup-prototype/calendar";
-import { PageHead } from "./deployment-prototype/page-head";
+import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
 import "./backup-prototype/calendar.css";
 
@@ -28,7 +28,8 @@ export function BackupsPage({
   applicationId,
   applicationName,
   now,
-  reachable = true,
+  reachable = "checking",
+  onReopen,
   chrome,
   onAsk,
 }: {
@@ -37,7 +38,9 @@ export function BackupsPage({
   applicationName: string;
   now: number;
   /** Whether a private way in still answers; see PageHead. */
-  reachable?: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   chrome: PageChrome;
   onAsk: (draft: string) => void;
 }) {
@@ -67,6 +70,7 @@ export function BackupsPage({
       openUrl={null}
       restricted={false}
       reachable={reachable}
+      onReopen={onReopen}
     />
   );
 
