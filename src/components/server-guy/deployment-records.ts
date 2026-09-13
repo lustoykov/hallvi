@@ -99,6 +99,19 @@ function runFor(record: SavedInformation | undefined, executions: ExecutionRecor
   return newest ? executions.filter((item) => item.runId === newest.runId) : [];
 }
 
+/**
+ * What to call the running image in one line. A digest is the honest
+ * identity and unreadable as a headline, so the name carries the line and
+ * the digest stays in the exact rows underneath.
+ */
+function readableImage(image: string) {
+  const [reference, digest] = image.split("@");
+  const tag = reference.includes(":") ? reference.split(":").at(-1) : null;
+  if (tag) return tag;
+  const name = reference.split("/").at(-1) ?? reference;
+  return digest ? `${name} · ${digest.replace("sha256:", "").slice(0, 12)}` : name;
+}
+
 export function deploymentFromRecords({
   records,
   executions,
@@ -173,7 +186,10 @@ export function deploymentFromRecords({
   if (content)
     facts.push({
       label: "Running",
-      value: content.image.split(":").at(-1) ?? content.image,
+      // A tag reads as a version; a digest-pinned reference does not. Taking
+      // the text after the last colon gives "13.2.1" for one and a bare
+      // 64-character hash for the other, so the two are read apart.
+      value: readableImage(content.image),
       sub: content.server,
       exact: [
         { label: "Image", value: content.image, mono: true },

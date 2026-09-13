@@ -116,6 +116,46 @@ than an overnight implementation — where a supplied value is held, how it
 reaches the host, whether it is write-only, and what the views say about a
 value they must never show. Left for review.
 
+## Grafana and Prometheus — passes
+
+The multi-service example, on a second isolated host. Every acceptance check
+in its README, verified directly rather than taken from Pi's report:
+
+| Check | Result |
+| --- | --- |
+| Grafana `/api/health` | `database: ok`, 13.2.1 |
+| Grafana `/login` through the tunnel | 200 |
+| Prometheus `/-/ready` | ready, reachable only from the app container |
+| `up` after the first scrape | `success`, value `"1"` |
+| Grafana queries the provisioned datasource | succeeds |
+| Dashboard and metrics across container recreation | both survived |
+| Prometheus published port | none; from this PC, `000` |
+| Grafana binding | `127.0.0.1:3000` only |
+| Images | both pinned to immutable amd64 digests |
+
+Eight records, and the multi-service shape came out without prompting:
+`topology` with the application's health, an access record, **two `door`
+records** — Grafana loopback-only, Prometheus unpublished — and **two
+`volume` records**. Architecture draws both services inside a "Private
+network · no ports open" box, the connection between them, and both volumes
+in the disk zone.
+
+### What it exposed
+
+**A deployment record cannot describe two services.** `deployment` content
+carries one `image`, so Pi recorded Prometheus's digest for a deployment
+whose application is Grafana, and nothing on record says which image each
+service runs. Topology names the parts; no record gives them their images.
+The smallest honest fix is for Pi to record each service as a `process`
+subject with its own `image` fact — the vocabulary already allows it and the
+guidance does not yet ask for it. Not changed here: it is a write-contract
+decision.
+
+**A digest is not a version.** Deployment's headline read the text after the
+last colon, which is a tag for `name:tag` and a bare 64-character hash for a
+digest-pinned reference. Fixed: the name carries the line and the digest sits
+in the rows underneath.
+
 ## Resources left running
 
 - `sg-rig-opus` — the host container, with `getting-started-app` deployed and
