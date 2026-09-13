@@ -15,6 +15,7 @@ import { z } from "zod";
 import { loadApplication, loadChat } from "./applications";
 import { getPiRun } from "./pi-runs";
 import { piConfigDir } from "./pi-configuration";
+import { redactHeldSecrets } from "./application-secrets";
 import { redactSecrets } from "./secrets";
 import type { PiRun } from "./types";
 
@@ -142,6 +143,25 @@ export function decideExecution(
   );
   return { approved };
 }
+/**
+ * Every string in a tool result, cleaned. Walks the shape rather than
+ * stringifying it, so a result keeps its types and a nested field cannot slip
+ * through by not being the one field somebody remembered to check.
+ */
+function cleanResult<T>(value: T, clean: (text: string) => string): T {
+  if (typeof value === "string") return clean(value) as T;
+  if (Array.isArray(value))
+    return value.map((item) => cleanResult(item, clean)) as T;
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        cleanResult(item, clean),
+      ]),
+    ) as T;
+  return value;
+}
+
 export function executionContext(run: PiRun, signal?: AbortSignal) {
   let lastApproval: string | undefined;
   async function execute<T>(
@@ -170,8 +190,14 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       runId: run.id,
       tool,
       target,
+      // What Pi wrote, which carries {{secret:NAME}} handles and not values.
+      // Resolution happens later and to a different string, so the record,
+      // the activity and the log all keep the handle.
       input: redactSecrets(
-        typeof input === "string" ? input : JSON.stringify(input),
+        redactHeldSecrets(
+          run.applicationId,
+          typeof input === "string" ? input : JSON.stringify(input),
+        ),
       ).text,
       mode,
       status: needsApproval ? "awaiting-approval" : "running",
@@ -185,8 +211,14 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
     });
     const path = recordPath(run.applicationId, record.id);
     const save = () => write(path, record);
+    // One redactor for every way text leaves this execution. A command should
+    // not print its own secret, but "should" is not a property anything can
+    // rely on, and each of these paths is read by somebody: the owner, the
+    // log, and the model.
+    const clean = (text: string) =>
+      redactSecrets(redactHeldSecrets(run.applicationId, text)).text;
     const output = (text: string) => {
-      record.output = redactSecrets(text).text.slice(-100_000);
+      record.output = clean(text).slice(-100_000);
       save();
     };
     save();
@@ -230,7 +262,10 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
       record.status = "running";
       conversationStatus("working");
       save();
-      const result = await work(output);
+      // Redacted before anything else touches it. The stored record was
+      // already clean; this is the copy the model receives, and a command
+      // that printed a held value used to hand it straight back.
+      const result = cleanResult(await work(output), clean);
       output(
         tool === "server_bash" &&
           result &&
@@ -255,16 +290,11 @@ export function executionContext(run: PiRun, signal?: AbortSignal) {
         signal?.aborted || getPiRun(run.id)?.status !== "running"
           ? "interrupted"
           : "failed";
-      output(
-        record.output +
-          "\n" +
-          (error instanceof Error ? error.message : "Execution failed."),
-      );
-      throw new Error(
-        redactSecrets(
-          error instanceof Error ? error.message : "Execution failed.",
-        ).text,
-      );
+      const said = error instanceof Error ? error.message : "Execution failed.";
+      output(record.output + "\n" + said);
+      // A failure can carry the value too — a connection string in a driver
+      // error, a command echoed back by the shell.
+      throw new Error(clean(said));
     } finally {
       if (getPiRun(run.id)?.status === "running") conversationStatus("working");
       record.finishedAt = new Date().toISOString();

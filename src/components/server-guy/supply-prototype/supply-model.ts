@@ -23,84 +23,27 @@ import {
 export { when, ago };
 
 /** Who decided a value. */
-export type Decider = "plan" | "you" | "generated" | "connection";
-
-export interface Value {
-  id: string;
-  name: string;
-  /** The process it is given to. */
-  service: string;
-  product: string;
-  who: Decider;
-  /** Held on the host rather than stated in the repository. */
-  held: boolean;
-  /** Where the value lives, in words. Never the value itself. */
-  where: string;
-  /** Why it was asked for, when the intake recorded a reason. */
-  why: string | null;
-  /** Recorded but not yet reached the running processes. */
-  pending: boolean;
-}
-
-/** Configuration that is a file rather than a name and a value. */
-export interface ConfigFile {
-  id: string;
-  name: string;
-  service: string;
-  product: string;
-  /** Where the process reads it. */
-  target: string;
-  readOnly: boolean;
-  bytes: number;
-  mode: string;
-  sha: string;
-}
-
-/** A value Server Guy still needs before it can go on. */
-export interface Waiting {
-  name: string;
-  reason: string;
-}
-
-/** A cache or broker beside the application. */
-export interface Broker {
-  name: string;
-  product: string;
-  role: string;
-  persistence: string | null;
-  reach: string;
-}
-
-/** The application's own queue, and what it is carrying. */
-export interface QueueLine {
-  library: string;
-  backedBy: string;
-  workers: string[];
-  backlog: number | null;
-  oldestSeconds: number | null;
-  failedLastHour: number | null;
-  at: string | null;
-}
-
-export interface JobLine {
-  name: string;
-  command: string;
-  schedule: string;
-  timezone: string;
-  nextAt: string | null;
-  paused: boolean;
-  last: { outcome: string; at: string; seconds: number | null } | null;
-}
-
-/** Work that recurs on this server without being the application's. */
-export interface Recurring {
-  id: string;
-  title: string;
-  words: string;
-  detail: string;
-  at: string | null;
-  where: "backups" | "deployment" | "domains";
-}
+// The seven the Manifest, Origin, Queue and Rota designs draw are shared
+// with the records path, so they live beside those designs.
+export type {
+  Broker,
+  ConfigFile,
+  Decider,
+  JobLine,
+  QueueLine,
+  Recurring,
+  Value,
+  Waiting,
+} from "./supply-story";
+import type {
+  Broker,
+  ConfigFile,
+  JobLine,
+  QueueLine,
+  Recurring,
+  Value,
+  Waiting,
+} from "./supply-story";
 
 export interface SupplyStory extends StackStory {
   revision: string | null;

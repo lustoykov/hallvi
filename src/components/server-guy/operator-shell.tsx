@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { Reachability } from "./deployment-prototype/page-head";
+
 import { applicationOperations } from "@/server/operation-record";
 import { stackOf } from "@/server/application-stack";
 import type { ApplicationFacts } from "@/server/application-facts";
@@ -237,19 +239,33 @@ export function OperatorShell({
       );
     }
   }, [applicationId, selectedChatId, demo]);
+  // Whether anything is actually happening. An idle page re-read every
+  // record and every execution off disk every 2.5 seconds to learn nothing,
+  // for as long as the tab stayed open.
+  const working =
+    view.messages.some(
+      (message) => message.status === "queued" || message.status === "running",
+    ) ||
+    (view.executions ?? []).some(
+      (execution) =>
+        execution.status === "running" ||
+        execution.status === "awaiting-approval",
+    );
   useEffect(() => {
     const initial = window.setTimeout(() => {
       void refreshDeployment().catch(() => setRecordLoaded(true));
     }, 0);
+    // Fast while Pi is working, because that is when the page changes under
+    // the reader; slow otherwise, because nothing else changes it.
     const timer = setInterval(
       () => void refreshDeployment().catch(() => undefined),
-      2500,
+      working ? 2500 : 15_000,
     );
     return () => {
       window.clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [refreshDeployment]);
+  }, [refreshDeployment, working]);
   const references = recordReferences(view);
   const operations = useMemo(
     () => view.operations ?? applicationOperations(deployment),
@@ -259,9 +275,84 @@ export function OperatorShell({
   // Which hideable destinations the records establish. The stack model above
   // is no longer written to, so without this every one of them stays dark
   // however much Pi records.
+  // Whether the tunnel behind a private access record is still open. The
+  // record is a claim about a moment; the tunnel is a process, and it dies
+  // with a restart.
+  //
+  // It starts as "checking" rather than as "open". Starting at open meant
+  // every page claimed a working way in for the frame before the answer
+  // arrived — a false frame on every single load, and the loudest one, since
+  // it is the link a reader is most likely to click.
+  //
+  // The answer is stored with the application it is about, so switching
+  // applications reads as "checking" without the effect having to set state
+  // on the way in — the last one's answer simply is not an answer to this
+  // one's question.
+  const [answered, setAnswered] = useState<{
+    id: string;
+    state: Reachability;
+  } | null>(null);
+  const applicationIdForAccess = view.application?.id;
+  const reachable: Reachability =
+    answered && answered.id === applicationIdForAccess
+      ? answered.state
+      : "checking";
+  useEffect(() => {
+    if (!applicationIdForAccess) return;
+    let cancelled = false;
+    const read = async () => {
+      try {
+        const response = await fetch(
+          `/api/applications/${applicationIdForAccess}/access`,
+        );
+        if (!response.ok) return;
+        const body = await response.json();
+        if (cancelled) return;
+        // Anything that is not a private tunnel is reached directly, and
+        // there is nothing of ours to be closed.
+        setAnswered({
+          id: applicationIdForAccess,
+          state:
+            body.mode !== "private" || body.open === true ? "open" : "closed",
+        });
+      } catch {
+        // A page that cannot reach its own controller has louder problems,
+        // and saying the tunnel is open is not one of the answers.
+      }
+    };
+    void read();
+    const timer = window.setInterval(read, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applicationIdForAccess]);
+
+  /** Asks Pi, in the main conversation, to open private access again. */
+  const askToReopen = useCallback(() => {
+    const url =
+      view.information
+        ?.filter((record) => !record.retiredAt)
+        .find(
+          (record) =>
+            record.presentation?.content?.kind === "application-access",
+        )?.presentation?.url ?? null;
+    askInConversation(
+      view.chats[0]?.id ?? null,
+      `The tunnel to ${application?.name ?? "this application"} is closed${
+        url ? ` — ${url} does not answer` : ""
+      }. Reopen private access and tell me the URL.`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.information, view.chats, application?.name]);
+
   const recordedHere = useMemo(
-    () => recordedSections(view.information ?? []),
-    [view.information],
+    () =>
+      recordedSections(
+        view.information ?? [],
+        (view.secrets ?? []).some((secret) => !secret.establishedAt),
+      ),
+    [view.information, view.secrets],
   );
   // Facts the view already carries, refreshed by the same poll as the record,
   // under the facts a destination fetches for itself while it is open.
@@ -467,7 +558,22 @@ export function OperatorShell({
   // Drafts a message in a conversation without sending it.
   function askInConversation(chatId: string | null, draft: string) {
     const target = chatId ?? view.selectedChatId;
-    if (!target) return;
+    if (!target) {
+      // Every destination's primary action goes through here. Returning
+      // quietly made all of them dead buttons for an application whose only
+      // conversation had been archived — the page invites the question and
+      // then swallows it. Start one instead.
+      if (!application) return;
+      void run("chat", async () => {
+        const next = await api.createChat(application.id);
+        const started = next.selectedChatId;
+        if (started) setDrafts((current) => ({ ...current, [started]: draft }));
+        return next;
+      });
+      closeSection();
+      focusComposer();
+      return;
+    }
     setDrafts((current) => ({ ...current, [target]: draft }));
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));
@@ -697,6 +803,8 @@ export function OperatorShell({
               key={`${applicationId}:${activeSection}`}
               section={activeSection}
               view={view}
+              reachable={reachable}
+              onReopen={askToReopen}
               deployment={deployment}
               stack={stack}
               operations={operations}

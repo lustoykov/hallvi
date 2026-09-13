@@ -21,51 +21,13 @@ import {
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { settledAt } from "../history-prototype/history-model";
 
-export interface Probe {
-  name: string;
-  probe: string;
-  /** Checked inside the server, on the private network. */
-  inside: boolean;
-  at: string | null;
-}
-export interface ProcessCard {
-  name: string;
-  product: string;
-  role: "web" | "private" | "worker" | "service";
-  roleWords: string;
-  port: number | null;
-  reach: string;
-  health: string | null;
-  image: string;
-  imageShort: string;
-  command: string | null;
-  probes: Probe[];
-  lastPassed: string | null;
-}
-export interface Change {
-  id: string;
-  title: string;
-  at: string;
-  state: ApplicationOperation["state"];
-  summary: string;
-  origin: ApplicationOperation["origin"];
-}
-export interface Gap {
-  id: string;
-  title: string;
-  detail: string;
-}
-export interface DataStore {
-  kind: "sqlite" | "postgres";
-  label: string;
-  owner: string;
-  ownerName: string;
-  file: string | null;
-  volume: { name: string; docker: string | null; mount: string } | null;
-  /** The check that read the database, when the deployment has one. */
-  probe: Probe | null;
-  firstFailure: { at: string; detail: string } | null;
-}
+// The four the Line design draws are shared with the records path, so they
+// live beside it rather than inside this builder.
+export type { Change, Gap, ProcessCard, Probe } from "./line-story";
+import type { Change, Gap, ProcessCard, Probe } from "./line-story";
+export type { DataStore } from "../data-prototype/data-story";
+import type { DataStore } from "../data-prototype/data-story";
+
 export interface Protection {
   schedule: { words: string; at: string } | null;
   backup: { at: string; detail: string } | null;

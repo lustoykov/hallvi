@@ -12,7 +12,8 @@
 // key both live under the ignored rig results; the endpoint is bound to
 // 127.0.0.1 and reaches one throwaway container.
 //
-// Usage: node tests/rig/host/ssh.mjs [container] [port] [--authorize <pubkey path>]
+// Usage: node tests/rig/host/ssh.mjs [container] [port]
+//        [--authorize <pubkey path>]
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 

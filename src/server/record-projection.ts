@@ -55,6 +55,9 @@ const expiry: Record<Claim, number> = {
   liveness: 15 * 60 * 1000,
 };
 
+/** The subject kinds, re-exported so components can name one in a table. */
+export type SubjectKindOf = SubjectKind;
+
 export function refKey(ref: Ref) {
   return `${ref.kind}:${ref.id}`;
 }
@@ -91,6 +94,58 @@ function stating(records: SavedInformation[], ref: Ref) {
         refKey(record.presentation.states.ref) === key,
     )
     .sort(newestFirst);
+}
+
+/**
+ * Every subject of a kind that any record speaks for, newest statement
+ * first. This is how a destination finds what it is about: Pi names things,
+ * the page does not have a list of them in advance.
+ *
+ * A subject stated `absent` is still returned — a volume that used to be
+ * there is information, and a page that silently dropped it would be
+ * reporting an absence as if nobody had looked.
+ */
+export function subjectsOfKind(records: SavedInformation[], kind: SubjectKind) {
+  const seen = new Map<string, Ref>();
+  for (const record of records
+    .filter((item) => !item.retiredAt)
+    .sort(newestFirst)) {
+    const ref = record.presentation?.states?.ref;
+    if (ref?.kind === kind && !seen.has(ref.id)) seen.set(ref.id, ref);
+  }
+  return [...seen.values()];
+}
+
+/**
+ * Every subject of a kind that any record *mentions*: one it speaks for, one
+ * a check was about, or one it lists in `about`.
+ *
+ * A destination needs this rather than only the stated ones, because a
+ * deployment legitimately says "the http check passed, about process:web"
+ * without speaking for that process — the deployment is an event and states
+ * nothing. Reading only stated subjects made the Processes page empty for an
+ * application whose every check named a process by id.
+ *
+ * Mentioning is not presence. A subject found only this way has
+ * `presenceOf` → not known, and the page says nobody has stated whether it is
+ * there, which is exactly the situation.
+ */
+export function subjectsMentioned(
+  records: SavedInformation[],
+  kind: SubjectKind,
+) {
+  const seen = new Map<string, Ref>();
+  const add = (ref: Ref | undefined) => {
+    if (ref?.kind === kind && !seen.has(ref.id)) seen.set(ref.id, ref);
+  };
+  for (const record of records
+    .filter((item) => !item.retiredAt)
+    .sort(newestFirst)) {
+    add(record.presentation?.states?.ref);
+    for (const ref of record.presentation?.about ?? []) add(ref);
+    for (const check of record.presentation?.checks ?? []) add(check.about);
+  }
+  return [...seen.values()];
 }
 
 export type Presence =
@@ -350,4 +405,50 @@ export function topologyOf(
     if (content?.kind === "topology") return { value: content, record };
   }
   return null;
+}
+
+export type Deployment = Extract<
+  NonNullable<Presentation["content"]>,
+  { kind: "deployment" }
+>;
+export interface ReleasedService {
+  /** The `process` subject this image runs as, when the record says. */
+  process: string | null;
+  /** What was asked for: a tag, which can change under you. */
+  image: string;
+  /** What actually ran, when it is known. */
+  digest: string | null;
+}
+
+/**
+ * What a release put on the server, in one shape.
+ *
+ * A release used to name one image, so a two-service release could only be
+ * recorded as one of them — Prometheus's digest stored against a Grafana
+ * deployment. `services` says it properly. This reads either, so no view has
+ * to know which shape it got, and a record written before `services` existed
+ * still answers the question it was always answering.
+ */
+export function releasedServices(content: Deployment): ReleasedService[] {
+  if (content.services?.length)
+    return content.services.map((service) => ({
+      process: service.process,
+      image: service.image,
+      digest: service.digest ?? digestIn(service.image),
+    }));
+  if (content.image)
+    return [
+      {
+        process: null,
+        image: content.image,
+        digest: digestIn(content.image),
+      },
+    ];
+  return [];
+}
+
+/** A digest pinned inside a reference — `name@sha256:…` — is still a digest. */
+function digestIn(image: string) {
+  const [, digest] = image.split("@");
+  return digest?.startsWith("sha256:") ? digest : null;
 }

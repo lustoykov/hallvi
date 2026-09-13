@@ -26,7 +26,7 @@ import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { ago, countWord, when } from "../stack-prototype/stack-model";
-import type { ProtectDirectionProps } from "./index";
+import type { ProtectProps } from "./protect-story";
 import { lasting, listed, soft, type Piece } from "./model";
 import "./flow.css";
 
@@ -37,8 +37,14 @@ const moodOf: Record<Tone, MascotMood> = {
   planned: "ready",
   checking: "working",
 };
-const size = (gb: number) =>
-  gb < 1 ? `${Math.round(gb * 1024)} MB` : `${gb.toFixed(1)} GB`;
+// A volume of 8 KiB rounded to "0 MB", which says empty when it means small.
+// Below a megabyte the recorded measurement is shown as it was written.
+const size = (gb: number, text?: string | null) =>
+  gb < 1 / 1024
+    ? (text ?? "under 1 MB")
+    : gb < 1
+      ? `${Math.round(gb * 1024)} MB`
+      : `${gb.toFixed(1)} GB`;
 
 interface Box {
   x: number;
@@ -66,7 +72,7 @@ export function FlowDirection({
   activity,
   server,
   onAsk,
-}: ProtectDirectionProps) {
+}: ProtectProps) {
   const board = useRef<HTMLDivElement>(null);
   const [geo, setGeo] = useState<Geo | null>(null);
   const [selected, setSelected] = useState(story.pieces[0]?.key ?? "copy");
@@ -129,8 +135,11 @@ export function FlowDirection({
   const [cadence, keeping] = (guard.schedule?.words ?? "").split(", ");
   const say = `${countWord(n)} ${n === 1 ? "volume holds" : "volumes hold"} the application's data on the server.`;
   const sub = [
-    story.keptAt &&
-      `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`,
+    story.lostAt
+      ? `${n === 1 ? "It did" : "They did"} not come through a container replacement ${when(story.lostAt)}.`
+      : story.keptAt
+        ? `${n === 1 ? "It" : n === 2 ? "Both" : "All"} came through a container replacement ${when(story.keptAt)}.`
+        : "Nobody has tested whether it survives a container replacement.",
     covered.length
       ? `${guard.schedule ? "The daily backup" : "A backup"} copies ${listed(covered.map((piece) => soft(piece.label)))}${left.length ? `; it leaves out ${listed(left.map((piece) => soft(piece.label)))}` : ""}.`
       : "Nothing on the server is in a backup plan.",
@@ -168,7 +177,7 @@ export function FlowDirection({
         label: "Size",
         value:
           volume.sizeGb != null
-            ? `${size(volume.sizeGb)}, measured ${ago(volume.measuredAt!, now)}`
+            ? `${size(volume.sizeGb, volume.sizeText)}, measured ${ago(volume.measuredAt!, now)}`
             : "Not measured",
       },
       {
@@ -179,9 +188,14 @@ export function FlowDirection({
       },
       {
         label: "Containers replaced",
-        value: story.keptAt
-          ? `Kept, as it was ${when(story.keptAt)}`
-          : "Kept: volumes stay when containers are replaced",
+        // "Volumes stay when containers are replaced" is true of a named
+        // volume and false of a bind mount to a temporary path, and this
+        // page cannot tell which without a test that has run.
+        value: story.lostAt
+          ? `The data was lost, ${when(story.lostAt)}`
+          : story.keptAt
+            ? `Kept, as it was ${when(story.keptAt)}`
+            : "Not tested",
       },
       {
         label: "Server lost",
@@ -272,7 +286,9 @@ export function FlowDirection({
           if (!p) return null;
           const y = p.y + p.h / 2;
           if (!item.method) {
-            const wall = edge + 26;
+            // A long volume name widens the server box, which used to push
+            // this label off the right of the board and clip it mid-word.
+            const wall = Math.min(edge + 26, geo.width - 96);
             return (
               <g
                 key={item.key}
@@ -333,10 +349,20 @@ export function FlowDirection({
         <div>
           <h2 className="axbf-say">{say}</h2>
           <p className="axbf-sure">
-            <Tag tone={story.keptAt ? toneOf(story.keptAt) : "planned"}>
-              {story.keptAt
-                ? `Kept through a replacement ${ago(story.keptAt, now)}`
-                : "Not replaced yet"}
+            <Tag
+              tone={
+                story.lostAt
+                  ? "failed"
+                  : story.keptAt
+                    ? toneOf(story.keptAt)
+                    : "planned"
+              }
+            >
+              {story.lostAt
+                ? `Did not survive a replacement ${ago(story.lostAt, now)}`
+                : story.keptAt
+                  ? `Kept through a replacement ${ago(story.keptAt, now)}`
+                  : "Never tested"}
             </Tag>
             <span>{sub}</span>
           </p>
@@ -401,9 +427,15 @@ export function FlowDirection({
                 </button>
               ))}
               <p className="axbf-vol-foot">
-                {item.sizeGb != null ? size(item.sizeGb) : "Size not measured"}
+                {item.sizeGb != null
+                  ? size(item.sizeGb, item.sizeText)
+                  : "Size not measured"}
                 {item.note ? ` · ${item.note}` : ""}
-                {story.keptAt ? ` · kept ${when(story.keptAt)}` : ""}
+                {story.lostAt
+                  ? ` · lost ${when(story.lostAt)}`
+                  : story.keptAt
+                    ? ` · kept ${when(story.keptAt)}`
+                    : ""}
               </p>
             </div>
           ))}

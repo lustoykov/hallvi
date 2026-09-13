@@ -110,7 +110,7 @@ test(
     await nav.getByRole("button", { name: "Show more", exact: true }).click();
     await expect(
       nav.getByRole("button", {
-        name: "Jobs nothing recorded yet",
+        name: "Jobs after deployment",
         exact: true,
       }),
     ).toBeVisible();
@@ -125,7 +125,7 @@ test(
           name:
             hidden === "Security"
               ? "Security check firewall rules"
-              : "CDN nothing recorded yet",
+              : "CDN after deployment",
           exact: true,
         }),
       ).toBeVisible();
@@ -150,7 +150,7 @@ test(
     await nav.getByRole("button", { name: "Show less", exact: true }).click();
     await expect(
       nav.getByRole("button", {
-        name: "Jobs nothing recorded yet",
+        name: "Jobs after deployment",
         exact: true,
       }),
     ).toHaveCount(0);
@@ -165,20 +165,34 @@ test(
       "Logs",
       "Monitoring",
       "Domains",
-      "Environment Variables",
     ]) {
       await nav.getByRole("button", { name: section, exact: true }).click();
       await expect(
         page.getByRole("heading", { name: section, exact: true }),
       ).toBeVisible();
     }
+    // Configuration is gated too now: nothing has named a variable, so it
+    // waits in the quiet row with its reason rather than being listed.
+    await nav.getByRole("button", { name: "Show more", exact: true }).click();
+    await nav
+      .getByRole("button", {
+        name: "Environment Variables after deployment",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Environment Variables", exact: true }),
+    ).toBeVisible();
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "Environment Variables", exact: true }),
     ).toBeVisible();
     await nav.getByRole("button", { name: "Backups", exact: true }).click();
+    // Backups is a designed destination now, and its own empty state says the
+    // same thing in its own words: nobody has looked, which is never the same
+    // as there being nothing to find.
     await expect(
-      page.getByText(/Nothing has been established here yet/),
+      page.getByText(/Nothing here has been looked at yet/),
     ).toBeVisible();
     await page.goBack();
     await expect(

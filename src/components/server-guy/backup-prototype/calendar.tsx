@@ -32,7 +32,7 @@ import type { Tone } from "../deployment-prototype/deployment-model";
 import { LittleServer } from "../deployment-prototype/little-server";
 import { useDismiss } from "../overview-prototype/shared";
 import { clock, countWord, when } from "../stack-prototype/stack-model";
-import type { ProtectDirectionProps } from "./index";
+import type { ProtectProps } from "./protect-story";
 import { dayOf, listed } from "./model";
 import "./calendar.css";
 
@@ -86,7 +86,7 @@ export function CalendarDirection({
   head,
   activity,
   onAsk,
-}: ProtectDirectionProps) {
+}: ProtectProps) {
   const [open, setOpen] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axbc-pop, .axbc-cell", close);

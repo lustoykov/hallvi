@@ -18,7 +18,11 @@
 // picture. A part nobody has looked at reads unknown; a part Pi declared
 // missing reads absent; the two are not the same and neither is healthy.
 
-import type { Ref, SavedInformation, SubjectKind } from "@/server/operator-data";
+import type {
+  Ref,
+  SavedInformation,
+  SubjectKind,
+} from "@/server/operator-data";
 import {
   checkAsNow,
   currentChecks,
@@ -118,7 +122,9 @@ function tagCheck(
     if (found) return found;
   }
   // A failure is worth saying even under a key this page does not know.
-  return [...held.values()].find((item) => item.value.status === "failed") ?? null;
+  return (
+    [...held.values()].find((item) => item.value.status === "failed") ?? null
+  );
 }
 
 /**
@@ -241,13 +247,11 @@ function factsFor(
 ) {
   const ref = refFor(records, part);
   if (!ref) return [];
-  return [...currentFacts(records, ref).values()].map(
-    (held) => ({
-      label: held.value.label,
-      value: held.value.value,
-      mono: held.value.mono,
-    }),
-  );
+  return [...currentFacts(records, ref).values()].map((held) => ({
+    label: held.value.label,
+    value: held.value.value,
+    mono: held.value.mono,
+  }));
 }
 
 /**
@@ -265,9 +269,7 @@ function sshLooking(
 ) {
   if (part.kind !== "gate") return false;
   if (/\bssh\b|\b22\b/i.test(`${part.name} ${part.role}`)) return true;
-  return (
-    factOf(records, { id: part.id, kind: "gate" }, "port") === "22"
-  );
+  return factOf(records, { id: part.id, kind: "gate" }, "port") === "22";
 }
 
 function slotFor(part: { id: string; kind: Part["kind"] }, sshLike: boolean) {
@@ -352,11 +354,19 @@ export function architectureFromRecords({
     .map((record) => record.presentation?.content)
     .find((content) => content?.kind === "deployment");
 
+  // A slot is a fixed position in the design and a part is Pi's. The first
+  // web process is drawn in "app" and the first HTTP gate in "gate:http";
+  // a second of either keeps its own reference rather than landing on top of
+  // the first, which drew one part over another and left React to report the
+  // duplicate key instead of the hidden part.
+  const taken = new Set<string>();
   const slots = new Map(
-    map.value.parts.map((part) => [
-      part.id,
-      slotFor(part, sshLooking(part, records)),
-    ]),
+    map.value.parts.map((part) => {
+      const wanted = slotFor(part, sshLooking(part, records));
+      const slot = taken.has(wanted) ? part.id : wanted;
+      taken.add(slot);
+      return [part.id, slot];
+    }),
   );
   const edges = map.value.edges.map((edge) => ({
     ...edge,
@@ -490,53 +500,64 @@ export function architectureFromRecords({
 
   const stops = (kinds: Part["kind"][]) =>
     kinds.flatMap((kind) => of(kind).map((part) => part.id));
-  const journeys: Journey[] = ([
-    {
-      id: "visit",
-      label: "A visit",
-      stops: stops(["controller", "gate", "tls", "web", "private"]),
-      summary:
-        openness === "restricted"
-          ? `A visit reaches ${headline} only from the machine running Server Guy.`
-          : openness === "public"
-            ? `A visit reaches ${headline} from anywhere.`
-            : `A visit reaches ${headline}; how far it can be reached from has not been read back.`,
-    },
-    {
-      id: "data",
-      label: "Your data",
-      stops: stops(["volume", "offsite"]),
-      summary: volumes.length
-        ? offsite.length
-          ? `${list(volumes.map((part) => part.name))} live on the server and are copied to ${list(offsite.map((part) => part.name))}.`
-          : `${list(volumes.map((part) => part.name))} live on the server. Whether anything copies them off it has not been assessed.`
-        : "No stored data is on record for this application.",
-    },
-    {
-      id: "release",
-      label: "A release",
-      stops: stops(["source", "controller", "gate", "host", "web"]),
-      summary: host
-        ? `Server Guy delivers to ${host.name} over the connection it holds.`
-        : "No host is on record for this application yet.",
-    },
-  ] satisfies Journey[]).filter((journey) => journey.stops.length >= 1);
+  const journeys: Journey[] = (
+    [
+      {
+        id: "visit",
+        label: "A visit",
+        stops: stops(["controller", "gate", "tls", "web", "private"]),
+        summary:
+          openness === "restricted"
+            ? `A visit reaches ${headline} only from the machine running Server Guy.`
+            : openness === "public"
+              ? `A visit reaches ${headline} from anywhere.`
+              : `A visit reaches ${headline}; how far it can be reached from has not been read back.`,
+      },
+      {
+        id: "data",
+        label: "Your data",
+        stops: stops(["volume", "offsite"]),
+        summary: volumes.length
+          ? offsite.length
+            ? `${list(volumes.map((part) => part.name))} live on the server and are copied to ${list(offsite.map((part) => part.name))}.`
+            : `${list(volumes.map((part) => part.name))} live on the server. Whether anything copies them off it has not been assessed.`
+          : "No stored data is on record for this application.",
+      },
+      {
+        id: "release",
+        label: "A release",
+        stops: stops(["source", "controller", "gate", "host", "web"]),
+        summary: host
+          ? `Server Guy delivers to ${host.name} over the connection it holds.`
+          : "No host is on record for this application yet.",
+      },
+    ] satisfies Journey[]
+  ).filter((journey) => journey.stops.length >= 1);
 
   // The application's own reading, as three separate questions.
   const applicationRef: Ref = { kind: "application", id: applicationId };
   const own = [...currentChecks(records, applicationRef).values()];
   const readings = own.map((held) => checkAsNow(held.value, held.record, now));
   const condition: ArchitectureModel["condition"] = planned
-    ? { certainty: "planned", text: "Nothing has run yet; this is the intended shape." }
+    ? {
+        certainty: "planned",
+        text: "Nothing has run yet; this is the intended shape.",
+      }
     : readings.includes("failed")
-      ? { certainty: "failed", text: "A check on the application did not pass." }
+      ? {
+          certainty: "failed",
+          text: "A check on the application did not pass.",
+        }
       : readings.includes("stale")
         ? {
             certainty: "stale",
             text: "It held when it was last checked, and enough time has passed that it may have changed.",
           }
         : readings.includes("verified")
-          ? { certainty: "verified", text: "Every check on the application held when it was last read." }
+          ? {
+              certainty: "verified",
+              text: "Every check on the application held when it was last read.",
+            }
           : {
               certainty: "unknown",
               text: "Nothing on record says whether the application is working.",

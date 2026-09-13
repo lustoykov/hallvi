@@ -28,6 +28,8 @@ import {
 const icons: Record<OperationState, ReactNode> = {
   proposed: <HourglassMedium weight="bold" aria-hidden="true" />,
   queued: <HourglassMedium aria-hidden="true" />,
+  declined: <X aria-hidden="true" />,
+  stopped: <X aria-hidden="true" />,
   cancelled: <X aria-hidden="true" />,
   working: <SpinnerGap className="spin" aria-hidden="true" />,
   inspected: <MagnifyingGlass weight="bold" aria-hidden="true" />,

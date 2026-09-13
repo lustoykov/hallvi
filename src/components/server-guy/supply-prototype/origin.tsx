@@ -12,7 +12,8 @@ import { ChatCircleText, MapPin } from "@phosphor-icons/react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { SupplyDirectionProps } from "./index";
+import type { MascotMood } from "../home/mascot-scene";
+import type { SupplyProps } from "./supply-story";
 import "./origin.css";
 
 const questions = [
@@ -42,8 +43,13 @@ export function OriginDirection({
   activity,
   onAsk,
   onOpenDestination,
-}: SupplyDirectionProps) {
+}: SupplyProps) {
   const { cdn } = story;
+  // A cache in front is not the same claim as a working site. When the origin
+  // behind it does not answer, the cache is still perfectly "on" — and every
+  // visitor gets the provider's error page. The page says which.
+  const dark = cdn.on && cdn.originReachable === "no";
+  const mood: MascotMood = dark ? "attention" : "ready";
   return (
     <section className="axog" aria-label="CDN">
       {head}
@@ -51,18 +57,26 @@ export function OriginDirection({
       <div className="axog-lede">
         <div>
           <h2>
-            {cdn.on
-              ? `${cdn.provider ?? "A cache"} keeps copies in front of ${story.name}.`
-              : `Every request for ${story.name} travels to one machine.`}
+            {dark
+              ? `${cdn.provider ?? "The cache"} answers for ${story.name}. The machine behind it does not.`
+              : cdn.on
+                ? `${cdn.provider ?? "A cache"} keeps copies in front of ${story.name}.`
+                : `Every request for ${story.name} travels to one machine.`}
           </h2>
           <p>
-            <Tag tone={cdn.on ? "verified" : "planned"}>
-              {cdn.on ? `Caching through ${cdn.provider}` : "No cache in front"}
+            <Tag tone={dark ? "failed" : cdn.on ? "verified" : "planned"}>
+              {dark
+                ? `${cdn.provider ?? "The cache"} is in front; the origin is not answering`
+                : cdn.on
+                  ? `Caching through ${cdn.provider}`
+                  : "No cache in front"}
             </Tag>
             <span>
-              {cdn.on
-                ? "The machine below still answers everything the cache does not hold, and a copy can be served after the machine changed — which is why clearing one lives here."
-                : `${cdn.detail} A missing cache is not a missing capability: the name and its certificate work without one, and most applications never need one.`}
+              {dark
+                ? `${cdn.detail} A visitor still reaches the cache and still gets a page — the provider's, not this application's.`
+                : cdn.on
+                  ? "The machine below still answers everything the cache does not hold, and a copy can be served after the machine changed — which is why clearing one lives here."
+                  : `${cdn.detail} A missing cache is not a missing capability: the name and its certificate work without one, and most applications never need one.`}
             </span>
           </p>
         </div>
@@ -87,7 +101,11 @@ export function OriginDirection({
           <span>Visitors, wherever they are</span>
           <i aria-hidden="true" />
         </div>
-        <div className="axog-shelf" data-on={cdn.on || undefined}>
+        <div
+          className="axog-shelf"
+          data-on={cdn.on || undefined}
+          data-dark={dark || undefined}
+        >
           {cdn.on ? (
             <>
               <b>{cdn.provider}</b>
@@ -103,8 +121,8 @@ export function OriginDirection({
             </>
           )}
         </div>
-        <div className="axog-machine">
-          <LittleServer mood="ready" className="axog-guy" />
+        <div className="axog-machine" data-dark={dark || undefined}>
+          <LittleServer mood={mood} className="axog-guy" />
           <div>
             <b>{story.machine ?? "One machine"}</b>
             <span className="axog-where">
@@ -116,9 +134,11 @@ export function OriginDirection({
             )}
           </div>
           <p>
-            One machine answers everything: the pages, the images and the API.
-            It is the only copy there is.
+            {dark
+              ? `${cdn.origin ? `The cache forwards to ${cdn.origin}, and nothing` : "Nothing"} came back from it. Every request the cache cannot answer from a copy ends here.`
+              : "One machine answers everything: the pages, the images and the API. It is the only copy there is."}
           </p>
+          {cdn.concern && <p className="axog-concern">{cdn.concern}</p>}
         </div>
       </div>
 

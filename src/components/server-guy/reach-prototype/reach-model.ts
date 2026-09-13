@@ -30,56 +30,10 @@ import {
 export { when };
 
 /** How far a way in reaches. */
-export type Reach = "internet" | "restricted" | "private" | "closed";
-/** Where what the page says comes from. */
-export type Told = "provider" | "plan" | "stack";
-
-export interface Door {
-  id: string;
-  port: string;
-  /** What is behind it, in words. */
-  title: string;
-  serves: string | null;
-  reach: Reach;
-  /** The sources exactly as the provider or the plan states them. */
-  sources: string[];
-  /** Worth naming even when the firewall works exactly as asked. */
-  concern: string | null;
-  detail: string;
-  /** The provider reports it; this deployment never asked for it. */
-  unasked?: boolean;
-}
-
-/** Something that protects the server without being a way in. */
-export interface Guard {
-  id: string;
-  title: string;
-  at: string | null;
-}
-
-/** What nothing on record covers. */
-export interface Hole {
-  id: string;
-  title: string;
-  detail: string;
-}
-
-/** What a visitor meets, derived from the record — never observed. */
-export interface Caller {
-  id: string;
-  who: string;
-  from: string;
-  typed: string;
-  /** What the browser would show. */
-  outcome: "loads" | "refused" | "no-name" | "insecure";
-  /** Whether what it typed is encrypted end to end. */
-  secure: boolean;
-  headline: string;
-  detail: string;
-  /** How sure: a check that proved it, the plan, or nothing set up. */
-  sure: "proved" | "asked" | "absent";
-  at: string | null;
-}
+// The five the Callers and Rings designs draw are shared with the records
+// path, so they live beside those designs rather than inside this builder.
+export type { Caller, Door, Guard, Hole, Reach, Told } from "./reach-story";
+import type { Caller, Door, Guard, Hole, Reach, Told } from "./reach-story";
 
 export interface ReachStory extends StackStory {
   address: string | null;

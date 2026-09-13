@@ -95,6 +95,12 @@
   border-color: var(--ax-verified-line);
   background: var(--ax-verified-bg);
 }
+/* The cache is genuinely there, so the shelf stays solid — but a green box
+   above the words "522 origin timeout" is the page arguing with itself. */
+.axog-shelf[data-dark] {
+  border-color: var(--ax-failed-line);
+  background: var(--ax-failed-bg);
+}
 .axog-shelf[data-on] b {
   color: var(--ax-verified-text);
 }
@@ -222,4 +228,13 @@
 }
 .axog > .ax-invented {
   align-self: flex-start;
+}
+
+/* The cache's origin is not always this application's machine, and the card
+   above this line names the machine. Saying so beats letting them merge. */
+.axog-concern {
+  margin: 6px 0 0 !important;
+  padding-left: 10px;
+  border-left: 2px solid var(--ax-warn, #c98a2b);
+  font-size: 13px;
 }

@@ -238,6 +238,10 @@
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  /* The column is narrow and the phrase is Pi's clock, so it will sometimes
+     not fit. Cutting it mid-word gave "Last checked 11 min ag", which reads
+     as a typo rather than as a truncation. */
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 560;
   white-space: nowrap;

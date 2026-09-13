@@ -10,6 +10,7 @@ import type { DeploymentRecord } from "@/server/deployment-types";
 import type { ApplicationOperation } from "@/server/operation-record";
 import type { OperatorView } from "@/server/types";
 
+import type { Reachability } from "./deployment-prototype/page-head";
 import { InformationCard } from "./information-card";
 import { LocalTime } from "./local-time";
 import { rank } from "./presentation";
@@ -25,6 +26,13 @@ import { OverviewPage } from "./overview-page";
 import { DeploymentPage } from "./deployment-page";
 import { HistoryPage } from "./history-page";
 import { LogsPage } from "./logs-page";
+import { BackupsPage } from "./backups-page";
+import { DatabasePage } from "./database-page";
+import { MonitoringPage } from "./monitoring-page";
+import { ProcessesPage } from "./processes-page";
+import { ReachPageView } from "./reach-pages";
+import { SupplyPageView, type SupplyPage } from "./supply-pages";
+import { StoragePage } from "./storage-page";
 import { ArchitecturePrototype } from "./architecture-prototype";
 import { BackupPrototype } from "./backup-prototype";
 import { DataPrototype } from "./data-prototype";
@@ -93,6 +101,8 @@ export function ApplicationSectionView({
   facts = {},
   operations,
   now,
+  reachable = "checking",
+  onReopen,
   onRefresh,
   onOpenDestination,
   onOpenConversation,
@@ -112,6 +122,10 @@ export function ApplicationSectionView({
   facts?: ApplicationFacts;
   operations: ApplicationOperation[];
   now: number;
+  /** Whether a private way in still answers; see PageHead. */
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access when it is closed. */
+  onReopen?: () => void;
   onRefresh: () => Promise<void>;
   onOpenDestination: (destination: ApplicationSection) => void;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -193,6 +207,8 @@ export function ApplicationSectionView({
     if (section === "deployment")
       return (
         <DeploymentPage
+          reachable={reachable}
+          onReopen={onReopen}
           records={view.information}
           executions={view.executions ?? []}
           applicationName={app.name}
@@ -204,6 +220,111 @@ export function ApplicationSectionView({
           }}
           panel={children}
           onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "processes")
+      return (
+        <ProcessesPage
+          reachable={reachable}
+          onReopen={onReopen}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenConversation={onOpenConversation}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "storage")
+      return (
+        <StoragePage
+          reachable={reachable}
+          onReopen={onReopen}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "domains" || section === "security")
+      return (
+        <ReachPageView
+          reachable={reachable}
+          onReopen={onReopen}
+          page={section}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          panel={section === "security" ? children : null}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "backups")
+      return (
+        <BackupsPage
+          reachable={reachable}
+          onReopen={onReopen}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "monitoring")
+      return (
+        <MonitoringPage
+          reachable={reachable}
+          onReopen={onReopen}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (section === "database")
+      return (
+        <DatabasePage
+          reachable={reachable}
+          onReopen={onReopen}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
+          onOpenDestination={onOpenDestination}
+          onAsk={(draft) => onAsk(null, draft)}
+        />
+      );
+    if (
+      section === "cache" ||
+      section === "jobs" ||
+      section === "variables" ||
+      section === "cdn"
+    )
+      return (
+        <SupplyPageView
+          reachable={reachable}
+          onReopen={onReopen}
+          page={section as SupplyPage}
+          records={view.information}
+          applicationId={app.id}
+          applicationName={app.name}
+          secrets={view.secrets ?? []}
+          now={now}
+          chrome={{ bar, header: null, activity: null }}
           onOpenDestination={onOpenDestination}
           onAsk={(draft) => onAsk(null, draft)}
         />

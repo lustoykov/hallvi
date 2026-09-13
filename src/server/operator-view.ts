@@ -1,5 +1,6 @@
 import { listActivity } from "./pi-activity";
 import { listExecutions } from "./operator-execution";
+import { listSecrets } from "./application-secrets";
 import { listInformation } from "./saved-information";
 import { listApplicationChatSummaries, listMessages } from "./db";
 import { loadApplication, loadChat, repositoryAccess } from "./applications";
@@ -52,6 +53,7 @@ export function getOperatorView(
     information: listInformation(application.id, "", true).filter(
       (r) => r.presentation,
     ),
+    secrets: listSecrets(application.id),
     activity: [],
   };
 }

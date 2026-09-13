@@ -18,7 +18,7 @@ import { useState, type ReactNode } from "react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { ReachDirectionProps } from "./index";
+import type { ReachProps } from "./reach-story";
 import { ago, when, type Door } from "./reach-model";
 import "./rings.css";
 
@@ -43,7 +43,7 @@ export function RingsDirection({
   panel,
   onCheck,
   checking,
-}: ReachDirectionProps) {
+}: ReachProps) {
   const [picked, setPicked] = useState<number | null>(null);
   // The "everything else" entry only belongs in a ring when nothing
   // refuses it, which is what a missing firewall means.
@@ -198,19 +198,35 @@ export function RingsDirection({
       <div className="axri-lede">
         <div>
           <h2>
-            {!walled
-              ? "Nothing stands between the internet and this server."
-              : pierce
-                ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
-                : "Four rings in, and each wall needs something different to pass."}
+            {/* An unread policy is an unknown policy. "Nothing stands
+                between the internet and this server" is a finding, and
+                only a policy somebody read can support it. */}
+            {story.firewall.state === "asked"
+              ? "Nobody has read what stands between the internet and this server."
+              : !walled
+                ? "Nothing stands between the internet and this server."
+                : pierce
+                  ? `Something out on the internet can reach ${pierce.title}, which was meant to stay inside.`
+                  : "Four rings in, and each wall needs something different to pass."}
           </h2>
           <p>
+            {/* Three states, not two. "There is no firewall" established by
+                a record is a finding and reads as one; nobody having looked
+                is the only case that deserves "never read back". */}
             <Tag
-              tone={story.firewall.state === "read" ? "verified" : "planned"}
+              tone={
+                story.firewall.state === "read"
+                  ? "verified"
+                  : story.firewall.state === "none"
+                    ? "failed"
+                    : "planned"
+              }
             >
               {story.firewall.state === "read"
                 ? `Read from ${story.firewall.provider} ${ago(story.firewall.at, now)}`
-                : "Asked for, never read back"}
+                : story.firewall.state === "none"
+                  ? `Established as absent ${ago(story.firewall.at, now)}`
+                  : "Asked for, never read back"}
             </Tag>
             <span>
               Standing in a ring means you can reach everything drawn in it.
@@ -265,10 +281,14 @@ export function RingsDirection({
           <>
             <h3>Pick a ring to see what someone standing there can reach.</h3>
             <p>
-              {story.firewall.detail}{" "}
+              {/* Pi's own sentence rarely ends in a stop, and the next one
+                  ran straight into it. */}
+              {story.firewall.detail.replace(/[.;]?\s*$/, ".")}{" "}
               {story.firewall.state === "read"
-                ? "The rules are the provider’s own, read just now."
-                : "These are the rules the deployment asked for, not a read of what is in place."}
+                ? `The rules are the provider’s own, read ${story.firewall.at ? ago(story.firewall.at, now) : "at some point"}.`
+                : story.firewall.state === "none"
+                  ? "What the rings show is the deployment's own arrangement, which is all that is holding."
+                  : "These are the rules the deployment asked for, not a read of what is in place."}
             </p>
           </>
         )}

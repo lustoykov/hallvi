@@ -19,6 +19,10 @@ export type OperationState =
   | "inspected"
   | "verified"
   | "failed"
+  /** You were asked and said no. Nothing ran. */
+  | "declined"
+  /** It was running and was stopped. How far it got is not known. */
+  | "stopped"
   | "cancelled";
 
 export interface OperationStep {

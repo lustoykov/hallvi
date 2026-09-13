@@ -114,6 +114,13 @@ export const browserJourneys = [
     smoke: false,
   },
   {
+    id: "record-destinations",
+    name: "Every destination, drawn from records",
+    description:
+      "Walk all sixteen views on every running application: deep link, reload, two desktop widths, and no console error, overflow or clipped text anywhere.",
+    smoke: false,
+  },
+  {
     id: "dashboard",
     name: "Testing dashboard and saved reviews",
     description:

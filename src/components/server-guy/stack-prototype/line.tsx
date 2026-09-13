@@ -17,12 +17,14 @@ import {
 
 import { Tag } from "../deployment-prototype/tag";
 import { useDismiss } from "../overview-prototype/shared";
-import type { StackDirectionProps } from "./index";
-import { clock, countWord, when, type Change, type Probe } from "./stack-model";
+import { clock, countWord, when } from "./stack-model";
+import type { Change, LineProps, Probe } from "./line-story";
 import "../deployment-prototype/transit.css";
 import "./line.css";
 
 interface Fact {
+  /** Unique per row: two processes can honestly share a product name. */
+  key: string;
   label: string;
   value: string;
   sub: string;
@@ -36,7 +38,7 @@ export function LineDirection({
   onAsk,
   onOpenConversation,
   onOpenDestination,
-}: StackDirectionProps) {
+}: LineProps) {
   const [open, setOpen] = useState<string | null>(null);
   const [lit, setLit] = useState<{ line: string; at: number } | null>(null);
   const [fact, setFact] = useState<string | null>(null);
@@ -125,10 +127,14 @@ export function LineDirection({
         <div
           key={probe.name}
           className="axm-rec"
-          data-tone={probe.at ? "pass" : "info"}
+          data-tone={
+            probe.passed === false ? "fail" : probe.at ? "pass" : "info"
+          }
         >
           <time>{probe.at ? clock(probe.at) : "—"}</time>
-          <b aria-hidden="true">{probe.at ? "✓" : "·"}</b>
+          <b aria-hidden="true">
+            {probe.passed === false ? "✕" : probe.at ? "✓" : "·"}
+          </b>
           <span>
             {probe.name} · {probe.probe} ·{" "}
             {probe.inside ? "inside the server" : "from your network"}
@@ -140,22 +146,22 @@ export function LineDirection({
   const facts = (items: Fact[]) => (
     <dl className="axm-facts">
       {items.map((item) => (
-        <div key={item.label} className="axm-fact">
+        <div key={item.key} className="axm-fact">
           <dt>{item.label}</dt>
           <dd>
             <button
               type="button"
               className="axm-fact-open"
-              aria-expanded={fact === item.label}
+              aria-expanded={fact === item.key}
               disabled={!item.exact.length}
               onClick={() =>
-                setFact((value) => (value === item.label ? null : item.label))
+                setFact((value) => (value === item.key ? null : item.key))
               }
             >
               <b>{item.value}</b>
               <small>{item.sub}</small>
             </button>
-            {fact === item.label && (
+            {fact === item.key && (
               <div className="axm-pop" role="dialog" aria-label={item.label}>
                 <dl>
                   {item.exact.map((row) => (
@@ -212,16 +218,23 @@ export function LineDirection({
   const say =
     story.state === "running"
       ? `${countWord(n)} ${n === 1 ? "process is" : "processes are"} running.`
-      : story.state === "unknown"
-        ? `${countWord(n)} ${n === 1 ? "process" : "processes"} may have changed.`
-        : `${countWord(n)} ${n === 1 ? "process is" : "processes are"} planned.`;
+      : story.state === "failed"
+        ? // Nothing here passed and something failed. Saying "running" over a
+          // red tag was the page arguing with itself.
+          `${countWord(n)} ${n === 1 ? "process is" : "processes are"} not answering.`
+        : story.state === "unknown"
+          ? `${countWord(n)} ${n === 1 ? "process" : "processes"} may have changed.`
+          : `${countWord(n)} ${n === 1 ? "process is" : "processes are"} planned.`;
   const processStop = (
     item: (typeof story.processes)[number],
     line: string,
     at: number,
     then?: string,
   ) => {
-    const passed = item.probes.filter((probe) => probe.at).length;
+    // Passed, not merely dated: a failed check has a time too.
+    const passed = item.probes.filter(
+      (probe) => probe.passed ?? Boolean(probe.at),
+    ).length;
     return stop({
       id: `process:${item.name}`,
       line,
@@ -229,8 +242,9 @@ export function LineDirection({
       then,
       className: item.role === "private" ? "axsl-private" : undefined,
       dot: item.role === "private" ? <Lock weight="bold" /> : undefined,
-      tone:
-        item.probes.length && passed === item.probes.length
+      tone: item.probes.some((probe) => probe.passed === false)
+        ? "fail"
+        : item.probes.length && passed === item.probes.length
           ? "pass"
           : undefined,
       title: (
@@ -269,6 +283,7 @@ export function LineDirection({
           </button>
           {facts(
             story.processes.map((item) => ({
+              key: item.name,
               label: item.product,
               value:
                 item.role === "web"
@@ -316,8 +331,13 @@ export function LineDirection({
               id: "port",
               line: "visit",
               at: 1,
-              title: "Port 80 on the server",
-              detail: `HTTP, opened by the firewall for ${story.restricted ? "your network" : "everyone"}`,
+              // What the records say the way in is. The fallback is the
+              // shape of a plain HTTP deployment, which is what the
+              // isolated visual reference draws.
+              title: story.entry?.title ?? "Port 80 on the server",
+              detail:
+                story.entry?.detail ??
+                `HTTP, opened by the firewall for ${story.restricted ? "your network" : "everyone"}`,
             })}
             {web.map((item, index) => processStop(item, "visit", 2 + index))}
           </ol>

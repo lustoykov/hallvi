@@ -18,6 +18,7 @@
 
 import type { InformationInput } from "./operator-data";
 import { basisKinds, claimKinds } from "./operator-data";
+import { looksLikeSecret } from "./secrets";
 
 const claimList = claimKinds.join(", ");
 const basisList = basisKinds.join(", ");
@@ -100,14 +101,22 @@ export function reviewRecord(value: InformationInput): string[] {
           `"info", or record what actually happened.`,
       );
   });
-  found.push(...duplicates(presentation.checks.map((c) => c.key), "checks"));
+  found.push(
+    ...duplicates(
+      presentation.checks.map((c) => c.key),
+      "checks",
+    ),
+  );
 
   (presentation.facts ?? []).forEach((fact, index) => {
     const gap = missing(fact, "Fact", index, fact.label);
     if (gap) found.push(gap);
   });
   found.push(
-    ...duplicates((presentation.facts ?? []).map((f) => f.key), "facts"),
+    ...duplicates(
+      (presentation.facts ?? []).map((f) => f.key),
+      "facts",
+    ),
   );
 
   // Facts and checks that name nothing are unreachable: a page asks for the
@@ -147,7 +156,34 @@ export function reviewRecord(value: InformationInput): string[] {
         `while it existed on the earlier record.`,
     );
 
+  // A variable is the one subject whose value must never be recorded, and a
+  // page that shows it cannot be un-shown. So the refusal is here, at the
+  // write, rather than left to every reader to remember.
+  if (presentation.states?.ref.kind === "variable")
+    for (const fact of presentation.facts ?? [])
+      if (/^(value|secret|password|token|key)$/i.test(fact.key ?? ""))
+        found.push(
+          `Fact "${fact.label}" uses the key "${fact.key}" on a variable. A ` +
+            `variable records where its value came from and whether one is ` +
+            `established — never the value itself. Use source, scope or ` +
+            `established, and request the value through request_secret so the ` +
+            `execution layer resolves it and you never hold it.`,
+        );
+  for (const fact of presentation.facts ?? [])
+    if (looksLikeSecret(fact.value))
+      found.push(
+        `Fact "${fact.label}" holds something credential-shaped. Records are ` +
+          `shown to the owner and kept forever; a secret belongs in ` +
+          `request_secret, which gives you a handle to use instead.`,
+      );
+
   const content = presentation.content;
+  if (content?.kind === "deployment" && !content.image && !content.services)
+    found.push(
+      `A deployment has to say what it deployed. Give image for a release ` +
+        `with one image, or services: [{process, image, digest?}] naming ` +
+        `each one — a release with two images cannot be recorded as one.`,
+    );
   if (content?.kind === "topology") {
     if (presentation.states?.ref.kind !== "application")
       found.push(

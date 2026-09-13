@@ -76,7 +76,7 @@ export const applicationSections = [
     icon: Lightning,
     group: "stack",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "jobs",
@@ -84,7 +84,7 @@ export const applicationSections = [
     icon: CalendarCheck,
     group: "stack",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "storage",
@@ -104,7 +104,7 @@ export const applicationSections = [
     icon: StackSimple,
     group: "care",
     hideable: true,
-    available: false,
+    available: true,
   },
   {
     id: "security",
@@ -119,6 +119,12 @@ export const applicationSections = [
     label: "Environment Variables",
     icon: SlidersHorizontal,
     group: "care",
+    // Gated like the rest: it appears once a variable or a pending request
+    // names one. It has to be `hideable` to say so, because a gated section
+    // without it is dropped by both lists and the destination simply
+    // disappears rather than waiting under "Show more".
+    hideable: true,
+    available: true,
   },
 ] as const;
 export type ApplicationSection = (typeof applicationSections)[number]["id"];
@@ -132,26 +138,58 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
  * there. The stack model this used to read is no longer populated, so every
  * hideable destination stayed dark however much Pi recorded.
  *
- * Only what the vocabulary can actually express appears here. A database, a
- * cache, a queue and a job have no subject kind yet, so nothing can
- * establish them and they stay hidden — which is the honest answer, not an
- * oversight.
+ * A destination lights up when a record *speaks for* one of its subjects. The
+ * map alone is not enough for most of them: it draws shapes, and a shape is
+ * not a thing that exists. Processes and Storage are the exception, because a
+ * planned map is worth navigating to before anything runs — and both pages
+ * say plainly that nothing has been looked at yet.
  */
-export function recordedSections(records: SavedInformation[]) {
+/**
+ * What the records establish, plus whether anything has been deployed at all.
+ * The second is not a destination; it is what tells a hidden row apart from a
+ * row that is hidden because nothing has happened yet.
+ */
+export type Recorded = Partial<Record<ApplicationSection, boolean>> & {
+  deployed?: boolean;
+};
+
+export function recordedSections(
+  records: SavedInformation[],
+  /** Whether Pi has asked the owner for a value it has not been given. */
+  waiting = false,
+): Recorded {
   const live = records.filter((record) => !record.retiredAt);
-  const states = (kind: string) =>
-    live.some((record) => record.presentation?.states?.ref.kind === kind);
+  const states = (...kinds: string[]) =>
+    live.some((record) =>
+      kinds.includes(record.presentation?.states?.ref.kind ?? ""),
+    );
   const map = live
     .map((record) => record.presentation?.content)
     .find((content) => content?.kind === "topology");
   const parts = map?.kind === "topology" ? map.parts : [];
   const has = (...kinds: string[]) =>
     parts.some((part) => kinds.includes(part.kind));
+  const secrets = live.some(
+    (record) => record.presentation?.states?.ref.kind === "variable",
+  );
   return {
     processes: states("process") || has("web", "private"),
     storage: states("volume") || has("volume"),
-    security: states("door") || states("access") || has("gate", "tls"),
-  } as Partial<Record<ApplicationSection, boolean>>;
+    security: states("door", "access", "firewall") || has("gate", "tls"),
+    database: states("database"),
+    cache: states("cache", "queue"),
+    jobs: states("job"),
+    // Configuration is worth a destination the moment anything names one,
+    // including a value Pi has asked the owner for and not yet been given.
+    variables: secrets || waiting,
+    cdn: states("cdn"),
+    deployed: live.some(
+      (record) => record.presentation?.content?.kind === "deployment",
+    ),
+    // Backups and Monitoring are always listed: "nothing is watching" and
+    // "nothing has been established about copies" are the answers a reader
+    // most needs, and a destination that hides them says the opposite.
+  };
 }
 
 /** Whether a hideable destination has anything recorded to show. */
@@ -161,7 +199,7 @@ export function sectionRecorded(
   facts: ApplicationFacts = {},
   hasHost = false,
   /** What the records establish; preferred over the retired stack model. */
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   if (recorded[section] !== undefined) return recorded[section];
   switch (section) {
@@ -195,7 +233,7 @@ export function visibleSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   return applicationSections.filter(
     (section) =>
@@ -214,7 +252,7 @@ export function hiddenSections(
   active: ApplicationSection | null,
   facts: ApplicationFacts = {},
   hasHost = false,
-  recorded: Partial<Record<ApplicationSection, boolean>> = {},
+  recorded: Recorded = {},
 ) {
   return applicationSections
     .filter(
@@ -230,9 +268,12 @@ export function hiddenSections(
         section.id === "security"
           ? "check firewall rules"
           : !("available" in section && section.available)
-            ? "nothing recorded yet"
-            : stack.recorded
-              ? "not used"
+            ? "nothing can record this yet"
+            : recorded.deployed
+              ? // Deployed, and still nothing names one. "Not used" would be
+                // a claim; "after deployment" was simply wrong, because the
+                // deployment has happened.
+                "nothing has looked"
               : "after deployment",
     }));
 }

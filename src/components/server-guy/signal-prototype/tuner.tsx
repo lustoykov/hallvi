@@ -19,7 +19,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { lasting } from "../backup-prototype/model";
 import { ago, countWord, when } from "../stack-prototype/stack-model";
-import type { SignalDirectionProps } from "./index";
+import type { TunerProps } from "./signal-story";
 import { toneOf, type Look } from "./signal-model";
 import "./tuner.css";
 
@@ -46,7 +46,9 @@ const signalWords = ["No signal", "Faint", "Weak", "Fair", "Good", "Strong"];
 const resultWord: Record<Look["state"], string> = {
   passing: "Passed",
   failing: "Failed",
-  unknown: "No result",
+  // It had a result; the result is out of its window. "No result" said
+  // nothing was ever heard, which is a different and worse thing.
+  unknown: "Out of date",
   seen: "Read",
 };
 
@@ -68,7 +70,8 @@ function Radio({
   onDrag: (value: number | null) => void;
   now: number;
   mood: MascotMood;
-  live: boolean;
+  /** true listening, false nothing, null there is one and it has gone quiet. */
+  live: boolean | null;
   note: string;
 }) {
   const glass = useRef<HTMLDivElement>(null);
@@ -111,9 +114,13 @@ function Radio({
     <div className="axtu-radio">
       <div className="axtu-face">
         <LittleServer mood={mood} className="axtu-guy" />
-        <span className="axtu-lamp" data-on={live || undefined}>
+        <span className="axtu-lamp" data-on={live === true || undefined}>
           <i aria-hidden="true" />
-          {live ? "Listening" : "Not listening"}
+          {live === true
+            ? "Listening"
+            : live === null
+              ? "Gone quiet"
+              : "Not listening"}
         </span>
         <small>{note}</small>
       </div>
@@ -166,7 +173,11 @@ function Radio({
                 ))}
               </span>
               <small>
-                {station.state === "failing" ? "Failing" : signalWords[bars]}
+                {station.state === "failing"
+                  ? "Failing"
+                  : station.state === "stale"
+                    ? "Out of date"
+                    : signalWords[bars]}
               </small>
             </button>
           );
@@ -257,9 +268,13 @@ export function TunerDirection({
   head,
   activity,
   onAsk,
-}: SignalDirectionProps) {
+}: TunerProps) {
   const failing = story.looks.find((look) => look.state === "failing") ?? null;
   const watching = story.watcher?.state === "running";
+  // A watcher that has gone quiet is not the same as no watcher, and the page
+  // said "Nothing is listening" for both.
+  const quiet = story.watcher?.state === "stale";
+  const nobody = !story.watcher || story.watcher.state === "not-running";
   const roles = new Map(
     story.processes.map((item) => [item.product, item.roleWords]),
   );
@@ -285,15 +300,20 @@ export function TunerDirection({
       name: part,
       sub: subOf(part),
       at,
+      // A station every one of whose readings is out of its window is stale,
+      // however recently the last one arrived. Bars measure recency; this
+      // measures whether the readings still stand.
       state: looks.some((look) => look.state === "failing")
         ? "failing"
         : looks.some((look) => look.invented)
           ? "live"
           : !at
             ? "static"
-            : toneOf(at, now) === "verified"
-              ? "fresh"
-              : "stale",
+            : looks.every((look) => look.state === "unknown")
+              ? "stale"
+              : toneOf(at, now) === "verified"
+                ? "fresh"
+                : "stale",
     };
   });
   const [tuned, setTuned] = useState(
@@ -304,7 +324,11 @@ export function TunerDirection({
   );
   const [drag, setDrag] = useState<number | null>(null);
   const [fade, setFade] = useState<string | null>(null);
+  // A dial with nothing to point at. The records path draws its own words in
+  // this case, so reaching here means the reference scenario produced no
+  // stations; either way, crashing is not the answer.
   const station = stations[tuned];
+  if (!station) return null;
   const between =
     drag !== null &&
     Math.abs(placeOf(tuned, stations.length) - drag) >= lockOf(stations.length);
@@ -357,8 +381,12 @@ export function TunerDirection({
     : {
         say: watching
           ? `Every check on ${story.name} is passing.`
-          : `Nothing is listening to ${story.name}.`,
-        tone: toneOf(story.lastCheckAt, now),
+          : quiet
+            ? `Whatever was watching ${story.name} has gone quiet.`
+            : `Nothing is listening to ${story.name}.`,
+        // "Last heard an hour ago" in green, beside "has gone quiet", was
+        // the tag agreeing with the clock and disagreeing with the sentence.
+        tone: quiet || nobody ? "stale" : toneOf(story.lastCheckAt, now),
         word: story.lastCheckAt
           ? `Last heard ${ago(story.lastCheckAt, now)}`
           : "Never heard",
@@ -392,11 +420,17 @@ export function TunerDirection({
                 ? "ready"
                 : "resting"
         }
-        live={watching}
+        // null is "there is one and it has gone quiet", which is neither.
+        live={watching ? true : quiet ? null : false}
         note={
-          watching
-            ? "A collector on the host listens every minute (invented)"
-            : "Nothing listens between deployments"
+          // What the watcher says about itself, when there is one. The
+          // sentence this replaced was the reference scenario's, and carried
+          // the word "invented" onto a page drawn from records.
+          watching || quiet
+            ? (story.watcher?.detail ?? "Something is watching")
+            : nobody
+              ? "Nothing listens between deployments"
+              : "Nothing listens between deployments"
         }
       />
       <Transcript
@@ -415,7 +449,11 @@ export function TunerDirection({
                 ? "failed"
                 : station.state === "static"
                   ? "planned"
-                  : toneOf(station.at, now)
+                  : // A station whose readings are all out of window is not
+                    // verified, however recently the last one arrived.
+                    station.state === "stale"
+                    ? "stale"
+                    : toneOf(station.at, now)
             }
           >
             {station.state === "failing"
@@ -449,9 +487,16 @@ export function TunerDirection({
         )}
         {heard.length > 0 && (
           <p className="axtu-silence" data-live={watching || undefined}>
+            {/* "(invented)" was the reference scenario's word and reached a
+                page drawn from records. And "with nothing listening" is
+                false when something is listening and has gone quiet. */}
             {watching
-              ? "Listening every minute (invented)."
-              : `Silence since ${when(last!)}: ${lasting(now - Date.parse(last!))} with nothing listening.`}
+              ? `Something is listening: ${story.watcher?.detail ?? "it reports on its own schedule"}.`
+              : `Silence since ${when(last!)}: ${lasting(now - Date.parse(last!))} ${
+                  quiet
+                    ? "since the watcher last said anything."
+                    : "with nothing listening."
+                }`}
           </p>
         )}
         {gaps.map((gap) => (

@@ -304,10 +304,20 @@ export function overviewFromRecords({
   // ---- what is true now ------------------------------------------------
   const vitals: Vital[] = (Object.keys(chrome) as Lane[]).map((id) => {
     const { held, subjects } = gathered[id];
-    // An absence someone wrote outranks a lane with nothing in it.
-    const declared = subjects
-      .map((ref) => presenceOf(live, ref))
-      .find((presence) => presence.known && presence.presence === "absent");
+    // An absence someone wrote outranks a lane with **nothing in it**. It
+    // does not outrank a lane whose other subject is present and passing:
+    // Shop's public HTTP port is deliberately absent and its private tunnel
+    // works, and reading the lane as "Not set up" turned the good half of
+    // that arrangement into a warning.
+    const presences = subjects.map((ref) => presenceOf(live, ref));
+    const anyPresent = presences.some(
+      (presence) => presence.known && presence.presence === "present",
+    );
+    const declared =
+      !anyPresent &&
+      presences.find(
+        (presence) => presence.known && presence.presence === "absent",
+      );
     const certainty: Certainty = declared ? "absent" : readLane(held, now);
     const facts: Fact[] = subjects.flatMap((ref) =>
       [...currentFacts(live, ref).values()].map((item) => ({

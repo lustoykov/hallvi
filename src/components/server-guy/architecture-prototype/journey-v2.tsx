@@ -229,7 +229,10 @@ function ServerGuyFace() {
   );
 }
 
-function iconFor(part: Part, openness: ArchitectureModel["openness"]): ReactNode {
+function iconFor(
+  part: Part,
+  openness: ArchitectureModel["openness"],
+): ReactNode {
   if (part.id.startsWith("gap:")) return <Heartbeat weight="bold" />;
   switch (part.kind) {
     case "controller":
@@ -1052,7 +1055,8 @@ export function JourneyDirection({
             ...volumes.map((volume) => volume.id),
             ...model.parts
               .filter(
-                (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
+                (part) =>
+                  part.kind === "monitor" && !part.id.startsWith("gap:"),
               )
               .map((part) => part.id),
             "offsite",
