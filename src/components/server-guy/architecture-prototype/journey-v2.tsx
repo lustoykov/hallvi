@@ -100,18 +100,38 @@ interface Layout {
   stops: Record<JourneyId, string[]>;
 }
 
+/**
+ * Stacks n boxes down a band, or lays them along a row, keeping the single
+ * case exactly where the design put it.
+ */
+function share(
+  count: number,
+  span: { start: number; end: number },
+  thickness: number,
+  gap = 12,
+) {
+  if (count < 1) return [];
+  const room = span.end - span.start;
+  const step = Math.min(
+    thickness + gap,
+    count > 1 ? (room - thickness) / (count - 1) : room,
+  );
+  const size = Math.min(thickness, Math.max(28, step - Math.min(gap, 8)));
+  const used = step * (count - 1) + size;
+  const start = span.start + Math.max(0, (room - used) / 2);
+  return Array.from({ length: count }, (_, index) => ({
+    at: start + index * step,
+    size,
+  }));
+}
+
 function layoutFor(model: ArchitectureModel): Layout {
-  const service = model.parts.find((part) => part.kind === "private");
+  // Every backing service, not the first one. Paperless runs PostgreSQL *and*
+  // Valkey; Plausible runs PostgreSQL and ClickHouse. Drawing one of them and
+  // saying nothing about the other is the map claiming a shape the records
+  // contradict, which is the one thing this page must never do.
+  const services = model.parts.filter((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
-  // Which volume goes in the application's disk slot. Pi may name what mounts
-  // it; where it named the host, or named nothing, a single volume still
-  // belongs under the application. This is placement, not a claim.
-  const appVolume =
-    volumes.find((volume) => volume.owner === "app") ??
-    (volumes.length === 1 ? volumes[0] : undefined);
-  const serviceVolume = service
-    ? volumes.find((volume) => volume.owner === service.id)
-    : undefined;
   const rects: Record<string, Rect> = {
     source: BOX.source,
     controller: BOX.controller,
@@ -122,26 +142,78 @@ function layoutFor(model: ArchitectureModel): Layout {
     "gate:ssh": BOX.ssh,
     tls: { x: 222, y: 315, w: 80, h: 17 },
   };
-  if (service) rects[service.id] = BOX.svc;
+  // One service sits exactly where the design drew it; several share the zone.
+  const serviceRows =
+    services.length === 1
+      ? [{ at: BOX.svc.y, size: BOX.svc.h }]
+      : share(services.length, { start: 226, end: 366 }, BOX.svc.h);
+  services.forEach((service, index) => {
+    rects[service.id] = {
+      x: BOX.svc.x,
+      y: serviceRows[index].at,
+      w: BOX.svc.w,
+      h: serviceRows[index].size,
+    };
+  });
   // A monitor Pi recorded takes the place the placeholder would have had, so
   // "something is watching this" is visible rather than merely not-missing.
   const monitor = model.parts.find(
     (part) => part.kind === "monitor" && !part.id.startsWith("gap:"),
   );
   if (monitor) rects[monitor.id] = BOX.watch;
-  if (appVolume) rects[appVolume.id] = BOX.appVol;
-  if (serviceVolume) rects[serviceVolume.id] = BOX.svcVol;
 
-  const visitEnd = service ? 612 : 332;
+  // Volumes keep the design's two slots while they fit it: the application's
+  // data under the application, its service's under the service. Beyond that
+  // they share the shelf in owner order, and the wire says whose each is.
+  const ownerOf = (volume: Part) =>
+    volume.owner && rects[volume.owner] ? volume.owner : undefined;
+  const appVolumes = volumes.filter(
+    (volume) =>
+      ownerOf(volume) === "app" || (!ownerOf(volume) && volumes.length === 1),
+  );
+  const rest = volumes.filter((volume) => !appVolumes.includes(volume));
+  const ordered = [...appVolumes, ...rest];
+  const classic =
+    appVolumes.length <= 1 &&
+    rest.length <= 1 &&
+    rest.every((volume) => ownerOf(volume) === services[0]?.id);
+  if (classic) {
+    if (appVolumes[0]) rects[appVolumes[0].id] = BOX.appVol;
+    if (rest[0]) rects[rest[0].id] = BOX.svcVol;
+  } else {
+    const columns = share(ordered.length, { start: 302, end: 846 }, 196, 16);
+    ordered.forEach((volume, index) => {
+      rects[volume.id] = {
+        x: columns[index].at,
+        y: BOX.appVol.y,
+        w: columns[index].size,
+        h: BOX.appVol.h,
+      };
+    });
+  }
+
+  const visitEnd = services.length ? BOX.svc.x : BOX.app.x;
   const visitMain = `M196 300H${visitEnd}`;
-  const visitBranches = [
-    appVolume ? "M430 338V434" : null,
-    serviceVolume ? "M710 338V434" : null,
-  ].filter((d): d is string => Boolean(d));
-  const dataStart = appVolume ? 430 : 710;
+  // A volume's wire starts at whatever mounts it and ends at wherever it was
+  // placed, so ownership survives the shelf being shared.
+  const centre = (rect: Rect) => rect.x + rect.w / 2;
+  const visitBranches = ordered
+    .map((volume) => {
+      const owner = rects[ownerOf(volume) ?? "app"] ?? BOX.app;
+      const from = centre(owner);
+      const to = centre(rects[volume.id]);
+      const top = owner.y + owner.h;
+      return Math.abs(from - to) < 2
+        ? `M${from} ${top}V${BOX.appVol.y}`
+        : `M${from} ${top}V410H${to}V${BOX.appVol.y}`;
+    })
+    .filter((d): d is string => Boolean(d));
+  const dataStart = ordered.length ? centre(rects[ordered[0].id]) : 710;
   const dataMain = `M${dataStart} 464H924`;
   const releaseMain = "M110 168V368Q110 382 124 382H372Q386 382 386 368V338";
-  const releaseFork = service ? "M386 382H652Q666 382 666 368V338" : null;
+  const releaseFork = services.length
+    ? "M386 382H652Q666 382 666 368V338"
+    : null;
   const legs: Record<JourneyId, string[][]> = {
     visit: [[visitMain], visitBranches].filter((leg) => leg.length),
     data: [[dataMain]],
@@ -164,18 +236,17 @@ function layoutFor(model: ArchitectureModel): Layout {
         "gate:http",
         "tls",
         "app",
-        service?.id,
-        appVolume?.id,
-        serviceVolume?.id,
+        ...services.map((service) => service.id),
+        ...ordered.map((volume) => volume.id),
       ),
-      data: ids(appVolume?.id, serviceVolume?.id, "offsite"),
+      data: ids(...ordered.map((volume) => volume.id), "offsite"),
       release: ids(
         "source",
         "controller",
         "gate:ssh",
         "host",
         "app",
-        service?.id,
+        ...services.map((service) => service.id),
       ),
     },
   };
@@ -754,7 +825,7 @@ export function JourneyDirection({
   }, []);
 
   const onPath = new Set(layout.stops[journey]);
-  const service = model.parts.find((part) => part.kind === "private");
+  const services = model.parts.filter((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
   const monitoringGap = model.gaps.find((gap) => gap.id === "monitoring");
   // The model owns what the ghost's state is — unassessed is not absent —
@@ -765,9 +836,12 @@ export function JourneyDirection({
     : null;
   const planned = model.status !== "live";
   const host = model.byId.host;
-  const order = ["host", "gate:http", "app", service?.id].filter(
-    (id): id is string => Boolean(id && model.byId[id]),
-  );
+  const order = [
+    "host",
+    "gate:http",
+    "app",
+    ...services.map((s) => s.id),
+  ].filter((id): id is string => Boolean(id && model.byId[id]));
   const current = model.journeys.find((item) => item.id === journey);
   const selectedPart = selected
     ? (model.byId[selected] ?? (ghostPart?.id === selected ? ghostPart : null))
@@ -879,7 +953,7 @@ export function JourneyDirection({
             </span>
           </button>
         </div>
-        {service && (
+        {services.length > 0 && (
           <div className="axj2-region axj2-private" style={place(BOX.private)}>
             <span>Private network · no ports open</span>
           </div>
@@ -1051,7 +1125,7 @@ export function JourneyDirection({
             "source",
             "controller",
             "app",
-            service?.id,
+            ...services.map((service) => service.id),
             ...volumes.map((volume) => volume.id),
             ...model.parts
               .filter(
