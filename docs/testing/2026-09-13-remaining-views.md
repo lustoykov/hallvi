@@ -301,6 +301,12 @@ reader.
 | the sidebar | "after deployment" | the application had deployed |
 | the whole product | every ask button dead | no conversation to draft into |
 | the tuner | a name cut mid-word | a sixty-character container name |
+| Overview | "Access · Not set up" | a working tunnel, outranked by a deliberately absent public port |
+| Overview | "Last checked 11 min ag" | a truncation with no ellipsis, which reads as a typo |
+| Logs | a blank page below the filter | a search that found nothing, saying nothing |
+| Logs | 200px of white under every capture | a 300px floor under four-line commands |
+| History | "57 operations. 49 verified; 3 failed" | five neither |
+| the whole app | 1.4 requests a second at idle, forever | nothing was happening |
 
 ## What passed first time
 
@@ -393,3 +399,22 @@ Their readings age from the moment they are written, which is the point — a
 fifteen-minute liveness claim is meant to go stale — and also means the
 database has to be rebuilt before a visual pass, or the page will be right
 about something nobody meant to test.
+
+## Performance, measured rather than assumed
+
+An open tab with nothing happening made **33 requests in 25 seconds** and kept
+doing so for as long as it stayed open: the workspace re-read every record,
+execution, activity entry and message every 2.5 seconds, and the operator
+console re-read every execution off disk every second.
+
+Both now poll fast while something is running or waiting on the owner and
+slowly otherwise:
+
+| | requests |
+|---|---|
+| idle, before | 33 in 25 s |
+| idle, after | 6 in 30 s |
+| a turn in flight, after | 5 view fetches in 20 s, against 1 when idle |
+
+No cache and no abstraction were added, because the measurement did not ask
+for either. The polls were simply always fast.
