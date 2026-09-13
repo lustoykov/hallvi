@@ -46,7 +46,7 @@ export function ConnectionsScreen({
         </Link>
       </header>
       <div className={s.page}>
-        <SettingsNav current="connections" prototype={prototype} />
+        <SettingsNav current="connections" />
         <header className={s.heading}>
           <h1>Settings</h1>
           <p>

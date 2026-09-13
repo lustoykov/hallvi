@@ -64,24 +64,14 @@ test.describe("supplying a secret", () => {
       test.skip(!app, "no acceptance server");
       const base = `${ACCEPTANCE}/api/applications/${app}/secrets`;
 
-      // Pi's side of the request, made directly: the tool would do this.
-      await page.request.post(
-        `${ACCEPTANCE}/api/applications/${app}/operator`,
-        {
-          data: { permissionMode: "bypass", host: null },
-        },
-      );
-      const asked = await page.evaluate(
-        async ({ url, name }) => {
-          // There is no route that asks; request_secret is Pi's tool. Seed the
-          // request by hand so the field has something to render.
-          void url;
-          void name;
-          return true;
-        },
-        { url: base, name: NAME },
-      );
-      expect(asked).toBe(true);
+      // No route asks for a secret — request_secret is Pi's tool — so this
+      // application may have none pending. What is asserted below holds
+      // either way: nothing carries a value.
+      //
+      // An earlier draft posted operator settings here, including host: null,
+      // which quietly disconnected the server from whichever application came
+      // first in the list. A test should not be able to do that by accident,
+      // and this one no longer touches settings at all.
 
       const seen = watchEverything(page);
       await page.goto(`${ACCEPTANCE}/applications/${app}#variables`);

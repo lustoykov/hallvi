@@ -154,7 +154,6 @@ export function ApplicationSectionView({
     if (section === "overview")
       return (
         <OverviewPage
-          reachable={reachable}
           records={view.information}
           executions={view.executions ?? []}
           application={app}
@@ -321,7 +320,6 @@ export function ApplicationSectionView({
     if (section === "architecture")
       return (
         <ArchitecturePage
-          reachable={reachable}
           records={view.information}
           applicationId={app.id}
           applicationName={app.name}

@@ -3,11 +3,8 @@ import s from "./pi-setup-screen.module.css";
 
 export function SettingsNav({
   current,
-  prototype = false,
 }: {
   current: "pi" | "github" | "connections";
-  /** The reference prototype adds the designed Connections home. */
-  prototype?: boolean;
 }) {
   return (
     <nav className={s.settingsNav} aria-label="Settings">
