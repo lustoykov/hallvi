@@ -82,9 +82,18 @@ export function normalizeTarPath(
  */
 export function readTar(
   buffer: Buffer,
-  options: { stripComponents?: number } = {},
+  options: {
+    stripComponents?: number;
+    /**
+     * The most file content this read may materialize. Defaults to the shared
+     * limit. A caller that has already bounded the buffer and intends to
+     * choose what to keep raises it and applies its own budget afterwards.
+     */
+    maxBytes?: number;
+  } = {},
 ): TarEntry[] {
   const strip = options.stripComponents ?? 0;
+  const maxBytes = options.maxBytes ?? TAR_LIMITS.bytes;
   const entries: TarEntry[] = [];
   let offset = 0;
   let paxPath: string | null = null;
@@ -132,9 +141,9 @@ export function readTar(
     const isDirectory = type === "5" || rawName.endsWith("/");
     if (!isDirectory) {
       total += size;
-      if (total > TAR_LIMITS.bytes)
+      if (total > maxBytes)
         throw new TarValidationError(
-          `Archive exceeds ${TAR_LIMITS.bytes} bytes of file content.`,
+          `Archive exceeds ${maxBytes} bytes of file content.`,
         );
     }
     entries.push({

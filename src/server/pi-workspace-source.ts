@@ -35,8 +35,20 @@ export async function applicationWorkspaceSource(
   ).data as { sha?: string };
   if (!commit.sha || !/^[0-9a-f]{40}$/.test(commit.sha))
     throw new Error("GitHub did not identify the default branch revision.");
+  const snapshot = await fetchBaseTree(repository, commit.sha, token, signal);
   return {
-    description: `${repository}@${commit.sha}, the ${branch} branch when this request started; repository snapshot for this request`,
-    files: await fetchBaseTree(repository, commit.sha, token, signal),
+    description:
+      `${repository}@${commit.sha}, the ${branch} branch when this request started; repository snapshot for this request` +
+      // A missing path must not read as a path that is not in the repository.
+      (snapshot.omitted.length
+        ? `\nToo large to carry, so left out of this copy (${snapshot.omitted.length} files, largest first): ${snapshot.omitted
+            .slice(0, 12)
+            .map(
+              (file) =>
+                `${file.path} (${Math.round(file.bytes / 1024)} KB)`,
+            )
+            .join(", ")}${snapshot.omitted.length > 12 ? ", …" : ""}. These paths exist upstream; read them on GitHub or on the server if you need them.`
+        : ""),
+    files: snapshot.files,
   };
 }
