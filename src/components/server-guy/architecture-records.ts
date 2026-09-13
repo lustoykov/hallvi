@@ -354,11 +354,19 @@ export function architectureFromRecords({
     .map((record) => record.presentation?.content)
     .find((content) => content?.kind === "deployment");
 
+  // A slot is a fixed position in the design and a part is Pi's. The first
+  // web process is drawn in "app" and the first HTTP gate in "gate:http";
+  // a second of either keeps its own reference rather than landing on top of
+  // the first, which drew one part over another and left React to report the
+  // duplicate key instead of the hidden part.
+  const taken = new Set<string>();
   const slots = new Map(
-    map.value.parts.map((part) => [
-      part.id,
-      slotFor(part, sshLooking(part, records)),
-    ]),
+    map.value.parts.map((part) => {
+      const wanted = slotFor(part, sshLooking(part, records));
+      const slot = taken.has(wanted) ? part.id : wanted;
+      taken.add(slot);
+      return [part.id, slot];
+    }),
   );
   const edges = map.value.edges.map((edge) => ({
     ...edge,
