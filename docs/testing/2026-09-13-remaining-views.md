@@ -130,3 +130,45 @@ process — while appearing nowhere in any record, log or artifact.
 That is the flow end to end: the owner types it, the controller seals it, the
 execution layer puts it in as the command is spawned, and the process gates on
 it.
+
+### What Shop populated, from ordinary work
+
+No corrective prompt. Three turns: prepare a host, deploy, carry on after the
+secrets arrived.
+
+| subject | destination it lights |
+|---|---|
+| `host:shop-host-4204` | Overview, Architecture, Monitoring |
+| `process:shop-web`, `process:shop-worker` | Processes |
+| `database:shop-postgres` | Database |
+| `cache:shop-redis` | Cache & queue |
+| `queue:shop-orders-queue` | Cache & queue |
+| `job:shop-nightly-job` | Jobs |
+| `volume:` ×3 (redis, postgres, receipts) | Storage |
+| `firewall:shop-firewall-4203` | Security |
+| `door:shop-public-http-8000` **absent** | Security |
+| `access:shop-private-access` | Domains, Security |
+| the release, the topology, the application | Deployment, Architecture, Overview |
+
+Nine of the eleven destinations, from one application, with nobody asking for
+any of it. The two that stayed empty are honest: Shop has no domain and no
+CDN, and nothing pretended otherwise.
+
+Pi also ran the nightly job rather than only reading its schedule, and
+recorded the result — so Jobs shows "Succeeded 5 min ago" beside a next run it
+was **told**, not one computed from a cron string.
+
+## What the second journey found
+
+| what the page said | what the records said |
+|---|---|
+| Redis's volume: **534 GB** | `534 bytes` — a missing unit prefix read as gigabytes |
+| PostgreSQL's volume: 48 GB | `48,217,962 bytes` |
+| "Shop queues nothing, so nothing is waiting" | a Redis whose recorded role is "Queue and cache" |
+| "Asked for, never read back" | a firewall Pi read back and found **absent** |
+| "Nothing stands between the internet and this server" | a Hetzner policy read back: TCP 22 and ICMP, deny unless listed |
+| "port not recorded" | a tunnel with two known ends, in the access content |
+| "Checked, with no detail recorded" | a check with a perfectly good label |
+
+The size one is the worst of the set: a volume drawn a thousand times the size
+of the disk under it, from a number Pi got exactly right.
