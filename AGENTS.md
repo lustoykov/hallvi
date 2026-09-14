@@ -1,0 +1,40 @@
+# Working on Server Guy
+
+Read [README.md](README.md), [PRODUCT.md](PRODUCT.md),
+[operator design](docs/operator-design.md) and [ROADMAP.md](ROADMAP.md).
+[CONTEXT.md](CONTEXT.md) owns terminology; the
+[component design](src/components/server-guy/DESIGN.md) owns the visual language.
+
+## Development and cleanup
+
+Development runs locally on the owner's MacBook, not on the Mac mini.
+Before creating or retiring development resources, read and follow
+[development resource ownership and cleanup](docs/development-resources.md).
+Record ownership and retention outside worktrees. Task completion includes
+verified cleanup or an explicit retained-resource handoff. The local daily
+Dev Cleanup task is the fallback; it also owns shared cloud cleanup.
+
+Use the existing authorized Default Hetzner project. Create billed resources
+only when the task authorizes them. Never print credentials or copy them into
+code, artifacts, commits or pull requests. Preserve dirty work, unique data,
+credentials, retained evidence and uncertain resources. Never broadly prune
+Docker volumes or force-remove worktrees.
+
+## Changes and checks
+
+Use Node.js 22 and locked dependencies: `npm ci`, never latest-version installs.
+Work on a branch and open a pull request; never commit directly to `main`.
+Preserve unrelated changes. Include a small decision-oriented diagram under
+`docs/architecture/` in each PR and link it from the description.
+
+Choose checks proportionate to the change; [tests/README.md](tests/README.md)
+owns the commands. Documentation changes need document/link review, not a
+browser suite. Run `npm run format` before finishing. Verify host tools and
+provider access before claiming support; unit tests do not prove deployment.
+
+`.server-guy/`, `.next/` and `tests/results/` are local data; never commit them.
+Keep decisions in their owning documents and update current wording instead
+of appending handoffs. Documentation does not establish shipped support.
+
+Scheduled tasks default to `gpt-5.6-sol` with medium reasoning unless the owner
+explicitly requests otherwise.

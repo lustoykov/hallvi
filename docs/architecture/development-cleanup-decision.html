@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Development cleanup decision flow</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --soft: #667389;
+        --rule: rgba(25, 35, 56, 0.12);
+        --accent: #285ad8;
+        --accent-tint: rgba(40, 90, 216, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(100%, 800px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--soft);
+        font: 500 8px/1 "Geist Mono", monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font: 400 28px/1.1 "Instrument Serif", serif;
+      }
+
+      p {
+        max-width: 640px;
+        margin: 12px 0 24px;
+        color: var(--muted);
+        font: 400 12px/1.6 "Geist", sans-serif;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .connector {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.2;
+        marker-end: url(#arrow);
+      }
+
+      .primary {
+        stroke: var(--accent);
+        marker-end: url(#arrow-accent);
+      }
+
+      .label-mask {
+        fill: var(--paper);
+      }
+
+      .arrow-label,
+      .tag,
+      .legend-label {
+        font-family: "Geist Mono", monospace;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+      }
+
+      .arrow-label,
+      .legend-label {
+        fill: var(--soft);
+      }
+
+      .node-name {
+        fill: var(--ink);
+        font: 600 12px/1 "Geist", sans-serif;
+        text-anchor: middle;
+      }
+
+      .node-detail {
+        fill: var(--muted);
+        font: 400 8px/1 "Geist Mono", monospace;
+        text-anchor: middle;
+      }
+
+      .tag {
+        fill: var(--soft);
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Server Guy · development resources</div>
+      <h1>Development cleanup decision flow</h1>
+      <p>
+        A resource is removed only after ownership, lifecycle, activity, and
+        preservation evidence all pass. Any failed or uncertain gate retains it.
+      </p>
+
+      <svg
+        viewBox="0 0 736 736"
+        role="img"
+        aria-labelledby="development-cleanup-title development-cleanup-desc"
+      >
+        <title id="development-cleanup-title">Development cleanup decision flow</title>
+        <desc id="development-cleanup-desc">
+          Flowchart showing that a Server Guy development resource is deleted only
+          after its ownership, completed or expired lifecycle, inactivity, and
+          preservation evidence are confirmed; uncertainty retains and reports it.
+        </desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#59667b" />
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#285ad8" />
+          </marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#285ad8" />
+          </marker>
+        </defs>
+
+        <!-- Connectors paint before nodes. -->
+        <path class="connector primary" d="M 368 72 V 104" />
+        <path class="connector primary" d="M 368 184 V 208" />
+        <path class="connector primary" d="M 368 288 V 312" />
+        <path class="connector primary" d="M 368 392 V 416" />
+        <path class="connector primary" d="M 368 496 V 528" />
+        <path class="connector primary" d="M 368 592 V 624" />
+
+        <path class="connector" d="M 468 144 H 640 Q 648 144 648 152 V 244" />
+        <path class="connector" d="M 468 248 H 536 Q 544 248 544 256 V 284 H 560" />
+        <path class="connector" d="M 468 352 H 560" />
+        <path class="connector" d="M 468 456 H 536 Q 544 456 544 448 V 420 H 560" />
+
+        <!-- Arrow labels sit clear of their connectors. -->
+        <rect class="label-mask" x="380" y="188" width="28" height="12" rx="2" />
+        <text class="arrow-label" x="394" y="196">YES</text>
+        <rect class="label-mask" x="380" y="292" width="28" height="12" rx="2" />
+        <text class="arrow-label" x="394" y="300">YES</text>
+        <rect class="label-mask" x="380" y="396" width="28" height="12" rx="2" />
+        <text class="arrow-label" x="394" y="404">YES</text>
+        <rect class="label-mask" x="380" y="500" width="28" height="12" rx="2" />
+        <text class="arrow-label" x="394" y="508">YES</text>
+
+        <rect class="label-mask" x="488" y="124" width="24" height="12" rx="2" />
+        <text class="arrow-label" x="500" y="132">NO</text>
+        <rect class="label-mask" x="488" y="228" width="24" height="12" rx="2" />
+        <text class="arrow-label" x="500" y="236">NO</text>
+        <rect class="label-mask" x="488" y="332" width="24" height="12" rx="2" />
+        <text class="arrow-label" x="500" y="340">NO</text>
+        <rect class="label-mask" x="488" y="436" width="24" height="12" rx="2" />
+        <text class="arrow-label" x="500" y="444">NO</text>
+
+        <!-- Start -->
+        <rect x="288" y="24" width="160" height="48" rx="20" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="48">Candidate resource</text>
+        <text class="node-detail" x="368" y="64">exact path or ID</text>
+
+        <!-- Decisions -->
+        <polygon points="368,104 468,144 368,184 268,144" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="140">Server Guy ownership</text>
+        <text class="node-detail" x="368" y="156">confirmed?</text>
+
+        <polygon points="368,208 468,248 368,288 268,248" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="244">Eligible under policy?</text>
+        <text class="node-detail" x="368" y="260">task / lease checked</text>
+
+        <polygon points="368,312 468,352 368,392 268,352" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="348">No active use or</text>
+        <text class="node-detail" x="368" y="364">retained dependency?</text>
+
+        <polygon points="368,416 468,456 368,496 268,456" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="452">Work and data safely</text>
+        <text class="node-detail" x="368" y="468">preserved?</text>
+
+        <!-- Retain outcome -->
+        <rect x="560" y="244" width="144" height="184" rx="6" fill="rgba(25,35,56,0.05)" stroke="#59667b" />
+        <text class="tag" x="632" y="272">SAFE DEFAULT</text>
+        <text class="node-name" x="632" y="320">Retain</text>
+        <text class="node-name" x="632" y="340">and report</text>
+        <text class="node-detail" x="632" y="372">record uncertainty,</text>
+        <text class="node-detail" x="632" y="388">owner, and evidence</text>
+
+        <!-- Approved cleanup -->
+        <rect x="288" y="528" width="160" height="64" rx="6" fill="rgba(40,90,216,0.08)" stroke="#285ad8" stroke-width="1.2" />
+        <text class="tag" x="368" y="548">EXACT TARGET</text>
+        <text class="node-name" x="368" y="568">Remove resource</text>
+        <text class="node-detail" x="368" y="584">no broad prune or force</text>
+
+        <rect x="272" y="624" width="192" height="48" rx="20" fill="#ffffff" stroke="#192338" />
+        <text class="node-name" x="368" y="648">Verify and audit</text>
+        <text class="node-detail" x="368" y="664">outside every worktree</text>
+
+        <!-- Legend -->
+        <line x1="32" y1="696" x2="704" y2="696" stroke="rgba(25,35,56,0.12)" stroke-width="0.8" />
+        <text class="legend-label" x="32" y="720">LEGEND</text>
+        <rect x="112" y="708" width="20" height="12" rx="2" fill="rgba(40,90,216,0.08)" stroke="#285ad8" />
+        <text class="legend-label" x="140" y="720">confirmed cleanup</text>
+        <rect x="300" y="708" width="20" height="12" rx="2" fill="rgba(25,35,56,0.05)" stroke="#59667b" />
+        <text class="legend-label" x="328" y="720">preserve by default</text>
+      </svg>
+    </main>
+  </body>
+</html>
