@@ -23,7 +23,9 @@ shell's PATH; application tests and deployment were not verified by this setup.
 
 ## Personal skills
 
-Run this on the main computer after editing standalone skills:
+An hourly Codex automation on the main computer runs the sync and stays quiet
+on success. The computer and Codex must be available for scheduled execution.
+For an immediate sync after editing standalone skills, run:
 
 ```sh
 ~/.local/bin/sync-codex-skills-to-mini
