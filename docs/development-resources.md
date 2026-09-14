@@ -3,7 +3,8 @@
 This policy covers local development resources for Server Guy. Hetzner and
 other shared cloud resources belong to the separate daily cloud audit on the
 owner's other machine; do not create or perform a competing cloud cleanup from
-this repository.
+this repository. The [cleanup decision flow](architecture/development-cleanup-decision.html)
+summarizes the evidence gates below.
 
 ## Ownership and records
 
