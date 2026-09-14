@@ -53,6 +53,12 @@ console.log("Cloudflare credential saved for the application.");
 NODE
 fi
 
+# R2 backups use S3 access credentials in addition to the Cloudflare API token.
+# Persist through the same application function as the backup Settings form.
+if [ -n "${R2_ACCESS_KEY_ID:-}${R2_SECRET_ACCESS_KEY:-}${R2_BUCKET:-}" ]; then
+  npx tsx -e 'import("./src/server/backup-connection.ts").then(m => m.saveBackupDestination({ provider: "r2", endpoint: process.env.R2_ENDPOINT || `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`, bucket: process.env.R2_BUCKET, region: "auto", accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY })).then(() => console.log("R2 backup configuration saved; backup and restore still require a live test.")).catch(() => { console.error("R2 backup setup failed; check the bucket, endpoint and both access credentials."); process.exitCode = 1; })'
+fi
+
 # Record which lockfile these modules came from; codex-maintenance.sh reinstalls
 # only when the lockfile has changed since.
 stamp="$HOME/.cache/server-guy/lock.sha"

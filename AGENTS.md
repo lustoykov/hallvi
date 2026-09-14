@@ -12,7 +12,7 @@ Node.js 22 with the locked dependencies. `npm ci`, never `npm install <pkg>@late
 The checks need no credentials: tests use disposable databases and synthetic
 provider responses.
 
-During beta, Codex cloud may use dedicated provider credentials stored through
+During beta, Codex cloud may use development provider credentials stored through
 Codex Secrets and persisted by setup into application configuration files. The
 agent can read these files; the owner accepts this trust model for beta. Use the
 existing Default Hetzner project, not a separate cloud project. See

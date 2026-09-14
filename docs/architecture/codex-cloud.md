@@ -1,7 +1,8 @@
 # Codex cloud development during beta
 
 The owner accepts agent-readable development credentials for beta. Use one
-Hetzner project (Default) and a Cloudflare token limited to the selected zone.
+Hetzner project (Default) and existing development credentials covering DNS
+and R2 backup operations. Dedicated cloud tokens are optional.
 Codex Secrets protect stored values; the setup script deliberately persists
 runtime copies that the application and the agent can read.
 
@@ -16,7 +17,7 @@ flowchart LR
     Files --> App[Server Guy runtime]
     Agent --> Checks[Code, tests, build, browser smoke]
     App --> Proxy[HTTP/HTTPS proxy and allowlist]
-    Proxy --> Providers[Hetzner Default and selected Cloudflare zone]
+    Proxy --> Providers[Hetzner Default, Cloudflare DNS and R2]
     Checks --> PR[Pull request and evidence]
     PR --> Verifier[Separate live SSH/deployment verifier]
 ```

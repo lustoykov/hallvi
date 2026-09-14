@@ -58,14 +58,17 @@ distinguishes two mechanisms:
 - **Secrets** are encrypted in storage and injected into setup; they are removed
   from the environment before the agent phase.
 
-Add `HETZNER_API_TOKEN` and `CLOUDFLARE_API_TOKEN` under **Secrets**, not ordinary
-environment variables. The setup script verifies each supplied token through a
+Add `HETZNER_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `R2_ACCESS_KEY_ID` and
+`R2_SECRET_ACCESS_KEY` under **Secrets**, not ordinary
+environment variables. Set `R2_BUCKET` and optionally `R2_ENDPOINT` as ordinary variables for backup
+tests. The setup script verifies each supplied provider API token through a
 read-only provider request, then saves it where Server Guy already reads it:
 
 | Secret | Runtime location |
 | --- | --- |
 | `HETZNER_API_TOKEN` | `$SERVER_GUY_CONFIG_DIR/hetzner-connection.json` |
 | `CLOUDFLARE_API_TOKEN` | `.env.local` in the checkout |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | `$SERVER_GUY_CONFIG_DIR/backup-destinations/default-credentials.json` |
 
 Both files use owner-only permissions (600). Cloudflare setup preserves unrelated
 `.env.local` settings. Tokens are optional: credential-free application tests
@@ -98,8 +101,9 @@ implemented here, and a reviewing model is not a substitute for that boundary.
 
 ## Provider scopes
 
-Use dedicated cloud-agent tokens so they can be revoked independently of local
-Server Guy credentials. Keep all current Hetzner development work in **Default**.
+Existing development credentials can be reused for the beta cloud environment;
+dedicated cloud tokens are optional, useful for independent revocation. Inspect
+existing permissions before creating replacements. Keep Hetzner in **Default**.
 The previously created empty cloud project is unused; this setup does not delete
 it or move resources.
 
@@ -110,16 +114,22 @@ existing development servers. A token cannot be scoped to one server. Resources
 are billed; permission to access the provider is not permission to create or
 delete resources without task-specific instructions.
 
-The prepared Cloudflare token is restricted to **accountant-agent.com** with:
+Cloudflare access should cover the features being developed, including DNS and
+R2 backups. The existing local Cloudflare token was verified to authenticate,
+list the zone and list R2 buckets. That read-only check does not prove write
+permissions or a backup round trip.
 
-- Zone / DNS / Edit, for DNS record operations.
-- Zone / Zone / Read, for zone discovery.
-- Zone / Zone Settings / Read, for inspecting settings.
+Backup data uses R2's S3 API with an Access Key ID and Secret Access Key; the
+Cloudflare management API token is a different interface. Existing local backup
+credentials are present and may be used for authorized beta tests. Setup saves
+the selected destination through the same function as Settings; this validates
+configuration but does not upload, delete or restore anything.
 
-It does not grant R2 or account-wide access, change TLS settings, or purge caches.
-R2 object testing needs separately scoped S3 credentials; Cloudflare REST bucket
-management uses broader account-level permissions. Do not reuse existing backup
-credentials. See [R2 token permissions](https://developers.cloudflare.com/r2/api/tokens/).
+Ensure the token permits any bucket management the task needs and that the S3
+credentials permit the required backup/restore operations. Do not omit R2 merely
+to make permissions narrower. Use an explicitly selected test prefix for test
+objects so that backup verification does not overwrite existing backup data.
+See [R2 token permissions](https://developers.cloudflare.com/r2/api/tokens/).
 
 Token creation and installation must be verified in the provider and Codex UIs;
 these repository changes alone do not establish that live access is configured.
@@ -128,7 +138,9 @@ these repository changes alone do not establish that live access is configured.
 
 Provider work needs `api.hetzner.cloud` and `api.cloudflare.com` in the agent's
 domain allowlist, alongside dependency domains and `fonts.googleapis.com` /
-`fonts.gstatic.com`. Write operations require allowing HTTP methods beyond GET,
+`fonts.gstatic.com`. R2 backup operations also need the selected S3 endpoint
+(e.g. `<account-id>.r2.cloudflarestorage.com`) in the allowlist. Write operations
+require allowing HTTP methods beyond GET,
 HEAD and OPTIONS. The environment-wide method setting also applies to the other
 allowed domains, so keep the domain list bounded. These changes must be applied
 in the Codex UI; documentation alone does not enable them.
@@ -142,10 +154,18 @@ See [Node 22.21 release notes](https://nodejs.org/en/blog/release/v22.21.0).
 says all outbound traffic passes through an HTTP/HTTPS proxy. Ordinary SSH uses
 its own TCP protocol, typically on port 22, and does not automatically use that
 proxy. An HTTPS API request that creates a VM therefore does not prove that
-`ssh user@server` can reach it. Direct SSH from this environment has not been
-verified; the documentation does not establish that every possible SSH transport
-is impossible. Until a supported path is tested, full deployment verification
-uses the owner's machine or a separate reachable Linux verifier.
+`ssh user@server` can reach it. A read-only probe on 2026-09-14 reached the same development server's SSH
+banner from the owner's Mac, while the Codex cloud setup container returned
+`OSError [Errno 101] Network is unreachable` for TCP port 22. An unauthenticated
+HTTPS request reached Hetzner with HTTP 401. Node fetch failed without
+`NODE_USE_ENV_PROXY=1` and returned the expected HTTP 401 with it. This verifies
+the direct-network restriction for that container and target, not every possible
+SSH transport. Full deployment verification still needs a reachable execution
+host or a separately tested supported transport.
+
+The probe used no provider tokens, SSH keys or server mutations. Its terminal
+markers were `NETWORK_PROBE_BEGIN` / `NETWORK_PROBE_END`, on Node 22.22.2. This
+was the environment setup-test container, not an end-to-end deployment task.
 
 See [agent network controls](https://developers.openai.com/codex/cloud/internet-access).
 
