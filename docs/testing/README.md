@@ -1,5 +1,7 @@
 # Testing and evidence
 
+For local or cloud fixtures, follow the [development resource policy](../development-resources.md): record ownership, renew temporary leases while active, and verify cleanup or explicit retention before retiring the task.
+
 [Requirements](../requirements.md) define user outcomes; [Roadmap](../../ROADMAP.md) distinguishes shipped work from gaps. [Test runners](../../tests/README.md) owns commands, fixtures and opt-in Docker/model runs. The small [acceptance guide](phase-one-acceptance.md) stays at its existing path because the local test dashboard loads it.
 
 ## Current redesign verification

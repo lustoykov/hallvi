@@ -11,6 +11,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |
+| [Development resources](development-resources.md) | Local development, resource ownership, task completion and scheduled cleanup safeguards. |
 | [GitHub setup](integrations/github.md) | Connection and credential setup that still applies. |
 | [Testing and evidence](testing/README.md) | What has actually been proved, coverage gaps and links to dated source accounts. |
 | [Dashboard acceptance guide](testing/phase-one-acceptance.md) | Small reference retained at the path the test dashboard loads. |
