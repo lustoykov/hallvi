@@ -1,5 +1,7 @@
 # Testing and evidence
 
+For real cloud tests, follow the [development resource lifecycle](../development-resources.md): label temporary resources at creation, renew their expiry during work, and verify cleanup before retiring the task's branch or worktree.
+
 [Requirements](../requirements.md) define user outcomes; [Roadmap](../../ROADMAP.md) distinguishes shipped work from gaps. [Test runners](../../tests/README.md) owns commands, fixtures and opt-in Docker/model runs. The small [acceptance guide](phase-one-acceptance.md) stays at its existing path because the local test dashboard loads it.
 
 ## Current redesign verification
