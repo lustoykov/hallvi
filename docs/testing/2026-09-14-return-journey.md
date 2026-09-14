@@ -24,7 +24,7 @@ records.
 | 7 · Restart the controller and worker | **pass** |
 | 8 · Last-known state told apart from freshly checked state | **pass**, after two fixes |
 | 9 · Regain access through the product; data still there | **pass** |
-| The same journey on a real provider host | **blocked** — project server limit, see [Limits](#limits) |
+| The same journey on a real provider host | **pass** — see [On real Hetzner hardware](#on-real-hetzner-hardware) |
 
 ## What was real and what stood in
 
@@ -100,6 +100,56 @@ GET /orders      → the order placed before the restart, still there
 GET /receipts/2  → the receipt the worker wrote before the restart, still there
 /admin/summary   → still accepts the password supplied before the restart
 ```
+
+## On real Hetzner hardware
+
+The owner cleared the quota — five old testing servers deleted on their
+instruction — and the whole loop ran again with **no stand-in anywhere**, on
+[Ghost](https://github.com/TryGhost/ghost-docker), a real public repository.
+
+| Step | Result |
+| --- | --- |
+| Server created through the product | **pass** — `ghost-cd7e1251` (165871496), cpx12, Ubuntu 24.04, `89.167.84.129` |
+| Host key scanned and pinned, SSH verified | **pass** — real `ssh`, real host |
+| Ghost 6.63.0 + MySQL 8.0.44 deployed from a pinned revision | **pass** — `3d737823` |
+| Private access through the product | **pass** — HTTP 200 at `http://127.0.0.1:8080` |
+| Public port refused | **pass** — `89.167.84.129` on 8080, 80 and 2368 all answer nothing |
+| Controller and worker restarted, tunnel gone with them | **pass** |
+| Overview after the return | **pass** — "The tunnel is closed", no anchor, Access lane red, the other three lanes green |
+| Record card in the conversation | **pass** — "Tunnel closed" chip, no link |
+| Access regained through the product | **pass** — HTTP 200 again, still refused publicly |
+
+Sixteen records, including a `topology`, a `deployment`, an
+`application-access`, both volumes, the database, the firewall and two backup
+plans. The earlier failure record — "Hetzner quota prevents a Ghost host from
+being created" — states the same `host:ghost-host` subject as the later success,
+so the projection reads the newer one and the Server lane is green without
+anything being retracted or rewritten. That is the presence rule doing exactly
+what it is for.
+
+On the return visit the log grew a **"while you were away"** divider above the
+one line that was new since the last visit.
+
+### What this run did not exercise
+
+**No private input.** Ghost creates its owner account interactively on first
+visit to `/ghost/`, and Pi generated the MySQL password itself, kept it in a
+server-side `.env` and referred to it as `$MYSQL_PASSWORD` — never inlined into
+a command. That is the right handling for a credential no human types, and it
+means this run had nothing to ask the owner for. The `request_secret` path is
+proved by the Shop run above, not by this one.
+
+**No content written into Ghost.** Writing a post needs an admin account, and
+creating accounts and handling login passwords is not something this session
+does on the owner's behalf. Persistence is therefore carried by Pi's own
+container-replacement check — "content and database survived container
+replacement", recorded during deployment — rather than by a post surviving a
+restart. The owner can complete Ghost's setup themselves while the tunnel is
+open if they want the fuller proof.
+
+**Cost.** €11.49/month server + €0.50 IPv4, and Pi enabled Hetzner's server
+backups on its own initiative, +€2.30/month — €14.29/month total, about
+€0.02/hour. The server is disposable and labelled `sg-cleanup: allowed`.
 
 ## What was wrong, and what changed
 
@@ -212,17 +262,14 @@ symlinks the same `node_modules`.
 
 ## Limits
 
-- **No real-provider host.** The authorised Hetzner project holds five servers
-  and refuses a sixth: `POST /servers` → `403 resource_limit_exceeded`,
-  confirmed directly against the API, not only through the product. All five
-  are classified `retain` in the local inventory — one owner application and
-  four demonstration fixtures whose committed evidence says to confirm
-  retirement before deleting — so none was touched. The Ghost run reached
-  server creation and stopped there; the SSH key and an SSH-only firewall were
-  prepared, and nothing was billed. Raising the project limit, or retiring one
-  fixture, unblocks it.
-- **The provider answers are a stand-in's** in the passing run. Cost, region
-  and server type are the rig's fiction. Everything else is real.
+- **The provider answers are a stand-in's in the Shop run.** Cost, region and
+  server type there are the rig's fiction; everything above the provider API is
+  real. The Ghost run has no stand-in at all.
+- **The first Ghost attempt was blocked** by the project's five-server limit
+  (`403 resource_limit_exceeded`, confirmed against the API directly). The
+  owner then instructed deletion of the old testing servers; all five went,
+  with their primary IPs, and the run completed. Deletions are recorded in the
+  development-cleanup inventory with a pre-deletion snapshot.
 - **One application, one tier.** Shop is a five-container stack with a
   database, a cache, a worker and persistent files. Nothing here says anything
   about a heavier one.
