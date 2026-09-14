@@ -149,6 +149,12 @@ Use a simple Codex-style approval interaction: a pending tool call asks the UI, 
 
 Read-only side conversations require an appropriate tool boundary; unrestricted server shell access cannot be made read-only merely by naming the conversation that way. The exact inspection capabilities remain open.
 
+### Beta security and later hardening
+
+During beta, prioritize the application's deployment experience and communicate the risks of the current general tools. Recommend the most capable supported model, but never describe any model as immune to prompt injection: logs, repository content and other tool results can carry attacker-controlled instructions. Model capability and user guidance reduce risk; they do not establish an enforced security boundary. The [beta guidance](../README.md#beta-safety) owns practical user precautions, and the [roadmap](../ROADMAP.md) owns delivery timing. Existing permission behavior and fixes for concrete failures remain required.
+
+After beta, revisit the execution boundary as the product matures: useful host diagnostics and disposable testing, restricted access to secrets and production data, network controls, destructive operations and independently protected backups. A separate LLM judge could review proposed tool calls before execution; treat this as a candidate additional check, not proof that two agents cannot be injected. No sandbox library, policy engine, reviewer architecture or new permission mode is selected by this note. Keep the work deferred rather than expanding the current sprint into a security platform.
+
 ### Stable navigation, model-curated content
 
 Keep the existing sidebar as the starting information architecture. Its sections teach users the recurring responsibilities of operating their application. The interiors of those views can change as the architecture changes.

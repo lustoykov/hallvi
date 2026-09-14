@@ -18,6 +18,15 @@ Start with [Product](PRODUCT.md), [Operator design](docs/operator-design.md) and
 
 Keep each decision or requirement in its owning document. Update current wording and delete obsolete handoffs; Git retains development history. Documentation changes do not establish shipped support. The user separately authorized a fresh start for current development data and deletion of legacy code/tests. Relevant verification remains necessary; migration compatibility and dedicated recovery tools are not redesign requirements.
 
+## Beta safety
+
+Server Guy can execute commands on your application server with the connected account's permissions. Incorrect actions or prompt injection through logs, repository content or other tool results can cause downtime, data loss or disclosure of data the tools can access. Broad security hardening is planned for after beta; these precautions are guidance, not a guarantee of protection.
+
+- Use the most capable supported model available to you. No model is immune to prompt injection, and general intelligence alone does not establish security.
+- Prefer a dedicated test server and non-sensitive data during beta. Keep unrelated systems and credentials outside its reach, and scope connected accounts to the resources you intend Server Guy to manage.
+- Use **Always ask** when you want to inspect commands before execution. **Pi decides** relies on the model's judgment about asking; **Bypass** runs without approval prompts. Review matters even for reads that could disclose private data.
+- Keep tested recovery copies that the managed server and its credentials cannot delete. Backups help recovery; they cannot undo data theft. Avoid exposing sensitive production data unless you accept the current access risks.
+
 ## Implementation status
 
 A real repository-to-Hetzner deployment with private persistent PostgreSQL and external behavior checks was [verified on 8 September](docs/testing/README.md#dated-evidence), followed by [hardening](docs/testing/README.md#dated-evidence). The [UI reference](docs/design/screens.md) distinguishes real records from simulated scenarios.
