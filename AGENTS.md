@@ -12,12 +12,13 @@ Node.js 22 with the locked dependencies. `npm ci`, never `npm install <pkg>@late
 The checks need no credentials: tests use disposable databases and synthetic
 provider responses.
 
-A cloud container may carry a Hetzner and a Cloudflare connection, scoped to a
-project and zone kept for this purpose. Resources created through them are real
-and are billed. Create or destroy nothing unless the task says so, name in the
-final message anything you left running, and never copy a token out of
-`.env.local` or `.server-guy/hetzner-connection.json` into code, output or a
-commit.
+The ordinary Codex cloud environment has no provider credentials. Do not persist
+setup secrets into files for the agent. See
+[docs/development/codex-cloud.md](docs/development/codex-cloud.md) for setup and
+provider-access boundaries. If a task explicitly configures live provider access,
+resources are real and billed. Create or destroy nothing unless the task says
+so, name in the final message anything you left running, and never copy tokens
+from environment or connection files into code, output or a commit.
 
 ## Checks
 
