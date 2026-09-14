@@ -12,13 +12,14 @@ Node.js 22 with the locked dependencies. `npm ci`, never `npm install <pkg>@late
 The checks need no credentials: tests use disposable databases and synthetic
 provider responses.
 
-The ordinary Codex cloud environment has no provider credentials. Do not persist
-setup secrets into files for the agent. See
-[docs/development/codex-cloud.md](docs/development/codex-cloud.md) for setup and
-provider-access boundaries. If a task explicitly configures live provider access,
-resources are real and billed. Create or destroy nothing unless the task says
-so, name in the final message anything you left running, and never copy tokens
-from environment or connection files into code, output or a commit.
+During beta, Codex cloud may use dedicated provider credentials stored through
+Codex Secrets and persisted by setup into application configuration files. The
+agent can read these files; the owner accepts this trust model for beta. Use the
+existing Default Hetzner project, not a separate cloud project. See
+[docs/development/codex-cloud.md](docs/development/codex-cloud.md) for scope and
+setup. Resources are real and billed. Create or destroy nothing unless the task
+says so, name anything left running, and never print credentials or copy them
+into code, test artifacts, commits or pull requests.
 
 ## Checks
 
@@ -37,13 +38,13 @@ commands.
 
 ## What this container cannot verify
 
-No model calls, no GitHub connection, and no SSH: outbound traffic goes through
-an HTTP proxy, so `ssh` to a server cannot connect even when the Hetzner API
-can. A cloud task can therefore create a machine but not configure it. The
-Docker workspace test is opt-in and needs a reachable engine.
-
-Deployment, provider and model proofs happen on the owner's machine against real
-infrastructure. Do not claim one from here — say which checks you actually ran.
+Model calls and authenticated GitHub flows need their own credentials. Provider
+API checks require configured tokens and allowed network destinations/methods.
+Cloud traffic uses an HTTP/HTTPS proxy. Direct SSH and full server configuration
+have not been verified from this environment; do not infer SSH connectivity from
+a successful provider API call. The Docker workspace test needs a reachable
+engine. Report the exact checks run and their results; do not claim deployment
+success from unit tests or VM creation alone.
 
 ## Conventions
 

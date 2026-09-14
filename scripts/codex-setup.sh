@@ -22,8 +22,36 @@ npx playwright install --with-deps chromium
 # A fresh development database, so the application and the inspector start.
 npm run db:push
 
-# Do not persist setup secrets into this cached filesystem. The checks need no
-# provider credentials; runtime provider access must be configured separately.
+# Beta trust model: Codex Secrets exist only during setup. Persist supplied
+# provider credentials into the files Server Guy reads at runtime. These files
+# are readable by the agent; gitignore and mode 600 are not agent isolation.
+export NODE_USE_ENV_PROXY=1
+if [ -n "${HETZNER_API_TOKEN:-}" ]; then
+  npx tsx -e 'import("./src/server/hetzner.ts").then(m => m.connectHetzner(process.env.HETZNER_API_TOKEN)).then(() => console.log("Hetzner credential verified and saved.")).catch(() => { console.error("Hetzner credential setup failed; check the token and API connectivity."); process.exitCode = 1; })'
+fi
+
+if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+  npx tsx -e 'import("./src/server/cloudflare.ts").then(m => m.verifyCloudflare()).then(result => { if (!result.connected) throw new Error(); console.log("Cloudflare credential verified."); }).catch(() => { console.error("Cloudflare credential setup failed; check the token and API connectivity."); process.exitCode = 1; })'
+  node --input-type=module <<'NODE'
+import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+const token = process.env.CLOUDFLARE_API_TOKEN;
+const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+if (!/^[A-Za-z0-9_-]{20,256}$/.test(token) || (account && !/^[a-f0-9]{32}$/.test(account))) {
+  throw new Error("Invalid Cloudflare credential format.");
+}
+let existing = "";
+try { existing = readFileSync(".env.local", "utf8"); }
+catch (error) { if (error.code !== "ENOENT") throw error; }
+const retained = existing.split("\n").filter(line => !/^\s*(?:export\s+)?CLOUDFLARE_(?:API_TOKEN|ACCOUNT_ID)\s*=/.test(line));
+const values = [`CLOUDFLARE_API_TOKEN=${token}`];
+if (account) values.push(`CLOUDFLARE_ACCOUNT_ID=${account}`);
+const temporary = `.env.local.${randomUUID()}.tmp`;
+writeFileSync(temporary, [...retained, ...values, ""].join("\n"), { mode: 0o600, flag: "wx" });
+renameSync(temporary, ".env.local");
+console.log("Cloudflare credential saved for the application.");
+NODE
+fi
 
 # Record which lockfile these modules came from; codex-maintenance.sh reinstalls
 # only when the lockfile has changed since.

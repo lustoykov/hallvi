@@ -1,9 +1,9 @@
 # Codex cloud environment
 
-Use the `server-guy` Codex environment for implementation, pull requests and
-browser checks. It needs no provider credentials. Real provider access is a
-separate configuration decision; adding a secret does not give the agent a
-credential-free way to call that provider.
+Use the `server-guy` Codex environment for implementation, pull requests, browser
+checks and authorized provider API work. During beta, the owner trusts the cloud
+agent with dedicated development credentials. Use the existing **Default**
+Hetzner project; a separate cloud project is not required.
 
 ## Setup
 
@@ -42,6 +42,8 @@ the script does not erase it.
 | `SERVER_GUY_DB_PATH` | `/tmp/server-guy/server-guy.db` |
 | `SERVER_GUY_LOG_DIR` | `/tmp/server-guy/diagnostics` |
 | `SERVER_GUY_TRACING` | `0` |
+| `NODE_USE_ENV_PROXY` | `1` |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account ID (public configuration) |
 
 GitHub App IDs and slugs are public configuration, but do not establish an
 authenticated GitHub connection. Do not copy the laptop's `.env.local`, provider
@@ -56,69 +58,96 @@ distinguishes two mechanisms:
 - **Secrets** are encrypted in storage and injected into setup; they are removed
   from the environment before the agent phase.
 
-Our scripts do not persist setup secrets. Keep shell tracing disabled (`set +x`)
-so future setup commands do not echo expanded credentials. Setup scripts and
-installed dependencies still execute with any setup secrets supplied, so review
-that code before granting access.
+Add `HETZNER_API_TOKEN` and `CLOUDFLARE_API_TOKEN` under **Secrets**, not ordinary
+environment variables. The setup script verifies each supplied token through a
+read-only provider request, then saves it where Server Guy already reads it:
 
-Writing a secret to `.env.local` or the configured
-`hetzner-connection.json` preserves agent access to that credential, including
-through the cached filesystem. Gitignore and mode 600 do not hide it from an
-agent running as the same user, and do not prevent code from leaking it. If a
-previous setup persisted credentials, revoke them and reset the container cache;
-removing a secret from the UI alone does not revoke its provider token.
+| Secret | Runtime location |
+| --- | --- |
+| `HETZNER_API_TOKEN` | `$SERVER_GUY_CONFIG_DIR/hetzner-connection.json` |
+| `CLOUDFLARE_API_TOKEN` | `.env.local` in the checkout |
 
-For real API operations during a task, choose explicitly between credentials
-accessible to that task and a separate service that holds credentials and
-executes permitted operations. The latter is not implemented by these scripts.
-Do not describe either setup secrets or a second reviewing model as a guarantee
-against prompt injection.
+Both files use owner-only permissions (600). Cloudflare setup preserves unrelated
+`.env.local` settings. Tokens are optional: credential-free application tests
+still work without them. Invalid supplied tokens fail setup with a generic
+message, without logging the credential.
 
-## Provider scope for a future live environment
+```mermaid
+flowchart LR
+    Store[Codex encrypted Secrets] --> Setup[Decrypted environment during setup]
+    Setup --> Files[Private application configuration files]
+    Files --> App[Server Guy runtime]
+    Files --> Agent[Agent can also read these files]
+```
 
-Prefer the existing empty **Server Guy Codex Cloud** Hetzner project over
-**Default**, even while everything is development. Default already contains
-other development deployments. A separate project limits an automation error to
-its own resources without requiring another running server.
+Codex removes the original secret environment variables before the agent phase;
+it does not erase files our setup deliberately wrote. This protects storage and
+keeps tokens out of ordinary settings and Git, but does not hide them from an
+agent running as the same user. Treat setup code, dependencies and the working
+agent as trusted under this beta configuration. Keep shell tracing disabled;
+never print credentials or include them in test evidence or PRs.
+
+To revoke access, revoke the token at the provider. Update the Codex Secret and
+reset/rebuild the cache to replace persisted copies. Codex invalidates the cache
+when secrets or setup settings change, but provider revocation is what makes an
+old credential unusable.
+
+Stronger separation is deferred: a credential-holding execution service could
+keep raw credentials outside the coding environment. That service is not
+implemented here, and a reviewing model is not a substitute for that boundary.
+
+## Provider scopes
+
+Use dedicated cloud-agent tokens so they can be revoked independently of local
+Server Guy credentials. Keep all current Hetzner development work in **Default**.
+The previously created empty cloud project is unused; this setup does not delete
+it or move resources.
 
 [Hetzner tokens](https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/)
-are project scoped. Use Read for observation; Read & Write permits resource
-creation, modification and deletion throughout that project. It cannot be scoped
-to one server. Resources are real and billed: a task must specify what it may
-create, its budget and what may remain running.
+are project scoped. The intended beta token is **Read & Write** in Default. This
+permits creation, modification and deletion across that entire project, including
+existing development servers. A token cannot be scoped to one server. Resources
+are billed; permission to access the provider is not permission to create or
+delete resources without task-specific instructions.
 
-For Cloudflare, issue a dedicated token with only the operations required by the
-test and a specific development zone. Do not reuse a token covering all zones or
-assume that an existing domain or backup bucket is disposable.
+The prepared Cloudflare token is restricted to **accountant-agent.com** with:
 
-- DNS changes need Zone / DNS / Edit on the selected zone. Add other zone
-  permissions only when testing operations that need them.
-- R2 **S3 object access** can use a separate Object Read & Write credential scoped
-  to a dedicated test bucket. It must not reach the existing backup bucket.
-- R2 **bucket management through the Cloudflare REST API** uses account-level
-  Workers R2 Storage permissions. This is broader than a bucket-scoped S3 token;
-  do not grant it for ordinary code or browser checks.
+- Zone / DNS / Edit, for DNS record operations.
+- Zone / Zone / Read, for zone discovery.
+- Zone / Zone Settings / Read, for inspecting settings.
 
-See [Cloudflare R2 token permissions](https://developers.cloudflare.com/r2/api/tokens/).
-The live `server-guy` Codex environment has no provider credentials configured.
+It does not grant R2 or account-wide access, change TLS settings, or purge caches.
+R2 object testing needs separately scoped S3 credentials; Cloudflare REST bucket
+management uses broader account-level permissions. Do not reuse existing backup
+credentials. See [R2 token permissions](https://developers.cloudflare.com/r2/api/tokens/).
+
+Token creation and installation must be verified in the provider and Codex UIs;
+these repository changes alone do not establish that live access is configured.
 
 ## Network and verification boundaries
 
-The live environment allows common dependency domains plus
-`fonts.googleapis.com` and `fonts.gstatic.com`, with GET, HEAD and OPTIONS during
-tasks. Setup has network access independently of that agent-phase policy.
+Provider work needs `api.hetzner.cloud` and `api.cloudflare.com` in the agent's
+domain allowlist, alongside dependency domains and `fonts.googleapis.com` /
+`fonts.gstatic.com`. Write operations require allowing HTTP methods beyond GET,
+HEAD and OPTIONS. The environment-wide method setting also applies to the other
+allowed domains, so keep the domain list bounded. These changes must be applied
+in the Codex UI; documentation alone does not enable them.
 
-If a separate live environment needs provider APIs, add only their required
-origins (`api.hetzner.cloud` and `api.cloudflare.com`). Write operations also need
-the appropriate HTTP methods. Network filtering supplements credential scope;
-it does not make secrets unreadable or guarantee that permitted destinations
-cannot receive sensitive data.
+Set `NODE_USE_ENV_PROXY=1` in environment settings so Node's HTTP clients and
+`fetch` use the supplied proxy configuration during the agent phase. This needs
+Node 22.21 or later in the Node 22 line; the observed cloud runtime was 22.22.2.
+See [Node 22.21 release notes](https://nodejs.org/en/blog/release/v22.21.0).
 
-See [Codex internet access](https://developers.openai.com/codex/cloud/internet-access).
-Outbound traffic uses an HTTP/HTTPS proxy; direct SSH into a provisioned server
-is not part of this environment's supported verification path. Creating a VM
-through an API is not proof that Server Guy can configure it. Full deployment
-proofs stay on the owner's machine or a separate reachable Linux verifier.
+[Codex documentation](https://developers.openai.com/codex/cloud/environments)
+says all outbound traffic passes through an HTTP/HTTPS proxy. Ordinary SSH uses
+its own TCP protocol, typically on port 22, and does not automatically use that
+proxy. An HTTPS API request that creates a VM therefore does not prove that
+`ssh user@server` can reach it. Direct SSH from this environment has not been
+verified; the documentation does not establish that every possible SSH transport
+is impossible. Until a supported path is tested, full deployment verification
+uses the owner's machine or a separate reachable Linux verifier.
+
+See [agent network controls](https://developers.openai.com/codex/cloud/internet-access).
 
 ## Checks and evidence
 
