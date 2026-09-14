@@ -21,7 +21,7 @@ At main `0682ab2` (PR #45), the actual configured Pi model (`openai-codex` / `gp
 
 The model, workspace, resolver, host script, records and verification were real. The provider was fake, SSH mapped to local execution, repository trees were fixtures and host HTTP was mapped to loopback. Worker processing in the second proof was asserted by the harness; the product checked image identity, readiness and HTTP behavior. That application did not demonstrate correction from host feedback; the notes application did. Neither establishes universal Compose support or every app's rollback/backup behavior.
 
-The final proof passed once in 215.6 seconds. Its default suite had 1,006 passing tests and 26 opt-in skips; Codex separately passed TypeScript and a scripted first-deployment Docker regression. These are dated results, not today's suite status. Reusable proof code remains in [native-release.docker.test.ts](../../tests/application/integration/native-release.docker.test.ts).
+The final proof passed once in 215.6 seconds. Its default suite had 1,006 passing tests and 26 opt-in skips; Codex separately passed TypeScript and a scripted first-deployment Docker regression. These are dated results, not today's suite status. The historical proof code is preserved in [native-release.docker.test.ts at the pre-cleanup revision](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/tests/application/integration/native-release.docker.test.ts).
 
 ## Dated evidence
 
