@@ -12,14 +12,11 @@ Node.js 22 with the locked dependencies. `npm ci`, never `npm install <pkg>@late
 The checks need no credentials: tests use disposable databases and synthetic
 provider responses.
 
-During beta, Codex cloud may use development provider credentials stored through
-Codex Secrets and persisted by setup into application configuration files. The
-agent can read these files; the owner accepts this trust model for beta. Use the
-existing Default Hetzner project, not a separate cloud project. See
-[docs/development/codex-cloud.md](docs/development/codex-cloud.md) for scope and
-setup. Resources are real and billed. Create or destroy nothing unless the task
-says so, name anything left running, and never print credentials or copy them
-into code, test artifacts, commits or pull requests.
+Development agents run on the owner's Mac Mini. Use the existing Default
+Hetzner project. Provider resources are real and billed: create or destroy
+nothing unless the task says so, name anything left running, and never print
+credentials or copy them into code, artifacts, commits or pull requests.
+See [remote development](docs/development/mac-mini.md).
 
 ## Checks
 
@@ -36,15 +33,12 @@ and link review, not the browser suite. Run `npm run format` before finishing so
 `npm run lint` stays clean. [tests/README.md](tests/README.md) owns the full test
 commands.
 
-## What this container cannot verify
+## Verification boundaries
 
-Model calls and authenticated GitHub flows need their own credentials. Provider
-API checks require configured tokens and allowed network destinations/methods.
-Cloud traffic uses an HTTP/HTTPS proxy. Direct SSH and full server configuration
-have not been verified from this environment; do not infer SSH connectivity from
-a successful provider API call. The Docker workspace test needs a reachable
-engine. Report the exact checks run and their results; do not claim deployment
-success from unit tests or VM creation alone.
+Check the current host's tools, credentials and connectivity before claiming
+provider, model, GitHub or deployment support. SSH reachability and successful
+API calls are separate checks. The Docker workspace test needs a reachable
+engine. Report the exact checks run; unit tests do not prove deployment success.
 
 ## Conventions
 
