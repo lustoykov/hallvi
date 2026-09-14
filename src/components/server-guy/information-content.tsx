@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationSection } from "./application-sections";
+import type { Reachability } from "./deployment-prototype/page-head";
 import { Tag, toneOf } from "./presentation";
 import { LocalTime } from "./local-time";
 import { InformationBody } from "./information-body";
@@ -20,12 +21,20 @@ export function InformationContent({
   currentView,
   onOpen,
   superseded,
+  reachable,
 }: {
   record: SavedInformation;
   currentView?: ApplicationSection;
   onOpen?: (view: ApplicationSection) => void;
   /** Already shown in full earlier in this conversation. */
   superseded?: boolean;
+  /**
+   * Whether the tunnel behind an access record's URL is still open. The card
+   * is a record and keeps every word it was written with; only the anchor is
+   * withheld, because a dead link that looks alive costs the reader a click,
+   * a wait and a browser error to learn what the page already knew.
+   */
+  reachable?: Reachability;
 }) {
   const presentation = record.presentation!;
   const content = presentation.content!;
@@ -148,7 +157,7 @@ export function InformationContent({
         <div className="sg-result-head">
           <Check className="sg-result-mark" aria-hidden="true" weight="bold" />
           <h3 title={record.title}>{record.title}</h3>
-          {access && presentation.url && (
+          {access && presentation.url && reachable !== "closed" && (
             <a
               className="sg-result-open"
               href={presentation.url}
@@ -157,6 +166,9 @@ export function InformationContent({
             >
               Open <ArrowUpRight aria-hidden="true" weight="bold" />
             </a>
+          )}
+          {access && presentation.url && reachable === "closed" && (
+            <span className="sg-result-shut">Tunnel closed</span>
           )}
         </div>
         {/* The limitation stays on the face. Compactness must not hide the

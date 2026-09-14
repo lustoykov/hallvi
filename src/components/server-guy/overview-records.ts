@@ -232,6 +232,7 @@ export function overviewFromRecords({
   applicationName,
   headline,
   now,
+  accessClosed = false,
   onOpenConversation,
 }: {
   records: SavedInformation[];
@@ -242,6 +243,15 @@ export function overviewFromRecords({
   /** The web part's name when the map has one. */
   headline: string;
   now: number;
+  /**
+   * The controller asked its own tunnel whether it is still there, and it is
+   * not. This is not a record and does not become one: it is an observation
+   * about now, of exactly the kind the Access lane exists to report, and the
+   * page header already reports it. Without it the two disagreed on one
+   * screen — "The tunnel is closed" above a green "Checked 5 min ago" — and
+   * the lane was the reassuring half.
+   */
+  accessClosed?: boolean;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
 }): Overview {
   const live = records.filter((record) => !record.retiredAt);
@@ -329,7 +339,16 @@ export function overviewFromRecords({
       presences.find(
         (presence) => presence.known && presence.presence === "absent",
       );
-    const certainty: Certainty = declared ? "absent" : readLane(held, now);
+    // A closed tunnel is a check that ran just now and did not pass, so it
+    // outranks the recorded reading the way any failure does. Only the Access
+    // lane hears it: the application, its data and the server are all exactly
+    // as they were, and it is only the way in from this PC that is gone.
+    const certainty: Certainty =
+      id === "access" && accessClosed
+        ? "failed"
+        : declared
+          ? "absent"
+          : readLane(held, now);
     const facts: Fact[] = subjects.flatMap((ref) =>
       [...currentFacts(live, ref).values()].map((item) => ({
         label: item.value.label,
@@ -340,15 +359,23 @@ export function overviewFromRecords({
     const spoken = held.find(
       (item) => item.record.presentation?.states && item.record.body,
     )?.record.body;
+    const text =
+      id === "access" && accessClosed
+        ? "Tunnel is closed"
+        : laneText(held, certainty, now);
     return {
       id,
       label: chrome[id].label,
       value: word[certainty],
-      status: { certainty, text: laneText(held, certainty, now) },
+      status: { certainty, text },
       lines: held.slice(0, 4).map((item) => item.check.label),
       // Needs a recurrence Pi cannot write yet.
       countdownTo: null,
-      plain: spoken ?? laneText(held, certainty, now),
+      // Pi's own sentence, except where it has been overtaken: it wrote "Shop
+      // is available privately from this PC" and that was true when it was
+      // written. Repeating it under a closed tunnel is the same lie in
+      // longer words.
+      plain: id === "access" && accessClosed ? text : (spoken ?? text),
       facts: facts.slice(0, 6),
       destination: chrome[id].destination,
       ask: chrome[id].ask,

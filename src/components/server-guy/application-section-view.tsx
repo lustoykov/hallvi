@@ -164,6 +164,8 @@ export function ApplicationSectionView({
           chats={view.chats}
           now={now}
           reduced={false}
+          reachable={reachable}
+          onReopen={onReopen}
           chrome={{
             bar,
             header: (

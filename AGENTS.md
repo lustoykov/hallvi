@@ -14,11 +14,16 @@ Record ownership and retention outside worktrees. Task completion includes
 verified cleanup or an explicit retained-resource handoff. The local daily
 Dev Cleanup task is the fallback; it also owns shared cloud cleanup.
 
-Use the existing authorized Default Hetzner project. Create billed resources
-only when the task authorizes them. Never print credentials or copy them into
-code, artifacts, commits or pull requests. Preserve dirty work, unique data,
-credentials, retained evidence and uncertain resources. Never broadly prune
-Docker volumes or force-remove worktrees.
+Use the existing authorized Default Hetzner project. On 14 September 2026 the
+owner standing-authorized creating billed development resources there whenever
+the work needs them; prefer a real host over a stand-in when the step is about
+deployment itself. That covers creation and use, never deletion of anything you
+did not create: label it, register it, and retire it when the task ends.
+
+Never print credentials or copy them into code, artifacts, commits or pull
+requests. Preserve dirty work, unique data, credentials, retained evidence and
+uncertain resources. Never broadly prune Docker volumes or force-remove
+worktrees.
 
 ## Changes and checks
 

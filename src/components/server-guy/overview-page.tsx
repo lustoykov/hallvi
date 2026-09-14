@@ -18,6 +18,7 @@ import type { PageChrome } from "./architecture-prototype/index";
 import type { LiveRecord } from "./architecture-prototype/model";
 import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";
+import type { Reachability } from "./deployment-prototype/page-head";
 import {
   applicationCondition,
   logFromRecords,
@@ -54,6 +55,8 @@ export function OverviewPage({
   now,
   chrome,
   reduced,
+  reachable = "checking",
+  onReopen,
   onOpenConversation,
   onOpenDestination,
   onAsk,
@@ -65,6 +68,9 @@ export function OverviewPage({
   now: number;
   chrome: PageChrome;
   reduced: boolean;
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access. Absent hides the offer. */
+  onReopen?: () => void;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
   onAsk: (draft: string) => void;
@@ -89,6 +95,7 @@ export function OverviewPage({
         applicationName: application.name,
         headline: model?.headline ?? application.name,
         now,
+        accessClosed: reachable === "closed",
         onOpenConversation,
       }),
     [
@@ -99,6 +106,7 @@ export function OverviewPage({
       application.name,
       model?.headline,
       now,
+      reachable,
       onOpenConversation,
     ],
   );
@@ -142,7 +150,15 @@ export function OverviewPage({
           onOpenConversation={onOpenConversation}
           onOpenDestination={onOpenDestination}
           onAsk={onAsk}
-          page={{ chrome, openUrl, busy: false, last: null, earlier: 0 }}
+          page={{
+            chrome,
+            openUrl,
+            reachable,
+            onReopen,
+            busy: false,
+            last: null,
+            earlier: 0,
+          }}
         />
       </div>
     );

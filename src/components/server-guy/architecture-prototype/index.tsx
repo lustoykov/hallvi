@@ -17,6 +17,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
 
 import type { ApplicationSection } from "../application-sections";
+import type { Reachability } from "../deployment-prototype/page-head";
 import { operationsFor, unresolved } from "../operation-model";
 import { JourneyDirection } from "./journey-v2";
 import { useLiveRecord } from "./live-record";
@@ -41,6 +42,13 @@ export interface PageContext {
   chrome: PageChrome;
   /** Where the application answers, while it is serving. */
   openUrl: string | null;
+  /**
+   * Whether the way in still works. A private URL lives inside a tunnel this
+   * controller holds, so the record naming it outlives the way to reach it.
+   */
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access. Absent hides the offer. */
+  onReopen?: () => void;
   /** Work is unsettled: the shipped activity is shown as it is. */
   busy: boolean;
   /** The last settled operation that touched this destination. */

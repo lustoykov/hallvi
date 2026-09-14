@@ -5,13 +5,7 @@
 // is the Timeline the owner chose on 10 Sep 2026; under it sit the map in
 // miniature, recent work, and one quiet line of ideas.
 
-import {
-  ArrowRight,
-  ArrowSquareOut,
-  CaretDown,
-  Lightbulb,
-  ShieldCheck,
-} from "@phosphor-icons/react";
+import { ArrowRight, CaretDown, Lightbulb } from "@phosphor-icons/react";
 import { useCallback, useMemo, useState } from "react";
 
 import type { ApplicationOperation } from "@/server/operation-record";
@@ -25,6 +19,7 @@ import type {
   LiveRecord,
 } from "../architecture-prototype/model";
 import type { Recheck } from "../architecture-prototype/use-recheck";
+import { AccessLink } from "../deployment-prototype/page-head";
 import { MiniMap } from "./mini-map";
 import { buildOverview, type Overview } from "./overview-model";
 import { IdeaCard, OpChip } from "./shared";
@@ -95,18 +90,14 @@ export function OverviewDirection({
         {page.chrome.bar && <div className="axj3-bar">{page.chrome.bar}</div>}
         <div className="axj3-title">
           <h1>Overview</h1>
-          {page.openUrl && !planned && (
-            <div className="axj3-open">
-              {model.restricted && (
-                <small>
-                  <ShieldCheck weight="bold" /> Only from your network
-                </small>
-              )}
-              <a href={page.openUrl} target="_blank" rel="noreferrer">
-                Open {model.headline}
-                <ArrowSquareOut weight="bold" />
-              </a>
-            </div>
+          {!planned && (
+            <AccessLink
+              openUrl={page.openUrl}
+              name={model.headline}
+              restricted={model.restricted}
+              reachable={page.reachable}
+              onReopen={page.onReopen}
+            />
           )}
         </div>
       </header>

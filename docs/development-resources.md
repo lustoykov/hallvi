@@ -21,10 +21,20 @@ The separate **Disk Audit** remains read-only and covers the wider Mac. Local
 **RAM Care** may manage preview memory under its own narrow authorization; all
 cleanup must recheck active use immediately before acting.
 
-Prefer local provider stand-ins when a real provider is unnecessary. Use only
-existing authorized provider projects (currently Default); do not create projects
-or infrastructure just to audit it. Verify account/project identity and access
-before any provider mutation. Inaccessible resources are a coverage gap.
+Use local provider stand-ins when a real provider adds nothing — a stand-in is
+faster and free, and everything above the provider API behaves identically. Use
+a real host when the step is about deployment itself, where a stand-in cannot
+establish the result.
+
+On 14 September 2026 the owner standing-authorized creating billed development
+resources in the authorized project whenever the work needs them, replacing the
+earlier per-task authorization. It is an authorization to create and use, not to
+delete: resources you did not create stay, and the labelling, registration and
+retirement rules below apply unchanged to everything you do create.
+
+Use only existing authorized provider projects (currently Default); do not create
+projects or infrastructure just to audit it. Verify account/project identity and
+access before any provider mutation. Inaccessible resources are a coverage gap.
 
 ## Ownership and durable records
 

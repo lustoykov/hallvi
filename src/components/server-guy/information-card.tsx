@@ -17,6 +17,7 @@ import {
 import { Tag, toneOf } from "./presentation";
 import "./information-card.css";
 import { InformationContent } from "./information-content";
+import type { Reachability } from "./deployment-prototype/page-head";
 
 export function InformationCard(props: {
   record: SavedInformation;
@@ -24,6 +25,8 @@ export function InformationCard(props: {
   currentView?: ApplicationSection;
   /** A later record states the same subject; see GenericInformationCard. */
   superseded?: boolean;
+  /** See InformationContent: an access URL outlives the tunnel behind it. */
+  reachable?: Reachability;
 }) {
   return props.record.presentation?.content ? (
     <InformationContent {...props} />
@@ -37,9 +40,12 @@ function GenericInformationCard({
   onOpen,
   currentView,
   superseded,
+  reachable,
 }: {
   record: SavedInformation;
   onOpen?: (view: ApplicationSection) => void;
+  /** See InformationContent: an access URL outlives the tunnel behind it. */
+  reachable?: Reachability;
   /** The destination this card is already sitting in, so it does not
       offer to open the page you are reading. */
   currentView?: ApplicationSection;
@@ -235,7 +241,7 @@ function GenericInformationCard({
         <div className="sg-result-head">
           <span className="sg-result-dot" data-tone={tone} aria-hidden="true" />
           <h3 title={record.title}>{record.title}</h3>
-          {routine && presentation.url && (
+          {routine && presentation.url && reachable !== "closed" && (
             <a
               className="sg-result-open"
               href={presentation.url}
@@ -244,6 +250,9 @@ function GenericInformationCard({
             >
               Open <ArrowUpRight aria-hidden="true" weight="bold" />
             </a>
+          )}
+          {routine && presentation.url && reachable === "closed" && (
+            <span className="sg-result-shut">Tunnel closed</span>
           )}
           <span className="sg-result-then">
             <LocalTime value={established} variant="compact" />

@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -31,6 +32,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { Chat, ChatMessage, OperatorView, PiRun } from "@/server/types";
 
 import type { ApplicationSection } from "./application-sections";
+import type { Reachability } from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
@@ -165,6 +167,7 @@ export function ChatPane({
   onOpenConversation,
   highlight,
   decisionFor,
+  reachable,
 }: {
   view: OperatorView;
   activeChat: Chat | null;
@@ -192,6 +195,11 @@ export function ChatPane({
   highlight?: MessageHighlight | null;
   /** The real decision controls for an operation while it needs one. */
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
+  /**
+   * Whether the tunnel behind an access record's URL is still open, so a
+   * record card in the transcript does not offer a link that stopped working.
+   */
+  reachable?: Reachability;
 }) {
   const chatId = activeChat?.id ?? null;
   // Receipts sit under the reply that started the work. One whose reply is
@@ -331,6 +339,22 @@ export function ChatPane({
   // and re-derived from timestamps after a refresh.
   const secretsOwnMessage = secretRequestPoint(secrets, view.messages ?? []);
   const secretsHere = Boolean(view.application) && chatId === view.chats[0]?.id;
+
+  /**
+   * Drafts the sentence that tells Pi the values are in, and puts the reader
+   * in the composer with it. It drafts rather than sends, like every other
+   * offer on these pages: the message is the reader's, and they may want to
+   * add to it before it goes.
+   */
+  const continueAfterSecrets = useCallback(
+    (draft: string) => {
+      onComposerChange(draft);
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLTextAreaElement>("#pi-composer")?.focus(),
+      );
+    },
+    [onComposerChange],
+  );
 
   /**
    * Where each saved record is shown in full.
@@ -603,6 +627,7 @@ export function ChatPane({
                           key={block.id}
                           record={record}
                           onOpen={openDestination}
+                          reachable={reachable}
                           superseded={
                             firstShown.get(record.id) !==
                             `${message.id}:${index}`
@@ -643,6 +668,7 @@ export function ChatPane({
                     applicationId={view.application!.id}
                     secrets={secrets}
                     onChanged={setSecrets}
+                    onContinue={continueAfterSecrets}
                   />
                 )}
               </Fragment>
@@ -705,6 +731,7 @@ export function ChatPane({
               applicationId={view.application!.id}
               secrets={secrets}
               onChanged={setSecrets}
+              onContinue={continueAfterSecrets}
             />
           )}
         </ConversationContent>

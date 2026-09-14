@@ -58,7 +58,11 @@ const httpCheck = {
   basis: "observed" as const,
 };
 
-function overview(records: SavedInformation[], now: number) {
+function overview(
+  records: SavedInformation[],
+  now: number,
+  accessClosed = false,
+) {
   return overviewFromRecords({
     records,
     executions: [],
@@ -67,6 +71,7 @@ function overview(records: SavedInformation[], now: number) {
     applicationName: "Getting Started",
     headline: "Getting Started",
     now,
+    accessClosed,
     onOpenConversation: () => undefined,
   });
 }
@@ -304,5 +309,63 @@ describe("what happened", () => {
   it("leaves out a record that established nothing", () => {
     const written = record({ id: "rec-none", at: null, title: "A note" });
     expect(overview([written], TEN_MINUTES_ON).recent).toEqual([]);
+  });
+});
+
+describe("a tunnel the controller has just found closed", () => {
+  // The record that says where the application answers is not wrong and is
+  // not withdrawn: it was true when it was written. What has changed is
+  // something only the controller can know, by asking its own tunnel, and
+  // the Access lane is where Overview reports exactly that.
+  const accessRecord = record({
+    id: "access",
+    title: "Getting Started is available privately from this PC",
+    states: { ref: { kind: "access", id: "private" }, presence: "present" },
+    checks: [
+      {
+        key: "tunnel",
+        label: "The tunnel reached the application",
+        status: "passed",
+        claim: "reachability",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("reads verified while nothing says otherwise", () => {
+    const access = overview([accessRecord], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "access",
+    );
+    expect(access?.status.certainty).toBe("verified");
+    expect(access?.status.text).toContain("Checked");
+  });
+
+  it("reports the closed tunnel instead of the recorded pass", () => {
+    const access = overview([accessRecord], TEN_MINUTES_ON, true).vitals.find(
+      (vital) => vital.id === "access",
+    );
+    expect(access?.status.certainty).toBe("failed");
+    expect(access?.status.text).toBe("Tunnel is closed");
+    // Pi's own sentence said the application was available from this PC.
+    // Repeating it under a closed tunnel is the same claim in longer words.
+    expect(access?.plain).toBe("Tunnel is closed");
+  });
+
+  it("leaves the other lanes alone", () => {
+    // The application, its data and the server are exactly as they were:
+    // only the way in from this PC is gone, and a closed tunnel is not
+    // evidence about any of them.
+    const checks = record({
+      id: "health",
+      states: { ref: application, presence: "present" },
+      checks: [httpCheck],
+    });
+    const built = overview([accessRecord, checks], TEN_MINUTES_ON, true);
+    expect(
+      built.vitals.find((vital) => vital.id === "checks")?.status.certainty,
+    ).toBe("verified");
+    expect(applicationCondition([checks], APP, TEN_MINUTES_ON).certainty).toBe(
+      "verified",
+    );
   });
 });
