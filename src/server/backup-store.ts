@@ -19,9 +19,16 @@
 // a compromised controller. `scp` over the connection the controller already
 // owns keeps the direction of trust the right way round.
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
@@ -114,17 +121,48 @@ export async function fetchBackupCopy(
   const into = directory(applicationId);
   const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${remotePath.split("/").at(-1)}`;
   const local = join(into, name);
-  await exec(
-    "scp",
-    [
-      ...connection,
-      "-P",
-      String(host.port),
-      `${host.user}@${host.address}:${remotePath}`,
-      local,
-    ],
-    { timeout: 600_000 },
-  );
+  // `ssh … cat`, not `scp`. One transport rather than two: the same options,
+  // the same pinned host key and the same credential the controller already
+  // uses for everything else, so there is one thing to get right instead of
+  // two that can disagree. It is also the difference between working and not
+  // on any setup where `ssh` is reached differently from `scp` — the rig is
+  // exactly that, and a real host is no worse off.
+  await new Promise<void>((resolve, reject) => {
+    const sink = openSync(local, "w", 0o600);
+    const pull = spawn(
+      "ssh",
+      [
+        ...connection,
+        "-p",
+        String(host.port),
+        `${host.user}@${host.address}`,
+        `cat ${shellQuote(remotePath)}`,
+      ],
+      { stdio: ["ignore", sink, "pipe"] },
+    );
+    let complaint = "";
+    pull.stderr?.on("data", (chunk) => (complaint += chunk));
+    pull.on("error", (problem) => {
+      closeSync(sink);
+      reject(problem);
+    });
+    pull.on("close", (code) => {
+      closeSync(sink);
+      if (code === 0) return resolve();
+      // A partial file is worse than none: it would look like a backup.
+      try {
+        unlinkSync(local);
+      } catch {
+        // Nothing was written.
+      }
+      reject(
+        new Error(
+          `Copying ${remotePath} off the server failed (exit ${code}). ` +
+            `Nothing was kept. ${complaint.slice(0, 300)}`,
+        ),
+      );
+    });
+  });
 
   const { readFileSync } = await import("node:fs");
   const bytes = statSync(local).size;

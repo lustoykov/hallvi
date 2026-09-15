@@ -56,6 +56,18 @@ export interface Protection {
 
 const newestFirst = (a: Dated, b: Dated) => b.at.localeCompare(a.at);
 
+/** A relative time for prose. The facts row uses LocalTime instead. */
+function when(at: string, now: number) {
+  const ms = now - Date.parse(at);
+  if (!Number.isFinite(ms)) return "at an unrecorded time";
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "taken just now";
+  if (minutes < 60) return `taken ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `taken ${hours} h ago`;
+  return `taken ${Math.round(hours / 24)} d ago`;
+}
+
 export function protectionFromRecords(
   records: SavedInformation[],
   now: number,
@@ -398,6 +410,29 @@ export function protectionVerdict(
     };
 
   if (newestRestore && newestCopy) {
+    // A restore proves the copy it restored, not every copy made since. When
+    // the newest copy postdates the newest restore, the copies being taken
+    // now have never been opened — which is the same position as never having
+    // tested one, except that an earlier copy is known to have worked. The
+    // page says both rather than letting the older proof vouch for the newer
+    // file.
+    if (Date.parse(newestCopy.at) > Date.parse(newestRestore.at))
+      return {
+        state: offsite ? "offsite-untested" : "local-only",
+        tone: "warning",
+        says: offsite
+          ? "Copies are reaching a destination off the application's server, and the newest one has not been restored."
+          : "Copies exist on the application's own server, and the newest one has not been restored.",
+        limit:
+          `An earlier copy was restored and checked, so recovery has worked ` +
+          `at least once. The newest copy, ${when(newestCopy.at, now)}, has ` +
+          `not been.${offsite ? "" : " These copies would also go with the server."}`,
+        next: {
+          label: "Test a restore of the newest copy",
+          draft:
+            "Restore the newest backup copy — not an older one — into an isolated copy of this application, verify the data and files are actually there, and record which copy it proved.",
+        },
+      };
     const stale = now - Date.parse(newestRestore.at) > STALE_MS;
     return {
       state: stale ? "evidence-stale" : "restore-verified",

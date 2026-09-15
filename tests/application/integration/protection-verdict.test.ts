@@ -209,12 +209,20 @@ describe("what the page says, state by state", () => {
     expect(said.tone).toBe("warning");
   });
 
-  it("a restore proved long ago stops vouching for copies made since", () => {
-    // Backups are still landing — a copy from an hour ago — and the only
-    // restore ever tested is from five weeks back. The copies being made now
-    // have never been restored from, which is the thing to say.
-    const recent = copy("off-site", "2026-10-20T10:00:00.000Z", "recent");
-    const said = verdict([plan("off-site"), recent, restore()], A_MONTH_ON);
+  it("a restore proved long ago stops vouching for the copy it proved", () => {
+    // No schedule, so nothing is overdue; the newest copy *was* the one
+    // restored, so nothing newer is untested. What is left is that the proof
+    // itself is five weeks old, which says little about the destination
+    // today. Deliberately without a plan: with a daily schedule this state is
+    // unreachable, because a copy old enough for the proof to lapse is also a
+    // copy old enough to be overdue, and that is the more urgent thing.
+    const said = verdict(
+      [
+        copy("off-site", "2026-09-15T10:00:00.000Z", "proved"),
+        restore("2026-09-15T10:30:00.000Z"),
+      ],
+      A_MONTH_ON,
+    );
     expect(said.state).toBe("evidence-stale");
     expect(said.tone).toBe("warning");
     expect(said.next?.label).toBe("Test a restore again");
@@ -260,5 +268,36 @@ describe("where the copies go", () => {
     expect(new Set(protection.destinations)).toEqual(
       new Set(["same-server", "off-site"]),
     );
+  });
+});
+
+describe("which copy a restore actually proved", () => {
+  it("does not let an older proof vouch for a newer copy", () => {
+    // The shape the 15 September run produced: a same-server archive that was
+    // restored, then a fresh copy pulled to the controller that never was.
+    // "Recovery proved" over that newer, untested file is an overclaim.
+    const proved = copy("same-server", "2026-09-15T10:00:00.000Z", "proved");
+    const fresh = copy("controller", "2026-09-15T10:45:00.000Z", "fresh");
+    const said = verdict(
+      [plan("controller"), proved, restore("2026-09-15T10:10:00.000Z"), fresh],
+      NOW,
+    );
+    expect(said.state).toBe("offsite-untested");
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("worked at least once");
+    expect(said.next?.label).toBe("Test a restore of the newest copy");
+  });
+
+  it("reads verified when the restore is of the newest copy", () => {
+    const said = verdict(
+      [
+        plan("controller"),
+        copy("controller", "2026-09-15T10:00:00.000Z", "newest"),
+        restore("2026-09-15T10:10:00.000Z"),
+      ],
+      NOW,
+    );
+    expect(said.state).toBe("restore-verified");
+    expect(said.tone).toBe("verified");
   });
 });
