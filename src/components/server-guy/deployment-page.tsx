@@ -121,7 +121,13 @@ export function DeploymentPage({
                 answer to "what just happened" and the wrong one to "what is
                 running" whenever those are different records. */}
             {releases.all.length > 0 && (
-              <ReleasesPanel view={releases} now={now} onAsk={onAsk} />
+              <ReleasesPanel
+                view={releases}
+                now={now}
+                reachable={reachable}
+                onReopen={onReopen}
+                onAsk={onAsk}
+              />
             )}
           </>
         }

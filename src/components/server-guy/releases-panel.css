@@ -191,3 +191,11 @@
   font-size: 12.5px;
   line-height: 1.55;
 }
+
+/* An address that is not currently a way in. Shown, not offered. */
+.rp-open-button.is-dead {
+  border-color: var(--line, rgba(25, 35, 56, 0.16));
+  background: transparent;
+  color: var(--muted, #59667b);
+  cursor: default;
+}

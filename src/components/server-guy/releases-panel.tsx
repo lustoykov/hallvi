@@ -15,6 +15,7 @@
 
 import { useState } from "react";
 
+import type { Reachability } from "./deployment-prototype/page-head";
 import { LocalTime } from "./local-time";
 import {
   releaseHeadline,
@@ -45,16 +46,32 @@ const OUTCOME_WORD: Record<Release["outcome"], string> = {
 export function ReleasesPanel({
   view,
   now,
+  reachable = "checking",
+  onReopen,
   onAsk,
 }: {
   view: ReleaseView;
   now: number;
+  /**
+   * Whether the private way in still answers, as the page header asked it.
+   *
+   * The same answer, not a second opinion. This card offered "Open app" over
+   * a live URL while the header three lines above said the tunnel was closed,
+   * which is the page disagreeing with itself about the one thing the reader
+   * is most likely to click.
+   */
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access. Absent hides the offer. */
+  onReopen?: () => void;
   onAsk: (draft: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const said = releaseHeadline(view);
   const { running, access } = view;
   const earlier = view.all.filter((release) => release.id !== running?.id);
+  // Only a private address depends on the tunnel. A public one is answered by
+  // the server whatever this Mac is doing.
+  const closed = Boolean(access?.localOnly) && reachable === "closed";
 
   return (
     <section className="rp" aria-label="What is running">
@@ -76,14 +93,39 @@ export function ReleasesPanel({
             record says there is a way in; otherwise it asks for one, rather
             than offering a button that goes nowhere. */}
         <div className="rp-open">
-          {access ? (
+          {access && closed ? (
+            // The tunnel is not answering, so the address is not a way in.
+            // Offering it anyway is the page promising something it has just
+            // been told is untrue.
+            <>
+              {onReopen ? (
+                <button
+                  type="button"
+                  className="rp-open-button is-ask"
+                  onClick={onReopen}
+                >
+                  Reopen access
+                </button>
+              ) : (
+                <span className="rp-open-button is-dead" aria-disabled="true">
+                  Open app
+                </span>
+              )}
+              <small>
+                The tunnel is closed, so <code>{access.url}</code> does not
+                answer from this Mac.
+              </small>
+            </>
+          ) : access ? (
             <>
               <a className="rp-open-button" href={access.url}>
                 Open app
               </a>
               <small>
                 {access.localOnly
-                  ? "Private — from this Mac only, while the tunnel is up"
+                  ? reachable === "checking"
+                    ? "Private — checking that the tunnel still answers"
+                    : "Private — from this Mac only, while the tunnel is up"
                   : "Public"}
                 <br />
                 <code>{access.url}</code>
