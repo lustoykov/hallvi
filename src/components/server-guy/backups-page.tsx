@@ -121,7 +121,7 @@ export function BackupsPage({
               )
             }
           >
-            Ask Pi what protects this
+            Check backups
           </button>
         </div>
         {/* Server Guy's own protection is true whether or not anything
