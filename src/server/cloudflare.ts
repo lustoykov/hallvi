@@ -338,6 +338,8 @@ export async function writeDomainRecord(change: {
   proxied?: boolean;
   ttl?: number;
   replace?: boolean;
+  /** Written into the record's comment, so an audit can attribute it. */
+  owner?: string;
 }): Promise<DomainRecordOutcome> {
   const wanted = domainName(change.name);
   const content = requireContent(change.type, change.content);
@@ -371,7 +373,7 @@ export async function writeDomainRecord(change: {
     content,
     ttl,
     proxied,
-    comment: "Server Guy",
+    comment: `managed-by=server-guy${change.owner ? ` app=${change.owner}` : ""}`,
   };
   let action: DomainRecordOutcome["action"] = "created";
   if (existing) {

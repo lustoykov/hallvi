@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>What counts as published</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --soft: #667389;
+        --rule: rgba(25, 35, 56, 0.12);
+        --accent: #285ad8;
+        --accent-tint: rgba(40, 90, 216, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(100%, 800px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--soft);
+        font: 500 8px/1 "Geist Mono", monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font: 400 28px/1.1 "Instrument Serif", serif;
+      }
+
+      p {
+        max-width: 640px;
+        margin: 12px 0 24px;
+        color: var(--muted);
+        font: 400 12px/1.6 "Geist", sans-serif;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .connector {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.2;
+        marker-end: url(#arrow);
+      }
+
+      .primary {
+        stroke: var(--accent);
+        marker-end: url(#arrow-accent);
+      }
+
+      .aside {
+        fill: none;
+        stroke: var(--soft);
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+      }
+
+      .arrow-label,
+      .tag,
+      .legend-label {
+        font-family: "Geist Mono", monospace;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+      }
+
+      .arrow-label,
+      .legend-label {
+        fill: var(--soft);
+      }
+
+      .node-name {
+        fill: var(--ink);
+        font: 600 12px/1 "Geist", sans-serif;
+        text-anchor: middle;
+      }
+
+      .node-detail {
+        fill: var(--muted);
+        font: 400 8px/1 "Geist Mono", monospace;
+        text-anchor: middle;
+      }
+
+      .probe {
+        fill: var(--ink);
+        font: 500 9px/1 "Geist Mono", monospace;
+      }
+
+      .claim {
+        fill: var(--ink);
+        font: 600 11px/1 "Geist", sans-serif;
+      }
+
+      .not {
+        fill: var(--muted);
+        font: 400 9px/1.5 "Geist", sans-serif;
+      }
+
+      .tag {
+        fill: var(--soft);
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Server Guy · publishing at a domain</div>
+      <h1>What counts as published</h1>
+      <p>
+        The public path runs without the owner's Mac. Five separate probes
+        establish five separate things, and only the last one means the
+        application is published — a saved record, a DNS write and a running
+        proxy are each work that was done rather than work that works.
+      </p>
+
+      <svg
+        viewBox="0 0 736 700"
+        role="img"
+        aria-labelledby="publishing-title publishing-desc"
+      >
+        <title id="publishing-title">What counts as published</title>
+        <desc id="publishing-desc">
+          The public request path runs from a visitor through public DNS to a
+          reverse proxy on the deployment server and on to the application and
+          its private dependencies, with the Server Guy controller attached
+          only by SSH and off the request path. Below it, five probes are
+          listed with what each establishes and what it does not: the provider
+          holding a record, public DNS resolving, the origin serving a trusted
+          certificate, the application answering through the name from
+          outside, and private ports refusing from outside. Only the fourth
+          means the application is published.
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#59667b" />
+          </marker>
+          <marker
+            id="arrow-accent"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#285ad8" />
+          </marker>
+        </defs>
+
+        <!-- ---- The request path. -->
+        <text class="tag" x="84" y="40" style="text-anchor: start">
+          THE PUBLIC REQUEST PATH
+        </text>
+        <line
+          x1="24"
+          y1="36"
+          x2="76"
+          y2="36"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+        <line
+          x1="248"
+          y1="36"
+          x2="712"
+          y2="36"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+
+        <path class="connector primary" d="M 144 92 H 162" />
+        <path class="connector primary" d="M 286 92 H 304" />
+        <path class="connector primary" d="M 428 92 H 446" />
+        <path class="connector primary" d="M 570 92 H 588" />
+
+        <rect
+          x="24"
+          y="64"
+          width="120"
+          height="56"
+          rx="20"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="node-name" x="84" y="88">Visitor</text>
+        <text class="node-detail" x="84" y="104">any browser</text>
+
+        <rect
+          x="166"
+          y="64"
+          width="120"
+          height="56"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="node-name" x="226" y="88">Public DNS</text>
+        <text class="node-detail" x="226" y="104">one A record</text>
+
+        <rect
+          x="308"
+          y="64"
+          width="120"
+          height="56"
+          rx="6"
+          fill="rgba(40,90,216,0.08)"
+          stroke="#285ad8"
+          stroke-width="1.2"
+        />
+        <text class="node-name" x="368" y="88">HTTPS proxy</text>
+        <text class="node-detail" x="368" y="104">:80 :443 · on the host</text>
+
+        <rect
+          x="450"
+          y="64"
+          width="120"
+          height="56"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="node-name" x="510" y="88">Application</text>
+        <text class="node-detail" x="510" y="104">private network</text>
+
+        <rect
+          x="592"
+          y="64"
+          width="120"
+          height="56"
+          rx="6"
+          fill="rgba(25,35,56,0.05)"
+          stroke="#59667b"
+        />
+        <text class="node-name" x="652" y="88">Its database</text>
+        <text class="node-detail" x="652" y="104">never published</text>
+
+        <!-- The controller, off the path on purpose. -->
+        <path class="aside" d="M 368 120 V 152 H 232" />
+        <text class="arrow-label" x="252" y="148">SSH ONLY · NOT ON THE PATH</text>
+        <rect
+          x="24"
+          y="136"
+          width="184"
+          height="40"
+          rx="6"
+          fill="rgba(25,35,56,0.05)"
+          stroke="#59667b"
+          stroke-dasharray="3 3"
+        />
+        <text class="node-name" x="116" y="154">Server Guy controller</text>
+        <text class="node-detail" x="116" y="168">the owner's Mac · may be off</text>
+
+        <!-- ---- What each probe establishes. -->
+        <text class="tag" x="84" y="228" style="text-anchor: start">
+          AND WHAT EACH CHECK PROVES
+        </text>
+        <line
+          x1="24"
+          y1="224"
+          x2="76"
+          y2="224"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+        <line
+          x1="246"
+          y1="224"
+          x2="712"
+          y2="224"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+
+        <path class="connector" d="M 214 272 H 238" />
+        <path class="connector" d="M 214 336 H 238" />
+        <path class="connector" d="M 214 400 H 238" />
+        <path class="connector primary" d="M 214 464 H 238" />
+        <path class="connector" d="M 214 528 H 238" />
+
+        <!-- 1 · the provider's own record -->
+        <rect
+          x="24"
+          y="252"
+          width="190"
+          height="40"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="probe" x="36" y="270">check_domain</text>
+        <text class="node-detail" x="119" y="284">asked of the provider</text>
+        <text class="claim" x="244" y="268">configured</text>
+        <text class="not" x="244" y="284">
+          The provider holds a record. Nothing answers at the other end.
+        </text>
+
+        <!-- 2 · public DNS -->
+        <rect
+          x="24"
+          y="316"
+          width="190"
+          height="40"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="probe" x="36" y="334">check_public_access · dns</text>
+        <text class="node-detail" x="119" y="348">from the controller</text>
+        <text class="claim" x="244" y="332">resolves</text>
+        <text class="not" x="244" y="348">
+          Both families, because a browser prefers the AAAA nobody verified.
+        </text>
+
+        <!-- 3 · the certificate, and who served it -->
+        <rect
+          x="24"
+          y="380"
+          width="190"
+          height="40"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="probe" x="36" y="398">check_public_access · tls</text>
+        <text class="node-detail" x="119" y="412">per resolved address</text>
+        <text class="claim" x="244" y="396">certificate valid</text>
+        <text class="not" x="244" y="412">
+          Only the origin's own address counts; an edge in front of a dead
+          origin serves one too.
+        </text>
+
+        <!-- 4 · the only one that means published -->
+        <rect
+          x="24"
+          y="444"
+          width="190"
+          height="40"
+          rx="6"
+          fill="rgba(40,90,216,0.08)"
+          stroke="#285ad8"
+          stroke-width="1.2"
+        />
+        <text class="probe" x="36" y="462">check_public_access · http</text>
+        <text class="node-detail" x="119" y="476">off the server entirely</text>
+        <text class="claim" x="244" y="460">serves · published</text>
+        <text class="not" x="244" y="476">
+          The application itself answered through the name. This is the only
+          one that says so.
+        </text>
+
+        <!-- 5 · what must stay shut -->
+        <rect
+          x="24"
+          y="508"
+          width="190"
+          height="40"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="probe" x="36" y="526">check_public_access · ports</text>
+        <text class="node-detail" x="119" y="540">from the internet</text>
+        <text class="claim" x="244" y="524">doors refused</text>
+        <text class="not" x="244" y="540">
+          A port on the host's loopback refuses on the server whatever the
+          world can open.
+        </text>
+
+        <!-- ---- What is never proved. -->
+        <rect
+          x="24"
+          y="580"
+          width="688"
+          height="48"
+          rx="6"
+          fill="rgba(25,35,56,0.05)"
+          stroke="#59667b"
+        />
+        <text class="tag" x="52" y="600" style="text-anchor: start">
+          STILL NOT PROVED
+        </text>
+        <text class="not" x="52" y="612">
+          Renewal. It is the proxy's configuration plus certificate storage
+          that survives replacement, so it is verified as configuration and
+          never as a renewal anyone watched happen.
+        </text>
+        <text class="not" x="52" y="624">
+          And every reading above is a moment, not a state: each is recorded
+          with the time its evidence was gathered, and ages from there.
+        </text>
+
+        <!-- Legend -->
+        <line
+          x1="32"
+          y1="656"
+          x2="704"
+          y2="656"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+        <text class="legend-label" x="32" y="680">LEGEND</text>
+        <rect
+          x="112"
+          y="668"
+          width="20"
+          height="12"
+          rx="2"
+          fill="rgba(40,90,216,0.08)"
+          stroke="#285ad8"
+        />
+        <text class="legend-label" x="140" y="680">publishing establishes this</text>
+        <rect
+          x="340"
+          y="668"
+          width="20"
+          height="12"
+          rx="2"
+          fill="rgba(25,35,56,0.05)"
+          stroke="#59667b"
+        />
+        <text class="legend-label" x="368" y="680">stays private, or stays unproved</text>
+      </svg>
+    </main>
+  </body>
+</html>

@@ -373,3 +373,82 @@ describe("the record that says how the application is reached", () => {
     );
   });
 });
+
+// Withdrawing something is an event. Writing it as a passing check on the
+// record that says the thing is gone leaves every reader of that subject
+// holding a check that says it works.
+describe("a record that says a thing is not there", () => {
+  const domain = { kind: "domain", id: "shop-example-com" } as const;
+  const absence = (checks: object[]) =>
+    review({
+      title: "The name was withdrawn",
+      body: "",
+      establishedAt: "2026-09-15T12:55:00.000Z",
+      presentation: {
+        states: { ref: domain, presence: "absent" },
+        views: ["domains"],
+        role: "outcome",
+        status: "verified",
+        checks,
+      },
+    });
+
+  it("refuses a passing check about the absent subject", () => {
+    const found = absence([
+      {
+        key: "resolves",
+        label: "The name resolves",
+        status: "passed",
+        claim: "reachability",
+        basis: "observed",
+        about: domain,
+      },
+    ]);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("nothing works about a thing that is absent");
+  });
+
+  it("refuses it just as firmly when the check names nothing", () => {
+    expect(
+      absence([
+        {
+          key: "resolves",
+          label: "The name resolves",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+        },
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it("allows an informational note about the withdrawal itself", () => {
+    expect(
+      absence([
+        {
+          key: "withdrawn",
+          label: "The record was removed at the provider",
+          status: "info",
+          claim: "configuration",
+          basis: "observed",
+          about: domain,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("leaves a passing check about something else alone", () => {
+    expect(
+      absence([
+        {
+          key: "private",
+          label: "The tunnel answers",
+          status: "passed",
+          claim: "reachability",
+          basis: "observed",
+          about: { kind: "access", id: "tunnel" },
+        },
+      ]),
+    ).toEqual([]);
+  });
+});

@@ -76,7 +76,7 @@ Open 80 and 443 to the internet, at the provider's firewall and at the host's, a
 
 Publicly reachable is not anonymous. The application keeps its own sign-in, and an application whose first-run setup is unfinished hands its administrator account to whoever arrives first: look for an unclaimed setup or installation page before the name is reachable, and complete setup with a value from request_secret instead of exposing it. Give the application what it needs to know about being behind a proxy at a public address — its own public URL, trusted origins and allowed hosts, forwarded-header handling, and WebSocket upgrade where it uses one — and restart it in place rather than recreating it.
 
-Then verify from outside with check_public_access, passing the server's public address as expectAddress: public DNS, a trusted certificate that covers the name and was served by the origin itself, what an ordinary request gets back, what plain HTTP does, and the private ports proving they refuse. A saved hostname, a successful DNS write and a running proxy are each something you did rather than something that works, and a certificate read through a provider's edge is that edge's certificate. Sign in through the public URL and exercise the application before calling it published. Record the outcome as a domain subject with its configured, resolves and serves checks, a certificate subject with valid, issuer and expires, door subjects for what is open and what refuses, and update the existing application-access record in place to mode public with the verified https URL and no tunnel ports. When part of it is incomplete, say which part changed, which did not and what comes next, and leave the private way in working.
+Then verify from outside with check_public_access, passing the server's public address as expectAddress: public DNS, a trusted certificate that covers the name and was served by the origin itself, what an ordinary request gets back, what plain HTTP does, and the private ports proving they refuse. A saved hostname, a successful DNS write and a running proxy are each something you did rather than something that works, and a certificate read through a provider's edge is that edge's certificate. Sign in through the public URL and exercise the application before calling it published. Record the outcome as a domain subject with its configured, resolves and serves checks, a certificate subject with valid, issuer and expires, door subjects for what is open and what refuses, and update the existing application-access record in place to mode public with the verified https URL and no tunnel ports. A door you have already stated keeps the id you gave it, because a second id for the same port is a second door: the page then lists the same port twice, once shut an hour ago and once shut now, and counts two ways in where there is one. Search the records for the ids you used before changing what they say. When part of it is incomplete, say which part changed, which did not and what comes next, and leave the private way in working.
 
 To make it private again, undo only what publishing did: bind the application's ports back to loopback, remove the route or proxy site you added, close the public firewall ports you opened, and take the record away with set_domain_record's remove action, which needs the address you expect to find and refuses anything else. Do not reverse a firewall rule or a DNS record you did not create, and never remove SSH, another application's route or a shared rule. Then reopen private access with open_server_port, record it as mode private again, and check from outside that the name no longer reaches the application.
 
@@ -603,7 +603,10 @@ export async function askPi(
                   () =>
                     params.action === "remove"
                       ? removeDomainRecord(params)
-                      : writeDomainRecord(params),
+                      : writeDomainRecord({
+                          ...params,
+                          owner: input.run.applicationId,
+                        }),
                   false,
                   id,
                 ),

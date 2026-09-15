@@ -10,6 +10,57 @@ The main application conversation owns general server execution. `pi.ts` registe
 
 The first chat is the permanent main conversation. The worker still serializes turns globally; native queue/steer and parallel read-only side explanations are deferred. PR #55 merged the storage checkpoint as `95b3829`, using schema 15: applications, conversations, messages and saved information. Conversations own current status and response pointers; messages own response text, structured references and completion metadata. The worker/API still calls its response projection a run, but no runs table remains. Permissions and optional host references live on applications; execution evidence stays in files. Pi saves shared information and selects presentation in stable views. Legacy deployment/operation stores and executors are deleted; old visual-reference types remain isolated from live storage. Hetzner provisioning and first deployment are separate subsequent checkpoints. See [verification](testing/2026-09-12-operator-execution.md).
 
+## Publishing at a domain, in review
+
+`claude/publish-custom-domain-fcec37` lets the main operator make a privately
+deployed application answer at a hostname the owner supplies, over HTTPS, from
+the internet. It adds two tools and no workflow, table or approval type. The
+public request path is browser → DNS → a reverse proxy on the deployment server
+→ the application → its private dependencies; the controller is on none of it.
+See the [decision diagram](architecture/publishing-evidence.html) and the
+[evidence](testing/2026-09-15-publish-custom-domain.md).
+
+`set_domain_record` writes one exact name of one exact type per call at the DNS
+provider, so no request it can make touches a record it was not given. It
+refuses to take a name away from whatever already holds it unless the caller
+passes `replace`, and refuses to remove a record whose address is not the one it
+expects, so withdrawal cannot delete somebody else's record. Its result reports
+what stood there before and every other address record still at the name, which
+is how a leftover AAAA becomes visible rather than silently breaking the name
+for IPv6 visitors.
+
+`check_public_access` is the vantage point the operator otherwise lacks: a
+command on the host answers from inside the firewall over loopback, and the
+repository workspace has no route to the host at all. From the controller it
+reads public DNS in both families, the certificate each resolved address serves
+and whether it is trusted and covers the name, an ordinary HTTPS request, what
+plain HTTP does, and TCP ports that must stay private. It compares the address
+that served the certificate against the origin's, so an edge answering for a
+dead origin cannot be reported as a working site.
+
+Everything else is ordinary `server_bash` work under the existing permission
+mode, guided by the system prompt: reuse a suitable proxy or install Caddy
+without asking the owner to choose one, address the application by Compose
+service name from inside the network and by loopback from the host, keep
+certificate state on a volume that survives replacement, open only 80 and 443,
+finish an unclaimed first-run setup before the name is reachable, and undo only
+what publishing did when it is withdrawn.
+
+The records are the existing vocabulary: a `domain` subject whose `configured`,
+`resolves` and `serves` checks are three different questions, a `certificate`,
+`door` subjects for what is open and what refuses, and the same
+`application-access` record updated in place to `mode: "public"`. The contract
+refuses a public access record that still carries tunnel ports or a loopback
+address, and refuses any record that says a subject is absent and then carries a
+passing check about it. Domains offers the work in whichever of its three states
+the records establish — publish, finish publishing, or make it private again —
+and a published address is asked whether it answers rather than assumed open
+because it is public.
+
+Automatic renewal is verified as configuration plus persistent certificate
+storage. An issued certificate is not a renewed one, and nothing in this path
+claims to have observed a renewal.
+
 ## Provisioning checkpoint in review
 
 The separate `codex/hetzner-provisioning` stage adds general `hetzner_request`, `server_public_key` and `connect_server` tools to the main operator. Pi selects resources from live API evidence. The controller keeps provider tokens and private SSH keys outside model arguments, verifies SSH before saving host/provider/account references on the application, and records calls through the existing permission/execution boundary. Shared information presents Pi's chosen recommendation or outcome. Existing-machine setup uses the public key and a trusted fingerprint in the main conversation. No schema table, workflow engine or approval mode is added. See the [checkpoint diagram, evidence and limits](testing/2026-09-12-hetzner-provisioning.md); first application deployment remains separate.
