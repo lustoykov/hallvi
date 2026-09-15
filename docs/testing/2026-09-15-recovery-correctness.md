@@ -57,6 +57,7 @@ across all of them**. Same class of bug, two fields further on.
 |---|---|---|
 | Newest copy is local; an older copy is off-site; the newest is restored | "Recovery proved", `limit: null`, `next: null` | `offsite` was read from the union of every copy's class, so yesterday's off-site copy answered the off-server question for a copy written today. |
 | The plan is widened to include uploads; every existing copy holds only the database | the coverage warning cleared | Coverage was computed from the plan's current `covers`, so widening the plan retroactively "added" uploads to archives already written. |
+| The plan predates the copy, and neither the copy nor its restore records contents | "Recovery proved", `limit: null`, `next: null` | Found on the second pass. My fix for the row above let the plan answer when nothing else could, gated on the plan being *newer* than the copy — so an older plan went on counting as evidence. |
 
 Both are fixed by keeping the evidence on the record that carries it:
 
@@ -65,13 +66,32 @@ Both are fixed by keeping the evidence on the record that carries it:
   reach off the server is stated as its own recovery point — "the most recent
   copy off the server is the older one, taken 8 d ago" — which is useful and
   is not a claim about the newest.
-- Coverage is answered by the strongest record that speaks to the newest copy:
-  what a restore of it actually brought back, else what that copy recorded
-  capturing, else the plan. And when only the plan can answer and it was
-  restated after the copy was written, the page says exactly that, because the
-  current plan's coverage is not a description of an older archive. That last
-  case has no list of names to print — the list is empty precisely because the
-  plan was widened — so the sentence is about the copy instead.
+- Coverage is answered only by a record that speaks to the newest copy: what a
+  restore of it actually brought back, or what that copy recorded capturing.
+
+A second review pass found the remaining half of that. My first fix let the
+plan answer when neither did, guarded by a timestamp — the plan had been
+restated after the copy was written — and an older plan therefore still
+counted as evidence. It is not evidence at any age. A plan says what copies
+are meant to contain, and being older than a copy does not promote intent into
+evidence; it only means the intent is old.
+
+So there are three answers and not two, and the third is not a weaker version
+of the others:
+
+| What answered | What the page says |
+|---|---|
+| A restore of the newest copy | "The restore did not bring back Customer uploads." Warning. |
+| The copy's own record | "The newest copy does not include Customer uploads." Warning. |
+| Nothing | "No record says what that copy contains." Not a warning. |
+
+The third keeps the successful restore exactly as it was — the restore
+happened and proved what it proved — and adds only that its extent was never
+written down. It does not claim data is missing, does not downgrade the tone,
+and does not ask for another backup. It offers to look inside the copy that
+already exists. The plan's own gap is still worth saying in the one place it
+is the only thing there is: a schedule with no copy yet, where what the plan
+leaves out is what the first copy will leave out.
 
 ## Evidence
 
@@ -89,7 +109,8 @@ Both are fixed by keeping the evidence on the record that carries it:
 | Incomplete required-data coverage | pass | `protection-verdict.test.ts`, "what the plan leaves out" (three cases, including the database-dump indirection and the volume nobody wrote down). |
 | An older off-site copy does not vouch for a newer local one | pass | `protection-verdict.test.ts`, "evidence belongs to the copy that carries it". Review's first sequence; it returned `limit: null, next: null` before. |
 | A widened plan does not add data to copies already taken | pass | same suite, three cases: the copy recorded its coverage, the restore recorded what it brought back, and neither did. Review's second sequence. |
-| A copy that does hold the data is not warned about | pass | same suite, "clears the coverage warning once a copy actually holds the data" — the fix must not paint every plan amber. |
+| A copy that does hold the data is not warned about | pass | same suite, "clears the coverage warning once a copy actually holds the data" — the fully evidenced success, retained. |
+| Unrecorded coverage is stated as unknown, not as missing data, at any plan age | pass | same suite, "says coverage is unrecorded, whether the plan is older or newer". Runs both plan ages. Asserts the restore stays `restore-verified`, that the limit names no data, and that the action offered is "Check what the copy holds" rather than another backup. |
 
 Each new test was run against the pre-change behaviour to check it actually
 catches the defect, by reverting the fix in memory with an `enforce: "pre"`

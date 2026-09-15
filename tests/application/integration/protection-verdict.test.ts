@@ -556,21 +556,32 @@ describe("evidence belongs to the copy that carries it", () => {
     expect(said.next?.label).toBe("Cover the rest");
   });
 
-  it("says the plan changed after the newest copy, when nothing else can", () => {
-    // Neither the copy nor the restore recorded what was in it. The only
-    // thing still true is that the copy was written before the plan said
-    // this, so the plan's coverage is not a description of it.
-    const said = covered([
-      planCovering("shop-db, shop-uploads", "2026-09-15T10:00:00.000Z"),
-      held("silent", "2026-09-15T09:00:00.000Z", "off-site"),
-      restoreOf("silent", "2026-09-15T09:30:00.000Z", null),
-      volume("shop-db", "PostgreSQL's data"),
-      volume("shop-uploads", "Customer uploads"),
-    ]);
-    expect(said.tone).toBe("warning");
-    expect(said.limit).toContain("stated after the newest copy was written");
-    expect(said.limit).toContain("no record says what that copy holds");
-    expect(said.next?.label).toBe("Back up now");
+  it("says coverage is unrecorded, whether the plan is older or newer", () => {
+    // Neither the copy nor the restore recorded what was in it, so nothing
+    // establishes what would come back. The plan cannot answer it at any age:
+    // an older plan is intent too. The restore still happened and still
+    // counts, and nothing here claims data is missing.
+    for (const planAt of [
+      "2026-09-15T08:00:00.000Z",
+      "2026-09-15T10:00:00.000Z",
+    ]) {
+      const said = covered([
+        planCovering("shop-db, shop-uploads", planAt),
+        held("silent", "2026-09-15T09:00:00.000Z", "off-site"),
+        restoreOf("silent", "2026-09-15T09:30:00.000Z", null),
+        volume("shop-db", "PostgreSQL's data"),
+        volume("shop-uploads", "Customer uploads"),
+      ]);
+      expect(said.state, planAt).toBe("restore-verified");
+      expect(said.says, planAt).toContain("restored and checked");
+      expect(said.limit, planAt).toContain(
+        "No record says what that copy contains",
+      );
+      // Not an accusation: nothing says the uploads are absent, only that
+      // nobody wrote down what is there.
+      expect(said.limit, planAt).not.toContain("Customer uploads");
+      expect(said.next?.label, planAt).toBe("Check what the copy holds");
+    }
   });
 
   it("prefers what the restore brought back to what the plan intends", () => {

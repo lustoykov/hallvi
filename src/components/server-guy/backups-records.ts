@@ -90,17 +90,22 @@ export interface Protection {
    */
   plannedDestinations: DestinationKind[];
   /**
-   * Required data the newest copy is not known to hold, and why.
+   * What the newest copy is known to be missing, and which record said so.
    *
-   * `basis` says which record answered: the restore that opened the copy, the
-   * copy's own record, or neither, in which case the plan's own coverage is
-   * all there is and it describes copies not yet taken.
+   * Only two records can answer: a restore of that copy, which brought its
+   * contents back and looked at them, or the copy's own record of what it
+   * captured. A plan cannot, at any age. It describes what copies are meant
+   * to contain, which is not a statement about one that already exists — and
+   * "the plan is older than the copy" does not promote intent into evidence,
+   * it only means the intent is old.
+   *
+   * So `unrecorded` is a third answer and not a weaker version of the first
+   * two: nothing is missing and nothing is covered, because nobody wrote down
+   * what is in there.
    */
   newestCopyCoverage: {
     missing: { id: string; label: string }[];
-    basis: "restore" | "copy" | "plan-only";
-    /** The plan's coverage was stated after the newest copy was written. */
-    planWidenedAfter: boolean;
+    basis: "restore" | "copy" | "unrecorded";
   };
   /**
    * Copy id → the restore test that opened that copy.
@@ -111,6 +116,8 @@ export interface Protection {
    * nothing has ever opened it. A restore proves the copy it restored.
    */
   verifiedCopies: Map<string, Dated>;
+  /** What is on record as being on this application's disk, with its label. */
+  requiredData: { id: string; label: string }[];
   /**
    * Data the application is recorded as having that no plan says it copies.
    *
@@ -212,8 +219,6 @@ export function protectionFromRecords(
       };
   }
   let nextRunAt: string | null = null;
-  /** When a plan last said what it covers. An older copy predates it. */
-  let coversStatedAt: string | null = null;
   for (const ref of plans) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") {
@@ -247,13 +252,9 @@ export function protectionFromRecords(
     const next = fact("next-run");
     if (next && (!nextRunAt || next < nextRunAt)) nextRunAt = next;
     const what = fact("covers");
-    if (what) {
-      const statedAt = facts.get("covers")?.record.establishedAt ?? null;
-      if (statedAt && (!coversStatedAt || statedAt > coversStatedAt))
-        coversStatedAt = statedAt;
+    if (what)
       for (const item of idList(what))
         covers.set(item, destination ?? schedule ?? "Copied by the plan");
-    }
     if (schedule && at) {
       schedules.push({
         id: ref.id,
@@ -406,26 +407,10 @@ export function protectionFromRecords(
   const provedCoverage = newest ? restoredCoverage.get(newest.id) : undefined;
   const newestCopyCoverage: Protection["newestCopyCoverage"] =
     provedCoverage?.length
-      ? {
-          missing: missingFrom(provedCoverage),
-          basis: "restore",
-          planWidenedAfter: false,
-        }
+      ? { missing: missingFrom(provedCoverage), basis: "restore" }
       : newest?.covers.length
-        ? {
-            missing: missingFrom(newest.covers),
-            basis: "copy",
-            planWidenedAfter: false,
-          }
-        : {
-            missing: uncovered,
-            basis: "plan-only",
-            // The one thing that can be said about a copy that never recorded
-            // its contents: it was written before the plan said this.
-            planWidenedAfter: Boolean(
-              newest && coversStatedAt && newest.at < coversStatedAt,
-            ),
-          };
+        ? { missing: missingFrom(newest.covers), basis: "copy" }
+        : { missing: [], basis: "unrecorded" };
 
   return {
     copies,
@@ -443,6 +428,7 @@ export function protectionFromRecords(
     destinations: [...destinations],
     plannedDestinations: [...plannedDestinations],
     verifiedCopies,
+    requiredData: required,
     uncovered,
     newestCopyCoverage,
     failures: {
@@ -613,54 +599,69 @@ export function protectionVerdict(
   const coverage = protection.newestCopyCoverage;
   const names = list(coverage.missing.map((item) => item.label));
   /**
-   * Named data missing from the newest copy, or — when nothing recorded that
-   * copy's contents and the plan has been restated since — the fact that the
-   * plan's coverage is not a description of it.
+   * What to say about what the newest copy holds.
    *
-   * That second case is the one review found: widening today's plan cleared
-   * the warning for copies written yesterday. The current plan's list is
-   * empty of gaps precisely because it was widened, so the honest sentence is
-   * not a list of names at all.
+   * Two different sentences, and the difference between them matters more
+   * than either. A record that opened the copy, or that wrote down what went
+   * into it, can say data is **missing**, and that is a warning. When neither
+   * exists, the only true sentence is that nobody wrote it down. That is not
+   * an accusation, it does not make the restore that did happen count for
+   * less, and it must not ask for another backup. It asks what is in the one
+   * already there.
+   *
+   * A plan answers neither question, at any age. It says what copies are
+   * meant to contain, which is not a statement about one that exists — and a
+   * plan being older than the copy does not promote intent into evidence, it
+   * only means the intent is old.
    */
-  const hole: { says: string; label: string; draft: string } | null =
-    coverage.missing.length && coverage.basis === "restore"
+  const missingData =
+    coverage.missing.length && coverage.basis !== "unrecorded"
       ? {
-          says: `The restore did not bring back ${names}.`,
-          label: "Cover the rest",
-          draft: coverDraft(names),
+          says:
+            coverage.basis === "restore"
+              ? `The restore did not bring back ${names}.`
+              : `The newest copy does not include ${names}.`,
+          next: { label: "Cover the rest", draft: coverDraft(names) },
         }
-      : coverage.missing.length && coverage.basis === "copy"
-        ? {
-            says: `The newest copy does not include ${names}.`,
-            label: "Cover the rest",
-            draft: coverDraft(names),
-          }
-        : coverage.basis === "plan-only" && coverage.planWidenedAfter
-          ? {
-              says:
-                "The plan's coverage was stated after the newest copy was " +
-                "written, and no record says what that copy holds, so the " +
-                "plan does not describe it.",
-              label: "Back up now",
-              draft:
-                "The backup plan has changed since the newest copy was taken, and nothing records what that copy contains. Take a copy under the current plan, record exactly what it captured, and restore it to check.",
-            }
-          : coverage.missing.length
-            ? {
-                says: `The plan does not say it copies ${names}.`,
-                label: "Cover the rest",
-                draft: coverDraft(names),
-              }
-            : null;
+      : null;
+  /**
+   * Raised only where something is on record as being on disk. With nothing
+   * established either way the page has no subject to be uncertain about, and
+   * its empty state says that better than a qualification would.
+   */
+  const unrecordedCoverage =
+    !missingData &&
+    coverage.basis === "unrecorded" &&
+    newestCopy &&
+    protection.requiredData.length
+      ? {
+          says: "No record says what that copy contains.",
+          next: {
+            label: "Check what the copy holds",
+            draft:
+              "Look inside the newest backup copy and record what is actually in it — which databases, which files — against what this application keeps on disk. Do not take a new backup to answer this.",
+          },
+        }
+      : null;
   const withHoles = (said: ProtectionVerdict): ProtectionVerdict =>
-    hole
+    missingData
       ? {
           ...said,
           tone: said.tone === "verified" ? "warning" : said.tone,
-          limit: [said.limit, hole.says].filter(Boolean).join(" "),
-          next: said.next ?? { label: hole.label, draft: hole.draft },
+          limit: [said.limit, missingData.says].filter(Boolean).join(" "),
+          next: said.next ?? missingData.next,
         }
-      : said;
+      : unrecordedCoverage
+        ? {
+            // Not a downgrade. The restore happened and proved what it
+            // proved; this says only that its extent was never written down.
+            ...said,
+            limit: [said.limit, unrecordedCoverage.says]
+              .filter(Boolean)
+              .join(" "),
+            next: said.next ?? unrecordedCoverage.next,
+          }
+        : said;
 
   if (!protection.assessed)
     return {
@@ -722,7 +723,14 @@ export function protectionVerdict(
       state: "scheduled-no-copy",
       tone: "warning",
       says: "Backups are scheduled, and none has run yet.",
-      limit: "A schedule is not a copy. Nothing has been written anywhere.",
+      // The one place a plan's own coverage is the right thing to read: there
+      // is no copy for it to be a false description of, and what it leaves
+      // out is what the first copy will leave out.
+      limit:
+        "A schedule is not a copy. Nothing has been written anywhere." +
+        (protection.uncovered.length
+          ? ` The plan does not say it copies ${list(protection.uncovered.map((item) => item.label))}.`
+          : ""),
       next: {
         label: "Back up now",
         draft:
