@@ -87,27 +87,36 @@ export function ControllerProtectionBand({
       aria-label="Server Guy itself"
       data-standalone={standalone || undefined}
     >
-      <div className="cpb-head">
-        <span className="cpb-icon" data-state={facts.state} aria-hidden="true">
-          {facts.state === "recoverable" ? (
-            <ShieldCheck weight="bold" />
-          ) : (
-            <Warning weight="bold" />
-          )}
-        </span>
-        <div>
-          <p className="cpb-title">
-            <b>Server Guy itself</b>
-            <em className="cpb-state" data-state={facts.state}>
-              {controllerWord[facts.state]}
-            </em>
-          </p>
-          <small>
-            Its conversations, connections, deployment access and decisions —
-            what rebuilding it needs.
-          </small>
+      {/* Under the board, the row above already names this and says its
+          state; saying it again here is the page saying one thing twice. On
+          the page with no board there is nothing else to say it. */}
+      {standalone && (
+        <div className="cpb-head">
+          <span
+            className="cpb-icon"
+            data-state={facts.state}
+            aria-hidden="true"
+          >
+            {facts.state === "recoverable" ? (
+              <ShieldCheck weight="bold" />
+            ) : (
+              <Warning weight="bold" />
+            )}
+          </span>
+          <div>
+            <p className="cpb-title">
+              <b>Server Guy itself</b>
+              <em className="cpb-state" data-state={facts.state}>
+                {controllerWord[facts.state]}
+              </em>
+            </p>
+            <small>
+              Its conversations, connections, deployment access and decisions —
+              what rebuilding it needs.
+            </small>
+          </div>
         </div>
-      </div>
+      )}
       {!facts.connected && facts.lastCopyAt ? (
         <p className="cpb-say">
           Backup storage is no longer connected. The copies already in{" "}
@@ -117,9 +126,9 @@ export function ControllerProtectionBand({
       ) : !facts.connected ? (
         <>
           <p className="cpb-say">
-            Losing this machine would lose them. Connecting off-host storage
-            protects your application’s data and Server Guy together — there is
-            nothing else to switch on.
+            Losing this machine would lose Server Guy’s own records and keys.
+            Connecting off-host storage protects your application’s data and
+            Server Guy together — there is nothing else to switch on.
           </p>
           <div className="cpb-form">
             <BackupStorageForm onConnected={onRefresh} />
@@ -127,8 +136,8 @@ export function ControllerProtectionBand({
         </>
       ) : !facts.lastCopyAt ? (
         <p className="cpb-say">
-          Storage is connected. The first copy is taken within a minute, or
-          right after the work in progress finishes.
+          Storage is connected. The first copy of Server Guy’s own records is
+          taken within a minute, or right after the work in progress finishes.
         </p>
       ) : quiet ? (
         <p className="cpb-say">
