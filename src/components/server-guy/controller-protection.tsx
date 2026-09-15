@@ -82,7 +82,11 @@ export function ControllerProtectionBand({
     facts.state === "recoverable" && !failed && !facts.retentionFailed;
   if (quiet && !standalone) return null;
   return (
-    <section className="cpb" aria-label="Server Guy itself">
+    <section
+      className="cpb"
+      aria-label="Server Guy itself"
+      data-standalone={standalone || undefined}
+    >
       <div className="cpb-head">
         <span className="cpb-icon" data-state={facts.state} aria-hidden="true">
           {facts.state === "recoverable" ? (
@@ -92,12 +96,12 @@ export function ControllerProtectionBand({
           )}
         </span>
         <div>
-          <b>
-            Server Guy itself
+          <p className="cpb-title">
+            <b>Server Guy itself</b>
             <em className="cpb-state" data-state={facts.state}>
               {controllerWord[facts.state]}
             </em>
-          </b>
+          </p>
           <small>
             Its conversations, connections, deployment access and decisions —
             what rebuilding it needs.
