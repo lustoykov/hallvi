@@ -15,7 +15,7 @@ stand-in, and no provider resource was created or changed for any of this.
 | --- | --- |
 | 1 · Controller-generated credentials, reveal and copy | **pass** |
 | 2 · Changing a credential as an operational change | **pass** |
-| 3 · Encrypted recovery export, recovered on a fresh controller | **pass** |
+| 3 · Encrypted recovery export, recovered on a fresh controller | **built, verified, then withdrawn** — see below |
 | 4 · Backup journey to a destination off the application host | **pass** — copy taken, transferred, restored in isolation and verified; see [limits](#what-is-not-proved) |
 | 5 · Backups UI states on real records | **pass** |
 
@@ -103,39 +103,34 @@ and every script that "sets the new password" would have quietly set the old
 one again. They are looked up separately now and a test asserts which is
 which.
 
-## 3 · A recovery copy, encrypted with something that is not in it
+## 3 · A recovery copy — built, verified, and withdrawn
 
-The secret store's key sits beside its ciphertext. That is right for a local
-single-operator application and useless as a backup: copying the directory
-copies the lock and the key together.
+This milestone built a second way to recover the controller: Settings →
+Recovery, writing an OpenPGP symmetric AES-256 archive through `gpg` that
+`gpg --decrypt | tar -x` opens on any machine with no code from this
+repository involved. It was verified by losing the controller — an archive
+written, decrypted with plain `gpg` and `tar`, and a fresh controller stood on
+the result with the generated database password byte-identical.
 
-Settings → Recovery writes an OpenPGP symmetric AES-256 archive through `gpg`.
-The format is deliberate: the case this exists for is *Server Guy is gone*, so
-an archive only Server Guy can open would not survive it.
-`gpg --decrypt | tar -x` opens it on any machine with no code from this
-repository involved. `tar` and `gpg` are piped, so the unencrypted archive is
-never a file on disk, and the passphrase reaches `gpg` on a file descriptor
-rather than a command line every process can read.
+**It is not in this branch.** While it was being built, [PR
+#74](https://github.com/lustoykov/server-guy/pull/74) landed on `main` and
+already copies the controller's own state to the connected object-storage
+destination automatically, encrypted under a generated passphrase, with a
+recovery kit of its own. Two recovery stories, two passphrases and two
+archive formats is precisely what the product's simplification principle
+forbids, and the owner chose #74's: it runs without being asked, which is the
+property that matters for something you need only after losing the machine.
 
-**Verified by losing the controller.** An archive was written, decrypted with
-plain `gpg` and `tar`, and a fresh controller stood on the result:
+So the page, its API route, `recovery-export.ts`, the screen and its tests
+were removed from this branch rather than carried as a second mechanism. What
+this milestone still owns is the sealed store the credential lives in and the
+controller's ownership of generating it; recovering the controller belongs to
+#74.
 
-```
-origin on both sides:              generated / generated
-same value after recovery:         true
-```
-
-Tests also assert that the passphrase is in neither the ciphertext nor the
-manifest, that the generated credential is not in the archive in the clear,
-that a wrong passphrase fails, that a passphrase under 16 characters is
-refused, and that no unencrypted copy is left behind.
-
-The page says exactly what goes in, marks the three entries that hold working
-credentials, and says what it is not — the applications' own data is not in
-there. The write button stays disabled until the owner confirms they have
-saved the passphrase somewhere that is not this computer, because an owner who
-has not saved it does not have a recovery copy and the moment they will
-believe otherwise is the moment the file appears.
+The one finding worth keeping from that work is recorded below: the export
+missed rows still in SQLite's write-ahead log, which is a trap any
+controller-state copy can fall into. #74's own capture takes an online
+backup, so the lesson is carried where the code now lives.
 
 ## 4 · The backup journey, end to end
 
@@ -224,7 +219,7 @@ A second session reviewed this branch at `0e6fbf4` and raised five points.
 All five were checked against the code rather than taken on trust; two were
 real defects of the kind this milestone exists to prevent.
 
-- **The recovery export missed recent writes.** The controller runs SQLite in
+- **The recovery export missed recent writes** (in the code since withdrawn, and the reason the lesson is recorded above). The controller runs SQLite in
   WAL mode, so its newest rows live in `server-guy.db-wal` rather than the
   database file. The export copied files, which meant an export taken shortly
   after a credential was generated could recover a database that did not
@@ -253,18 +248,15 @@ real defects of the kind this milestone exists to prevent.
   passing timer check. The verdict now carries `judged`, and `temper()` can
   only make an answer less reassuring: it downgrades `verified` to `warning`
   and never overrides a failure.
-- **The export listed one database and captured another.** Raised on
-  re-verification: `exportContents()` looked for `server-guy.db` inside the
-  config directory, while `snapshotDatabase()` reads `databasePath()` —
-  `SERVER_GUY_DB_PATH`, or `cwd/.server-guy`. The defaults, `scripts/dev.mjs`
-  and the rig keep the two together, so it took a script pointed at only one
-  of them to surface it; with them apart, the page described a file the
-  archive would not contain. The listing now resolves the database the same
-  way the snapshot does, and reports its size with the write-ahead log folded
-  in, because the snapshot captures both and the main file alone understates
-  what is in the archive. The test sets the two paths to different
-  directories and asserts the listed byte count is the captured database's:
-  without the fix it reports 4,096 bytes for a database that is 41,208.
+- **The export listed one database and captured another** (same withdrawn
+  code). `exportContents()` resolved `server-guy.db` inside the config
+  directory while the snapshot read `databasePath()`, so with the two pointed
+  apart the page described a file the archive would not contain. Fixed before
+  the feature was withdrawn. The transferable part is the test lesson: my
+  first regression test asserted the entry was *listed*, which passes either
+  way when both directories hold a file of that name — the assertion has to
+  be the file's identity, and the byte count was what distinguished them
+  (4,096 listed for a database that was 41,208).
 
 - **The lane was dropping the half of the sentence that mattered.** With the
   verdict wired in, `plain` took the verdict's `says` and discarded its
@@ -379,5 +371,5 @@ reveal cannot be trusted to hide it again.
 New focused tests: generation, reuse on retry, restart survival, reveal and
 its refusals, the change flow and its rollback, the incoming/outgoing
 environment, a value carrying `'; rm -rf /` put through a real shell, the ten
-protection states, destination classes, and the recovery archive's round trip
-and its leaks.
+protection states and destination classes. The recovery archive's round-trip
+and leak tests went with the feature.
