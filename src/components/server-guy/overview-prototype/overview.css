@@ -475,10 +475,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* How many data locations there are, where their names used to be. Four long
-   container ids at a third of their usual size is a paragraph, not a map. */
-.axo-map-count {
-  fill: #6b7891;
-  font-size: 21px;
+/* One readable storage summary replaces several anonymous miniature tiles. */
+.axo-map-volume-group rect {
+  fill: #ffffff;
+  stroke: #e7e9ee;
+  stroke-width: 2;
+}
+.axo-map-volume-group text {
+  fill: #687183;
+  font-size: 24px;
   font-weight: 600;
 }

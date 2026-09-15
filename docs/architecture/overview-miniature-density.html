@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview miniature density decision</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --line: #dfe5ee;
+        --blue: #285ad8;
+        --blue-wash: #eef3ff;
+        --green: #14945f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: Geist, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(100%, 840px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.025em;
+      }
+
+      p {
+        max-width: 70ch;
+        margin: 10px 0 24px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .box {
+        fill: white;
+        stroke: var(--line);
+        stroke-width: 2;
+      }
+
+      .decision {
+        fill: var(--blue-wash);
+        stroke: var(--blue);
+        stroke-width: 2;
+      }
+
+      .path {
+        fill: none;
+        stroke: #9aa7ba;
+        stroke-width: 2;
+        marker-end: url(#arrow);
+      }
+
+      .title {
+        fill: var(--ink);
+        font-size: 14px;
+        font-weight: 600;
+        text-anchor: middle;
+      }
+
+      .detail,
+      .branch {
+        fill: var(--muted);
+        font-size: 11px;
+        text-anchor: middle;
+      }
+
+      .branch {
+        font-weight: 600;
+      }
+
+      .dot {
+        fill: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Keep the Overview map readable</h1>
+      <p>
+        Overview summarizes the recorded topology. Architecture retains every
+        exact name. The miniature keeps names while they fit, then groups dense
+        storage into one explicit count without drawing anonymous empty tiles.
+      </p>
+
+      <svg
+        viewBox="0 0 776 430"
+        role="img"
+        aria-labelledby="diagram-title diagram-description"
+      >
+        <title id="diagram-title">Overview miniature density decision</title>
+        <desc id="diagram-description">
+          Recorded topology enters a decision based on the number of data
+          locations. One or two locations keep named tiles. Three or more use
+          one labeled group with a count and state dots. The primary application
+          name may wrap once, and Architecture remains the place for every name.
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#9aa7ba" />
+          </marker>
+        </defs>
+
+        <rect class="box" x="278" y="20" width="220" height="64" rx="12" />
+        <text class="title" x="388" y="48">Recorded topology</text>
+        <text class="detail" x="388" y="66">application, services, storage</text>
+
+        <path class="path" d="M388 84V126" />
+        <rect class="decision" x="258" y="128" width="260" height="72" rx="18" />
+        <text class="title" x="388" y="157">How many data locations?</text>
+        <text class="detail" x="388" y="177">Use the recorded count</text>
+
+        <path class="path" d="M258 164H132V236" />
+        <text class="branch" x="182" y="154">1–2</text>
+        <rect class="box" x="24" y="238" width="216" height="90" rx="12" />
+        <text class="title" x="132" y="272">Keep named tiles</text>
+        <text class="detail" x="132" y="294">Names and state remain visible</text>
+
+        <path class="path" d="M518 164H644V236" />
+        <text class="branch" x="594" y="154">3+</text>
+        <rect class="box" x="536" y="238" width="216" height="90" rx="12" />
+        <text class="title" x="644" y="270">4 data locations</text>
+        <circle class="dot" cx="609" cy="296" r="5" />
+        <circle class="dot" cx="632" cy="296" r="5" />
+        <circle class="dot" cx="655" cy="296" r="5" />
+        <circle class="dot" cx="678" cy="296" r="5" />
+
+        <path class="path" d="M132 328V366H278" />
+        <path class="path" d="M644 328V366H498" />
+        <rect class="box" x="278" y="342" width="220" height="68" rx="12" />
+        <text class="title" x="388" y="371">Open Architecture</text>
+        <text class="detail" x="388" y="391">Every exact name stays available</text>
+      </svg>
+    </main>
+  </body>
+</html>
