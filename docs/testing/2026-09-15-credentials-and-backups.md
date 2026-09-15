@@ -59,6 +59,23 @@ so the two cannot disagree. Its subheading used to say generated values were
 "never shown", which stopped being true the moment they could be; it now says
 *"Nobody typed these. Open one to read it back when you need it."*
 
+![The Environment Variables page. Two groups: "Only you could give these"
+and "Made by Server Guy". POSTGRES_PASSWORD is open, its value shown as a row
+of dots with Reveal and Copy buttons beside
+it](2026-09-15-credentials-and-backups/generated-credential-masked.png)
+
+*Revision `047c50f` on the local rig — real sshd in a Linux container, a real
+ssh client with a pinned host key, real Docker and a real model; the GitHub
+and Hetzner APIs are stand-ins. 1440×980. The rig reports the commit it
+serves in its `manifest.json`, and it reported this one with a clean tree.*
+
+*What it shows: the two groups are separated by origin, and only the generated
+one opens to a `Reveal`. The panel says what the credential is for, which
+services hold it, and that changing it is an operational change. **Nothing was
+revealed for this capture** — the script asserts the field still matches the
+mask and refuses to shoot otherwise, which is also why there is no "revealed"
+screenshot anywhere in this report.*
+
 ## 2 · Changing one is an operational change
 
 `begin_credential_change` makes both values live and tells them apart:
@@ -102,6 +119,25 @@ flattens the incoming and outgoing values so redaction covers both, and
 and every script that "sets the new password" would have quietly set the old
 one again. They are looked up separately now and a test asserts which is
 which.
+
+![The conversation showing the rotation: the outgoing credential rejected and
+the replacement accepted, an order priced and a receipt read back, then "The
+change is settled: POSTGRES_PASSWORD is now controller revision 2 with no
+in-progress rotation"](2026-09-15-credentials-and-backups/credential-change-settled.png)
+
+*Revision `047c50f` on the local rig — real sshd in a Linux container, a real
+ssh client with a pinned host key, real Docker and a real model; the GitHub
+and Hetzner APIs are stand-ins. 1440×980. The rig reports the commit it
+serves in its `manifest.json`, and it reported this one with a clean tree.*
+
+*What it shows: the change end to end in Pi's own words — authenticating with
+`$POSTGRES_PASSWORD_PREVIOUS`, altering the role, installing the replacement,
+recreating PostgreSQL, web and worker, confirming the outgoing credential is
+rejected, then proving it through the application with a real order priced at
+3500 and a receipt the web process read back, and only then settling as
+established. Note what is absent: every mention is a variable name. The values
+are not in the conversation, and there is no shape of this flow that puts them
+there.*
 
 ## 3 · A recovery copy — built, verified, and withdrawn
 
@@ -212,6 +248,37 @@ Two self-contradictions found by looking at the page with real records on it:
 the calendar called every copy one "off the server" while the banner above
 said they were all on it, and retention recorded as "7 daily copies" printed
 as "Not recorded" because it would not parse as a number.
+
+![The Backups page. An amber banner reading LIMITED — copies are reaching a
+destination off the application's server and the newest one has not been
+restored — above three destination classes and a row of facts](2026-09-15-credentials-and-backups/backups-verdict.png)
+
+*Revision `047c50f` on the local rig — real sshd in a Linux container, a real
+ssh client with a pinned host key, real Docker and a real model; the GitHub
+and Hetzner APIs are stand-ins. 1440×980. The rig reports the commit it
+serves in its `manifest.json`, and it reported this one with a clean tree.*
+
+*What it shows: the verdict credits the earlier restore that passed and still
+refuses to call the newest copy protected. Below it the three destination
+classes say what each does and does not protect against. The band for Server
+Guy's own protection, from [PR
+#74](https://github.com/lustoykov/server-guy/pull/74), sits beside it rather
+than inside it — the application's data and the controller's own recovery are
+different questions and the page keeps them apart.*
+
+![Overview, with the Backups lane reading "Copied, restore untested" and its
+detail carrying the same sentence as the Backups page](2026-09-15-credentials-and-backups/overview-lane-agrees.png)
+
+*Revision `047c50f` on the local rig — real sshd in a Linux container, a real
+ssh client with a pinned host key, real Docker and a real model; the GitHub
+and Hetzner APIs are stand-ins. 1440×980. The rig reports the commit it
+serves in its `manifest.json`, and it reported this one with a clean tree.*
+
+*What it shows: the lane and the page now say the same thing in the same
+words, including the limit. This is the defect review found — the lane used to
+form its own opinion, and a plan with a passing timer could read "Verified"
+three clicks from "Limited". The header also shows the earlier journey's fix:
+"The tunnel is closed", with no way in offered.*
 
 ## What review found, and what it changed
 
