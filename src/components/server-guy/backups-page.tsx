@@ -62,8 +62,8 @@ export function BackupsPage({
     [records, applicationId, now],
   );
   const protection = useMemo(
-    () => protectionFromRecords(records, now),
-    [records, now],
+    () => protectionFromRecords(records, now, applicationId),
+    [records, now, applicationId],
   );
   const assessed = protection.assessed;
   // The one verdict the page leads with. It is deliberately not derived from

@@ -72,8 +72,22 @@ export function ProtectionBanner({
   onAsk: (draft: string) => void;
 }) {
   void now;
-  const { summary, destinations, failures, nextRunAt, covers, keepText } =
-    protection;
+  const {
+    summary,
+    destinations,
+    plannedDestinations,
+    failures,
+    nextRunAt,
+    covers,
+    keepText,
+  } = protection;
+  // Only where a plan names somewhere no copy has reached. Listing a class
+  // twice — once as intent and once as evidence — is the page saying the same
+  // thing in two tones.
+  const onlyPlanned = plannedDestinations.filter(
+    (kind) => !destinations.includes(kind),
+  );
+  const restoreIsPrimary = /restore/i.test(verdict.next?.label ?? "");
   return (
     <section
       className="sg-protect"
@@ -88,7 +102,7 @@ export function ProtectionBanner({
 
       {verdict.limit && <p className="sg-protect-limit">{verdict.limit}</p>}
 
-      {/* Where the copies go, and what each class actually survives. Drawn
+      {/* Where the copies actually went, and what each class survives. Drawn
           per class rather than once, because a plan can have more than one
           and they do not protect against the same thing. */}
       {destinations.length > 0 && (
@@ -100,6 +114,19 @@ export function ProtectionBanner({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Somewhere the plan means to write and nothing has. Said in the
+          future tense and kept out of the list above, because that list is
+          what the copies did and this is what they are meant to do. */}
+      {onlyPlanned.length > 0 && (
+        <p className="sg-protect-planned">
+          The plan also names{" "}
+          {onlyPlanned
+            .map((kind) => destinationWord[kind].toLowerCase())
+            .join(" and ")}
+          . No copy has reached there yet.
+        </p>
       )}
 
       <dl className="sg-protect-facts">
@@ -190,17 +217,23 @@ export function ProtectionBanner({
           <ArrowClockwise weight="bold" aria-hidden="true" />
           Back up now
         </button>
-        <button
-          type="button"
-          className="sg-protect-action"
-          onClick={() =>
-            onAsk(
-              "Restore the newest backup copy into an isolated copy of this application and verify the data and files are actually there. Keep it away from the running application and anything it talks to, and record exactly what it proved.",
-            )
-          }
-        >
-          Test a restore
-        </button>
+        {/* Dropped when the verdict already asks for a restore. Two buttons
+            a word apart — "Test a restore of the newest copy" beside "Test a
+            restore" — read as two different operations, and the reader has
+            to work out that one of them is the other one, vaguer. */}
+        {!restoreIsPrimary && (
+          <button
+            type="button"
+            className="sg-protect-action"
+            onClick={() =>
+              onAsk(
+                "Restore the newest backup copy into an isolated copy of this application and verify the data and files are actually there. Keep it away from the running application and anything it talks to, and record exactly what it proved.",
+              )
+            }
+          >
+            Test a restore
+          </button>
+        )}
       </div>
     </section>
   );

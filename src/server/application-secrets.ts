@@ -55,6 +55,12 @@ export interface SecretRequest {
    * must not report the credential as settled either way.
    */
   changing?: boolean;
+  /**
+   * A change was attempted and neither value could be proved against the
+   * service. Both are still held. This is not a worse kind of `changing` —
+   * it is the state that says nobody is coming back to it on their own.
+   */
+  unresolved?: { at: string; why: string } | null;
   /** The environment variable name, which is also the handle's name. */
   name: string;
   /** Why the application needs it, in Pi's words, for the owner to judge. */
@@ -89,8 +95,26 @@ interface Stored extends SecretRequest {
    * before the new one does. This holds the outgoing value until the new one
    * is proven, and is cleared the moment it is. It is deliberately not a
    * history: one predecessor, for exactly as long as it can still be needed.
+   *
+   * It carries the predecessor's own record, not just its bytes. Rolling
+   * back used to restore the value and leave the new one's provenance in
+   * place, so a generated rotation of a password the owner had typed left the
+   * owner's value sealed under `origin: "generated"` — and generated is
+   * precisely the origin that may be read back. The record has to travel with
+   * the value or the rollback is not a rollback.
    */
-  previous?: { sealed: string; since: string } | null;
+  previous?: {
+    sealed: string;
+    since: string;
+    origin: "owner" | "generated";
+    establishedAt: string | null;
+    revision: number;
+  } | null;
+  /**
+   * Set when a settle attempt could not establish which value the service
+   * accepts. Both values stay; nothing is discarded; the page says so.
+   */
+  unresolved?: { at: string; why: string } | null;
 }
 
 const NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
@@ -220,17 +244,19 @@ export function requestSecret(
 
 /** What the owner and every page may see: names and states, never values. */
 export function listSecrets(applicationId: string): SecretRequest[] {
-  return read(applicationId).map(({ sealed, previous, ...rest }) => {
-    void previous;
-    return {
-      ...rest,
-      // Records written before origin existed were all owner-supplied.
-      origin: rest.origin ?? "owner",
-      revision: rest.revision ?? (sealed ? 1 : 0),
-      establishedAt: sealed ? rest.establishedAt : null,
-      changing: Boolean(previous),
-    };
-  });
+  return read(applicationId).map(
+    ({ sealed, previous, unresolved, ...rest }) => {
+      return {
+        ...rest,
+        // Records written before origin existed were all owner-supplied.
+        origin: rest.origin ?? "owner",
+        revision: rest.revision ?? (sealed ? 1 : 0),
+        establishedAt: sealed ? rest.establishedAt : null,
+        changing: Boolean(previous),
+        unresolved: previous ? (unresolved ?? null) : null,
+      };
+    },
+  );
 }
 
 /** The owner supplies a value. The only way one ever enters the controller. */
@@ -397,11 +423,12 @@ export function beginChange(
   // the two to keep.
   if (found.previous)
     throw new Error(
-      `A change to ${name} is already part-way through, and the value that ` +
-        `still works is being held for it. Settle that one first: ` +
-        `settle_credential_change with established true if you have proved ` +
-        `the new value against the service, or false to put the working one ` +
-        `back. Then begin again.`,
+      `A change to ${name} is already part-way through, and both values are ` +
+        `being held for it. Settle that one first with ` +
+        `settle_credential_change: outcome "established" once you have proved ` +
+        `the new value against the service, "reverted" once you have proved ` +
+        `the service still takes the old one, or "unresolved" if you cannot ` +
+        `tell yet. Then begin again.`,
     );
   if (supplied !== undefined && supplied.length < MINIMUM_LENGTH)
     throw new Error(
@@ -409,44 +436,109 @@ export function beginChange(
     );
   const next = supplied ?? randomBytes(GENERATED_BYTES).toString("base64url");
   const current = unseal(found.sealed);
-  found.previous = { sealed: found.sealed, since: new Date().toISOString() };
+  found.previous = {
+    sealed: found.sealed,
+    since: new Date().toISOString(),
+    origin: found.origin ?? "owner",
+    establishedAt: found.establishedAt,
+    revision: found.revision ?? 1,
+  };
   found.sealed = seal(next);
   found.establishedAt = new Date().toISOString();
   found.origin = supplied === undefined ? "generated" : "owner";
   found.revision = (found.revision ?? 0) + 1;
+  found.unresolved = null;
   write(applicationId, held);
   return { name, previous: current, next, changing: true };
 }
 
 /**
- * Finish a change: keep the new value and forget the old one, or put the old
- * one back.
+ * How a change ended.
+ *
+ * Three outcomes rather than two, because there are three and the missing
+ * one was the dangerous one. A password change is not a transaction: the
+ * service takes the new value in one step and the application's configuration
+ * takes it in another, and the step between them can fail. At that moment the
+ * truthful answer is not "it worked" and not "it did not" — it is that the
+ * service has one of two passwords and nobody has asked it which.
+ *
+ * `established` and `reverted` each throw a value away, so each is a claim
+ * that needs proof. `unresolved` throws nothing away and needs none.
+ */
+export type ChangeOutcome = "established" | "reverted" | "unresolved";
+
+/**
+ * Finish a change, or record that it could not be finished.
  *
  * `established` means the new credential has been proven against the thing it
- * authenticates to — not that a command exited zero. Rolling back restores the
- * predecessor exactly, which is what makes a half-finished change recoverable
- * rather than a locked-out application.
+ * authenticates to — not that a command exited zero. `reverted` means the old
+ * one has been proven to still work, which is the only thing that makes
+ * discarding the new one safe: if the service already took the new password,
+ * "putting the working value back" puts back a value nothing accepts and
+ * deletes the one that does. That was the old rollback, and it turned a
+ * half-finished change into a locked-out application — exactly the outcome
+ * the predecessor is kept to prevent.
+ *
+ * `unresolved` is for everything else. Both values stay sealed, both stay
+ * exported to commands as `$NAME` and `$NAME_PREVIOUS`, the credential keeps
+ * saying a change is part-way through, and the page says nobody has
+ * established which value the service holds. It is not a failure state; it is
+ * an honest one, and it is recoverable because nothing was deleted.
  */
 export function settleChange(
   applicationId: string,
   name: string,
-  established: boolean,
+  outcome: ChangeOutcome,
+  why?: string,
 ) {
   const held = read(applicationId);
   const found = held.find((item) => item.name === name);
   if (!found) throw new Error(`No value is held for ${name}.`);
-  if (!found.previous) return { name, settled: established, rolledBack: false };
-  if (established) {
+  if (!found.previous)
+    return {
+      name,
+      outcome,
+      settled: outcome === "established",
+      rolledBack: false,
+      unresolved: false,
+    };
+  if (outcome === "unresolved") {
+    found.unresolved = {
+      at: new Date().toISOString(),
+      why: (why ?? "").trim().slice(0, 300) || "No reason was recorded.",
+    };
+    write(applicationId, held);
+    return {
+      name,
+      outcome,
+      settled: false,
+      rolledBack: false,
+      unresolved: true,
+    };
+  }
+  if (outcome === "established") {
     // Deleted rather than nulled: the predecessor's ciphertext should not be
     // in the file, and neither should a field implying one is kept.
     delete found.previous;
   } else {
+    // The record travels with the value. Restoring the bytes alone left an
+    // owner-supplied password sealed under `generated`, and generated is the
+    // one origin `revealSecret` will read back.
     found.sealed = found.previous.sealed;
+    found.origin = found.previous.origin;
+    found.establishedAt = found.previous.establishedAt;
+    found.revision = found.previous.revision;
     delete found.previous;
-    found.revision = Math.max(0, (found.revision ?? 1) - 1);
   }
+  delete found.unresolved;
   write(applicationId, held);
-  return { name, settled: established, rolledBack: !established };
+  return {
+    name,
+    outcome,
+    settled: outcome === "established",
+    rolledBack: outcome === "reverted",
+    unresolved: false,
+  };
 }
 
 /** Whether a change is in flight, for a page that must not claim success. */

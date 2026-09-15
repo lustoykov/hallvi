@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -27,6 +28,7 @@ import {
   openControllerCopy,
   type DestinationAccess,
 } from "../../../src/server/controller-protection";
+import * as secrets from "../../../src/server/application-secrets";
 import { readTar } from "../../../src/server/tar";
 import { pushTestDatabase } from "../../test-database";
 
@@ -314,4 +316,102 @@ it("opens a copy again through the recovery command, and refuses a damaged one",
   expect(() =>
     openControllerCopy(damaged, recoveryKit()!.passphrase),
   ).toThrow();
+});
+
+it("carries the application secret store, and the values resolve after restore", async () => {
+  // The gap this closes was invisible from the outside: the archive opened,
+  // every digest matched, and the recovered controller could not authenticate
+  // to a single database it had deployed. A copy that restores the
+  // deployments and not the passwords is not a recovery copy.
+  const { app } = application();
+  const generatedName = "POSTGRES_PASSWORD";
+  const suppliedName = "GF_SECURITY_ADMIN_PASSWORD";
+  secrets.generateSecret(app.id, {
+    name: generatedName,
+    why: "PostgreSQL role password.",
+    process: "db",
+  });
+  secrets.requestSecret(app.id, {
+    name: suppliedName,
+    why: "Grafana admin.",
+    process: "grafana",
+  });
+  const supplied = "the-owner-typed-this-one";
+  secrets.establishSecret(app.id, suppliedName, supplied);
+  const generated = secrets.revealSecret(app.id, generatedName).value;
+
+  const copy = await protectController("daily", { access });
+  expect(copy?.outcome).toBe("succeeded");
+  const stored = objects.get(`/controller-copies/${copy!.objectKey}`)!;
+  const archive = join(root, "secrets-copy.tar.enc");
+  writeFileSync(archive, stored);
+  const target = join(root, `restore-secrets-${randomUUID()}`);
+  execFileSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "scripts/controller-backups/decrypt-copy.mjs",
+      "--archive",
+      archive,
+      "--target",
+      target,
+      "--passphrase",
+      recoveryKit()!.passphrase,
+    ],
+    { encoding: "utf8", cwd: process.cwd() },
+  );
+
+  // The sealed store and the key that opens it, restored to the isolated
+  // config directory and nowhere else.
+  const restoredConfig = join(target, "payload", "config");
+  expect(existsSync(join(restoredConfig, "secrets", "key"))).toBe(true);
+  expect(existsSync(join(restoredConfig, "secrets", `${app.id}.json`))).toBe(
+    true,
+  );
+  // Still sealed: the archive's own encryption is not what protects these.
+  const sealedFile = readFileSync(
+    join(restoredConfig, "secrets", `${app.id}.json`),
+    "utf8",
+  );
+  expect(sealedFile).not.toContain(supplied);
+  expect(sealedFile).not.toContain(generated);
+
+  // A controller reading only the restored directory resolves both values.
+  // Compared, never printed: the assertion is that they match, and a failure
+  // message must not become the place a password appears.
+  vi.stubEnv("SERVER_GUY_CONFIG_DIR", restoredConfig);
+  try {
+    const environment = secrets.secretEnvironment(app.id, [
+      generatedName,
+      suppliedName,
+    ]);
+    const value = (name: string) => {
+      const row = environment
+        .split("\n")
+        .find((line) => line.startsWith(`export ${name}=`))!;
+      return row.slice(`export ${name}='`.length, -1);
+    };
+    expect(secrets.sameSecret(value(generatedName), generated)).toBe(true);
+    expect(secrets.sameSecret(value(suppliedName), supplied)).toBe(true);
+    // And the provenance survives, so the restored controller still refuses
+    // to read the owner's own value back to the screen.
+    const rows = secrets.listSecrets(app.id);
+    expect(rows.find((row) => row.name === suppliedName)?.origin).toBe("owner");
+    expect(() => secrets.revealSecret(app.id, suppliedName)).toThrow();
+    expect(
+      secrets.sameSecret(
+        secrets.revealSecret(app.id, generatedName).value,
+        generated,
+      ),
+    ).toBe(true);
+  } finally {
+    vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "state"));
+  }
+
+  // The passphrase stays outside the thing it opens.
+  const opened = openControllerCopy(stored, recoveryKit()!.passphrase);
+  expect(
+    opened.entries.some((entry) => entry.path.includes("recovery-key.json")),
+  ).toBe(false);
 });

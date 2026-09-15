@@ -279,7 +279,7 @@ export function supplyFromRecords({
   // report "cached by Cloudflare" as though it meant the site is up.
   const originCheck = cdnChecks?.get("origin-reachable") ?? null;
 
-  const protection = protectionFromRecords(live, now);
+  const protection = protectionFromRecords(live, now, applicationId);
   const recurring: Recurring[] = protection.schedules.map((schedule) => ({
     id: schedule.id,
     title: "Backups",

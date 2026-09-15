@@ -253,7 +253,21 @@ export async function captureControllerPayload(): Promise<{
         content: readFileSync(join(config, name)),
         mode: 0o600,
       });
-  for (const name of ["deployments", "backup-schedules", "backup-destinations"])
+  // Named rather than swept: a copy of every directory beside the database
+  // would eventually take one nobody meant to send off the machine. Each of
+  // these is here because recovery cannot proceed without it.
+  //
+  // `secrets` holds the application credentials and the key that opens them.
+  // It was missing, and its absence was invisible: the archive opened, every
+  // digest matched, and the recovered controller could not authenticate to a
+  // single database it had deployed. A copy that restores everything except
+  // the passwords is not a recovery copy.
+  for (const name of [
+    "deployments",
+    "backup-schedules",
+    "backup-destinations",
+    "secrets",
+  ])
     if (existsSync(join(config, name)))
       walk(join(config, name), `payload/config/${name}`, entries);
   // The copy history travels with the copy; the passphrase never does.

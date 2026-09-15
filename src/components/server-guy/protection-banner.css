@@ -70,6 +70,7 @@
 }
 
 .sg-protect-limit,
+.sg-protect-planned,
 .sg-protect-failure {
   margin: 0;
   font-size: 12.5px;
@@ -80,6 +81,11 @@
 .sg-protect-failure {
   color: var(--sg-bad-ink, #a6312b);
   font-weight: 500;
+}
+
+/* Intent, set below the evidence and quieter than it. */
+.sg-protect-planned {
+  color: var(--sg-ink-3, #6b7891);
 }
 
 .sg-protect-destinations {

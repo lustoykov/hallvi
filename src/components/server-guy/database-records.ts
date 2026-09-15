@@ -45,7 +45,7 @@ export function databaseFromRecords({
   const live = records.filter((record) => !record.retiredAt);
   const map = topologyOf(live, applicationId)?.value ?? null;
   const ref = subjectsMentioned(live, "database")[0] ?? null;
-  const protection = protectionFromRecords(live, now);
+  const protection = protectionFromRecords(live, now, applicationId);
   const marks: Mark[] = [];
 
   let database: DataStore | null = null;

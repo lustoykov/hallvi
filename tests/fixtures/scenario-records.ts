@@ -108,6 +108,7 @@ export function scenarios(): Scenario[] {
   const recovered = "aaaaaaaa-0000-4000-8000-000000000004";
   const withdrawn = "aaaaaaaa-0000-4000-8000-000000000005";
   const rich = "aaaaaaaa-0000-4000-8000-000000000006";
+  const overclaimed = "aaaaaaaa-0000-4000-8000-000000000007";
 
   return [
     {
@@ -310,6 +311,135 @@ export function scenarios(): Scenario[] {
         "Every destination populated at once, with awkward values: long names, Unicode, odd units.",
       records: richRecords(rich),
     },
+    {
+      id: overclaimed,
+      name: "Scenario · overclaimed",
+      shows:
+        "A plan that promises more than the copies deliver: off-site intended, beside the application in fact, and one volume nobody copies.",
+      records: overclaimedRecords(overclaimed),
+    },
+  ];
+}
+
+/**
+ * The three ways this page used to say more than it knew, on one screen.
+ *
+ * The plan means to write off-site and the only copy is beside the
+ * application. The copy's own class is declared, so the page cannot round it
+ * up to the plan's. And the plan names the database and not the uploads, so a
+ * reader who sees "copies exist" still has a volume in no copy at all.
+ */
+function overclaimedRecords(id: string): SavedInformation[] {
+  return [
+    states(
+      id,
+      { kind: "application", id },
+      {
+        at: ago(2 * HOUR),
+        title: "Shop",
+        views: ["architecture", "overview"],
+        content: {
+          kind: "topology",
+          from: "observed",
+          parts: [
+            {
+              id: "web",
+              kind: "web",
+              name: "Shop",
+              role: "the site",
+              plain: "the site",
+            },
+            {
+              id: "shop-postgres",
+              kind: "private",
+              name: "PostgreSQL",
+              role: "the database",
+              plain: "the database",
+            },
+            {
+              id: "shop-db",
+              kind: "volume",
+              name: "Database files",
+              role: "the database files",
+              plain: "the database files",
+            },
+            {
+              id: "shop-uploads",
+              kind: "volume",
+              name: "Uploads",
+              role: "the uploads",
+              plain: "the uploads",
+            },
+          ],
+          edges: [
+            { from: "shop-postgres", to: "shop-db", network: "disk" },
+            { from: "web", to: "shop-uploads", network: "disk" },
+          ],
+        },
+      },
+    ),
+    states(
+      id,
+      { kind: "volume", id: "shop-db" },
+      {
+        at: ago(2 * HOUR),
+        title: "The database files survive replacement",
+        views: ["storage"],
+        facts: [
+          fact("path", "/var/lib/postgresql/data"),
+          fact("holds", "PostgreSQL's data"),
+        ],
+        checks: [check("persistence", "passed", "configuration")],
+      },
+    ),
+    states(
+      id,
+      { kind: "volume", id: "shop-uploads" },
+      {
+        at: ago(2 * HOUR),
+        title: "The uploads survive replacement",
+        views: ["storage"],
+        facts: [
+          fact("path", "/srv/shop/uploads"),
+          fact("holds", "Customer uploads"),
+        ],
+        checks: [check("persistence", "passed", "configuration")],
+      },
+    ),
+    states(
+      id,
+      { kind: "backup-plan", id: "nightly" },
+      {
+        at: ago(DAY),
+        title: "Backups are meant to reach object storage",
+        views: ["backups"],
+        facts: [
+          fact("schedule", "Daily at 02:30", "configuration", "planned"),
+          fact("destination", "s3://shop-backups", "configuration", "planned"),
+          fact("destination-kind", "off-site", "configuration", "planned"),
+          fact("keep", "7", "configuration", "planned"),
+          // The database, by its owner's id. Not the uploads.
+          fact("covers", "shop-postgres"),
+        ],
+        checks: [check("configured", "passed", "configuration")],
+      },
+    ),
+    states(
+      id,
+      { kind: "backup-copy", id: "copy-last-night" },
+      {
+        at: ago(6 * HOUR),
+        title: "A copy was written",
+        views: ["backups"],
+        facts: [
+          fact("destination", "/var/backups/shop"),
+          // Beside the application, whatever the plan intends.
+          fact("destination-kind", "same-server"),
+          fact("size", "94 MB", "contents"),
+        ],
+        checks: [check("written", "passed", "identity")],
+      },
+    ),
   ];
 }
 
@@ -492,6 +622,7 @@ function richRecords(id: string): SavedInformation[] {
         facts: [
           fact("schedule", "Daily at 03:30", "configuration", "planned"),
           fact("destination", "Cloudflare R2", "configuration", "reported"),
+          fact("destination-kind", "off-site", "configuration", "planned"),
           fact("keep", "7", "configuration", "planned"),
           fact("covers", "big-volume"),
         ],
@@ -507,6 +638,7 @@ function richRecords(id: string): SavedInformation[] {
         views: ["backups"],
         facts: [
           fact("destination", "Cloudflare R2"),
+          fact("destination-kind", "off-site"),
           fact("size", "512 MB", "contents"),
         ],
         checks: [check("written", "passed", "identity")],
@@ -521,6 +653,7 @@ function richRecords(id: string): SavedInformation[] {
         views: ["backups"],
         facts: [
           fact("destination", "Cloudflare R2"),
+          fact("destination-kind", "off-site"),
           fact("size", "515 MB", "contents"),
         ],
         checks: [check("written", "passed", "identity")],
@@ -535,6 +668,11 @@ function richRecords(id: string): SavedInformation[] {
         views: ["backups"],
         facts: [
           fact("covers", "The whole volume"),
+          // Deliberately the older copy, tested after the newer one existed.
+          // This is the shape the page used to read as "recovery proved": the
+          // restore is newer than the newest copy, and it opened a different
+          // file. The page has to say which copy it proved.
+          fact("restored-copy", "copy-yesterday"),
           fact("took", "3 min", "contents"),
         ],
         checks: [

@@ -464,9 +464,9 @@ describe("a backup plan that is set up and protects less than its name implies",
 
   it("a plan Pi is content with, and has carried out, reads verified", () => {
     // The fix must not paint every backup plan amber. What earns verified is
-    // the plan plus the evidence: a copy that left the host and a restore
-    // that was actually tried. A schedule on its own never reads verified,
-    // however content Pi is with it — that is the whole point of the verdict.
+    // the plan plus the evidence: a copy that left the host and a restore of
+    // *that copy*. A schedule on its own never reads verified, however
+    // content Pi is with it — that is the whole point of the verdict.
     const plan = record({
       id: "offsite",
       status: "verified",
@@ -505,6 +505,9 @@ describe("a backup plan that is set up and protects less than its name implies",
         ref: { kind: "restore-test", id: "shop-offsite-restore" },
         presence: "present",
       },
+      // Which copy it opened. Without it the lane can only say recovery has
+      // worked at some point, never that this copy is good.
+      facts: [{ key: "restored-copy", value: "shop-offsite-1" }],
     });
     const lane = overview([plan, copy, restore], TEN_MINUTES_ON).vitals.find(
       (vital) => vital.id === "backups",
