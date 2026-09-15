@@ -25,8 +25,27 @@ import {
 
 import type { Check, Dated } from "./backup-prototype/protect-story";
 
+/**
+ * One copy, with the two things that are true of it and of nothing else:
+ * where it went, and what it holds.
+ *
+ * Both used to be collected across every copy into one set, and both were
+ * wrong in the same way restore proof was. An off-site copy from last week
+ * does not put this morning's local copy off the server, and a plan widened
+ * today does not put uploads into an archive written yesterday.
+ */
+export interface BackupCopy extends Dated {
+  /** The class this copy actually reached. Unclassified when it did not say. */
+  kind: DestinationKind;
+  /** Where, in Pi's words, for the reader. */
+  destination: string | null;
+  /** The subject ids this copy recorded capturing.
+   *  Empty means it did not say. */
+  covers: string[];
+}
+
 export interface Protection {
-  copies: Dated[];
+  copies: BackupCopy[];
   schedules: Dated[];
   restores: Dated[];
   checks: Check[];
@@ -71,6 +90,19 @@ export interface Protection {
    */
   plannedDestinations: DestinationKind[];
   /**
+   * Required data the newest copy is not known to hold, and why.
+   *
+   * `basis` says which record answered: the restore that opened the copy, the
+   * copy's own record, or neither, in which case the plan's own coverage is
+   * all there is and it describes copies not yet taken.
+   */
+  newestCopyCoverage: {
+    missing: { id: string; label: string }[];
+    basis: "restore" | "copy" | "plan-only";
+    /** The plan's coverage was stated after the newest copy was written. */
+    planWidenedAfter: boolean;
+  };
+  /**
    * Copy id → the restore test that opened that copy.
    *
    * By identity, because time cannot answer this: making copy B and then
@@ -98,6 +130,23 @@ export interface Protection {
 }
 
 const newestFirst = (a: Dated, b: Dated) => b.at.localeCompare(a.at);
+
+/** What to ask for when data on this application's disk is in no copy. */
+function coverDraft(names: string) {
+  return (
+    `The newest backup does not contain ${names}, and this application's disk ` +
+    `does. Decide what actually needs keeping — a cache does not — then extend ` +
+    `the plan and take a copy that includes it.`
+  );
+}
+
+/** A comma-separated `covers` fact as the subject ids it names. */
+function idList(value: string | undefined | null) {
+  return (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
 
 /** "a", "a and b", "a, b and c". A sentence, not a join. */
 function list(items: string[]) {
@@ -163,6 +212,8 @@ export function protectionFromRecords(
       };
   }
   let nextRunAt: string | null = null;
+  /** When a plan last said what it covers. An older copy predates it. */
+  let coversStatedAt: string | null = null;
   for (const ref of plans) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") {
@@ -196,10 +247,13 @@ export function protectionFromRecords(
     const next = fact("next-run");
     if (next && (!nextRunAt || next < nextRunAt)) nextRunAt = next;
     const what = fact("covers");
-    if (what)
-      for (const item of what.split(",").map((part) => part.trim()))
-        if (item)
-          covers.set(item, destination ?? schedule ?? "Copied by the plan");
+    if (what) {
+      const statedAt = facts.get("covers")?.record.establishedAt ?? null;
+      if (statedAt && (!coversStatedAt || statedAt > coversStatedAt))
+        coversStatedAt = statedAt;
+      for (const item of idList(what))
+        covers.set(item, destination ?? schedule ?? "Copied by the plan");
+    }
     if (schedule && at) {
       schedules.push({
         id: ref.id,
@@ -213,7 +267,7 @@ export function protectionFromRecords(
 
   // ---- The copies. One record per copy, so the page counts records and
   // never a number somebody incremented.
-  const copies: Dated[] = [];
+  const copies: BackupCopy[] = [];
   const failures: { copy: Dated | null; restore: Dated | null } = {
     copy: null,
     restore: null,
@@ -226,14 +280,24 @@ export function protectionFromRecords(
     if (!at) continue;
     const facts = currentFacts(live, ref);
     const size = facts.get("size")?.value.value;
-    const destination = facts.get("destination")?.value.value;
+    const destination = facts.get("destination")?.value.value ?? null;
     const declared = facts.get("destination-kind")?.value.value;
-    const dated = {
+    // A copy that exists and does not say where it went is unclassified, the
+    // same as a plan that does not. Reading it as anything else is a
+    // statement about a location no record has made.
+    const kind: DestinationKind =
+      declared && DESTINATION_KINDS.has(declared as DestinationKind)
+        ? (declared as DestinationKind)
+        : "unclassified";
+    const dated: BackupCopy = {
       id: ref.id,
       at,
       detail:
         [destination, size].filter(Boolean).join(" · ") ||
         presence.record.title,
+      kind,
+      destination,
+      covers: idList(facts.get("covers")?.value.value),
     };
     // A copy whose own record failed is not a copy. It is kept out of the
     // list entirely and remembered as the newest failure, which no later
@@ -243,13 +307,7 @@ export function protectionFromRecords(
       if (!failures.copy || at > failures.copy.at) failures.copy = dated;
       continue;
     }
-    if (declared && DESTINATION_KINDS.has(declared as DestinationKind))
-      destinations.add(declared as DestinationKind);
-    // A copy that exists and does not say where it went is unclassified, the
-    // same as a plan that does not. Adding nothing here left `destinations`
-    // empty, and an empty set read downstream as "on the server only" — a
-    // statement about a location no record had made.
-    else destinations.add("unclassified");
+    destinations.add(kind);
     copies.push(dated);
   }
 
@@ -257,6 +315,7 @@ export function protectionFromRecords(
   const restores: Dated[] = [];
   const checks: Check[] = [];
   const verifiedCopies = new Map<string, Dated>();
+  const restoredCoverage = new Map<string, string[]>();
   for (const ref of subjectsOfKind(live, "restore-test")) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") continue;
@@ -282,6 +341,12 @@ export function protectionFromRecords(
     if (restored) {
       const held = verifiedCopies.get(restored);
       if (!held || at > held.at) verifiedCopies.set(restored, dated);
+      // What the restore actually brought back, which outranks what the copy
+      // claimed to hold: one of them was opened and looked at.
+      restoredCoverage.set(
+        restored,
+        idList(restoreFacts.get("covers")?.value.value),
+      );
     }
     for (const held of currentChecks(live, ref).values())
       checks.push({
@@ -297,31 +362,70 @@ export function protectionFromRecords(
   restores.sort(newestFirst);
   schedules.sort(newestFirst);
 
-  // ---- What the plan leaves out.
+  // ---- What is on record as being there, and what does not hold it.
   //
   // Only ever a subtraction from what records actually state: a volume nobody
-  // has written down is not a hole in the plan, it is a thing nobody has
-  // looked at, and saying otherwise would put an invented gap on the page.
-  const uncovered: { id: string; label: string }[] = [];
-  if (applicationId && plans.length) {
-    const map = topologyOf(live, applicationId)?.value ?? null;
-    // A plan naming a database covers the volume that database's files live
-    // in. The `disk` edge is the only record of which volume that is.
-    const throughOwner = new Set<string>();
-    for (const named of covers.keys()) {
-      const edge = map?.edges.find(
-        (item) => item.network === "disk" && item.from === named,
-      );
-      if (edge) throughOwner.add(edge.to);
-    }
+  // has written down is not a hole, it is a thing nobody has looked at, and
+  // saying otherwise would put an invented gap on the page.
+  const required: { id: string; label: string }[] = [];
+  const map = applicationId
+    ? (topologyOf(live, applicationId)?.value ?? null)
+    : null;
+  if (applicationId)
     for (const ref of subjectsMentioned(live, "volume")) {
       const presence = presenceOf(live, ref);
       if (!(presence.known && presence.presence === "present")) continue;
-      if (covers.has(ref.id) || throughOwner.has(ref.id)) continue;
       const holds = currentFacts(live, ref).get("holds")?.value.value ?? null;
-      uncovered.push({ id: ref.id, label: holds ?? ref.id });
+      required.push({ id: ref.id, label: holds ?? ref.id });
     }
-  }
+
+  /**
+   * What a list of covered ids leaves out.
+   *
+   * A list naming a database covers the volume that database's files live in
+   * — a nightly dump copies those bytes as surely as copying the volume would
+   * — and the map's `disk` edge is the only record of which volume that is.
+   */
+  const missingFrom = (named: string[]) => {
+    const reach = new Set(named);
+    for (const item of named) {
+      const edge = map?.edges.find(
+        (edge) => edge.network === "disk" && edge.from === item,
+      );
+      if (edge) reach.add(edge.to);
+    }
+    return required.filter((item) => !reach.has(item.id));
+  };
+
+  const uncovered = plans.length ? missingFrom([...covers.keys()]) : [];
+
+  // What the *newest copy* is known to hold, which is a different question
+  // from what the plan intends to copy next time. A plan widened this morning
+  // cannot reach back and put uploads into an archive written last night.
+  const newest = copies[0] ?? null;
+  const provedCoverage = newest ? restoredCoverage.get(newest.id) : undefined;
+  const newestCopyCoverage: Protection["newestCopyCoverage"] =
+    provedCoverage?.length
+      ? {
+          missing: missingFrom(provedCoverage),
+          basis: "restore",
+          planWidenedAfter: false,
+        }
+      : newest?.covers.length
+        ? {
+            missing: missingFrom(newest.covers),
+            basis: "copy",
+            planWidenedAfter: false,
+          }
+        : {
+            missing: uncovered,
+            basis: "plan-only",
+            // The one thing that can be said about a copy that never recorded
+            // its contents: it was written before the plan said this.
+            planWidenedAfter: Boolean(
+              newest && coversStatedAt && newest.at < coversStatedAt,
+            ),
+          };
 
   return {
     copies,
@@ -340,6 +444,7 @@ export function protectionFromRecords(
     plannedDestinations: [...plannedDestinations],
     verifiedCopies,
     uncovered,
+    newestCopyCoverage,
     failures: {
       // A copy that actually failed is the more specific finding and keeps
       // its place; a plan whose own check failed fills in when no copy did,
@@ -447,8 +552,7 @@ export function protectionVerdict(
   protection: Protection,
   now: number,
 ): ProtectionVerdict {
-  const { copies, schedules, restores, failures, destinations, nextRunAt } =
-    protection;
+  const { copies, schedules, restores, failures, nextRunAt } = protection;
   /**
    * Pi's judgement, applied to whatever the arithmetic concluded.
    *
@@ -471,42 +575,90 @@ export function protectionVerdict(
       : said;
   const newestCopy = copies[0] ?? null;
   const newestRestore = restores[0] ?? null;
-  // Where the copies that exist actually went. A plan's destination is not
-  // consulted here at all: intent cannot establish a transfer.
-  const offsite = destinations.some(
-    (kind) => kind === "off-site" || kind === "controller",
-  );
-  /** Nothing says where the copies went, so nothing may claim they are safe. */
-  const placeless =
-    !offsite &&
-    (destinations.length === 0 || destinations.includes("unclassified"));
+  /**
+   * Where the *newest* copy went. Not the union of every copy's destination:
+   * an off-site copy from last week does not move this morning's local copy
+   * off the server, and reading the set let it say so.
+   *
+   * A plan's destination is not consulted here at all: intent cannot
+   * establish a transfer.
+   */
+  const newestKind = newestCopy?.kind ?? null;
+  const offsite = newestKind === "off-site" || newestKind === "controller";
+  /** Nothing says where the newest copy went, so nothing may call it safe. */
+  const placeless = newestKind === null || newestKind === "unclassified";
+  /** The most recent copy off the server, when that is not this one. */
+  const olderOffsite =
+    offsite || !newestCopy
+      ? null
+      : (copies.find(
+          (copy) => copy.kind === "off-site" || copy.kind === "controller",
+        ) ?? null);
+  const elsewhere = olderOffsite
+    ? ` The most recent copy off the server is the older one, ${when(olderOffsite.at, now)}.`
+    : "";
   /** The restore that opened the newest copy, if one has. */
   const provesNewest = newestCopy
     ? (protection.verifiedCopies.get(newestCopy.id) ?? null)
     : null;
   /**
-   * What is on record as being there that no plan says it copies, in the
-   * page's words. Appended to whatever the verdict concluded rather than
-   * replacing it: a plan can be reaching object storage nightly and still
-   * leave the uploads out.
+   * What is on record as being there that the newest copy is not known to
+   * hold. Appended to whatever the verdict concluded rather than replacing
+   * it: a plan can be reaching object storage nightly, and its copies can be
+   * restorable, and the uploads can still be in none of them.
+   *
+   * Which record answered matters, because widening a plan cannot put data
+   * into an archive that was written before it.
    */
-  const holeInTheCoverage = protection.uncovered.length
-    ? `The plan does not say it copies ${list(protection.uncovered.map((item) => item.label))}.`
-    : null;
+  const coverage = protection.newestCopyCoverage;
+  const names = list(coverage.missing.map((item) => item.label));
+  /**
+   * Named data missing from the newest copy, or — when nothing recorded that
+   * copy's contents and the plan has been restated since — the fact that the
+   * plan's coverage is not a description of it.
+   *
+   * That second case is the one review found: widening today's plan cleared
+   * the warning for copies written yesterday. The current plan's list is
+   * empty of gaps precisely because it was widened, so the honest sentence is
+   * not a list of names at all.
+   */
+  const hole: { says: string; label: string; draft: string } | null =
+    coverage.missing.length && coverage.basis === "restore"
+      ? {
+          says: `The restore did not bring back ${names}.`,
+          label: "Cover the rest",
+          draft: coverDraft(names),
+        }
+      : coverage.missing.length && coverage.basis === "copy"
+        ? {
+            says: `The newest copy does not include ${names}.`,
+            label: "Cover the rest",
+            draft: coverDraft(names),
+          }
+        : coverage.basis === "plan-only" && coverage.planWidenedAfter
+          ? {
+              says:
+                "The plan's coverage was stated after the newest copy was " +
+                "written, and no record says what that copy holds, so the " +
+                "plan does not describe it.",
+              label: "Back up now",
+              draft:
+                "The backup plan has changed since the newest copy was taken, and nothing records what that copy contains. Take a copy under the current plan, record exactly what it captured, and restore it to check.",
+            }
+          : coverage.missing.length
+            ? {
+                says: `The plan does not say it copies ${names}.`,
+                label: "Cover the rest",
+                draft: coverDraft(names),
+              }
+            : null;
   const withHoles = (said: ProtectionVerdict): ProtectionVerdict =>
-    holeInTheCoverage
+    hole
       ? {
           ...said,
           tone: said.tone === "verified" ? "warning" : said.tone,
-          limit: [said.limit, holeInTheCoverage].filter(Boolean).join(" "),
-          next: said.next ?? {
-            label: "Cover the rest",
-            draft:
-              `The backup plan does not cover ` +
-              `${list(protection.uncovered.map((item) => item.label))}. Decide ` +
-              `what actually needs keeping — a cache does not — and extend the ` +
-              `plan to cover the rest.`,
-          },
+          limit: [said.limit, hole.says].filter(Boolean).join(" "),
+          next: said.next ?? { label: hole.label, draft: hole.draft },
         }
       : said;
 
@@ -622,19 +774,19 @@ export function protectionVerdict(
           : "local-only",
       tone: "warning",
       says: placeless
-        ? "Copies exist, and nothing records where they go or whether the newest one can be opened."
+        ? "Copies exist, and nothing records where the newest one went or whether it can be opened."
         : offsite
-          ? "Copies are reaching a destination off the application's server, and the newest one has not been restored."
-          : "Copies exist on the application's own server, and the newest one has not been restored.",
+          ? "The newest copy reached a destination off the application's server, and it has not been restored."
+          : "The newest copy is on the application's own server, and it has not been restored.",
       limit:
         (protection.verifiedCopies.size
           ? `An earlier copy was restored and checked, so recovery has worked at least once. The newest copy, ${when(newestCopy.at, now)}, has not been.`
           : `A restore was tested, and no record says which copy it opened, so it does not vouch for the copy ${when(newestCopy.at, now)}.`) +
         (placeless
-          ? " Nothing states a destination for these copies either."
+          ? ` Nothing states where the newest copy went either.${elsewhere}`
           : offsite
             ? ""
-            : " These copies would also go with the server."),
+            : ` The newest copy would also go with the server.${elsewhere}`),
       next: {
         label: "Test a restore of the newest copy",
         draft:
@@ -654,12 +806,12 @@ export function protectionVerdict(
           ? "The newest copy was restored and checked, long enough ago that it no longer says much about the copies being made now."
           : "The newest copy was restored and checked, so recovery has actually been done and not just planned.",
         limit: placeless
-          ? "Nothing records where these copies go, so this proves the data is recoverable and not that it survives losing the machine."
+          ? `Nothing records where the newest copy went, so this proves the data is recoverable and not that it survives losing the machine.${elsewhere}`
           : offsite
             ? stale
               ? "Test a current copy to bring the evidence back."
               : null
-            : "Every copy is on the application's own server, so this proves the data is recoverable and not that it survives losing the machine.",
+            : `The newest copy is on the application's own server, so this proves the data is recoverable and not that it survives losing the machine.${elsewhere}`,
         next: stale
           ? {
               label: "Test a restore again",
@@ -670,8 +822,9 @@ export function protectionVerdict(
             ? null
             : {
                 label: "Add an off-server destination",
-                draft:
-                  "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
+                draft: olderOffsite
+                  ? "The newest backup copy is on the application's own server; only an older one reached anywhere else. Find out why the copies stopped leaving the machine, and make the current ones go where the older one went."
+                  : "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
               },
       }),
     );
@@ -682,9 +835,10 @@ export function protectionVerdict(
       temper({
         state: "destination-unknown",
         tone: "warning",
-        says: "Copies exist, and nothing records where they go.",
+        says: "Copies exist, and nothing records where the newest one went.",
         limit:
-          "No record says whether they survive losing the server, and no restore has been tested. Treat them as unproven until one of those is answered.",
+          "No record says whether it survives losing the server, and no restore has been tested. Treat it as unproven until one of those is answered." +
+          elsewhere,
         next: {
           label: "Find out where the copies go",
           draft:
@@ -698,13 +852,17 @@ export function protectionVerdict(
       temper({
         state: "local-only",
         tone: "warning",
-        says: "Copies exist, and all of them are on the application's own server.",
+        says: olderOffsite
+          ? "The newest copy is on the application's own server, and only an older one reached anywhere else."
+          : "Copies exist, and all of them are on the application's own server.",
         limit:
-          "This recovers from a mistake inside the application. It does not survive losing the server, and no restore has been tested.",
+          "This recovers from a mistake inside the application. It does not survive losing the server, and no restore has been tested." +
+          elsewhere,
         next: {
           label: "Add an off-server destination",
-          draft:
-            "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
+          draft: olderOffsite
+            ? "The newest backup copy is on the application's own server; only an older one reached anywhere else. Find out why the copies stopped leaving the machine, and make the current ones go where the older one went."
+            : "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
         },
       }),
     );
@@ -714,7 +872,7 @@ export function protectionVerdict(
       temper({
         state: "offsite-untested",
         tone: "warning",
-        says: "Copies are reaching a destination off the application's server, and none has been restored.",
+        says: "The newest copy reached a destination off the application's server, and none has been restored.",
         limit:
           "A copy nobody has restored is a file nobody has opened. Until one is, recovery is untested.",
         next: {

@@ -46,6 +46,33 @@ hole in it is named in the verdict's limit.
 Guy's own copies. The application's data is a separate job with its own plan,
 reusing the same connection.
 
+## What review found after the first pass
+
+Codex reviewed the change and ran two independent checks. Both still read
+`restore-verified` with no limitation, because restore proof had become
+specific to a copy while **destination and coverage were still aggregated
+across all of them**. Same class of bug, two fields further on.
+
+| Sequence | What it said | Why |
+|---|---|---|
+| Newest copy is local; an older copy is off-site; the newest is restored | "Recovery proved", `limit: null`, `next: null` | `offsite` was read from the union of every copy's class, so yesterday's off-site copy answered the off-server question for a copy written today. |
+| The plan is widened to include uploads; every existing copy holds only the database | the coverage warning cleared | Coverage was computed from the plan's current `covers`, so widening the plan retroactively "added" uploads to archives already written. |
+
+Both are fixed by keeping the evidence on the record that carries it:
+
+- A copy holds its own destination class and its own recorded coverage. The
+  verdict asks about **the newest copy**, not the set. An older copy that did
+  reach off the server is stated as its own recovery point — "the most recent
+  copy off the server is the older one, taken 8 d ago" — which is useful and
+  is not a claim about the newest.
+- Coverage is answered by the strongest record that speaks to the newest copy:
+  what a restore of it actually brought back, else what that copy recorded
+  capturing, else the plan. And when only the plan can answer and it was
+  restated after the copy was written, the page says exactly that, because the
+  current plan's coverage is not a description of an older archive. That last
+  case has no list of names to print — the list is empty precisely because the
+  plan was widened — so the sentence is about the copy instead.
+
 ## Evidence
 
 | Acceptance criterion | Result | Where |
@@ -60,6 +87,9 @@ reusing the same connection.
 | A local copy plus an unexecuted offsite plan | pass | `protection-verdict.test.ts`, "an off-site plan over a same-server copy does not claim a transfer", and on screen below. |
 | An old-copy restore after a newer copy was created | pass | `protection-verdict.test.ts`, "a restore of an older copy does not verify a newer one, whatever the clock says". |
 | Incomplete required-data coverage | pass | `protection-verdict.test.ts`, "what the plan leaves out" (three cases, including the database-dump indirection and the volume nobody wrote down). |
+| An older off-site copy does not vouch for a newer local one | pass | `protection-verdict.test.ts`, "evidence belongs to the copy that carries it". Review's first sequence; it returned `limit: null, next: null` before. |
+| A widened plan does not add data to copies already taken | pass | same suite, three cases: the copy recorded its coverage, the restore recorded what it brought back, and neither did. Review's second sequence. |
+| A copy that does hold the data is not warned about | pass | same suite, "clears the coverage warning once a copy actually holds the data" — the fix must not paint every plan amber. |
 
 Each new test was run against the pre-change behaviour to check it actually
 catches the defect, by reverting the fix in memory with an `enforce: "pre"`
@@ -74,7 +104,7 @@ on `:3520` and main `45db310` on `:3521`. Same records, same page.
 | | Before (main) | After |
 |---|---|---|
 | ![before](2026-09-15-recovery-correctness/backups-before.png) | "Recovery proved — a copy was restored and checked" over a newest copy nothing has opened | ![after](2026-09-15-recovery-correctness/backups-after.png) |
-| ![before](2026-09-15-recovery-correctness/overclaimed-before.png) | "Copies are reaching a destination off the application's server", over one copy in `/var/backups/shop` | ![after](2026-09-15-recovery-correctness/overclaimed-after.png) |
+| ![before](2026-09-15-recovery-correctness/overclaimed-before.png) | "Recovery proved", with no limitation, over a newest copy that is on the application's own server and holds no uploads | ![after](2026-09-15-recovery-correctness/overclaimed-after.png) |
 
 The second pair also shows two smaller repairs. The plan's off-site intention
 is now stated as intention, below the destination that copies actually
@@ -87,15 +117,17 @@ The connection band's sentence is in
 and
 [controller-band-after.png](2026-09-15-recovery-correctness/controller-band-after.png).
 
-`Scenario · overclaimed` was added to the scenario fixtures for this: a plan
-that means to write off-site, one copy beside the application, and an uploads
-volume the plan does not name. Clearly synthetic, in the isolated scenario
-database, never near a real application.
+`Scenario · overclaimed` was added to the scenario fixtures for this, and now
+carries both of review's sequences at once: a plan that means to write
+off-site, an off-site copy from last week, a newer copy beside the
+application, a restore of that newer copy, and an uploads volume no copy
+holds. Before, that read "Recovery proved" with nothing else to say. Clearly
+synthetic, in the isolated scenario database, never near a real application.
 
 ## Commands
 
 ```
-npm test                                    955 passed, 3 skipped
+npm test                                    961 passed, 3 skipped
 SERVER_GUY_DOCKER_TESTS=1 npx vitest run \
   --config tests/application/vitest.config.mjs credential-change
                                             2 passed, real PostgreSQL

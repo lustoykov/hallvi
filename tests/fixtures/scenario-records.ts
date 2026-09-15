@@ -426,6 +426,22 @@ function overclaimedRecords(id: string): SavedInformation[] {
     ),
     states(
       id,
+      { kind: "backup-copy", id: "copy-last-week" },
+      {
+        at: ago(8 * DAY),
+        title: "A copy was written",
+        views: ["backups"],
+        facts: [
+          fact("destination", "s3://shop-backups"),
+          fact("destination-kind", "off-site"),
+          fact("covers", "shop-postgres"),
+          fact("size", "88 MB", "contents"),
+        ],
+        checks: [check("written", "passed", "identity")],
+      },
+    ),
+    states(
+      id,
       { kind: "backup-copy", id: "copy-last-night" },
       {
         at: ago(6 * HOUR),
@@ -433,11 +449,28 @@ function overclaimedRecords(id: string): SavedInformation[] {
         views: ["backups"],
         facts: [
           fact("destination", "/var/backups/shop"),
-          // Beside the application, whatever the plan intends.
+          // Beside the application, whatever the plan intends, and whatever
+          // last week's copy managed.
           fact("destination-kind", "same-server"),
+          fact("covers", "shop-postgres"),
           fact("size", "94 MB", "contents"),
         ],
         checks: [check("written", "passed", "identity")],
+      },
+    ),
+    states(
+      id,
+      { kind: "restore-test", id: "restore-last-night" },
+      {
+        at: ago(5 * HOUR),
+        title: "A copy was restored and checked",
+        views: ["backups"],
+        facts: [
+          fact("restored-copy", "copy-last-night"),
+          fact("covers", "shop-postgres"),
+          fact("took", "2 min", "contents"),
+        ],
+        checks: [check("restored", "passed", "identity")],
       },
     ),
   ];

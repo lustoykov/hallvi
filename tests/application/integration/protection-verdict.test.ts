@@ -264,7 +264,7 @@ describe("where the copies go", () => {
     const said = verdict([plan(null), copy("unclassified")]);
     expect(said.state).toBe("destination-unknown");
     expect(said.tone).toBe("warning");
-    expect(said.says).toContain("nothing records where they go");
+    expect(said.says).toContain("nothing records where the newest one went");
   });
 
   it("the controller's own machine counts as off the application host", () => {
@@ -455,5 +455,172 @@ describe("what the plan leaves out", () => {
       APP,
     );
     expect(protection.uncovered).toEqual([]);
+  });
+});
+
+describe("evidence belongs to the copy that carries it", () => {
+  // Found by review of the first fix: restore proof became specific to a copy
+  // while destination and coverage were still read across all of them. Both
+  // let one copy's virtue answer for another's.
+
+  /** A copy that says what it captured as well as where it went. */
+  const held = (
+    id: string,
+    at: string,
+    kind: string,
+    covers: string | null = null,
+  ) =>
+    record({
+      id,
+      at,
+      ref: { kind: "backup-copy", id },
+      title: "A copy was written",
+      facts: [
+        { key: "destination-kind", value: kind },
+        { key: "size", value: "2.8 kB" },
+        ...(covers ? [{ key: "covers", value: covers }] : []),
+      ],
+    });
+
+  const volume = (id: string, holds: string) =>
+    record({
+      id: `volume-${id}`,
+      ref: { kind: "volume", id },
+      title: `${id} is on disk`,
+      facts: [{ key: "holds", value: holds }],
+    });
+
+  const restoreOf = (of: string, at: string, covers: string | null) =>
+    record({
+      id: "restore",
+      at,
+      ref: { kind: "restore-test", id: "restore-1" },
+      title: "A copy was restored and checked",
+      facts: [
+        ...(covers ? [{ key: "covers", value: covers }] : []),
+        { key: "restored-copy", value: of },
+      ],
+    });
+
+  const planCovering = (what: string, at = AT) =>
+    record({
+      id: "plan",
+      at,
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination", value: "s3://shop-backups" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: what },
+      ],
+    });
+
+  it("does not let an older off-site copy vouch for a newer local one", () => {
+    // Restoring the newest copy proves the newest copy. It does not move it
+    // off the server, and an off-site copy from last week is a different
+    // recovery point rather than a property of this one.
+    const said = verdict([
+      held("old-offsite", "2026-09-14T10:00:00.000Z", "off-site"),
+      held("fresh-local", "2026-09-15T09:00:00.000Z", "same-server"),
+      restore("2026-09-15T09:30:00.000Z", "verified", "fresh-local"),
+    ]);
+    expect(said.state).toBe("restore-verified");
+    // Review found this returning limit:null and next:null, because an
+    // off-site copy from yesterday satisfied the off-server question for a
+    // copy written today.
+    expect(said.limit).toBeTruthy();
+    expect(said.limit).toContain("on the application's own server");
+    // The older off-site copy is still worth knowing about, said as its own
+    // recovery point and not as reassurance about the newest.
+    expect(said.limit).toContain("off the server");
+    expect(said.next).not.toBeNull();
+  });
+
+  const covered = (records: SavedInformation[]) =>
+    protectionVerdict(protectionFromRecords(records, NOW, APP), NOW);
+
+  it("does not let a widened plan add data to copies already taken", () => {
+    // The plan learns about the uploads today. Every copy on the shelf was
+    // taken before it did, and none of them contains an upload.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T10:00:00.000Z"),
+      held("db-only", "2026-09-15T09:00:00.000Z", "off-site", "shop-db"),
+      // The restore says what it brought back, and it was the database.
+      restoreOf("db-only", "2026-09-15T09:30:00.000Z", "shop-db"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("Customer uploads");
+    expect(said.next?.label).toBe("Cover the rest");
+  });
+
+  it("says the plan changed after the newest copy, when nothing else can", () => {
+    // Neither the copy nor the restore recorded what was in it. The only
+    // thing still true is that the copy was written before the plan said
+    // this, so the plan's coverage is not a description of it.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T10:00:00.000Z"),
+      held("silent", "2026-09-15T09:00:00.000Z", "off-site"),
+      restoreOf("silent", "2026-09-15T09:30:00.000Z", null),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("stated after the newest copy was written");
+    expect(said.limit).toContain("no record says what that copy holds");
+    expect(said.next?.label).toBe("Back up now");
+  });
+
+  it("prefers what the restore brought back to what the plan intends", () => {
+    // A restore that says what it recovered is the strongest evidence there
+    // is about a copy's contents, and outranks the copy's own claim.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
+      held(
+        "claims-both",
+        "2026-09-15T09:00:00.000Z",
+        "off-site",
+        "shop-db, shop-uploads",
+      ),
+      restoreOf("claims-both", "2026-09-15T09:30:00.000Z", "shop-db"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.limit).toContain("The restore did not bring back");
+    expect(said.limit).toContain("Customer uploads");
+  });
+
+  it("clears the coverage warning once a copy actually holds the data", () => {
+    // The other half of the rule: a copy taken after the plan widened, whose
+    // own record says it captured both, is not warned about.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
+      held(
+        "both",
+        "2026-09-15T09:00:00.000Z",
+        "off-site",
+        "shop-db, shop-uploads",
+      ),
+      restoreOf("both", "2026-09-15T09:30:00.000Z", "shop-db, shop-uploads"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.state).toBe("restore-verified");
+    expect(said.limit).toBeNull();
+  });
+
+  it("keeps each copy's destination on that copy", () => {
+    const protection = protectionFromRecords(
+      [
+        held("old-offsite", "2026-09-14T10:00:00.000Z", "off-site"),
+        held("fresh-local", "2026-09-15T09:00:00.000Z", "same-server"),
+      ],
+      NOW,
+    );
+    expect(protection.copies[0].id).toBe("fresh-local");
+    expect(protection.copies[0].kind).toBe("same-server");
+    expect(protection.copies[1].kind).toBe("off-site");
   });
 });
