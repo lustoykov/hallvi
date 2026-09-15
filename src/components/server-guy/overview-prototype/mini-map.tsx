@@ -39,6 +39,20 @@ function thumbName(id: string, name: string) {
   return name.split("/").pop() ?? name;
 }
 
+/**
+ * SVG text does not wrap and does not clip: it simply keeps going, out of its
+ * box and across whatever is next to it. So a label that will not fit has to
+ * be cut here, at the width the box actually has.
+ *
+ * The full name is one click away — the whole thumbnail is a button that
+ * opens Architecture — which is what makes cutting it acceptable.
+ */
+function fit(text: string, boxWidth: number, fontSize = 23, inset = 54) {
+  const room = boxWidth - inset;
+  const budget = Math.max(3, Math.floor(room / (fontSize * 0.56)));
+  return text.length <= budget ? text : `${text.slice(0, budget - 1)}…`;
+}
+
 export function MiniMap({
   model,
   reduced,
@@ -54,19 +68,30 @@ export function MiniMap({
 }) {
   const layout = useMemo(() => layoutFor(model), [model]);
   const planned = model.status !== "live";
-  const service = model.parts.find((part) => part.kind === "private");
+  const services = model.parts.filter((part) => part.kind === "private");
   const volumes = model.parts.filter((part) => part.kind === "volume");
+  // Drawing one service and saying nothing about the other two is the
+  // thumbnail claiming a shape the records contradict — the same rule the
+  // full map already follows.
   const stops = [
     "source",
     "controller",
     "app",
-    service?.id,
+    ...services.map((service) => service.id),
     ...volumes.map((volume) => volume.id),
     "offsite",
   ].filter((id): id is string => Boolean(id));
+  // A thumbnail shows the shape. Four long container names at a third of
+  // their usual size is not a shape, it is a paragraph — so past two, the
+  // data locations keep their tiles and their state dots and the shelf says
+  // how many there are.
+  const nameVolumes = volumes.length <= 2;
   const visit = layout.legs.visit.flat();
   const host = model.byId.host;
   const header = BOX.header.y + BOX.header.h;
+  const server = layout.rects.server ?? BOX.server;
+  const shelf = layout.rects.shelf ?? BOX.shelf;
+  const privateZone = layout.rects.private ?? BOX.private;
   return (
     <button
       type="button"
@@ -79,19 +104,22 @@ export function MiniMap({
         onOpen(part ?? undefined);
       }}
     >
-      <svg viewBox={`0 ${MAP_TOP} ${MAP_W} ${MAP_H}`} aria-hidden="true">
+      <svg
+        viewBox={`0 ${MAP_TOP} ${MAP_W} ${layout.height}`}
+        aria-hidden="true"
+      >
         <rect
           className="axo-map-server"
-          x={BOX.server.x}
-          y={BOX.server.y}
-          width={BOX.server.w}
-          height={BOX.server.h}
+          x={server.x}
+          y={server.y}
+          width={server.w}
+          height={server.h}
           rx="26"
         />
         <line
           className="axo-map-rule"
-          x1={BOX.server.x}
-          x2={BOX.server.x + BOX.server.w}
+          x1={server.x}
+          x2={server.x + server.w}
           y1={header}
           y2={header}
         />
@@ -104,36 +132,36 @@ export function MiniMap({
             fill="transparent"
           />
           <circle
-            cx={BOX.server.x + 30}
+            cx={server.x + 30}
             cy={BOX.header.y + 27}
             r="8"
             fill={tint[host?.evidence.certainty ?? "unknown"]}
           />
           <text
             className="axo-map-title"
-            x={BOX.server.x + 50}
+            x={server.x + 50}
             y={BOX.header.y + 36}
           >
             {host?.name ?? "Your server"}
           </text>
         </g>
-        {service && (
+        {services.length > 0 && (
           <rect
             className="axo-map-private"
-            x={BOX.private.x}
-            y={BOX.private.y}
-            width={BOX.private.w}
-            height={BOX.private.h}
+            x={privateZone.x}
+            y={privateZone.y}
+            width={privateZone.w}
+            height={privateZone.h}
             rx="18"
           />
         )}
         {volumes.length > 0 && (
           <rect
             className="axo-map-shelf"
-            x={BOX.shelf.x}
-            y={BOX.shelf.y}
-            width={BOX.shelf.w}
-            height={BOX.shelf.h}
+            x={shelf.x}
+            y={shelf.y}
+            width={shelf.w}
+            height={shelf.h}
             rx="18"
           />
         )}
@@ -205,16 +233,34 @@ export function MiniMap({
                 r="8"
                 fill={part.quiet ? "#3e4a60" : tint[part.evidence.certainty]}
               />
-              <text x={r.x + 42} y={r.y + r.h / 2 + 8}>
-                {thumbName(id, part.name)}
-              </text>
+              {(part.kind !== "volume" || nameVolumes) && (
+                <text x={r.x + 42} y={r.y + r.h / 2 + 8}>
+                  {fit(thumbName(id, part.name), r.w)}
+                </text>
+              )}
             </g>
           );
         })}
+        {!nameVolumes && (
+          <text
+            className="axo-map-count"
+            x={shelf.x + shelf.w - 20}
+            y={shelf.y + 22}
+            textAnchor="end"
+          >
+            {volumes.length} data locations
+          </text>
+        )}
         {model.gaps.some((gap) => gap.id === "monitoring") && (
           <g data-part="gap:monitoring" className="axo-map-ghost">
-            <rect x={924} y={96} width={176} height={72} rx="14" />
-            <text x={946} y={140}>
+            <rect
+              x={BOX.watch.x}
+              y={BOX.watch.y}
+              width={BOX.watch.w}
+              height={BOX.watch.h}
+              rx="14"
+            />
+            <text x={BOX.watch.x + 22} y={BOX.watch.y + BOX.watch.h / 2 + 8}>
               Monitoring
             </text>
           </g>

@@ -312,6 +312,13 @@ export function scenarios(): Scenario[] {
       records: richRecords(rich),
     },
     {
+      id: "cccccccc-0000-4000-8000-000000000001",
+      name: "Scenario · Paperless-ngx",
+      shows:
+        "The shape that broke the map: three backing services, four data locations, and the names an upstream Compose file actually uses.",
+      records: paperlessRecords("cccccccc-0000-4000-8000-000000000001"),
+    },
+    {
       id: overclaimed,
       name: "Scenario · overclaimed",
       shows:
@@ -915,5 +922,176 @@ function richRecords(id: string): SavedInformation[] {
         remotePort: 8443,
       },
     }),
+  ];
+}
+
+/**
+ * A Paperless-like stack, at the size that broke the map.
+ *
+ * Three backing services and four data locations, with the names a real
+ * upstream Compose file uses rather than short ones invented to fit. The
+ * diagram shrank its boxes to make room and left the text at its own size, so
+ * names wrapped out of their boxes and across the wires.
+ */
+function paperlessRecords(id: string): SavedInformation[] {
+  const services = [
+    ["paperless-postgres", "PostgreSQL 16", "the database"],
+    ["paperless-valkey", "Valkey", "the task broker"],
+    ["paperless-gotenberg", "Gotenberg", "document conversion"],
+  ] as const;
+  const volumes = [
+    [
+      "paperless-ngx-data",
+      "Indexes and the search database",
+      "/usr/src/paperless/data",
+      "3.4 GB",
+    ],
+    [
+      "paperless-ngx-media",
+      "Every document ever filed",
+      "/usr/src/paperless/media",
+      "48.2 GB",
+    ],
+    [
+      "paperless-postgres-data",
+      "PostgreSQL's own files",
+      "/var/lib/postgresql/data",
+      "2.1 GB",
+    ],
+    ["paperless-valkey-data", "Queued and running tasks", "/data", "18 MB"],
+  ] as const;
+  return [
+    states(
+      id,
+      { kind: "application", id },
+      {
+        at: ago(2 * HOUR),
+        title: "Paperless-ngx",
+        views: ["architecture", "overview"],
+        content: {
+          kind: "topology",
+          from: "observed",
+          parts: [
+            {
+              id: "paperless-webserver",
+              kind: "web",
+              name: "paperless-webserver",
+              role: "the site people use",
+              plain: "the site",
+            },
+            ...services.map(([partId, name, role]) => ({
+              id: partId,
+              kind: "private" as const,
+              name,
+              role,
+              plain: role,
+            })),
+            ...volumes.map(([partId, holds]) => ({
+              id: partId,
+              kind: "volume" as const,
+              name: partId,
+              role: holds,
+              plain: holds,
+            })),
+          ],
+          edges: [
+            {
+              from: "paperless-webserver",
+              to: "paperless-postgres",
+              network: "private",
+            },
+            {
+              from: "paperless-webserver",
+              to: "paperless-valkey",
+              network: "private",
+            },
+            {
+              from: "paperless-webserver",
+              to: "paperless-gotenberg",
+              network: "private",
+            },
+            {
+              from: "paperless-webserver",
+              to: "paperless-ngx-data",
+              network: "disk",
+            },
+            {
+              from: "paperless-webserver",
+              to: "paperless-ngx-media",
+              network: "disk",
+            },
+            {
+              from: "paperless-postgres",
+              to: "paperless-postgres-data",
+              network: "disk",
+            },
+            {
+              from: "paperless-valkey",
+              to: "paperless-valkey-data",
+              network: "disk",
+            },
+          ],
+        },
+      },
+    ),
+    states(
+      id,
+      { kind: "host", id: "paperless-host" },
+      {
+        at: ago(2 * HOUR),
+        title: "The server",
+        views: ["overview"],
+        facts: [
+          fact("address", "203.0.113.41"),
+          fact("region", "Helsinki"),
+          fact("size", "CPX31 · 4 vCPU · 8 GB"),
+        ],
+        checks: [check("ssh", "passed", "reachability")],
+      },
+    ),
+    states(
+      id,
+      { kind: "process", id: "paperless-webserver" },
+      {
+        at: ago(20 * MINUTE),
+        title: "The site answers",
+        views: ["processes"],
+        facts: [
+          fact("image", "ghcr.io/paperless-ngx/paperless-ngx:2.13.5"),
+          fact("port", "8000"),
+        ],
+        checks: [check("http", "passed", "reachability")],
+      },
+    ),
+    ...services.map(([partId, name, role]) =>
+      states(
+        id,
+        { kind: "process", id: partId },
+        {
+          at: ago(20 * MINUTE),
+          title: `${name} is running`,
+          views: ["processes"],
+          facts: [fact("product", name), fact("role", role)],
+          checks: [check("reachable", "passed", "reachability")],
+        },
+      ),
+    ),
+    ...volumes.map(([partId, holds, path, size]) =>
+      states(
+        id,
+        { kind: "volume", id: partId },
+        {
+          at: ago(2 * HOUR),
+          title: `${partId} survives replacement`,
+          views: ["storage"],
+          facts: [
+            fact("path", path),
+            fact("holds", holds),
+            fact("size", size, "contents"),
+          ],
+          checks: [check("persistence", "passed", "configuration")],
+        },
+      ),
+    ),
   ];
 }

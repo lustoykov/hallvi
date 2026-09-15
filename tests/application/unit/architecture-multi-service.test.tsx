@@ -167,12 +167,16 @@ describe("a map with two backing services and three volumes", () => {
         onAsk={() => undefined}
       />,
     );
-    // The design's own coordinates for the one-service case, untouched:
-    // the service at 612/1120 across, the two volumes in their own slots,
-    // and the original straight disk wires.
+    // The design's own coordinates for the one-service case: the service at
+    // 612/1120 across, the two volumes in their own slots, and straight disk
+    // wires rather than the elbows a shared shelf needs.
     expect(html).toContain("left:54.64285714285714%;top:40.400000000000006%");
-    expect(html).toContain('d="M430 338V434"');
     expect(html).toContain('d="M710 338V434"');
+    // The application card is the one box that moved, and only downwards: at
+    // 1280 it held a name, a description and a reading in room for two of
+    // them, so `paperless-webserver` pushed its own status line out of the
+    // bottom. Its wire leaves from the new edge; nothing else shifted.
+    expect(html).toContain('d="M430 346V434"');
     expect(html).toContain("Application data");
     expect(html).not.toContain("Valkey");
   });
