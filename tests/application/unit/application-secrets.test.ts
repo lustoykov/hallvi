@@ -507,3 +507,40 @@ describe("the environment a change runs in", () => {
     expect(echoed).toBe(nasty);
   });
 });
+
+describe("a second change while one is in flight", () => {
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("is refused, rather than discarding the password that still works", () => {
+    // Before this was refused, the second begin overwrote the predecessor
+    // with the first change's unproven value. Rolling back then restored a
+    // password nothing had ever accepted, and the application was locked out
+    // by the very mechanism meant to prevent it. A retried turn is the
+    // ordinary way to reach this.
+    const original = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(() => secrets.beginChange(APP, "POSTGRES_PASSWORD")).toThrow(
+      /already part-way through/,
+    );
+    // And the working value is still the one that comes back.
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", false);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(original);
+  });
+
+  it("lets a change begin again once the first is settled", () => {
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    const second = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(second.changing).toBe(true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
+      second.next,
+    );
+  });
+});

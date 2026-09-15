@@ -389,6 +389,20 @@ export function beginChange(
     throw new Error(
       `No value is held for ${name}, so there is none to change.`,
     );
+  // A second change while one is in flight used to overwrite the predecessor
+  // with the first change's unproven value — so rolling back restored a
+  // password nothing had ever accepted, and $NAME_PREVIOUS exported one too.
+  // A retried turn, or a restart followed by a retry, is the ordinary way to
+  // reach this, which is what makes refusing better than guessing which of
+  // the two to keep.
+  if (found.previous)
+    throw new Error(
+      `A change to ${name} is already part-way through, and the value that ` +
+        `still works is being held for it. Settle that one first: ` +
+        `settle_credential_change with established true if you have proved ` +
+        `the new value against the service, or false to put the working one ` +
+        `back. Then begin again.`,
+    );
   if (supplied !== undefined && supplied.length < MINIMUM_LENGTH)
     throw new Error(
       `Server Guy holds secrets of at least ${MINIMUM_LENGTH} characters.`,

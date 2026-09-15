@@ -35,9 +35,15 @@ const VISIBLE_MS = 30_000;
 export function RevealSecret({
   applicationId,
   name,
+  revealable = true,
+  changing = false,
 }: {
   applicationId: string;
   name: string;
+  /** Only a generated value can be read back; see revealSecret. */
+  revealable?: boolean;
+  /** A replacement is part-way through and not yet proven. */
+  changing?: boolean;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -123,46 +129,59 @@ export function RevealSecret({
     }
   };
 
+  // An owner-supplied value with nothing in flight has nothing to offer here:
+  // it cannot be read back and there is no change to report. Rendering an
+  // empty container would leave its spacing behind in the panel.
+  if (!revealable && !changing) return null;
+
   return (
     <div className="sg-reveal">
-      <div className="sg-reveal-row">
-        {/* Masked by default, and the mask is not the value: there is no
+      {revealable && (
+        <div className="sg-reveal-row">
+          {/* Masked by default, and the mask is not the value: there is no
             plaintext in the DOM until the reader asks for it. */}
-        <code className="sg-reveal-value" data-shown={value ? "" : undefined}>
-          {/* The mask says "hidden"; it deliberately does not match the
+          <code className="sg-reveal-value" data-shown={value ? "" : undefined}>
+            {/* The mask says "hidden"; it deliberately does not match the
               value's length, which is not the reader's business and wrapped
               onto two lines in a narrow column. */}
-          {value ?? "••••••••••••"}
-        </code>
-        <button
-          type="button"
-          className="sg-reveal-button"
-          onClick={value ? hide : reveal}
-          disabled={busy}
-          aria-label={value ? `Hide ${name}` : `Reveal ${name}`}
-        >
-          {value ? (
-            <EyeSlash weight="bold" aria-hidden="true" />
-          ) : (
-            <Eye weight="bold" aria-hidden="true" />
-          )}
-          {value ? "Hide" : busy ? "Reading…" : "Reveal"}
-        </button>
-        <button
-          type="button"
-          className="sg-reveal-button"
-          onClick={copy}
-          disabled={busy}
-          aria-label={`Copy ${name}`}
-        >
-          {copied ? (
-            <Check weight="bold" aria-hidden="true" />
-          ) : (
-            <Copy weight="bold" aria-hidden="true" />
-          )}
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
+            {value ?? "••••••••••••"}
+          </code>
+          <button
+            type="button"
+            className="sg-reveal-button"
+            onClick={value ? hide : reveal}
+            disabled={busy}
+            aria-label={value ? `Hide ${name}` : `Reveal ${name}`}
+          >
+            {value ? (
+              <EyeSlash weight="bold" aria-hidden="true" />
+            ) : (
+              <Eye weight="bold" aria-hidden="true" />
+            )}
+            {value ? "Hide" : busy ? "Reading…" : "Reveal"}
+          </button>
+          <button
+            type="button"
+            className="sg-reveal-button"
+            onClick={copy}
+            disabled={busy}
+            aria-label={`Copy ${name}`}
+          >
+            {copied ? (
+              <Check weight="bold" aria-hidden="true" />
+            ) : (
+              <Copy weight="bold" aria-hidden="true" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      )}
+      {changing && (
+        <p className="sg-reveal-note" data-held="">
+          A replacement is part-way through and not in use yet. The value that
+          still works is being kept until the new one is proved.
+        </p>
+      )}
       {value && (
         <p className="sg-reveal-note">
           On screen for {VISIBLE_MS / 1000} seconds, then hidden again. Server

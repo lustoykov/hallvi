@@ -112,7 +112,8 @@ export function ManifestDirection({
                     : "Nothing applied yet"}
             </Tag>
             <span>
-              No value appears on this page.{" "}
+              No value is printed on this page; a credential Server Guy
+              generated opens to a Reveal.{" "}
               {held.length
                 ? `${held.length === 1 ? "One is" : `${held.length} are`} held on the host, where only the process that needs it can read it. `
                 : ""}
@@ -311,11 +312,17 @@ function Opened({
         <div>
           <dt>Where the value is</dt>
           <dd>
-            {value.revealable && applicationId ? (
+            {value.held && applicationId ? (
               <>
-                {value.where}. Server Guy generated it, so you have never seen
-                it — read it back here when you need it.
-                <RevealSecret applicationId={applicationId} name={value.name} />
+                {value.revealable
+                  ? `${value.where}. Server Guy generated it, so you have never seen it — read it back here when you need it.`
+                  : `${value.where}, and never printed here.`}
+                <RevealSecret
+                  applicationId={applicationId}
+                  name={value.name}
+                  revealable={Boolean(value.revealable)}
+                  changing={Boolean(value.changing)}
+                />
               </>
             ) : (
               `${value.where}, and never printed here`

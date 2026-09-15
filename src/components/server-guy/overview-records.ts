@@ -28,6 +28,11 @@ import {
 } from "@/server/record-projection";
 
 import type { ApplicationSection } from "./application-sections";
+import {
+  protectionFromRecords,
+  protectionVerdict,
+  type ProtectionVerdict,
+} from "./backups-records";
 import type { Certainty, Fact } from "./architecture-prototype/model";
 import type {
   Idea,
@@ -88,6 +93,31 @@ function when(at: string, now: number) {
   if (hours < 24) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
 }
+
+/** The verdict's four tones in the lane's own vocabulary. */
+const verdictCertainty: Record<ProtectionVerdict["tone"], Certainty> = {
+  verified: "verified",
+  warning: "warning",
+  failed: "failed",
+  unknown: "unknown",
+};
+
+/**
+ * Short captions for the four-line stack beside the timeline. The verdict's
+ * full sentence is too long for this column and goes in `plain` instead.
+ */
+const verdictCaption: Partial<Record<ProtectionVerdict["state"], string>> = {
+  "not-assessed": "Nobody has looked yet",
+  "none-configured": "Nothing backs this up",
+  "scheduled-no-copy": "Scheduled, no copy yet",
+  "local-only": "On the server only",
+  "offsite-untested": "Copied, restore untested",
+  "restore-verified": "Restore proved",
+  "backup-failed": "A backup failed",
+  "backup-overdue": "Overdue",
+  "restore-failed": "A restore failed",
+  "evidence-stale": "Proof has lapsed",
+};
 
 interface Held {
   check: RecordCheck;
@@ -298,6 +328,14 @@ export function overviewFromRecords({
 }): Overview {
   const live = records.filter((record) => !record.retiredAt);
   const gathered = byLane(live);
+  // Backups is the one lane its own checks cannot answer: a plan's timer
+  // passing says nothing about a copy existing, and a copy says nothing about
+  // a restore. The destination page already works that out, so the lane reads
+  // the same verdict rather than forming a second opinion. It claimed to
+  // share it before this and did not — a plan with a passing timer and no
+  // restore read "Verified" here and "Limited" three clicks away, and on the
+  // rig they agreed only because Pi happened to mark the plan a warning.
+  const backups = protectionVerdict(protectionFromRecords(records, now), now);
 
   // ---- what wants you -------------------------------------------------
   const needs: NeedItem[] = [];
@@ -385,12 +423,19 @@ export function overviewFromRecords({
     // outranks the recorded reading the way any failure does. Only the Access
     // lane hears it: the application, its data and the server are all exactly
     // as they were, and it is only the way in from this PC that is gone.
+    const verdict = id === "backups" ? backups : null;
     const certainty: Certainty =
       id === "access" && accessClosed
         ? "failed"
-        : declared
+        : // A declared absence keeps the contract's own reading. "Nothing
+          // backs this up" is a finding, and the lane's word for it is "Not
+          // set up" rather than a warning — the verdict's sentence carries
+          // the detail underneath.
+          verdict?.state === "none-configured" || (declared && !verdict)
           ? "absent"
-          : readLane(held, now);
+          : verdict
+            ? verdictCertainty[verdict.tone]
+            : readLane(held, now);
     const facts: Fact[] = subjects.flatMap((ref) =>
       [...currentFacts(live, ref).values()].map((item) => ({
         label: item.value.label,
@@ -404,7 +449,8 @@ export function overviewFromRecords({
     const text =
       id === "access" && accessClosed
         ? "Tunnel is closed"
-        : laneText(held, certainty, now);
+        : (verdict && verdictCaption[verdict.state]) ||
+          laneText(held, certainty, now);
     return {
       id,
       label: chrome[id].label,
@@ -417,7 +463,16 @@ export function overviewFromRecords({
       // is available privately from this PC" and that was true when it was
       // written. Repeating it under a closed tunnel is the same lie in
       // longer words.
-      plain: id === "access" && accessClosed ? text : (spoken ?? text),
+      // The destination page's own sentence, so the lane and the page cannot
+      // differ about what the copies add up to. The limit is part of it: a
+      // lane that says a plan is limited without saying *what* the limit is
+      // has told the reader only that they should worry.
+      plain:
+        id === "access" && accessClosed
+          ? text
+          : verdict
+            ? [verdict.says, verdict.limit].filter(Boolean).join(" ")
+            : (spoken ?? text),
       facts: facts.slice(0, 6),
       destination: chrome[id].destination,
       ask: chrome[id].ask,

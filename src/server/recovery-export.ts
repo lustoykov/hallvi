@@ -48,6 +48,7 @@ import {
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { databasePath } from "./db";
 import { piConfigDir } from "./pi-configuration";
 
 const exec = promisify(execFile);
@@ -69,6 +70,13 @@ const INCLUDED: { path: string; what: string; sensitive: boolean }[] = [
     what: "Applications, conversations, messages and saved records",
     sensitive: false,
   },
+  // Not listed as files: `server-guy.db-wal` and `-shm`. The database runs in
+  // WAL mode, so recent writes live in the log rather than the main file, and
+  // copying the three as they lie on disk is a race with whatever the worker
+  // is doing. `snapshotDatabase` writes one consistent file instead. Copying
+  // only `server-guy.db` was the original bug: on a live controller the log
+  // was several times the size of the main file, so an archive written that
+  // way would have been missing most of the week.
   {
     path: "secrets",
     what: "Every credential the owner supplied or the controller generated, sealed, together with the key that seals them",
@@ -234,10 +242,16 @@ export async function writeRecoveryExport(options: {
   const temporary = mkdtemp();
   writeFileSync(join(temporary, "manifest.json"), manifest, { mode: 0o600 });
   try {
+    // The database comes from the snapshot, everything else from the config
+    // directory as it stands — those are ordinary files nothing is mid-write
+    // on.
+    await snapshotDatabase(temporary);
     await pipeline(
       temporary,
       base,
-      entries.map((entry) => entry.path),
+      entries
+        .map((entry) => entry.path)
+        .filter((path) => path !== "server-guy.db"),
       file,
       options.passphrase,
     );
@@ -274,7 +288,17 @@ function pipeline(
   return new Promise<void>((resolve, reject) => {
     const archive = spawn(
       "tar",
-      ["-cf", "-", "-C", temporary, "manifest.json", "-C", base, ...paths],
+      [
+        "-cf",
+        "-",
+        "-C",
+        temporary,
+        "manifest.json",
+        "server-guy.db",
+        "-C",
+        base,
+        ...paths,
+      ],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     const sink = openSync(out, "w", 0o600);
@@ -324,6 +348,25 @@ function pipeline(
     for (const child of [archive, encrypt])
       child.on("error", (problem) => reject(problem));
   });
+}
+
+/**
+ * One consistent database file, including everything still in the log.
+ *
+ * `better-sqlite3`'s own `backup()` is used rather than copying the three WAL
+ * files: it takes a read lock, walks the pages and writes a single complete
+ * database, so the result is what the controller would read if it opened it
+ * now — not a main file that is hours behind its log, and not a set of three
+ * files captured at three different instants while the worker was writing.
+ */
+async function snapshotDatabase(into: string) {
+  const { default: Database } = await import("better-sqlite3");
+  const source = new Database(databasePath(), { readonly: true });
+  try {
+    await source.backup(join(into, "server-guy.db"));
+  } finally {
+    source.close();
+  }
 }
 
 function mkdtemp() {

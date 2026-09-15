@@ -40,6 +40,17 @@ export interface Protection {
   assessed: boolean;
   /** A record states there is no plan — different from nobody having looked. */
   declaredAbsent: boolean;
+  /** A plan is on record, whether or not it states a schedule. */
+  planned: boolean;
+  /**
+   * Pi marked one of these records a warning, and what it said.
+   *
+   * A judgement, not a reading: it outranks a passing check on the same
+   * record and does not age. Overview's lane learned this first; the verdict
+   * has to know it too, or delegating the lane to the verdict would quietly
+   * undo it.
+   */
+  judged: string | null;
   /**
    * The classes of destination any live plan or copy declares. Empty means no
    * plan declared one, which the page reports as unclassified rather than
@@ -85,6 +96,26 @@ export function protectionFromRecords(
 
   const destinations = new Set<DestinationKind>();
   let declaredAbsent = false;
+  let judged: string | null = null;
+  let brokenPlan: Dated | null = null;
+  for (const record of live) {
+    const kind = record.presentation?.states?.ref?.kind ?? "";
+    if (!kind.startsWith("backup") && kind !== "restore-test") continue;
+    if (record.presentation?.status === "warning" && !judged)
+      judged = record.body?.trim() || record.title;
+    // A check that ran and failed on a plan is a failed backup, whatever the
+    // record's own status says. "The timer is not running" is not a warning
+    // about protection, it is the absence of it.
+    const broken = (record.presentation?.checks ?? []).find(
+      (check) => check.status === "failed",
+    );
+    if ((record.presentation?.status === "failed" || broken) && !brokenPlan)
+      brokenPlan = {
+        id: record.presentation?.states?.ref?.id ?? record.id,
+        at: record.establishedAt ?? record.createdAt,
+        detail: broken?.label ?? record.title,
+      };
+  }
   let nextRunAt: string | null = null;
   for (const ref of plans) {
     const presence = presenceOf(live, ref);
@@ -216,9 +247,18 @@ export function protectionFromRecords(
       plans.length + copies.length + restores.length > 0 ||
       Boolean(failures.copy || failures.restore),
     declaredAbsent,
+    planned: plans.length > 0,
+    judged,
     keepText,
     destinations: [...destinations],
-    failures,
+    failures: {
+      // A copy that actually failed is the more specific finding and keeps
+      // its place; a plan whose own check failed fills in when no copy did,
+      // so "the timer is not running" still reads as a failed backup rather
+      // than a warning about one.
+      copy: failures.copy ?? brokenPlan,
+      restore: failures.restore,
+    },
     nextRunAt,
     summary: {
       schedule: scheduleWords,
@@ -316,7 +356,28 @@ export function protectionVerdict(
   protection: Protection,
   now: number,
 ): ProtectionVerdict {
-  const { copies, schedules, restores, failures, destinations } = protection;
+  const { copies, schedules, restores, failures, destinations, nextRunAt } =
+    protection;
+  /**
+   * Pi's judgement, applied to whatever the arithmetic concluded.
+   *
+   * It can only ever make the answer less reassuring: a `warning` never
+   * upgrades anything, and it never overrides a failure. This is the rule
+   * Overview's lane learned first — a same-host plan whose one check passes
+   * must not read verified because Pi already said in as many words that it
+   * does not survive losing the machine.
+   */
+  const temper = (said: ProtectionVerdict): ProtectionVerdict =>
+    protection.judged
+      ? {
+          ...said,
+          // A warning never upgrades anything and never overrides a failure.
+          tone: said.tone === "verified" ? "warning" : said.tone,
+          // Pi's own words about the limit always reach the reader: it is the
+          // only place they learn *what* the limit is.
+          limit: [said.limit, protection.judged].filter(Boolean).join(" "),
+        }
+      : said;
   const newestCopy = copies[0] ?? null;
   const newestRestore = restores[0] ?? null;
   const offsite = destinations.some(
@@ -378,8 +439,8 @@ export function protectionVerdict(
       },
     };
 
-  if (schedules.length && !copies.length)
-    return {
+  if ((schedules.length || protection.planned) && !copies.length)
+    return temper({
       state: "scheduled-no-copy",
       tone: "warning",
       says: "Backups are scheduled, and none has run yet.",
@@ -389,17 +450,28 @@ export function protectionVerdict(
         draft:
           "Take a backup now rather than waiting for the schedule, and verify the copy is readable.",
       },
-    };
+    });
 
+  // Only where the words actually say daily, or a next run is on record and
+  // has passed. "On demand after a consistent snapshot" and "Weekly on
+  // Sundays" are both schedules and neither is overdue after 36 hours;
+  // treating every schedule as daily put the wrong sentence on the page and
+  // named a plan the application does not have.
+  const daily = schedules.some((schedule) =>
+    /daily|every day|nightly/i.test(schedule.detail),
+  );
+  const pastDue = Boolean(nextRunAt && Date.parse(nextRunAt) < now);
   if (
-    schedules.length &&
+    (daily || pastDue) &&
     newestCopy &&
     now - Date.parse(newestCopy.at) > OVERDUE_MS
   )
     return {
       state: "backup-overdue",
       tone: "warning",
-      says: "A daily backup is scheduled, and the newest copy is older than that.",
+      says: daily
+        ? "A daily backup is scheduled, and the newest copy is older than that."
+        : "A scheduled backup was due, and the newest copy is older than that.",
       limit:
         "Either the schedule is not running or its copies are not landing.",
       next: {
@@ -434,7 +506,7 @@ export function protectionVerdict(
         },
       };
     const stale = now - Date.parse(newestRestore.at) > STALE_MS;
-    return {
+    return temper({
       state: stale ? "evidence-stale" : "restore-verified",
       tone: stale ? "warning" : "verified",
       says: stale
@@ -458,11 +530,11 @@ export function protectionVerdict(
               draft:
                 "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
             },
-    };
+    });
   }
 
   if (copies.length && !offsite)
-    return {
+    return temper({
       state: "local-only",
       tone: "warning",
       says: "Copies exist, and all of them are on the application's own server.",
@@ -473,10 +545,10 @@ export function protectionVerdict(
         draft:
           "Every backup copy is on the application's own server. Recommend an off-server destination, tell me the trade-offs and the cost, and set it up when I agree.",
       },
-    };
+    });
 
   if (copies.length)
-    return {
+    return temper({
       state: "offsite-untested",
       tone: "warning",
       says: "Copies are reaching a destination off the application's server, and none has been restored.",
@@ -487,7 +559,7 @@ export function protectionVerdict(
         draft:
           "Restore the newest backup copy into an isolated copy of the application and verify the data and files are actually there. Record exactly what it proved.",
       },
-    };
+    });
 
   return {
     state: "not-assessed",
