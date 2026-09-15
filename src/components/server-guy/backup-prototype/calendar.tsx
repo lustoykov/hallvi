@@ -92,6 +92,7 @@ export function CalendarDirection({
   activity,
   controller,
   controllerBand,
+  lede = true,
   onAsk,
 }: ProtectProps) {
   const [open, setOpen] = useState<string | null>(null);
@@ -311,14 +312,23 @@ export function CalendarDirection({
   const say = copy
     ? `${story.copies.length === 1 ? "One copy" : `${countWord(story.copies.length)} copies`} ${story.copies.length === 1 ? "is" : "are"} on record${keep ? `; the schedule keeps ${keep}` : ""}.`
     : "No copy off the server is on record.";
-  const sub = [
-    unknownDays.length > 0 &&
-      `The scheduled ${unknownDays.length === 1 ? "copy" : "copies"} for ${listed(unknownDays.map(dayOf))} ${unknownDays.length === 1 ? "isn't" : "aren't"} on record here.`,
-    restore && `A restore test passed ${when(restore.at)}.`,
-    controller && controllerSentence(controller, now),
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // The scheduled copies nobody wrote down are the board's own finding: they
+  // are days on it, and nothing else on the page can say them. The restore
+  // and Server Guy's own copies belong to whatever leads the page, so this
+  // repeats them only when it is the thing leading.
+  const ownFinding =
+    unknownDays.length > 0
+      ? `The scheduled ${unknownDays.length === 1 ? "copy" : "copies"} for ${listed(unknownDays.map(dayOf))} ${unknownDays.length === 1 ? "isn't" : "aren't"} on record here.`
+      : "";
+  const sub = lede
+    ? [
+        ownFinding,
+        restore && `A restore test passed ${when(restore.at)}.`,
+        controller && controllerSentence(controller, now),
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : ownFinding;
 
   // A phone cannot hold three weeks of day columns, so the board scrolls
   // sideways there. Opening it at the oldest day would show a reader the one
@@ -337,24 +347,28 @@ export function CalendarDirection({
     <section className="axbc" aria-label="Backups">
       {head}
       {activity}
-      <div className="axbc-lede">
-        <div>
-          <h2 className="axbc-say">{say}</h2>
-          {sub && <p className="axbc-sub">{sub}</p>}
+      {lede ? (
+        <div className="axbc-lede">
+          <div>
+            <h2 className="axbc-say">{say}</h2>
+            {sub && <p className="axbc-sub">{sub}</p>}
+          </div>
+          <button
+            type="button"
+            className="ax-button axbc-ask"
+            onClick={() =>
+              onAsk(
+                "List the backup copies kept off the server, with their dates and sizes.",
+              )
+            }
+          >
+            <ChatCircleText weight="bold" />
+            Ask Server Guy to list the copies
+          </button>
         </div>
-        <button
-          type="button"
-          className="ax-button axbc-ask"
-          onClick={() =>
-            onAsk(
-              "List the backup copies kept off the server, with their dates and sizes.",
-            )
-          }
-        >
-          <ChatCircleText weight="bold" />
-          Ask Server Guy to list the copies
-        </button>
-      </div>
+      ) : (
+        sub && <p className="axbc-sub axbc-sub-alone">{sub}</p>
+      )}
 
       <div className="axbc-board">
         <div className="axbc-scroll" ref={scroller}>

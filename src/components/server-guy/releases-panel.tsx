@@ -69,25 +69,40 @@ export function ReleasesPanel({
   const said = releaseHeadline(view);
   const { running, access } = view;
   const earlier = view.all.filter((release) => release.id !== running?.id);
+  const diverged = Boolean(
+    running && view.latest && running.id !== view.latest.id,
+  );
   // Only a private address depends on the tunnel. A public one is answered by
   // the server whatever this Mac is doing.
   const closed = Boolean(access?.localOnly) && reachable === "closed";
 
   return (
     <section className="rp" aria-label="What is running">
-      <div className="rp-now" data-limit={said.limit ? "yes" : undefined}>
-        <div>
-          <p className="rp-says">{said.says}</p>
-          {/* Two facts, never folded into one. A reader told only that the
-              update failed does not know whether their application is up. */}
-          {said.limit && <p className="rp-limit">{said.limit}</p>}
-          {/* No fact row here. The release story below this carries the
-              running image, its digest, the revision, the server and the
-              tunnel's two ports, in more detail than a summary would — and a
-              summary above it would be the same four facts twice. What this
-              adds is the one thing that story cannot say: which release is
-              running when the newest one is not. */}
-        </div>
+      <div
+        className="rp-now"
+        data-limit={said.limit ? "yes" : undefined}
+        data-only={diverged ? undefined : "access"}
+      >
+        {/* Only when the running release and the latest attempt are different
+            records. When they are the same one, the release story below this
+            already names it, in more detail than a repeat of its short
+            revision adds, and two headings for one release is the page saying
+            the same thing twice. There is then no column here at all: an
+            empty one is a hole the reader reads as missing content.
+
+            No fact row either. The story below carries the running image, its
+            digest, the revision, the server and the tunnel's two ports. What
+            this adds is the one thing that story cannot say: which release is
+            running when the newest one is not. */}
+        {diverged && (
+          <div>
+            <p className="rp-says">{said.says}</p>
+            {/* Two facts, never folded into one. A reader told only that the
+                update failed does not know whether their application is
+                up. */}
+            {said.limit && <p className="rp-limit">{said.limit}</p>}
+          </div>
+        )}
 
         {/* The one action this page owes the reader. A link only where a
             record says there is a way in; otherwise it asks for one, rather

@@ -141,6 +141,10 @@ export function BackupsPage({
         story={story}
         now={now}
         head={head}
+        /* The stages above answer "are we backed up" and offer the one thing
+           to do about it. The board below them says which days hold a copy,
+           which is a different question and not a second summary. */
+        lede={false}
         activity={
           /* Set up, copied, opened — three stages rather than one verdict
              with three facts folded into it. Merging any two of them is the

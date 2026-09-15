@@ -29,6 +29,16 @@
 .rp-now[data-limit] {
   border-left-color: #b8811f;
 }
+/* Nothing to say, only somewhere to go. The story below already names the
+   release, so what is left is the way in, and a bordered card around one
+   button reads as a panel whose content failed to load. */
+.rp-now[data-only="access"] {
+  grid-template-columns: auto;
+  justify-content: end;
+  padding: 0;
+  border: 0;
+  background: none;
+}
 .rp-says {
   margin: 0;
   font-size: 17px;

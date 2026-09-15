@@ -32,6 +32,13 @@
   color: var(--ax-ink-2);
   text-wrap: pretty;
 }
+/* Standing on its own, under a summary something else already gave, this is
+   a caption for the board rather than a paragraph of the page. */
+.axbc-sub-alone {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--ax-ink-3, var(--ax-ink-2));
+}
 .axbc-ask {
   border-color: var(--ax-ink);
   background: var(--ax-ink);
