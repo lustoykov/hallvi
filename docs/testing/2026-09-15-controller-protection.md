@@ -1,8 +1,9 @@
 # Server Guy's own protection, 15 September 2026
 
 What was verified for automatic controller copies, and what was not. Branch
-`claude/controller-protection`, on top of `be8c199`. No real provider was
-called and no object was written to the owner's Cloudflare R2 account.
+`claude/controller-protection`, on top of `be8c199`. The focused tests use a
+local stand-in for the bucket; one real copy has since been written to and
+read back from the owner's Cloudflare R2 account, recorded below.
 
 ## What the copies are
 
@@ -14,6 +15,33 @@ selected model credential and the environment files join it in one tar, which
 is encrypted with AES-256-GCM under a generated passphrase and uploaded with a
 single signed PutObject under the bucket's `controller/` prefix. The last 14
 copies are kept. Pi never runs any of it.
+
+## The first real copy
+
+Run on 15 September 2026 at 12:33 UTC by the reviewing session, with the
+owner's authorisation, from this worktree at `70d5e50`: `protectController("daily")`
+called directly against the owner's real configuration directory and their real
+`server-guy-backups` R2 destination.
+
+- `succeeded`, `controller/20260915T123354Z-9fde0101.tar.enc`, 1,464,372 bytes,
+  657 ms from capture to uploaded, retention deleted 0 and did not fail.
+- A separately written SigV4 `GET` of that key returned 200 with the identical
+  byte count and a matching SHA-256, so both the PUT signature and the stored
+  object are proven against real R2 rather than against the stand-in.
+- `openControllerCopy` opened it with the generated passphrase: 43 files, the
+  manifest verified, both `RECOVERY_QUARANTINE` markers present, and one
+  recovery dependency recorded (point `pi-settings.json` at
+  `recovery-provider-auth.json`, or reconnect the model account).
+- The owner's configuration directory now holds `controller-protection/state.json`
+  and `recovery-key.json` with the kit unconfirmed, so Backups shows "Kit not
+  saved" for the owner to confirm. Nothing else in that directory was touched.
+
+That run also found one defect, fixed here: `payload/config/pi-settings.json`
+was written into the archive twice, because the config directory's `*.json`
+sweep and the account-directory copy both add it when `SERVER_GUY_CONFIG_DIR`
+is set — the production shape. The manifest and the reopen tolerated it by
+keying on path; the capture now skips the account copy when the same path has
+already been taken, and a test asserts the archive has no repeated path.
 
 ## Verified here
 
@@ -68,9 +96,10 @@ gone, and Settings → Connections shows the passphrase again only after
 
 ## Not verified
 
-- **No real R2 or S3 request was made.** The SigV4 signing is exercised only
-  against a stand-in that does not verify signatures. The first real upload is
-  the thing to watch; a rejected request records `failed` with its status.
+- **One real R2 round trip, on one account.** The run above proves a PUT, a
+  GET and a reopen against Cloudflare R2. It does not prove AWS S3, another R2
+  account, a bucket with different permissions, or a copy large enough to need
+  multipart upload.
 - **No replacement-controller activation.** The command restores and verifies;
   copying state into live paths, removing quarantine markers and starting a
   replacement remains the manual boundary in
@@ -81,13 +110,15 @@ gone, and Settings → Connections shows the passphrase again only after
 - **The passphrase is stored on the controller** so the worker can keep making
   copies. It is the archive's protection against whoever can read the bucket,
   not against whoever can read this machine.
-- **The manual stopped-controller script still targets the pre-schema-15
-  database** and was not updated here; the README now says so.
+- **No rehearsal has been run against these copies.** The September 2026
+  replacement rehearsal ran against the retired schema and its helper scripts;
+  the owner chose to delete that tooling rather than keep it documented as
+  broken, so [REHEARSAL.md](../../scripts/controller-backups/REHEARSAL.md) now
+  keeps the procedure and its lessons as prose with no code behind it.
 
 ## Environment
 
-macOS, Node 26, better-sqlite3 13. The full application suite passes (825
-tests). Three `@smoke` browser specs — `applications-home`,
+macOS, Node 26, better-sqlite3 13. The full application suite passes. Three `@smoke` browser specs — `applications-home`,
 `operator-information` and `typed-information` — fail in this environment;
 they fail identically on `be8c199` with none of this branch's code, so they
 are not caused by these changes.

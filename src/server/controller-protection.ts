@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { execFileSync } from "node:child_process";
 import {
   createCipheriv,
   createDecipheriv,
@@ -178,6 +179,27 @@ function walk(directory: string, prefix: string, entries: TarFile[]) {
   }
 }
 
+/**
+ * Which revision of Server Guy this copy came from, so recovery can install
+ * the code that matches its records. A controller running from something
+ * other than a checkout says so rather than guessing.
+ */
+function sourceRevision() {
+  try {
+    const git = (args: string[]) =>
+      execFileSync("git", ["-C", process.cwd(), ...args], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    return {
+      sourceRevision: git(["rev-parse", "HEAD"]),
+      sourceDirty: Boolean(git(["status", "--porcelain"])),
+    };
+  } catch {
+    return { sourceRevision: null, sourceDirty: null };
+  }
+}
+
 interface TarFile {
   path: string;
   content: Buffer;
@@ -249,11 +271,14 @@ export async function captureControllerPayload(): Promise<{
       providerId?: string;
       authPath?: string;
     };
-    entries.push({
-      path: "payload/config/pi-settings.json",
-      content: readFileSync(settingsPath),
-      mode: 0o600,
-    });
+    // The account directory is usually the config directory, whose *.json
+    // sweep has already taken this file. Do not put it in twice.
+    if (settingsPath !== join(config, "pi-settings.json"))
+      entries.push({
+        path: "payload/config/pi-settings.json",
+        content: readFileSync(settingsPath),
+        mode: 0o600,
+      });
     const auth = settings.authPath ?? "";
     if (auth && existsSync(auth) && !lstatSync(auth).isSymbolicLink()) {
       const credential = (
@@ -299,6 +324,7 @@ export async function captureControllerPayload(): Promise<{
     format: 1,
     capturedAt,
     hot: true,
+    ...sourceRevision(),
     sourcePaths: { config, database, project: process.cwd() },
     recoveryDependencies: dependencies,
     files: Object.fromEntries(

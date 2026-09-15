@@ -126,6 +126,8 @@ it("copies the controller while it runs, including committed WAL data", async ()
   expect(names).toContain("payload/config/RECOVERY_QUARANTINE");
   expect(names).toContain("payload/config/backup-destinations/default.json");
   expect(names).toContain("payload/manifest.json");
+  // One file, once: the account directory is usually the config directory.
+  expect(new Set(names).size).toBe(names.length);
   expect(Date.parse(capturedAt)).toBeGreaterThan(0);
   // The message was committed through WAL and never checkpointed; the online
   // backup has to carry it, or the copy is a copy of yesterday.
@@ -179,6 +181,9 @@ it("uploads a copy the owner can open, and offers the kit once", async () => {
   );
   expect(manifest.format).toBe(1);
   expect(manifest.hot).toBe(true);
+  // Recovery has to install the code that matches these records.
+  expect(manifest.sourceRevision).toMatch(/^[0-9a-f]{40}$/);
+  expect(typeof manifest.sourceDirty).toBe("boolean");
   // The passphrase must not be inside the thing it opens.
   for (const [, content] of opened)
     expect(content.includes(kit.passphrase)).toBe(false);
