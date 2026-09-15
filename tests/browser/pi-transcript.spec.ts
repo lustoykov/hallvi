@@ -56,7 +56,10 @@ test("Pi text stays once in order through completion and reload @journey-streami
     await page.goto(`/applications/${appId}`);
     const message = page.locator(`#sg-message-${runId}`);
     await expect(message.getByText(body, { exact: true })).toHaveCount(1);
-    const group = message.getByRole("button", { name: /File reads/ });
+    // What the group line actually says. It counts and pluralises — "1 file
+    // read" — and this asked for "File reads", so the one spec guarding the
+    // transcript has been red on main rather than guarding anything.
+    const group = message.getByRole("button", { name: /1 file read/ });
     await expect(group).toBeVisible();
     await group.click();
     await expect(

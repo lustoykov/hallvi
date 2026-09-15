@@ -82,9 +82,38 @@ test("server output streams inline, preserves reading position and stays readabl
     const card = page.locator(`#execution-${executionId}`);
     const output = card.getByRole("region", { name: "Command output" });
     await expect(output).toContainText("Waiting for command output");
-    await expect(card.getByLabel("Command", { exact: true })).toHaveText(
-      "docker compose up -d",
+    // What ran is a caption above the output, not a second scrolling pane.
+    // Two clipped panes in one dark box read as two terminals running two
+    // things, which is the single most confusing thing on this screen.
+    // Which machine, said as a machine. "on your server" was printed over
+    // every shell command whatever it touched.
+    await expect(card.locator(".sg-execution-where")).toContainText(
+      "On the server · fixture-server",
     );
+    await expect(card.locator(".sg-execution-where")).toHaveAttribute(
+      "title",
+      "root@fixture-server:22",
+    );
+    const ran = card.locator(".sg-stream-ran code");
+    await expect(ran).toHaveText("docker compose up -d");
+    expect(
+      await card.locator(".sg-stream-terminal pre").count(),
+      "one command, one output pane",
+    ).toBe(1);
+    // This payload carries a timeoutSeconds beside the command, so there is
+    // something behind the disclosure — but one line of script, so it must
+    // not be advertised as two.
+    const full = card.getByRole("button", {
+      name: "Full command",
+      exact: true,
+    });
+    await expect(full).toBeVisible();
+    await full.click();
+    await expect(card.getByLabel("Full command")).toContainText(
+      "timeoutSeconds: 120",
+    );
+    await card.getByRole("button", { name: "Hide", exact: true }).click();
+    await expect(card.getByLabel("Full command")).toHaveCount(0);
     const lines = Array.from(
       { length: 60 },
       (_, i) => `Building layer ${i + 1}/60`,

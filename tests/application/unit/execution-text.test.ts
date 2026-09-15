@@ -12,7 +12,9 @@ import {
   commandOf,
   essence,
   executionLine,
+  hostOf,
   plainText,
+  whereItRan,
 } from "@/components/server-guy/execution-text";
 
 describe("reading the envelope", () => {
@@ -145,5 +147,53 @@ describe("the full payload, for a disclosure", () => {
 
   it("leaves plain text alone", () => {
     expect(plainText("just text")).toBe("just text");
+  });
+});
+
+describe("which machine a command ran on", () => {
+  // The console printed "on your server" over a shell command and the raw
+  // recorded target over everything else, so a container on this Mac, a
+  // tunnel this Mac holds open and a call to Hetzner all arrived as prose the
+  // reader had to decode — and the one that can break the application read
+  // like the rest of them.
+
+  it("names the application's server, and the address a person recognises", () => {
+    expect(
+      whereItRan({ tool: "server_bash", target: "root@203.0.113.7:22" }),
+    ).toEqual({ said: "On the server", detail: "203.0.113.7" });
+  });
+
+  it("does not call a workspace container the server", () => {
+    expect(
+      whereItRan({ tool: "bash", target: "Repository workspace" }),
+    ).toEqual({
+      said: "In the repository copy",
+      detail: "an isolated container on this Mac",
+    });
+  });
+
+  it("puts controller-side work on this Mac", () => {
+    for (const tool of [
+      "open_server_port",
+      "server_public_key",
+      "connect_server",
+      "check_public_access",
+    ])
+      expect(whereItRan({ tool, target: "Private access" })?.said, tool).toBe(
+        "On this Mac",
+      );
+  });
+
+  it("says nothing rather than guessing about a tool it does not know", () => {
+    expect(whereItRan({ tool: "some_future_tool", target: "x" })).toBeNull();
+    // An approval is a question and runs nowhere at all.
+    expect(
+      whereItRan({ tool: "request_approval", target: "User decision" }),
+    ).toBeNull();
+  });
+
+  it("reads the host out of a login string, and leaves prose alone", () => {
+    expect(hostOf("deploy@example.test:2222")).toBe("example.test");
+    expect(hostOf("Repository workspace")).toBeNull();
   });
 });

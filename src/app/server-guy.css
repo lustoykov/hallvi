@@ -550,6 +550,50 @@
 .sg-reply-pending svg {
   width: 15px;
 }
+/* What is still running, on the same measure as the composer under it.
+   Quiet on purpose: this is Server Guy working, not a problem. */
+.sg-still-working {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  width: min(100%, var(--sg-measure, 760px));
+  margin: 0 auto 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sg-surface, #fff);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.sg-still-working svg {
+  width: 13px;
+  flex: none;
+}
+.sg-still-what {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.sg-still-what small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.sg-still-show {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+.sg-still-show:hover {
+  background: var(--sg-hover, rgba(25, 35, 56, 0.05));
+}
 .sg-error {
   padding: 10px 12px;
   border: 1px solid #efb9b5;
@@ -603,6 +647,19 @@
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.6;
+}
+/* The elapsed time, set apart from the sentence. It is the half that moves,
+   and a reader checking on a long turn is looking for whether it still is. */
+.sg-run-elapsed {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+/* A turn stopped on the reader is not a turn that is working. */
+.sg-run-status [data-waiting] {
+  color: var(--ink);
+  font-weight: 500;
 }
 .sg-run-status svg {
   width: 12px;

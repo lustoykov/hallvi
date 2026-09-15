@@ -37,6 +37,7 @@ const MINIMUM_LENGTH = 8;
 export const SECRET_REQUEST_ANCHOR = "sg-secret-request";
 
 import "./secret-request.css";
+import { useOffScreen } from "./use-off-screen";
 
 export interface SecretRequest {
   name: string;
@@ -304,35 +305,7 @@ function when(at: string) {
  */
 export function SecretRequestsChip({ secrets }: { secrets: SecretRequest[] }) {
   const waiting = secrets.filter((secret) => !secret.establishedAt).length;
-  const [away, setAway] = useState(false);
-
-  useEffect(() => {
-    if (!waiting) return;
-    let watch: IntersectionObserver | null = null;
-    let frame = 0;
-    let tries = 0;
-    const attach = () => {
-      const block = document.getElementById(SECRET_REQUEST_ANCHOR);
-      if (block) {
-        watch = new IntersectionObserver(
-          ([entry]) => setAway(!entry.isIntersecting),
-          { threshold: 0.12 },
-        );
-        watch.observe(block);
-        return;
-      }
-      // The request is a sibling in the transcript, so on a cold load this
-      // can run a frame or two before there is anything to watch. Giving up
-      // on the first miss is how the chip goes missing exactly when the
-      // transcript is long enough to need it.
-      if (tries++ < 60) frame = requestAnimationFrame(attach);
-    };
-    attach();
-    return () => {
-      cancelAnimationFrame(frame);
-      watch?.disconnect();
-    };
-  }, [waiting]);
+  const away = useOffScreen(SECRET_REQUEST_ANCHOR, waiting > 0);
 
   if (!waiting || !away) return null;
   return (

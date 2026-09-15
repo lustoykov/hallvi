@@ -37,6 +37,8 @@ import { LocalTime } from "./local-time";
 import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
+import { useOffScreen } from "./use-off-screen";
+import { runActivity, useClockReady, type RunActivity } from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import {
   SecretRequests,
@@ -135,13 +137,25 @@ export function stopOutcome(
   return ["Stopped.", already, unconfirmed].filter(Boolean).join(" ");
 }
 
-/** "Working for 1m 12s" — Pi is busy, and for how long. */
-function working(run: PiRun | undefined, now: number) {
-  const started = run?.startedAt ? Date.parse(run.startedAt) : null;
-  if (!started || !now || now < started) return "Working";
-  const seconds = Math.floor((now - started) / 1000);
-  if (seconds < 60) return `Working for ${seconds}s`;
-  return `Working for ${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+/**
+ * What Pi is doing, and for how long, on one line.
+ *
+ * The elapsed time is set apart rather than folded into the sentence: it is
+ * the half that changes every second, and a reader glancing at a running turn
+ * is looking for whether the number is still moving.
+ */
+function Doing({ activity }: { activity: RunActivity }) {
+  const clock = useClockReady();
+  return (
+    <>
+      <span data-waiting={activity.waitingOnYou || undefined}>
+        {activity.says}
+      </span>
+      {clock && activity.since && (
+        <small className="sg-run-elapsed">{activity.since}</small>
+      )}
+    </>
+  );
 }
 
 export function ChatPane({
@@ -326,6 +340,36 @@ export function ChatPane({
   const readOnly = archived;
   const canWrite = piReady && Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
+  const clockReady = useClockReady();
+  /**
+   * The turn this conversation is still finishing, if there is one.
+   *
+   * The backend refuses a second message while one is queued or running, so
+   * this is the same condition it enforces, read from the same records.
+   */
+  const inFlight = (view.messages ?? []).find(
+    (message) =>
+      message.role === "assistant" &&
+      (message.status === "queued" || message.status === "running"),
+  );
+  const inFlightActivity = runActivity({
+    runId: inFlight?.id,
+    status: inFlight?.status ?? "",
+    startedAt: runs.find((item) => item.assistantMessageId === inFlight?.id)
+      ?.startedAt,
+    hasDraft: Boolean(inFlight?.body?.trim()),
+    executions: view.executions ?? [],
+    activity: view.piActivity ?? [],
+    now,
+  });
+  /**
+   * Only while the turn it describes is not on screen. With the running
+   * message in view this is the same sentence twice, one above the other.
+   */
+  const inFlightAway = useOffScreen(
+    inFlight ? `sg-message-${inFlight.id}` : null,
+    Boolean(inFlight),
+  );
   const requestPending = view.messages.some(
     (message) => message.status === "queued" || message.status === "running",
   );
@@ -504,18 +548,29 @@ export function ChatPane({
                           {inProgress && (
                             <SpinnerGap className="spin" aria-hidden="true" />
                           )}
-                          {message.status === "queued"
-                            ? "Waiting to reply"
-                            : message.status === "running"
-                              ? working(run, now)
-                              : run?.error?.startsWith(
-                                    "Conversation history unavailable.",
-                                  )
-                                ? run.error
-                                : message.status === "cancelled" ||
-                                    message.status === "interrupted"
-                                  ? stopOutcome(view.executions, message.id)
-                                  : "Something went wrong. Please retry."}
+                          {message.status === "queued" ||
+                          message.status === "running" ? (
+                            <Doing
+                              activity={runActivity({
+                                runId: message.id,
+                                status: message.status,
+                                startedAt: run?.startedAt,
+                                hasDraft: Boolean(message.body?.trim()),
+                                executions: view.executions ?? [],
+                                activity: view.piActivity ?? [],
+                                now,
+                              })}
+                            />
+                          ) : run?.error?.startsWith(
+                              "Conversation history unavailable.",
+                            ) ? (
+                            run.error
+                          ) : message.status === "cancelled" ||
+                            message.status === "interrupted" ? (
+                            stopOutcome(view.executions, message.id)
+                          ) : (
+                            "Something went wrong. Please retry."
+                          )}
                         </p>
                         {message.body && !inProgress && (
                           <details className="sg-run-draft">
@@ -747,6 +802,37 @@ export function ChatPane({
           while the request has scrolled out of sight. */}
       {view.application && chatId && view.chats[0]?.id === chatId && (
         <SecretRequestsChip secrets={secrets} />
+      )}
+
+      {/* What is still running, said before the reader finds out by being
+          refused.
+          Sending while a turn is in flight is rejected by the backend with
+          "Pi is still working in this conversation", and the owner meets that
+          sentence after typing — having read a finished-looking answer and
+          scrolled past a request Server Guy started for itself. The guard is
+          right and stays; what was missing is that the conversation never
+          said so where the typing happens. */}
+      {inFlight && inFlightAway && (
+        <div className="sg-still-working" role="status">
+          <SpinnerGap className="spin" aria-hidden="true" />
+          <span className="sg-still-what">
+            {inFlightActivity.says}
+            {clockReady && inFlightActivity.since && (
+              <small>{inFlightActivity.since}</small>
+            )}
+          </span>
+          <button
+            type="button"
+            className="sg-still-show"
+            onClick={() =>
+              document
+                .getElementById(`sg-message-${inFlight.id}`)
+                ?.scrollIntoView({ block: "center", behavior: "smooth" })
+            }
+          >
+            Show
+          </button>
+        </div>
       )}
 
       <form
