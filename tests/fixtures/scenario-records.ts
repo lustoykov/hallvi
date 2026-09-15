@@ -59,6 +59,8 @@ const states = (
   input: Partial<Presentation> & {
     at?: string | null;
     title: string;
+    /** Pi's own words about what happened, which some events need. */
+    body?: string;
     presence?: "present" | "absent";
     retiredAt?: string;
   },
@@ -310,6 +312,13 @@ export function scenarios(): Scenario[] {
       shows:
         "Every destination populated at once, with awkward values: long names, Unicode, odd units.",
       records: richRecords(rich),
+    },
+    {
+      id: "dddddddd-0000-4000-8000-000000000001",
+      name: "Scenario · four releases",
+      shows:
+        "A first release, a second, a failed update, a retry that worked, and a resolved failure — the sequence Deployment, History and Logs each have to tell truthfully.",
+      records: releaseRecords("dddddddd-0000-4000-8000-000000000001"),
     },
     {
       id: "cccccccc-0000-4000-8000-000000000001",
@@ -1093,5 +1102,137 @@ function paperlessRecords(id: string): SavedInformation[] {
         },
       ),
     ),
+  ];
+}
+
+/**
+ * The release history Deployment, History and Logs each have to tell.
+ *
+ * Four releases and one failed attempt between the last two, because the
+ * question that matters is what a page says when the newest thing that
+ * happened is not the thing that is running.
+ */
+function releaseRecords(id: string): SavedInformation[] {
+  const release = (
+    key: string,
+    at: number,
+    revision: string,
+    changes: string[],
+    failed = false,
+  ) =>
+    states(
+      id,
+      { kind: "application", id: `release-${key}` },
+      {
+        at: ago(at),
+        status: failed ? "failed" : "verified",
+        title: failed
+          ? `Update to ${revision.slice(0, 7)} did not finish`
+          : `Released ${revision.slice(0, 7)}`,
+        views: ["deployment", "history"],
+        body: failed
+          ? "The image built and the container would not start: the new release expects a column the database does not have."
+          : "",
+        content: {
+          kind: "deployment",
+          repositoryUrl: "https://github.com/qa/shop",
+          revision,
+          image: `ghcr.io/qa/shop:${revision.slice(0, 7)}`,
+          server: "shop-host",
+          changes,
+        },
+        checks: failed
+          ? [check("started", "failed", "liveness")]
+          : [
+              check("started", "passed", "liveness"),
+              check("http", "passed", "reachability"),
+            ],
+      },
+    );
+
+  return [
+    states(
+      id,
+      { kind: "host", id: "shop-host" },
+      {
+        at: ago(9 * DAY),
+        title: "The server",
+        views: ["overview"],
+        facts: [fact("address", "203.0.113.24"), fact("region", "Helsinki")],
+      },
+    ),
+    release("1", 9 * DAY, "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", [
+      "First release",
+    ]),
+    release("2", 4 * DAY, "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1", [
+      "Add the receipts page",
+      "Bump Django to 5.1",
+    ]),
+    release(
+      "3",
+      26 * HOUR,
+      "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+      ["Add a discount column"],
+      true,
+    ),
+    release("4", 22 * HOUR, "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3", [
+      "Add a discount column",
+      "Run the migration first",
+    ]),
+    // A consequential event that is not a release, between two that are.
+    states(
+      id,
+      { kind: "backup-copy", id: "copy-nightly" },
+      {
+        at: ago(7 * HOUR),
+        title: "A copy was written",
+        views: ["backups", "history"],
+        facts: [
+          fact("destination", "s3://shop-backups"),
+          fact("destination-kind", "off-site"),
+          fact("size", "412 MB", "contents"),
+        ],
+        checks: [check("written", "passed", "identity")],
+      },
+    ),
+    // A failure that was resolved, which History must keep without making it
+    // read as something still wrong.
+    states(
+      id,
+      { kind: "access", id: "private-access" },
+      {
+        at: ago(20 * HOUR),
+        status: "failed",
+        title: "The private way in stopped answering",
+        views: ["history"],
+        body: "The tunnel died when the Mac slept.",
+      },
+    ),
+    states(
+      id,
+      { kind: "access", id: "private-access" },
+      {
+        at: ago(19 * HOUR),
+        title: "Private access reopened",
+        views: ["history"],
+        body: "Reopened on port 18000; the application answered.",
+        checks: [check("reachable", "passed", "reachability")],
+      },
+    ),
+    record(id, {
+      at: ago(19 * HOUR),
+      title: "It is reachable from this PC",
+      views: ["deployment", "overview"],
+      role: "status",
+      about: [{ kind: "application", id }],
+      url: "http://127.0.0.1:18000",
+      content: {
+        kind: "application-access",
+        mode: "private",
+        server: "shop-host",
+        localPort: 18000,
+        remotePort: 8000,
+      },
+    }),
   ];
 }
