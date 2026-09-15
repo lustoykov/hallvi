@@ -136,3 +136,38 @@ export interface ReachProps {
   onCheck?: () => void;
   checking?: boolean;
 }
+
+/**
+ * What the Domains page offers to do about a name, which is three different
+ * offers and never one.
+ *
+ * A name nobody has connected is an invitation. A name that is on record and
+ * not yet serving the application is unfinished work, and offering to
+ * "publish" it again reads as starting over. A name that serves is something
+ * the owner may want to take back. Each draft is a sentence they can send as
+ * it stands or finish typing; none of them invents a hostname.
+ */
+export function publishOffer(story: {
+  name: string;
+  domain: DomainState | null;
+}): { label: string; primary: boolean; draft: string } {
+  const domain = story.domain;
+  if (!domain)
+    return {
+      label: "Publish at a domain…",
+      // The only invitation on the page, so the only emphatic thing on it.
+      primary: true,
+      draft: `Publish ${story.name} at my own domain name. The hostname is: `,
+    };
+  if (domain.state === "serving")
+    return {
+      label: "Make it private again",
+      primary: false,
+      draft: `Make ${story.name} private again: withdraw ${domain.name} and the public access you set up for it, leave SSH and anything you did not create alone, and give me back a private way in.`,
+    };
+  return {
+    label: "Finish publishing it",
+    primary: false,
+    draft: `${domain.name} is not serving ${story.name} yet. Find out which part is incomplete, finish publishing it, and check it from outside.`,
+  };
+}

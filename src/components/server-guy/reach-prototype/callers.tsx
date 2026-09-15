@@ -8,12 +8,12 @@
 // is set up. Nothing is observed now; the windows are drawn from the
 // record, never fetched.
 
-import { ChatCircleText, Lock, Warning } from "@phosphor-icons/react";
+import { ChatCircleText, Globe, Lock, Warning } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
-import type { ReachProps } from "./reach-story";
+import { publishOffer, type ReachProps } from "./reach-story";
 import { countWord } from "../stack-prototype/stack-model";
 import type { Tone } from "../deployment-prototype/deployment-model";
 import { ago, when, type Caller } from "./reach-model";
@@ -88,6 +88,8 @@ export function CallersDirection({
             ? `${domain.name} resolves; what answers is unchecked`
             : `${domain.name} is on record; nobody has resolved it`;
 
+  const publish = publishOffer(story);
+
   return (
     <section className="axca" aria-label="Domains">
       {head}
@@ -131,18 +133,32 @@ export function CallersDirection({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          className="ax-button axca-ask"
-          onClick={() =>
-            onAsk(
-              `Try reaching ${story.name} the way a visitor would, and tell me what answers and what does not.`,
-            )
-          }
-        >
-          <ChatCircleText weight="bold" />
-          Ask for a knock test
-        </button>
+        <div className="axca-actions">
+          {/* The one thing this page is for, in whichever of its three
+              states the records put it in. Each drafts the request in the
+              conversation rather than starting a form: publishing is work
+              with decisions in it, and the decisions belong in the chat. */}
+          <button
+            type="button"
+            className={`ax-button${publish.primary ? " ax-button-primary" : ""}`}
+            onClick={() => onAsk(publish.draft)}
+          >
+            <Globe weight="bold" />
+            {publish.label}
+          </button>
+          <button
+            type="button"
+            className="ax-button axca-ask"
+            onClick={() =>
+              onAsk(
+                `Try reaching ${story.name} the way a visitor would, and tell me what answers and what does not.`,
+              )
+            }
+          >
+            <ChatCircleText weight="bold" />
+            Ask for a knock test
+          </button>
+        </div>
       </div>
 
       <div className="axca-grid">
@@ -274,7 +290,10 @@ export function CallersDirection({
             ? // "While it is being set up" was a phase nothing recorded.
               // What is on record is that access is private.
               `HTTP is held to your network${story.controllerIp ? ` (${story.controllerIp})` : ""}, so a stranger gets nothing. `
-            : `Port 80 is open to every network, which is what a public application is for. `}
+            : // Reachable by anyone is not readable by anyone, and the page
+              // should not imply either that it is, or that a particular
+              // port is open when no check on this page read one.
+              `Anyone on the internet can ask for this application, so its own sign-in is what decides who gets in. `}
           {named
             ? story.tls.state === "valid"
               ? `The certificate ${story.tls.expiresAt ? `expires ${when(story.tls.expiresAt)}` : "is valid"}.`
@@ -285,7 +304,7 @@ export function CallersDirection({
                   : story.tls.state === "not-configured"
                     ? "There is no certificate for it, so even the name is served over plain HTTP."
                     : "Nothing has read a certificate for it either way."
-            : "Connecting a name is not implemented yet; until then the server’s address is the only way in."}
+            : "No name is connected. Publishing one puts a certificate and a proxy in front of this application where it already runs, rather than moving it or its data."}
         </p>
       </footer>
       {story.invented && <p className="ax-invented">{story.invented}</p>}

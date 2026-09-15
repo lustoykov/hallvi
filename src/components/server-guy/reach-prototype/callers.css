@@ -40,6 +40,15 @@
   flex: 1 1 340px;
   min-width: 0;
 }
+/* The page's own actions, beside the lede rather than under it: publishing
+   is what this destination is for, and a reader should not have to scroll
+   past four browser windows to find it. */
+.axca-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .axca-ask {
   flex: none;
 }

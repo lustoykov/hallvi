@@ -68,7 +68,13 @@ export function PageHead({
             ) : reachable === "closed" ? (
               <>
                 <small className="axj3-closed">
-                  <WarningCircle weight="bold" /> The tunnel is closed
+                  <WarningCircle weight="bold" />{" "}
+                  {/* A published address has no tunnel to be closed. What
+                      failed is the address itself, and saying "tunnel"
+                      sends the reader to look at the wrong thing. */}
+                  {restricted
+                    ? "The tunnel is closed"
+                    : "The address did not answer"}
                 </small>
                 {/* No anchor at all. A dead link that looks alive is worse
                     than no link: the reader spends the click, the wait and
@@ -80,7 +86,7 @@ export function PageHead({
                     onClick={onReopen}
                   >
                     <ChatCircleText weight="bold" />
-                    Ask Pi to reopen it
+                    {restricted ? "Ask Pi to reopen it" : "Ask Pi to look"}
                   </button>
                 )}
               </>

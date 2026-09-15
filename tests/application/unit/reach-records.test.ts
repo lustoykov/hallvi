@@ -613,3 +613,59 @@ describe("a name, and whether anything answers on it", () => {
     expect(read([states(domain, { presence: "absent" })]).domain).toBeNull();
   });
 });
+
+// Publishing changes the answer to "who is this for", and the page reads
+// that from the access record rather than from a name existing.
+describe("an application published at its own name", () => {
+  const publicAccess = () =>
+    record({
+      about: [{ kind: "application", id: APP }],
+      url: "https://shop.example.com",
+      content: {
+        kind: "application-access",
+        mode: "public",
+        server: "host-1",
+      },
+    });
+
+  it("reads the audience and the address from the access record", () => {
+    const story = read([publicAccess()]);
+    expect(story.audience).toBe("public");
+    expect(story.address).toBe("https://shop.example.com");
+  });
+
+  it("describes the visitor as anyone online, over a secure address", () => {
+    const caller = read([publicAccess()]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.who).toBe("Anyone online");
+    expect(caller?.from).toBe("the internet");
+    expect(caller?.secure).toBe(true);
+    expect(caller?.headline).toBe("It answers on the internet");
+  });
+
+  // Publishing is not finished until the name itself answers, and the access
+  // record is not the thing that establishes that.
+  it("does not let a public access record make the name read as serving", () => {
+    const story = read([
+      publicAccess(),
+      states(
+        { kind: "domain", id: "shop.example.com" },
+        {
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("configured", "passed", "configuration")],
+        },
+      ),
+    ]);
+    expect(story.audience).toBe("public");
+    expect(story.domain?.state).toBe("pending-dns");
+  });
+
+  it("still reads a private record as reaching only this computer", () => {
+    const story = read([privateAccess()]);
+    expect(story.audience).toBe("controller");
+    expect(story.callers.find((item) => item.id === "access")?.secure).toBe(
+      false,
+    );
+  });
+});
