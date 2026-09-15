@@ -49,6 +49,11 @@ export const applicationSections = [
     group: "application",
   },
   {
+    // Placement is part of the navigation decision still open, and `hideable`
+    // is not the lever for it: it means "hide until something records this",
+    // so a populated History is promoted back to primary by design. Making
+    // History permanently secondary wants a flag that means that, and it is
+    // not worth adding one before the arrangement is chosen.
     id: "history",
     label: "History",
     icon: ClockCounterClockwise,
@@ -95,7 +100,17 @@ export const applicationSections = [
     available: true,
   },
   { id: "backups", label: "Backups", icon: Archive, group: "care" },
-  { id: "logs", label: "Logs", icon: TerminalWindow, group: "care" },
+  {
+    // Not "Logs". Nothing in this product retrieves an application's own
+    // logs — no tool does it — and this page has only ever held Server Guy's
+    // command output, which History now carries as evidence on the event that
+    // produced it. Named for what it holds; whether it keeps a door of its
+    // own is the navigation decision still open.
+    id: "logs",
+    label: "Command output",
+    icon: TerminalWindow,
+    group: "care",
+  },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
   { id: "domains", label: "Domains", icon: Globe, group: "care" },
   {

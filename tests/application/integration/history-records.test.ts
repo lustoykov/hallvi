@@ -8,11 +8,18 @@ describe("record history origins", () => {
     const record: SavedInformation = {
       id: "record-1",
       applicationId: "application-1",
-      title: "The application answered",
-      body: "The health check passed.",
+      // A consequential record, because History no longer lists an ordinary
+      // passing inspection: a check that found everything normal is Server
+      // Guy doing its job, not a thing that happened to the application.
+      title: "Private access reopened",
+      body: "Reopened on port 18000; the application answered.",
       evidence: [{ type: "message", id: "message-1" }],
       establishedAt: "2026-09-12T16:05:00.000Z",
       presentation: {
+        states: {
+          ref: { kind: "access", id: "private-access" },
+          presence: "present",
+        },
         views: ["history"],
         role: "outcome",
         status: "verified",

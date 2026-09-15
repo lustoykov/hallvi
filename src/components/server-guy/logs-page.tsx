@@ -1,6 +1,11 @@
 "use client";
 
-// Logs, from captured execution evidence.
+// Command output, from captured execution evidence.
+//
+// Not logs. Nothing in this product retrieves an application's own logs —
+// there is no tool that does it — and this page has only ever held what
+// Server Guy's own commands printed. Calling that "Logs" told an owner
+// looking for their application's errors that they were in the right place.
 //
 // The output Server Guy already has, with the time it was captured. Nothing
 // here collects anything: re-running a command to fill a panel would make the
@@ -8,29 +13,25 @@
 // this page Navigate and Ask only. Asking is a message in the conversation,
 // and the next captured output is what changes the page.
 //
-// The streams are where output came from — the server, the repository copy,
-// the provider — because a line's meaning depends on where it was read.
+// Where output came from is read from the one table the console and the
+// activity transcript read, rather than from a fourth copy of it kept here.
 
 import { ArrowUpRight, MagnifyingGlass } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 
-import { clip, commandOf, essence } from "./execution-text";
+import {
+  clip,
+  commandOf,
+  essence,
+  placeOf as sharedPlaceOf,
+} from "./execution-text";
 import type { ExecutionRecord } from "@/server/operator-execution";
 
 import { LocalTime } from "./local-time";
 import type { ApplicationSection } from "./application-sections";
 
-const places: { test: (tool: string) => boolean; label: string }[] = [
-  { test: (tool) => tool === "server_bash", label: "The server" },
-  {
-    test: (tool) => tool === "bash" || tool === "powershell",
-    label: "The repository copy",
-  },
-  { test: (tool) => tool === "hetzner_request", label: "The provider" },
-];
-
 function placeOf(tool: string) {
-  return places.find((place) => place.test(tool))?.label ?? "Server Guy";
+  return sharedPlaceOf(tool) ?? "Server Guy";
 }
 
 export function LogsPage({
@@ -99,10 +100,12 @@ export function LogsPage({
       {bar}
       <header className="sg-section-header">
         <div>
-          <h1>Logs</h1>
+          <h1>Command output</h1>
           <p>
-            Output Server Guy captured while it worked, with when it was
-            captured. Nothing here runs anything.
+            What Server Guy&rsquo;s own commands printed, with when it was
+            captured. Not the application&rsquo;s logs: nothing here collects
+            those, and nothing here runs anything. Each of these also sits on
+            the event it belongs to in History.
           </p>
         </div>
       </header>
@@ -167,8 +170,9 @@ export function LogsPage({
             <h2>No output has been captured yet.</h2>
             <p>
               That is not a claim the application is quiet — only that nothing
-              Server Guy ran has produced output on record. Ask in the
-              conversation and whatever it collects is kept here.
+              Server Guy ran has printed anything on record. If you are looking
+              for the application&rsquo;s own logs, ask for them in the
+              conversation: whatever that command prints is kept here.
             </p>
           </div>
         )}

@@ -164,3 +164,93 @@ export function runActivity(input: {
     waitingOnYou: false,
   };
 }
+
+export interface RunFailure {
+  /** What went wrong, from the evidence rather than from a template. */
+  says: string;
+  /** The one control to offer, and what it does. */
+  action: { label: string; kind: "retry" | "ask"; draft?: string };
+}
+
+/**
+ * Whether a failure is worth trying again, or worth understanding first.
+ *
+ * A command that exited non-zero will exit non-zero again: retrying it is a
+ * way of not reading the error. A connection that dropped is a different
+ * thing, and trying again is exactly right. The page offers one control, and
+ * which one it is depends on what failed.
+ */
+const TRANSIENT =
+  /\b(timed? ?out|timeout|connection (refused|reset|closed)|broken pipe|temporarily|network is unreachable|no route to host|EOF|ssh_exchange|handshake)\b/i;
+
+/** The last line of output that says something, for a one-line explanation. */
+function lastMeaningfulLine(output: string) {
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^\s*$/.test(line));
+  // Errors are usually last. A trailing "exit status 1" repeats the code the
+  // card already shows, so step past it.
+  for (const line of lines.reverse())
+    if (!/^exit (status )?\d+$/i.test(line)) return line;
+  return "";
+}
+
+export function runFailure(input: {
+  runId: string | undefined;
+  error?: string | null;
+  executions: ExecutionRecord[];
+}): RunFailure {
+  const mine = input.runId
+    ? input.executions.filter((item) => item.runId === input.runId)
+    : [];
+  const failed = mine
+    .filter((item) => item.status === "failed")
+    .sort(
+      (a, b) =>
+        Date.parse(b.finishedAt ?? b.createdAt) -
+        Date.parse(a.finishedAt ?? a.createdAt),
+    )[0];
+
+  if (failed) {
+    const place = placeOf(failed.tool);
+    const where = place
+      ? `${place.charAt(0).toLowerCase()}${place.slice(1)}`
+      : "somewhere";
+    const line = lastMeaningfulLine(failed.output ?? "");
+    const code =
+      typeof failed.exitCode === "number" ? ` (exit ${failed.exitCode})` : "";
+    // Transient even at the command level: an SSH connection that dropped
+    // mid-command is worth another go; a program that rejected its input is
+    // not.
+    const transient = TRANSIENT.test(line) || TRANSIENT.test(input.error ?? "");
+    return {
+      says: line
+        ? `A command ${where} did not finish${code}: ${line}`
+        : `A command ${where} did not finish${code}.`,
+      action: transient
+        ? { label: "Try again", kind: "retry" }
+        : {
+            label: "Ask what went wrong",
+            kind: "ask",
+            draft:
+              "The last command failed. Read its output, tell me in one paragraph what actually went wrong, and say what you would do about it before doing anything.",
+          },
+    };
+  }
+
+  // A run's own `error` is runtime text — "Transaction failed for internal
+  // Run id." — and this product has already decided it does not reach the
+  // reader. That decision is right and is guarded by a test: an internal
+  // identifier in a status line tells somebody nothing and looks like a
+  // crash. A failed command's output is different and is used above: it is
+  // the command's own words, already redacted, already on screen in its
+  // terminal.
+  //
+  // So with no command to read, the honest line says exactly that, and the
+  // offer is the one thing that might work.
+  return {
+    says: "The turn ended before it finished, and no command recorded why.",
+    action: { label: "Try again", kind: "retry" },
+  };
+}
