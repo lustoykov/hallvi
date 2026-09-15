@@ -10,9 +10,9 @@ The main application conversation owns general server execution. `pi.ts` registe
 
 The first chat is the permanent main conversation. The worker still serializes turns globally; native queue/steer and parallel read-only side explanations are deferred. PR #55 merged the storage checkpoint as `95b3829`, using schema 15: applications, conversations, messages and saved information. Conversations own current status and response pointers; messages own response text, structured references and completion metadata. The worker/API still calls its response projection a run, but no runs table remains. Permissions and optional host references live on applications; execution evidence stays in files. Pi saves shared information and selects presentation in stable views. Legacy deployment/operation stores and executors are deleted; old visual-reference types remain isolated from live storage. Hetzner provisioning and first deployment are separate subsequent checkpoints. See [verification](testing/2026-09-12-operator-execution.md).
 
-## Publishing at a domain, in review
+## Publishing at a domain
 
-`claude/publish-custom-domain-fcec37` lets the main operator make a privately
+Merged in [PR #76](https://github.com/lustoykov/server-guy/pull/76) on 15 September 2026, this lets the main operator make a privately
 deployed application answer at a hostname the owner supplies, over HTTPS, from
 the internet. It adds two tools and no workflow, table or approval type. The
 public request path is browser → DNS → a reverse proxy on the deployment server
