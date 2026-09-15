@@ -65,16 +65,28 @@ const H = 500;
 type Rect = { x: number; y: number; w: number; h: number };
 
 const pct = (value: number, total: number) => `${(value / total) * 100}%`;
-const place = (r: Rect): CSSProperties => ({
-  left: pct(r.x, W),
-  top: pct(r.y - TOP, H),
-  width: pct(r.w, W),
-  height: pct(r.h, H),
+/**
+ * The canvas is a fixed width and a height that depends on what is on it.
+ *
+ * Everything is placed as a percentage, so the drawing scales with the
+ * container — which is right for the shapes and wrong for the words, because
+ * the words do not scale. The answer is not to shrink boxes until the text
+ * leaves them; it is to make the canvas taller when there is more to draw,
+ * so a box keeps the size its label needs however many neighbours it has.
+ */
+const placer = (height: number) => ({
+  place: (r: Rect): CSSProperties => ({
+    left: pct(r.x, W),
+    top: pct(r.y - TOP, height),
+    width: pct(r.w, W),
+    height: pct(r.h, height),
+  }),
+  point: (x: number, y: number): CSSProperties => ({
+    left: pct(x, W),
+    top: pct(y - TOP, height),
+  }),
 });
-const point = (x: number, y: number): CSSProperties => ({
-  left: pct(x, W),
-  top: pct(y - TOP, H),
-});
+const { place, point } = placer(H);
 
 const BOX: Record<string, Rect> = {
   source: { x: 24, y: 96, w: 172, h: 72 },
@@ -83,18 +95,25 @@ const BOX: Record<string, Rect> = {
   header: { x: 262, y: 80, w: 616, h: 54 },
   private: { x: 566, y: 206, w: 292, h: 170 },
   shelf: { x: 290, y: 398, w: 568, h: 114 },
-  app: { x: 332, y: 262, w: 196, h: 76 },
+  // Wider than the original 196: `paperless-webserver` is an ordinary
+  // container name and it wrapped to two lines, which pushed the reading out
+  // of the bottom of the card.
+  app: { x: 308, y: 262, w: 244, h: 84 },
   svc: { x: 612, y: 262, w: 196, h: 76 },
   appVol: { x: 332, y: 434, w: 196, h: 60 },
   svcVol: { x: 612, y: 434, w: 196, h: 60 },
   offsite: { x: 924, y: 428, w: 176, h: 72 },
-  watch: { x: 924, y: 96, w: 176, h: 72 },
+  // Taller than its neighbours on purpose: this slot holds a placeholder
+  // whose headline is a sentence, and at 1280 a 72-unit box cut it off.
+  watch: { x: 918, y: 96, w: 190, h: 86 },
   http: { x: 204, y: 284, w: 116, h: 32 },
   ssh: { x: 204, y: 366, w: 116, h: 32 },
 };
 
 interface Layout {
   rects: Record<string, Rect>;
+  /** The canvas height this model needs, in the same units as the boxes. */
+  height: number;
   legs: Record<JourneyId, string[][]>;
   wires: { d: string; journey: JourneyId }[];
   stops: Record<JourneyId, string[]>;
@@ -112,9 +131,11 @@ function share(
 ) {
   if (count < 1) return [];
   const room = span.end - span.start;
+  // The floor is what a name and its reading-dot need, not an arbitrary
+  // small number. Below it the box stops being a box with a label in it.
   const size = Math.min(
     thickness,
-    Math.max(28, (room - gap * (count - 1)) / count),
+    Math.max(46, (room - gap * (count - 1)) / count),
   );
   const step = size + gap;
   const used = size * count + gap * (count - 1);
@@ -153,15 +174,18 @@ function layoutFor(model: ArchitectureModel): Layout {
       : share(
           services.length,
           // Below the zone's own label, down to just inside its bottom edge.
-          { start: 240, end: rects.private.y + rects.private.h - 4 },
+          { start: 236, end: rects.private.y + rects.private.h - 4 },
           BOX.svc.h,
-          10,
+          6,
         );
   services.forEach((service, index) => {
     rects[service.id] = {
-      x: BOX.svc.x,
+      // Wider than the design's single-service slot, because three of them
+      // share the zone and a name that wraps is a name that leaves its box.
+      // The zone runs 566..858; this leaves the same margin on both sides.
+      x: services.length > 1 ? BOX.private.x + 14 : BOX.svc.x,
       y: serviceRows[index].at,
-      w: BOX.svc.w,
+      w: services.length > 1 ? BOX.private.w - 28 : BOX.svc.w,
       h: serviceRows[index].size,
     };
   });
@@ -191,16 +215,50 @@ function layoutFor(model: ArchitectureModel): Layout {
     if (appVolumes[0]) rects[appVolumes[0].id] = BOX.appVol;
     if (rest[0]) rects[rest[0].id] = BOX.svcVol;
   } else {
-    const columns = share(ordered.length, { start: 302, end: 846 }, 196, 16);
+    // Wrapped, not squeezed.
+    //
+    // Four data locations in one row made each box 124 wide in a 1120-wide
+    // space — about 105px on a 1280 screen — and the names an upstream
+    // Compose file uses are longer than that. The box shrank, the text did
+    // not, and every one of them rendered as `paperless…`.
+    //
+    // Two rows of two beats one row of four for the same reason: a name that
+    // has to be read whole needs width, and there is more width in the shelf
+    // than there is room for a fifth column.
+    const perRow = Math.min(3, Math.max(1, Math.ceil(ordered.length / 2)));
+    const rows = Math.ceil(ordered.length / perRow);
+    // Above the threshold that drops a card to one clamped line: these
+    // names are long and a wrapped one is worth more vertical space than a
+    // cut one is worth saving.
+    const rowHeight = rows > 1 ? 68 : BOX.appVol.h;
+    const rowGap = 10;
+    // The shelf grows to hold its rows rather than letting them out of it.
+    const label = 26;
+    const needed = label + rows * rowHeight + (rows - 1) * rowGap + 12;
+    rects.shelf =
+      needed > BOX.shelf.h ? { ...BOX.shelf, h: needed } : BOX.shelf;
     ordered.forEach((volume, index) => {
+      const row = Math.floor(index / perRow);
+      const inRow = Math.min(perRow, ordered.length - row * perRow);
+      const columns = share(inRow, { start: 302, end: 846 }, 268, 16);
       rects[volume.id] = {
-        x: columns[index].at,
-        y: BOX.appVol.y,
-        w: columns[index].size,
-        h: BOX.appVol.h,
+        x: columns[index % perRow].at,
+        y: rects.shelf.y + label + row * (rowHeight + rowGap),
+        w: columns[index % perRow].size,
+        h: rowHeight,
       };
     });
   }
+  rects.shelf = rects.shelf ?? BOX.shelf;
+  // The server card contains the shelf, and the canvas contains the server.
+  // Both follow it down rather than clipping it.
+  const grew = Math.max(
+    0,
+    rects.shelf.y + rects.shelf.h + 20 - (BOX.server.y + BOX.server.h),
+  );
+  rects.server = { ...BOX.server, h: BOX.server.h + grew };
+  rects.host = BOX.header;
+  const height = H + grew;
 
   const visitEnd = services.length ? BOX.svc.x : BOX.app.x;
   const visitMain = `M196 300H${visitEnd}`;
@@ -213,14 +271,22 @@ function layoutFor(model: ArchitectureModel): Layout {
       const from = centre(owner);
       const to = centre(rects[volume.id]);
       const top = owner.y + owner.h;
+      const landing = rects[volume.id].y;
+      // The elbow sits just above whatever row the volume ended up on.
+      const elbow = rects.shelf.y - 6;
       return Math.abs(from - to) < 2
-        ? `M${from} ${top}V${BOX.appVol.y}`
-        : `M${from} ${top}V410H${to}V${BOX.appVol.y}`;
+        ? `M${from} ${top}V${landing}`
+        : `M${from} ${top}V${elbow}H${to}V${landing}`;
     })
     .filter((d): d is string => Boolean(d));
   const dataStart = ordered.length ? centre(rects[ordered[0].id]) : 710;
-  const dataMain = `M${dataStart} 464H924`;
-  const releaseMain = "M110 168V368Q110 382 124 382H372Q386 382 386 368V338";
+  // Out of the first row, at its middle, rather than at a y the shelf may
+  // no longer occupy.
+  const dataY = ordered.length
+    ? rects[ordered[0].id].y + rects[ordered[0].id].h / 2
+    : 464;
+  const dataMain = `M${dataStart} ${dataY}H924`;
+  const releaseMain = "M110 168V368Q110 382 124 382H372Q386 382 386 368V346";
   const releaseFork = services.length
     ? "M386 382H652Q666 382 666 368V338"
     : null;
@@ -238,6 +304,7 @@ function layoutFor(model: ArchitectureModel): Layout {
     values.filter((value): value is string => Boolean(value));
   return {
     rects,
+    height,
     legs,
     wires,
     stops: {
@@ -397,6 +464,8 @@ function Card({
   arriving,
   popped,
   compact,
+  tight,
+  placeAt,
   ghost,
   onSelect,
 }: {
@@ -410,6 +479,10 @@ function Card({
   arriving: boolean;
   popped: boolean;
   compact?: boolean;
+  /** The box is too short for a sentence; show the dot and the name only. */
+  tight?: boolean;
+  /** The canvas's own placer, since its height depends on the model. */
+  placeAt?: (r: Rect) => CSSProperties;
   ghost?: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -417,9 +490,9 @@ function Card({
   return (
     <button
       type="button"
-      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${popped ? " is-popped" : ""}${part.checking ? " is-checking" : ""}`}
+      className={`axj2-card k-${part.kind}${compact ? " is-compact" : ""}${tight ? " is-tight" : ""}${ghost ? " is-ghost" : ""}${selected ? " is-selected" : ""}${dim ? " is-dim" : ""}${lit ? " is-lit" : ""}${arriving ? " is-arriving" : ""}${popped ? " is-popped" : ""}${part.checking ? " is-checking" : ""}`}
       data-c={certainty}
-      style={{ ...place(rect), ["--i" as string]: index }}
+      style={{ ...(placeAt ?? place)(rect), ["--i" as string]: index }}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(part.id);
@@ -435,15 +508,20 @@ function Card({
             Two lines is the right budget for a node in a map, so the full
             value stays available rather than being lost to the clamp. */}
         <b title={titleFor(part)}>{titleFor(part)}</b>
-        {!compact && (
+        {!compact && !tight && (
           <small title={subtitleFor(part, model)}>
             {subtitleFor(part, model)}
           </small>
         )}
+        {/* In a crowded map the reading keeps its dot and loses its sentence.
+            The dot already carries the certainty, the full reading is one
+            click away in the inspector, and the alternative — the text
+            staying while the box shrinks under it — is how
+            `paperless-postgres-data` ended up written across a wire. */}
         {!part.quiet && (
-          <span className="axj2-status">
+          <span className="axj2-status" data-tight={tight || undefined}>
             <i aria-hidden="true" />
-            {part.checking ? "Checking…" : part.evidence.short}
+            {tight ? null : part.checking ? "Checking…" : part.evidence.short}
           </span>
         )}
       </span>
@@ -632,6 +710,13 @@ export function JourneyDirection({
 }: DirectionProps) {
   const reduced = useReducedMotion();
   const layout = useMemo(() => layoutFor(model), [model]);
+  // Shadows the module-level pair on purpose: everything this component draws
+  // is placed on the canvas this model actually needs, not on the 500-unit
+  // one the design started from.
+  const { place, point } = useMemo(
+    () => placer(layout.height),
+    [layout.height],
+  );
   const layoutRef = useRef(layout);
   useEffect(() => {
     layoutRef.current = layout;
@@ -937,13 +1022,17 @@ export function JourneyDirection({
       </div>
 
       <div
+        style={{ aspectRatio: `${W} / ${layout.height}` }}
         className={`axj2-stage${touring ? " is-touring" : ""}${planned ? " is-planned" : ""}${shift ? " is-shifting" : ""}`}
         data-journey={journey}
         data-shift={shift ?? undefined}
         onClick={() => setSelected(null)}
       >
         {/* The server, as a place. */}
-        <div className="axj2-server" style={place(BOX.server)}>
+        <div
+          className="axj2-server"
+          style={place(layout.rects.server ?? BOX.server)}
+        >
           <button
             type="button"
             className={`axj2-server-head${selected === "host" ? " is-selected" : ""}${host?.checking ? " is-checking" : ""}${popped ? " is-popped" : ""}`}
@@ -979,7 +1068,10 @@ export function JourneyDirection({
           </div>
         )}
         {volumes.length > 0 && (
-          <div className="axj2-region axj2-shelf" style={place(BOX.shelf)}>
+          <div
+            className="axj2-region axj2-shelf"
+            style={place(layout.rects.shelf ?? BOX.shelf)}
+          >
             <span>Disk · kept when containers are replaced</span>
           </div>
         )}
@@ -1161,7 +1253,18 @@ export function JourneyDirection({
               key={id}
               index={index}
               rect={layout.rects[id]}
-              compact={model.byId[id].kind === "volume"}
+              compact={
+                model.byId[id].kind === "volume" ||
+                // A placeholder's headline already says nothing has looked;
+                // its subtitle said so again, in a card with no room for
+                // either sentence.
+                id.startsWith("gap:")
+              }
+              // Read from the box the layout actually gave it, so a map that
+              // had to make room says less per card rather than saying the
+              // same amount outside the card.
+              tight={layout.rects[id].h < 58}
+              placeAt={place}
               {...cardProps(model.byId[id])}
             />
           ) : null,
@@ -1179,6 +1282,10 @@ export function JourneyDirection({
             arriving={false}
             popped={false}
             ghost
+            placeAt={place}
+            // The headline already says nothing has looked. The subtitle said
+            // so a second time, in a card that had room for neither.
+            compact
             onSelect={(id) =>
               setSelected((currentId) => (currentId === id ? null : id))
             }

@@ -1613,3 +1613,19 @@
   font-size: 15px;
   color: var(--ax-ink-2);
 }
+
+/* A card the layout had to make short: the name, and a dot for the reading.
+   The sentence is in the inspector, which is a click away and has room. */
+.axj2-card.is-tight {
+  align-items: center;
+}
+.axj2-card.is-tight .axj2-text {
+  gap: 2px;
+}
+.axj2-card.is-tight b {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+.axj2-status[data-tight] {
+  gap: 0;
+}

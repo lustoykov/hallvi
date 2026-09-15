@@ -474,3 +474,11 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* How many data locations there are, where their names used to be. Four long
+   container ids at a third of their usual size is a paragraph, not a map. */
+.axo-map-count {
+  fill: #6b7891;
+  font-size: 21px;
+  font-weight: 600;
+}

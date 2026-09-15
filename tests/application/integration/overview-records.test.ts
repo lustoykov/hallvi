@@ -223,7 +223,7 @@ describe("what is true now", () => {
       "unknown",
     );
     expect(vitals.find((v) => v.id === "backups")!.status.text).toBe(
-      "Nobody has looked yet",
+      "Not checked yet",
     );
   });
 

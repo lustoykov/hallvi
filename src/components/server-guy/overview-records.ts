@@ -107,7 +107,11 @@ const verdictCertainty: Record<ProtectionVerdict["tone"], Certainty> = {
  * full sentence is too long for this column and goes in `plain` instead.
  */
 const verdictCaption: Partial<Record<ProtectionVerdict["state"], string>> = {
-  "not-assessed": "Nobody has looked yet",
+  // "Nobody has looked yet" was 130px in a 129px column, so it rendered as
+  // "Nobody has looked ye…". Four words shorter says the same thing and fits
+  // — and the distinction that matters, between nobody having checked and
+  // there being nothing, survives either way.
+  "not-assessed": "Not checked yet",
   "none-configured": "Nothing backs this up",
   "scheduled-no-copy": "Scheduled, no copy yet",
   "local-only": "On the server only",
@@ -214,7 +218,7 @@ function laneText(held: Held[], certainty: Certainty, now: number) {
   // than the lane's name implies, and the record says what in its own words.
   if (certainty === "warning") return "Set up, with a limit";
   if (certainty === "unknown")
-    return held.length ? "Recorded, not dated" : "Nobody has looked yet";
+    return held.length ? "Recorded, not dated" : "Not checked yet";
   if (certainty === "stale") {
     // The time that belongs beside "last checked" is the lapsed claim's own,
     // not the newest in the lane. One stale claim among five fresh ones made

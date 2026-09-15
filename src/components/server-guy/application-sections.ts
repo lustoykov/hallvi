@@ -272,8 +272,9 @@ export function hiddenSections(
             : recorded.deployed
               ? // Deployed, and still nothing names one. "Not used" would be
                 // a claim; "after deployment" was simply wrong, because the
-                // deployment has happened.
-                "nothing has looked"
+                // deployment has happened. Said the same way Overview says
+                // it, so the two surfaces describe one state in one phrase.
+                "not checked yet"
               : "after deployment",
     }));
 }
