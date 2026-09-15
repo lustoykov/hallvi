@@ -635,3 +635,68 @@ describe("evidence belongs to the copy that carries it", () => {
     expect(protection.copies[1].kind).toBe("off-site");
   });
 });
+
+describe("a plan that is on record, and a record saying there is none", () => {
+  it("does not count an established absence as a plan", () => {
+    // `plans` is every subject a record speaks about, which includes one
+    // whose whole content is "there is no plan". Counting those meant an
+    // application Server Guy had checked and found unprotected read as
+    // planned — latent in the verdict and live the moment anything else
+    // asked the question.
+    const absent = record({
+      id: "looked",
+      ref: { kind: "backup-plan", id: "daily" },
+      presence: "absent",
+      status: "warning",
+      title: "Nothing is copying this application's data",
+    });
+    const protection = protectionFromRecords([absent], NOW);
+    expect(protection.declaredAbsent).toBe(true);
+    expect(protection.planned).toBe(false);
+  });
+
+  it("still counts a plan that is stated", () => {
+    expect(protectionFromRecords([plan("off-site")], NOW).planned).toBe(true);
+  });
+});
+
+describe("the owner's words for what is copied", () => {
+  it("prints what a volume says it holds, not the id a page matches on", () => {
+    const volume = record({
+      id: "volume-shop-uploads",
+      ref: { kind: "volume", id: "shop-uploads" },
+      title: "shop-uploads is on disk",
+      facts: [{ key: "holds", value: "Customer uploads" }],
+    });
+    const covering = record({
+      id: "plan",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: "shop-uploads" },
+      ],
+    });
+    const protection = protectionFromRecords([covering, volume], NOW, APP);
+    expect(protection.coverLabels).toEqual(["Customer uploads"]);
+    expect(protection.names.get("shop-uploads")).toBe("Customer uploads");
+  });
+
+  it("leaves an id nothing names as itself", () => {
+    // Honest, and also a sign that nobody has written that subject down.
+    const covering = record({
+      id: "plan",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: "shop-mystery" },
+      ],
+    });
+    expect(protectionFromRecords([covering], NOW, APP).coverLabels).toEqual([
+      "shop-mystery",
+    ]);
+  });
+});

@@ -119,6 +119,15 @@ export interface Protection {
   /** What is on record as being on this application's disk, with its label. */
   requiredData: { id: string; label: string }[];
   /**
+   * Subject id → the owner's words for it, where a record gives any.
+   *
+   * So a page can print "PostgreSQL's data" where a record says
+   * `shop-postgres`, instead of showing the reader the plumbing.
+   */
+  names: Map<string, string>;
+  /** What the plan says it covers, in those words. */
+  coverLabels: string[];
+  /**
    * Data the application is recorded as having that no plan says it copies.
    *
    * A plan may cover a volume by naming it, or by naming the database whose
@@ -145,6 +154,36 @@ function coverDraft(names: string) {
     `does. Decide what actually needs keeping — a cache does not — then extend ` +
     `the plan and take a copy that includes it.`
   );
+}
+
+/**
+ * A subject id as the owner's words, where a record gives one.
+ *
+ * Pi records coverage as ids — `shop-uploads`, `shop-postgres` — because a
+ * page has to match them, and every page then printed them. A volume record
+ * carries `holds`; a database, cache or process record carries a name or a
+ * product. An id nothing names comes through as itself, which is honest and
+ * is also a sign that nobody has written that subject down.
+ */
+function namesFor(live: SavedInformation[]) {
+  const names = new Map<string, string>();
+  for (const kind of [
+    "volume",
+    "database",
+    "cache",
+    "queue",
+    "process",
+  ] as const)
+    for (const ref of subjectsMentioned(live, kind)) {
+      const facts = currentFacts(live, ref);
+      const said =
+        facts.get("holds")?.value.value ??
+        facts.get("product")?.value.value ??
+        facts.get("engine")?.value.value ??
+        null;
+      if (said && !names.has(ref.id)) names.set(ref.id, said);
+    }
+  return names;
 }
 
 /** A comma-separated `covers` fact as the subject ids it names. */
@@ -219,6 +258,16 @@ export function protectionFromRecords(
       };
   }
   let nextRunAt: string | null = null;
+  /**
+   * Plans that are actually on record.
+   *
+   * `plans` is every subject a record *speaks about*, which includes one
+   * whose entire content is "there is no plan". Counting those as plans meant
+   * an application Server Guy had checked and found unprotected read as
+   * planned — latent in the verdict, because the declared-absent branch is
+   * tested first, and live the moment anything else asks the question.
+   */
+  let stated = 0;
   for (const ref of plans) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") {
@@ -227,6 +276,7 @@ export function protectionFromRecords(
       declaredAbsent = true;
       continue;
     }
+    stated += 1;
     const facts = currentFacts(live, ref);
     const fact = (key: string) => facts.get(key)?.value.value ?? null;
     const schedule = fact("schedule");
@@ -398,7 +448,10 @@ export function protectionFromRecords(
     return required.filter((item) => !reach.has(item.id));
   };
 
-  const uncovered = plans.length ? missingFrom([...covers.keys()]) : [];
+  const uncovered = stated ? missingFrom([...covers.keys()]) : [];
+  const names = namesFor(live);
+  const say = (id: string) => names.get(id) ?? id;
+  const coverLabels = [...covers.keys()].map(say);
 
   // What the *newest copy* is known to hold, which is a different question
   // from what the plan intends to copy next time. A plan widened this morning
@@ -422,13 +475,15 @@ export function protectionFromRecords(
       plans.length + copies.length + restores.length > 0 ||
       Boolean(failures.copy || failures.restore),
     declaredAbsent,
-    planned: plans.length > 0,
+    planned: stated > 0,
     judged,
     keepText,
     destinations: [...destinations],
     plannedDestinations: [...plannedDestinations],
     verifiedCopies,
     requiredData: required,
+    names,
+    coverLabels,
     uncovered,
     newestCopyCoverage,
     failures: {
