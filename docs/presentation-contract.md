@@ -65,11 +65,22 @@ looked. These are different pages and they must read differently.
 ### Subject kinds
 
 `application` · `host` · `process` · `volume` · `door` · `certificate` ·
-`monitor` · `access` · `backup-plan`
+`monitor` · `access` · `backup-plan` · `backup-copy` · `restore-test` ·
+`database` · `cache` · `queue` · `job` · `variable` · `domain` · `cdn` ·
+`firewall`
 
-Bounded on purpose: these are what Architecture reads. A kind is added when a
-concrete view needs it. A vocabulary nothing consumes is a second
-representation waiting to disagree with the first.
+Bounded on purpose, and each one earned by a view that reads it — the list in
+`src/server/operator-data.ts` says which. A kind is added when a concrete view
+needs it. A vocabulary nothing consumes is a second representation waiting to
+disagree with the first.
+
+The three that Backups rests on are separate subjects on purpose, because they
+answer different questions and each can be absent on its own. A `backup-plan`
+says copies are meant to happen. A `backup-copy` is one dated copy that
+exists. A `restore-test` is the only thing that says a copy is worth
+anything. None is inferred from another, and a page that merges any two of
+them is wrong: a schedule with no copies is a promise, and copies with no
+restore test are files nobody has opened.
 
 **Pi reuses a reference.** `host:hetzner-165619823` is the same host on every
 later observation, which is what lets a second look add to the first instead
@@ -222,6 +233,9 @@ Declared keys, which are the only ones that may drive what the map says:
 | gate | `refused`, `open` | `port` `sources` |
 | certificate | `valid` | `expires` |
 | monitor | `answering` | `target` |
+| backup-plan | `configured` | `schedule` `destination` `destination-kind` `keep` `covers` |
+| backup-copy | `written` `verified` | `size` `destination` `destination-kind` `covers` |
+| restore-test | `restored` | `covers` `took` |
 
 A check under any other key still reads in the part's detail. It never decides
 what the map says: an unknown key silently driving designed UI is how a page
@@ -405,6 +419,27 @@ judgement about prose and is not decided here.
 
 ---
 
+## 6b. Where a copy goes
+
+`destination-kind` is the one fact that decides what losing a machine costs,
+and it is declared rather than read off prose: `/var/backups/shop` and
+`s3://bucket/shop` are both destinations and one of them dies with the server.
+Exactly four values, and a plan that declares none reads as **unclassified**,
+which the page treats as unproven rather than safe.
+
+| | Survives losing the application host | Survives losing the controller | Application-aware |
+| --- | --- | --- | --- |
+| `same-server` | no | yes | yes |
+| `controller` | yes | no | yes |
+| `off-site` | yes | yes | yes |
+| `provider` | yes | yes | **no** — a whole-disk snapshot, which can rebuild a machine and says nothing about the data being consistent |
+
+A record's own `status` is read alongside its checks wherever a lane or a
+verdict is formed. `failed` and `warning` are judgements and do not age, and a
+`warning` outranks a passing check on the same record: Pi recording a
+same-host plan as a warning is what stops a passing "the timer is active"
+printing green under the word Backups.
+
 ## 7. Actions
 
 **Navigate** and **Ask**. Nothing on a designed page executes anything. A
@@ -450,8 +485,14 @@ brings its own read rules and its own worked example.
 - **`schedule` and recurrence** — the Backups calendar, Overview's Tomorrow,
   a job's next run. A recurrence that cannot be expanded may be printed and
   never computed from.
-- **`backup-plan`, `backup-copy`, `restore-test`** — all of Backups, and
-  Storage's flow.
+- **Combining a copy and a restore into one reading automatically.** The three
+  subjects are live and the Backups page reads all three, with a verdict over
+  them (`protectionVerdict`) that Overview's lane shares. What is still
+  deferred is the arithmetic that would let a page decide protection *without*
+  Pi's judgement: today a plan Pi declines to warn about, whose copies are all
+  off-site and restored, reads verified, and a plan Pi marks `warning` reads
+  limited whatever its checks say. That is the right default and it does lean
+  on Pi getting the judgement right.
 - **`doors` with `complete`** — Security's walls and Domains' callers. Until
   then a port with no rule on record is unknown, not closed.
 - **`inventory`** — Variables' manifest, Processes beyond what topology gives.

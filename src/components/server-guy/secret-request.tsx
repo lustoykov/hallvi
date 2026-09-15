@@ -52,6 +52,8 @@ export interface SecretRequest {
   origin?: "owner" | "generated";
   /** How many times this name's value has been replaced. */
   revision?: number;
+  /** A replacement is part-way through and not yet proven. */
+  changing?: boolean;
 }
 
 /**

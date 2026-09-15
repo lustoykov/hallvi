@@ -452,3 +452,58 @@ describe("changing a credential", () => {
     ).toThrow(/at least/);
   });
 });
+
+describe("the environment a change runs in", () => {
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("exports the incoming value as $NAME, never the outgoing one", () => {
+    // The bug this guards: both values live in the store during a change, and
+    // a lookup that flattens them exports whichever came last. If $NAME ever
+    // became the old password, every script that "sets the new password"
+    // would quietly set the old one again.
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    const environment = secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"]);
+    expect(environment).toContain(
+      "export POSTGRES_PASSWORD='" + change.next + "'",
+    );
+    expect(environment).toContain(
+      "export POSTGRES_PASSWORD_PREVIOUS='" + change.previous + "'",
+    );
+  });
+
+  it("offers the outgoing value only while the change is in flight", () => {
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).not.toContain(
+      "_PREVIOUS",
+    );
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).toContain(
+      "_PREVIOUS",
+    );
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).not.toContain(
+      "_PREVIOUS",
+    );
+  });
+
+  it("puts a value carrying shell syntax through as bytes", () => {
+    const nasty = "a'; rm -rf /; echo '";
+    secrets.requestSecret(APP, { name: "AWKWARD", why: "x" });
+    secrets.establishSecret(APP, "AWKWARD", nasty);
+    const environment = secrets.secretEnvironment(APP, ["AWKWARD"]);
+    // Single-quoted with POSIX escaping, so the shell never parses it. Run it
+    // to be sure rather than asserting a shape: the variable must come back
+    // byte-for-byte and no second command may run.
+    const echoed = execFileSync(
+      "sh",
+      ["-c", environment + 'printf %s "$AWKWARD"'],
+      { encoding: "utf8" },
+    );
+    expect(echoed).toBe(nasty);
+  });
+});

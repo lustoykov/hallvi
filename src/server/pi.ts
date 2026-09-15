@@ -2,17 +2,24 @@ import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
 import { openServerPort } from "./private-access";
 import {
+  fetchBackupCopy,
+  listBackupCopies,
+  pruneBackupCopies,
+} from "./backup-store";
+import {
   cloudflareDomain,
   removeDomainRecord,
   writeDomainRecord,
 } from "./cloudflare";
 import { checkPublicAccess } from "./public-access";
 import {
+  beginChange,
   generateSecret,
   listSecrets,
   refuseSecretHandles,
   requestSecret,
   secretEnvironment,
+  settleChange,
 } from "./application-secrets";
 import {
   listInformation,
@@ -543,6 +550,98 @@ export async function askPi(
                   ? "A value was already established for this name and has been kept. Nothing was regenerated, so do not report a new credential."
                   : `A ${made.length}-character credential was generated and sealed. You cannot read it; the owner can reveal it from the application's pages.`,
               });
+            },
+          }),
+          defineTool({
+            name: "begin_credential_change",
+            executionMode: "sequential",
+            label: "Begin a credential change",
+            description:
+              'Start replacing an established credential. The controller generates the replacement (or takes one the owner supplied) and keeps the outgoing value, so during the change server_bash gives you both: "$NAME" is what the credential is becoming, and "$NAME_PREVIOUS" is the one the service still accepts and that you authenticate with in order to change it. Nothing is current yet. Changing a password is an operational change and not an edit to a stored value: update the account on the service itself, update whatever configuration the application reads, restart or reconnect what holds a connection, then prove the new credential works by doing something real with the application — not by a command exiting zero. Then call settle_credential_change. Until you do, the page says a change is part-way through and claims nothing. If you cannot establish it, settle with established:false and the controller puts the working value back, which is the difference between a rolled-back change and a locked-out application.',
+            parameters: Type.Object({
+              name: Type.String(),
+              value: Type.Optional(Type.String()),
+            }),
+            async execute(_id, params) {
+              const started = beginChange(
+                input.run.applicationId,
+                params.name,
+                params.value,
+              );
+              return json({
+                name: started.name,
+                changing: true,
+                environment: `$${started.name} is the new value; $${started.name}_PREVIOUS is the one still in use.`,
+                next: "Change it on the service, update the application's configuration, restart what reads it, verify the application actually works, then call settle_credential_change.",
+              });
+            },
+          }),
+          defineTool({
+            name: "settle_credential_change",
+            executionMode: "sequential",
+            label: "Settle a credential change",
+            description:
+              'Finish a change you began. established:true keeps the new credential and forgets the old one — say it only when you have proved the new value works against the service and the application behaves, because this is the point after which the old password is gone. established:false restores the working value exactly and leaves the application as it was; use it whenever you are not sure, including when a command failed part-way and you do not know which password the service now has. "The command exited zero" is not proof; "the application answered and its data is there" is.',
+            parameters: Type.Object({
+              name: Type.String(),
+              established: Type.Boolean(),
+              why: Type.String(),
+            }),
+            async execute(_id, params) {
+              const settled = settleChange(
+                input.run.applicationId,
+                params.name,
+                params.established,
+              );
+              return json({
+                ...settled,
+                why: params.why,
+                note: settled.rolledBack
+                  ? "The working value has been put back. The application should still be reachable with it; check that it is, and say what you will do differently."
+                  : "The new credential is current and the old one is gone. Record the change, with what proved it, and never the value.",
+              });
+            },
+          }),
+          defineTool({
+            name: "fetch_backup_copy",
+            executionMode: "sequential",
+            label: "Copy a backup off the server",
+            description:
+              'Pull one file from the application server onto the computer running Server Guy, which is a destination that survives losing the application\'s server. Give an absolute remotePath on the server and say in covers what the copy is of. The controller asks the server for the file\'s size and digest, copies it over the connection it already owns, and checks the digest on arrival: a copy that does not match is deleted rather than kept, so there is never a half-file to mistake for a backup. It returns the size, the digest and the words to use for the destination — record a backup-copy with destination-kind "controller" and those facts. This is not object storage and the record must not imply it is: it depends on this computer existing and being reachable. Say that in the body. Do not use this for a copy that belongs beside the application; that is an ordinary server_bash write with destination-kind "same-server".',
+            parameters: Type.Object({
+              remotePath: Type.String(),
+              covers: Type.String(),
+            }),
+            async execute(_id, params) {
+              return json(
+                await fetchBackupCopy(input.run.applicationId, params),
+              );
+            },
+          }),
+          defineTool({
+            name: "list_backup_copies",
+            executionMode: "parallel",
+            label: "List copies held here",
+            description:
+              "The backup copies held on the computer running Server Guy for this application, newest first, with their sizes and times. Read this before taking another one, so a plan that says it keeps seven copies can be checked against what is actually here rather than what a schedule intended.",
+            parameters: Type.Object({}),
+            async execute() {
+              return json({
+                copies: listBackupCopies(input.run.applicationId),
+              });
+            },
+          }),
+          defineTool({
+            name: "prune_backup_copies",
+            executionMode: "sequential",
+            label: "Apply retention here",
+            description:
+              "Delete the oldest copies held on this computer beyond the number to keep, and report exactly which were removed. Retention is the part of a backup plan that quietly stops working, so it runs where the files are rather than as a line in a host crontab nobody reads. Keep at least one.",
+            parameters: Type.Object({ keep: Type.Number() }),
+            async execute(_id, params) {
+              return json(
+                pruneBackupCopies(input.run.applicationId, params.keep),
+              );
             },
           }),
           defineTool({

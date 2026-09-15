@@ -50,6 +50,11 @@ import { z } from "zod";
 import { piConfigDir } from "./pi-configuration";
 
 export interface SecretRequest {
+  /**
+   * A replacement is part-way through and not yet proven. A page showing this
+   * must not report the credential as settled either way.
+   */
+  changing?: boolean;
   /** The environment variable name, which is also the handle's name. */
   name: string;
   /** Why the application needs it, in Pi's words, for the owner to judge. */
@@ -223,6 +228,7 @@ export function listSecrets(applicationId: string): SecretRequest[] {
       origin: rest.origin ?? "owner",
       revision: rest.revision ?? (sealed ? 1 : 0),
       establishedAt: sealed ? rest.establishedAt : null,
+      changing: Boolean(previous),
     };
   });
 }
@@ -456,6 +462,24 @@ export function withdrawSecret(applicationId: string, name: string) {
 }
 
 /**
+ * The current value of each name, and the one being replaced where there is
+ * one. Separate from `values()` because that one deliberately flattens both
+ * for redaction, and an environment must not: a Map built from the flattened
+ * list keeps whichever came last, which would silently export the outgoing
+ * password as `$NAME` for the duration of every change.
+ */
+function currentAndPrevious(applicationId: string) {
+  const current = new Map<string, string>();
+  const previous = new Map<string, string>();
+  for (const item of read(applicationId)) {
+    if (item.sealed) current.set(item.name, unseal(item.sealed));
+    if (item.previous?.sealed)
+      previous.set(item.name, unseal(item.previous.sealed));
+  }
+  return { current, previous };
+}
+
+/**
  * Every value this application holds, for scanning output. Never returned to
  * a caller that could show it — the two callers are handle resolution and
  * redaction, both inside the privileged layer.
@@ -492,21 +516,26 @@ function values(applicationId: string) {
  */
 export function secretEnvironment(applicationId: string, names: string[]) {
   if (!names.length) return "";
-  const held = new Map(
-    values(applicationId).map((item) => [item.name, item.value]),
-  );
-  const missing = names.filter((name) => !held.has(name));
+  const { current, previous } = currentAndPrevious(applicationId);
+  const missing = names.filter((name) => !current.has(name));
   if (missing.length)
     throw new Error(
       `No value has been supplied for ${missing.join(", ")}. Ask for it with ` +
-        `request_secret and wait for the owner to fill it in; do not ` +
-        `substitute a value of your own.`,
+        `request_secret, or have the controller make one with ` +
+        `generate_secret, and do not substitute a value of your own.`,
     );
-  return (
-    names
-      .map((name) => `export ${name}=${posixQuote(held.get(name)!)}`)
-      .join("\n") + "\n"
+  const lines = names.map(
+    (name) => `export ${name}=${posixQuote(current.get(name)!)}`,
   );
+  // While a change is in flight the outgoing value is still the one the
+  // service accepts, and a script that has to authenticate in order to change
+  // the password needs it. It is exported under its own name so nothing can
+  // confuse the two: $NAME is always what the credential is becoming.
+  for (const name of names) {
+    const outgoing = previous.get(name);
+    if (outgoing) lines.push(`export ${name}_PREVIOUS=${posixQuote(outgoing)}`);
+  }
+  return lines.join("\n") + "\n";
 }
 
 /** `it's` → `'it'\''s'`. The only escaping a single-quoted shell word needs. */

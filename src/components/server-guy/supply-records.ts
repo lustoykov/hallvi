@@ -253,6 +253,7 @@ export function supplyFromRecords({
         held: true,
         revealable:
           secret.origin === "generated" && Boolean(secret.establishedAt),
+        changing: secret.changing,
         where: secret.establishedAt
           ? secret.origin === "generated"
             ? "Generated and sealed on this computer; put in as the command runs"
