@@ -535,6 +535,45 @@ const DESTINATION_KINDS = new Set<DestinationKind>([
   "provider",
 ]);
 
+/**
+ * What each destination class is called, and what it does and does not
+ * protect against — one entry per class, in one place.
+ *
+ * The name and the meaning used to live in two files: the banner kept the
+ * words and the projection kept the sentences, so a second page showing a
+ * destination had to pick one and invent the other.
+ */
+export const CLASS_MEANING: Record<
+  DestinationKind,
+  { word: string; means: string }
+> = {
+  "same-server": {
+    word: "On the application's server",
+    means:
+      "This recovers from a mistake inside the application and from nothing else: if the server is lost, the copies are lost with it.",
+  },
+  controller: {
+    word: "On this computer",
+    means:
+      "That survives losing the application's server, and depends on this machine still existing and being reachable.",
+  },
+  "off-site": {
+    word: "Off-site storage",
+    means:
+      "In object storage independent of both machines, subject to the access and retention configured there.",
+  },
+  provider: {
+    word: "Provider snapshot",
+    means:
+      "The provider's snapshot of the whole disk. It can rebuild the machine; it is not an application-aware copy and says nothing about the data being consistent.",
+  },
+  unclassified: {
+    word: "Destination not classified",
+    means:
+      "A destination is recorded, but nothing says whether it survives losing the server. Until it does, treat this as unproven.",
+  },
+};
+
 /** What each class does and does not protect against, in the page's words. */
 export const destinationMeaning: Record<DestinationKind, string> = {
   "same-server":

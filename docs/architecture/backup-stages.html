@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Which stage owns a gap</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --soft: #667389;
+        --rule: rgba(25, 35, 56, 0.12);
+        --accent: #285ad8;
+        --warn: #9a6207;
+        --warn-tint: rgba(154, 98, 7, 0.08);
+        --accent-tint: rgba(40, 90, 216, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(100%, 800px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--soft);
+        font: 500 8px/1 "Geist Mono", monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font: 400 28px/1.1 "Instrument Serif", serif;
+      }
+
+      p {
+        max-width: 640px;
+        margin: 12px 0 24px;
+        color: var(--muted);
+        font: 400 12px/1.6 "Geist", sans-serif;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .connector {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.2;
+        marker-end: url(#arrow);
+      }
+
+      .arrow-label,
+      .tag {
+        font-family: "Geist Mono", monospace;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        fill: var(--soft);
+      }
+
+      .tag {
+        text-anchor: middle;
+      }
+
+      .node-name {
+        fill: var(--ink);
+        font: 600 12px/1 "Geist", sans-serif;
+      }
+
+      .node-detail {
+        fill: var(--muted);
+        font: 400 9px/1.5 "Geist", sans-serif;
+      }
+
+      .mono {
+        fill: var(--ink);
+        font: 500 9px/1 "Geist Mono", monospace;
+      }
+
+      .says {
+        fill: var(--warn);
+        font: 500 9px/1 "Geist Mono", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Server Guy · backups</div>
+      <h1>Which stage owns a gap</h1>
+      <p>
+        Being backed up is three facts in order, and every bug this page has
+        had was two of them folded together. So the page is three stages, and
+        each one reports its own result and nobody else&rsquo;s. That only
+        settles anything if there is a rule for the awkward case: the
+        application keeps something that is not in the newest copy. The gap
+        belongs to the stage whose own record names it, and when no record
+        names anything, no stage is at fault and the page says so.
+      </p>
+
+      <svg
+        viewBox="0 0 736 588"
+        role="img"
+        aria-labelledby="stages-title stages-desc"
+      >
+        <title id="stages-title">Which stage owns a gap</title>
+        <desc id="stages-desc">
+          Two panels. The first routes a coverage gap: if the restore test
+          recorded what came back, the gap belongs to the restore stage; if
+          only the copy&rsquo;s own record names what went in, it belongs to
+          the copy stage; if neither recorded anything, nothing is marked and
+          the page offers to look inside the copy. The second panel shows the
+          three application stages beside Server Guy&rsquo;s own three, which
+          are a separate subject and never fold into the first.
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#59667b" />
+          </marker>
+        </defs>
+
+        <!-- ---- Panel one: where a gap belongs. -->
+        <text class="tag" x="24" y="28" style="text-anchor: start">
+          WHERE A COVERAGE GAP BELONGS
+        </text>
+        <line
+          x1="236"
+          y1="24"
+          x2="712"
+          y2="24"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+
+        <rect
+          x="236"
+          y="48"
+          width="264"
+          height="56"
+          rx="10"
+          fill="#ffffff"
+          stroke="rgba(25,35,56,0.12)"
+        />
+        <text class="node-name" x="252" y="70">Customer uploads</text>
+        <text class="node-detail" x="252" y="88">
+          on disk, and not in the newest copy
+        </text>
+
+        <path class="connector" d="M300 104 L120 150" />
+        <path class="connector" d="M368 104 L368 150" />
+        <path class="connector" d="M436 104 L616 150" />
+
+        <rect
+          x="24"
+          y="156"
+          width="192"
+          height="128"
+          rx="10"
+          fill="var(--warn-tint)"
+          stroke="rgba(154,98,7,0.3)"
+        />
+        <text class="mono" x="40" y="178">basis: restore</text>
+        <text class="node-detail" x="40" y="196">
+          The restore recorded what
+        </text>
+        <text class="node-detail" x="40" y="210">came back, and this was</text>
+        <text class="node-detail" x="40" y="224">not in it.</text>
+        <text class="node-name" x="40" y="248">Last restore test</text>
+        <text class="says" x="40" y="266">opened it, without X</text>
+
+        <rect
+          x="272"
+          y="156"
+          width="192"
+          height="128"
+          rx="10"
+          fill="var(--warn-tint)"
+          stroke="rgba(154,98,7,0.3)"
+        />
+        <text class="mono" x="288" y="178">basis: copy</text>
+        <text class="node-detail" x="288" y="196">
+          Only the copy&rsquo;s own
+        </text>
+        <text class="node-detail" x="288" y="210">
+          record names what went
+        </text>
+        <text class="node-detail" x="288" y="224">in, and this did not.</text>
+        <text class="node-name" x="288" y="248">Latest backup</text>
+        <text class="says" x="288" y="266">off-site, without X</text>
+
+        <rect
+          x="520"
+          y="156"
+          width="192"
+          height="128"
+          rx="10"
+          fill="#ffffff"
+          stroke="rgba(25,35,56,0.12)"
+        />
+        <text class="mono" x="536" y="178">basis: unrecorded</text>
+        <text class="node-detail" x="536" y="196">Nobody wrote down what</text>
+        <text class="node-detail" x="536" y="210">is in the copy. That is a</text>
+        <text class="node-detail" x="536" y="224">thing to find out.</text>
+        <text class="node-name" x="536" y="248">Nothing is marked</text>
+        <text class="node-detail" x="536" y="266">
+          offers &ldquo;Check what the copy holds&rdquo;
+        </text>
+
+        <text class="arrow-label" x="24" y="308">
+          A plan is intent at any age, so it never answers this. Widening it
+          cannot reach back into an archive already written.
+        </text>
+
+        <!-- ---- Panel two: two subjects, never one. -->
+        <text class="tag" x="24" y="360" style="text-anchor: start">
+          TWO SUBJECTS, NEVER ONE
+        </text>
+        <line
+          x1="196"
+          y1="356"
+          x2="712"
+          y2="356"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+
+        <rect
+          x="24"
+          y="384"
+          width="336"
+          height="164"
+          rx="10"
+          fill="#ffffff"
+          stroke="rgba(25,35,56,0.12)"
+        />
+        <text class="mono" x="40" y="406">THIS APPLICATION&rsquo;S DATA</text>
+        <text class="node-name" x="40" y="432">Set up</text>
+        <text class="node-detail" x="150" y="432">
+          intent: what, where, how many
+        </text>
+        <text class="node-name" x="40" y="464">Latest backup</text>
+        <text class="node-detail" x="150" y="464">
+          one file, at one destination
+        </text>
+        <text class="node-name" x="40" y="496">Last restore test</text>
+        <text class="node-detail" x="150" y="496">
+          the one copy it names, opened
+        </text>
+        <text class="node-detail" x="40" y="524">
+          Collapses to one line only when all three hold.
+        </text>
+
+        <rect
+          x="392"
+          y="384"
+          width="320"
+          height="164"
+          rx="10"
+          fill="var(--accent-tint)"
+          stroke="rgba(40,90,216,0.25)"
+        />
+        <text class="mono" x="408" y="406">SERVER GUY&rsquo;S OWN RECOVERY</text>
+        <text class="node-name" x="408" y="432">Storage connected</text>
+        <text class="node-name" x="408" y="464">Copied</text>
+        <text class="node-name" x="408" y="496">Recovery kit saved</text>
+        <text class="node-detail" x="408" y="520">
+          Its connections and decisions. Connecting storage
+        </text>
+        <text class="node-detail" x="408" y="536">
+          here sets up nothing for the application above.
+        </text>
+      </svg>
+    </main>
+  </body>
+</html>
