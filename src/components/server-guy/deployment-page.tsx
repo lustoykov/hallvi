@@ -19,6 +19,8 @@ import { deploymentFromRecords } from "./deployment-records";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { TransitDirection } from "./deployment-prototype/transit";
 import "./deployment-prototype/transit.css";
+import { releasesFromRecords } from "./release-records";
+import { ReleasesPanel } from "./releases-panel";
 
 export function DeploymentPage({
   records,
@@ -90,27 +92,38 @@ export function DeploymentPage({
     </div>
   );
 
+  const releases = useMemo(() => releasesFromRecords(records, ""), [records]);
+
   return (
     <div className="ax-root" data-variant="transit">
       <TransitDirection
         story={story}
         now={now}
         head={
-          <PageHead
-            bar={chrome.bar}
-            title="Deployment"
-            name={story.name}
-            // Offered only while a release is standing; a failed or
-            // unfinished one has nothing to open.
-            openUrl={
-              story.state === "live"
-                ? (access?.presentation?.url ?? null)
-                : null
-            }
-            restricted={restricted}
-            reachable={reachable}
-            onReopen={onReopen}
-          />
+          <>
+            <PageHead
+              bar={chrome.bar}
+              title="Deployment"
+              name={story.name}
+              // Offered only while a release is standing; a failed or
+              // unfinished one has nothing to open.
+              openUrl={
+                story.state === "live"
+                  ? (access?.presentation?.url ?? null)
+                  : null
+              }
+              restricted={restricted}
+              reachable={reachable}
+              onReopen={onReopen}
+            />
+            {/* What is deployed, above the story of the latest attempt.
+                The story below is the attempt's phases, which is the right
+                answer to "what just happened" and the wrong one to "what is
+                running" whenever those are different records. */}
+            {releases.all.length > 0 && (
+              <ReleasesPanel view={releases} now={now} onAsk={onAsk} />
+            )}
+          </>
         }
         activity={
           story.state === "working" || story.state === "awaiting"

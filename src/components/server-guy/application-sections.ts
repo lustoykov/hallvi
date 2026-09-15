@@ -49,17 +49,15 @@ export const applicationSections = [
     group: "application",
   },
   {
-    // Secondary on purpose. History is what happened, which matters when you
-    // are working out how the present came about and not while you are
-    // looking at the present. The current-status surfaces answer the first
-    // question; this one answers the second, and it kept a primary seat for
-    // the older reason that it used to be where commands were listed.
+    // Placement is part of the navigation decision still open, and `hideable`
+    // is not the lever for it: it means "hide until something records this",
+    // so a populated History is promoted back to primary by design. Making
+    // History permanently secondary wants a flag that means that, and it is
+    // not worth adding one before the arrangement is chosen.
     id: "history",
     label: "History",
     icon: ClockCounterClockwise,
     group: "application",
-    hideable: true,
-    available: true,
   },
   {
     id: "processes",
@@ -105,15 +103,13 @@ export const applicationSections = [
   {
     // Not "Logs". Nothing in this product retrieves an application's own
     // logs — no tool does it — and this page has only ever held Server Guy's
-    // command output, which History already carries as evidence on the event
-    // that produced it. Named for what it holds, and secondary, until there
-    // is a runtime-log capability for a Logs destination to be about.
+    // command output, which History now carries as evidence on the event that
+    // produced it. Named for what it holds; whether it keeps a door of its
+    // own is the navigation decision still open.
     id: "logs",
     label: "Command output",
     icon: TerminalWindow,
     group: "care",
-    hideable: true,
-    available: true,
   },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
   { id: "domains", label: "Domains", icon: Globe, group: "care" },
