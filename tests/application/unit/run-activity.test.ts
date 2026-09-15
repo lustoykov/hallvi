@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { runActivity } from "@/components/server-guy/run-activity";
+import { runActivity, runFailure } from "@/components/server-guy/run-activity";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
 
@@ -132,5 +132,71 @@ describe("what a turn in flight says it is doing", () => {
     const said = ask({ status: "queued" });
     expect(said.says).toBe("Waiting to start");
     expect(said.since).toBeNull();
+  });
+});
+
+describe("what to say and offer when a turn failed", () => {
+  const failed = (over: Partial<ExecutionRecord>): ExecutionRecord =>
+    execution({ status: "failed", exitCode: 1, ...over });
+
+  it("reads the failure out of the command that produced it", () => {
+    const said = runFailure({
+      runId: RUN,
+      executions: [
+        failed({
+          output:
+            "Step 4/9 : RUN pip install -r requirements.txt\nERROR: No matching distribution found for django==6.0\nexit status 1",
+        }),
+      ],
+    });
+    expect(said.says).toContain("on the server");
+    expect(said.says).toContain("exit 1");
+    // The last line that says something, not the exit code the card shows.
+    expect(said.says).toContain("No matching distribution");
+  });
+
+  it("offers understanding, not retry, when a command rejected its input", () => {
+    // Running it again gets the same exit code. Retrying is a way of not
+    // reading the error.
+    const said = runFailure({
+      runId: RUN,
+      executions: [failed({ output: "ERROR: manifest unknown" })],
+    });
+    expect(said.action.kind).toBe("ask");
+    expect(said.action.label).toBe("Ask what went wrong");
+  });
+
+  it("offers retry when the connection dropped", () => {
+    const said = runFailure({
+      runId: RUN,
+      executions: [
+        failed({ output: "client_loop: send disconnect: Broken pipe" }),
+      ],
+    });
+    expect(said.action.kind).toBe("retry");
+    expect(said.action.label).toBe("Try again");
+  });
+
+  it("keeps a run's internal error out of the line, and offers retry", () => {
+    // A run's own error is runtime text, and this product has already decided
+    // it does not reach the reader. A failed command's output is different:
+    // it is the command's own words, already redacted and already on screen
+    // in its own terminal.
+    const said = runFailure({
+      runId: RUN,
+      error: "Transaction failed for internal Run id.",
+      executions: [],
+    });
+    expect(said.says).not.toContain("Transaction failed");
+    expect(said.says).toContain("no command recorded why");
+    expect(said.action.kind).toBe("retry");
+  });
+
+  it("does not read another turn's failure", () => {
+    const said = runFailure({
+      runId: RUN,
+      executions: [failed({ runId: "another", output: "ERROR: boom" })],
+    });
+    expect(said.says).toContain("no command recorded why");
   });
 });

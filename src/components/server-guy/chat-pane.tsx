@@ -38,7 +38,12 @@ import { Markdown } from "./markdown";
 import { InformationCard } from "./information-card";
 import { hasActivity, PiActivity } from "./pi-activity";
 import { useOffScreen } from "./use-off-screen";
-import { runActivity, useClockReady, type RunActivity } from "./run-activity";
+import {
+  runActivity,
+  runFailure,
+  useClockReady,
+  type RunActivity,
+} from "./run-activity";
 import { OperatorConsole } from "./operator-console";
 import {
   SecretRequests,
@@ -490,6 +495,11 @@ export function ChatPane({
             const retried =
               run !== undefined &&
               runs.some((attempt) => attempt.retryOfId === run.id);
+            const failure = runFailure({
+              runId: message.id,
+              error: run?.error,
+              executions: view.executions ?? [],
+            });
             const historyUnavailable =
               run?.status === "failed" &&
               run.error?.startsWith("Conversation history unavailable.");
@@ -569,7 +579,7 @@ export function ChatPane({
                             message.status === "interrupted" ? (
                             stopOutcome(view.executions, message.id)
                           ) : (
-                            "Something went wrong. Please retry."
+                            failure.says
                           )}
                         </p>
                         {message.body && !inProgress && (
@@ -590,11 +600,11 @@ export function ChatPane({
                             disabled={busy !== null}
                             onClick={() => {
                               if (historyUnavailable) onNewChat();
-                              else
-                                onRunAction(
-                                  run.id,
-                                  inProgress ? "cancel" : "retry",
-                                );
+                              else if (inProgress)
+                                onRunAction(run.id, "cancel");
+                              else if (failure.action.kind === "ask")
+                                continueAfterSecrets(failure.action.draft!);
+                              else onRunAction(run.id, "retry");
                             }}
                             type="button"
                           >
@@ -608,7 +618,11 @@ export function ChatPane({
                               ? "Stop"
                               : historyUnavailable
                                 ? "Start a new chat"
-                                : "Retry reply"}
+                                : // A command that exited non-zero will exit
+                                  // non-zero again, so retrying it is a way
+                                  // of not reading the error. The control
+                                  // follows what actually failed.
+                                  failure.action.label}
                           </button>
                         )}
                       </div>

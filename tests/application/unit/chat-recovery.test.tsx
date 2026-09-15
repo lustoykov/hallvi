@@ -108,7 +108,14 @@ describe("conversation recovery and assistant branding", () => {
     // for a command building an image and for a decision nobody had noticed.
     ["queued", "Waiting to start"],
     ["running", "Waiting for the model"],
-    ["failed", "Something went wrong. Please retry."],
+    // No command failed, so there is nothing to read — the run's own error is
+    // runtime text and stays internal, which the assertions below guard.
+    // A failure that does have a command behind it says what that command
+    // printed; see run-activity.test.ts.
+    [
+      "failed",
+      "The turn ended before it finished, and no command recorded why.",
+    ],
     // Stopping ends the reply and does not undo work that already ran, so
     // the line reports what happened rather than naming the reply.
     ["cancelled", "Stopped."],
@@ -128,13 +135,17 @@ describe("conversation recovery and assistant branding", () => {
       error: "Commit failed",
       body: "Saved: hosting budget €30/month.",
     });
-    expect(html).toContain("Something went wrong. Please retry.");
+    expect(html).toContain(
+      "The turn ended before it finished, and no command recorded why.",
+    );
     expect(html).toMatch(
       /<details class="sg-run-draft"><summary>Show unfinished draft<\/summary>/,
     );
     expect(html).toContain("Saved: hosting budget €30/month.");
     expect(html).not.toContain("Commit failed");
-    expect(html).toContain("Retry reply</button>");
+    // "Try again" now: the control follows what failed, and with no command
+    // output to read, trying again is the honest offer.
+    expect(html).toContain("Try again</button>");
   });
 
   it("offers a new chat for a history failure and preserves ordinary retry for other failures", () => {
@@ -144,14 +155,17 @@ describe("conversation recovery and assistant branding", () => {
     const ordinary = render({
       error: "Server Guy could not finish this attempt.",
     });
-    expect(ordinary).toContain("Retry reply</button>");
+    // "Try again" now, because the control follows what failed: with no
+    // command output to read, trying again is the honest offer.
+    expect(ordinary).toContain("Try again</button>");
     expect(ordinary).not.toContain("Start a new chat</button>");
   });
 
   it("offers no recovery mutation in an archived Chat", () => {
     const html = render({ archived: true });
     expect(html).not.toContain("Start a new chat</button>");
-    expect(html).not.toContain("Retry reply</button>");
+    expect(html).not.toContain("Try again</button>");
+    expect(html).not.toContain("Ask what went wrong</button>");
   });
 
   it("uses one assistant name and a matching composer accessible label", () => {
