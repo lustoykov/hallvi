@@ -1,7 +1,7 @@
 "use client";
 import { Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useState } from "react";
-import { plainText } from "./execution-text";
+import { plainText, whereItRan } from "./execution-text";
 import type {
   ExecutionRecord,
   OperatorSettings,
@@ -218,88 +218,94 @@ export function OperatorConsole({
               (!executionId || item.id === executionId) &&
               !excludeIds.includes(item.id),
           )
-          .map((item) => (
-            <article
-              id={`execution-${item.id}`}
-              key={item.id}
-              className={`sg-execution ${item.status}`}
-            >
-              <header>
-                <strong>
-                  {item.tool === "request_approval"
-                    ? "Approval requested"
-                    : item.tool === "server_bash"
-                      ? "Run on server"
-                      : item.tool}
-                </strong>
-                {/* "root@192.0.2.10:22" is a login string. The reader is
-                    being asked whether to let something run on their server;
-                    which server, in their words, is the useful half, and the
-                    login stays available on hover. */}
-                <span className="sg-execution-where" title={item.target}>
-                  {item.tool === "server_bash" ? "on your server" : item.target}
-                  {item.tool === "server_bash" &&
-                    item.target.includes("@") &&
-                    ` · ${item.target.split("@").at(-1)?.split(":")[0]}`}
-                  {" · "}
-                  {new Date(item.createdAt).toLocaleTimeString(undefined, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                <span role="status" className="sg-execution-state">
-                  {states[item.status] ? (
-                    <Tag tone={states[item.status]!.tone}>
-                      {states[item.status]!.word}
-                    </Tag>
-                  ) : (
-                    <Working>Running</Working>
-                  )}
-                  {typeof item.exitCode === "number" && (
-                    <em>exit {item.exitCode}</em>
-                  )}
-                </span>
-              </header>
-              {item.tool === "server_bash" ? (
-                <StreamingOutput item={item} />
-              ) : (
-                <details
-                  open={
-                    item.status === "awaiting-approval" ||
-                    item.status === "running"
-                  }
-                >
-                  <summary>
-                    {item.status === "awaiting-approval"
-                      ? "Review this action"
-                      : "Command and output"}
-                  </summary>
-                  <pre>{plainText(item.input)}</pre>
-                  {item.output && <pre>{item.output}</pre>}
-                </details>
-              )}
-              {item.status === "awaiting-approval" && main && (
-                <div className="sg-execution-actions">
-                  <button
-                    type="button"
-                    className="sg-primary-button"
-                    disabled={busy !== null}
-                    onClick={() => void decide(item.id, true)}
+          .map((item) => {
+            const where = whereItRan(item);
+            return (
+              <article
+                id={`execution-${item.id}`}
+                key={item.id}
+                className={`sg-execution ${item.status}`}
+              >
+                <header>
+                  <strong>
+                    {item.tool === "request_approval"
+                      ? "Approval requested"
+                      : item.tool === "server_bash"
+                        ? "Run on server"
+                        : item.tool}
+                  </strong>
+                  {/* Which machine, said as a machine.
+                    "on your server" was printed over `server_bash` and the
+                    recorded target verbatim over everything else, so a
+                    workspace container, a tunnel on this Mac and a call to
+                    Hetzner all arrived as prose a reader had to decode — and
+                    the one thing that could break the application read like
+                    the rest. "root@192.0.2.10:22" is a login string, not how
+                    anyone refers to a machine; the address is the half a
+                    person recognises and the whole of it stays on hover. */}
+                  <span className="sg-execution-where" title={item.target}>
+                    {where ? where.said : item.target}
+                    {where?.detail && ` · ${where.detail}`}
+                    {" · "}
+                    {new Date(item.createdAt).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span role="status" className="sg-execution-state">
+                    {states[item.status] ? (
+                      <Tag tone={states[item.status]!.tone}>
+                        {states[item.status]!.word}
+                      </Tag>
+                    ) : (
+                      <Working>Running</Working>
+                    )}
+                    {typeof item.exitCode === "number" && (
+                      <em>exit {item.exitCode}</em>
+                    )}
+                  </span>
+                </header>
+                {item.tool === "server_bash" ? (
+                  <StreamingOutput item={item} />
+                ) : (
+                  <details
+                    open={
+                      item.status === "awaiting-approval" ||
+                      item.status === "running"
+                    }
                   >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="sg-secondary-button"
-                    disabled={busy !== null}
-                    onClick={() => void decide(item.id, false)}
-                  >
-                    Decline
-                  </button>
-                </div>
-              )}
-            </article>
-          ))}
+                    <summary>
+                      {item.status === "awaiting-approval"
+                        ? "Review this action"
+                        : "Command and output"}
+                    </summary>
+                    <pre>{plainText(item.input)}</pre>
+                    {item.output && <pre>{item.output}</pre>}
+                  </details>
+                )}
+                {item.status === "awaiting-approval" && main && (
+                  <div className="sg-execution-actions">
+                    <button
+                      type="button"
+                      className="sg-primary-button"
+                      disabled={busy !== null}
+                      onClick={() => void decide(item.id, true)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="sg-secondary-button"
+                      disabled={busy !== null}
+                      onClick={() => void decide(item.id, false)}
+                    >
+                      Decline
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
       {error && <p role="alert">{error}</p>}
     </div>
   );

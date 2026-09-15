@@ -75,13 +75,71 @@ export function clip(text: string, limit: number): string {
   return `${(space > limit * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
+/**
+ * Which machine a tool actually runs on.
+ *
+ * Four different places, and the console called three of them nothing and one
+ * of them "your server". They are not alike: a command on the application's
+ * host can break the application, one in the workspace container touches a
+ * copy of the repository on this Mac, one against a provider's API spends
+ * money, and opening a tunnel changes only what this Mac can reach. A reader
+ * deciding whether to approve something needs to know which of those it is.
+ *
+ * `request_approval` is absent on purpose. It runs nowhere; it is a question.
+ */
+const WORKSPACE = {
+  said: "In the repository copy",
+  detail: "an isolated container on this Mac",
+};
+const PLACES: Record<string, { said: string; detail?: string }> = {
+  server_bash: { said: "On the server" },
+  bash: WORKSPACE,
+  powershell: WORKSPACE,
+  write: WORKSPACE,
+  edit: WORKSPACE,
+  hetzner_request: { said: "At Hetzner" },
+  set_domain_record: { said: "At the DNS provider" },
+  // Each of these runs here and reaches outward: a tunnel this Mac holds
+  // open, a key this Mac keeps, an SSH check this Mac makes, a request this
+  // Mac sends. None of them changes anything on the application's server.
+  open_server_port: { said: "On this Mac" },
+  server_public_key: { said: "On this Mac" },
+  connect_server: { said: "On this Mac" },
+  check_public_access: { said: "On this Mac" },
+};
+
 /** Where a tool ran, in the reader's words. Null when we cannot say. */
 export function placeOf(tool: string): string | null {
-  if (tool === "server_bash") return "On the server";
-  if (tool === "bash" || tool === "powershell") return "In the repository copy";
-  if (tool === "hetzner_request") return "Asked the provider";
   if (tool === "request_approval") return "Your decision";
-  return null;
+  return PLACES[tool]?.said ?? null;
+}
+
+/**
+ * The host inside a login string. `root@203.0.113.1:22` is how the executor
+ * addresses a machine and not how anyone refers to one; the address is the
+ * half a reader recognises, and the whole string stays on hover.
+ */
+export function hostOf(target: string) {
+  if (!target.includes("@")) return null;
+  const after = target.split("@").at(-1) ?? "";
+  const host = after.split(":")[0].trim();
+  return host || null;
+}
+
+/**
+ * Where an execution ran and, where one exists, which machine or endpoint.
+ * `said` is never guessed: a tool this does not know about returns null
+ * rather than a plausible sentence.
+ */
+export function whereItRan(execution: { tool: string; target: string }) {
+  if (execution.tool === "request_approval") return null;
+  const place = PLACES[execution.tool];
+  if (!place) return null;
+  return {
+    said: place.said,
+    // The recorded target, preferring the address a person would recognise.
+    detail: hostOf(execution.target) ?? place.detail ?? null,
+  };
 }
 
 /**

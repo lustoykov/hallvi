@@ -52,6 +52,11 @@ export function pulse(item: ExecutionRecord, now: number) {
   return quiet < 20 ? running : `${running} · quiet for ${spell(quiet)}`;
 }
 
+/** Lines that carry something, so a one-line script is not called two. */
+function lineCount(text: string) {
+  return text.split("\n").filter((line) => line.trim()).length;
+}
+
 export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   // A command waiting for a decision opens closed. The terminal was open by
   // default, which made a dark block of shell the primary content of the one
@@ -66,9 +71,25 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
   );
   const [follow, setFollow] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
+  // The command is the content only while it is a proposal. Once it has run,
+  // the output is what the reader came for and the command is provenance.
+  const [showCommand, setShowCommand] = useState(
+    item.status === "awaiting-approval",
+  );
   const viewport = useRef<HTMLPreElement>(null);
   const output = outputText(item);
+  /** The whole payload: the script, and the settings that travelled with it. */
   const command = plainText(item.input);
+  /**
+   * The one line that says what this does. Read from the command itself and
+   * never from the payload, so a setting printed beside it can never become
+   * the caption, and with the shell preamble skipped, because the first line
+   * of a script is `set -euo pipefail` and that is not what it is for.
+   */
+  const line = clip(essence(commandOf(item.input)), 140);
+  const script = lineCount(commandOf(item.input));
+  /** Whether anything at all is hidden: more script, or settings, or both. */
+  const more = command.trim() !== line;
   const running = item.status === "running";
   const awaiting = item.status === "awaiting-approval";
   // The clock is outside React: it ticks on its own and the component reads
@@ -130,9 +151,37 @@ export function StreamingOutput({ item }: { item: ExecutionRecord }) {
               : "Command and output"}
         </summary>
         <div className="sg-stream-terminal">
-          <pre className="sg-stream-command" aria-label="Command">
-            <code>{command}</code>
-          </pre>
+          {/* One line, in a strip, deliberately not a <pre>.
+              This used to be a second scrolling dark pane above the output
+              pane, and two clipped panes in one dark box read as two
+              terminals running two things. The command still has to be here —
+              output without it is unattributable — but it is a caption, and
+              the whole of it is one click away. */}
+          <div className="sg-stream-ran">
+            <span className="sg-stream-prompt" aria-hidden="true">
+              $
+            </span>
+            <code title={line}>{line}</code>
+            {more && (
+              <button
+                type="button"
+                className="sg-stream-more"
+                aria-expanded={showCommand}
+                onClick={() => setShowCommand(!showCommand)}
+              >
+                {showCommand
+                  ? "Hide"
+                  : script > 1
+                    ? `Full command · ${script} lines`
+                    : "Full command"}
+              </button>
+            )}
+          </div>
+          {showCommand && more && (
+            <pre className="sg-stream-command" aria-label="Full command">
+              <code>{command}</code>
+            </pre>
+          )}
           <pre
             className="sg-stream-output"
             ref={viewport}
