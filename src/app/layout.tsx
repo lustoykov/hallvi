@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { StandInNotice } from "@/components/server-guy/stand-in-notice";
+
 import "./globals.css";
 import "./server-guy.css";
 
@@ -26,6 +28,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
+        <StandInNotice />
       </body>
     </html>
   );
