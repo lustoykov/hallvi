@@ -62,7 +62,7 @@ const release = (
   }) as unknown as SavedInformation;
 
 describe("what is running, and what happened last", () => {
-  it("keeps the running release when a later update failed", () => {
+  it("keeps the last verified release without claiming it survived a failed update", () => {
     const view = releasesFromRecords(
       [
         release("r1", "2026-09-10T10:00:00.000Z", "aaaaaaa1111", "deployed"),
@@ -73,8 +73,10 @@ describe("what is running, and what happened last", () => {
     expect(view.running?.id).toBe("r1");
     expect(view.latest?.id).toBe("r2");
     const said = releaseHeadline(view);
-    expect(said.says).toContain("Running aaaaaaa");
-    expect(said.limit).toContain("did not start");
+    expect(said.says).toBe("Last verified release: aaaaaaa.");
+    expect(said.limit).toBe(
+      "The update to bbbbbbb failed. Check what is running now.",
+    );
   });
 
   it("says unknown rather than the previous release when nothing was established", () => {
@@ -88,6 +90,7 @@ describe("what is running, and what happened last", () => {
       APP,
     );
     expect(view.running?.id).toBe("r1");
+    expect(releaseHeadline(view).says).toBe("Last verified release: aaaaaaa.");
     expect(releaseHeadline(view).limit).toContain("unconfirmed");
   });
 

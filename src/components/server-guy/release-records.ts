@@ -158,17 +158,17 @@ export function releaseHeadline(view: ReleaseView) {
     return {
       says:
         latest.outcome === "failed"
-          ? "No release has ever started successfully."
+          ? "No successful release is recorded."
           : "A release was attempted and nothing established what came of it.",
       limit: null,
     };
   if (running.id === latest.id)
     return { says: `Running ${running.short}.`, limit: null };
   return {
-    says: `Running ${running.short}.`,
+    says: `Last verified release: ${running.short}.`,
     limit:
       latest.outcome === "failed"
-        ? `The update to ${latest.short} after it did not start, so this is still what is deployed.`
+        ? `The update to ${latest.short} failed. Check what is running now.`
         : `An update to ${latest.short} was attempted after it and nothing established what came of it, so what is running now is unconfirmed.`,
   };
 }

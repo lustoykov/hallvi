@@ -38,7 +38,7 @@ function ago(at: string, now: number) {
 
 const OUTCOME_WORD: Record<Release["outcome"], string> = {
   deployed: "Deployed",
-  failed: "Did not start",
+  failed: "Failed",
   // Not "unknown": something ran, and what it left behind was never checked.
   attempted: "Outcome not established",
 };
