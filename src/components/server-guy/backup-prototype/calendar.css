@@ -347,3 +347,61 @@
   height: 18px;
   border-radius: 5px;
 }
+
+/* ---------- Narrow widths ---------- */
+
+/* Three weeks of day columns beside a 250px name column do not fit a phone:
+   the days collapsed into four-pixel slivers with each weekday drawn on top
+   of its date. The names take only what they need, the days keep a size a
+   finger can hit, and the board scrolls sideways inside its own box with the
+   names held in place — the one thing the responsive rule lets scroll. */
+@media (max-width: 720px) {
+  .axbc-board {
+    padding: 0 0 14px;
+  }
+  .axbc-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    /* Little Server stands above the day row. Its headroom has to be inside
+       the box that clips, or it is cut in half. */
+    padding: 84px 16px 6px;
+    scrollbar-width: thin;
+  }
+  .axbc-grid {
+    --head: 148px;
+    grid-template-columns: var(--head) repeat(var(--cols), minmax(40px, 1fr));
+  }
+  .axbc-corner,
+  .axbc-head {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: var(--ax-surface);
+  }
+  .axbc-head {
+    padding-right: 8px;
+    box-shadow: 10px 0 10px -10px rgb(23 34 56 / 22%);
+  }
+  /* The name says what the icon says, and the name is what does not fit. */
+  .axbc-head-icon {
+    display: none;
+  }
+  .axbc-head-text small {
+    white-space: normal;
+    line-height: 1.35;
+  }
+  /* A 300px record cannot open beside a cell on a 400px screen, and inside
+     a box that scrolls sideways it would open off the edge. It comes to the
+     bottom of the screen instead, saying the same thing. */
+  .axbc-pop,
+  .axbc-pop[data-align="end"] {
+    position: fixed;
+    inset: auto 12px 12px;
+    width: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .axbc-legend {
+    margin-inline: 16px;
+  }
+}
