@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Check, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { SettingsNav } from "./settings-nav";
 import s from "./pi-setup-screen.module.css";
@@ -24,11 +25,95 @@ export interface ConnectionItem {
   action: string;
 }
 
+/**
+ * Server Guy's own copies are encrypted with a passphrase the owner keeps
+ * elsewhere. It is shown once when the first copy lands; afterwards only a
+ * deliberate action here shows it again.
+ */
+function RecoveryKit({
+  kit,
+}: {
+  kit: { confirmedAt: string | null; bucket: string; host: string };
+}) {
+  const [shown, setShown] = useState<{
+    passphrase: string;
+    endpoint: string;
+  } | null>(null);
+  const [error, setError] = useState("");
+  return (
+    <section className={s.card} aria-label="Server Guy recovery kit">
+      <section className={s.section}>
+        <h2>
+          <span className={s.step} aria-hidden="true">
+            {kit.confirmedAt ? <Check /> : <Warning />}
+          </span>
+          Server Guy recovery kit
+        </h2>
+        <p className={s.hint}>
+          Server Guy copies its own records and keys into{" "}
+          <code>{kit.bucket}</code> at {kit.host}. The copies are encrypted, and
+          this passphrase is the only thing that opens them.
+        </p>
+        <div className={s.accountRow}>
+          <div>
+            <p>
+              {kit.confirmedAt
+                ? "You have said this is saved outside this machine."
+                : "Not saved yet. Keep it in your password manager."}
+            </p>
+            {shown && (
+              <>
+                <code className={s.recoveryCode} data-recovery-passphrase="">
+                  {shown.passphrase}
+                </code>
+                <p className={s.hint}>{shown.endpoint}</p>
+              </>
+            )}
+            {error && (
+              <p className={s.hint} role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+          {!shown && (
+            <button
+              type="button"
+              className={s.textButton}
+              onClick={async () => {
+                setError("");
+                try {
+                  const response = await fetch(
+                    "/api/controller-protection/kit",
+                  );
+                  const value = await response.json();
+                  if (!response.ok || !value?.passphrase)
+                    throw new Error("The recovery kit could not be read.");
+                  setShown(value);
+                } catch (caught) {
+                  setError(
+                    caught instanceof Error
+                      ? caught.message
+                      : "The recovery kit could not be read.",
+                  );
+                }
+              }}
+            >
+              Show recovery kit
+            </button>
+          )}
+        </div>
+      </section>
+    </section>
+  );
+}
+
 export function ConnectionsScreen({
   connections,
+  recoveryKit,
   prototype = false,
 }: {
   connections: ConnectionItem[];
+  recoveryKit?: { confirmedAt: string | null; bucket: string; host: string };
   prototype?: boolean;
 }) {
   const needing = connections.filter(
@@ -122,6 +207,7 @@ export function ConnectionsScreen({
             </section>
           ))}
         </section>
+        {recoveryKit && <RecoveryKit kit={recoveryKit} />}
         <p className={s.hint}>
           Connecting an account never authorises spending or changes on its own.
           Each purchase, deployment or change is approved in the conversation

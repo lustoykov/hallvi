@@ -278,6 +278,8 @@ export function ApplicationSectionView({
           applicationName={app.name}
           now={now}
           chrome={{ bar, header: null, activity: null }}
+          controller={facts.controllerProtection}
+          onRefresh={onRefresh}
           onAsk={(draft) => onAsk(null, draft)}
         />
       );

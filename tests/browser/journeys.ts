@@ -121,6 +121,13 @@ export const browserJourneys = [
     smoke: false,
   },
   {
+    id: "controller-protection",
+    name: "Server Guy's own protection",
+    description:
+      "State Server Guy's own copies on Backups: unprotected without storage, copied but not yet recoverable, and recoverable once the owner saves the kit.",
+    smoke: false,
+  },
+  {
     id: "dashboard",
     name: "Testing dashboard and saved reviews",
     description:

@@ -15,6 +15,7 @@ import {
   Check,
   Database,
   FolderSimple,
+  HardDrives,
   Minus,
   X,
 } from "@phosphor-icons/react";
@@ -33,6 +34,8 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { useDismiss } from "../overview-prototype/shared";
 import { clock, countWord, when } from "../stack-prototype/stack-model";
 import type { ProtectProps } from "./protect-story";
+import { ago } from "../architecture-prototype/model";
+import { controllerSentence, controllerWord } from "../controller-protection";
 import { dayOf, listed } from "./model";
 import "./calendar.css";
 
@@ -85,6 +88,8 @@ export function CalendarDirection({
   now,
   head,
   activity,
+  controller,
+  controllerBand,
   onAsk,
 }: ProtectProps) {
   const [open, setOpen] = useState<string | null>(null);
@@ -237,7 +242,66 @@ export function CalendarDirection({
     }),
   };
 
-  const rows = [copiesRow, ...pieceRows, restoreRow];
+  // Server Guy's own copies, on the same days as the application's. A cell is
+  // drawn only where a copy actually reached storage; a failure or a skip is
+  // said in the row's status and under the board, never as a green mark.
+  const controllerRow: Row | null = controller
+    ? {
+        id: "controller",
+        icon: <HardDrives weight="bold" />,
+        name: "Server Guy itself",
+        status:
+          controllerWord[controller.state] +
+          (controller.lastCopyAt
+            ? ` · last ${ago(controller.lastCopyAt, now)}`
+            : ""),
+        c:
+          controller.state === "recoverable"
+            ? "verified"
+            : controller.state === "failing"
+              ? "gap"
+              : controller.state === "copied"
+                ? "stale"
+                : "absent",
+        cells: days.map((day): Cell => {
+          const list = controller.copies.filter(
+            (item) =>
+              item.outcome === "succeeded" &&
+              startOf(Date.parse(item.at)) === day,
+          );
+          if (!list.length)
+            return day > today && controller.connected
+              ? {
+                  state: "planned",
+                  title: "Scheduled",
+                  lines: [
+                    `Server Guy copies its own records after each piece of work and once a day; the last ${controller.keep} copies are kept.`,
+                  ],
+                }
+              : empty;
+          return {
+            state: "copy",
+            mark:
+              list.length > 1 ? <b>{list.length}</b> : <Check weight="bold" />,
+            title:
+              list.length === 1
+                ? "A copy of Server Guy's own records"
+                : `${countWord(list.length)} copies of Server Guy's own records`,
+            lines: list.map(
+              (item) =>
+                `${clock(item.at)} · encrypted copy of Server Guy's records and keys${item.size ? `, ${item.size}` : ""}`,
+            ),
+          };
+        }),
+      }
+    : null;
+
+  const rows = [
+    copiesRow,
+    ...pieceRows,
+    restoreRow,
+    ...(controllerRow ? [controllerRow] : []),
+  ];
 
   // ---------- What it says ----------
   const unknownDays = days.filter((day) => copyState(day) === "unknown");
@@ -248,6 +312,7 @@ export function CalendarDirection({
     unknownDays.length > 0 &&
       `The scheduled ${unknownDays.length === 1 ? "copy" : "copies"} for ${listed(unknownDays.map(dayOf))} ${unknownDays.length === 1 ? "isn't" : "aren't"} on record here.`,
     restore && `A restore test passed ${when(restore.at)}.`,
+    controller && controllerSentence(controller, now),
   ]
     .filter(Boolean)
     .join(" ");
@@ -392,6 +457,7 @@ export function CalendarDirection({
           ))}
         </ul>
       </div>
+      {controllerBand}
     </section>
   );
 }

@@ -1,0 +1,190 @@
+/* Server Guy's own protection, under the Backups board. Prefix: cpb-.
+   It borrows the board's card, not its grid: this is one subject, and the
+   only thing on the page the owner can be asked to do something about. */
+
+.cpb {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  border: 1px solid var(--ax-line);
+  border-radius: 22px;
+  background: var(--ax-surface);
+  box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
+}
+/* Under the board it is the board's width. On the page that has no board it
+   is the page's own measure, which the empty state sets at 62ch: a card that
+   ran to twice the width of the prose above it read as a different page. */
+.cpb[data-standalone] {
+  max-width: 62ch;
+}
+.cpb-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+/* The state word is a chip beside the name, not a word in it: keep them on
+   one line while there is room, and let the chip drop rather than squeeze
+   the name when there is not. */
+.cpb-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+}
+.cpb-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  /* Sits on the name's line, not in the middle of the block, which grows to
+     three lines at narrow widths. */
+  margin-top: 1px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--ax-waiting-bg);
+  color: var(--ax-waiting-text);
+  box-shadow: inset 0 0 0 1px rgb(23 34 56 / 7%);
+}
+.cpb-icon[data-state="recoverable"] {
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified-text);
+}
+.cpb-icon[data-state="failing"] {
+  background: var(--ax-failed-bg);
+  color: var(--ax-failed);
+}
+.cpb-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.cpb-head b {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ax-ink);
+}
+/* The band is often the whole page's account of this subject, on a
+   controller that has never deployed anything, so it states the word
+   itself rather than relying on the board's row. */
+.cpb-state {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ax-waiting-bg);
+  color: var(--ax-waiting-text);
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 620;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.cpb-state[data-state="recoverable"] {
+  background: var(--ax-verified-bg);
+  color: var(--ax-verified-text);
+}
+.cpb-state[data-state="failing"] {
+  background: var(--ax-failed-bg);
+  color: var(--ax-failed);
+}
+.cpb-head small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.cpb-say {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ax-ink-2);
+  text-wrap: pretty;
+}
+.cpb-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ax-failed);
+}
+
+/* The kit is read once and copied out; it is the loudest thing here until
+   the owner says it is saved. */
+.cpb-kit {
+  display: grid;
+  gap: 10px;
+  /* A pair of short values does not want the width of the whole board; the
+     label and what it labels stay near each other. */
+  max-width: 660px;
+  padding: 18px 20px;
+  border: 1px solid var(--ax-waiting-line);
+  border-radius: 16px;
+  background: var(--ax-waiting-bg);
+}
+.cpb-kit b {
+  font-size: 14px;
+  font-weight: 620;
+  color: var(--ax-ink);
+}
+.cpb-kit p {
+  margin: 0;
+  max-width: 68ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ax-ink-2);
+}
+.cpb-kit dl {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.cpb-kit dl > div {
+  display: grid;
+  /* The labels are three short words; give the column they do not need to
+     the passphrase, which is the thing being read and copied. */
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+.cpb-kit dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ax-muted);
+}
+.cpb-kit dd {
+  margin: 0;
+  min-width: 0;
+}
+.cpb-kit code {
+  font-family: var(--ax-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.cpb-kit dd > code[data-recovery-passphrase] {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.cpb-saved {
+  justify-self: start;
+  border-color: var(--ax-ink);
+  background: var(--ax-ink);
+  color: #ffffff;
+}
+.cpb-saved:hover:not([disabled]) {
+  border-color: var(--ax-blue);
+  background: var(--ax-blue);
+}
+
+/* The existing storage form keeps the product's form styling; give it the
+   room this card expects and nothing else. */
+.cpb-form {
+  max-width: 460px;
+}
+.cpb-form form {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .cpb-kit dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

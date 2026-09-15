@@ -309,6 +309,16 @@
   letter-spacing: 0.08em;
   user-select: all;
 }
+/* A recovery passphrase is read once and copied; it is long, so it wraps
+   rather than taking the device code's headline size. */
+.recoveryCode {
+  display: block;
+  margin: 6px 0 0;
+  font: 18px var(--font-geist-mono);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
 .help {
   box-sizing: border-box;
   position: fixed;
