@@ -73,6 +73,14 @@ export interface DomainState {
   /** Something true and awkward about the record, said rather than hidden. */
   concern?: string | null;
   userStep?: string | null;
+  /**
+   * When the name last answered, on a `serves` check that passed and has
+   * since aged past its horizon. Set only in that case, because it is the
+   * one the other fields cannot express: the state falls back to
+   * `resolving`, which reads as "nobody has found out what is behind it"
+   * and is exactly wrong. Somebody did find out; it was a while ago.
+   */
+  lastServedAt?: string | null;
 }
 
 export interface TlsState {
@@ -164,6 +172,15 @@ export function publishOffer(story: {
       label: "Make it private again",
       primary: false,
       draft: `Make ${story.name} private again: withdraw ${domain.name} and the public access you set up for it, leave SSH and anything you did not create alone, and give me back a private way in.`,
+    };
+  // A name that answered, a while ago, is published. What is old is the
+  // evidence, and the work to offer is looking again — never finishing a
+  // job that was finished, which is what "Finish publishing it" claims.
+  if (domain.lastServedAt)
+    return {
+      label: "Check it from outside",
+      primary: false,
+      draft: `${domain.name} answered when it was last checked, and that reading has aged. Ask for it from outside again and tell me what ${story.name} returns now.`,
     };
   return {
     label: "Finish publishing it",

@@ -412,7 +412,13 @@ export function reachFromRecords({
               ? validRead === "verified" || !certRef
                 ? "loads"
                 : "insecure"
-              : "no-answer",
+              : // A reading that has aged still says what came back. Drawing
+                // the browser's "this page isn't working" over a name that
+                // answered is inventing a failure nobody observed; the
+                // window shows what was seen and the row is dated with when.
+                servesRead === "stale"
+                ? "loads"
+                : "no-answer",
       secure: validRead === "verified",
       headline:
         domainState === "failed"
@@ -423,7 +429,13 @@ export function reachFromRecords({
               ? proxied
                 ? `${domainFacts?.get("registrar")?.value.value ?? "The provider"} answers; the application does not`
                 : "The name resolves; the application does not answer"
-              : "The name resolves; nothing has checked what answers",
+              : // "Nothing has checked" is false once something has. A
+                // reading that has aged is still a reading, and the reader
+                // needs to know an answer came back rather than go looking
+                // for a check nobody ran.
+                servesRead === "stale"
+                ? "The name reached this application when it was last checked"
+                : "The name resolves; nothing has checked what answers",
       detail: domainDetail(),
       sure: domainState === "resolving" && !serves ? "asked" : "proved",
       at: (serves ?? resolves)!.record.establishedAt,
@@ -480,6 +492,12 @@ export function reachFromRecords({
               : "external",
             state: domainState,
             detail: domainDetail(),
+            // Only when it passed and then aged. A failing or absent check
+            // never sets this, so nothing can read a working past out of it.
+            lastServedAt:
+              servesRead === "stale"
+                ? (serves!.record.establishedAt ?? null)
+                : null,
             origin,
             proxied,
             concern,

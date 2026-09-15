@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { reachFromRecords } from "@/components/server-guy/reach-records";
+import { publishOffer } from "@/components/server-guy/reach-prototype/reach-story";
 import {
   APP,
   NOW,
@@ -773,5 +774,79 @@ describe("after a published name is withdrawn", () => {
     const story = read([whileItServed()]);
     expect(story.domain?.state).toBe("serving");
     expect(story.callers.some((caller) => caller.id === "domain")).toBe(true);
+  });
+});
+
+// A name that answered thirteen hours ago is published; what is old is the
+// evidence. Calling that "nobody has checked what answers" sends a reader to
+// look for a check that ran, and calling it unfinished work is worse.
+describe("a published name whose reading has aged", () => {
+  const AGED = "2026-09-12T22:00:00.000Z"; // 14 hours before NOW
+  const served = (at: string) =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        at,
+        facts: [fact("name", "shop.example.com")],
+        checks: [check("resolves", "passed"), check("serves", "passed")],
+      },
+    );
+
+  it("says when it last answered, rather than that nothing looked", () => {
+    const story = read([served(AGED)]);
+    expect(story.domain?.lastServedAt).toBe(AGED);
+    const caller = story.callers.find((item) => item.id === "domain");
+    expect(caller?.headline).toBe(
+      "The name reached this application when it was last checked",
+    );
+    // What was seen is what the window draws; the row carries the date.
+    expect(caller?.outcome).toBe("loads");
+    expect(caller?.at).toBe(AGED);
+  });
+
+  it("offers another look rather than finishing a finished job", () => {
+    const offer = publishOffer(read([served(AGED)]));
+    expect(offer.label).toBe("Check it from outside");
+    expect(offer.draft).toContain("answered when it was last checked");
+    expect(offer.draft).not.toContain("is not serving");
+  });
+
+  it("sets nothing of the sort while the reading is fresh", () => {
+    const story = read([served("2026-09-13T11:55:00.000Z")]);
+    expect(story.domain?.state).toBe("serving");
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(publishOffer(story).label).toBe("Make it private again");
+  });
+
+  // Only a check that passed and then aged. A failure is not a working past.
+  it("never reads a working past out of a failed check", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop-example-com" },
+        {
+          at: AGED,
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("resolves", "passed"), check("serves", "failed")],
+        },
+      ),
+    ]);
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(story.domain?.state).toBe("unreachable");
+    expect(publishOffer(story).label).toBe("Finish publishing it");
+  });
+
+  it("still offers finishing when nothing ever checked what answers", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop-example-com" },
+        {
+          at: AGED,
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("resolves", "passed")],
+        },
+      ),
+    ]);
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(publishOffer(story).label).toBe("Finish publishing it");
   });
 });

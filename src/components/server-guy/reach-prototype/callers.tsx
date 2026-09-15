@@ -84,9 +84,11 @@ export function CallersDirection({
         ? `${domain.name} does not answer`
         : domain.state === "failed"
           ? `${domain.name} does not resolve`
-          : domain.state === "resolving"
-            ? `${domain.name} resolves; what answers is unchecked`
-            : `${domain.name} is on record; nobody has resolved it`;
+          : domain.lastServedAt
+            ? `${domain.name} answered here, last checked ${when(domain.lastServedAt)}`
+            : domain.state === "resolving"
+              ? `${domain.name} resolves; what answers is unchecked`
+              : `${domain.name} is on record; nobody has resolved it`;
 
   const publish = publishOffer(story);
 

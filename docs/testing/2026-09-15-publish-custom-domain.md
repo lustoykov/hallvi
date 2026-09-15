@@ -182,6 +182,43 @@ Verified from the MacBook afterwards:
 The Domains page returned to "Only one kind of visitor reaches Quokka Notes
 today", "No name, no certificate", and offers "Publish at a domain…" again.
 
+## What the page looks like
+
+Captured from the retained development database on this branch at `ca33ccd`,
+through the running controller on `127.0.0.1:3510` at 1280×900. Real records,
+written by Pi during the run above; nothing here is a fixture or a scenario.
+
+![The Domains destination after the name was withdrawn: the heading reads
+"Only one kind of visitor reaches Quokka Notes today", the state tag reads "No
+name, no certificate", and the page offers "Publish at a domain…" beside "Ask
+for a knock test". Six windows show what each visitor would meet — the tunnel
+answering on 127.0.0.1:2368, and five refusals — each dated by the check that
+established it.](2026-09-15-publish-custom-domain/domains-private-again.png)
+
+The header says **"The tunnel is closed"** with an offer to reopen it, because
+this capture was taken after the controller's SSH tunnel had been stopped. That
+is the header reading the address rather than a flag: a loopback address is a
+tunnel, a published address is not, and it offers no link at all while the way
+in does not work.
+
+![The main conversation after the withdrawal, with Pi's reply listing the record
+removed, the proxy removed, the ports filtered, SSH still reachable and all 97
+tables intact — and the composer holding the sentence the Publish action drafted:
+"Publish Quokka Notes at my own domain name. The hostname is:" with the caret at
+the end.](2026-09-15-publish-custom-domain/publish-draft.png)
+
+That second image is the affordance doing its whole job: a click puts a request
+in the conversation for the owner to finish typing, rather than opening a form.
+
+**What is not captured, and why.** The serving state and the 502 state were both
+seen live and are quoted verbatim above, but they cannot be re-captured from
+this database: records are superseded rather than rewritten, so the withdrawal's
+`domain … absent` record is now the newest one stating that subject, and the
+page correctly refuses to draw the earlier ones. The stale-evidence state cannot
+be captured either without waiting out a twelve-hour horizon. None of the three
+was reconstructed for a screenshot, because a page drawn from invented records
+would be evidence of nothing.
+
 ## Four defects this run found, and their fixes
 
 Each was found by looking at the product's own pages during the run, and each is
