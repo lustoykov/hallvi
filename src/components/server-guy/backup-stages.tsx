@@ -85,7 +85,10 @@ export function BackupStages({
   const offServer =
     newest?.kind === "off-site" || newest?.kind === "controller";
   const failed = protection.failures.copy;
-  const copyFailed = failed?.source === "copy" ? failed : null;
+  const copyFailed =
+    failed?.source === "copy" && (!newest || failed.at >= newest.at)
+      ? failed
+      : null;
 
   const stages: Stage[] = [
     {

@@ -164,6 +164,21 @@ function marks(html: string) {
 }
 
 describe("each stage reports its own result", () => {
+  it("shows the newer successful copy after an earlier backup failure", () => {
+    const html = draw([
+      plan,
+      record({
+        id: "failed-copy",
+        ref: { kind: "backup-copy", id: "failed-copy" },
+        at: "2026-09-15T09:00:00.000Z",
+        status: "failed",
+      }),
+      copy("shop-db, shop-uploads"),
+    ]);
+    expect(marks(html)[1]).toBe("done");
+    expect(html).not.toContain("The attempt 2 h ago failed");
+  });
+
   it("a restore that came back short is not a tick", () => {
     // It proved recovery works and proved this copy is not enough. A tick
     // says only the first, and the reader acts on the first.
