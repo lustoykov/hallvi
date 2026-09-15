@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { CallersDirection } from "@/components/server-guy/reach-prototype/callers";
+import { PageHead } from "@/components/server-guy/deployment-prototype/page-head";
 import {
   publishOffer,
   type DomainState,
@@ -119,5 +120,40 @@ describe("what the page says about it", () => {
 
   it("does not name an open port on a page that read no port", () => {
     expect(render(named("serving"))).not.toContain("Port 80 is open");
+  });
+});
+
+// The header's own copy. A published address has no tunnel to be closed,
+// and the pages that are not about reach at all pass restricted as false,
+// so only the address itself can settle which failure this is.
+describe("what the header says when the way in has stopped working", () => {
+  const head = (openUrl: string | null, restricted: boolean) =>
+    renderToStaticMarkup(
+      <PageHead
+        bar={null}
+        title="Storage"
+        name="Paper"
+        openUrl={openUrl}
+        restricted={restricted}
+        reachable="closed"
+        onReopen={() => {}}
+      />,
+    );
+
+  it("calls a loopback address a tunnel, on a page that says nothing about reach", () => {
+    const html = head("http://127.0.0.1:38123", false);
+    expect(html).toContain("The tunnel is closed");
+    expect(html).toContain("Ask Pi to reopen it");
+  });
+
+  it("calls a published address an address", () => {
+    const html = head("https://paper.example.com", false);
+    expect(html).toContain("The address did not answer");
+    expect(html).not.toContain("tunnel");
+  });
+
+  it("offers nothing to click either way", () => {
+    expect(head("https://paper.example.com", false)).not.toContain("<a ");
+    expect(head("http://127.0.0.1:38123", true)).not.toContain("<a ");
   });
 });
