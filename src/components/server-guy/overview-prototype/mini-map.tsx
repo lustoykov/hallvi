@@ -26,6 +26,8 @@ const tint: Record<Certainty, string> = {
   verified: "#14945f",
   stale: "#c2691f",
   failed: "#a6312b",
+  // Amber, like stale: something to look at, not something broken.
+  warning: "#c2691f",
   planned: "#8b95a5",
   unknown: "#8b95a5",
   absent: "#b9c2d0",

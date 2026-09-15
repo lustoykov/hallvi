@@ -84,9 +84,18 @@ function lines(output: string): StoryLine[] {
 }
 
 /**
- * The run that produced this release. A record cites the moment it was
- * saved, so its message evidence names the run; without that, the newest run
- * on record is the best the controller can offer and is labelled as such.
+ * The run that produced this release.
+ *
+ * A record cites the moment it was saved, so its message evidence names the
+ * run. Failing that, the commands it cites name the run just as exactly —
+ * every execution carries its `runId` — and a deployment record in practice
+ * cites its executions and no message at all. Without that step the page fell
+ * through to "the newest run on record", which is only the deployment's run
+ * until some later, unrelated turn happens: reopening a closed tunnel
+ * replaced a release's whole history with the two commands that reopened it,
+ * under a heading still naming the revision.
+ *
+ * The newest run remains the last resort, for a record that cites nothing.
  */
 function runFor(
   record: SavedInformation | undefined,
@@ -95,6 +104,20 @@ function runFor(
   const cited = record?.evidence.find((item) => item.type === "message");
   if (cited && "id" in cited) {
     const mine = executions.filter((item) => item.runId === cited.id);
+    if (mine.length) return mine;
+  }
+  const citedCommands = new Set(
+    (record?.evidence ?? [])
+      .filter((item) => item.type === "execution")
+      .map((item) => item.id),
+  );
+  if (citedCommands.size) {
+    const runs = new Set(
+      executions
+        .filter((item) => citedCommands.has(item.id))
+        .map((item) => item.runId),
+    );
+    const mine = executions.filter((item) => runs.has(item.runId));
     if (mine.length) return mine;
   }
   const newest = [...executions].sort(

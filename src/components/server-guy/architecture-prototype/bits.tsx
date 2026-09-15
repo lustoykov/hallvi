@@ -24,6 +24,7 @@ const icons: Record<Certainty | "checking", ReactNode> = {
   planned: <PencilSimpleLine weight="bold" />,
   absent: <MinusCircle weight="bold" />,
   failed: <Warning weight="bold" />,
+  warning: <Warning weight="bold" />,
   checking: <SpinnerGap weight="bold" className="ax-spin" />,
 };
 
@@ -34,6 +35,7 @@ export const certaintyWord: Record<Certainty, string> = {
   planned: "Planned",
   absent: "Not set up",
   failed: "Failed",
+  warning: "Wants looking at",
 };
 
 export function CertaintyTag({

@@ -21,7 +21,13 @@
 // Nothing is pinned there now except, once the request has scrolled out of
 // sight, a single chip that carries you back to it.
 
-import { CaretRight, Check, Eye, Key } from "@phosphor-icons/react";
+import {
+  CaretRight,
+  ChatCircleText,
+  Check,
+  Eye,
+  Key,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 /** The floor the controller enforces; see MINIMUM_LENGTH on the server. */
@@ -81,11 +87,27 @@ export function SecretRequests({
   applicationId,
   secrets,
   onChanged,
+  onContinue,
 }: {
   applicationId: string;
   secrets: SecretRequest[];
   onChanged: (secrets: SecretRequest[]) => void;
+  /**
+   * Offers to tell Pi the values are in. Absent hides the offer.
+   *
+   * Pi asks for a value and its turn ends, because only the owner can answer.
+   * Supplying one is a write to the controller and not a message, so nothing
+   * in the conversation changes and Pi is never told — the page went quiet
+   * with a receipt on it and no way forward, and the reader had to guess that
+   * the next move was theirs and what to type. This drafts that sentence.
+   */
+  onContinue?: (draft: string) => void;
 }) {
+  // Whether the last outstanding value was supplied here, in this reading of
+  // the page. The offer to continue belongs to that moment: on a later visit
+  // the same receipt is history, and a standing "tell Pi to continue" under
+  // work that finished long ago is noise.
+  const [justCompleted, setJustCompleted] = useState(false);
   if (!secrets.length) return null;
   const waiting = secrets.filter((secret) => !secret.establishedAt);
   const supplied = secrets.filter((secret) => secret.establishedAt);
@@ -130,6 +152,22 @@ export function SecretRequests({
               are written once and never read back for display.
             </p>
           </details>
+          {justCompleted && onContinue && (
+            <button
+              type="button"
+              className="sg-secrets-continue"
+              onClick={() =>
+                onContinue(
+                  `${supplied.map((secret) => secret.name).join(", ")} ${
+                    supplied.length === 1 ? "is" : "are"
+                  } supplied now. Please carry on.`,
+                )
+              }
+            >
+              <ChatCircleText weight="bold" aria-hidden="true" />
+              Tell Server Guy to carry on
+            </button>
+          )}
         </div>
       </section>
     );
@@ -163,7 +201,13 @@ export function SecretRequests({
               <SecretField
                 applicationId={applicationId}
                 secret={secret}
-                onChanged={onChanged}
+                onChanged={(next) => {
+                  // The answer that leaves nothing outstanding is the one
+                  // that earns the offer to carry on.
+                  if (next.every((item) => item.establishedAt))
+                    setJustCompleted(true);
+                  onChanged(next);
+                }}
               />
             </li>
           ))}

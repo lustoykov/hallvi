@@ -21,10 +21,20 @@ The separate **Disk Audit** remains read-only and covers the wider Mac. Local
 **RAM Care** may manage preview memory under its own narrow authorization; all
 cleanup must recheck active use immediately before acting.
 
-Prefer local provider stand-ins when a real provider is unnecessary. Use only
-existing authorized provider projects (currently Default); do not create projects
-or infrastructure just to audit it. Verify account/project identity and access
-before any provider mutation. Inaccessible resources are a coverage gap.
+Use local provider stand-ins when a real provider adds nothing — a stand-in is
+faster and free, and everything above the provider API behaves identically. Use
+a real host when the step is about deployment itself, where a stand-in cannot
+establish the result.
+
+On 14 September 2026 the owner standing-authorized creating billed development
+resources in the authorized project whenever the work needs them, replacing the
+earlier per-task authorization. It is an authorization to create and use, not to
+delete: resources you did not create stay, and the labelling, registration and
+retirement rules below apply unchanged to everything you do create.
+
+Use only existing authorized provider projects (currently Default); do not create
+projects or infrastructure just to audit it. Verify account/project identity and
+access before any provider mutation. Inaccessible resources are a coverage gap.
 
 ## Ownership and durable records
 
@@ -220,3 +230,24 @@ recoverable relocation, not reclaimed disk space. Do not empty unrelated Trash.
 Verify cloud deletions with a fresh inventory including separately billed
 resources. Report only meaningful changes, actionable findings, failures or
 needed decisions; remain quiet when nothing actionable has changed.
+
+Before deleting anything in a shared provider project, snapshot **every**
+collection it holds, not the kinds you are about to delete: servers, primary
+and floating IPs, volumes, snapshots, load balancers, networks, firewalls and
+SSH keys. A snapshot that omits a collection cannot establish what was in it
+afterwards, and providers do not all keep an audit log to fall back on —
+Hetzner keeps none for SSH keys. On 14 September 2026 this task deleted 17 SSH
+keys it had not captured and could not subsequently attribute; see the
+[resource scope audit](testing/2026-09-14-resource-scope-audit.md).
+
+Credential-shaped resources — SSH keys, tokens, registry logins — are retained
+by default even inside a broad instruction to clean up. That a key authorises
+no current resource says nothing about whose it is: unused is not unowned, and
+an unattributable credential is exactly the case the retain rule exists for.
+Match each one to an owner by label, by a local record, or by asking, and
+delete only the ones you can name.
+
+A model-selected paid add-on on a resource you were authorized to create —
+provider backups, extra storage, a larger plan — is a separate billing
+decision from the resource. Decline it, or raise it with the owner while it can
+still be declined, rather than reporting the cost after it has accrued.

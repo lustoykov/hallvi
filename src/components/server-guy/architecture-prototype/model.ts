@@ -18,7 +18,19 @@ import type { ApplicationRecord } from "@/server/types";
 import type { ApplicationSection } from "../application-sections";
 
 export type Certainty =
-  "verified" | "stale" | "unknown" | "planned" | "absent" | "failed";
+  | "verified"
+  | "stale"
+  | "unknown"
+  | "planned"
+  | "absent"
+  | "failed"
+  /**
+   * Pi judged that this wants looking at, without a check having failed. A
+   * same-host backup copy is the worked example: written, readable, and no
+   * protection at all against losing the machine. Like `failed` it is a
+   * judgement rather than a reading, so it never ages into something softer.
+   */
+  | "warning";
 
 export type PartKind =
   | "controller"

@@ -883,6 +883,7 @@ export function OperatorShell({
               )}
             <ChatPane
               activeChat={activeChat}
+              reachable={reachable}
               busy={busy}
               composer={composer}
               error={error}

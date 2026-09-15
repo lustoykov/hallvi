@@ -432,3 +432,16 @@
 .sg-info-more[open] > summary {
   margin-bottom: 8px;
 }
+
+/* An access record whose tunnel has since closed. The record keeps every
+   word; only the anchor is withheld, and this says why there is none. */
+.sg-result-shut {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--sg-warn-soft, #fdf1e3);
+  color: var(--sg-warn-ink, #8a5a1b);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}

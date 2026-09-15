@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Where the way in is answered</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --soft: #667389;
+        --rule: rgba(25, 35, 56, 0.12);
+        --accent: #285ad8;
+        --accent-tint: rgba(40, 90, 216, 0.08);
+        --warn: #8a5a1b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(100%, 800px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--soft);
+        font: 500 8px/1 "Geist Mono", monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font: 400 28px/1.1 "Instrument Serif", serif;
+      }
+
+      p {
+        max-width: 640px;
+        margin: 12px 0 24px;
+        color: var(--muted);
+        font: 400 12px/1.6 "Geist", sans-serif;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .connector {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.2;
+        marker-end: url(#arrow);
+      }
+
+      .primary {
+        stroke: var(--accent);
+        marker-end: url(#arrow-accent);
+      }
+
+      .label-mask {
+        fill: var(--paper);
+      }
+
+      .arrow-label,
+      .tag,
+      .legend-label {
+        font-family: "Geist Mono", monospace;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+      }
+
+      .arrow-label,
+      .legend-label {
+        fill: var(--soft);
+      }
+
+      .node-name {
+        fill: var(--ink);
+        font: 600 12px/1 "Geist", sans-serif;
+        text-anchor: middle;
+      }
+
+      .node-detail {
+        fill: var(--muted);
+        font: 400 8px/1 "Geist Mono", monospace;
+        text-anchor: middle;
+      }
+
+      .tag {
+        fill: var(--soft);
+        text-anchor: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Server Guy · private access</div>
+      <h1>Where the way in is answered</h1>
+      <p>
+        The record that names a private URL is durable and stays exactly as true
+        as it was written. Whether the tunnel behind it is still there is a
+        different question, asked live, and every surface that offers the link
+        now asks it. Nothing claims a way in that has stopped working.
+      </p>
+
+      <svg
+        viewBox="0 0 736 604"
+        role="img"
+        aria-labelledby="private-access-title private-access-desc"
+      >
+        <title id="private-access-title">Where the way in is answered</title>
+        <desc id="private-access-desc">
+          Diagram showing that the saved application-access record supplies the
+          URL while the controller separately asks its own SSH control socket
+          whether the tunnel is still open; when it is, surfaces offer the link,
+          and when it is not they withhold the anchor, say the tunnel is closed
+          and offer to ask Pi to reopen it. Overview's header and Access lane,
+          every destination header and the chat record cards all read the same
+          live answer.
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#59667b" />
+          </marker>
+          <marker
+            id="arrow-accent"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#285ad8" />
+          </marker>
+        </defs>
+
+        <!-- Connectors paint before nodes. -->
+        <path class="connector" d="M 188 168 V 214 H 356" />
+        <path class="connector primary" d="M 548 168 V 214 H 380" />
+        <path class="connector primary" d="M 268 254 H 180 Q 172 254 172 262 V 322" />
+        <path class="connector primary" d="M 468 254 H 556 Q 564 254 564 262 V 322" />
+
+        <path class="connector" d="M 172 442 V 464 Q 172 472 180 472 H 360 Q 368 472 368 480 V 486" />
+        <path class="connector" d="M 564 442 V 464 Q 564 472 556 472 H 376 Q 368 472 368 480 V 486" />
+
+        <!-- Arrow labels sit clear of their connectors. -->
+        <rect class="label-mask" x="150" y="288" width="44" height="12" rx="2" />
+        <text class="arrow-label" x="172" y="296">OPEN</text>
+        <rect class="label-mask" x="540" y="288" width="48" height="12" rx="2" />
+        <text class="arrow-label" x="564" y="296">CLOSED</text>
+
+        <!-- The two sources -->
+        <rect
+          x="48"
+          y="24"
+          width="280"
+          height="144"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="tag" x="188" y="48">DURABLE</text>
+        <text class="node-name" x="188" y="76">The saved record</text>
+        <text class="node-detail" x="188" y="96">application-access</text>
+        <text class="node-detail" x="188" y="116">url · established at</text>
+        <text class="node-detail" x="188" y="140">true when written,</text>
+        <text class="node-detail" x="188" y="154">and never edited</text>
+
+        <rect
+          x="408"
+          y="24"
+          width="280"
+          height="144"
+          rx="6"
+          fill="var(--accent-tint)"
+          stroke="#285ad8"
+        />
+        <text class="tag" x="548" y="48">ASKED NOW</text>
+        <text class="node-name" x="548" y="76">The controller</text>
+        <text class="node-detail" x="548" y="96">ssh -O check, its own socket</text>
+        <text class="node-detail" x="548" y="116">GET /api/…/access</text>
+        <text class="node-detail" x="548" y="140">the master dies with a</text>
+        <text class="node-detail" x="548" y="154">reboot, not with a record</text>
+
+        <!-- The question -->
+        <polygon
+          points="368,214 468,254 368,294 268,254"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="node-name" x="368" y="250">Is the tunnel</text>
+        <text class="node-detail" x="368" y="266">still there?</text>
+
+        <!-- Outcomes -->
+        <rect
+          x="48"
+          y="322"
+          width="248"
+          height="120"
+          rx="6"
+          fill="#ffffff"
+          stroke="#192338"
+        />
+        <text class="node-name" x="172" y="356">Offer the link</text>
+        <text class="node-detail" x="172" y="378">“Open Shop web ↗”</text>
+        <text class="node-detail" x="172" y="400">“Only from your network”</text>
+        <text class="node-detail" x="172" y="422">the lane reads Verified</text>
+
+        <rect
+          x="440"
+          y="322"
+          width="248"
+          height="120"
+          rx="6"
+          fill="rgba(138,90,27,0.06)"
+          stroke="#8a5a1b"
+        />
+        <text class="node-name" x="564" y="352">No anchor at all</text>
+        <text class="node-detail" x="564" y="374">“The tunnel is closed”</text>
+        <text class="node-detail" x="564" y="396">“Ask Pi to reopen it”</text>
+        <text class="node-detail" x="564" y="418">the lane reads Failed</text>
+
+        <!-- Who asks -->
+        <rect
+          x="48"
+          y="486"
+          width="640"
+          height="94"
+          rx="6"
+          fill="rgba(25,35,56,0.05)"
+          stroke="#59667b"
+        />
+        <text class="tag" x="368" y="510">EVERY SURFACE THAT OFFERS A WAY IN</text>
+        <text class="node-detail" x="368" y="534">
+          Overview header · Overview’s Access lane · every destination header
+        </text>
+        <text class="node-detail" x="368" y="552">
+          · the record card in the conversation ·
+        </text>
+        <text class="node-detail" x="368" y="572">
+          one answer, so no two of them can disagree on one screen
+        </text>
+      </svg>
+    </main>
+  </body>
+</html>

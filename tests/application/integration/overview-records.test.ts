@@ -58,7 +58,11 @@ const httpCheck = {
   basis: "observed" as const,
 };
 
-function overview(records: SavedInformation[], now: number) {
+function overview(
+  records: SavedInformation[],
+  now: number,
+  accessClosed = false,
+) {
   return overviewFromRecords({
     records,
     executions: [],
@@ -67,6 +71,7 @@ function overview(records: SavedInformation[], now: number) {
     applicationName: "Getting Started",
     headline: "Getting Started",
     now,
+    accessClosed,
     onOpenConversation: () => undefined,
   });
 }
@@ -304,5 +309,221 @@ describe("what happened", () => {
   it("leaves out a record that established nothing", () => {
     const written = record({ id: "rec-none", at: null, title: "A note" });
     expect(overview([written], TEN_MINUTES_ON).recent).toEqual([]);
+  });
+});
+
+describe("a tunnel the controller has just found closed", () => {
+  // The record that says where the application answers is not wrong and is
+  // not withdrawn: it was true when it was written. What has changed is
+  // something only the controller can know, by asking its own tunnel, and
+  // the Access lane is where Overview reports exactly that.
+  const accessRecord = record({
+    id: "access",
+    title: "Getting Started is available privately from this PC",
+    states: { ref: { kind: "access", id: "private" }, presence: "present" },
+    checks: [
+      {
+        key: "tunnel",
+        label: "The tunnel reached the application",
+        status: "passed",
+        claim: "reachability",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("reads verified while nothing says otherwise", () => {
+    const access = overview([accessRecord], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "access",
+    );
+    expect(access?.status.certainty).toBe("verified");
+    expect(access?.status.text).toContain("Checked");
+  });
+
+  it("reports the closed tunnel instead of the recorded pass", () => {
+    const access = overview([accessRecord], TEN_MINUTES_ON, true).vitals.find(
+      (vital) => vital.id === "access",
+    );
+    expect(access?.status.certainty).toBe("failed");
+    expect(access?.status.text).toBe("Tunnel is closed");
+    // Pi's own sentence said the application was available from this PC.
+    // Repeating it under a closed tunnel is the same claim in longer words.
+    expect(access?.plain).toBe("Tunnel is closed");
+  });
+
+  it("leaves the other lanes alone", () => {
+    // The application, its data and the server are exactly as they were:
+    // only the way in from this PC is gone, and a closed tunnel is not
+    // evidence about any of them.
+    const checks = record({
+      id: "health",
+      states: { ref: application, presence: "present" },
+      checks: [httpCheck],
+    });
+    const built = overview([accessRecord, checks], TEN_MINUTES_ON, true);
+    expect(
+      built.vitals.find((vital) => vital.id === "checks")?.status.certainty,
+    ).toBe("verified");
+    expect(applicationCondition([checks], APP, TEN_MINUTES_ON).certainty).toBe(
+      "verified",
+    );
+  });
+});
+
+describe("a backup plan that is set up and protects less than its name implies", () => {
+  // The real records from the 14 September Shop run. Pi did the right thing
+  // in both: the plan is a warning whose body says it does not protect
+  // against losing the machine, and the copy that exists says a restore has
+  // never been performed. The lane used to read only the checks, so a passing
+  // "timer is active" printed green under the word Backups.
+  const sameHostPlan = record({
+    id: "plan",
+    title: "Daily same-host backups are configured",
+    status: "warning",
+    states: {
+      ref: { kind: "backup-plan", id: "shop-local-backup" },
+      presence: "present",
+    },
+    checks: [
+      {
+        key: "configured",
+        label: "Daily backup timer is active",
+        status: "passed",
+        claim: "configuration",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("does not read as verified on the strength of a passing timer check", () => {
+    const lane = overview([sameHostPlan], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "backups",
+    );
+    expect(lane?.status.certainty).not.toBe("verified");
+    expect(lane?.status.certainty).toBe("warning");
+    expect(lane?.value).toBe("Limited");
+    expect(lane?.status.text).toBe("Set up, with a limit");
+  });
+
+  it("keeps Pi's own sentence about what the limit is", () => {
+    // The body is the only place the reader learns *what* the limit is, so a
+    // lane that says "with a limit" has to carry it.
+    const spoken = {
+      ...sameHostPlan,
+      body: "It does not protect against loss of the entire server.",
+    };
+    const lane = overview([spoken], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "backups",
+    );
+    expect(lane?.plain).toContain("does not protect against loss");
+  });
+
+  it("a judgement does not age into something softer", () => {
+    // A day later the configuration claim is still inside its window, so
+    // without the judgement the lane would still be green rather than stale.
+    const lane = overview([sameHostPlan], A_DAY_ON).vitals.find(
+      (vital) => vital.id === "backups",
+    );
+    expect(lane?.status.certainty).toBe("warning");
+  });
+
+  it("a failed check still outranks a warning", () => {
+    const broken = record({
+      id: "broken",
+      status: "warning",
+      states: {
+        ref: { kind: "backup-plan", id: "shop-local-backup" },
+        presence: "present",
+      },
+      checks: [
+        {
+          key: "configured",
+          label: "Daily backup timer is active",
+          status: "failed",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ],
+    });
+    const lane = overview([broken], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "backups",
+    );
+    expect(lane?.status.certainty).toBe("failed");
+  });
+
+  it("a plan Pi is content with still reads verified", () => {
+    // The fix must not paint every backup plan amber.
+    const offsite = record({
+      id: "offsite",
+      status: "verified",
+      states: {
+        ref: { kind: "backup-plan", id: "shop-offsite" },
+        presence: "present",
+      },
+      checks: [
+        {
+          key: "configured",
+          label: "Daily off-site copy is active",
+          status: "passed",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ],
+    });
+    const lane = overview([offsite], TEN_MINUTES_ON).vitals.find(
+      (vital) => vital.id === "backups",
+    );
+    expect(lane?.status.certainty).toBe("verified");
+  });
+});
+
+describe("which time a stale reading cites", () => {
+  // The real shape from the 15 September run: one reachability check from
+  // yesterday sitting beside five observations minutes old. The lane is
+  // rightly stale, and the number beside it has to be the lapsed claim's.
+  const application: Ref = { kind: "application", id: APP };
+  const lapsed = record({
+    id: "yesterday",
+    at: "2026-09-12T16:05:00.000Z",
+    states: { ref: application, presence: "present" },
+    checks: [
+      {
+        key: "workflow",
+        label: "The order workflow ran end to end",
+        status: "passed",
+        claim: "reachability",
+        basis: "observed",
+      },
+    ],
+  });
+  const fresh = record({
+    id: "just-now",
+    at: "2026-09-13T16:00:00.000Z",
+    states: { ref: application, presence: "present" },
+    checks: [
+      {
+        key: "http",
+        label: "The homepage answered",
+        status: "passed",
+        claim: "liveness",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("cites the lapsed claim, not the newest observation", () => {
+    const condition = applicationCondition([lapsed, fresh], APP, A_DAY_ON);
+    expect(condition.certainty).toBe("stale");
+    // A_DAY_ON is five minutes after `fresh` and a day after `lapsed`.
+    expect(condition.text).toContain("1 d ago");
+    expect(condition.text).not.toContain("5 min ago");
+  });
+
+  it("does the same for a lane caption", () => {
+    const lane = overview([lapsed, fresh], A_DAY_ON).vitals.find(
+      (vital) => vital.id === "checks",
+    );
+    expect(lane?.status.certainty).toBe("stale");
+    expect(lane?.status.text).toBe("Last checked 1 d ago");
   });
 });
