@@ -64,6 +64,27 @@ If there are no material findings, say so directly.
 - Verification is proportionate to the risk and supports the claims being made.
 - The change does not include unrelated refactors or preparatory machinery.
 
+## Visual verification evidence
+
+PRs affecting the user experience must attach or link visual evidence from the
+implemented revision using representative application data. Prefer a few
+captioned screenshots for layouts and resulting states. Use short video clips
+when interaction, transitions, or a sequence matters to understanding the change.
+
+Omit or accelerate waiting periods and clearly mark time skips. Preserve the
+action and its result; link longer recordings only when useful for investigating
+a failure. Aim for 2–5 screenshots or a 30–90-second clip when appropriate;
+these are guidelines, not quotas or duration gates.
+
+State the tested revision, environment, what the evidence demonstrates, and
+material limitations. Never include credentials or sensitive user data. Visuals
+show what the user saw; operational claims still need supporting execution or
+external verification evidence, such as an actual restore behind a backup claim.
+
+Documentation-only and backend-only changes do not require screenshots unless
+they help explain the result. Use proportionate document or execution evidence
+instead. This guidance does not change roadmap scope or deferred hardening.
+
 ## Write actionable findings
 
 Order findings by severity. For each finding, identify the exact location,
