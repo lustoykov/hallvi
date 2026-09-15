@@ -68,6 +68,26 @@ const plan = record({
 });
 
 /** A volume, named the way Pi names one: `holds` carries the owner's words. */
+/** A plan record whose own check failed: no timer, so nothing ever ran. */
+const brokenPlan = {
+  ...record({
+    id: "plan",
+    ref: { kind: "backup-plan", id: "daily" },
+    presence: "absent",
+    status: "warning",
+    title: "No off-server backup copies exist",
+  }),
+} as SavedInformation;
+(brokenPlan.presentation as { checks: unknown[] }).checks = [
+  {
+    key: "configured",
+    label: "Off-server backup plan is configured",
+    status: "failed",
+    claim: "configuration",
+    basis: "observed",
+  },
+];
+
 const volume = (id: string, name: string) =>
   record({
     id: `vol-${id}`,
@@ -105,16 +125,28 @@ const restoreOf = (covers: string | null) =>
     ],
   });
 
-function draw(records: SavedInformation[]) {
+function draw(
+  records: SavedInformation[],
+  controller?: Parameters<typeof BackupStages>[0]["controller"],
+) {
   const protection = protectionFromRecords(records, NOW, APP);
   return renderToStaticMarkup(
     <BackupStages
       protection={protection}
       verdict={protectionVerdict(protection, NOW)}
       now={NOW}
+      controller={controller}
       onAsk={() => undefined}
     />,
   );
+}
+
+/** The marks on Server Guy's own track, which is the second one. */
+function ownMarks(html: string) {
+  const track = /<ol class="bs-track bs-track-small">(.*?)<\/ol>/s.exec(html);
+  return [
+    ...(track?.[1] ?? "").matchAll(/class="bs-mark" data-state="([a-z]+)"/g),
+  ].map((match) => match[1]);
 }
 
 /**
@@ -190,6 +222,17 @@ describe("each stage reports its own result", () => {
     expect(html).toContain("A schedule is not a copy");
   });
 
+  it("a failed plan check is not a failed backup attempt", () => {
+    // The owner's own Paperless records: a plan check that failed, and no
+    // backup ever run. The page said "The attempt 5 h ago failed", which
+    // invented a backup run out of a check on a schedule.
+    const html = draw([brokenPlan]);
+    expect(html).not.toContain("The attempt");
+    expect(html).toContain("No copy has been written");
+    expect(marks(html)[0]).toBe("failed");
+    expect(marks(html)[1]).toBe("waiting");
+  });
+
   it("names the subjects rather than their ids", () => {
     const html = draw([
       plan,
@@ -198,5 +241,31 @@ describe("each stage reports its own result", () => {
       copy("shop-db"),
     ]);
     expect(html).not.toContain("shop-uploads");
+  });
+});
+
+describe("Server Guy's own recovery", () => {
+  it("does not ask for a passphrase before there is a copy to open", () => {
+    const html = draw([plan], {
+      connected: false,
+      bucket: null,
+      lastCopyAt: null,
+      kitConfirmedAt: null,
+      keep: 14,
+    } as Parameters<typeof BackupStages>[0]["controller"]);
+    expect(ownMarks(html)[2]).toBe("waiting");
+    expect(html).toContain("nothing has been copied for it to open");
+  });
+
+  it("asks for it once copies exist", () => {
+    const html = draw([plan], {
+      connected: true,
+      bucket: "shop-controller",
+      lastCopyAt: AT,
+      kitConfirmedAt: null,
+      keep: 14,
+    } as Parameters<typeof BackupStages>[0]["controller"]);
+    expect(ownMarks(html)[2]).toBe("attention");
+    expect(html).toContain("nobody can open the copies yet");
   });
 });

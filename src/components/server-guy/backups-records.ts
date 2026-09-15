@@ -137,8 +137,18 @@ export interface Protection {
    * uploads were in no copy at all.
    */
   uncovered: { id: string; label: string }[];
-  /** The newest failure of each kind, which no later success hides. */
-  failures: { copy: Dated | null; restore: Dated | null };
+  /**
+   * The newest failure of each kind, which no later success hides.
+   *
+   * `source` on the copy failure says which record failed. A plan whose own
+   * check failed still means the data is not being copied, so the verdict
+   * treats the two alike; a page that words it as "the attempt failed" must
+   * not, because nothing attempted anything.
+   */
+  failures: {
+    copy: (Dated & { source: "copy" | "plan" }) | null;
+    restore: Dated | null;
+  };
   /** Retention, coverage and the next run, for the facts row. */
   nextRunAt: string | null;
   /** Retention exactly as Pi wrote it, when it is not a bare number. */
@@ -319,7 +329,10 @@ export function protectionFromRecords(
   // ---- The copies. One record per copy, so the page counts records and
   // never a number somebody incremented.
   const copies: BackupCopy[] = [];
-  const failures: { copy: Dated | null; restore: Dated | null } = {
+  const failures: {
+    copy: (Dated & { source: "copy" }) | null;
+    restore: Dated | null;
+  } = {
     copy: null,
     restore: null,
   };
@@ -355,7 +368,8 @@ export function protectionFromRecords(
     // success is allowed to hide — and it contributes no destination either,
     // because an attempt that failed reached nowhere.
     if (presence.record.presentation?.status === "failed") {
-      if (!failures.copy || at > failures.copy.at) failures.copy = dated;
+      if (!failures.copy || at > failures.copy.at)
+        failures.copy = { ...dated, source: "copy" };
       continue;
     }
     destinations.add(kind);
@@ -491,7 +505,9 @@ export function protectionFromRecords(
       // its place; a plan whose own check failed fills in when no copy did,
       // so "the timer is not running" still reads as a failed backup rather
       // than a warning about one.
-      copy: failures.copy ?? brokenPlan,
+      copy:
+        failures.copy ??
+        (brokenPlan ? { ...brokenPlan, source: "plan" as const } : null),
       restore: failures.restore,
     },
     nextRunAt,

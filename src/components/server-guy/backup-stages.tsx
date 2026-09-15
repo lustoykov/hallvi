@@ -84,6 +84,8 @@ export function BackupStages({
   const missing = coverage.missing.map((item) => item.label);
   const offServer =
     newest?.kind === "off-site" || newest?.kind === "controller";
+  const failed = protection.failures.copy;
+  const copyFailed = failed?.source === "copy" ? failed : null;
 
   const stages: Stage[] = [
     {
@@ -179,8 +181,12 @@ export function BackupStages({
     {
       id: "copy",
       title: "Latest backup",
-      says: protection.failures.copy
-        ? `The attempt ${ago(protection.failures.copy.at, now)} failed`
+      // Only a copy's own record may say an attempt failed. A plan whose
+      // check failed means nothing was ever attempted, and the stage above
+      // already carries that; saying "the attempt failed" here would invent a
+      // backup run out of a check on a schedule.
+      says: copyFailed
+        ? `The attempt ${ago(copyFailed.at, now)} failed`
         : newest
           ? [
               `${ago(newest.at, now)} · ${CLASS_MEANING[newest.kind].word}`,
@@ -196,7 +202,7 @@ export function BackupStages({
       // this stage's when a record of the copy itself names it; if nothing
       // says what went in, that is the restore stage's "unrecorded", not a
       // fault here.
-      state: protection.failures.copy
+      state: copyFailed
         ? "failed"
         : newest
           ? offServer && !(coverage.basis === "copy" && missing.length > 0)
@@ -309,6 +315,44 @@ export function BackupStages({
 
   const settled = stages.every((stage) => stage.state === "done");
 
+  // Server Guy's own three, in the same shape. The kit is only worth asking
+  // about once there is something it would open: a passphrase nobody has
+  // saved for copies nobody has taken is not a thing needing attention.
+  const copiedItself = Boolean(controller?.lastCopyAt);
+  const own: { title: string; says: React.ReactNode; state: StageState }[] = [
+    {
+      title: "Storage connected",
+      says: controller?.bucket ?? "none",
+      state: controller?.connected ? "done" : "waiting",
+    },
+    {
+      title: "Copied",
+      says: copiedItself ? (
+        <>
+          <LocalTime value={controller!.lastCopyAt!} variant="compact" />
+          {" · after each piece of work, at most hourly, and once a day · "}
+          keeping the last {controller!.keep}
+        </>
+      ) : (
+        "never"
+      ),
+      state: copiedItself ? "done" : "waiting",
+    },
+    {
+      title: "Recovery kit saved",
+      says: controller?.kitConfirmedAt
+        ? "you hold what opens the copies"
+        : copiedItself
+          ? "nobody can open the copies yet"
+          : "nothing has been copied for it to open",
+      state: controller?.kitConfirmedAt
+        ? "done"
+        : copiedItself
+          ? "attention"
+          : "waiting",
+    },
+  ];
+
   return (
     <div className="bs">
       <p className="bs-lede" data-tone={verdict.tone}>
@@ -374,56 +418,17 @@ export function BackupStages({
         for that.
       </p>
       <ol className="bs-track bs-track-small">
-        <li data-state={controller?.connected ? "done" : "waiting"}>
-          <span
-            className="bs-mark"
-            data-state={controller?.connected ? "done" : "waiting"}
-          >
-            {MARK[controller?.connected ? "done" : "waiting"]}
-          </span>
-          <span className="bs-body">
-            <b>Storage connected</b>
-            <small>{controller?.bucket ?? "none"}</small>
-          </span>
-        </li>
-        <li data-state={controller?.lastCopyAt ? "done" : "waiting"}>
-          <span
-            className="bs-mark"
-            data-state={controller?.lastCopyAt ? "done" : "waiting"}
-          >
-            {MARK[controller?.lastCopyAt ? "done" : "waiting"]}
-          </span>
-          <span className="bs-body">
-            <b>Copied</b>
-            <small>
-              {controller?.lastCopyAt ? (
-                <>
-                  <LocalTime value={controller.lastCopyAt} variant="compact" />
-                  {" · after each piece of work, at most hourly, and once a "}
-                  day · keeping the last {controller.keep}
-                </>
-              ) : (
-                "never"
-              )}
-            </small>
-          </span>
-        </li>
-        <li data-state={controller?.kitConfirmedAt ? "done" : "attention"}>
-          <span
-            className="bs-mark"
-            data-state={controller?.kitConfirmedAt ? "done" : "attention"}
-          >
-            {MARK[controller?.kitConfirmedAt ? "done" : "attention"]}
-          </span>
-          <span className="bs-body">
-            <b>Recovery kit saved</b>
-            <small>
-              {controller?.kitConfirmedAt
-                ? "you hold what opens the copies"
-                : "nobody can open the copies yet"}
-            </small>
-          </span>
-        </li>
+        {own.map((step) => (
+          <li key={step.title} data-state={step.state}>
+            <span className="bs-mark" data-state={step.state}>
+              {MARK[step.state]}
+            </span>
+            <span className="bs-body">
+              <b>{step.title}</b>
+              <small>{step.says}</small>
+            </span>
+          </li>
+        ))}
       </ol>
     </div>
   );

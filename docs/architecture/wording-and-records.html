@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wording that outruns its record</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f9fc;
+        --ink: #192338;
+        --muted: #59667b;
+        --soft: #667389;
+        --rule: rgba(25, 35, 56, 0.12);
+        --accent: #285ad8;
+        --warn: #9a6207;
+        --warn-tint: rgba(154, 98, 7, 0.07);
+        --good-tint: rgba(28, 120, 72, 0.07);
+        --good: #1c7848;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(100%, 800px);
+        margin: 0 auto;
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--soft);
+        font: 500 8px/1 "Geist Mono", monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font: 400 28px/1.1 "Instrument Serif", serif;
+      }
+
+      p {
+        max-width: 640px;
+        margin: 12px 0 24px;
+        color: var(--muted);
+        font: 400 12px/1.6 "Geist", sans-serif;
+      }
+
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .connector {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.2;
+        marker-end: url(#arrow);
+      }
+
+      .tag {
+        font-family: "Geist Mono", monospace;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        fill: var(--soft);
+      }
+
+      .where {
+        fill: var(--ink);
+        font: 500 9px/1 "Geist Mono", monospace;
+      }
+
+      .said {
+        fill: var(--warn);
+        font: 400 11px/1 "Geist", sans-serif;
+      }
+
+      .now {
+        fill: var(--good);
+        font: 600 11px/1 "Geist", sans-serif;
+      }
+
+      .why {
+        fill: var(--muted);
+        font: 400 9px/1.5 "Geist", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Server Guy · wording</div>
+      <h1>Wording that outruns its record</h1>
+      <p>
+        A pass over every sentence the product shows an owner turned up three
+        of the same mistake, and none of them were sloppy prose. Each was a
+        line that described something no record establishes: a page that
+        collects nothing promising collected output, a page arguing that only a
+        restore proves a backup promising a restore you can trust, and a stage
+        reporting a failed attempt when the only thing that failed was a check
+        on a schedule. The rule they all break is one rule.
+      </p>
+
+      <svg
+        viewBox="0 0 736 448"
+        role="img"
+        aria-labelledby="wording-title wording-desc"
+      >
+        <title id="wording-title">Wording that outruns its record</title>
+        <desc id="wording-desc">
+          Three rows. Each names where the line appears, what it used to say,
+          and what it says now, with the record that does or does not support
+          it. Logs promised collected output from the host; nothing collects
+          any, so it now describes Server Guy's own command output. Backups
+          promised a restore you can trust; it now says whether one has been
+          opened. The backup stage said an attempt failed when a plan check
+          failed; it now says no copy has been written, and the failed check
+          stays on the stage above.
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#59667b" />
+          </marker>
+        </defs>
+
+        <text class="tag" x="24" y="24">WHERE</text>
+        <text class="tag" x="180" y="24">WHAT IT SAID</text>
+        <text class="tag" x="452" y="24">WHAT IT SAYS NOW</text>
+        <line
+          x1="24"
+          y1="34"
+          x2="712"
+          y2="34"
+          stroke="rgba(25,35,56,0.12)"
+          stroke-width="0.8"
+        />
+
+        <text class="where" x="24" y="64">Command output</text>
+        <text class="said" x="180" y="64">the latest collected output</text>
+        <text class="said" x="180" y="80">from your application host</text>
+        <text class="why" x="180" y="100">
+          Nothing in the product collects an
+        </text>
+        <text class="why" x="180" y="114">application's logs.</text>
+        <path class="connector" d="M418 70 L444 70" />
+        <text class="now" x="452" y="64">What Server Guy's own</text>
+        <text class="now" x="452" y="80">commands printed</text>
+        <line
+          x1="24"
+          y1="134"
+          x2="712"
+          y2="134"
+          stroke="rgba(25,35,56,0.08)"
+          stroke-width="0.8"
+        />
+
+        <text class="where" x="24" y="164">Backups</text>
+        <text class="said" x="180" y="164">with a restore you can trust</text>
+        <text class="why" x="180" y="184">
+          On the page whose whole argument
+        </text>
+        <text class="why" x="180" y="198">
+          is that only a restore somebody ran
+        </text>
+        <text class="why" x="180" y="212">proves anything.</text>
+        <path class="connector" d="M418 160 L444 160" />
+        <text class="now" x="452" y="164">and whether one has</text>
+        <text class="now" x="452" y="180">been opened</text>
+        <line
+          x1="24"
+          y1="232"
+          x2="712"
+          y2="232"
+          stroke="rgba(25,35,56,0.08)"
+          stroke-width="0.8"
+        />
+
+        <text class="where" x="24" y="262">Latest backup</text>
+        <text class="said" x="180" y="262">The attempt 5 h ago failed</text>
+        <text class="why" x="180" y="282">
+          The record that failed was a check
+        </text>
+        <text class="why" x="180" y="296">
+          on the plan. Nothing attempted a
+        </text>
+        <text class="why" x="180" y="310">
+          backup, so nothing could fail at one.
+        </text>
+        <path class="connector" d="M418 258 L444 258" />
+        <text class="now" x="452" y="262">No copy has been written</text>
+        <text class="why" x="452" y="282">The failed check keeps its</text>
+        <text class="why" x="452" y="296">place on Set up, where the</text>
+        <text class="why" x="452" y="310">plan is the subject.</text>
+
+        <rect
+          x="24"
+          y="344"
+          width="688"
+          height="80"
+          rx="10"
+          fill="var(--good-tint)"
+          stroke="rgba(28,120,72,0.25)"
+        />
+        <text class="where" x="44" y="370">THE RULE</text>
+        <text class="why" x="44" y="392">
+          A line may describe only what some record establishes, and only the
+          record it is standing on. Wording is where this
+        </text>
+        <text class="why" x="44" y="406">
+          leaks, because a sentence can borrow a neighbour's evidence without
+          anything in the code being wrong. Found by
+        </text>
+        <text class="why" x="44" y="420">
+          reading every owner-facing sentence in the product against the
+          projection behind it.
+        </text>
+      </svg>
+    </main>
+  </body>
+</html>
