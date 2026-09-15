@@ -13,9 +13,13 @@
 }
 /* Under the board it is the board's width. On the page that has no board it
    is the page's own measure, which the empty state sets at 62ch: a card that
-   ran to twice the width of the prose above it read as a different page. */
+   ran to twice the width of the prose above it read as a different page.
+   Nothing between that page's last control and this card set any space, so
+   they met flush; a card following a button wants the page's own rhythm and
+   a step more, the way the button itself sits 16px under the prose. */
 .cpb[data-standalone] {
   max-width: 62ch;
+  margin-top: 20px;
 }
 .cpb-head {
   display: flex;
