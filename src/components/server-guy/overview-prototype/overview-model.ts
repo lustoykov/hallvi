@@ -78,6 +78,7 @@ const word: Record<Certainty, string> = {
   verified: "Verified",
   stale: "Out of date",
   failed: "Failed",
+  warning: "Limited",
   planned: "Planned",
   unknown: "Not observed",
   absent: "Not set up",

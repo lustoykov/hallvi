@@ -230,3 +230,24 @@ recoverable relocation, not reclaimed disk space. Do not empty unrelated Trash.
 Verify cloud deletions with a fresh inventory including separately billed
 resources. Report only meaningful changes, actionable findings, failures or
 needed decisions; remain quiet when nothing actionable has changed.
+
+Before deleting anything in a shared provider project, snapshot **every**
+collection it holds, not the kinds you are about to delete: servers, primary
+and floating IPs, volumes, snapshots, load balancers, networks, firewalls and
+SSH keys. A snapshot that omits a collection cannot establish what was in it
+afterwards, and providers do not all keep an audit log to fall back on —
+Hetzner keeps none for SSH keys. On 14 September 2026 this task deleted 17 SSH
+keys it had not captured and could not subsequently attribute; see the
+[resource scope audit](testing/2026-09-14-resource-scope-audit.md).
+
+Credential-shaped resources — SSH keys, tokens, registry logins — are retained
+by default even inside a broad instruction to clean up. That a key authorises
+no current resource says nothing about whose it is: unused is not unowned, and
+an unattributable credential is exactly the case the retain rule exists for.
+Match each one to an owner by label, by a local record, or by asking, and
+delete only the ones you can name.
+
+A model-selected paid add-on on a resource you were authorized to create —
+provider backups, extra storage, a larger plan — is a separate billing
+decision from the resource. Decline it, or raise it with the owner while it can
+still be declined, rather than reporting the cost after it has accrued.

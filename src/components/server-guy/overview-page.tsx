@@ -42,6 +42,7 @@ const tone = {
   verified: "verified",
   stale: "stale",
   failed: "failed",
+  warning: "stale",
   absent: "absent",
   unknown: "unknown",
   planned: "unknown",

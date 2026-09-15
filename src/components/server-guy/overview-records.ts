@@ -70,6 +70,9 @@ const word: Record<Certainty, string> = {
   verified: "Verified",
   stale: "Out of date",
   failed: "Failed",
+  // Not "Verified", and not "Failed": something is set up and it does
+  // less than the lane's name suggests.
+  warning: "Limited",
   planned: "Planned",
   unknown: "Not assessed",
   absent: "Not set up",
@@ -138,11 +141,26 @@ function byLane(records: SavedInformation[]) {
  * A lane's reading, worst first. A failure outranks everything and never ages;
  * one stale claim makes the lane stale, because a lane that reports "verified"
  * on the strength of its freshest check would hide the one that has lapsed.
+ *
+ * A record's own `status` is read as well as its checks, because a check and a
+ * judgement answer different questions. Pi recorded Shop's same-host backup
+ * plan as `warning`, with a body saying in as many words that it "does not
+ * protect against loss of the entire server" — and its one check, that the
+ * timer is active, passed. Reading only the checks threw the judgement away
+ * and printed a green "Checked 5 min ago" under the word Backups, which is
+ * the most reassuring thing the page could have said and among the least
+ * true. `failed` and `warning` are judgements: like a failed check they do not
+ * age, and they outrank a passing one on the same record.
  */
 function readLane(held: Held[], now: number): Certainty {
   if (!held.length) return "unknown";
+  const judged = new Set(
+    held.map((item) => item.record.presentation?.status).filter(Boolean),
+  );
+  if (judged.has("failed")) return "failed";
   const readings = held.map((item) => checkAsNow(item.check, item.record, now));
   if (readings.includes("failed")) return "failed";
+  if (judged.has("warning")) return "warning";
   if (readings.includes("stale")) return "stale";
   if (readings.includes("verified")) return "verified";
   return "unknown";
@@ -161,11 +179,35 @@ function laneText(held: Held[], certainty: Certainty, now: number) {
     .at(-1);
   if (certainty === "absent") return "Not set up";
   if (certainty === "failed") return "A check did not pass";
+  // The time it was checked is not the news here: what is set up does less
+  // than the lane's name implies, and the record says what in its own words.
+  if (certainty === "warning") return "Set up, with a limit";
   if (certainty === "unknown")
     return held.length ? "Recorded, not dated" : "Nobody has looked yet";
-  if (certainty === "stale")
-    return newest ? `Last checked ${when(newest, now)}` : "Checked once";
+  if (certainty === "stale") {
+    // The time that belongs beside "last checked" is the lapsed claim's own,
+    // not the newest in the lane. One stale claim among five fresh ones made
+    // this read "Last checked 4 min ago" in amber, about something last
+    // observed twenty-one hours earlier: the number invited the reader to
+    // dismiss the colour.
+    const lapsed = staleAt(held, now);
+    return lapsed ? `Last checked ${when(lapsed, now)}` : "Checked once";
+  }
   return newest ? `Checked ${when(newest, now)}` : "Checked";
+}
+
+/**
+ * When the lapsed claim was established — the newest one that has nonetheless
+ * gone out of window, which is the most recent honest answer to "how long ago
+ * was this actually true".
+ */
+function staleAt(held: Held[], now: number): string | undefined {
+  return held
+    .filter((item) => checkAsNow(item.check, item.record, now) === "stale")
+    .map((item) => item.record.establishedAt)
+    .filter((at): at is string => Boolean(at))
+    .sort()
+    .at(-1);
 }
 
 /**
@@ -461,13 +503,25 @@ export function applicationCondition(
       certainty: "failed",
       text: "A check on the application did not pass.",
     };
-  if (readings.includes("stale"))
+  if (readings.includes("stale")) {
+    // The lapsed claim's own time, not the newest of all of them. Five checks
+    // four minutes old beside one twenty-one hours old produced "It held when
+    // it was last checked, 4 min ago. Enough time has passed that it may have
+    // changed." — a sentence that argues with itself, and whose number is
+    // about the wrong observation.
+    const lapsed = held
+      .filter((item) => checkAsNow(item.value, item.record, now) === "stale")
+      .map((item) => item.record.establishedAt)
+      .filter((at): at is string => Boolean(at))
+      .sort()
+      .at(-1);
     return {
       certainty: "stale",
-      text: newest
-        ? `It held when it was last checked, ${when(newest, now)}. Enough time has passed that it may have changed.`
+      text: lapsed
+        ? `It held when it was last checked, ${when(lapsed, now)}. Enough time has passed that it may have changed.`
         : "It held when it was last checked; enough time has passed that it may have changed.",
     };
+  }
   if (readings.includes("verified"))
     return {
       certainty: "verified",

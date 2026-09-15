@@ -19,6 +19,7 @@ records.
 | 2 · Pi reads the repository and deploys it | **pass** |
 | 3 · A private input and an execution approval, through the product | **pass**, after one fix |
 | 4 · Open it by the product's link and do something real | **pass** |
+| 4b · Data survives container recreation **and** a restart, byte for byte | **pass** — see [Persistence](#persistence-proved-by-the-data-rather-than-by-a-count) |
 | 5 · Chat, Overview, Deployment, Architecture and access agree | **pass**, after two fixes |
 | 6 · Refresh and reopen | **pass** |
 | 7 · Restart the controller and worker | **pass** |
@@ -75,6 +76,53 @@ GET  /receipts/2                → "… — 33.00 EUR"              the worker 
 
 The background worker is doing real work on real queue state, which is what
 makes the persistence check below mean something.
+
+## Persistence, proved by the data rather than by a count
+
+Run on 15 September, after the owner asked for something stronger than table
+counts and an HTTP 200. Four orders placed through Shop's own HTTP interface,
+each one priced by the background worker and given a receipt file on a volume:
+
+```
+POST /orders  "Persistence proof — brass telescope"    → id 3, later 3500c
+POST /orders  "Persistence proof — walnut desk lamp"   → id 4, later 3600c
+POST /orders  "Persistence proof — linen apron"        → id 5, later 3100c
+                                     with id 2 from the day before, 3300c
+```
+
+The complete reply of `/orders`, all four `/receipts/<id>` bodies and
+`/admin/summary` were captured to a file. Then, in order:
+
+1. **Containers recreated through the product.** Pi removed all four Shop
+   containers and the Compose network and brought them back from the existing
+   images, leaving the volumes alone. It reported four new container ids, three
+   unchanged volume identities, and — the part that matters — that all four
+   **receipt files matched their original checksums**.
+2. **Server Guy restarted**, by exact PID rather than a pattern.
+3. **The SSH master killed**, also by exact PID, identified by this
+   application's own key path: the way in gone, `curl` to the private URL
+   returning nothing.
+4. **Access reopened through the product**, by asking in the conversation.
+5. The same three endpoints captured again and `diff`ed against the baseline.
+
+```
+diff before after  →  identical
+```
+
+Byte for byte: every order id, item string, price in cents, every receipt body
+the worker wrote, and the admin total of 4 orders / 13500c. The admin endpoint
+still authenticates with the value the owner typed the day before, so the
+secret survived the recreation too.
+
+That is three different persistence layers proved at once — PostgreSQL rows,
+Redis-driven worker output, and files on a mounted volume — across container
+replacement *and* a controller restart, with the way back in re-established
+through the product rather than by hand.
+
+**No test administrator was needed.** The owner authorised creating a
+disposable one; Shop's admin surface is a password the owner had already
+supplied through the product's masked field, and there is no account to create,
+so nothing was.
 
 ## Restart and return
 
@@ -228,6 +276,25 @@ When Pi could not provision on the real provider it recorded the failure rather
 than a success: *"Hetzner rejected provisioning because the project is at its
 apparent server-count limit, so no host exists for this application. No server,
 IPv4, or backup charge was started."* — with a next step, and no invented URL.
+
+## The Backups lane, and my own resource actions
+
+Two follow-ups the owner asked for after the first pass, each with its own
+document because neither is about the journey:
+
+- **[Why the Backups lane was green](2026-09-15-backup-protection.md).** It
+  discarded Pi's own `warning` and read only the checks, so a passing "the
+  timer is active" printed green under the word Backups while the only copy
+  that existed sat on the same disk as the data and no restore had ever been
+  attempted. Fixed, with the four kinds of protection kept apart, and with what
+  the fix still does not do stated plainly.
+- **[What was authorized, what was owned, and what I cannot
+  establish](2026-09-14-resource-scope-audit.md).** An audit of every provider
+  change this task made. The server deletions were authorized and their
+  ownership is evidenced. **Deleting 17 SSH keys was not**: I never captured
+  them, Hetzner keeps no audit log for them, and I cannot now say whose they
+  were. Pi's paid backup add-on had general authorization but I let it stand
+  instead of raising it while it could still be declined.
 
 ## Checks
 
