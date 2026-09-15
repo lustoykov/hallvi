@@ -277,3 +277,26 @@ export function hiddenSections(
               : "after deployment",
     }));
 }
+
+/**
+ * The one destination a repeated record should send a reader to.
+ *
+ * A record names every view it belongs to, and the row of pills on its full
+ * card keeps the sidebar's order — right for a row. A single link has to
+ * choose one, and the record's own order is the better authority: Pi writes
+ * `["backups", "overview"]` for a backup copy because Backups renders it and
+ * Overview only mentions it. Choosing by sidebar order sent the reader to
+ * the page that says least.
+ *
+ * Returns undefined when the record names no other view, which is when a
+ * scroll to its first appearance is still the best available.
+ */
+export function recordDestination(
+  views: readonly string[],
+  currentView?: ApplicationSection,
+) {
+  return views
+    .filter((view) => view !== currentView)
+    .map((view) => applicationSections.find((section) => section.id === view))
+    .find((section) => section !== undefined);
+}

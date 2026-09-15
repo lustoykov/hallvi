@@ -406,6 +406,30 @@
 .sg-result-alone > summary {
   color: var(--faint, #8b95a5);
 }
+/* The repeat's way to the record in full. It replaced an anchor and has to
+   read as the same thing: a line of text you can follow, not a control. */
+.sg-result-elsewhere {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue, #285ad8);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sg-result-elsewhere:hover {
+  text-decoration: underline;
+}
+.sg-result-elsewhere:focus-visible {
+  outline: 2px solid rgb(40 90 216 / 45%);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* A retired card carries its tag where the dot would be; the row stays one
+   line high. */
+.sg-result-head > .sg-tag {
+  flex: none;
+}
 
 /* Supporting detail in a transcript folds; on its own destination it does not. */
 .sg-info-more {
