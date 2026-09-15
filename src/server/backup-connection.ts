@@ -102,3 +102,29 @@ export function backupDestination() {
     return { connected: false as const };
   }
 }
+
+/**
+ * The same destination with its key, for the controller's own copies. Only
+ * server code that uploads may call it; nothing returns it to a browser or
+ * to Pi.
+ */
+export function backupDestinationAccess() {
+  try {
+    const root = join(piConfigDir(), "backup-destinations");
+    const destination = destinationSchema.parse(
+      privateJson(join(root, "default.json")),
+    );
+    const credentials = credentialSchema.parse(
+      privateJson(join(root, destination.credentialFile)),
+    );
+    return {
+      endpoint: destination.endpoint,
+      region: destination.region,
+      bucket: destination.bucket,
+      accessKeyId: credentials.accessKeyId,
+      secretAccessKey: credentials.secretAccessKey,
+    };
+  } catch {
+    return null;
+  }
+}

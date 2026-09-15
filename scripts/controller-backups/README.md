@@ -1,12 +1,53 @@
-# Controller recovery checkpoints
+# Controller recovery
 
-This operator tool captures Server Guy's own records and access configuration.
-Application data backups remain separate and continue on their host timers.
-This first version is a **manual, stopped-controller checkpoint**, not an
-unattended schedule. No new daemon is installed. Restic supplies encryption and
-R2 storage; Python supplies consistent staging and recovery validation.
+Server Guy's own records and access configuration — the keys, history and
+decisions recovery depends on. Application data backups remain separate and
+continue on their host timers.
 
-## Capture and upload
+There are two paths, and the automatic one is the one that runs:
+
+- **Automatic copies (default).** When a backup destination is connected, the
+  worker copies the controller after each piece of work it finishes — at most
+  hourly — and once a day, uploading one encrypted archive per copy under the
+  `controller/` prefix of the same bucket. It does not stop the controller: the
+  database is read through SQLite's online-backup API, so committed WAL data is
+  included, and a copy that would overlap a running change is skipped and
+  recorded with that reason. The last 14 copies are kept. Backups states it,
+  and the passphrase is shown once as a recovery kit. The implementation is
+  [`src/server/controller-protection.ts`](../../src/server/controller-protection.ts).
+- **The manual stopped-controller checkpoint** below, for a deliberate
+  pre-migration checkpoint. It is unchanged and still requires a stopped
+  controller and `restic`.
+
+**The manual checkpoint predates schema 15.** `controller_backup.py` still
+reads `chats`, `pi_runs`, `application_operations` and `deployments`; the
+current database has `applications`, `conversations`, `messages` and
+`saved_information`, so a capture against a current controller fails before it
+writes anything. Its own tests build the old tables and still pass. Update it
+with the tables it needs before relying on it again.
+
+## Opening an automatic copy
+
+Download the object with any S3 client — the bucket and prefix are in the
+recovery kit, which Settings → Connections shows on request — then:
+
+```
+node --import tsx scripts/controller-backups/decrypt-copy.mjs \
+  --archive /private/controller-copy.tar.enc \
+  --passphrase-file /private/recovery-passphrase.txt \
+  --target /private/controller-restore
+```
+
+The target must not exist. The command decrypts the archive, checks its
+manifest inventory and every file's SHA-256 before writing anything, and
+leaves the result private and quarantined. It never starts an application,
+contacts a host or activates a controller. The payload has the same layout as
+the checkpoint below, so the quarantine markers and the activation boundary
+apply unchanged. Losing every copy of the passphrase makes recovery
+impossible: the archive contains the credential for the bucket it is stored
+in, which is exactly why the passphrase is kept outside the controller.
+
+## Manual checkpoint: capture and upload
 
 1. Stop the web application and worker gracefully. Wait for ongoing work to
    finish. Do not kill active deployment or agent operations to make a checkpoint.
@@ -99,7 +140,13 @@ immutability is a later hardening step.
 
 ## Tests
 
-`python3 -m unittest discover -s tests/application/operator -p test_controller_backups.py -v`
+Automatic copies: `npm test -- controller-protection`. It captures a live
+controller, proves committed WAL data is in the copy, encrypts and uploads to
+a local stand-in for the bucket, skips while a change runs, applies retention,
+and opens a copy again through the command above. No real provider is called.
+
+Manual checkpoint: `python3 -m unittest discover -s tests/application/operator
+-p test_controller_backups.py -v`
 
 The encrypted roundtrip requires `restic` on PATH (on macOS: `brew install restic`).
 Other tests use SQLite and local fixtures only. No real provider calls occur.
