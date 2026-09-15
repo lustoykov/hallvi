@@ -19,6 +19,18 @@ export interface Value {
   why: string | null;
   /** Recorded but not yet reached the running processes. */
   pending: boolean;
+  /**
+   * The owner may ask to see this one.
+   *
+   * True only for a credential the controller generated: the owner has never
+   * seen it, and it is in their database and nowhere else they can reach.
+   * A value they typed is never revealable — reading it back would tell them
+   * nothing and would turn the store into an oracle for secrets given in
+   * confidence.
+   */
+  revealable?: boolean;
+  /** A replacement is part-way through and not yet proven. */
+  changing?: boolean;
 }
 
 export interface ConfigFile {
@@ -118,6 +130,12 @@ export interface SupplyView {
 export interface SupplyProps {
   story: SupplyView;
   now: number;
+  /**
+   * Needed only so a generated credential can be revealed to the owner from
+   * the panel that describes it. The visual reference has no such control,
+   * and every other surface here works without knowing the id.
+   */
+  applicationId?: string;
   head: import("react").ReactNode;
   /** Work in progress on this destination, as the shell shows it. */
   activity: import("react").ReactNode;

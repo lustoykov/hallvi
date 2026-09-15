@@ -88,6 +88,7 @@ export function SupplyPageView({
   const props = {
     story,
     now,
+    applicationId,
     head,
     activity: null,
     onAsk,

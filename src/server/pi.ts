@@ -8,6 +8,7 @@ import {
 } from "./cloudflare";
 import { checkPublicAccess } from "./public-access";
 import {
+  generateSecret,
   listSecrets,
   refuseSecretHandles,
   requestSecret,
@@ -84,7 +85,7 @@ Permissions are independent of the task. In Always ask, the executor requests ap
 
 Use judgment to avoid unnecessary downtime, data loss and spending. Inspect before making assumptions. If a command fails or its outcome is unknown, investigate using your general tools and decide how to proceed. A successful command does not prove the application works: check the result.
 
-Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold — an admin password, an API key, a token — call request_secret, then list its name in server_bash's secrets argument and refer to it in your script as an ordinary variable such as "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs, so the value never appears in the command, the record, the activity or the log. Do not write a value or a handle into the command text: a value spliced into a command is shell syntax rather than data. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
+Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold, there are two cases and they are not interchangeable. A value only the owner has — their API key, a token for their account, a password they already chose — is request_secret, which asks them for it. A value nobody needs to have chosen, such as a database role's password or an internal service token, is generate_secret: the controller makes it from the system random source and keeps it, and you never see it. Never author a password yourself and never reuse one from an example. Either way, list its name in server_bash's secrets argument and refer to it in your script as an ordinary variable such as "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs, so the value never appears in the command, the record, the activity or the log. Do not write a value or a handle into the command text: a value spliced into a command is shell syntax rather than data. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
 
 Save information worth preserving with save_information: discoveries costly to rediscover, preferences, recommendations and consequential outcomes. Search saved information when needed. Omit presentation for working knowledge. To surface a record, provide presentation.views and role; the product renders the same record in those views and, when showInChat is true, in this reply. Use a separate outcome for each historical event; update ordinary knowledge in place. Retire stale records. A deployment handover should save the application URL and verification evidence. Saved preferences never change permission settings. Never save secrets. Sidebar destinations are overview, architecture, deployment, history, processes, database, cache, jobs, storage, backups, logs, monitoring, domains, cdn, security, variables.
 
@@ -520,6 +521,27 @@ export async function askPi(
                 waiting: asked.established
                   ? null
                   : "The owner has not supplied it yet. It appears as a masked field in the conversation.",
+              });
+            },
+          }),
+          defineTool({
+            name: "generate_secret",
+            executionMode: "parallel",
+            label: "Generate a credential",
+            description:
+              "Have the controller generate a credential the application needs and nobody has to type: a database role password, an internal service token. Use this rather than inventing a value yourself — a password you write is in your context, your transcript and every artifact made from either, and it is not random. The controller generates 192 bits from the system random source, seals it, and returns only the name and its length. Name it after the environment variable the application reads, in capitals with underscores, and say in `why` which service uses it. Use it exactly as a supplied secret: list the name in server_bash's secrets argument and refer to it as \"$NAME\". Calling this again for a name that already has a value returns that value's reference and tells you it was reused — it does not make a second password, so a retry cannot leave the running service on a value the controller has replaced. There is no tool that reads it back; the owner can reveal it in the application's own pages. To replace an established credential, do not call this: changing one is an operational change that has to reach the service too.",
+            parameters: Type.Object({
+              name: Type.String(),
+              why: Type.String(),
+              process: Type.Optional(Type.String()),
+            }),
+            async execute(_id, params) {
+              const made = generateSecret(input.run.applicationId, params);
+              return json({
+                ...made,
+                note: made.reused
+                  ? "A value was already established for this name and has been kept. Nothing was regenerated, so do not report a new credential."
+                  : `A ${made.length}-character credential was generated and sealed. You cannot read it; the owner can reveal it from the application's pages.`,
               });
             },
           }),

@@ -19,6 +19,7 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { listed } from "../backup-prototype/model";
 import type { SupplyProps } from "./supply-story";
+import { RevealSecret } from "../reveal-secret";
 import { ago, sizeWords, when, type Value } from "./supply-model";
 import "./manifest.css";
 
@@ -36,7 +37,11 @@ const deciders = [
   {
     key: "generated",
     title: "Made by Server Guy",
-    note: "Created during the deployment and never shown.",
+    // "never shown" was true of every value on this page until the
+    // controller started generating them. A generated credential the owner
+    // cannot read is one they do not have, so these are the one kind that
+    // opens to a Reveal — and the note must not claim otherwise.
+    note: "Nobody typed these. Open one to read it back when you need it.",
   },
   {
     key: "connection",
@@ -48,6 +53,7 @@ const deciders = [
 export function ManifestDirection({
   story,
   now,
+  applicationId,
   head,
   activity,
   onAsk,
@@ -195,7 +201,12 @@ export function ManifestDirection({
             ))}
           </div>
           {shown && group.items.some((item) => item.id === shown.id) && (
-            <Opened value={shown} story={story} now={now} />
+            <Opened
+              value={shown}
+              story={story}
+              now={now}
+              applicationId={applicationId}
+            />
           )}
         </section>
       ))}
@@ -273,10 +284,12 @@ function Opened({
   value,
   story,
   now,
+  applicationId,
 }: {
   value: Value;
   story: SupplyProps["story"];
   now: number;
+  applicationId?: string;
 }) {
   const held = value.held;
   return (
@@ -297,7 +310,17 @@ function Opened({
         </div>
         <div>
           <dt>Where the value is</dt>
-          <dd>{value.where}, and never printed here</dd>
+          <dd>
+            {value.revealable && applicationId ? (
+              <>
+                {value.where}. Server Guy generated it, so you have never seen
+                it — read it back here when you need it.
+                <RevealSecret applicationId={applicationId} name={value.name} />
+              </>
+            ) : (
+              `${value.where}, and never printed here`
+            )}
+          </dd>
         </div>
         <div>
           <dt>Applied</dt>
@@ -312,9 +335,11 @@ function Opened({
         <div>
           <dt>Changing it</dt>
           <dd>
-            {held
-              ? "Ask in the conversation; Server Guy replaces it on the host and restarts what reads it."
-              : "It lives in the repository, so it changes with a release."}
+            {value.changing
+              ? "A replacement is part-way through. The value that still works is kept until the new one is proven."
+              : held
+                ? "Ask in the conversation. Changing a credential is an operational change: the service it authenticates to has to be updated too, and the new value only becomes current once it is proven to work."
+                : "It lives in the repository, so it changes with a release."}
           </dd>
         </div>
       </dl>
