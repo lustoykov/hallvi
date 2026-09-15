@@ -57,7 +57,10 @@ export function ReachPageView({
       bar={chrome.bar}
       title={page === "domains" ? "Domains" : "Security"}
       name={applicationName}
-      openUrl={null}
+      // Domains is the page a reader lands on to find the address, so it
+      // offers it — under the same live answer every other page uses, which
+      // for a published name is a request to the name itself.
+      openUrl={page === "domains" ? story.address : null}
       restricted={story.audience === "controller"}
       reachable={reachable}
       onReopen={onReopen}

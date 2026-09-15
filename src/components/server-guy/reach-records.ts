@@ -322,26 +322,55 @@ export function reachFromRecords({
   const valid = certRef ? currentChecks(live, certRef).get("valid") : null;
   const validRead = valid ? checkAsNow(valid.value, valid.record, now) : null;
 
+  /**
+   * Whether the newest check on the name contradicts the access record.
+   *
+   * An access record says where the application is reached; it never says
+   * that anything answers, and it is not rewritten when the application
+   * falls over. For a published address that difference is the whole page:
+   * a row reading "It answers on the internet" beside a name the same page
+   * says does not answer is the page contradicting itself in the reader's
+   * favour, which is the direction that costs them an afternoon.
+   *
+   * Only a failure overrides. A passing or ageing check leaves the row as
+   * the record wrote it, and the name's own row carries that nuance.
+   */
+  const accessUrl = accessRecord?.presentation?.url ?? null;
+  const accessHost =
+    accessUrl && URL.canParse(accessUrl) ? new URL(accessUrl).hostname : null;
+  const namesTheAccessHost =
+    accessHost &&
+    (domainFacts?.get("name")?.value.value ?? domainRef?.id ?? "")
+      .trim()
+      .toLowerCase() === accessHost.toLowerCase();
+  const accessFailed =
+    audience === "public" && namesTheAccessHost && servesRead === "failed";
+
   // ---- Who gets what, as callers. Each row is one probe that was run.
   const callers: Caller[] = [];
-  if (accessRecord?.presentation?.url)
+  if (accessUrl)
     callers.push({
       id: "access",
       who: audience === "public" ? "Anyone online" : "You, on this computer",
       from: audience === "public" ? "the internet" : "127.0.0.1",
-      typed: accessRecord.presentation.url,
-      outcome: "loads",
-      secure: accessRecord.presentation.url.startsWith("https://"),
-      headline:
-        audience === "public"
+      typed: accessUrl,
+      outcome: accessFailed ? "no-answer" : "loads",
+      secure: accessUrl.startsWith("https://"),
+      headline: accessFailed
+        ? "It does not answer on the internet"
+        : audience === "public"
           ? "It answers on the internet"
           : "It answers through the tunnel",
-      detail:
-        audience === "public"
+      detail: accessFailed
+        ? (serves!.value.detail ??
+          "This is still the address the application is published at. Nothing came back from it when it was last asked.")
+        : audience === "public"
           ? "The address is reachable without going through this computer."
           : "Only this computer reaches it, over an SSH tunnel to the host's own loopback.",
       sure: "proved",
-      at: accessRecord.establishedAt,
+      at: accessFailed
+        ? serves!.record.establishedAt
+        : (accessRecord?.establishedAt ?? null),
     });
   for (const door of doors)
     if (door.reach === "closed")
@@ -362,7 +391,13 @@ export function reachFromRecords({
   // from the serves check: a resolving name proves the internet can find the
   // provider, and a valid certificate proves the provider has one. Neither is
   // the application. Under a proxy both are true of a site that is down.
-  if (domainRef && (resolves || serves))
+  // A name that has been withdrawn is not a way in, whatever checks were
+  // recorded while it was one. Nothing else on the page would contradict a
+  // row still saying the name reaches the application, and the reader would
+  // believe the row over the heading that says there is no name.
+  const domainGone =
+    domainPresence?.known && domainPresence.presence === "absent";
+  if (domainRef && !domainGone && (resolves || serves))
     callers.push({
       id: "domain",
       who: "Anyone typing the name",
@@ -377,7 +412,13 @@ export function reachFromRecords({
               ? validRead === "verified" || !certRef
                 ? "loads"
                 : "insecure"
-              : "no-answer",
+              : // A reading that has aged still says what came back. Drawing
+                // the browser's "this page isn't working" over a name that
+                // answered is inventing a failure nobody observed; the
+                // window shows what was seen and the row is dated with when.
+                servesRead === "stale"
+                ? "loads"
+                : "no-answer",
       secure: validRead === "verified",
       headline:
         domainState === "failed"
@@ -388,7 +429,13 @@ export function reachFromRecords({
               ? proxied
                 ? `${domainFacts?.get("registrar")?.value.value ?? "The provider"} answers; the application does not`
                 : "The name resolves; the application does not answer"
-              : "The name resolves; nothing has checked what answers",
+              : // "Nothing has checked" is false once something has. A
+                // reading that has aged is still a reading, and the reader
+                // needs to know an answer came back rather than go looking
+                // for a check nobody ran.
+                servesRead === "stale"
+                ? "The name reached this application when it was last checked"
+                : "The name resolves; nothing has checked what answers",
       detail: domainDetail(),
       sure: domainState === "resolving" && !serves ? "asked" : "proved",
       at: (serves ?? resolves)!.record.establishedAt,
@@ -445,6 +492,12 @@ export function reachFromRecords({
               : "external",
             state: domainState,
             detail: domainDetail(),
+            // Only when it passed and then aged. A failing or absent check
+            // never sets this, so nothing can read a working past out of it.
+            lastServedAt:
+              servesRead === "stale"
+                ? (serves!.record.establishedAt ?? null)
+                : null,
             origin,
             proxied,
             concern,

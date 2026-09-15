@@ -145,16 +145,37 @@ export function reviewRecord(value: InformationInput): string[] {
         `the record can only be shown as recorded.`,
     );
 
-  if (
-    presentation.states?.presence === "absent" &&
-    (presentation.facts ?? []).length
-  )
+  const absent =
+    presentation.states?.presence === "absent" ? presentation.states : null;
+  if (absent && (presentation.facts ?? []).length)
     found.push(
-      `This record says ${presentation.states.ref.kind} "${presentation.states.ref.id}" is ` +
+      `This record says ${absent.ref.kind} "${absent.ref.id}" is ` +
         `absent and then carries facts about it. An absence states that there ` +
         `is nothing there: write it on its own, and keep what you observed ` +
         `while it existed on the earlier record.`,
     );
+  // The same mistake, in the field a page trusts most. A withdrawn name whose
+  // record still carries a passing "resolves" leaves every reader of that
+  // subject holding a check that says it works, and the page goes on drawing
+  // a visitor reaching an application through a name that no longer exists.
+  if (absent)
+    presentation.checks.forEach((check, index) => {
+      const about = check.about ?? absent.ref;
+      if (
+        check.status !== "passed" ||
+        about.kind !== absent.ref.kind ||
+        about.id !== absent.ref.id
+      )
+        return;
+      found.push(
+        `Check ${index + 1} ("${check.label}") passed, on a record saying ` +
+          `${absent.ref.kind} "${absent.ref.id}" is not there. A passing check ` +
+          `says something works; nothing works about a thing that is absent. ` +
+          `If it was true before, leave it on the earlier record. If it is what ` +
+          `you did just now — withdrew it, removed it — that is an event: write ` +
+          `it as its own record that states nothing and is about this subject.`,
+      );
+    });
 
   // A variable is the one subject whose value must never be recorded, and a
   // page that shows it cannot be un-shown. So the refusal is here, at the

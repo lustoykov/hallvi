@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { reachFromRecords } from "@/components/server-guy/reach-records";
+import { publishOffer } from "@/components/server-guy/reach-prototype/reach-story";
 import {
   APP,
   NOW,
@@ -611,5 +612,241 @@ describe("a name, and whether anything answers on it", () => {
   it("an absent domain is an absence, and a missing one is nobody looking", () => {
     expect(read([]).domain).toBeNull();
     expect(read([states(domain, { presence: "absent" })]).domain).toBeNull();
+  });
+});
+
+// Publishing changes the answer to "who is this for", and the page reads
+// that from the access record rather than from a name existing.
+describe("an application published at its own name", () => {
+  const publicAccess = () =>
+    record({
+      about: [{ kind: "application", id: APP }],
+      url: "https://shop.example.com",
+      content: {
+        kind: "application-access",
+        mode: "public",
+        server: "host-1",
+      },
+    });
+
+  it("reads the audience and the address from the access record", () => {
+    const story = read([publicAccess()]);
+    expect(story.audience).toBe("public");
+    expect(story.address).toBe("https://shop.example.com");
+  });
+
+  it("describes the visitor as anyone online, over a secure address", () => {
+    const caller = read([publicAccess()]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.who).toBe("Anyone online");
+    expect(caller?.from).toBe("the internet");
+    expect(caller?.secure).toBe(true);
+    expect(caller?.headline).toBe("It answers on the internet");
+  });
+
+  // Publishing is not finished until the name itself answers, and the access
+  // record is not the thing that establishes that.
+  it("does not let a public access record make the name read as serving", () => {
+    const story = read([
+      publicAccess(),
+      states(
+        { kind: "domain", id: "shop.example.com" },
+        {
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("configured", "passed", "configuration")],
+        },
+      ),
+    ]);
+    expect(story.audience).toBe("public");
+    expect(story.domain?.state).toBe("pending-dns");
+  });
+
+  it("still reads a private record as reaching only this computer", () => {
+    const story = read([privateAccess()]);
+    expect(story.audience).toBe("controller");
+    expect(story.callers.find((item) => item.id === "access")?.secure).toBe(
+      false,
+    );
+  });
+});
+
+// An access record says where the application is reached. It never says that
+// anything answers, and nothing rewrites it when the application falls over.
+describe("when the published name stops answering", () => {
+  const publicAccess = () =>
+    record({
+      about: [{ kind: "application", id: APP }],
+      url: "https://shop.example.com",
+      content: {
+        kind: "application-access",
+        mode: "public",
+        server: "host-1",
+      },
+    });
+  const domain = (serves: "passed" | "failed") =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        at: "2026-09-13T11:58:00.000Z",
+        facts: [fact("name", "shop.example.com")],
+        checks: [
+          check("configured", "passed", "configuration"),
+          check("resolves", "passed"),
+          check("serves", serves, "reachability", {
+            detail: "The proxy answered with 502.",
+          }),
+        ],
+      },
+    );
+
+  it("does not leave the address claiming to answer", () => {
+    const caller = read([publicAccess(), domain("failed")]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.outcome).toBe("no-answer");
+    expect(caller?.headline).toBe("It does not answer on the internet");
+    expect(caller?.detail).toBe("The proxy answered with 502.");
+    // The failure is what was checked, so the row is dated by that check.
+    expect(caller?.at).toBe("2026-09-13T11:58:00.000Z");
+  });
+
+  it("still calls it the address, rather than dropping the way in", () => {
+    const caller = read([publicAccess(), domain("failed")]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.typed).toBe("https://shop.example.com");
+    expect(caller?.secure).toBe(true);
+  });
+
+  it("leaves the row alone while the name serves", () => {
+    const caller = read([publicAccess(), domain("passed")]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.outcome).toBe("loads");
+    expect(caller?.headline).toBe("It answers on the internet");
+  });
+
+  // A failure on some other name says nothing about this address.
+  it("only defers to a check on the name the address uses", () => {
+    const elsewhere = states(
+      { kind: "domain", id: "old.example.org" },
+      {
+        facts: [fact("name", "old.example.org")],
+        checks: [check("serves", "failed")],
+      },
+    );
+    const caller = read([publicAccess(), elsewhere]).callers.find(
+      (item) => item.id === "access",
+    );
+    expect(caller?.outcome).toBe("loads");
+  });
+});
+
+// Withdrawing a name is the round trip, and the page has to complete it.
+describe("after a published name is withdrawn", () => {
+  const withdrawn = () =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        presence: "absent",
+        at: "2026-09-13T11:59:00.000Z",
+        checks: [check("withdrawn", "info", "configuration")],
+      },
+    );
+  const whileItServed = () =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        at: "2026-09-13T11:50:00.000Z",
+        facts: [fact("name", "shop.example.com")],
+        checks: [check("resolves", "passed"), check("serves", "passed")],
+      },
+    );
+
+  it("stops offering a name that is no longer there", () => {
+    const story = read([whileItServed(), withdrawn()]);
+    expect(story.domain).toBeNull();
+    expect(story.callers.some((caller) => caller.id === "domain")).toBe(false);
+  });
+
+  it("keeps the name while it is only unchecked, not established absent", () => {
+    const story = read([whileItServed()]);
+    expect(story.domain?.state).toBe("serving");
+    expect(story.callers.some((caller) => caller.id === "domain")).toBe(true);
+  });
+});
+
+// A name that answered thirteen hours ago is published; what is old is the
+// evidence. Calling that "nobody has checked what answers" sends a reader to
+// look for a check that ran, and calling it unfinished work is worse.
+describe("a published name whose reading has aged", () => {
+  const AGED = "2026-09-12T22:00:00.000Z"; // 14 hours before NOW
+  const served = (at: string) =>
+    states(
+      { kind: "domain", id: "shop-example-com" },
+      {
+        at,
+        facts: [fact("name", "shop.example.com")],
+        checks: [check("resolves", "passed"), check("serves", "passed")],
+      },
+    );
+
+  it("says when it last answered, rather than that nothing looked", () => {
+    const story = read([served(AGED)]);
+    expect(story.domain?.lastServedAt).toBe(AGED);
+    const caller = story.callers.find((item) => item.id === "domain");
+    expect(caller?.headline).toBe(
+      "The name reached this application when it was last checked",
+    );
+    // What was seen is what the window draws; the row carries the date.
+    expect(caller?.outcome).toBe("loads");
+    expect(caller?.at).toBe(AGED);
+  });
+
+  it("offers another look rather than finishing a finished job", () => {
+    const offer = publishOffer(read([served(AGED)]));
+    expect(offer.label).toBe("Check it from outside");
+    expect(offer.draft).toContain("answered when it was last checked");
+    expect(offer.draft).not.toContain("is not serving");
+  });
+
+  it("sets nothing of the sort while the reading is fresh", () => {
+    const story = read([served("2026-09-13T11:55:00.000Z")]);
+    expect(story.domain?.state).toBe("serving");
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(publishOffer(story).label).toBe("Make it private again");
+  });
+
+  // Only a check that passed and then aged. A failure is not a working past.
+  it("never reads a working past out of a failed check", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop-example-com" },
+        {
+          at: AGED,
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("resolves", "passed"), check("serves", "failed")],
+        },
+      ),
+    ]);
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(story.domain?.state).toBe("unreachable");
+    expect(publishOffer(story).label).toBe("Finish publishing it");
+  });
+
+  it("still offers finishing when nothing ever checked what answers", () => {
+    const story = read([
+      states(
+        { kind: "domain", id: "shop-example-com" },
+        {
+          at: AGED,
+          facts: [fact("name", "shop.example.com")],
+          checks: [check("resolves", "passed")],
+        },
+      ),
+    ]);
+    expect(story.domain?.lastServedAt).toBeNull();
+    expect(publishOffer(story).label).toBe("Finish publishing it");
   });
 });

@@ -352,6 +352,27 @@ export const informationInputSchema = z.object({
           path: ["url"],
           message: "Application access requires its browser URL.",
         });
+      if (content.mode === "public") {
+        // A tunnel's two ends describe a way in only this PC has. Carrying
+        // them on a public record says the address depends on the
+        // controller being up, which is the one thing publishing changes.
+        if (content.localPort || content.remotePort)
+          context.addIssue({
+            code: "custom",
+            path: ["content"],
+            message:
+              "Public access is not reached through a tunnel: drop localPort and remotePort, and give the address a visitor types.",
+          });
+        if (value.url && URL.canParse(value.url)) {
+          const host = new URL(value.url).hostname;
+          if (/^(127\.|localhost$|\[?::1\]?$|0\.0\.0\.0$)/.test(host))
+            context.addIssue({
+              code: "custom",
+              path: ["url"],
+              message: `${host} is this controller PC, not a public address. A public access record holds the hostname a visitor types.`,
+            });
+        }
+      }
       if (content.mode === "private") {
         if (!content.localPort || !content.remotePort)
           context.addIssue({

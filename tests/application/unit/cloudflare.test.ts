@@ -225,3 +225,185 @@ describe("reading one name", () => {
     expect(fetched[1]).toContain(`/zones/${ZONE}/dns_records`);
   });
 });
+
+// Writing a record. The safety here is the shape of the call — one exact
+// name and one exact type, so there is no request it can make that touches
+// something the caller did not name — and the two refusals: taking a name
+// away from whatever already has it, and deleting a record that is not ours.
+describe("pointing a name at a server", () => {
+  const ZONE = "b".repeat(32);
+  let sent: { url: string; method: string; body: unknown }[] = [];
+
+  function zone(records: Record<string, unknown>[]) {
+    sent = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        const method = init.method ?? "GET";
+        sent.push({
+          url,
+          method,
+          body: init.body ? JSON.parse(String(init.body)) : null,
+        });
+        const result = url.includes("/dns_records")
+          ? method === "GET"
+            ? records
+            : { id: "new" }
+          : [
+              {
+                id: ZONE,
+                name: "example.com",
+                status: "active",
+                name_servers: ["ns1.example.net"],
+              },
+            ];
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, result }),
+        } as Response;
+      }),
+    );
+  }
+
+  const held = (over: Record<string, unknown> = {}) => ({
+    id: "rec-1",
+    type: "A",
+    name: "app.example.com",
+    content: "203.0.113.10",
+    proxied: false,
+    ...over,
+  });
+
+  const wrote = () => sent.filter((call) => call.method !== "GET");
+
+  it("creates the record when the name is free", async () => {
+    zone([]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(outcome.action).toBe("created");
+    expect(outcome.previous).toBeNull();
+    expect(wrote()).toHaveLength(1);
+    expect(wrote()[0].method).toBe("POST");
+    expect(wrote()[0].body).toMatchObject({
+      type: "A",
+      name: "app.example.com",
+      content: "203.0.113.10",
+      proxied: false,
+    });
+  });
+
+  it("refuses to take a name away from whatever already has it", async () => {
+    zone([held({ content: "198.51.100.5" })]);
+    await expect(
+      cloudflare.writeDomainRecord({
+        name: "app.example.com",
+        type: "A",
+        content: "203.0.113.10",
+      }),
+    ).rejects.toThrow(/198\.51\.100\.5.*Nothing was changed/s);
+    expect(wrote()).toHaveLength(0);
+  });
+
+  it("takes it over only when the owner has decided to", async () => {
+    zone([held({ content: "198.51.100.5" })]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+      replace: true,
+    });
+    expect(outcome.action).toBe("updated");
+    expect(outcome.previous).toEqual({
+      content: "198.51.100.5",
+      proxied: false,
+    });
+    expect(wrote()[0].method).toBe("PUT");
+  });
+
+  it("writes nothing when the record already says what was asked for", async () => {
+    zone([held()]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(outcome.action).toBe("unchanged");
+    expect(wrote()).toHaveLength(0);
+  });
+
+  // The failure this field exists for: browsers prefer IPv6, so a leftover
+  // AAAA breaks the name for the visitors who have one while the IPv4 path
+  // a check just proved stays perfect.
+  it("reports the other addresses the name still hands out", async () => {
+    zone([held(), held({ id: "rec-2", type: "AAAA", content: "2001:db8::1" })]);
+    const outcome = await cloudflare.writeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(
+      outcome.others.map((item) => `${item.type} ${item.content}`),
+    ).toEqual(["AAAA 2001:db8::1"]);
+  });
+
+  it("will not put an address of the wrong family in a record", async () => {
+    zone([]);
+    await expect(
+      cloudflare.writeDomainRecord({
+        name: "app.example.com",
+        type: "AAAA",
+        content: "203.0.113.10",
+      }),
+    ).rejects.toThrow(/IPv6/);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("refuses a name no visible zone covers, rather than guessing one", async () => {
+    zone([]);
+    await expect(
+      cloudflare.writeDomainRecord({
+        name: "app.elsewhere.test",
+        type: "A",
+        content: "203.0.113.10",
+      }),
+    ).rejects.toThrow(/No zone this token can see/);
+  });
+
+  it("removes only the record whose address it was given", async () => {
+    zone([held()]);
+    const outcome = await cloudflare.removeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(outcome.action).toBe("removed");
+    expect(wrote()[0].method).toBe("DELETE");
+  });
+
+  it("refuses to delete a record pointing somewhere else", async () => {
+    zone([held({ content: "198.51.100.5" })]);
+    await expect(
+      cloudflare.removeDomainRecord({
+        name: "app.example.com",
+        type: "A",
+        content: "203.0.113.10",
+      }),
+    ).rejects.toThrow(/not the record this application published/);
+    expect(wrote()).toHaveLength(0);
+  });
+
+  it("treats an already absent record as removed rather than an error", async () => {
+    zone([]);
+    const outcome = await cloudflare.removeDomainRecord({
+      name: "app.example.com",
+      type: "A",
+      content: "203.0.113.10",
+    });
+    expect(outcome.action).toBe("removed");
+    expect(wrote()).toHaveLength(0);
+  });
+});

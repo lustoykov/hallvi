@@ -46,6 +46,11 @@ export function PageHead({
   /** Asks Pi to reopen private access. Absent hides the offer. */
   onReopen?: () => void;
 }) {
+  // Only a tunnel ends at this computer's own loopback.
+  const tunnelled = Boolean(
+    openUrl &&
+    /^https?:\/\/(127\.0\.0\.1|\[?::1\]?|localhost)(:|\/|$)/.test(openUrl),
+  );
   return (
     <header className="axj3-head">
       {bar && <div className="axj3-bar">{bar}</div>}
@@ -68,7 +73,17 @@ export function PageHead({
             ) : reachable === "closed" ? (
               <>
                 <small className="axj3-closed">
-                  <WarningCircle weight="bold" /> The tunnel is closed
+                  <WarningCircle weight="bold" />{" "}
+                  {/* A published address has no tunnel to be closed. What
+                      failed is the address itself, and saying "tunnel"
+                      sends the reader to look at the wrong thing. The
+                      address itself settles which one this is: only a
+                      tunnel ends at this computer's own loopback, and
+                      `restricted` is passed as false by pages that are not
+                      about reach at all. */}
+                  {tunnelled
+                    ? "The tunnel is closed"
+                    : "The address did not answer"}
                 </small>
                 {/* No anchor at all. A dead link that looks alive is worse
                     than no link: the reader spends the click, the wait and
@@ -80,7 +95,7 @@ export function PageHead({
                     onClick={onReopen}
                   >
                     <ChatCircleText weight="bold" />
-                    Ask Pi to reopen it
+                    {tunnelled ? "Ask Pi to reopen it" : "Ask Pi to look"}
                   </button>
                 )}
               </>

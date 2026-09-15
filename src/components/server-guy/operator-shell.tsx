@@ -308,12 +308,14 @@ export function OperatorShell({
         if (!response.ok) return;
         const body = await response.json();
         if (cancelled) return;
-        // Anything that is not a private tunnel is reached directly, and
-        // there is nothing of ours to be closed.
+        // A published address is asked the same question a tunnel is. It
+        // used to be assumed open because it was public, which is the
+        // unchecked claim the tunnel side exists to avoid. `open` is absent
+        // only when there is no address to ask about, and then nothing is
+        // offered to click either.
         setAnswered({
           id: applicationIdForAccess,
-          state:
-            body.mode !== "private" || body.open === true ? "open" : "closed",
+          state: body.open === false ? "closed" : "open",
         });
       } catch {
         // A page that cannot reach its own controller has louder problems,
@@ -328,20 +330,26 @@ export function OperatorShell({
     };
   }, [applicationIdForAccess]);
 
-  /** Asks Pi, in the main conversation, to open private access again. */
+  /** Asks Pi, in the main conversation, about a way in that stopped working. */
   const askToReopen = useCallback(() => {
-    const url =
-      view.information
-        ?.filter((record) => !record.retiredAt)
-        .find(
-          (record) =>
-            record.presentation?.content?.kind === "application-access",
-        )?.presentation?.url ?? null;
+    const record = view.information
+      ?.filter((item) => !item.retiredAt)
+      .find(
+        (item) => item.presentation?.content?.kind === "application-access",
+      );
+    const url = record?.presentation?.url ?? null;
+    const content = record?.presentation?.content;
+    const name = application?.name ?? "this application";
+    // A published address and a tunnel fail for different reasons, so they
+    // are different questions. Asking Pi to "reopen private access" for a
+    // public name would have it undo the publishing.
     askInConversation(
       view.chats[0]?.id ?? null,
-      `The tunnel to ${application?.name ?? "this application"} is closed${
-        url ? ` — ${url} does not answer` : ""
-      }. Reopen private access and tell me the URL.`,
+      content?.kind === "application-access" && content.mode === "public"
+        ? `${url ?? name} is not answering. Check it from outside, find out what is broken between the name and the application, and fix it.`
+        : `The tunnel to ${name} is closed${
+            url ? ` — ${url} does not answer` : ""
+          }. Reopen private access and tell me the URL.`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.information, view.chats, application?.name]);
