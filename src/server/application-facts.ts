@@ -387,8 +387,36 @@ export interface JobFacts {
   }[];
 }
 
+/**
+ * Server Guy's own protection: whether its records and keys are copied off
+ * this machine, and whether the owner holds what opens those copies. It is
+ * not application-scoped — every application's Backups view states the same
+ * controller fact.
+ */
+export interface ControllerProtectionFacts {
+  connected: boolean;
+  state: "unprotected" | "copied" | "recoverable" | "failing";
+  bucket: string | null;
+  host: string | null;
+  keep: number;
+  lastCopyAt: string | null;
+  nextCopyBy: string | null;
+  kitConfirmedAt: string | null;
+  /** A kit exists, so at least one copy has reached storage. */
+  kitReady: boolean;
+  copies: Array<{
+    id: string;
+    at: string;
+    outcome: "succeeded" | "failed" | "skipped";
+    reason: string | null;
+    size: string | null;
+  }>;
+  retentionFailed: boolean;
+}
+
 export interface ApplicationFacts {
   protection?: ProtectionFacts;
+  controllerProtection?: ControllerProtectionFacts;
   backupSetup?: { connected: boolean };
   /** Manual restore proofs. Independent of `protection`, never a stand-in. */
   backupEvidence?: BackupEvidenceFacts;

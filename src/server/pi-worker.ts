@@ -1,4 +1,5 @@
 import { cleanupPiWorkspaces } from "./pi-workspace";
+import { copyDue, protectController } from "./controller-protection";
 import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -252,6 +253,21 @@ export async function executePiRun(
   return getPiRun(run.id);
 }
 
+/**
+ * Server Guy's own records are copied off this machine by the worker, not by
+ * Pi and not by the owner remembering to. A copy that cannot be taken is
+ * recorded where the Backups view reads it; it never stops the worker.
+ */
+async function keepControllerCopy(trigger: "after-change" | "daily") {
+  try {
+    if (copyDue(trigger)) await protectController(trigger);
+  } catch (error) {
+    console.warn(
+      `Server Guy could not copy its own records: ${error instanceof Error ? error.message : "unknown reason"}`,
+    );
+  }
+}
+
 export async function runPiWorker(signal: AbortSignal) {
   const release = acquireWorkerLock();
   let unsettled = false;
@@ -264,10 +280,21 @@ export async function runPiWorker(signal: AbortSignal) {
       settleRunningActivity(applicationId, null);
     await cleanupPiWorkspaces().catch(() => undefined);
     console.info("Pi worker ready. Watching saved requests, one at a time.");
+    let nextProtectionCheck = 0;
     while (!signal.aborted) {
       const run = claimNextPiRun();
-      if (run) await executePiRun(run, { signal });
-      else await delay(250, undefined, { signal }).catch(() => undefined);
+      if (run) {
+        await executePiRun(run, { signal });
+        await keepControllerCopy("after-change");
+      } else {
+        // Between runs, and rarely: the check reads one small file, and the
+        // copy itself decides whether anything is owed.
+        if (Date.now() >= nextProtectionCheck) {
+          nextProtectionCheck = Date.now() + 60_000;
+          await keepControllerCopy("daily");
+        }
+        await delay(250, undefined, { signal }).catch(() => undefined);
+      }
     }
   } catch (error) {
     unsettled = error instanceof PiWorkerDrainError;

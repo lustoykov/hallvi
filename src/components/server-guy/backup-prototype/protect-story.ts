@@ -85,5 +85,13 @@ export interface ProtectProps {
   activity: import("react").ReactNode;
   /** The server it all lives on. */
   server: { label: string; city: string | null } | null;
+  /**
+   * Server Guy's own protection. It is not this application's data, but it is
+   * the same question — would this survive losing the machine — so it is one
+   * more row rather than a page of its own.
+   */
+  controller?: import("@/server/application-facts").ControllerProtectionFacts;
+  /** What that row needs the owner to know or do, drawn under the board. */
+  controllerBand?: import("react").ReactNode;
   onAsk: (draft: string) => void;
 }

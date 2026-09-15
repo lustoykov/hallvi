@@ -13,11 +13,13 @@
 
 import { useMemo } from "react";
 
+import type { ControllerProtectionFacts } from "@/server/application-facts";
 import type { SavedInformation } from "@/server/operator-data";
 import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 
 import type { PageChrome } from "./architecture-prototype/index";
 import { protectionFromRecords } from "./backups-records";
+import { ControllerProtectionBand } from "./controller-protection";
 import { CalendarDirection } from "./backup-prototype/calendar";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
@@ -31,6 +33,8 @@ export function BackupsPage({
   reachable = "checking",
   onReopen,
   chrome,
+  controller,
+  onRefresh,
   onAsk,
 }: {
   records: SavedInformation[];
@@ -42,6 +46,10 @@ export function BackupsPage({
   /** Asks Pi to reopen private access when it is closed. */
   onReopen?: () => void;
   chrome: PageChrome;
+  /** Server Guy's own protection, which no application record establishes. */
+  controller?: ControllerProtectionFacts;
+  /** Re-reads the view after the owner confirms the recovery kit. */
+  onRefresh?: () => Promise<void>;
   onAsk: (draft: string) => void;
 }) {
   const story = useMemo(
@@ -103,6 +111,18 @@ export function BackupsPage({
             Ask Pi what protects this
           </button>
         </div>
+        {/* Server Guy's own protection is true whether or not anything
+            has looked at this application, and the first copy's recovery
+            kit has to be findable on a controller that has never deployed
+            anything. */}
+        {controller && (
+          <ControllerProtectionBand
+            facts={controller}
+            now={now}
+            onRefresh={onRefresh}
+            standalone
+          />
+        )}
       </div>
     );
 
@@ -114,6 +134,16 @@ export function BackupsPage({
         head={head}
         activity={null}
         server={server}
+        controller={controller}
+        controllerBand={
+          controller && (
+            <ControllerProtectionBand
+              facts={controller}
+              now={now}
+              onRefresh={onRefresh}
+            />
+          )
+        }
         onAsk={onAsk}
       />
     </div>
