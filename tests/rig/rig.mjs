@@ -27,6 +27,7 @@ import {
   createWriteStream,
   existsSync,
   mkdirSync,
+  rmSync,
   renameSync,
   symlinkSync,
   writeFileSync,
@@ -67,8 +68,22 @@ for (const directory of [root, state, host, agent, logs])
 
 const git = (...args) =>
   execFileSync("git", ["-C", source, ...args], { encoding: "utf8" }).trim();
-if (fresh) {
+
+// The source is copied on EVERY start, not only a fresh one.
+//
+// It used to be copied once, when the rig directory was created, and that
+// made the rig quietly dishonest: a restart went on serving the snapshot
+// taken days earlier, so a page checked in a browser could show behaviour
+// from code that no longer existed and a fix could look like it had not
+// landed. Recorded state and the host container are what make a restart
+// cheap, and those are deliberately left alone below — it is only the
+// application source that is refreshed, which takes a moment and removes a
+// whole class of false evidence.
+{
   mkdirSync(app, { recursive: true });
+  // Removed rather than merged, so a file deleted upstream does not live on
+  // in the copy and keep being served.
+  rmSync(join(app, "src"), { recursive: true, force: true });
   for (const entry of [
     "src",
     "scripts",
@@ -79,7 +94,8 @@ if (fresh) {
     "drizzle.config.ts",
   ])
     cpSync(join(source, entry), join(app, entry), { recursive: true });
-  symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
+  if (!existsSync(join(app, "node_modules")))
+    symlinkSync(join(source, "node_modules"), join(app, "node_modules"), "dir");
   cpSync(
     join(rig, "stand-ins/github-api.ts.txt"),
     join(app, "src/server/github-api.ts"),
@@ -99,11 +115,14 @@ if (fresh) {
       join(app, "src/server/native-compose.ts"),
     );
   }
+  // Rewritten on every start, because it answers "what is this rig serving?"
+  // and that changes when the source is refreshed.
   writeFileSync(
     join(root, "manifest.json"),
     JSON.stringify(
       {
-        createdAt: new Date().toISOString(),
+        sourceCopiedAt: new Date().toISOString(),
+        createdFresh: fresh,
         commit: git("rev-parse", "HEAD"),
         localChanges: git("status", "--porcelain") !== "",
         replayedFrom: from,

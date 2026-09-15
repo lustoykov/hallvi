@@ -270,3 +270,277 @@ describe("one application cannot reach another's", () => {
       expect(() => secrets.listSecrets(bad)).toThrow();
   });
 });
+
+describe("a credential the controller generates", () => {
+  it("never returns the value, only its name and length", () => {
+    const made = secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL needs a password for the application's role.",
+      process: "db",
+    });
+    expect(made.handle).toBe("{{secret:POSTGRES_PASSWORD}}");
+    expect(made.origin).toBe("generated");
+    expect(made.length).toBe(32);
+    expect(made.reused).toBe(false);
+    // Nothing in the returned object is the password.
+    expect(JSON.stringify(made)).not.toContain(
+      secrets.revealSecret(APP, "POSTGRES_PASSWORD").value,
+    );
+  });
+
+  it("is strong and free of characters that need escaping", () => {
+    secrets.generateSecret(APP, { name: "POSTGRES_PASSWORD", why: "x" });
+    const { value } = secrets.revealSecret(APP, "POSTGRES_PASSWORD");
+    // base64url only: safe in a connection string, a shell word and a URL.
+    expect(value).toMatch(/^[A-Za-z0-9_-]{32}$/);
+  });
+
+  it("does not collide across calls", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 32; i++) {
+      const app = `22222222-2222-4222-8222-${String(i).padStart(12, "0")}`;
+      secrets.generateSecret(app, { name: "POSTGRES_PASSWORD", why: "x" });
+      seen.add(secrets.revealSecret(app, "POSTGRES_PASSWORD").value);
+    }
+    expect(seen.size).toBe(32);
+  });
+
+  it("reuses an established credential instead of quietly making another", () => {
+    // The failure this prevents: a retried turn or a restarted worker
+    // generating afresh, leaving the running database on a value the
+    // controller has already replaced.
+    secrets.generateSecret(APP, { name: "POSTGRES_PASSWORD", why: "first" });
+    const first = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    const again = secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "second attempt",
+    });
+    expect(again.reused).toBe(true);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(first);
+  });
+
+  it("survives a restart, because it is on disk and not in memory", async () => {
+    secrets.generateSecret(APP, { name: "POSTGRES_PASSWORD", why: "x" });
+    const before = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    // A fresh import is this process's version of the controller restarting.
+    const restarted = await import(
+      "@/server/application-secrets?restart=" + Date.now()
+    );
+    expect(restarted.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(before);
+  });
+
+  it("is not in the list every page reads", () => {
+    secrets.generateSecret(APP, { name: "POSTGRES_PASSWORD", why: "x" });
+    const value = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    const listed = secrets.listSecrets(APP);
+    expect(JSON.stringify(listed)).not.toContain(value);
+    const row = listed.find((item) => item.name === "POSTGRES_PASSWORD");
+    expect(row?.origin).toBe("generated");
+  });
+});
+
+describe("revealing", () => {
+  it("returns a generated value to the owner who asked", () => {
+    secrets.generateSecret(APP, { name: "POSTGRES_PASSWORD", why: "x" });
+    const shown = secrets.revealSecret(APP, "POSTGRES_PASSWORD");
+    expect(shown.value).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(shown.origin).toBe("generated");
+  });
+
+  it("refuses to read back a value the owner supplied", () => {
+    // The store is not an oracle for secrets it was given in confidence, and
+    // the owner already knows what they typed.
+    secrets.establishSecret(APP, "GF_SECURITY_ADMIN_PASSWORD", VALUE);
+    expect(() =>
+      secrets.revealSecret(APP, "GF_SECURITY_ADMIN_PASSWORD"),
+    ).toThrow(/will not read it back/);
+  });
+
+  it("refuses a name it holds nothing for", () => {
+    expect(() => secrets.revealSecret(APP, "NOTHING_HERE")).toThrow(
+      /No value is held/,
+    );
+  });
+});
+
+describe("changing a credential", () => {
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("hands back both values, because the change needs both", () => {
+    const before = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(change.previous).toBe(before);
+    expect(change.next).not.toBe(before);
+    expect(change.next).toMatch(/^[A-Za-z0-9_-]{32}$/);
+  });
+
+  it("says a change is in flight until it is settled", () => {
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(false);
+  });
+
+  it("keeps the new value once its use is established", () => {
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
+      change.next,
+    );
+  });
+
+  it("puts the working value back when the change could not be established", () => {
+    // The one unrecoverable outcome is losing the password that still works
+    // before the new one does, so a failed change is a no-op and not a
+    // locked-out application.
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    const settled = secrets.settleChange(APP, "POSTGRES_PASSWORD", false);
+    expect(settled.rolledBack).toBe(true);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
+      change.previous,
+    );
+  });
+
+  it("redacts both values while the change is in flight", () => {
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    const output = `old=${change.previous} new=${change.next}`;
+    const clean = secrets.redactHeldSecrets(APP, output);
+    expect(clean).not.toContain(change.previous);
+    expect(clean).not.toContain(change.next);
+  });
+
+  it("does not keep the old value after the change settles", () => {
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    const stored = readFileSync(
+      join(directory, "secrets", `${APP}.json`),
+      "utf8",
+    );
+    // Not an indefinite history: one predecessor, only while it can still be
+    // needed. Its ciphertext is gone once the new value is proven.
+    expect(stored).not.toContain("previous");
+    expect(secrets.redactHeldSecrets(APP, change.previous)).toBe(
+      change.previous,
+    );
+  });
+
+  it("accepts a value the owner chose instead of generating one", () => {
+    const change = secrets.beginChange(
+      APP,
+      "POSTGRES_PASSWORD",
+      "a-password-the-owner-picked",
+    );
+    expect(change.next).toBe("a-password-the-owner-picked");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    const row = secrets
+      .listSecrets(APP)
+      .find((item) => item.name === "POSTGRES_PASSWORD");
+    expect(row?.origin).toBe("owner");
+    // And an owner-chosen value stops being revealable, as any owner value is.
+    expect(() => secrets.revealSecret(APP, "POSTGRES_PASSWORD")).toThrow();
+  });
+
+  it("refuses a replacement too short to redact", () => {
+    expect(() =>
+      secrets.beginChange(APP, "POSTGRES_PASSWORD", "short"),
+    ).toThrow(/at least/);
+  });
+});
+
+describe("the environment a change runs in", () => {
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("exports the incoming value as $NAME, never the outgoing one", () => {
+    // The bug this guards: both values live in the store during a change, and
+    // a lookup that flattens them exports whichever came last. If $NAME ever
+    // became the old password, every script that "sets the new password"
+    // would quietly set the old one again.
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    const environment = secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"]);
+    expect(environment).toContain(
+      "export POSTGRES_PASSWORD='" + change.next + "'",
+    );
+    expect(environment).toContain(
+      "export POSTGRES_PASSWORD_PREVIOUS='" + change.previous + "'",
+    );
+  });
+
+  it("offers the outgoing value only while the change is in flight", () => {
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).not.toContain(
+      "_PREVIOUS",
+    );
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).toContain(
+      "_PREVIOUS",
+    );
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).not.toContain(
+      "_PREVIOUS",
+    );
+  });
+
+  it("puts a value carrying shell syntax through as bytes", () => {
+    const nasty = "a'; rm -rf /; echo '";
+    secrets.requestSecret(APP, { name: "AWKWARD", why: "x" });
+    secrets.establishSecret(APP, "AWKWARD", nasty);
+    const environment = secrets.secretEnvironment(APP, ["AWKWARD"]);
+    // Single-quoted with POSIX escaping, so the shell never parses it. Run it
+    // to be sure rather than asserting a shape: the variable must come back
+    // byte-for-byte and no second command may run.
+    const echoed = execFileSync(
+      "sh",
+      ["-c", environment + 'printf %s "$AWKWARD"'],
+      { encoding: "utf8" },
+    );
+    expect(echoed).toBe(nasty);
+  });
+});
+
+describe("a second change while one is in flight", () => {
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("is refused, rather than discarding the password that still works", () => {
+    // Before this was refused, the second begin overwrote the predecessor
+    // with the first change's unproven value. Rolling back then restored a
+    // password nothing had ever accepted, and the application was locked out
+    // by the very mechanism meant to prevent it. A retried turn is the
+    // ordinary way to reach this.
+    const original = secrets.revealSecret(APP, "POSTGRES_PASSWORD").value;
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(() => secrets.beginChange(APP, "POSTGRES_PASSWORD")).toThrow(
+      /already part-way through/,
+    );
+    // And the working value is still the one that comes back.
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", false);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(original);
+  });
+
+  it("lets a change begin again once the first is settled", () => {
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    const second = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    expect(second.changing).toBe(true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
+      second.next,
+    );
+  });
+});

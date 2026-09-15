@@ -18,8 +18,13 @@ import type { SavedInformation } from "@/server/operator-data";
 import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 
 import type { PageChrome } from "./architecture-prototype/index";
-import { protectionFromRecords } from "./backups-records";
+import {
+  destinationMeaning,
+  protectionFromRecords,
+  protectionVerdict,
+} from "./backups-records";
 import { ControllerProtectionBand } from "./controller-protection";
+import { ProtectionBanner } from "./protection-banner";
 import { CalendarDirection } from "./backup-prototype/calendar";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
@@ -56,9 +61,17 @@ export function BackupsPage({
     () => storageFromRecords({ records, applicationId, now }),
     [records, applicationId, now],
   );
-  const assessed = useMemo(
-    () => protectionFromRecords(records, now).assessed,
+  const protection = useMemo(
+    () => protectionFromRecords(records, now),
     [records, now],
+  );
+  const assessed = protection.assessed;
+  // The one verdict the page leads with. It is deliberately not derived from
+  // the calendar below it: the calendar shows what happened, and this says
+  // what that adds up to, which is the question a reader arrives with.
+  const verdict = useMemo(
+    () => protectionVerdict(protection, now),
+    [protection, now],
   );
   const server = useMemo(() => {
     const live = records.filter((record) => !record.retiredAt);
@@ -132,7 +145,15 @@ export function BackupsPage({
         story={story}
         now={now}
         head={head}
-        activity={null}
+        activity={
+          <ProtectionBanner
+            verdict={verdict}
+            protection={protection}
+            meaning={destinationMeaning}
+            now={now}
+            onAsk={onAsk}
+          />
+        }
         server={server}
         controller={controller}
         controllerBand={

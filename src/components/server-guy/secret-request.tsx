@@ -44,6 +44,16 @@ export interface SecretRequest {
   process: string | null;
   requestedAt: string;
   establishedAt: string | null;
+  /**
+   * Who chose the current value. `generated` is the only one the owner can
+   * ask to see: they have never seen it, and it is in the service it
+   * authenticates to and nowhere else they can reach.
+   */
+  origin?: "owner" | "generated";
+  /** How many times this name's value has been replaced. */
+  revision?: number;
+  /** A replacement is part-way through and not yet proven. */
+  changing?: boolean;
 }
 
 /**

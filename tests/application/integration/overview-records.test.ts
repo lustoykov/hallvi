@@ -28,6 +28,7 @@ function record(input: {
   role?: "recommendation" | "status" | "outcome";
   nextStep?: string;
   checks?: NonNullable<SavedInformation["presentation"]>["checks"];
+  facts?: { key: string; value: string }[];
 }): SavedInformation {
   return {
     id: input.id,
@@ -42,6 +43,13 @@ function record(input: {
       role: input.role ?? "outcome",
       status: input.status ?? "verified",
       checks: input.checks ?? [],
+      facts: (input.facts ?? []).map((fact) => ({
+        key: fact.key,
+        label: fact.key,
+        value: fact.value,
+        claim: "configuration" as const,
+        basis: "observed" as const,
+      })),
       nextStep: input.nextStep,
     },
     createdAt: AT,
@@ -262,7 +270,7 @@ describe("what is true now", () => {
       (v) => v.id === "backups",
     )!;
     expect(vital.status.certainty).toBe("absent");
-    expect(vital.status.text).toBe("Not set up");
+    expect(vital.status.text).toBe("Nothing backs this up");
   });
 
   it("reads a declared absence even when it has no check", () => {
@@ -277,7 +285,7 @@ describe("what is true now", () => {
       (v) => v.id === "backups",
     )!;
     expect(vital.status.certainty).toBe("absent");
-    expect(vital.status.text).toBe("Not set up");
+    expect(vital.status.text).toBe("Nothing backs this up");
   });
 
   it("reserves no countdown, because no recurrence can be written yet", () => {
@@ -402,7 +410,10 @@ describe("a backup plan that is set up and protects less than its name implies",
     expect(lane?.status.certainty).not.toBe("verified");
     expect(lane?.status.certainty).toBe("warning");
     expect(lane?.value).toBe("Limited");
-    expect(lane?.status.text).toBe("Set up, with a limit");
+    // Named for what is missing rather than for the fact of a limit: there is
+    // a schedule on record and no copy anywhere, which is the more useful
+    // half of the sentence.
+    expect(lane?.status.text).toBe("Scheduled, no copy yet");
   });
 
   it("keeps Pi's own sentence about what the limit is", () => {
@@ -451,9 +462,12 @@ describe("a backup plan that is set up and protects less than its name implies",
     expect(lane?.status.certainty).toBe("failed");
   });
 
-  it("a plan Pi is content with still reads verified", () => {
-    // The fix must not paint every backup plan amber.
-    const offsite = record({
+  it("a plan Pi is content with, and has carried out, reads verified", () => {
+    // The fix must not paint every backup plan amber. What earns verified is
+    // the plan plus the evidence: a copy that left the host and a restore
+    // that was actually tried. A schedule on its own never reads verified,
+    // however content Pi is with it — that is the whole point of the verdict.
+    const plan = record({
       id: "offsite",
       status: "verified",
       states: {
@@ -470,7 +484,29 @@ describe("a backup plan that is set up and protects less than its name implies",
         },
       ],
     });
-    const lane = overview([offsite], TEN_MINUTES_ON).vitals.find(
+    const copy = record({
+      id: "offsite-copy",
+      at: "2026-09-14T15:00:00.000Z",
+      status: "verified",
+      states: {
+        ref: { kind: "backup-copy", id: "shop-offsite-1" },
+        presence: "present",
+      },
+      facts: [
+        { key: "destination-kind", value: "off-site" },
+        { key: "destination", value: "the computer running Server Guy" },
+      ],
+    });
+    const restore = record({
+      id: "offsite-restore",
+      at: "2026-09-14T16:00:00.000Z",
+      status: "verified",
+      states: {
+        ref: { kind: "restore-test", id: "shop-offsite-restore" },
+        presence: "present",
+      },
+    });
+    const lane = overview([plan, copy, restore], TEN_MINUTES_ON).vitals.find(
       (vital) => vital.id === "backups",
     );
     expect(lane?.status.certainty).toBe("verified");

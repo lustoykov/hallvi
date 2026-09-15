@@ -50,6 +50,11 @@ import { z } from "zod";
 import { piConfigDir } from "./pi-configuration";
 
 export interface SecretRequest {
+  /**
+   * A replacement is part-way through and not yet proven. A page showing this
+   * must not report the credential as settled either way.
+   */
+  changing?: boolean;
   /** The environment variable name, which is also the handle's name. */
   name: string;
   /** Why the application needs it, in Pi's words, for the owner to judge. */
@@ -59,11 +64,33 @@ export interface SecretRequest {
   requestedAt: string;
   /** When a value was supplied. Null means the request is still open. */
   establishedAt: string | null;
+  /**
+   * Where the current value came from.
+   *
+   * `owner` means they typed it and the controller has never seen another;
+   * `generated` means the controller made it, which is the only case where
+   * revealing it tells the owner something they do not already know. The
+   * distinction drives the UI: there is no point offering to reveal a value
+   * the owner chose, and every point in offering it for one they did not.
+   */
+  origin: "owner" | "generated";
+  /** How many times this name's value has been replaced. */
+  revision: number;
 }
 
 interface Stored extends SecretRequest {
   /** iv:tag:ciphertext, base64. Absent until the owner supplies a value. */
   sealed: string | null;
+  /**
+   * The value being replaced, kept only while a change is in flight.
+   *
+   * Changing a database password is several steps that can fail between them,
+   * and the one unrecoverable outcome is losing the password that still works
+   * before the new one does. This holds the outgoing value until the new one
+   * is proven, and is cleared the moment it is. It is deliberately not a
+   * history: one predecessor, for exactly as long as it can still be needed.
+   */
+  previous?: { sealed: string; since: string } | null;
 }
 
 const NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
@@ -180,6 +207,8 @@ export function requestSecret(
       process: request.process ?? null,
       requestedAt: new Date().toISOString(),
       establishedAt: null,
+      origin: "owner",
+      revision: 0,
       sealed: null,
     });
   write(applicationId, held);
@@ -191,10 +220,17 @@ export function requestSecret(
 
 /** What the owner and every page may see: names and states, never values. */
 export function listSecrets(applicationId: string): SecretRequest[] {
-  return read(applicationId).map(({ sealed, ...rest }) => ({
-    ...rest,
-    establishedAt: sealed ? rest.establishedAt : null,
-  }));
+  return read(applicationId).map(({ sealed, previous, ...rest }) => {
+    void previous;
+    return {
+      ...rest,
+      // Records written before origin existed were all owner-supplied.
+      origin: rest.origin ?? "owner",
+      revision: rest.revision ?? (sealed ? 1 : 0),
+      establishedAt: sealed ? rest.establishedAt : null,
+      changing: Boolean(previous),
+    };
+  });
 }
 
 /** The owner supplies a value. The only way one ever enters the controller. */
@@ -219,7 +255,205 @@ export function establishSecret(
     );
   found.sealed = seal(value);
   found.establishedAt = new Date().toISOString();
+  found.origin = "owner";
+  found.revision = (found.revision ?? 0) + 1;
   write(applicationId, held);
+}
+
+/**
+ * How much randomness a generated credential carries.
+ *
+ * 24 bytes is 192 bits, encoded base64url into 32 characters. base64url is
+ * chosen over a wider alphabet on purpose: every character in it survives a
+ * connection string, a shell word, a YAML scalar and a URL without escaping,
+ * and a password that has to be escaped somewhere is a password that will one
+ * day be escaped wrongly. No character class rules are applied, because
+ * complexity rules lower entropy rather than raise it.
+ */
+const GENERATED_BYTES = 24;
+
+/**
+ * The controller makes a credential and tells Pi only its name.
+ *
+ * Pi must not author passwords: a model's output is in its context, its
+ * transcript and every artifact made from either, and "generate something
+ * random" is not a thing a language model can do. So the controller generates,
+ * seals and keeps it, and hands back a reference — the same reference shape
+ * an owner-supplied secret has, so everything downstream is unchanged.
+ *
+ * **Asking twice does not make a second password.** A retried turn, a
+ * restarted worker or a second deployment attempt all call this again, and
+ * generating afresh each time would leave the running application
+ * authenticating with a value the controller had already replaced. An
+ * established value is returned as it stands, and the caller is told it was
+ * reused so it does not report a rotation that did not happen.
+ */
+export function generateSecret(
+  applicationId: string,
+  request: { name: string; why: string; process?: string | null },
+) {
+  if (!NAME.test(request.name))
+    throw new Error(
+      `"${request.name}" is not a usable name. Use the environment variable ` +
+        `the application reads, in capitals with underscores, such as ` +
+        `POSTGRES_PASSWORD.`,
+    );
+  const held = read(applicationId);
+  const existing = held.find((item) => item.name === request.name);
+  if (existing?.sealed) {
+    existing.why = request.why;
+    existing.process = request.process ?? existing.process;
+    write(applicationId, held);
+    return {
+      handle: `{{secret:${request.name}}}`,
+      name: request.name,
+      reused: true,
+      origin: existing.origin ?? "owner",
+      length: 0,
+      establishedAt: existing.establishedAt,
+    };
+  }
+  const value = randomBytes(GENERATED_BYTES).toString("base64url");
+  const now = new Date().toISOString();
+  const record: Stored = {
+    name: request.name,
+    why: request.why,
+    process: request.process ?? null,
+    requestedAt: existing?.requestedAt ?? now,
+    establishedAt: now,
+    origin: "generated",
+    revision: (existing?.revision ?? 0) + 1,
+    sealed: seal(value),
+    previous: null,
+  };
+  if (existing) Object.assign(existing, record);
+  else held.push(record);
+  write(applicationId, held);
+  // Length, not the value: enough for Pi to say "a 32-character password was
+  // generated" without the password being in the sentence.
+  return {
+    handle: `{{secret:${request.name}}}`,
+    name: request.name,
+    reused: false,
+    origin: "generated" as const,
+    length: value.length,
+    establishedAt: now,
+  };
+}
+
+/**
+ * The value, for the owner, once, because they asked.
+ *
+ * This is the only function that returns a stored secret to a caller that can
+ * display it, and it exists because a generated password the owner cannot read
+ * is a password they do not have: it is in their database and nowhere else
+ * they can reach. Withholding it is not security, it is losing their
+ * credential on their behalf.
+ *
+ * Only generated values are revealable. A value the owner typed tells them
+ * nothing they do not know, and reading it back would turn the store into an
+ * oracle for secrets it was given in confidence.
+ */
+export function revealSecret(applicationId: string, name: string) {
+  const found = read(applicationId).find((item) => item.name === name);
+  if (!found?.sealed) throw new Error(`No value is held for ${name}.`);
+  if ((found.origin ?? "owner") !== "generated")
+    throw new Error(
+      `${name} is the value you supplied, so Server Guy will not read it ` +
+        `back. Only credentials it generated itself can be revealed.`,
+    );
+  return {
+    name,
+    value: unseal(found.sealed),
+    origin: "generated" as const,
+    establishedAt: found.establishedAt,
+  };
+}
+
+/**
+ * Begin replacing a value, keeping the one that still works.
+ *
+ * Returns both, because the caller changing a database password needs the old
+ * one to authenticate the change and the new one to set. Nothing is marked
+ * current here: `settleChange` does that, and only once the new value has been
+ * shown to work.
+ */
+export function beginChange(
+  applicationId: string,
+  name: string,
+  supplied?: string,
+) {
+  const held = read(applicationId);
+  const found = held.find((item) => item.name === name);
+  if (!found?.sealed)
+    throw new Error(
+      `No value is held for ${name}, so there is none to change.`,
+    );
+  // A second change while one is in flight used to overwrite the predecessor
+  // with the first change's unproven value — so rolling back restored a
+  // password nothing had ever accepted, and $NAME_PREVIOUS exported one too.
+  // A retried turn, or a restart followed by a retry, is the ordinary way to
+  // reach this, which is what makes refusing better than guessing which of
+  // the two to keep.
+  if (found.previous)
+    throw new Error(
+      `A change to ${name} is already part-way through, and the value that ` +
+        `still works is being held for it. Settle that one first: ` +
+        `settle_credential_change with established true if you have proved ` +
+        `the new value against the service, or false to put the working one ` +
+        `back. Then begin again.`,
+    );
+  if (supplied !== undefined && supplied.length < MINIMUM_LENGTH)
+    throw new Error(
+      `Server Guy holds secrets of at least ${MINIMUM_LENGTH} characters.`,
+    );
+  const next = supplied ?? randomBytes(GENERATED_BYTES).toString("base64url");
+  const current = unseal(found.sealed);
+  found.previous = { sealed: found.sealed, since: new Date().toISOString() };
+  found.sealed = seal(next);
+  found.establishedAt = new Date().toISOString();
+  found.origin = supplied === undefined ? "generated" : "owner";
+  found.revision = (found.revision ?? 0) + 1;
+  write(applicationId, held);
+  return { name, previous: current, next, changing: true };
+}
+
+/**
+ * Finish a change: keep the new value and forget the old one, or put the old
+ * one back.
+ *
+ * `established` means the new credential has been proven against the thing it
+ * authenticates to — not that a command exited zero. Rolling back restores the
+ * predecessor exactly, which is what makes a half-finished change recoverable
+ * rather than a locked-out application.
+ */
+export function settleChange(
+  applicationId: string,
+  name: string,
+  established: boolean,
+) {
+  const held = read(applicationId);
+  const found = held.find((item) => item.name === name);
+  if (!found) throw new Error(`No value is held for ${name}.`);
+  if (!found.previous) return { name, settled: established, rolledBack: false };
+  if (established) {
+    // Deleted rather than nulled: the predecessor's ciphertext should not be
+    // in the file, and neither should a field implying one is kept.
+    delete found.previous;
+  } else {
+    found.sealed = found.previous.sealed;
+    delete found.previous;
+    found.revision = Math.max(0, (found.revision ?? 1) - 1);
+  }
+  write(applicationId, held);
+  return { name, settled: established, rolledBack: !established };
+}
+
+/** Whether a change is in flight, for a page that must not claim success. */
+export function changeInFlight(applicationId: string, name: string) {
+  return Boolean(
+    read(applicationId).find((item) => item.name === name)?.previous,
+  );
 }
 
 /**
@@ -242,14 +476,40 @@ export function withdrawSecret(applicationId: string, name: string) {
 }
 
 /**
+ * The current value of each name, and the one being replaced where there is
+ * one. Separate from `values()` because that one deliberately flattens both
+ * for redaction, and an environment must not: a Map built from the flattened
+ * list keeps whichever came last, which would silently export the outgoing
+ * password as `$NAME` for the duration of every change.
+ */
+function currentAndPrevious(applicationId: string) {
+  const current = new Map<string, string>();
+  const previous = new Map<string, string>();
+  for (const item of read(applicationId)) {
+    if (item.sealed) current.set(item.name, unseal(item.sealed));
+    if (item.previous?.sealed)
+      previous.set(item.name, unseal(item.previous.sealed));
+  }
+  return { current, previous };
+}
+
+/**
  * Every value this application holds, for scanning output. Never returned to
  * a caller that could show it — the two callers are handle resolution and
  * redaction, both inside the privileged layer.
  */
 function values(applicationId: string) {
-  return read(applicationId)
-    .filter((item): item is Stored & { sealed: string } => Boolean(item.sealed))
-    .map((item) => ({ name: item.name, value: unseal(item.sealed) }));
+  const held: { name: string; value: string }[] = [];
+  for (const item of read(applicationId)) {
+    if (item.sealed) held.push({ name: item.name, value: unseal(item.sealed) });
+    // The value being replaced counts too. While a change is in flight both
+    // are live — the old one still authenticates and the new one is being
+    // installed — so a command's output can contain either, and redaction
+    // that only knew the new one would print the old one in the clear.
+    if (item.previous?.sealed)
+      held.push({ name: item.name, value: unseal(item.previous.sealed) });
+  }
+  return held;
 }
 
 /**
@@ -270,21 +530,26 @@ function values(applicationId: string) {
  */
 export function secretEnvironment(applicationId: string, names: string[]) {
   if (!names.length) return "";
-  const held = new Map(
-    values(applicationId).map((item) => [item.name, item.value]),
-  );
-  const missing = names.filter((name) => !held.has(name));
+  const { current, previous } = currentAndPrevious(applicationId);
+  const missing = names.filter((name) => !current.has(name));
   if (missing.length)
     throw new Error(
       `No value has been supplied for ${missing.join(", ")}. Ask for it with ` +
-        `request_secret and wait for the owner to fill it in; do not ` +
-        `substitute a value of your own.`,
+        `request_secret, or have the controller make one with ` +
+        `generate_secret, and do not substitute a value of your own.`,
     );
-  return (
-    names
-      .map((name) => `export ${name}=${posixQuote(held.get(name)!)}`)
-      .join("\n") + "\n"
+  const lines = names.map(
+    (name) => `export ${name}=${posixQuote(current.get(name)!)}`,
   );
+  // While a change is in flight the outgoing value is still the one the
+  // service accepts, and a script that has to authenticate in order to change
+  // the password needs it. It is exported under its own name so nothing can
+  // confuse the two: $NAME is always what the credential is becoming.
+  for (const name of names) {
+    const outgoing = previous.get(name);
+    if (outgoing) lines.push(`export ${name}_PREVIOUS=${posixQuote(outgoing)}`);
+  }
+  return lines.join("\n") + "\n";
 }
 
 /** `it's` → `'it'\''s'`. The only escaping a single-quoted shell word needs. */

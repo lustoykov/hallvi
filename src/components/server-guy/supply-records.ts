@@ -209,13 +209,20 @@ export function supplyFromRecords({
         // The application when the map does not know the scope: echoing the
         // id back reads "shop-web · shop-web", which says nothing twice.
         product: (scope ? partOf(scope)?.name : null) ?? applicationName,
+        // The store knows who chose the value; a record's `source` prose is a
+        // description of it. Prefer the store, which cannot disagree with
+        // itself, and fall back to the prose only for values no secret backs.
         who: asked
-          ? ("you" as const)
+          ? asked.origin === "generated"
+            ? ("generated" as const)
+            : ("you" as const)
           : source && /generat/i.test(source)
             ? ("generated" as const)
             : source && /connect/i.test(source)
               ? ("connection" as const)
               : ("plan" as const),
+        revealable:
+          asked?.origin === "generated" && Boolean(asked.establishedAt),
         // A secret is held by the controller; an ordinary value is in the
         // release. Either way its content is not here.
         held: Boolean(asked),
@@ -242,10 +249,15 @@ export function supplyFromRecords({
         product:
           (secret.process ? partOf(secret.process)?.name : null) ??
           applicationName,
-        who: "you",
+        who: secret.origin === "generated" ? "generated" : "you",
         held: true,
+        revealable:
+          secret.origin === "generated" && Boolean(secret.establishedAt),
+        changing: secret.changing,
         where: secret.establishedAt
-          ? "Kept sealed on this computer; put in as the command runs"
+          ? secret.origin === "generated"
+            ? "Generated and sealed on this computer; put in as the command runs"
+            : "Kept sealed on this computer; put in as the command runs"
           : "Waiting for you",
         why: secret.why,
         pending: !secret.establishedAt,

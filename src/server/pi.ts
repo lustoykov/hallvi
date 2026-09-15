@@ -2,16 +2,24 @@ import { hetzner, hetznerConnectionId } from "./hetzner";
 import { serverPublicKey, connectServer } from "./server-access";
 import { openServerPort } from "./private-access";
 import {
+  fetchBackupCopy,
+  listBackupCopies,
+  pruneBackupCopies,
+} from "./backup-store";
+import {
   cloudflareDomain,
   removeDomainRecord,
   writeDomainRecord,
 } from "./cloudflare";
 import { checkPublicAccess } from "./public-access";
 import {
+  beginChange,
+  generateSecret,
   listSecrets,
   refuseSecretHandles,
   requestSecret,
   secretEnvironment,
+  settleChange,
 } from "./application-secrets";
 import {
   listInformation,
@@ -84,7 +92,7 @@ Permissions are independent of the task. In Always ask, the executor requests ap
 
 Use judgment to avoid unnecessary downtime, data loss and spending. Inspect before making assumptions. If a command fails or its outcome is unknown, investigate using your general tools and decide how to proceed. A successful command does not prove the application works: check the result.
 
-Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold — an admin password, an API key, a token — call request_secret, then list its name in server_bash's secrets argument and refer to it in your script as an ordinary variable such as "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs, so the value never appears in the command, the record, the activity or the log. Do not write a value or a handle into the command text: a value spliced into a command is shell syntax rather than data. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
+Read current application information when it matters. Execution history is timestamped evidence, not a fresh health check. The workspace is a disposable repository snapshot, not the server. Controller credentials stay outside your tools. Never ask the user to paste secrets into chat. When an application needs a value you must not hold, there are two cases and they are not interchangeable. A value only the owner has — their API key, a token for their account, a password they already chose — is request_secret, which asks them for it. A value nobody needs to have chosen, such as a database role's password or an internal service token, is generate_secret: the controller makes it from the system random source and keeps it, and you never see it. Never author a password yourself and never reuse one from an example. Either way, list its name in server_bash's secrets argument and refer to it in your script as an ordinary variable such as "$POSTGRES_PASSWORD". The privileged layer exports it before your script runs, so the value never appears in the command, the record, the activity or the log. Do not write a value or a handle into the command text: a value spliced into a command is shell syntax rather than data. There is no tool that reads a value back, and there must never be one in a record: state the variable as a subject with source and established facts, and never its value.
 
 Save information worth preserving with save_information: discoveries costly to rediscover, preferences, recommendations and consequential outcomes. Search saved information when needed. Omit presentation for working knowledge. To surface a record, provide presentation.views and role; the product renders the same record in those views and, when showInChat is true, in this reply. Use a separate outcome for each historical event; update ordinary knowledge in place. Retire stale records. A deployment handover should save the application URL and verification evidence. Saved preferences never change permission settings. Never save secrets. Sidebar destinations are overview, architecture, deployment, history, processes, database, cache, jobs, storage, backups, logs, monitoring, domains, cdn, security, variables.
 
@@ -96,7 +104,7 @@ Write each record as what you looked at this time, not as a snapshot, and never 
 
 When you have checked the application itself, record its condition as a record that states it: states {ref:{kind:"application",id:"<the application id>"},presence:"present"} with the checks your evidence establishes, and set establishedAt to when you gathered that evidence rather than when you are writing. A deployment outcome speaks for none of the things it touched, so without this nothing says whether the application is working, and Overview correctly reads it as not assessed. Keeping the original time is the point: evidence gathered an hour ago is an hour old however recently it was written down, and the page says so instead of reassuring the reader.
 
-Architecture reads particular keys, so use these whenever the evidence gives them: on a host, the ssh check and the address, region, size, server-id and os facts; on a web process, the http and container checks and the image, port and revision facts; on a private process, use reachable instead of http; on a volume, the persistence check and the path fact; on a door, the refused or open check and the port and sources facts; on a certificate, the valid check and the expires fact; on a monitor, the answering check and the target fact. A key outside that list is still saved and still readable as a detail, but it does not decide what a page says about a part. The destination pages read the same way: on a database, the answering check and the engine, version, path, size and owner facts, where owner is the id of the process that runs it and not a filesystem uid; on a cache, answering and engine, version, persistence and port; on a queue, draining and library, backend, depth, oldest, failed and workers; on a job, ran and schedule, command, timezone, last-run and next-run; on a variable, no check and the source, scope and established facts and never a value; on a backup-plan, configured and schedule, destination, keep and covers, where covers is a comma-separated list of the subject ids the plan protects — the volume ids, or the database id whose files live in one — and not a description, because a page matches ids and cannot match prose; on a backup-copy, written and verified with size, destination and covers; on a restore-test, restored with covers and took; on a domain, the configured, resolves and serves checks with name, registrar, type, origin, proxied, nameservers and records facts, and these are three different questions: configured is what the provider holds for the name, resolves is what public DNS returns for it, and serves is whether the application itself answers when someone asks for that name over HTTP. A configured record never answers the third one. A proxied name is worse still: the provider answers for it, so it resolves to the provider's addresses and serves the provider's certificate while the origin behind it is dead, and reporting that as working is the single worst thing this page can do. Record serves as failed, with what you got, when the name is configured and the application does not answer through it; on a cdn, the caching and origin-reachable checks with provider, zone, origin and covers facts, where origin-reachable is whether the cache can get an answer out of the origin behind it; on a firewall, configured with provider, default and rules; on a monitor, also interval and notifies; on a certificate, also issuer and covers; on a host, cpu, memory and disk for what the machine has and cpu-used, memory-used and disk-used for what it is doing now — capacity is configuration you were told and a reading is contents you observed, and one key for both makes a monitoring page show a spec sheet and call it a measurement; on a process, also product, role, command, health, restarts, cpu-used and memory-used. Processes and Storage are read from these subjects and not from the map: the map draws shapes, and only a record stating a process or a volume says one exists. So when you have found out what runs, state each process; when you have found out where data lives, state each volume, and say with a persistence check whether it actually survived the container being replaced rather than leaving a reader to assume a volume implies it. The same holds for the rest: state a database when the application has one and record whether it answers, a cache and a queue when it has those, a job for anything that runs on a schedule, and a variable for each piece of configuration. Record a next-run only if you actually know it; never work one out from a cron expression, because a page cannot show that it guessed. A queue with no depth fact reads as unmeasured, which is the truth — do not write a depth of zero you did not observe. And when the application genuinely has none of something, say so with presence:"absent" on that subject: silence means nobody looked, which is a different and worse answer.
+Architecture reads particular keys, so use these whenever the evidence gives them: on a host, the ssh check and the address, region, size, server-id and os facts; on a web process, the http and container checks and the image, port and revision facts; on a private process, use reachable instead of http; on a volume, the persistence check and the path fact; on a door, the refused or open check and the port and sources facts; on a certificate, the valid check and the expires fact; on a monitor, the answering check and the target fact. A key outside that list is still saved and still readable as a detail, but it does not decide what a page says about a part. The destination pages read the same way: on a database, the answering check and the engine, version, path, size and owner facts, where owner is the id of the process that runs it and not a filesystem uid; on a cache, answering and engine, version, persistence and port; on a queue, draining and library, backend, depth, oldest, failed and workers; on a job, ran and schedule, command, timezone, last-run and next-run; on a variable, no check and the source, scope and established facts and never a value; on a backup-plan, configured and schedule, destination, destination-kind, keep and covers, where covers is a comma-separated list of the subject ids the plan protects — the volume ids, or the database id whose files live in one — and not a description, because a page matches ids and cannot match prose, and destination-kind is exactly one of same-server, controller, off-site or provider: this is the one fact that decides what losing the machine would cost, and it cannot be read off the destination's prose, because "/var/backups/shop" and "s3://bucket/shop" are both destinations and one of them dies with the server. A plan that does not declare it reads as unclassified, which the page treats as unproven rather than safe. same-server is beside the application and survives nothing that kills the host; controller is the machine running Server Guy, which survives the application host and depends on that machine; off-site is storage independent of both; provider is the host provider's own whole-disk snapshot, which can rebuild a machine and is not an application-aware copy. Never record a same-host copy as though it were protection from losing the server, and say the limit in the body. On a backup-copy, written and verified with size, destination, destination-kind and covers; on a restore-test, restored with covers and took; on a domain, the configured, resolves and serves checks with name, registrar, type, origin, proxied, nameservers and records facts, and these are three different questions: configured is what the provider holds for the name, resolves is what public DNS returns for it, and serves is whether the application itself answers when someone asks for that name over HTTP. A configured record never answers the third one. A proxied name is worse still: the provider answers for it, so it resolves to the provider's addresses and serves the provider's certificate while the origin behind it is dead, and reporting that as working is the single worst thing this page can do. Record serves as failed, with what you got, when the name is configured and the application does not answer through it; on a cdn, the caching and origin-reachable checks with provider, zone, origin and covers facts, where origin-reachable is whether the cache can get an answer out of the origin behind it; on a firewall, configured with provider, default and rules; on a monitor, also interval and notifies; on a certificate, also issuer and covers; on a host, cpu, memory and disk for what the machine has and cpu-used, memory-used and disk-used for what it is doing now — capacity is configuration you were told and a reading is contents you observed, and one key for both makes a monitoring page show a spec sheet and call it a measurement; on a process, also product, role, command, health, restarts, cpu-used and memory-used. Processes and Storage are read from these subjects and not from the map: the map draws shapes, and only a record stating a process or a volume says one exists. So when you have found out what runs, state each process; when you have found out where data lives, state each volume, and say with a persistence check whether it actually survived the container being replaced rather than leaving a reader to assume a volume implies it. The same holds for the rest: state a database when the application has one and record whether it answers, a cache and a queue when it has those, a job for anything that runs on a schedule, and a variable for each piece of configuration. Record a next-run only if you actually know it; never work one out from a cron expression, because a page cannot show that it guessed. A queue with no depth fact reads as unmeasured, which is the truth — do not write a depth of zero you did not observe. And when the application genuinely has none of something, say so with presence:"absent" on that subject: silence means nobody looked, which is a different and worse answer.
 
 For the application's map, put presentation.content={kind:"topology",from:"observed"|"plan",parts:[{id,kind,name,role,plain}],edges:[{from,to,network:"public"|"private"|"loopback"|"disk",label?}]} on a record whose presentation.states names the application. Part kinds are controller, source, gate, tls, host, web, private, volume, offsite and monitor. Parts carry no state, because a part's state is the newest record stating that part: draw the shape here and record the state where it belongs. from:"plan" is the map before anything has run, so a reader can see the intended shape in ghost. Do not add absent to topology; established absence belongs on a separate record with presentation.states.presence="absent". Use loopback for something reachable only through the host's own loopback, which is neither public nor the container network.
 
@@ -521,6 +529,120 @@ export async function askPi(
                   ? null
                   : "The owner has not supplied it yet. It appears as a masked field in the conversation.",
               });
+            },
+          }),
+          defineTool({
+            name: "generate_secret",
+            executionMode: "parallel",
+            label: "Generate a credential",
+            description:
+              "Have the controller generate a credential the application needs and nobody has to type: a database role password, an internal service token. Use this rather than inventing a value yourself — a password you write is in your context, your transcript and every artifact made from either, and it is not random. The controller generates 192 bits from the system random source, seals it, and returns only the name and its length. Name it after the environment variable the application reads, in capitals with underscores, and say in `why` which service uses it. Use it exactly as a supplied secret: list the name in server_bash's secrets argument and refer to it as \"$NAME\". Calling this again for a name that already has a value returns that value's reference and tells you it was reused — it does not make a second password, so a retry cannot leave the running service on a value the controller has replaced. There is no tool that reads it back; the owner can reveal it in the application's own pages. To replace an established credential, do not call this: changing one is an operational change that has to reach the service too.",
+            parameters: Type.Object({
+              name: Type.String(),
+              why: Type.String(),
+              process: Type.Optional(Type.String()),
+            }),
+            async execute(_id, params) {
+              const made = generateSecret(input.run.applicationId, params);
+              return json({
+                ...made,
+                note: made.reused
+                  ? "A value was already established for this name and has been kept. Nothing was regenerated, so do not report a new credential."
+                  : `A ${made.length}-character credential was generated and sealed. You cannot read it; the owner can reveal it from the application's pages.`,
+              });
+            },
+          }),
+          defineTool({
+            name: "begin_credential_change",
+            executionMode: "sequential",
+            label: "Begin a credential change",
+            description:
+              'Start replacing an established credential. The controller generates the replacement and keeps the outgoing value, so during the change server_bash gives you both: "$NAME" is what the credential is becoming, and "$NAME_PREVIOUS" is the one the service still accepts and that you authenticate with in order to change it. Nothing is current yet. Changing a password is an operational change and not an edit to a stored value: update the account on the service itself, update whatever configuration the application reads, restart or reconnect what holds a connection, then prove the new credential works by doing something real with the application — not by a command exiting zero. Then call settle_credential_change. Until you do, the page says a change is part-way through and claims nothing. If you cannot establish it, settle with established:false and the controller puts the working value back, which is the difference between a rolled-back change and a locked-out application. You cannot pass a value, and neither can the owner through you: replacements are generated by the controller. If the owner wants to choose one, say that this version does not support it rather than inventing a way. Only one change per credential at a time, and beginning again is refused while one is unsettled — that refusal is what keeps the working password from being thrown away by a second attempt.',
+            // No value parameter. An owner-chosen replacement reaching the
+            // store by being typed into chat would contradict everything else
+            // here: a value in a message is in the model's context, its
+            // transcript and every artifact made from either. So replacements
+            // are generated-only in this milestone. An owner-supplied
+            // replacement wants its own masked field, and that is a path
+            // worth building when somebody actually needs it rather than
+            // alongside the first one.
+            parameters: Type.Object({ name: Type.String() }),
+            async execute(_id, params) {
+              const started = beginChange(input.run.applicationId, params.name);
+              return json({
+                name: started.name,
+                changing: true,
+                environment: `$${started.name} is the new value; $${started.name}_PREVIOUS is the one still in use.`,
+                next: "Change it on the service, update the application's configuration, restart what reads it, verify the application actually works, then call settle_credential_change.",
+              });
+            },
+          }),
+          defineTool({
+            name: "settle_credential_change",
+            executionMode: "sequential",
+            label: "Settle a credential change",
+            description:
+              'Finish a change you began. established:true keeps the new credential and forgets the old one — say it only when you have proved the new value works against the service and the application behaves, because this is the point after which the old password is gone. established:false restores the working value exactly and leaves the application as it was; use it whenever you are not sure, including when a command failed part-way and you do not know which password the service now has. "The command exited zero" is not proof; "the application answered and its data is there" is.',
+            parameters: Type.Object({
+              name: Type.String(),
+              established: Type.Boolean(),
+              why: Type.String(),
+            }),
+            async execute(_id, params) {
+              const settled = settleChange(
+                input.run.applicationId,
+                params.name,
+                params.established,
+              );
+              return json({
+                ...settled,
+                why: params.why,
+                note: settled.rolledBack
+                  ? "The working value has been put back. The application should still be reachable with it; check that it is, and say what you will do differently."
+                  : "The new credential is current and the old one is gone. Record the change, with what proved it, and never the value.",
+              });
+            },
+          }),
+          defineTool({
+            name: "fetch_backup_copy",
+            executionMode: "sequential",
+            label: "Copy a backup off the server",
+            description:
+              'Pull one file from the application server onto the computer running Server Guy, which is a destination that survives losing the application\'s server. Give an absolute remotePath on the server and say in covers what the copy is of. The controller asks the server for the file\'s size and digest, copies it over the connection it already owns, and checks the digest on arrival: a copy that does not match is deleted rather than kept, so there is never a half-file to mistake for a backup. It returns the size, the digest and the words to use for the destination — record a backup-copy with destination-kind "controller" and those facts. This is not object storage and the record must not imply it is: it depends on this computer existing and being reachable. Say that in the body. Do not use this for a copy that belongs beside the application; that is an ordinary server_bash write with destination-kind "same-server".',
+            parameters: Type.Object({
+              remotePath: Type.String(),
+              covers: Type.String(),
+            }),
+            async execute(_id, params) {
+              return json(
+                await fetchBackupCopy(input.run.applicationId, params),
+              );
+            },
+          }),
+          defineTool({
+            name: "list_backup_copies",
+            executionMode: "parallel",
+            label: "List copies held here",
+            description:
+              "The backup copies held on the computer running Server Guy for this application, newest first, with their sizes and times. Read this before taking another one, so a plan that says it keeps seven copies can be checked against what is actually here rather than what a schedule intended.",
+            parameters: Type.Object({}),
+            async execute() {
+              return json({
+                copies: listBackupCopies(input.run.applicationId),
+              });
+            },
+          }),
+          defineTool({
+            name: "prune_backup_copies",
+            executionMode: "sequential",
+            label: "Apply retention here",
+            description:
+              "Delete the oldest copies held on this computer beyond the number to keep, and report exactly which were removed. Retention is the part of a backup plan that quietly stops working, so it runs where the files are rather than as a line in a host crontab nobody reads. Keep at least one.",
+            parameters: Type.Object({ keep: Type.Number() }),
+            async execute(_id, params) {
+              return json(
+                pruneBackupCopies(input.run.applicationId, params.keep),
+              );
             },
           }),
           defineTool({

@@ -2,7 +2,7 @@
 
 // PROTOTYPE · opus-ui-improvements · chosen for Backups.
 // Calendar: one column a day, from the day before the first thing on record
-// to a week ahead. A row for the copies off the server, a row for each piece
+// to a week ahead. A row for the copies taken, a row for each piece
 // of data saying whether each copy holds it, and a row for restore tests. A
 // day the schedule should have copied but the record doesn't show is dashed,
 // never green. Little Server stands over today; a day opens what is on
@@ -146,7 +146,7 @@ export function CalendarDirection({
   const copiesRow: Row = {
     id: "copies",
     icon: <Archive weight="bold" />,
-    name: "Copies off the server",
+    name: "Copies taken",
     status: `${story.copies.length} on record${keep ? ` · keeps ${keep}` : ""}`,
     c: copy ? (fresh ? "verified" : "stale") : "absent",
     cells: days.map((day): Cell => {
@@ -159,8 +159,8 @@ export function CalendarDirection({
             list.length > 1 ? <b>{list.length}</b> : <Check weight="bold" />,
           title:
             list.length === 1
-              ? "A copy off the server"
-              : `${countWord(list.length)} copies off the server`,
+              ? "A copy was taken"
+              : `${countWord(list.length)} copies were taken`,
           lines: list.map((item) => `${clock(item.at)} · ${item.detail}`),
         };
       if (state === "unknown")
@@ -309,7 +309,7 @@ export function CalendarDirection({
   // ---------- What it says ----------
   const unknownDays = days.filter((day) => copyState(day) === "unknown");
   const say = copy
-    ? `${story.copies.length === 1 ? "One copy" : `${countWord(story.copies.length)} copies`} off the server ${story.copies.length === 1 ? "is" : "are"} on record${keep ? `; the schedule keeps ${keep}` : ""}.`
+    ? `${story.copies.length === 1 ? "One copy" : `${countWord(story.copies.length)} copies`} ${story.copies.length === 1 ? "is" : "are"} on record${keep ? `; the schedule keeps ${keep}` : ""}.`
     : "No copy off the server is on record.";
   const sub = [
     unknownDays.length > 0 &&
