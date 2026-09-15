@@ -1,3 +1,5 @@
+> This document describes the earlier read-only check against a copy of the owner's records. The later [local backup/restore proof](2026-09-15-local-backup-proof.md) verifies the current branch with synthetic data and an actual Pi run. Duplicate Deployment and Backups leads and provider query-string summaries were fixed afterward. The owner's own app remains unchanged; its lack of backups does not prevent local integration verification.
+
 # One journey, across the five destinations
 
 15 September 2026. Branch `claude/cp7-journey` (`051844d`), stacked on

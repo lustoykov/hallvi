@@ -109,3 +109,7 @@ npm run lint    2 pre-existing errors (pi-activity.tsx), unchanged
 The rig, its Linux host container, its MinIO, the disposable application and
 every restored container are all under `tests/results/rig/` and Docker names
 beginning `sg-cp7-` or `notes-`. Nothing outside them was created.
+
+## Final review
+
+Codex inspected the retained local database and confirmed the restore record's `restored-copy` matches the saved backup-copy subject. A focused regression also reproduced an older failed copy incorrectly overriding a newer successful copy in the stage; the stage now follows the newer result. The backup stage, verdict and Deployment hierarchy checks pass together, 57 tests. This does not add real SSH or object-storage verification to the local stand-ins described above.
