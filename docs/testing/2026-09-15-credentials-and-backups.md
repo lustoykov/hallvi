@@ -253,6 +253,19 @@ real defects of the kind this milestone exists to prevent.
   passing timer check. The verdict now carries `judged`, and `temper()` can
   only make an answer less reassuring: it downgrades `verified` to `warning`
   and never overrides a failure.
+- **The export listed one database and captured another.** Raised on
+  re-verification: `exportContents()` looked for `server-guy.db` inside the
+  config directory, while `snapshotDatabase()` reads `databasePath()` —
+  `SERVER_GUY_DB_PATH`, or `cwd/.server-guy`. The defaults, `scripts/dev.mjs`
+  and the rig keep the two together, so it took a script pointed at only one
+  of them to surface it; with them apart, the page described a file the
+  archive would not contain. The listing now resolves the database the same
+  way the snapshot does, and reports its size with the write-ahead log folded
+  in, because the snapshot captures both and the main file alone understates
+  what is in the archive. The test sets the two paths to different
+  directories and asserts the listed byte count is the captured database's:
+  without the fix it reports 4,096 bytes for a database that is 41,208.
+
 - **The lane was dropping the half of the sentence that mattered.** With the
   verdict wired in, `plain` took the verdict's `says` and discarded its
   `limit` — so a lane could read "with a limit" and never say what the limit

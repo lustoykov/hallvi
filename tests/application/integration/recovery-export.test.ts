@@ -278,4 +278,64 @@ describe.skipIf(!gpgAvailable)("the database inside the archive", () => {
     expect(existsSync(join(recovered, "server-guy.db-wal"))).toBe(false);
     expect(existsSync(join(recovered, "server-guy.db-shm"))).toBe(false);
   });
+
+  it("describes the database it will actually capture, wherever it lives", async () => {
+    // The database is the one entry that can sit outside the config
+    // directory. A reviewer pointed a script at a config directory whose
+    // SERVER_GUY_DB_PATH led elsewhere and the listing described one file
+    // while the archive would have carried another — a page disagreeing with
+    // the thing it describes, which is the failure mode this milestone is
+    // about. The defaults, scripts/dev.mjs and the rig all keep the two
+    // together, so nothing but a test like this one holds them together.
+    const elsewhere = mkdtempSync(join(tmpdir(), "sg-db-"));
+    const away = join(elsewhere, "server-guy.db");
+    process.env.SERVER_GUY_DB_PATH = away;
+    const { default: Database } = await import("better-sqlite3");
+    const live = new Database(away);
+    live.pragma("journal_mode = WAL");
+    live.exec("create table rows (id integer primary key, note text)");
+    const insert = live.prepare("insert into rows (note) values (?)");
+    for (let index = 0; index < 7; index++) insert.run(`away ${index}`);
+
+    const listed = recovery
+      .exportContents()
+      .entries.find((entry) => entry.path === "server-guy.db");
+    expect(listed).toBeTruthy();
+    // The size has to be the *away* database's, log included. A config
+    // directory holding its own `server-guy.db` — this one does, with 40
+    // rows in it — makes "is it listed at all?" pass either way, so the
+    // byte count is what actually distinguishes the two files.
+    const expected =
+      statSync(away).size +
+      (existsSync(`${away}-wal`) ? statSync(`${away}-wal`).size : 0);
+    expect(listed!.bytes).toBe(expected);
+    expect(listed!.bytes).not.toBe(
+      statSync(join(controller, "server-guy.db")).size +
+        statSync(join(controller, "server-guy.db-wal")).size,
+    );
+
+    const passphrase = recovery.suggestPassphrase();
+    const written = await recovery.writeRecoveryExport({
+      passphrase,
+      directory: join(controller, "out-away"),
+    });
+    const recovered = openWithoutServerGuy(written.file, passphrase);
+    const restored = new Database(join(recovered, "server-guy.db"), {
+      readonly: true,
+    });
+    try {
+      // The rows from the database the listing described, not the one beside
+      // the config directory.
+      expect(
+        (
+          restored.prepare("select count(*) as n from rows").get() as {
+            n: number;
+          }
+        ).n,
+      ).toBe(7);
+    } finally {
+      restored.close();
+      live.close();
+    }
+  });
 });

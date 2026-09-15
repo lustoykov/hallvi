@@ -128,12 +128,29 @@ export function exportContents(): {
   const entries: ExportEntry[] = [];
   const missing: string[] = [];
   for (const item of INCLUDED) {
-    const full = join(base, item.path);
+    // The database is the one entry whose location is not simply "inside the
+    // config directory": `SERVER_GUY_DB_PATH` can point it elsewhere, and
+    // that is the file `snapshotDatabase` reads. Asking the config directory
+    // about it would let the page list one file while the archive carried
+    // another — the exact kind of disagreement this milestone exists to stop.
+    // The two are together under the defaults, `scripts/dev.mjs` and the
+    // rig, which is why it took a peer pointing a script at only one of them
+    // to notice.
+    const full =
+      item.path === "server-guy.db" ? databasePath() : join(base, item.path);
     if (!existsSync(full)) {
       missing.push(item.path);
       continue;
     }
-    entries.push({ ...item, bytes: sizeOf(full) });
+    // The snapshot folds the write-ahead log into one file, so the main
+    // file's size alone would understate what the archive holds. Neither is
+    // the archive's compressed size, which nothing can know before writing
+    // it; this is the footprint of the live database being captured.
+    const bytes =
+      item.path === "server-guy.db"
+        ? sizeOf(full) + (existsSync(`${full}-wal`) ? sizeOf(`${full}-wal`) : 0)
+        : sizeOf(full);
+    entries.push({ ...item, bytes });
   }
   return { entries, missing };
 }
