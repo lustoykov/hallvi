@@ -93,6 +93,7 @@ export function DeploymentPage({
   );
 
   const releases = useMemo(() => releasesFromRecords(records, ""), [records]);
+  const hasReleases = releases.all.length > 0;
 
   return (
     <div className="ax-root" data-variant="transit">
@@ -105,10 +106,15 @@ export function DeploymentPage({
               bar={chrome.bar}
               title="Deployment"
               name={story.name}
+              // The release panel an inch below owns the way in on this page:
+              // the state, the address and the one control. The header offers
+              // it everywhere else, and offering it here too put two reopen
+              // buttons and the same sentence twice on one screen.
+              //
               // Offered only while a release is standing; a failed or
               // unfinished one has nothing to open.
               openUrl={
-                story.state === "live"
+                story.state === "live" && !hasReleases
                   ? (access?.presentation?.url ?? null)
                   : null
               }
@@ -120,7 +126,7 @@ export function DeploymentPage({
                 The story below is the attempt's phases, which is the right
                 answer to "what just happened" and the wrong one to "what is
                 running" whenever those are different records. */}
-            {releases.all.length > 0 && (
+            {hasReleases && (
               <ReleasesPanel
                 view={releases}
                 now={now}

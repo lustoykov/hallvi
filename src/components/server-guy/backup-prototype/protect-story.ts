@@ -93,5 +93,13 @@ export interface ProtectProps {
   controller?: import("@/server/application-facts").ControllerProtectionFacts;
   /** What that row needs the owner to know or do, drawn under the board. */
   controllerBand?: import("react").ReactNode;
+  /**
+   * Whether this draws the page's summary and its primary action.
+   *
+   * False where something above it already answers "are we backed up" and
+   * offers the one thing to do about it. The board then keeps only what is
+   * its own: which days hold a copy, and which are unaccounted for.
+   */
+  lede?: boolean;
   onAsk: (draft: string) => void;
 }

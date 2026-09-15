@@ -175,10 +175,15 @@ export function ProtectionBanner({
             {/* Coverage, which is the part most often incomplete and least
                 often mentioned: a plan that copies the database and not the
                 uploads is a plan with a hole in it. */}
+            {/* In the owner's words. This printed `covers shop-postgres`,
+                which is the id a page matches on and not a thing anybody
+                calls their data. */}
             <small>
-              {covers.size
-                ? `covers ${[...covers.keys()].join(", ")}`
-                : "nothing says what it covers"}
+              {protection.coverLabels.length
+                ? `covers ${protection.coverLabels.join(", ")}`
+                : covers.size
+                  ? `covers ${[...covers.keys()].join(", ")}`
+                  : "nothing says what it covers"}
             </small>
           </dd>
         </div>

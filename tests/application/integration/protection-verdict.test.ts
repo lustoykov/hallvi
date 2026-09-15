@@ -635,3 +635,161 @@ describe("evidence belongs to the copy that carries it", () => {
     expect(protection.copies[1].kind).toBe("off-site");
   });
 });
+
+describe("a plan that is on record, and a record saying there is none", () => {
+  it("does not count an established absence as a plan", () => {
+    // `plans` is every subject a record speaks about, which includes one
+    // whose whole content is "there is no plan". Counting those meant an
+    // application Server Guy had checked and found unprotected read as
+    // planned — latent in the verdict and live the moment anything else
+    // asked the question.
+    const absent = record({
+      id: "looked",
+      ref: { kind: "backup-plan", id: "daily" },
+      presence: "absent",
+      status: "warning",
+      title: "Nothing is copying this application's data",
+    });
+    const protection = protectionFromRecords([absent], NOW);
+    expect(protection.declaredAbsent).toBe(true);
+    expect(protection.planned).toBe(false);
+  });
+
+  it("still counts a plan that is stated", () => {
+    expect(protectionFromRecords([plan("off-site")], NOW).planned).toBe(true);
+  });
+});
+
+describe("the owner's words for what is copied", () => {
+  it("prints what a volume says it holds, not the id a page matches on", () => {
+    const volume = record({
+      id: "volume-shop-uploads",
+      ref: { kind: "volume", id: "shop-uploads" },
+      title: "shop-uploads is on disk",
+      facts: [{ key: "holds", value: "Customer uploads" }],
+    });
+    const covering = record({
+      id: "plan",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: "shop-uploads" },
+      ],
+    });
+    const protection = protectionFromRecords([covering, volume], NOW, APP);
+    expect(protection.coverLabels).toEqual(["Customer uploads"]);
+    expect(protection.names.get("shop-uploads")).toBe("Customer uploads");
+  });
+
+  it("leaves an id nothing names as itself", () => {
+    // Honest, and also a sign that nobody has written that subject down.
+    const covering = record({
+      id: "plan",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: "shop-mystery" },
+      ],
+    });
+    expect(protectionFromRecords([covering], NOW, APP).coverLabels).toEqual([
+      "shop-mystery",
+    ]);
+  });
+});
+
+describe("a failed check on a plan is not a failed backup attempt", () => {
+  // Found on a live Pi run: a plan record saying there is no plan, with a
+  // failed `configured` check, and a copy taken three minutes ago. The page
+  // led with "The last backup attempt failed" directly above a stage saying
+  // the latest backup succeeded, and the two were reading the same records.
+  const brokenPlan = record({
+    id: "broken",
+    status: "warning",
+    ref: { kind: "backup-plan", id: "daily" },
+    title: "Nothing backs this up",
+    presence: "absent",
+    checks: [
+      {
+        key: "configured",
+        label: "Off-server backup plan is configured",
+        status: "failed",
+        claim: "configuration",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("does not claim an attempt when nothing attempted anything", () => {
+    // A record stating the plan is absent is answered by the absence, which
+    // is the more specific thing to say than that a check failed.
+    const said = verdict([brokenPlan]);
+    expect(said.says).not.toContain("attempt failed");
+    expect(said.says).toContain("there is no backup");
+  });
+
+  it("a plan that exists and whose check failed says the plan is broken", () => {
+    const stopped = record({
+      id: "stopped",
+      status: "warning",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "The backup timer is not running",
+      checks: [
+        {
+          key: "configured",
+          label: "Daily backup timer is active",
+          status: "failed",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ],
+    });
+    const said = verdict([stopped]);
+    expect(said.says).toBe("The backup plan is not working.");
+    expect(said.says).not.toContain("attempt failed");
+    expect(said.tone).toBe("failed");
+  });
+
+  it("never invents a plan the records say is absent", () => {
+    // The live rig: a record saying there is no plan, with a failed check,
+    // and a copy that was taken and restored. The page said the plan was not
+    // working an inch above a stage saying there was no plan.
+    const said = verdict([brokenPlan, copy("controller")]);
+    expect(said.says).not.toContain("plan is not working");
+    expect(said.says).not.toContain("attempt failed");
+  });
+
+  it("a copy written after the failed check is the newer news", () => {
+    const later = Date.parse("2026-09-15T10:30:00.000Z");
+    const said = protectionVerdict(
+      protectionFromRecords(
+        [brokenPlan, copy("controller", "2026-09-15T10:20:00.000Z")],
+        later,
+      ),
+      later,
+    );
+    expect(said.says).not.toContain("not working");
+    expect(said.says).not.toContain("attempt failed");
+  });
+
+  it("a copy that itself failed still leads", () => {
+    const said = verdict([
+      plan("off-site"),
+      copy("off-site", AT, "bad", "failed"),
+    ]);
+    expect(said.says).toBe("The last backup attempt failed.");
+  });
+
+  it("never prints a raw timestamp at the reader", () => {
+    const said = verdict([
+      plan("off-site"),
+      copy("off-site", "2026-09-15T09:00:00.000Z", "good"),
+      copy("off-site", AT, "bad", "failed"),
+    ]);
+    expect(said.limit).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(said.limit).toContain("ago");
+  });
+});

@@ -74,6 +74,40 @@ function titleOf(execution: ExecutionRecord) {
   }
 }
 
+/**
+ * A provider call, in words, with its path kept for whoever wants it.
+ *
+ * The story printed the request exactly as it went out, so a reader looking
+ * for what happened to their application got
+ * `/servers?label_selector=server-guy-application=<uuid>` across two lines of
+ * a summary row. The resource is the part worth reading at a glance; the
+ * query string is evidence, and evidence belongs inside the row.
+ */
+const RESOURCES: Record<string, string> = {
+  pricing: "Prices",
+  server_types: "Server types",
+  locations: "Locations",
+  images: "Images",
+  servers: "Servers",
+  ssh_keys: "SSH keys",
+  firewalls: "Firewalls",
+  actions: "Actions",
+  volumes: "Volumes",
+};
+
+function providerCall(target: string) {
+  const path = target.trim().replace(/^[A-Z]+\s+/, "");
+  const [route, query] = path.split("?");
+  const segment = route.replace(/^\//, "").split("/")[0] ?? "";
+  const name =
+    RESOURCES[segment] ??
+    (segment ? segment.replaceAll("_", " ") : "The provider");
+  return {
+    detail: query ? `${name}, narrowed by a filter` : name,
+    raw: path,
+  };
+}
+
 function lines(output: string): StoryLine[] {
   return output
     .split("\n")
@@ -161,15 +195,28 @@ export function deploymentFromRecords({
   const ordered = [...runFor(release, executions)].sort(
     (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
   );
-  const phases: Phase[] = ordered.map((execution) => ({
-    id: execution.id,
-    title: titleOf(execution),
-    detail: clip(essence(commandOf(execution.input)), 140),
-    start: execution.createdAt,
-    end: execution.finishedAt ?? execution.createdAt,
-    tone: phaseTone[execution.status] ?? "work",
-    lines: lines(execution.output ?? ""),
-  }));
+  const phases: Phase[] = ordered.map((execution) => {
+    const provider =
+      execution.tool === "hetzner_request"
+        ? providerCall(execution.target ?? "")
+        : null;
+    return {
+      id: execution.id,
+      title: titleOf(execution),
+      detail: provider
+        ? provider.detail
+        : clip(essence(commandOf(execution.input)), 140),
+      start: execution.createdAt,
+      end: execution.finishedAt ?? execution.createdAt,
+      tone: phaseTone[execution.status] ?? "work",
+      lines: [
+        ...(provider?.raw
+          ? [{ at: "", text: provider.raw, tone: "info" as const }]
+          : []),
+        ...lines(execution.output ?? ""),
+      ],
+    };
+  });
 
   const waiting = ordered.some(
     (execution) => execution.status === "awaiting-approval",

@@ -119,6 +119,15 @@ export interface Protection {
   /** What is on record as being on this application's disk, with its label. */
   requiredData: { id: string; label: string }[];
   /**
+   * Subject id → the owner's words for it, where a record gives any.
+   *
+   * So a page can print "PostgreSQL's data" where a record says
+   * `shop-postgres`, instead of showing the reader the plumbing.
+   */
+  names: Map<string, string>;
+  /** What the plan says it covers, in those words. */
+  coverLabels: string[];
+  /**
    * Data the application is recorded as having that no plan says it copies.
    *
    * A plan may cover a volume by naming it, or by naming the database whose
@@ -128,8 +137,18 @@ export interface Protection {
    * uploads were in no copy at all.
    */
   uncovered: { id: string; label: string }[];
-  /** The newest failure of each kind, which no later success hides. */
-  failures: { copy: Dated | null; restore: Dated | null };
+  /**
+   * The newest failure of each kind, which no later success hides.
+   *
+   * `source` on the copy failure says which record failed. A plan whose own
+   * check failed still means the data is not being copied, so the verdict
+   * treats the two alike; a page that words it as "the attempt failed" must
+   * not, because nothing attempted anything.
+   */
+  failures: {
+    copy: (Dated & { source: "copy" | "plan" }) | null;
+    restore: Dated | null;
+  };
   /** Retention, coverage and the next run, for the facts row. */
   nextRunAt: string | null;
   /** Retention exactly as Pi wrote it, when it is not a bare number. */
@@ -145,6 +164,36 @@ function coverDraft(names: string) {
     `does. Decide what actually needs keeping — a cache does not — then extend ` +
     `the plan and take a copy that includes it.`
   );
+}
+
+/**
+ * A subject id as the owner's words, where a record gives one.
+ *
+ * Pi records coverage as ids — `shop-uploads`, `shop-postgres` — because a
+ * page has to match them, and every page then printed them. A volume record
+ * carries `holds`; a database, cache or process record carries a name or a
+ * product. An id nothing names comes through as itself, which is honest and
+ * is also a sign that nobody has written that subject down.
+ */
+function namesFor(live: SavedInformation[]) {
+  const names = new Map<string, string>();
+  for (const kind of [
+    "volume",
+    "database",
+    "cache",
+    "queue",
+    "process",
+  ] as const)
+    for (const ref of subjectsMentioned(live, kind)) {
+      const facts = currentFacts(live, ref);
+      const said =
+        facts.get("holds")?.value.value ??
+        facts.get("product")?.value.value ??
+        facts.get("engine")?.value.value ??
+        null;
+      if (said && !names.has(ref.id)) names.set(ref.id, said);
+    }
+  return names;
 }
 
 /** A comma-separated `covers` fact as the subject ids it names. */
@@ -219,6 +268,16 @@ export function protectionFromRecords(
       };
   }
   let nextRunAt: string | null = null;
+  /**
+   * Plans that are actually on record.
+   *
+   * `plans` is every subject a record *speaks about*, which includes one
+   * whose entire content is "there is no plan". Counting those as plans meant
+   * an application Server Guy had checked and found unprotected read as
+   * planned — latent in the verdict, because the declared-absent branch is
+   * tested first, and live the moment anything else asks the question.
+   */
+  let stated = 0;
   for (const ref of plans) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") {
@@ -227,6 +286,7 @@ export function protectionFromRecords(
       declaredAbsent = true;
       continue;
     }
+    stated += 1;
     const facts = currentFacts(live, ref);
     const fact = (key: string) => facts.get(key)?.value.value ?? null;
     const schedule = fact("schedule");
@@ -269,7 +329,10 @@ export function protectionFromRecords(
   // ---- The copies. One record per copy, so the page counts records and
   // never a number somebody incremented.
   const copies: BackupCopy[] = [];
-  const failures: { copy: Dated | null; restore: Dated | null } = {
+  const failures: {
+    copy: (Dated & { source: "copy" }) | null;
+    restore: Dated | null;
+  } = {
     copy: null,
     restore: null,
   };
@@ -305,7 +368,8 @@ export function protectionFromRecords(
     // success is allowed to hide — and it contributes no destination either,
     // because an attempt that failed reached nowhere.
     if (presence.record.presentation?.status === "failed") {
-      if (!failures.copy || at > failures.copy.at) failures.copy = dated;
+      if (!failures.copy || at > failures.copy.at)
+        failures.copy = { ...dated, source: "copy" };
       continue;
     }
     destinations.add(kind);
@@ -398,7 +462,10 @@ export function protectionFromRecords(
     return required.filter((item) => !reach.has(item.id));
   };
 
-  const uncovered = plans.length ? missingFrom([...covers.keys()]) : [];
+  const uncovered = stated ? missingFrom([...covers.keys()]) : [];
+  const names = namesFor(live);
+  const say = (id: string) => names.get(id) ?? id;
+  const coverLabels = [...covers.keys()].map(say);
 
   // What the *newest copy* is known to hold, which is a different question
   // from what the plan intends to copy next time. A plan widened this morning
@@ -422,13 +489,15 @@ export function protectionFromRecords(
       plans.length + copies.length + restores.length > 0 ||
       Boolean(failures.copy || failures.restore),
     declaredAbsent,
-    planned: plans.length > 0,
+    planned: stated > 0,
     judged,
     keepText,
     destinations: [...destinations],
     plannedDestinations: [...plannedDestinations],
     verifiedCopies,
     requiredData: required,
+    names,
+    coverLabels,
     uncovered,
     newestCopyCoverage,
     failures: {
@@ -436,7 +505,9 @@ export function protectionFromRecords(
       // its place; a plan whose own check failed fills in when no copy did,
       // so "the timer is not running" still reads as a failed backup rather
       // than a warning about one.
-      copy: failures.copy ?? brokenPlan,
+      copy:
+        failures.copy ??
+        (brokenPlan ? { ...brokenPlan, source: "plan" as const } : null),
       restore: failures.restore,
     },
     nextRunAt,
@@ -479,6 +550,45 @@ const DESTINATION_KINDS = new Set<DestinationKind>([
   "off-site",
   "provider",
 ]);
+
+/**
+ * What each destination class is called, and what it does and does not
+ * protect against — one entry per class, in one place.
+ *
+ * The name and the meaning used to live in two files: the banner kept the
+ * words and the projection kept the sentences, so a second page showing a
+ * destination had to pick one and invent the other.
+ */
+export const CLASS_MEANING: Record<
+  DestinationKind,
+  { word: string; means: string }
+> = {
+  "same-server": {
+    word: "On the application's server",
+    means:
+      "This recovers from a mistake inside the application and from nothing else: if the server is lost, the copies are lost with it.",
+  },
+  controller: {
+    word: "On this computer",
+    means:
+      "That survives losing the application's server, and depends on this machine still existing and being reachable.",
+  },
+  "off-site": {
+    word: "Off-site storage",
+    means:
+      "In object storage independent of both machines, subject to the access and retention configured there.",
+  },
+  provider: {
+    word: "Provider snapshot",
+    means:
+      "The provider's snapshot of the whole disk. It can rebuild the machine; it is not an application-aware copy and says nothing about the data being consistent.",
+  },
+  unclassified: {
+    word: "Destination not classified",
+    means:
+      "A destination is recorded, but nothing says whether it survives losing the server. Until it does, treat this as unproven.",
+  },
+};
 
 /** What each class does and does not protect against, in the page's words. */
 export const destinationMeaning: Record<DestinationKind, string> = {
@@ -703,20 +813,53 @@ export function protectionVerdict(
       },
     };
 
-  if (failures.copy)
-    return {
-      state: "backup-failed",
-      tone: "failed",
-      says: "The last backup attempt failed.",
-      limit: newestCopy
-        ? `The newest copy that did succeed is from ${newestCopy.at}.`
-        : "No copy has ever succeeded.",
-      next: {
-        label: "Investigate the failure",
-        draft:
-          "The last backup attempt failed. Find out why and fix it, then take a copy and verify it.",
-      },
-    };
+  // A copy that actually failed, and nothing newer has succeeded since. A
+  // plan whose own check failed is not an attempt at anything, and a copy
+  // written after the check makes the check the older news of the two: saying
+  // "the last backup attempt failed" over a copy taken three minutes ago
+  // contradicts the stage directly below it, which is reading the same
+  // records.
+  // A failed check on a plan that a record says is ABSENT is the absence
+  // being reported, not a plan that broke. Saying "the backup plan is not
+  // working" there invents a plan directly above a stage saying there is
+  // none, so it falls through and the copies speak instead.
+  const standing =
+    failures.copy &&
+    !(newestCopy && newestCopy.at > failures.copy.at) &&
+    !(failures.copy.source === "plan" && protection.declaredAbsent)
+      ? failures.copy
+      : null;
+  if (standing)
+    return standing.source === "copy"
+      ? {
+          state: "backup-failed",
+          tone: "failed",
+          says: "The last backup attempt failed.",
+          limit: newestCopy
+            ? `The newest copy that did succeed was ${when(newestCopy.at, now)}.`
+            : "No copy has ever succeeded.",
+          next: {
+            label: "Investigate the failure",
+            draft:
+              "The last backup attempt failed. Find out why and fix it, then take a copy and verify it.",
+          },
+        }
+      : {
+          // The plan's own check failed. Nothing attempted a backup, so
+          // nothing failed at one, and the timer not running is the absence
+          // of protection rather than a warning about it.
+          state: "backup-failed",
+          tone: "failed",
+          says: "The backup plan is not working.",
+          limit: newestCopy
+            ? `A check on it failed, and the newest copy was ${when(newestCopy.at, now)}.`
+            : "A check on it failed and no copy has ever been written.",
+          next: {
+            label: "Find out why",
+            draft:
+              "A check on this application's backup plan failed. Find out why nothing is running, fix it, then take a copy and verify it.",
+          },
+        };
 
   if ((schedules.length || protection.planned) && !copies.length)
     return temper({

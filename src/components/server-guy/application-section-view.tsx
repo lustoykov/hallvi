@@ -61,14 +61,20 @@ import { VariablesView } from "./views/variables-view";
 import type { ViewProps } from "./views/bits";
 import { Loading } from "./views/visuals";
 
+// The line under each destination's heading, and the first sentence a reader
+// gets about a page. So it may not describe a page that no longer exists.
+// Logs promised collected output from the host and nothing collects any;
+// Backups promised "a restore you can trust" on a page whose whole argument
+// is that a restore is trustworthy only once somebody has run one; Deployment
+// offered a next release it has no way to propose; History described every
+// operation, when it now keeps what happened and folds the rest underneath.
 const descriptions: Record<ApplicationSection, string> = {
-  history:
-    "Every operation across your conversations and automatic work, in one record.",
+  history: "What has happened to this application, and the commands behind it.",
   overview:
     "What is running, what needs you, what changed, and how fresh the evidence is.",
   architecture: "How your source, application, host and data fit together.",
   deployment:
-    "What is serving, what could be released next, and how it was prepared.",
+    "What is running, what ran before it, and how the latest attempt went.",
   processes:
     "The web and worker processes that make up your application on its instance.",
   database:
@@ -77,8 +83,9 @@ const descriptions: Record<ApplicationSection, string> = {
     "The cache or broker your application relies on, and the queue its workers consume.",
   jobs: "Scheduled commands and queued work, and the processes that run them.",
   storage: "Volumes and files that must survive container replacement.",
-  backups: "Off-host copies of your data, with a restore you can trust.",
-  logs: "Inspect the latest collected output from your application host.",
+  backups:
+    "Copies of your data off this server, and whether one has been opened.",
+  logs: "What Server Guy's own commands printed, and where each of them ran.",
   monitoring:
     "Health, issues and resource usage, and how you hear about problems.",
   domains: "The name your application answers on, and the HTTPS behind it.",

@@ -69,7 +69,12 @@ it("draws Server Guy as one more row on the board, in its own words", () => {
   const markup = draw([PLAN()], controller());
   expect(markup).toContain("Server Guy itself");
   expect(markup).toContain("Recoverable");
-  expect(markup).toContain("you hold what opens them");
+  // Who holds the key is stated once, on Server Guy's own track. The board
+  // below used to say it a second time in its own words, under a summary the
+  // track had already given.
+  expect(markup).toContain("you hold what opens the copies");
+  expect(markup).not.toContain("you hold what opens them");
+  expect(markup.split("you hold what opens")).toHaveLength(2);
   expect(markup).toContain("copy of Server Guy&#x27;s own records");
   // Quiet when there is nothing to ask of the owner: the row carries it.
   expect(markup).not.toContain("Save your recovery kit");
@@ -87,7 +92,9 @@ it("says so on the board when the copies are not yet the owner's", () => {
   expect(markup).not.toContain("cpb-head");
   // The region keeps its accessible name; only the visible repeat goes.
   expect(markup).toContain('aria-label="Server Guy itself"');
-  expect(markup).toContain("recovery kit is not saved yet");
+  // Said once, by the track, and asked for once, by the band.
+  expect(markup).toContain("nobody can open the copies yet");
+  expect(markup).not.toContain("recovery kit is not saved yet");
   expect(markup).toContain("Save your recovery kit");
   // The passphrase is fetched when the band is shown, never rendered with
   // the page.

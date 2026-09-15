@@ -1,0 +1,213 @@
+/* Backups as a chain: set up, copied, opened. */
+
+.bs {
+  display: grid;
+  gap: 12px;
+}
+.bs-lede {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line, rgba(25, 35, 56, 0.14));
+  border-radius: 10px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+.bs-lede[data-tone="warning"] {
+  background: #fdf8ec;
+}
+.bs-lede[data-tone="failed"] {
+  background: #fdf1f0;
+}
+.bs-lede[data-tone="verified"] {
+  background: #f2f9f5;
+}
+.bs-limit {
+  margin: -4px 0 0;
+  color: var(--muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.bs-head {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted, #59667b);
+}
+.bs-aside {
+  margin: 0;
+  color: var(--muted, #59667b);
+  font-size: 12.5px;
+}
+.bs-unknown {
+  color: var(--muted, #59667b);
+  font-style: italic;
+}
+
+.bs-primary,
+.bs-action {
+  flex: none;
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-self: start;
+  padding: 7px 14px;
+  border: 1px solid var(--line, rgba(25, 35, 56, 0.18));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink, #192338);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bs-primary {
+  border-color: #285ad8;
+  background: #285ad8;
+  color: #fff;
+}
+.bs-primary em {
+  color: rgba(255, 255, 255, 0.72);
+}
+.bs-action:hover {
+  background: rgba(25, 35, 56, 0.05);
+}
+.bs-primary em,
+.bs-action em {
+  font-size: 11px;
+  font-style: normal;
+}
+.bs-action em {
+  color: var(--muted, #59667b);
+}
+
+.bs-track {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  border: 1px solid var(--line, rgba(25, 35, 56, 0.14));
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.bs-track > li + li {
+  border-top: 1px solid var(--line, rgba(25, 35, 56, 0.1));
+}
+/* Every link holds. Three sentences saying nothing is wrong is worse than
+   one, so the chain shrinks rather than shouting about itself. */
+.bs-track[data-settled] > li > button {
+  padding: 8px 16px;
+}
+.bs-track[data-settled] .bs-body small {
+  font-size: 12px;
+}
+.bs-track > li > button {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.bs-track > li > button:hover {
+  background: rgba(25, 35, 56, 0.04);
+}
+.bs-track-small > li {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 16px;
+}
+.bs-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(25, 35, 56, 0.08);
+  color: var(--muted, #59667b);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bs-mark[data-state="done"] {
+  background: rgba(46, 125, 85, 0.14);
+  color: #2e7d55;
+}
+.bs-mark[data-state="attention"] {
+  background: rgba(184, 129, 31, 0.18);
+  color: #8a6115;
+}
+.bs-mark[data-state="failed"] {
+  background: rgba(166, 49, 43, 0.14);
+  color: #a6312b;
+}
+.bs-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.bs-body b {
+  font-weight: 600;
+}
+.bs-body small {
+  color: var(--muted, #59667b);
+  font-size: 12.5px;
+}
+
+.bs-detail {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px 54px;
+}
+.bs-detail dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.bs-detail dt {
+  color: var(--muted, #59667b);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bs-detail dd {
+  margin: 3px 0 0;
+  display: grid;
+  gap: 3px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.bs-detail dd small {
+  color: var(--muted, #59667b);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bs-covers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.bs-covers li::before {
+  content: "✕ ";
+  color: #a6312b;
+}
+.bs-covers li[data-in]::before {
+  content: "✓ ";
+  color: #2e7d55;
+}

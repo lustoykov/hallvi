@@ -18,13 +18,9 @@ import type { SavedInformation } from "@/server/operator-data";
 import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 
 import type { PageChrome } from "./architecture-prototype/index";
-import {
-  destinationMeaning,
-  protectionFromRecords,
-  protectionVerdict,
-} from "./backups-records";
+import { protectionFromRecords, protectionVerdict } from "./backups-records";
+import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
-import { ProtectionBanner } from "./protection-banner";
 import { CalendarDirection } from "./backup-prototype/calendar";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
@@ -145,12 +141,21 @@ export function BackupsPage({
         story={story}
         now={now}
         head={head}
+        /* The stages above answer "are we backed up" and offer the one thing
+           to do about it. The board below them says which days hold a copy,
+           which is a different question and not a second summary. */
+        lede={false}
         activity={
-          <ProtectionBanner
-            verdict={verdict}
+          /* Set up, copied, opened — three stages rather than one verdict
+             with three facts folded into it. Merging any two of them is the
+             mistake this page kept making, and separate stages make it
+             structurally impossible rather than a thing to be careful
+             about. */
+          <BackupStages
             protection={protection}
-            meaning={destinationMeaning}
+            verdict={verdict}
             now={now}
+            controller={controller}
             onAsk={onAsk}
           />
         }
