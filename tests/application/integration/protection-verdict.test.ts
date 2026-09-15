@@ -700,3 +700,96 @@ describe("the owner's words for what is copied", () => {
     ]);
   });
 });
+
+describe("a failed check on a plan is not a failed backup attempt", () => {
+  // Found on a live Pi run: a plan record saying there is no plan, with a
+  // failed `configured` check, and a copy taken three minutes ago. The page
+  // led with "The last backup attempt failed" directly above a stage saying
+  // the latest backup succeeded, and the two were reading the same records.
+  const brokenPlan = record({
+    id: "broken",
+    status: "warning",
+    ref: { kind: "backup-plan", id: "daily" },
+    title: "Nothing backs this up",
+    presence: "absent",
+    checks: [
+      {
+        key: "configured",
+        label: "Off-server backup plan is configured",
+        status: "failed",
+        claim: "configuration",
+        basis: "observed",
+      },
+    ],
+  });
+
+  it("does not claim an attempt when nothing attempted anything", () => {
+    // A record stating the plan is absent is answered by the absence, which
+    // is the more specific thing to say than that a check failed.
+    const said = verdict([brokenPlan]);
+    expect(said.says).not.toContain("attempt failed");
+    expect(said.says).toContain("there is no backup");
+  });
+
+  it("a plan that exists and whose check failed says the plan is broken", () => {
+    const stopped = record({
+      id: "stopped",
+      status: "warning",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "The backup timer is not running",
+      checks: [
+        {
+          key: "configured",
+          label: "Daily backup timer is active",
+          status: "failed",
+          claim: "configuration",
+          basis: "observed",
+        },
+      ],
+    });
+    const said = verdict([stopped]);
+    expect(said.says).toBe("The backup plan is not working.");
+    expect(said.says).not.toContain("attempt failed");
+    expect(said.tone).toBe("failed");
+  });
+
+  it("never invents a plan the records say is absent", () => {
+    // The live rig: a record saying there is no plan, with a failed check,
+    // and a copy that was taken and restored. The page said the plan was not
+    // working an inch above a stage saying there was no plan.
+    const said = verdict([brokenPlan, copy("controller")]);
+    expect(said.says).not.toContain("plan is not working");
+    expect(said.says).not.toContain("attempt failed");
+  });
+
+  it("a copy written after the failed check is the newer news", () => {
+    const later = Date.parse("2026-09-15T10:30:00.000Z");
+    const said = protectionVerdict(
+      protectionFromRecords(
+        [brokenPlan, copy("controller", "2026-09-15T10:20:00.000Z")],
+        later,
+      ),
+      later,
+    );
+    expect(said.says).not.toContain("not working");
+    expect(said.says).not.toContain("attempt failed");
+  });
+
+  it("a copy that itself failed still leads", () => {
+    const said = verdict([
+      plan("off-site"),
+      copy("off-site", AT, "bad", "failed"),
+    ]);
+    expect(said.says).toBe("The last backup attempt failed.");
+  });
+
+  it("never prints a raw timestamp at the reader", () => {
+    const said = verdict([
+      plan("off-site"),
+      copy("off-site", "2026-09-15T09:00:00.000Z", "good"),
+      copy("off-site", AT, "bad", "failed"),
+    ]);
+    expect(said.limit).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(said.limit).toContain("ago");
+  });
+});

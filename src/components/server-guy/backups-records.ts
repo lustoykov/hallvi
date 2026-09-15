@@ -813,20 +813,53 @@ export function protectionVerdict(
       },
     };
 
-  if (failures.copy)
-    return {
-      state: "backup-failed",
-      tone: "failed",
-      says: "The last backup attempt failed.",
-      limit: newestCopy
-        ? `The newest copy that did succeed is from ${newestCopy.at}.`
-        : "No copy has ever succeeded.",
-      next: {
-        label: "Investigate the failure",
-        draft:
-          "The last backup attempt failed. Find out why and fix it, then take a copy and verify it.",
-      },
-    };
+  // A copy that actually failed, and nothing newer has succeeded since. A
+  // plan whose own check failed is not an attempt at anything, and a copy
+  // written after the check makes the check the older news of the two: saying
+  // "the last backup attempt failed" over a copy taken three minutes ago
+  // contradicts the stage directly below it, which is reading the same
+  // records.
+  // A failed check on a plan that a record says is ABSENT is the absence
+  // being reported, not a plan that broke. Saying "the backup plan is not
+  // working" there invents a plan directly above a stage saying there is
+  // none, so it falls through and the copies speak instead.
+  const standing =
+    failures.copy &&
+    !(newestCopy && newestCopy.at > failures.copy.at) &&
+    !(failures.copy.source === "plan" && protection.declaredAbsent)
+      ? failures.copy
+      : null;
+  if (standing)
+    return standing.source === "copy"
+      ? {
+          state: "backup-failed",
+          tone: "failed",
+          says: "The last backup attempt failed.",
+          limit: newestCopy
+            ? `The newest copy that did succeed was ${when(newestCopy.at, now)}.`
+            : "No copy has ever succeeded.",
+          next: {
+            label: "Investigate the failure",
+            draft:
+              "The last backup attempt failed. Find out why and fix it, then take a copy and verify it.",
+          },
+        }
+      : {
+          // The plan's own check failed. Nothing attempted a backup, so
+          // nothing failed at one, and the timer not running is the absence
+          // of protection rather than a warning about it.
+          state: "backup-failed",
+          tone: "failed",
+          says: "The backup plan is not working.",
+          limit: newestCopy
+            ? `A check on it failed, and the newest copy was ${when(newestCopy.at, now)}.`
+            : "A check on it failed and no copy has ever been written.",
+          next: {
+            label: "Find out why",
+            draft:
+              "A check on this application's backup plan failed. Find out why nothing is running, fix it, then take a copy and verify it.",
+          },
+        };
 
   if ((schedules.length || protection.planned) && !copies.length)
     return temper({
