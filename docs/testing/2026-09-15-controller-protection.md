@@ -37,7 +37,14 @@ copies are kept. Pi never runs any of it.
   before the copy. One flipped bit is refused rather than partly restored.
 - **Skips.** With a response still `running`, the copy records `skipped` with
   "A change was running" and sends nothing; once the change settles the next
-  copy succeeds.
+  copy succeeds. This check is a guard, not the mechanism that prevents
+  overlap: the single sequential worker is, and both call sites are outside
+  `executePiRun`. It catches a second worker or a stale row left by a crash.
+- **Back-off.** An attempt that produced no copy — failed or skipped — is not
+  due again for an hour. Without it, a destination that rejects the very
+  first upload would be captured, encrypted and re-attempted every minute the
+  worker is idle, and 30 identical failures would push the record's real
+  copies out of it.
 - **Retention.** Sixteen copies leave fourteen objects in the stand-in, two
   DELETEs are issued, and every live record points at an object that is there.
 - **Failure.** An unreachable endpoint records `failed` with a reason and the

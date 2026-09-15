@@ -12,7 +12,9 @@ There are two paths, and the automatic one is the one that runs:
   `controller/` prefix of the same bucket. It does not stop the controller: the
   database is read through SQLite's online-backup API, so committed WAL data is
   included, and a copy that would overlap a running change is skipped and
-  recorded with that reason. The last 14 copies are kept. Backups states it,
+  recorded with that reason. An attempt that produced no copy waits an hour
+  before the next one, so a destination that refuses an upload is not retried
+  every minute. The last 14 copies are kept. Backups states it,
   and the passphrase is shown once as a recovery kit. The implementation is
   [`src/server/controller-protection.ts`](../../src/server/controller-protection.ts).
 - **The manual stopped-controller checkpoint** below, for a deliberate

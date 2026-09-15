@@ -136,7 +136,7 @@ export function ControllerProtectionBand({
       {failed && (
         <p className="cpb-say">
           The last attempt failed {ago(failed.at, now)}: {failed.reason} Server
-          Guy tries again after the next piece of work.
+          Guy tries again within the hour.
         </p>
       )}
       {facts.retentionFailed && (

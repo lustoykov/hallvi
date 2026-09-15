@@ -91,6 +91,9 @@ afterAll(() => {
 beforeEach(() => {
   objects.clear();
   requests.length = 0;
+  // A case that leaves a response mid-flight must not make every later copy
+  // a skip.
+  store.db().$client.exec("UPDATE messages SET status = 'completed'");
   rmSync(join(root, "state", "controller-protection"), {
     recursive: true,
     force: true,
@@ -199,8 +202,11 @@ it("skips a copy while a change is running and says so", async () => {
   expect(skipped?.outcome).toBe("skipped");
   expect(skipped?.reason).toMatch(/change was running/i);
   expect(requests).toEqual([]);
-  // It is owed again as soon as the change finishes.
-  expect(copyDue("after-change")).toBe(true);
+  // A stale running row must not make the worker record a skip every minute
+  // until the copies the record should hold are pushed out of it.
+  const at = Date.parse(skipped!.finishedAt!);
+  expect(copyDue("after-change", at + 60_000)).toBe(false);
+  expect(copyDue("after-change", at + 3_600_000)).toBe(true);
   store
     .db()
     .$client.exec(
@@ -227,6 +233,18 @@ it("keeps the last fourteen copies and deletes the rest", async () => {
   expect(live).toHaveLength(14);
   for (const item of live)
     expect(objects.has(`/controller-copies/${item.objectKey}`)).toBe(true);
+});
+
+it("waits an hour after an upload that produced no copy", async () => {
+  const broken = { ...access, endpoint: "http://127.0.0.1:1" };
+  const failed = await protectController("daily", { access: broken });
+  expect(failed?.outcome).toBe("failed");
+  const at = Date.parse(failed!.finishedAt!);
+  // Without this the first rejected upload is captured, encrypted and
+  // re-attempted every minute the worker is idle.
+  expect(copyDue("daily", at + 60_000)).toBe(false);
+  expect(copyDue("after-change", at + 60_000)).toBe(false);
+  expect(copyDue("daily", at + 3_600_000)).toBe(true);
 });
 
 it("records a failure without claiming protection", async () => {

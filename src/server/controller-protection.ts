@@ -544,7 +544,7 @@ export async function protectController(
       ...base,
       outcome: "skipped",
       finishedAt: new Date().toISOString(),
-      reason: "A change was running. The next copy follows it.",
+      reason: "A change was running. The next copy follows within the hour.",
     });
   try {
     const { entries, capturedAt } = await captureControllerPayload();
@@ -590,12 +590,19 @@ export async function protectController(
 /**
  * Whether a copy is owed. Work finishing earns one at most hourly, so a busy
  * afternoon cannot push a fortnight of copies out of retention; a quiet day
- * still gets its own. Without a successful copy, one is always owed.
+ * still gets its own; and an attempt that produced nothing waits an hour
+ * rather than retrying every time the worker looks.
  */
 export function copyDue(trigger: ControllerCopy["trigger"], now = Date.now()) {
-  const last = controllerProtectionState().copies.find(
-    (copy) => copy.outcome === "succeeded",
-  );
+  const copies = controllerProtectionState().copies;
+  const newest = copies[0];
+  // An attempt that did not produce a copy waits an hour before the next
+  // one. Without this, a destination that refuses the very first upload is
+  // captured, encrypted and re-attempted every minute, and the record fills
+  // with identical failures until the copies it should hold are gone.
+  if (newest && newest.outcome !== "succeeded")
+    return now - Date.parse(newest.finishedAt ?? newest.startedAt) >= HOUR_MS;
+  const last = copies.find((copy) => copy.outcome === "succeeded");
   if (!last?.finishedAt) return true;
   return (
     now - Date.parse(last.finishedAt) >=
