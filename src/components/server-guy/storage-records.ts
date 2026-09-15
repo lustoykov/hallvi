@@ -158,7 +158,7 @@ export function storageFromRecords({
   // copying the volume would. Reading only volume names put "One copy off the
   // server is on record" on one page and "PostgreSQL's data · Not in the
   // backup plan" on the next.
-  const protection = protectionFromRecords(live, now);
+  const protection = protectionFromRecords(live, now, applicationId);
   const throughDatabase = new Map<string, string>();
   for (const [named, how] of protection.covers) {
     const disk = map?.edges.find(

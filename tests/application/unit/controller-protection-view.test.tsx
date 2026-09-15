@@ -114,9 +114,15 @@ it("states Server Guy on a page no record has anything to say about", () => {
   expect(markup).toContain("Server Guy itself");
   expect(markup).toContain("Not copied");
   expect(markup).toContain("Connect backup storage");
-  expect(markup).toContain("protects your application");
-  // And the sentence beside that form stands on its own words.
+  // And the sentence beside that form stands on its own words — about this
+  // machine, which is what this band is for.
   expect(markup).toContain("would lose Server Guy");
+  // Connecting storage starts the controller's copies. It does not discover,
+  // configure, run and verify a backup of the application's data, and the
+  // band that said it did left owners believing their application was
+  // covered by a form they filled in once.
+  expect(markup).not.toContain("protects your application");
+  expect(markup).toContain("separate job with its own plan");
 });
 
 it("keeps stating Server Guy on that page once it is recoverable", () => {

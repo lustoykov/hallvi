@@ -112,6 +112,7 @@ const verdictCaption: Partial<Record<ProtectionVerdict["state"], string>> = {
   "scheduled-no-copy": "Scheduled, no copy yet",
   "local-only": "On the server only",
   "offsite-untested": "Copied, restore untested",
+  "destination-unknown": "Copied, destination unrecorded",
   "restore-verified": "Restore proved",
   "backup-failed": "A backup failed",
   "backup-overdue": "Overdue",
@@ -301,6 +302,7 @@ export function overviewFromRecords({
   records,
   executions,
   chats,
+  applicationId,
   applicationName,
   headline,
   now,
@@ -335,7 +337,10 @@ export function overviewFromRecords({
   // share it before this and did not — a plan with a passing timer and no
   // restore read "Verified" here and "Limited" three clicks away, and on the
   // rig they agreed only because Pi happened to mark the plan a warning.
-  const backups = protectionVerdict(protectionFromRecords(records, now), now);
+  const backups = protectionVerdict(
+    protectionFromRecords(records, now, applicationId),
+    now,
+  );
 
   // ---- what wants you -------------------------------------------------
   const needs: NeedItem[] = [];

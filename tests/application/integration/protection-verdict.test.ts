@@ -98,14 +98,27 @@ const copy = (
     ],
   });
 
-const restore = (at = AT, status: "verified" | "failed" = "verified") =>
+/**
+ * A restore test. `of` is the id of the copy it opened, which is the only
+ * thing that lets the page say a particular file has been proved: a restore
+ * that names no copy proves recovery has worked and vouches for nothing being
+ * kept now.
+ */
+const restore = (
+  at = AT,
+  status: "verified" | "failed" = "verified",
+  of: string | null = "copy",
+) =>
   record({
     id: "restore",
     at,
     status,
     ref: { kind: "restore-test", id: "restore-1" },
     title: "A copy was restored and checked",
-    facts: [{ key: "covers", value: "shop-db, shop-receipts" }],
+    facts: [
+      { key: "covers", value: "shop-db, shop-receipts" },
+      ...(of ? [{ key: "restored-copy", value: of }] : []),
+    ],
   });
 
 const verdict = (records: SavedInformation[], now = NOW) =>
@@ -219,7 +232,7 @@ describe("what the page says, state by state", () => {
     const said = verdict(
       [
         copy("off-site", "2026-09-15T10:00:00.000Z", "proved"),
-        restore("2026-09-15T10:30:00.000Z"),
+        restore("2026-09-15T10:30:00.000Z", "verified", "proved"),
       ],
       A_MONTH_ON,
     );
@@ -242,10 +255,16 @@ describe("what the page says, state by state", () => {
 describe("where the copies go", () => {
   it("an undeclared destination is unclassified, not assumed safe", () => {
     const protection = protectionFromRecords([plan(null)], NOW);
-    expect(protection.destinations).toEqual(["unclassified"]);
-    // And unclassified must not satisfy the off-server question.
+    // A plan's destination is intent, and belongs with the other intent.
+    expect(protection.plannedDestinations).toEqual(["unclassified"]);
+    expect(protection.destinations).toEqual([]);
+    // And unclassified must satisfy neither the off-server question nor the
+    // on-server one: "all of them are on the application's own server" is a
+    // claim about a location, and no record here makes it.
     const said = verdict([plan(null), copy("unclassified")]);
-    expect(said.state).toBe("local-only");
+    expect(said.state).toBe("destination-unknown");
+    expect(said.tone).toBe("warning");
+    expect(said.says).toContain("nothing records where the newest one went");
   });
 
   it("the controller's own machine counts as off the application host", () => {
@@ -260,14 +279,27 @@ describe("where the copies go", () => {
     expect(said.state).toBe("scheduled-no-copy");
   });
 
-  it("keeps every class a plan declares, because they differ", () => {
+  it("keeps a plan's intent apart from where copies actually went", () => {
     const protection = protectionFromRecords(
       [plan("same-server"), copy("off-site", AT, "offsite")],
       NOW,
     );
-    expect(new Set(protection.destinations)).toEqual(
-      new Set(["same-server", "off-site"]),
-    );
+    expect(protection.destinations).toEqual(["off-site"]);
+    expect(protection.plannedDestinations).toEqual(["same-server"]);
+  });
+
+  it("an off-site plan over a same-server copy does not claim a transfer", () => {
+    // The sentence this forbids: "Copies are reaching a destination off the
+    // application's server," printed over a bucket nothing had ever written
+    // to, because a plan said it meant to. A plan describes intent and cannot
+    // establish a transfer.
+    const said = verdict([
+      plan("off-site"),
+      copy("same-server", AT, "beside-the-app"),
+    ]);
+    expect(said.says).not.toContain("off the application's server");
+    expect(said.state).toBe("local-only");
+    expect(said.says).toContain("on the application's own server");
   });
 });
 
@@ -279,7 +311,12 @@ describe("which copy a restore actually proved", () => {
     const proved = copy("same-server", "2026-09-15T10:00:00.000Z", "proved");
     const fresh = copy("controller", "2026-09-15T10:45:00.000Z", "fresh");
     const said = verdict(
-      [plan("controller"), proved, restore("2026-09-15T10:10:00.000Z"), fresh],
+      [
+        plan("controller"),
+        proved,
+        restore("2026-09-15T10:10:00.000Z", "verified", "proved"),
+        fresh,
+      ],
       NOW,
     );
     expect(said.state).toBe("offsite-untested");
@@ -293,11 +330,308 @@ describe("which copy a restore actually proved", () => {
       [
         plan("controller"),
         copy("controller", "2026-09-15T10:00:00.000Z", "newest"),
-        restore("2026-09-15T10:10:00.000Z"),
+        restore("2026-09-15T10:10:00.000Z", "verified", "newest"),
       ],
       NOW,
     );
     expect(said.state).toBe("restore-verified");
     expect(said.tone).toBe("verified");
+  });
+
+  it("a restore of an older copy does not verify a newer one, whatever the clock says", () => {
+    // The exact sequence the timestamp comparison got wrong: copy B is made,
+    // then older copy A is restored. The newest restore is now later than the
+    // newest copy, and reading that as proof called B verified when nothing
+    // had ever opened it.
+    const older = copy("off-site", "2026-09-15T09:00:00.000Z", "a");
+    const newer = copy("off-site", "2026-09-15T09:30:00.000Z", "b");
+    const said = verdict(
+      [older, newer, restore("2026-09-15T10:30:00.000Z", "verified", "a")],
+      NOW,
+    );
+    expect(said.state).toBe("offsite-untested");
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("worked at least once");
+  });
+
+  it("a restore naming no copy says so, rather than vouching for the newest", () => {
+    const said = verdict(
+      [
+        copy("off-site", "2026-09-15T10:00:00.000Z", "only"),
+        restore("2026-09-15T10:30:00.000Z", "verified", null),
+      ],
+      NOW,
+    );
+    expect(said.state).toBe("offsite-untested");
+    expect(said.limit).toContain("no record says which copy it opened");
+  });
+});
+
+describe("what the plan leaves out", () => {
+  const volume = (id: string, holds: string) =>
+    record({
+      id: `volume-${id}`,
+      ref: { kind: "volume", id },
+      title: `${id} is on disk`,
+      facts: [{ key: "holds", value: holds }],
+    });
+
+  /** A plan naming exactly what `covers` says, so each case sets its own. */
+  const planCovering = (what: string) =>
+    record({
+      id: "plan",
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination", value: "s3://shop-backups" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: what },
+      ],
+    });
+
+  const map = (edges: { from: string; to: string }[]) =>
+    ({
+      ...record({ id: "map", ref: { kind: "application", id: APP } }),
+      presentation: {
+        states: { ref: { kind: "application", id: APP }, presence: "present" },
+        views: ["architecture"],
+        role: "outcome",
+        status: "verified",
+        checks: [],
+        content: {
+          kind: "topology",
+          from: "observed",
+          parts: [],
+          edges: edges.map((edge) => ({ ...edge, network: "disk" })),
+        },
+      },
+    }) as unknown as SavedInformation;
+
+  it("names the data on record that no plan says it copies", () => {
+    const said = protectionVerdict(
+      protectionFromRecords(
+        [
+          planCovering("shop-db"),
+          copy("off-site", "2026-09-15T10:00:00.000Z", "c1"),
+          restore("2026-09-15T10:30:00.000Z", "verified", "c1"),
+          volume("shop-db", "PostgreSQL's data"),
+          volume("shop-uploads", "Uploaded receipts"),
+        ],
+        NOW,
+        APP,
+      ),
+      NOW,
+    );
+    // Restored and proved, and still not the whole story: a verified restore
+    // of a copy that never held the uploads is not protection of the uploads.
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("Uploaded receipts");
+    expect(said.limit).not.toContain("PostgreSQL's data");
+  });
+
+  it("counts a database dump as covering the volume its files live in", () => {
+    // A nightly pg_dump copies those bytes as surely as copying the volume
+    // would. Reading only volume names put "not in the backup plan" on a
+    // volume the plan covered through its owner.
+    const protection = protectionFromRecords(
+      [
+        planCovering("shop-postgres"),
+        volume("shop-db", "PostgreSQL's data"),
+        map([{ from: "shop-postgres", to: "shop-db" }]),
+      ],
+      NOW,
+      APP,
+    );
+    expect(protection.uncovered).toEqual([]);
+  });
+
+  it("says nothing about coverage for a volume nobody has written down", () => {
+    // An absent record is nobody having looked, and inventing a hole from
+    // silence is the same error as inventing protection from it.
+    const protection = protectionFromRecords(
+      [planCovering("shop-db")],
+      NOW,
+      APP,
+    );
+    expect(protection.uncovered).toEqual([]);
+  });
+});
+
+describe("evidence belongs to the copy that carries it", () => {
+  // Found by review of the first fix: restore proof became specific to a copy
+  // while destination and coverage were still read across all of them. Both
+  // let one copy's virtue answer for another's.
+
+  /** A copy that says what it captured as well as where it went. */
+  const held = (
+    id: string,
+    at: string,
+    kind: string,
+    covers: string | null = null,
+  ) =>
+    record({
+      id,
+      at,
+      ref: { kind: "backup-copy", id },
+      title: "A copy was written",
+      facts: [
+        { key: "destination-kind", value: kind },
+        { key: "size", value: "2.8 kB" },
+        ...(covers ? [{ key: "covers", value: covers }] : []),
+      ],
+    });
+
+  const volume = (id: string, holds: string) =>
+    record({
+      id: `volume-${id}`,
+      ref: { kind: "volume", id },
+      title: `${id} is on disk`,
+      facts: [{ key: "holds", value: holds }],
+    });
+
+  const restoreOf = (of: string, at: string, covers: string | null) =>
+    record({
+      id: "restore",
+      at,
+      ref: { kind: "restore-test", id: "restore-1" },
+      title: "A copy was restored and checked",
+      facts: [
+        ...(covers ? [{ key: "covers", value: covers }] : []),
+        { key: "restored-copy", value: of },
+      ],
+    });
+
+  const planCovering = (what: string, at = AT) =>
+    record({
+      id: "plan",
+      at,
+      ref: { kind: "backup-plan", id: "daily" },
+      title: "Daily backups are configured",
+      facts: [
+        { key: "schedule", value: "Daily at 02:30 UTC" },
+        { key: "destination", value: "s3://shop-backups" },
+        { key: "destination-kind", value: "off-site" },
+        { key: "covers", value: what },
+      ],
+    });
+
+  it("does not let an older off-site copy vouch for a newer local one", () => {
+    // Restoring the newest copy proves the newest copy. It does not move it
+    // off the server, and an off-site copy from last week is a different
+    // recovery point rather than a property of this one.
+    const said = verdict([
+      held("old-offsite", "2026-09-14T10:00:00.000Z", "off-site"),
+      held("fresh-local", "2026-09-15T09:00:00.000Z", "same-server"),
+      restore("2026-09-15T09:30:00.000Z", "verified", "fresh-local"),
+    ]);
+    expect(said.state).toBe("restore-verified");
+    // Review found this returning limit:null and next:null, because an
+    // off-site copy from yesterday satisfied the off-server question for a
+    // copy written today.
+    expect(said.limit).toBeTruthy();
+    expect(said.limit).toContain("on the application's own server");
+    // The older off-site copy is still worth knowing about, said as its own
+    // recovery point and not as reassurance about the newest.
+    expect(said.limit).toContain("off the server");
+    expect(said.next).not.toBeNull();
+  });
+
+  const covered = (records: SavedInformation[]) =>
+    protectionVerdict(protectionFromRecords(records, NOW, APP), NOW);
+
+  it("does not let a widened plan add data to copies already taken", () => {
+    // The plan learns about the uploads today. Every copy on the shelf was
+    // taken before it did, and none of them contains an upload.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T10:00:00.000Z"),
+      held("db-only", "2026-09-15T09:00:00.000Z", "off-site", "shop-db"),
+      // The restore says what it brought back, and it was the database.
+      restoreOf("db-only", "2026-09-15T09:30:00.000Z", "shop-db"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain("Customer uploads");
+    expect(said.next?.label).toBe("Cover the rest");
+  });
+
+  it("says coverage is unrecorded, whether the plan is older or newer", () => {
+    // Neither the copy nor the restore recorded what was in it, so nothing
+    // establishes what would come back. The plan cannot answer it at any age:
+    // an older plan is intent too. The restore still happened and still
+    // counts, and nothing here claims data is missing.
+    for (const planAt of [
+      "2026-09-15T08:00:00.000Z",
+      "2026-09-15T10:00:00.000Z",
+    ]) {
+      const said = covered([
+        planCovering("shop-db, shop-uploads", planAt),
+        held("silent", "2026-09-15T09:00:00.000Z", "off-site"),
+        restoreOf("silent", "2026-09-15T09:30:00.000Z", null),
+        volume("shop-db", "PostgreSQL's data"),
+        volume("shop-uploads", "Customer uploads"),
+      ]);
+      expect(said.state, planAt).toBe("restore-verified");
+      expect(said.says, planAt).toContain("restored and checked");
+      expect(said.limit, planAt).toContain(
+        "No record says what that copy contains",
+      );
+      // Not an accusation: nothing says the uploads are absent, only that
+      // nobody wrote down what is there.
+      expect(said.limit, planAt).not.toContain("Customer uploads");
+      expect(said.next?.label, planAt).toBe("Check what the copy holds");
+    }
+  });
+
+  it("prefers what the restore brought back to what the plan intends", () => {
+    // A restore that says what it recovered is the strongest evidence there
+    // is about a copy's contents, and outranks the copy's own claim.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
+      held(
+        "claims-both",
+        "2026-09-15T09:00:00.000Z",
+        "off-site",
+        "shop-db, shop-uploads",
+      ),
+      restoreOf("claims-both", "2026-09-15T09:30:00.000Z", "shop-db"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.limit).toContain("The restore did not bring back");
+    expect(said.limit).toContain("Customer uploads");
+  });
+
+  it("clears the coverage warning once a copy actually holds the data", () => {
+    // The other half of the rule: a copy taken after the plan widened, whose
+    // own record says it captured both, is not warned about.
+    const said = covered([
+      planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
+      held(
+        "both",
+        "2026-09-15T09:00:00.000Z",
+        "off-site",
+        "shop-db, shop-uploads",
+      ),
+      restoreOf("both", "2026-09-15T09:30:00.000Z", "shop-db, shop-uploads"),
+      volume("shop-db", "PostgreSQL's data"),
+      volume("shop-uploads", "Customer uploads"),
+    ]);
+    expect(said.state).toBe("restore-verified");
+    expect(said.limit).toBeNull();
+  });
+
+  it("keeps each copy's destination on that copy", () => {
+    const protection = protectionFromRecords(
+      [
+        held("old-offsite", "2026-09-14T10:00:00.000Z", "off-site"),
+        held("fresh-local", "2026-09-15T09:00:00.000Z", "same-server"),
+      ],
+      NOW,
+    );
+    expect(protection.copies[0].id).toBe("fresh-local");
+    expect(protection.copies[0].kind).toBe("same-server");
+    expect(protection.copies[1].kind).toBe("off-site");
   });
 });

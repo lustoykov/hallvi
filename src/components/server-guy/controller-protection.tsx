@@ -127,8 +127,9 @@ export function ControllerProtectionBand({
         <>
           <p className="cpb-say">
             Losing this machine would lose Server Guy’s own records and keys.
-            Connecting off-host storage protects your application’s data and
-            Server Guy together — there is nothing else to switch on.
+            Connecting storage starts copying them here, automatically. Your
+            application’s own data is a separate job with its own plan, and the
+            same connection can be reused for it.
           </p>
           <div className="cpb-form">
             <BackupStorageForm onConnected={onRefresh} />
@@ -138,6 +139,7 @@ export function ControllerProtectionBand({
         <p className="cpb-say">
           Storage is connected. The first copy of Server Guy’s own records is
           taken within a minute, or right after the work in progress finishes.
+          This copies Server Guy, not the application.
         </p>
       ) : quiet ? (
         <p className="cpb-say">

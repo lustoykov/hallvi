@@ -32,6 +32,10 @@ they confirm they saved it; Settings → Connections shows it again on request.
 - The native conversation JSONL files.
 - Controller JSON connection settings, deployment SSH keys, host identity
   files, deployment inputs, backup destinations and schedule evidence.
+- The application secret store: every credential the owner supplied or the
+  controller generated, still sealed, together with the key that opens them.
+  Without it a recovered controller has the deployments and none of the
+  passwords they authenticate with.
 - The selected external model credential when one is readable, as
   `recovery-provider-auth.json`. Unrelated provider credentials are excluded,
   and a missing one is recorded as a recovery dependency rather than skipped

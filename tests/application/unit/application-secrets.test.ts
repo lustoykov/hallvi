@@ -383,24 +383,24 @@ describe("changing a credential", () => {
   it("says a change is in flight until it is settled", () => {
     secrets.beginChange(APP, "POSTGRES_PASSWORD");
     expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(true);
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(false);
   });
 
   it("keeps the new value once its use is established", () => {
     const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
       change.next,
     );
   });
 
-  it("puts the working value back when the change could not be established", () => {
-    // The one unrecoverable outcome is losing the password that still works
-    // before the new one does, so a failed change is a no-op and not a
-    // locked-out application.
+  it("puts the old value back when the service is proved to still take it", () => {
+    // Only ever after proof. The outcome for "a command failed and I do not
+    // know which password the service has" is unresolved, which discards
+    // nothing; see the unresolved suite below.
     const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
-    const settled = secrets.settleChange(APP, "POSTGRES_PASSWORD", false);
+    const settled = secrets.settleChange(APP, "POSTGRES_PASSWORD", "reverted");
     expect(settled.rolledBack).toBe(true);
     expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
       change.previous,
@@ -417,7 +417,7 @@ describe("changing a credential", () => {
 
   it("does not keep the old value after the change settles", () => {
     const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     const stored = readFileSync(
       join(directory, "secrets", `${APP}.json`),
       "utf8",
@@ -437,7 +437,7 @@ describe("changing a credential", () => {
       "a-password-the-owner-picked",
     );
     expect(change.next).toBe("a-password-the-owner-picked");
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     const row = secrets
       .listSecrets(APP)
       .find((item) => item.name === "POSTGRES_PASSWORD");
@@ -450,6 +450,116 @@ describe("changing a credential", () => {
     expect(() =>
       secrets.beginChange(APP, "POSTGRES_PASSWORD", "short"),
     ).toThrow(/at least/);
+  });
+});
+
+describe("a change nobody could settle", () => {
+  // The scenario this exists for: ALTER ROLE succeeds, then writing the
+  // application's configuration fails. The service has the new password and
+  // the controller cannot prove it. The old answer was to roll back, which
+  // deleted the only password the database now accepts.
+  beforeEach(() => {
+    secrets.generateSecret(APP, {
+      name: "POSTGRES_PASSWORD",
+      why: "PostgreSQL role password.",
+      process: "db",
+    });
+  });
+
+  it("keeps both values, so the one the service took is still there", () => {
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    const settled = secrets.settleChange(
+      APP,
+      "POSTGRES_PASSWORD",
+      "unresolved",
+      "ALTER ROLE succeeded; writing the application config failed.",
+    );
+    expect(settled.unresolved).toBe(true);
+    const environment = secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"]);
+    expect(environment).toContain(`export POSTGRES_PASSWORD='${change.next}'`);
+    expect(environment).toContain(
+      `export POSTGRES_PASSWORD_PREVIOUS='${change.previous}'`,
+    );
+  });
+
+  it("keeps saying the change is part-way through, with the reason", () => {
+    secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(
+      APP,
+      "POSTGRES_PASSWORD",
+      "unresolved",
+      "The database was reachable and the app config write failed.",
+    );
+    expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(true);
+    const row = secrets
+      .listSecrets(APP)
+      .find((item) => item.name === "POSTGRES_PASSWORD");
+    expect(row?.changing).toBe(true);
+    expect(row?.unresolved?.why).toMatch(/app config write failed/);
+  });
+
+  it("settles properly once the answer is found", () => {
+    const change = secrets.beginChange(APP, "POSTGRES_PASSWORD");
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "unresolved", "Unknown.");
+    // Pi goes and asks the service which password it takes, then says so.
+    secrets.settleChange(
+      APP,
+      "POSTGRES_PASSWORD",
+      "established",
+      "psql authenticated with the new value and the app answered.",
+    );
+    expect(secrets.changeInFlight(APP, "POSTGRES_PASSWORD")).toBe(false);
+    expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
+      change.next,
+    );
+    const row = secrets
+      .listSecrets(APP)
+      .find((item) => item.name === "POSTGRES_PASSWORD");
+    expect(row?.unresolved).toBe(null);
+  });
+});
+
+describe("provenance across a rollback", () => {
+  it("does not turn an owner's password into a revealable generated one", () => {
+    // A generated rotation of a value the owner typed, rolled back. The bytes
+    // came back and the record did not, so the store held the owner's own
+    // password under origin "generated" — and generated is exactly the origin
+    // that may be read back to the screen.
+    secrets.requestSecret(APP, {
+      name: "GF_SECURITY_ADMIN_PASSWORD",
+      why: "Grafana admin.",
+    });
+    secrets.establishSecret(
+      APP,
+      "GF_SECURITY_ADMIN_PASSWORD",
+      "the-owner-typed-this",
+    );
+    const before = secrets
+      .listSecrets(APP)
+      .find((item) => item.name === "GF_SECURITY_ADMIN_PASSWORD");
+    expect(before?.origin).toBe("owner");
+
+    secrets.beginChange(APP, "GF_SECURITY_ADMIN_PASSWORD");
+    secrets.settleChange(
+      APP,
+      "GF_SECURITY_ADMIN_PASSWORD",
+      "reverted",
+      "Grafana still accepts the old password; the new one never reached it.",
+    );
+
+    const after = secrets
+      .listSecrets(APP)
+      .find((item) => item.name === "GF_SECURITY_ADMIN_PASSWORD");
+    expect(after?.origin).toBe("owner");
+    expect(after?.revision).toBe(before?.revision);
+    expect(after?.establishedAt).toBe(before?.establishedAt);
+    expect(() =>
+      secrets.revealSecret(APP, "GF_SECURITY_ADMIN_PASSWORD"),
+    ).toThrow(/will not read it back/);
+    // And the value that came back is the owner's, not the replacement.
+    expect(
+      secrets.secretEnvironment(APP, ["GF_SECURITY_ADMIN_PASSWORD"]),
+    ).toContain("'the-owner-typed-this'");
   });
 });
 
@@ -485,7 +595,7 @@ describe("the environment a change runs in", () => {
     expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).toContain(
       "_PREVIOUS",
     );
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     expect(secrets.secretEnvironment(APP, ["POSTGRES_PASSWORD"])).not.toContain(
       "_PREVIOUS",
     );
@@ -529,16 +639,16 @@ describe("a second change while one is in flight", () => {
       /already part-way through/,
     );
     // And the working value is still the one that comes back.
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", false);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "reverted");
     expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(original);
   });
 
   it("lets a change begin again once the first is settled", () => {
     secrets.beginChange(APP, "POSTGRES_PASSWORD");
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     const second = secrets.beginChange(APP, "POSTGRES_PASSWORD");
     expect(second.changing).toBe(true);
-    secrets.settleChange(APP, "POSTGRES_PASSWORD", true);
+    secrets.settleChange(APP, "POSTGRES_PASSWORD", "established");
     expect(secrets.revealSecret(APP, "POSTGRES_PASSWORD").value).toBe(
       second.next,
     );
