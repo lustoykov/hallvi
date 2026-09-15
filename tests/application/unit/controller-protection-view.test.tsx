@@ -81,6 +81,12 @@ it("says so on the board when the copies are not yet the owner's", () => {
     controller({ state: "copied", kitConfirmedAt: null }),
   );
   expect(markup).toContain("Kit not saved");
+  // The board's row names the subject and its state. The band below it asks
+  // for what the owner has to do, and says neither of them again.
+  expect(markup.split("Kit not saved")).toHaveLength(2);
+  expect(markup).not.toContain("cpb-head");
+  // The region keeps its accessible name; only the visible repeat goes.
+  expect(markup).toContain('aria-label="Server Guy itself"');
   expect(markup).toContain("recovery kit is not saved yet");
   expect(markup).toContain("Save your recovery kit");
   // The passphrase is fetched when the band is shown, never rendered with
@@ -104,10 +110,13 @@ it("states Server Guy on a page no record has anything to say about", () => {
     }),
   );
   expect(markup).toContain("Nothing here has been looked at yet.");
+  // Nothing else on this page names the subject, so the band still does.
   expect(markup).toContain("Server Guy itself");
   expect(markup).toContain("Not copied");
   expect(markup).toContain("Connect backup storage");
   expect(markup).toContain("protects your application");
+  // And the sentence beside that form stands on its own words.
+  expect(markup).toContain("would lose Server Guy");
 });
 
 it("keeps stating Server Guy on that page once it is recoverable", () => {
