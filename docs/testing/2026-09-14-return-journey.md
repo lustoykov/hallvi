@@ -381,3 +381,21 @@ was genuinely dead:
 
 The prose links inside Pi's own messages are still live, which is the
 deliberate decision recorded above.
+
+![A record card headed "Shop private access is open from this PC", with an
+amber "Tunnel closed" chip where its "Open" link used to
+be](2026-09-14-return-journey/closed-tunnel-chip.png)
+
+*Revision `10d5be3`, on the local rig (real sshd in a Linux container, real
+ssh client with pinned host key, real Docker, real model; GitHub and Hetzner
+are stand-ins), 1440×980, with the tunnel genuinely dead. The card's own claim
+stays and is dated — the check did pass when it ran, and the product does not
+rewrite history — but where it offered a way in there is now a chip saying
+there is none. No "Open" link remains anywhere on the page; the capture
+refuses to run if one does.*
+
+*The green tick and "1 check passed" sit beside the closed chip. That was put
+to the owner as a judgement rather than claimed as correct, and they accepted
+it on 15 September: the check did pass when it ran, the chip says the way in
+is gone now, and the two together read as the history plus the present rather
+than as a contradiction.*
