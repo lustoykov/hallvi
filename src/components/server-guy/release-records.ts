@@ -52,7 +52,7 @@ export interface Release {
 export interface ReleaseView {
   /** The newest release a check proved. Null when none ever was. */
   running: Release | null;
-  /** The newest attempt of any kind. Same object as `running` when it worked. */
+  /** The newest attempt. The same object as `running` when it worked. */
   latest: Release | null;
   /** Every release, newest first, including the two above. */
   all: Release[];
