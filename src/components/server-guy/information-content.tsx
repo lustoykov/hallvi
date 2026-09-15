@@ -12,6 +12,7 @@ import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationSection } from "./application-sections";
 import type { Reachability } from "./deployment-prototype/page-head";
 import { Tag, toneOf } from "./presentation";
+import { recordDestination } from "./application-sections";
 import { LocalTime } from "./local-time";
 import { InformationBody } from "./information-body";
 import "./information-content.css";
@@ -115,6 +116,7 @@ export function InformationContent({
   // failure, a warning or a next step keeps the room it needs.
   const routine =
     compact && tone === "verified" && !presentation.nextStep && !primary;
+  const elsewhere = recordDestination(presentation.views, currentView);
   const passed = presentation.checks.filter(
     (check) => check.status === "passed",
   ).length;
@@ -139,7 +141,20 @@ export function InformationContent({
           </span>
         </div>
         <p className="sg-result-alone">
-          <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+          {/* The same rule as the generic card: a repeat goes to the page
+              that renders the record, because the first appearance is often
+              just as compact and "in full" delivered nothing. */}
+          {onOpen && elsewhere ? (
+            <button
+              type="button"
+              className="sg-result-elsewhere"
+              onClick={() => onOpen(elsewhere.id)}
+            >
+              {word} · open {elsewhere.label}
+            </button>
+          ) : (
+            <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+          )}
         </p>
       </article>
     );

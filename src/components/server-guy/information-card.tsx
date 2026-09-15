@@ -12,6 +12,7 @@ import { InformationBody } from "./information-body";
 import { LocalTime } from "./local-time";
 import {
   applicationSections,
+  recordDestination,
   type ApplicationSection,
 } from "./application-sections";
 import { Tag, toneOf } from "./presentation";
@@ -66,8 +67,20 @@ function GenericInformationCard({
     (section) =>
       presentation.views.includes(section.id) && section.id !== currentView,
   );
+  const elsewhere = recordDestination(presentation.views, currentView);
   const established = record.establishedAt ?? record.updatedAt;
   const recommendation = presentation.role === "recommendation";
+  /**
+   * Retired: a later record replaced this one, so it is history.
+   *
+   * It used to render at full height with its red failed check and its
+   * "Next" line intact. A reader scrolling the conversation met a resolved
+   * failure that still told them what to do about it — in one real
+   * transcript, a transfer that failed at 11:53 and succeeded at 11:55 sat
+   * there advising a retry, which is not history, it is a to-do nobody
+   * needs. The failure stays; the instruction and the alarm go.
+   */
+  const retired = Boolean(record.retiredAt);
   // Records written before facts existed have none: the presentation column
   // is JSON read back by cast, not by parse.
   const facts = presentation.facts ?? [];
@@ -135,7 +148,7 @@ function GenericInformationCard({
         </ul>
       )}
 
-      {presentation.nextStep && (
+      {presentation.nextStep && !retired && (
         <p className="sg-info-next">
           <span>{recommendation ? "What Pi suggests" : "Next"}</span>
           {presentation.nextStep}
@@ -223,7 +236,7 @@ function GenericInformationCard({
     !presentation.nextStep &&
     !recommendation;
 
-  if (superseded || routine)
+  if (superseded || routine || retired)
     return (
       <article
         /* The first appearance carries the anchor even when it is compact.
@@ -239,18 +252,33 @@ function GenericInformationCard({
         data-information-id={record.id}
       >
         <div className="sg-result-head">
-          <span className="sg-result-dot" data-tone={tone} aria-hidden="true" />
-          <h3 title={record.title}>{record.title}</h3>
-          {routine && presentation.url && reachable !== "closed" && (
-            <a
-              className="sg-result-open"
-              href={presentation.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open <ArrowUpRight aria-hidden="true" weight="bold" />
-            </a>
+          {retired ? (
+            /* The tag rather than the dot: "No longer current" is the whole
+               point of this card, and a grey dot does not say it. */
+            <Tag tone={tone}>{word}</Tag>
+          ) : (
+            <span
+              className="sg-result-dot"
+              data-tone={tone}
+              aria-hidden="true"
+            />
           )}
+          <h3 title={record.title}>{record.title}</h3>
+          {/* Three reasons not to offer it: the record is history, the way
+              in has stopped working, or there is no address. */}
+          {routine &&
+            !retired &&
+            presentation.url &&
+            reachable !== "closed" && (
+              <a
+                className="sg-result-open"
+                href={presentation.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open <ArrowUpRight aria-hidden="true" weight="bold" />
+              </a>
+            )}
           {routine && presentation.url && reachable === "closed" && (
             <span className="sg-result-shut">Tunnel closed</span>
           )}
@@ -259,11 +287,29 @@ function GenericInformationCard({
           </span>
         </div>
         {superseded ? (
-          /* A repeat of a record already shown. Rather than a second copy of
-             the evidence, it links to the one that holds it — an ordinary
-             anchor, so it survives a reload and works with browser back. */
+          /* A repeat of a record already shown. It used to link to that first
+             appearance with an anchor — which is right only when the first
+             appearance holds something more. Often it does not: a record
+             mentioned twice in a conversation that went well is compact both
+             times, so "see it in full above" scrolled the reader into the
+             middle of history and showed them the same one line again.
+             The place that renders this record in full is its destination,
+             which the record already names in `views` — the same list the
+             full card's pills come from — so that is where the repeat goes.
+             Without a view, or without a shell to switch, the anchor is
+             still the best there is. */
           <p className="sg-result-alone">
-            <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+            {onOpen && elsewhere ? (
+              <button
+                type="button"
+                className="sg-result-elsewhere"
+                onClick={() => onOpen(elsewhere.id)}
+              >
+                {word} · open {elsewhere.label}
+              </button>
+            ) : (
+              <a href={`#record-${record.id}`}>{word} · see it in full above</a>
+            )}
           </p>
         ) : (
           <details className="sg-result-more sg-result-alone">
