@@ -53,6 +53,22 @@ function fit(text: string, boxWidth: number, fontSize = 23, inset = 54) {
   return text.length <= budget ? text : `${text.slice(0, budget - 1)}…`;
 }
 
+/** Keep the primary application name whole when one natural break will do. */
+function fitPrimary(text: string, boxWidth: number, fontSize = 23) {
+  const budget = Math.max(3, Math.floor((boxWidth - 54) / (fontSize * 0.56)));
+  if (text.length <= budget) return [text];
+  const breakAt = Math.max(
+    ...[...text]
+      .map((character, index) =>
+        character === "-" || character === "_" ? index + 1 : -1,
+      )
+      .filter((index) => index > 0 && index <= budget),
+  );
+  if (breakAt > 0 && text.length - breakAt <= budget)
+    return [text.slice(0, breakAt), text.slice(breakAt)];
+  return [fit(text, boxWidth, fontSize)];
+}
+
 export function MiniMap({
   model,
   reduced,
@@ -81,17 +97,23 @@ export function MiniMap({
     ...volumes.map((volume) => volume.id),
     "offsite",
   ].filter((id): id is string => Boolean(id));
-  // A thumbnail shows the shape. Four long container names at a third of
-  // their usual size is not a shape, it is a paragraph — so past two, the
-  // data locations keep their tiles and their state dots and the shelf says
-  // how many there are.
-  const nameVolumes = volumes.length <= 2;
+  // A thumbnail shows the shape. Past two locations, one named group carries
+  // the count and each location's state; empty individual tiles look like
+  // missing content and add no useful detail at this size.
+  const groupVolumes = volumes.length > 2;
   const visit = layout.legs.visit.flat();
+  const showRelease = Boolean(model.byId.source || model.byId.controller);
   const host = model.byId.host;
   const header = BOX.header.y + BOX.header.h;
   const server = layout.rects.server ?? BOX.server;
   const shelf = layout.rects.shelf ?? BOX.shelf;
   const privateZone = layout.rects.private ?? BOX.private;
+  const volumeGroup = {
+    x: shelf.x + 18,
+    y: shelf.y + 42,
+    w: shelf.w - 36,
+    h: Math.max(56, shelf.h - 58),
+  };
   return (
     <button
       type="button"
@@ -169,13 +191,15 @@ export function MiniMap({
           className="axo-map-wall"
           d="M262 146V280M262 320V362M262 402V510"
         />
-        {layout.wires.map((wire) => (
-          <path
-            key={wire.d}
-            d={wire.d}
-            className={`axo-map-wire j-${wire.journey}`}
-          />
-        ))}
+        {layout.wires
+          .filter((wire) => wire.journey !== "release" || showRelease)
+          .map((wire) => (
+            <path
+              key={wire.d}
+              d={wire.d}
+              className={`axo-map-wire j-${wire.journey}`}
+            />
+          ))}
         {!planned &&
           visit.map((d) => (
             <path key={`lit:${d}`} d={d} className="axo-map-lit" />
@@ -208,7 +232,12 @@ export function MiniMap({
           const part = model.byId[id];
           const r = layout.rects[id];
           if (!part || !r) return null;
+          if (groupVolumes && part.kind === "volume") return null;
           const failed = part.evidence.certainty === "failed";
+          const lines =
+            id === "app"
+              ? fitPrimary(part.name, r.w)
+              : [fit(thumbName(id, part.name), r.w)];
           return (
             <g
               key={id}
@@ -233,23 +262,50 @@ export function MiniMap({
                 r="8"
                 fill={part.quiet ? "#3e4a60" : tint[part.evidence.certainty]}
               />
-              {(part.kind !== "volume" || nameVolumes) && (
-                <text x={r.x + 42} y={r.y + r.h / 2 + 8}>
-                  {fit(thumbName(id, part.name), r.w)}
-                </text>
-              )}
+              <text
+                x={r.x + 42}
+                y={r.y + r.h / 2 + (lines.length > 1 ? -4 : 8)}
+              >
+                {lines.map((line, index) => (
+                  <tspan
+                    key={`${line}:${index}`}
+                    x={r.x + 42}
+                    dy={index === 0 ? 0 : 26}
+                  >
+                    {line}
+                  </tspan>
+                ))}
+              </text>
             </g>
           );
         })}
-        {!nameVolumes && (
-          <text
-            className="axo-map-count"
-            x={shelf.x + shelf.w - 20}
-            y={shelf.y + 22}
-            textAnchor="end"
-          >
-            {volumes.length} data locations
-          </text>
+        {groupVolumes && (
+          <g className="axo-map-volume-group">
+            <rect
+              x={volumeGroup.x}
+              y={volumeGroup.y}
+              width={volumeGroup.w}
+              height={volumeGroup.h}
+              rx="12"
+            />
+            <text
+              x={volumeGroup.x + 22}
+              y={volumeGroup.y + volumeGroup.h / 2 + 8}
+            >
+              {volumes.length} data locations
+            </text>
+            {volumes.map((volume, index) => (
+              <circle
+                key={volume.id}
+                cx={volumeGroup.x + volumeGroup.w - 24 - index * 24}
+                cy={volumeGroup.y + volumeGroup.h / 2}
+                r="7"
+                fill={
+                  volume.quiet ? "#3e4a60" : tint[volume.evidence.certainty]
+                }
+              />
+            ))}
+          </g>
         )}
         {model.gaps.some((gap) => gap.id === "monitoring") && (
           <g data-part="gap:monitoring" className="axo-map-ghost">
