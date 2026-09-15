@@ -361,7 +361,14 @@ const lanes: Partial<Record<SubjectKind, Lane>> = {
   application: "checks",
   process: "checks",
   volume: "checks",
+  // All three, because the lane's question is "is my data safe" and a plan
+  // alone cannot answer it. A plan says copies are meant to happen, a copy
+  // says one exists, and a restore test is the only one that says recovery
+  // works. Reading only the plan let a passing timer check speak for all
+  // three.
   "backup-plan": "backups",
+  "backup-copy": "backups",
+  "restore-test": "backups",
   host: "server",
   access: "access",
   door: "access",

@@ -1,0 +1,195 @@
+/* What protects this application's data, said before the calendar of what
+   happened. Four tones, and "verified" is reachable only by a restore that
+   actually ran. */
+
+.sg-protect {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-2, #d8dee8);
+  border-left: 3px solid var(--sg-muted, #667389);
+  border-radius: 8px;
+  background: var(--sg-surface-2, #fbfcfe);
+}
+
+.sg-protect[data-tone="verified"] {
+  border-left-color: #2f7d52;
+  background: #f5fbf7;
+}
+.sg-protect[data-tone="warning"] {
+  border-left-color: #b07d1a;
+  background: #fffaef;
+}
+.sg-protect[data-tone="failed"] {
+  border-left-color: #a6312b;
+  background: #fdf6f5;
+}
+
+.sg-protect-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sg-protect-mark {
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+}
+.sg-protect[data-tone="verified"] .sg-protect-mark {
+  color: #2f7d52;
+}
+.sg-protect[data-tone="warning"] .sg-protect-mark {
+  color: #b07d1a;
+}
+.sg-protect[data-tone="failed"] .sg-protect-mark {
+  color: #a6312b;
+}
+.sg-protect[data-tone="unknown"] .sg-protect-mark {
+  color: var(--sg-muted, #667389);
+}
+
+.sg-protect-tag {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sg-muted, #667389);
+}
+
+.sg-protect-says {
+  flex: 1 1 24ch;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--sg-ink, #192338);
+}
+
+.sg-protect-limit,
+.sg-protect-failure {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--sg-ink-2, #3e4a60);
+}
+
+.sg-protect-failure {
+  color: var(--sg-bad-ink, #a6312b);
+  font-weight: 500;
+}
+
+.sg-protect-destinations {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-protect-destinations li {
+  display: grid;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2, #d8dee8);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.sg-protect-destinations b {
+  font-size: 12px;
+}
+
+.sg-protect-destinations li[data-kind="same-server"] b,
+.sg-protect-destinations li[data-kind="unclassified"] b {
+  color: #8a5a1b;
+}
+.sg-protect-destinations li[data-kind="off-site"] b {
+  color: #2f7d52;
+}
+
+.sg-protect-destinations span {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--sg-muted, #667389);
+}
+
+.sg-protect-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.sg-protect-facts dt {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sg-muted, #667389);
+}
+
+.sg-protect-facts dd {
+  display: grid;
+  gap: 1px;
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--sg-ink, #192338);
+}
+
+.sg-protect-facts small {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--sg-muted, #667389);
+  overflow-wrap: anywhere;
+}
+
+.sg-protect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sg-protect-primary,
+.sg-protect-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.sg-protect-primary {
+  border: 1px solid var(--sg-accent, #285ad8);
+  background: var(--sg-accent, #285ad8);
+  color: #fff;
+}
+.sg-protect-primary:hover {
+  background: #2247ad;
+}
+
+.sg-protect-action {
+  border: 1px solid var(--line-2, #d8dee8);
+  background: #fff;
+  color: var(--blue, #285ad8);
+}
+.sg-protect-action:hover {
+  border-color: #bcc9e4;
+  background: var(--working-bg, #edf3ff);
+}
+
+.sg-protect-primary:focus-visible,
+.sg-protect-action:focus-visible {
+  outline: 2px solid rgb(40 90 216 / 45%);
+  outline-offset: 2px;
+}
