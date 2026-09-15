@@ -49,10 +49,17 @@ export const applicationSections = [
     group: "application",
   },
   {
+    // Secondary on purpose. History is what happened, which matters when you
+    // are working out how the present came about and not while you are
+    // looking at the present. The current-status surfaces answer the first
+    // question; this one answers the second, and it kept a primary seat for
+    // the older reason that it used to be where commands were listed.
     id: "history",
     label: "History",
     icon: ClockCounterClockwise,
     group: "application",
+    hideable: true,
+    available: true,
   },
   {
     id: "processes",
@@ -95,7 +102,19 @@ export const applicationSections = [
     available: true,
   },
   { id: "backups", label: "Backups", icon: Archive, group: "care" },
-  { id: "logs", label: "Logs", icon: TerminalWindow, group: "care" },
+  {
+    // Not "Logs". Nothing in this product retrieves an application's own
+    // logs — no tool does it — and this page has only ever held Server Guy's
+    // command output, which History already carries as evidence on the event
+    // that produced it. Named for what it holds, and secondary, until there
+    // is a runtime-log capability for a Logs destination to be about.
+    id: "logs",
+    label: "Command output",
+    icon: TerminalWindow,
+    group: "care",
+    hideable: true,
+    available: true,
+  },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
   { id: "domains", label: "Domains", icon: Globe, group: "care" },
   {
