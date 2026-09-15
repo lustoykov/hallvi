@@ -22,6 +22,8 @@ import {
 import {
   Fragment,
   useCallback,
+  useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -95,6 +97,7 @@ export function CalendarDirection({
   const [open, setOpen] = useState<string | null>(null);
   const close = useCallback(() => setOpen(null), []);
   useDismiss(Boolean(open), ".axbc-pop, .axbc-cell", close);
+  const scroller = useRef<HTMLDivElement>(null);
 
   // ---------- The days ----------
   const today = startOf(now);
@@ -317,6 +320,19 @@ export function CalendarDirection({
     .filter(Boolean)
     .join(" ");
 
+  // A phone cannot hold three weeks of day columns, so the board scrolls
+  // sideways there. Opening it at the oldest day would show a reader the one
+  // part of it nothing has happened in: start where today is.
+  useEffect(() => {
+    const box = scroller.current;
+    const today = box?.querySelector<HTMLElement>(".axbc-day[data-today]");
+    if (!box || !today || box.scrollWidth <= box.clientWidth) return;
+    box.scrollLeft = Math.max(
+      0,
+      today.offsetLeft + today.offsetWidth / 2 - box.clientWidth / 2,
+    );
+  }, [days.length, todayIndex]);
+
   return (
     <section className="axbc" aria-label="Backups">
       {head}
@@ -341,112 +357,114 @@ export function CalendarDirection({
       </div>
 
       <div className="axbc-board">
-        <div
-          className="axbc-grid"
-          style={
-            {
-              "--cols": days.length,
-              gridTemplateRows: `auto repeat(${rows.length}, 52px)`,
-            } as CSSProperties
-          }
-        >
-          <span className="axbc-corner">{month(days[0])}</span>
-          {todayIndex >= 0 && (
-            <span
-              className="axbc-today"
-              style={{ gridColumn: todayIndex + 2 }}
-              aria-hidden="true"
-            />
-          )}
-          {days.map((day, index) => (
-            <span
-              key={day}
-              className="axbc-day"
-              data-today={day === today || undefined}
-              style={{ gridColumn: index + 2, gridRow: 1 }}
-            >
-              {day === today && (
-                <LittleServer
-                  mood={
-                    moodOf[copy ? (fresh ? "verified" : "stale") : "failed"]
-                  }
-                  className="axbc-guy"
-                />
-              )}
-              <small>{day === today ? "Today" : weekday(day)}</small>
-              <b>{new Date(day).getDate()}</b>
-            </span>
-          ))}
-          {rows.map((row, rowIndex) => (
-            <Fragment key={row.id}>
-              <div
-                className="axbc-head"
-                data-c={row.c}
-                style={{ gridRow: rowIndex + 2, gridColumn: 1 }}
+        <div className="axbc-scroll" ref={scroller}>
+          <div
+            className="axbc-grid"
+            style={
+              {
+                "--cols": days.length,
+                gridTemplateRows: `auto repeat(${rows.length}, 52px)`,
+              } as CSSProperties
+            }
+          >
+            <span className="axbc-corner">{month(days[0])}</span>
+            {todayIndex >= 0 && (
+              <span
+                className="axbc-today"
+                style={{ gridColumn: todayIndex + 2 }}
+                aria-hidden="true"
+              />
+            )}
+            {days.map((day, index) => (
+              <span
+                key={day}
+                className="axbc-day"
+                data-today={day === today || undefined}
+                style={{ gridColumn: index + 2, gridRow: 1 }}
               >
-                <span className="axbc-head-icon" aria-hidden="true">
-                  {row.icon}
-                </span>
-                <span className="axbc-head-text">
-                  <b>{row.name}</b>
-                  <small>
-                    <i aria-hidden="true" />
-                    {row.status}
-                  </small>
-                </span>
-              </div>
-              {row.cells.map((cell, index) => {
-                const id = `${row.id}@${days[index]}`;
-                return (
-                  <div
-                    key={id}
-                    className="axbc-slot"
-                    style={{ gridRow: rowIndex + 2, gridColumn: index + 2 }}
-                  >
-                    {cell.state !== "none" && (
-                      <button
-                        type="button"
-                        className="axbc-cell"
-                        data-state={cell.state}
-                        aria-label={`${dayOf(days[index])}: ${cell.title}`}
-                        aria-expanded={open === id}
-                        onClick={() =>
-                          setOpen((value) => (value === id ? null : id))
-                        }
-                      >
-                        {cell.mark}
-                      </button>
-                    )}
-                    {open === id && (
-                      <div
-                        className="axbc-pop"
-                        role="dialog"
-                        aria-label={`${dayOf(days[index])}: ${cell.title}`}
-                        data-align={index > days.length - 5 ? "end" : "start"}
-                      >
-                        <header>
-                          <div>
-                            <b>{dayOf(days[index])}</b>
-                            <small>{cell.title}</small>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={close}
-                            aria-label="Close"
-                          >
-                            <X weight="bold" />
-                          </button>
-                        </header>
-                        {cell.lines.map((line, lineIndex) => (
-                          <p key={lineIndex}>{line}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </Fragment>
-          ))}
+                {day === today && (
+                  <LittleServer
+                    mood={
+                      moodOf[copy ? (fresh ? "verified" : "stale") : "failed"]
+                    }
+                    className="axbc-guy"
+                  />
+                )}
+                <small>{day === today ? "Today" : weekday(day)}</small>
+                <b>{new Date(day).getDate()}</b>
+              </span>
+            ))}
+            {rows.map((row, rowIndex) => (
+              <Fragment key={row.id}>
+                <div
+                  className="axbc-head"
+                  data-c={row.c}
+                  style={{ gridRow: rowIndex + 2, gridColumn: 1 }}
+                >
+                  <span className="axbc-head-icon" aria-hidden="true">
+                    {row.icon}
+                  </span>
+                  <span className="axbc-head-text">
+                    <b>{row.name}</b>
+                    <small>
+                      <i aria-hidden="true" />
+                      {row.status}
+                    </small>
+                  </span>
+                </div>
+                {row.cells.map((cell, index) => {
+                  const id = `${row.id}@${days[index]}`;
+                  return (
+                    <div
+                      key={id}
+                      className="axbc-slot"
+                      style={{ gridRow: rowIndex + 2, gridColumn: index + 2 }}
+                    >
+                      {cell.state !== "none" && (
+                        <button
+                          type="button"
+                          className="axbc-cell"
+                          data-state={cell.state}
+                          aria-label={`${dayOf(days[index])}: ${cell.title}`}
+                          aria-expanded={open === id}
+                          onClick={() =>
+                            setOpen((value) => (value === id ? null : id))
+                          }
+                        >
+                          {cell.mark}
+                        </button>
+                      )}
+                      {open === id && (
+                        <div
+                          className="axbc-pop"
+                          role="dialog"
+                          aria-label={`${dayOf(days[index])}: ${cell.title}`}
+                          data-align={index > days.length - 5 ? "end" : "start"}
+                        >
+                          <header>
+                            <div>
+                              <b>{dayOf(days[index])}</b>
+                              <small>{cell.title}</small>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={close}
+                              aria-label="Close"
+                            >
+                              <X weight="bold" />
+                            </button>
+                          </header>
+                          {cell.lines.map((line, lineIndex) => (
+                            <p key={lineIndex}>{line}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
         </div>
         <ul className="axbc-legend">
           {legend.map(([state, words]) => (
