@@ -97,6 +97,26 @@ const PLACES: Record<string, { said: string; detail?: string }> = {
   powershell: WORKSPACE,
   write: WORKSPACE,
   edit: WORKSPACE,
+  // Reading a file in the repository copy is the same place as running a
+  // command in it. The activity transcript kept its own list of these and its
+  // own word for each place, so the same call read "on your server" there and
+  // "On the server" one card away.
+  read: WORKSPACE,
+  read_file: WORKSPACE,
+  cat: WORKSPACE,
+  ls: WORKSPACE,
+  list_directory: WORKSPACE,
+  grep: WORKSPACE,
+  find: WORKSPACE,
+  glob: WORKSPACE,
+  write_file: WORKSPACE,
+  edit_file: WORKSPACE,
+  multi_edit: WORKSPACE,
+  // Not a machine, but the same question: what did this touch?
+  save_information: { said: "In Server Guy's records" },
+  retire_information: { said: "In Server Guy's records" },
+  search_information: { said: "In Server Guy's records" },
+  get_application_status: { said: "In Server Guy's records" },
   hetzner_request: { said: "At Hetzner" },
   set_domain_record: { said: "At the DNS provider" },
   // Each of these runs here and reaches outward: a tunnel this Mac holds

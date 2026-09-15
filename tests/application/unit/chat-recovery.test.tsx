@@ -102,10 +102,12 @@ function render({
 
 describe("conversation recovery and assistant branding", () => {
   it.each([
-    // The status line now reads like a status rather than an announcement,
-    // and says how long Pi has been at it when there is a start time.
-    ["queued", "Waiting to reply"],
-    ["running", "Working"],
+    // The status line says what is actually happening, read from the records
+    // that say so. With no execution and no tool call in flight, a running
+    // turn is inside a model call, and "Working" was the same word it used
+    // for a command building an image and for a decision nobody had noticed.
+    ["queued", "Waiting to start"],
+    ["running", "Waiting for the model"],
     ["failed", "Something went wrong. Please retry."],
     // Stopping ends the reply and does not undo work that already ran, so
     // the line reports what happened rather than naming the reply.

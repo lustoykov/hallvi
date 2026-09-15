@@ -38,7 +38,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
-import { plainText } from "./execution-text";
+import { placeOf as placeOfTool, plainText } from "./execution-text";
 import { Markdown } from "./markdown";
 import "./pi-activity.css";
 
@@ -96,36 +96,21 @@ const icons: Record<Kind, typeof FileText> = {
  * runs in the repository copy and `server_bash` runs on the deployed host —
  * so the place is never left to be inferred from the command.
  */
-type Place = "server" | "repository" | "records" | "provider" | "controller";
+/** The phrase itself is the identity now: same words, same group. */
+type Place = string;
 
-const places: { test: RegExp; place: Place }[] = [
-  { test: /^server_bash$/, place: "server" },
-  {
-    test: /^(read|read_file|cat|ls|list_directory|grep|find|glob|write|write_file|edit|edit_file|multi_edit|bash|powershell)$/,
-    place: "repository",
-  },
-  {
-    test: /^(save_information|retire_information|search_information|get_application_status)$/,
-    place: "records",
-  },
-  { test: /^hetzner_request$/, place: "provider" },
-  {
-    test: /^(open_server_port|server_public_key|connect_server)$/,
-    place: "controller",
-  },
-];
-
-const where: Record<Place, string> = {
-  server: "on your server",
-  repository: "in the repository copy",
-  records: "in Server Guy’s records",
-  provider: "at Hetzner",
-  controller: "on Server Guy",
-};
-
-/** A tool nobody has placed yet says nothing rather than guessing. */
-function placeOf(record: ActivityRecord): Place | null {
-  return places.find((entry) => entry.test.test(record.tool))?.place ?? null;
+/**
+ * Where a call acted, read from the one table the console reads.
+ *
+ * This file used to carry its own list of tools and its own word for each
+ * place, so the same call said "on your server" here and "On the server" on
+ * the execution card beside it. One table, one answer, lowercased for use
+ * inside a sentence.
+ */
+function placeOf(record: ActivityRecord) {
+  const said = placeOfTool(record.tool);
+  if (!said) return null;
+  return said.charAt(0).toLowerCase() + said.slice(1);
 }
 
 /** "root@46.62.253.6:22" — the reader wants the host, not the login. */
@@ -395,8 +380,8 @@ function Quiet({
         <span>{summarise(records)}</span>
         {place && (
           <span className="sg-did-where">
-            {where[place]}
-            {host && place === "server" && <code>{host}</code>}
+            {place}
+            {host && <code>{host}</code>}
           </span>
         )}
         {/* One mark per call, in order. Six green ticks and one red is a

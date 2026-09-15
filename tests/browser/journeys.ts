@@ -2,6 +2,13 @@
 // tags.
 export const browserJourneys = [
   {
+    id: "still-working",
+    name: "A turn in flight, and letting go of it",
+    description:
+      "Say what a running turn is actually doing, above the composer as well as in the transcript, and take the next message once it finishes.",
+    smoke: false,
+  },
+  {
     id: "streaming-output",
     name: "Inline command output",
     description:
