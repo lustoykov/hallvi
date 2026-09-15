@@ -233,5 +233,21 @@ fixed with a regression test.
 Every resource created for this run is recorded under owner UUID
 `d6bbf454-0d68-4a12-a8b0-536960fecfff` in the local inventory at
 `~/Library/Application Support/Server Guy/development-cleanup/`, with the
-`sg-*` development labels applied to each Hetzner resource. See the PR
-description for the disposition recorded at the end of the task.
+`sg-*` development labels applied to each Hetzner resource.
+
+Disposition, verified at the end of the task: server 166041471, firewall
+11626980, ssh key 130045125 and both primary IPs deleted by exact id, and every
+Hetzner resource type — servers, firewalls, SSH keys, primary IPs, volumes,
+networks, load balancers, snapshots and floating IPs — re-listed afterwards and
+empty. The primary IPs were `auto_delete`, and were confirmed gone by that
+re-listing rather than assumed. The DNS record was removed through the product,
+and the zone's other nine records were re-listed and are unchanged. This task's
+controller, worker and SSH tunnel were stopped after being identified by exact
+worktree working directory; two node processes on this Mac that could not be
+attributed to this task were left running and recorded.
+
+Retained: the worktree and its `.server-guy` development database, because the
+branch is in review on [PR #76](https://github.com/lustoykov/server-guy/pull/76).
+It holds SSH key material for the deleted server and a copied
+`hetzner-connection.json`, and should go with the worktree once the PR is
+settled. This report is committed, so the evidence survives that removal.
