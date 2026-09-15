@@ -354,3 +354,30 @@ Local Docker only, registered under owner `f67b220d-6d9e-4da0-bd08-5463e8406eb9`
 in the development-cleanup inventory: the `sg-rig-return` host container, its
 `sg-rig-ssh-2226` loopback endpoint, their two volumes, and the rig records
 under the ignored `tests/results/rig/return/`. No paid resource was created.
+
+## A caveat on this document's UI evidence, added 15 September
+
+The local rig copies the application's `src` into its own directory, and until
+15 September it did so **only when that directory did not already exist** — so
+a restarted rig went on serving the snapshot it was built from. This rig's
+snapshot was taken on 14 September at 16:27. The five fixes above were written
+during that session and re-verified "on the same records", which is
+projection-level evidence and remains sound; but **any page rendered in a
+browser after 16:27 was rendering the pre-fix snapshot**, so browser
+observations from that window cannot support a claim about this branch's code.
+
+`tests/rig/rig.mjs` now refreshes its source on every start and records the
+commit it serves (see PR #73). With the rig serving this branch's code, the
+access-closed behaviour was re-checked on 15 September, on a rig whose tunnel
+was genuinely dead:
+
+| Re-checked | What the page did |
+| --- | --- |
+| Overview's header | "The tunnel is closed", with "Ask Pi to reopen it" and **no anchor** to the application |
+| every page | no `Open ↗` link anywhere |
+| an information card citing the private URL | a "Tunnel closed" chip in place of the link |
+| Overview's Access lane | "Tunnel is closed", read as a failure rather than a lapsed check |
+| the Backups calendar | "Copies taken", not "Copies off the server" |
+
+The prose links inside Pi's own messages are still live, which is the
+deliberate decision recorded above.
