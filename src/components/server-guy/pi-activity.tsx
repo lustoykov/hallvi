@@ -34,7 +34,7 @@ import {
   SpinnerGap,
   Terminal,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
@@ -261,7 +261,11 @@ export function PiActivity({
   // Executions that have earned a card keep it. Remembering is what stops a
   // fast command flashing one open and shut, and stops a finished one
   // snatching its output back into a closed row.
-  const kept = useRef(new Set<string>());
+  //
+  // What is remembered is read while deciding what to draw, so it is state
+  // rather than a ref: a ref read during render is the one thing React does
+  // not promise to have kept.
+  const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
   const mine = records
     .filter((record) => record.runId === runId)
     .sort((a, b) => a.sequence - b.sequence);
@@ -284,12 +288,14 @@ export function PiActivity({
       execution.status === "awaiting-approval" ||
       (execution.status === "running" &&
         Boolean(record.preview.trim() || execution.output.trim()));
-    if (watchable || kept.current.has(record.executionId))
+    if (watchable || kept.has(record.executionId))
       cards.add(record.executionId);
   }
-  useEffect(() => {
-    for (const id of cards) kept.current.add(id);
-  });
+  // Remembered where it is used, rather than after the paint: this is the
+  // supported way to adjust state during a render, and it settles at once
+  // because the next render earns nothing new.
+  const earned = [...cards].filter((id) => !kept.has(id));
+  if (earned.length) setKept(new Set([...kept, ...earned]));
 
   if (!mine.length && !tail) return null;
   return (
