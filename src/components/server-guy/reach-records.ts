@@ -98,6 +98,10 @@ export function reachFromRecords({
       ? "public"
       : "controller";
 
+  /** A label only counts as something to read when it is more than a name. */
+  const sentence = (said: string | undefined | null) =>
+    said && /\s/.test(said.trim()) ? said : null;
+
   // ---- The doors, and whether each is doing its job.
   const doors: Door[] = [];
   const guards: Guard[] = [];
@@ -151,10 +155,17 @@ export function reachFromRecords({
           // Pi's own detail, else the label of the check that ran: saying
           // "checked, with no detail recorded" tells a reader about our
           // bookkeeping instead of about their server.
+          //
+          // A one-word label is that bookkeeping. A check named `open` put
+          // the bare word "open" under "What that rests on", which is the
+          // check's own name and not a thing anyone found out.
           (refused ?? open)?.value.detail ??
-          (refused ?? open)?.value.label ??
-          [...checks.values()][0]?.value.label ??
-          "Nobody has checked this port.",
+          sentence((refused ?? open)?.value.label) ??
+          sentence([...checks.values()][0]?.value.label) ??
+          // A check ran and wrote no sentence, so there is nothing to put
+          // here. "Nobody has checked this port" would be false, and the
+          // page says what the check established in its own line anyway.
+          (checks.size ? "" : "Nobody has checked this port."),
         unasked: checks.size === 0 || undefined,
         // Only this door's checks establish a connection result. Its detail
         // carries the checking location; the key alone does not imply an

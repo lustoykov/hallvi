@@ -466,7 +466,7 @@ function Connection({
           incident. */}
       <div className="pm-rests">
         <span className="pm-eyebrow">What that rests on</span>
-        <p>{door.detail}</p>
+        {door.detail && <p>{door.detail}</p>}
         {door.sources.length > 0 && (
           <p className="pm-sources">
             Allowed to <code>{door.sources.join(", ")}</code>

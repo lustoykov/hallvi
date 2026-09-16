@@ -79,7 +79,7 @@ export function DatabasePage({
               )
             }
           >
-            Ask Pi where the data lives
+            Ask Server Guy where the data lives
           </button>
         </div>
       </div>

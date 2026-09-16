@@ -20,7 +20,7 @@
 // only some of the commands ran anywhere else. The filter belongs on Command
 // output, which is a list of commands.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
@@ -87,7 +87,30 @@ const STEP_STATE: Record<ExecutionRecord["status"], string> = {
 function Work({ steps }: { steps: ReleaseStep[] }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [full, setFull] = useState<string | null>(null);
+  const pane = useRef<HTMLDivElement>(null);
   const step = steps.find((one) => one.id === picked) ?? null;
+
+  /**
+   * Picking a step, and finding what it printed.
+   *
+   * One pane for the release is the design and stays. What it cost is that
+   * on a narrow window the pane sits below the whole list, so a reader who
+   * picks the first of six commands is looking at a pane they cannot see.
+   * Bringing it into view only when it is out of view leaves the ordinary
+   * case alone and answers the click in the one case that needed it.
+   */
+  const pick = (id: string) => {
+    const next = id === picked ? null : id;
+    setPicked(next);
+    if (!next) return;
+    requestAnimationFrame(() => {
+      const box = pane.current?.getBoundingClientRect();
+      if (!box) return;
+      const hidden = box.bottom > window.innerHeight || box.top < 0;
+      if (hidden)
+        pane.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
   if (!steps.length)
     return (
       <p className="rp-quiet">
@@ -106,7 +129,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
               className="rp-step"
               data-picked={one.id === picked || undefined}
               aria-pressed={one.id === picked}
-              onClick={() => setPicked(one.id === picked ? null : one.id)}
+              onClick={() => pick(one.id)}
             >
               <span className="rp-step-mark" aria-hidden="true" />
               <span className="rp-step-body">
@@ -130,7 +153,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
           </li>
         ))}
       </ol>
-      <div className="rp-output" data-outcome={step?.outcome}>
+      <div className="rp-output" ref={pane} data-outcome={step?.outcome}>
         <header>
           <span className="rp-lights" aria-hidden="true">
             <i />

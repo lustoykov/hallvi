@@ -93,7 +93,7 @@ export function StoragePage({
               )
             }
           >
-            Ask Pi what is on disk
+            Ask Server Guy what is on disk
           </button>
         </div>
       </div>

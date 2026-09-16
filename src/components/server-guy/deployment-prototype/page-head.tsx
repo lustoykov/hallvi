@@ -129,7 +129,13 @@ export function AccessLink({
           {onReopen && (
             <button type="button" className="axj3-reopen" onClick={onReopen}>
               <ChatCircleText weight="bold" />
-              {tunnelled ? "Ask Pi to reopen it" : "Ask Pi to look"}
+              {/* The same words the release band uses for the same action.
+                  "Reopen it" and "reopen access" name a thing the reader has
+                  no picture of; what dropped is a connection this computer
+                  holds open. */}
+              {tunnelled
+                ? "Open the connection again"
+                : "Ask Server Guy to look"}
             </button>
           )}
         </>

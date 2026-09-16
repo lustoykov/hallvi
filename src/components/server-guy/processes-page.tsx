@@ -92,7 +92,7 @@ export function ProcessesPage({
               )
             }
           >
-            Ask Pi what is running
+            Ask Server Guy what is running
           </button>
         </div>
       </div>
