@@ -349,8 +349,18 @@ export function ChatPane({
   const application = view.application;
   const archived = Boolean(activeChat?.archivedAt);
   const readOnly = archived;
-  const canWrite = piReady && Boolean(application) && Boolean(activeChat);
+  /**
+   * Writing and sending are separate.
+   *
+   * The whole composer used to go dead the moment ChatGPT was not connected,
+   * which meant the one thing a reader arrives wanting to do — put their
+   * question into words — was the thing they could not do until they had
+   * been through setup. They can write it now; only Send waits for the
+   * connection, and the draft is kept while they go and make one.
+   */
+  const canWrite = Boolean(application) && Boolean(activeChat);
   const composerDisabled = !canWrite || readOnly;
+  const sendDisabled = composerDisabled || !piReady;
   const clockReady = useClockReady();
   /**
    * The turn this conversation is still finishing, if there is one.
@@ -898,9 +908,23 @@ export function ChatPane({
             <WarningCircle weight="bold" />
             <div>
               <strong>Connect ChatGPT to chat</strong>
-              <p>Your applications and chat history are still available.</p>
+              <p>
+                Your applications and chat history are still available, and
+                anything you have typed here is kept.
+              </p>
             </div>
-            <Link href="/setup/pi">Open Settings</Link>
+            {/* The two ids are what brings the reader back to this exact
+                conversation afterwards. They name records, not a URL, and
+                the draft stays in this browser rather than travelling. */}
+            <Link
+              href={
+                chatId
+                  ? `/setup/pi?application=${application.id}&chat=${chatId}`
+                  : "/setup/pi"
+              }
+            >
+              Open Settings
+            </Link>
           </div>
         )}
         <div
@@ -918,14 +942,15 @@ export function ChatPane({
                 !event.nativeEvent.isComposing
               ) {
                 event.preventDefault();
-                if (!busy) event.currentTarget.form?.requestSubmit();
+                if (!busy && !sendDisabled)
+                  event.currentTarget.form?.requestSubmit();
               }
             }}
             placeholder={
               archived
                 ? "This chat is archived"
                 : !piReady
-                  ? "Connect ChatGPT in Settings to chat"
+                  ? "Write it now; connect ChatGPT to send it"
                   : application
                     ? "Ask Server Guy, correct a decision, or add context…"
                     : "Add an application to start chatting"
@@ -939,7 +964,7 @@ export function ChatPane({
             </span>
             <button
               className="sg-send"
-              disabled={!composer.trim() || composerDisabled || busy !== null}
+              disabled={!composer.trim() || sendDisabled || busy !== null}
               type="submit"
             >
               {busy === "message" ? (

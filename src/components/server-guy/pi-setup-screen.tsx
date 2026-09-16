@@ -46,8 +46,15 @@ function effortLabel(effort: string) {
 
 export function PiSetupScreen({
   initialStatus,
+  returnTo,
 }: {
   initialStatus: PiSetupStatus;
+  /**
+   * The conversation the reader came from, already checked against the
+   * records by the page. Setup is a detour, and both ways out of it — a
+   * saved login and a cancelled one — lead back here.
+   */
+  returnTo?: { href: string; label: string };
 }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
@@ -288,7 +295,7 @@ export function PiSetupScreen({
             }),
           ),
         );
-      router.push("/applications");
+      router.push(returnTo?.href ?? "/applications");
       router.refresh();
     } catch (caught) {
       setError(
@@ -316,8 +323,11 @@ export function PiSetupScreen({
           <span className="sg-app-mark">SG</span>
           <span>Server Guy</span>
         </Link>
-        <Link className="sg-setup-back" href="/applications">
-          <ArrowLeft /> All applications
+        <Link
+          className="sg-setup-back"
+          href={returnTo?.href ?? "/applications"}
+        >
+          <ArrowLeft /> {returnTo?.label ?? "All applications"}
         </Link>
       </header>
       <div className={s.page}>
@@ -585,7 +595,9 @@ export function PiSetupScreen({
               {working
                 ? "Finish sign-in to continue."
                 : !connectionReady
-                  ? "Connect your account to start."
+                  ? returnTo
+                    ? "Connect your account to send this message. Your draft is still there."
+                    : "Connect your account to start."
                   : hasChanges
                     ? "Your model preferences will be saved."
                     : "Access is checked when you send a message."}
@@ -598,7 +610,7 @@ export function PiSetupScreen({
               }
               onClick={viewApplications}
             >
-              {saving ? "Saving…" : "View applications"}
+              {saving ? "Saving…" : (returnTo?.label ?? "View applications")}
               <ArrowRight />
             </button>
           </footer>
