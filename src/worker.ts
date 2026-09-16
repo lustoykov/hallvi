@@ -1,4 +1,9 @@
-import { PiWorkerDrainError, runPiWorker } from "./server/pi-worker";
+import {
+  PiWorkerBusyError,
+  PiWorkerDrainError,
+  runPiWorker,
+  WORKER_BUSY_EXIT,
+} from "./server/pi-worker";
 import { shutdownTracing } from "./server/tracing";
 
 const controller = new AbortController();
@@ -11,6 +16,9 @@ runPiWorker(controller.signal)
       error instanceof Error ? error.message : "The Pi worker could not start.",
     );
     if (error instanceof PiWorkerDrainError) process.exit(1);
-    process.exitCode = 1;
+    // A worker that stepped aside for a live one is not a failure to restart
+    // into; its own exit code says which case this was.
+    process.exitCode =
+      error instanceof PiWorkerBusyError ? WORKER_BUSY_EXIT : 1;
   })
   .finally(shutdownTracing);

@@ -50,13 +50,11 @@ npm run db:push
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>. In another terminal from the same checkout:
+Open <http://127.0.0.1:3000>. That one command starts three processes: the application, the Pi worker that carries its conversations, and a Drizzle Studio on the same database. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands all three children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `SERVER_GUY_DB_PATH` overrides the default `.server-guy/server-guy.db`. The Studio takes the first free port from 4983 or from `SERVER_GUY_STUDIO_PORT`, and the application is told which port it chose.
 
-```sh
-npm run worker
-```
+The worker stays a separate process with its own exclusive lock ([what the launcher does when it stops](docs/architecture/development-start.md)). If it exits unexpectedly, the launcher says so and starts it once more; if it exits again, the launcher stops the children it started and exits non-zero rather than leaving the application in front of a queue nobody reads. A worker that finds another one already serving this database steps aside, and the launcher leaves that running worker alone. For debugging, `npm run worker` still starts one on its own from the same checkout.
 
-Both processes must use the same database/configuration. The worker loads `.env` and `.env.local`. `SERVER_GUY_DB_PATH` overrides the default `.server-guy/server-guy.db`. `npm run dev` also starts a Drizzle Studio on that same database, taking the first free port from 4983 or from `SERVER_GUY_STUDIO_PORT`, and tells the application which port it chose. Without the worker, accepted requests remain queued. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
+Accepted messages are saved and stay queued until a worker picks them up. When none is running, the conversation says so above the composer and on the waiting message instead of showing a reply in progress. The current controller binds to loopback and rejects arbitrary Host headers; public deployment of the controller still needs authenticated setup.
 
 ### Private application access
 

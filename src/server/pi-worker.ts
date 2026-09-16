@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { realpathSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { databasePath, listMessages } from "./db";
+import { announceWorker } from "./worker-presence";
 import { beginRunDiagnostics } from "./tracing";
 import { buildPiRunContext } from "./pi-run-context";
 import { NativeSessionError } from "./pi-sessions";
@@ -32,6 +33,15 @@ import { diagnosticFailure, type DiagnosticFailure } from "./diagnostics";
 // The process must exit instead of releasing its writer locks while SDK work
 // may still be alive. This is deliberately not an ordinary failed Run.
 export class PiWorkerDrainError extends Error {}
+
+/**
+ * Another worker already serves this database. Not a failure: the queue has a
+ * reader, and it is not this process. The exit code says so to whatever
+ * started it, so a launcher can leave the running one alone instead of
+ * restarting into the same lock.
+ */
+export class PiWorkerBusyError extends Error {}
+export const WORKER_BUSY_EXIT = 3;
 // Retain a poisoned worker's lock strongly until process exit; otherwise the
 // native SQLite handle could be garbage-collected while SDK work is alive.
 const unsettledWorkerLocks = new Set<() => void>();
@@ -45,7 +55,9 @@ export function acquireWorkerLock() {
     lock.exec("BEGIN EXCLUSIVE");
   } catch {
     lock.close();
-    throw new Error("A Pi worker is already running for this database.");
+    throw new PiWorkerBusyError(
+      "A Pi worker is already running for this database.",
+    );
   }
   return () => {
     lock.close();
@@ -270,6 +282,9 @@ async function keepControllerCopy(trigger: "after-change" | "daily") {
 
 export async function runPiWorker(signal: AbortSignal) {
   const release = acquireWorkerLock();
+  // Only after the lock: a process that never became the worker must not
+  // claim to be one.
+  const stopAnnouncing = announceWorker();
   let unsettled = false;
   try {
     interruptRunningPiRuns();
@@ -302,6 +317,9 @@ export async function runPiWorker(signal: AbortSignal) {
   } finally {
     // A poisoned worker keeps the OS lock until process exit, not merely until
     // this function rejects. No next writer may overlap an unresponsive SDK.
+    // Its beat stops either way: it is not reading the queue any more, and
+    // the conversation must say so rather than wait on it.
+    stopAnnouncing();
     if (unsettled) unsettledWorkerLocks.add(release);
     else release();
   }
