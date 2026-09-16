@@ -65,30 +65,25 @@ const draw = (
     />,
   );
 
-it("draws Server Guy as one more row on the board, in its own words", () => {
+it("states Server Guy's own recovery once, on its own track", () => {
   const markup = draw([PLAN()], controller());
-  expect(markup).toContain("Server Guy itself");
-  expect(markup).toContain("Recoverable");
-  // Who holds the key is stated once, on Server Guy's own track. The board
-  // below used to say it a second time in its own words, under a summary the
-  // track had already given.
+  expect(markup).toContain("Server Guy\u2019s own recovery");
+  // Who holds the key is stated once, on that track. The band under it says
+  // neither the subject nor its state again.
   expect(markup).toContain("you hold what opens the copies");
   expect(markup).not.toContain("you hold what opens them");
   expect(markup.split("you hold what opens")).toHaveLength(2);
-  expect(markup).toContain("copy of Server Guy&#x27;s own records");
   // Quiet when there is nothing to ask of the owner: the row carries it.
   expect(markup).not.toContain("Save your recovery kit");
 });
 
-it("says so on the board when the copies are not yet the owner's", () => {
+it("says so on the track when the copies are not yet the owner's", () => {
   const markup = draw(
     [PLAN()],
     controller({ state: "copied", kitConfirmedAt: null }),
   );
-  expect(markup).toContain("Kit not saved");
-  // The board's row names the subject and its state. The band below it asks
+  // The track's row names the subject and its state. The band below it asks
   // for what the owner has to do, and says neither of them again.
-  expect(markup.split("Kit not saved")).toHaveLength(2);
   expect(markup).not.toContain("cpb-head");
   // The region keeps its accessible name; only the visible repeat goes.
   expect(markup).toContain('aria-label="Server Guy itself"');
@@ -156,7 +151,10 @@ it("reports a failed copy instead of a quiet page", () => {
       ],
     }),
   );
-  expect(markup).toContain("Copy failed");
+  // The row itself says it broke. A tick over "last copied 2 h ago" with the
+  // failure only in the band below reads as a page that is fine.
+  expect(markup).toContain("the last attempt failed");
+  expect(markup).toContain('data-state="failed"');
   expect(markup).toContain("refused the request (403)");
 });
 

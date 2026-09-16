@@ -2,10 +2,19 @@
 
 // Backups, on real records.
 //
-// The accepted Calendar design over the same three subjects Storage reads —
-// plan, copy, restore test — because they are the same records and the two
+// The selected design (C inside F) over the same three subjects Storage reads
+// — plan, copy, restore test — because they are the same records and the two
 // pages ask different questions of them. Storage asks "would this survive the
 // container being replaced"; this one asks "would it survive the server".
+//
+// The stages are the page. The calendar board that used to sit under them is
+// kept at backup-prototype/calendar.tsx as the alternative it now is: with
+// the things themselves inside the stages, a board of the same copies by day
+// is the reader meeting the same facts twice. One finding went with it — the
+// board marked a day where a schedule implied a copy and none was on record,
+// which it worked out by assuming the schedule was daily. Nothing on record
+// says the cadence, so that mark is not reproduced here rather than guessed
+// at again.
 //
 // The empty state is the one that has to be right. "No backups" is a claim,
 // and a page that makes it on the strength of no records has told the reader
@@ -15,16 +24,13 @@ import { useMemo } from "react";
 
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 import type { SavedInformation } from "@/server/operator-data";
-import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 
 import type { PageChrome } from "./architecture-prototype/index";
 import { protectionFromRecords, protectionVerdict } from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";
-import { CalendarDirection } from "./backup-prototype/calendar";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";
-import "./backup-prototype/calendar.css";
 
 export function BackupsPage({
   records,
@@ -62,23 +68,13 @@ export function BackupsPage({
     [records, now, applicationId],
   );
   const assessed = protection.assessed;
-  // The one verdict the page leads with. It is deliberately not derived from
-  // the calendar below it: the calendar shows what happened, and this says
-  // what that adds up to, which is the question a reader arrives with.
+  // The one verdict the page leads with, and deliberately not a summary of
+  // the stages under it: they say what happened, this says what that adds up
+  // to, which is the question a reader arrives with.
   const verdict = useMemo(
     () => protectionVerdict(protection, now),
     [protection, now],
   );
-  const server = useMemo(() => {
-    const live = records.filter((record) => !record.retiredAt);
-    const host = subjectsOfKind(live, "host")[0];
-    if (!host) return null;
-    return {
-      label: host.id,
-      city: currentFacts(live, host).get("region")?.value.value ?? null,
-    };
-  }, [records]);
-
   const head = (
     <PageHead
       bar={chrome.bar}
@@ -93,7 +89,7 @@ export function BackupsPage({
 
   if (!assessed)
     return (
-      <div className="ax-root" data-variant="calendar">
+      <div className="ax-root" data-variant="stages">
         {head}
         <div className="sg-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
@@ -136,42 +132,33 @@ export function BackupsPage({
     );
 
   return (
-    <div className="ax-root" data-variant="calendar">
-      <CalendarDirection
-        story={story}
-        now={now}
-        head={head}
-        /* The stages above answer "are we backed up" and offer the one thing
-           to do about it. The board below them says which days hold a copy,
-           which is a different question and not a second summary. */
-        lede={false}
-        activity={
-          /* Set up, copied, opened — three stages rather than one verdict
-             with three facts folded into it. Merging any two of them is the
-             mistake this page kept making, and separate stages make it
-             structurally impossible rather than a thing to be careful
-             about. */
-          <BackupStages
-            protection={protection}
-            verdict={verdict}
+    <div className="ax-root" data-variant="stages">
+      <section className="sg-backups" aria-label="Backups">
+        {head}
+        {/* Set up, copied, opened — three stages rather than one verdict with
+            three facts folded into it, and what the application keeps inside
+            the first of them. */}
+        <BackupStages
+          protection={protection}
+          verdict={verdict}
+          now={now}
+          applicationName={applicationName}
+          volumes={story.volumes}
+          pieces={story.pieces}
+          controller={controller}
+          onAsk={onAsk}
+        />
+        {/* The track above already names Server Guy's own recovery and says
+            its state, so this stays quiet unless there is something to do
+            about it. */}
+        {controller && (
+          <ControllerProtectionBand
+            facts={controller}
             now={now}
-            controller={controller}
-            onAsk={onAsk}
+            onRefresh={onRefresh}
           />
-        }
-        server={server}
-        controller={controller}
-        controllerBand={
-          controller && (
-            <ControllerProtectionBand
-              facts={controller}
-              now={now}
-              onRefresh={onRefresh}
-            />
-          )
-        }
-        onAsk={onAsk}
-      />
+        )}
+      </section>
     </div>
   );
 }
