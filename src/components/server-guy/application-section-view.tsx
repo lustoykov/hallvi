@@ -228,8 +228,6 @@ export function ApplicationSectionView({
             activity: null,
           }}
           panel={children}
-          onOpenConversation={onOpenConversation}
-          onOpenDestination={onOpenDestination}
           onAsk={(draft) => onAsk(null, draft)}
         />
       );
