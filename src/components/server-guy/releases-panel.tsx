@@ -228,6 +228,9 @@ export function ReleasesPanel({
             // The tunnel is not answering, so the address is not a way in.
             // Offering it anyway is the page promising something it has just
             // been told is untrue.
+            // "Reopen access" named a thing the reader has no picture of.
+            // What is true is that this application answers only through a
+            // connection this Mac holds open, and that connection dropped.
             <>
               {onReopen ? (
                 <button
@@ -235,7 +238,7 @@ export function ReleasesPanel({
                   className="rp-open-button is-ask"
                   onClick={onReopen}
                 >
-                  Reopen access
+                  Open the connection again
                 </button>
               ) : (
                 <span className="rp-open-button is-dead" aria-disabled="true">
