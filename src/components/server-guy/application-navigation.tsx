@@ -8,7 +8,7 @@ import {
   Plus,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   applicationSections,
   type ApplicationSection,
@@ -110,6 +110,82 @@ function Reveal({
   );
 }
 
+/**
+ * History and command output, behind one heading.
+ *
+ * They were rows beside Backups and Domains, which made them read as two more
+ * parts of the application needing attention. They are neither: they are the
+ * record of what has been done to it. Closed by default, and open whenever
+ * the page you are on is inside — a link into History has to show you where
+ * you have landed, and a group that hid its own active child would be worse
+ * than the rows it replaced.
+ *
+ * The rows inside are the same size and the same target as the ones above.
+ * Making a destination smaller is not making it secondary; it is making it
+ * harder to hit.
+ */
+function Activity({
+  sections,
+  section,
+  indicators,
+  onSection,
+}: {
+  sections: readonly ApplicationSectionDefinition[];
+  section: ApplicationSection | null;
+  indicators?: Partial<Record<ApplicationSection, NavigationIndicator>>;
+  onSection: (section: ApplicationSection) => void;
+}) {
+  const inside = sections.some((item) => item.id === section);
+  const [open, setOpen] = useState(inside);
+  const [wasInside, setWasInside] = useState(inside);
+  // Landing on a child opens the group it lives in. Adjusting during render
+  // rather than in an effect, so the group is never briefly shut around the
+  // page the reader just asked for.
+  if (inside !== wasInside) {
+    setWasInside(inside);
+    if (inside) setOpen(true);
+  }
+  if (!sections.length) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className={`sg-nav-activity sg-nav-group-start ${
+          inside && !open ? "selected" : ""
+        }`}
+        aria-expanded={open}
+        aria-current={inside && !open ? "page" : undefined}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? (
+          <CaretDown aria-hidden="true" />
+        ) : (
+          <CaretRight aria-hidden="true" />
+        )}
+        <span>Activity</span>
+      </button>
+      {open &&
+        sections.map((item) => {
+          const indicator = indicators?.[item.id];
+          const markId = `sg-mark-${item.id}`;
+          return (
+            <button
+              key={item.id}
+              className={`sg-nav-inside ${section === item.id ? "selected" : ""}`}
+              aria-current={section === item.id ? "page" : undefined}
+              aria-describedby={indicator ? markId : undefined}
+              onClick={() => onSection(item.id)}
+            >
+              <item.icon aria-hidden="true" />
+              <span>{item.label}</span>
+              {indicator && <Mark id={markId} indicator={indicator} />}
+            </button>
+          );
+        })}
+    </>
+  );
+}
+
 export function ApplicationNavigation({
   chats,
   selectedChatId,
@@ -147,6 +223,8 @@ export function ApplicationNavigation({
   indicators?: Partial<Record<ApplicationSection, NavigationIndicator>>;
   chatMarks?: Record<string, NavigationIndicator>;
 }) {
+  const primary = sections.filter((item) => item.group !== "activity");
+  const activity = sections.filter((item) => item.group === "activity");
   return (
     <aside
       className="sg-application-navigation"
@@ -166,11 +244,11 @@ export function ApplicationNavigation({
       )}
       <nav aria-label="Application workspace">
         <div className="sg-destinations">
-          {sections.map((item, index) => {
+          {primary.map((item, index) => {
             const indicator = indicators?.[item.id];
             const markId = `sg-mark-${item.id}`;
             const groupStart =
-              index > 0 && item.group !== sections[index - 1].group;
+              index > 0 && item.group !== primary[index - 1].group;
             const row = (
               <button
                 key={item.id}
@@ -195,6 +273,12 @@ export function ApplicationNavigation({
               onSection={onSection}
             />
           )}
+          <Activity
+            sections={activity}
+            section={section}
+            indicators={indicators}
+            onSection={onSection}
+          />
         </div>
         <div className="sg-conversations-heading">
           <span>Conversations</span>

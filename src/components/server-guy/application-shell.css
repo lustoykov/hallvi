@@ -1603,6 +1603,16 @@ dd.sg-protection-warn {
   width: 13px;
   height: 13px;
 }
+/* The activity heading is a destination row, not a footnote: same size and
+   same target as the rows above it, with the caret in the icon's place. */
+.sg-application-navigation .sg-nav-activity svg {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+.sg-application-navigation .sg-nav-inside {
+  padding-left: 30px;
+}
 .sg-application-navigation .sg-nav-unused {
   color: var(--muted);
 }
