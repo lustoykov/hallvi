@@ -124,131 +124,139 @@ const restore = (
 const verdict = (records: SavedInformation[], now = NOW) =>
   protectionVerdict(protectionFromRecords(records, now), now);
 
+// Every verdict the page can reach, and the words each one owes the reader.
+// The rows are ordered the way the verdict ranks them, so a row that also
+// matches an earlier condition documents which one wins.
 describe("what the page says, state by state", () => {
-  it("no records at all is not assessed, never 'no backups'", () => {
-    // The one claim that would stop a reader acting, made on no evidence.
-    const said = verdict([]);
-    expect(said.state).toBe("not-assessed");
-    expect(said.tone).toBe("unknown");
-    expect(said.says).toContain("Nobody has looked");
+  const absent = record({
+    id: "none",
+    ref: { kind: "backup-plan", id: "daily" },
+    presence: "absent",
+    title: "Nothing backs this up",
+  });
+  const older = "2026-09-15T10:00:00.000Z";
+  const newer = "2026-09-15T10:30:00.000Z";
+
+  it.each([
+    {
+      when: "nothing has looked",
+      // The one claim that would stop a reader acting, made on no evidence.
+      records: [],
+      state: "not-assessed",
+      tone: "unknown",
+      says: /Nobody has looked/,
+    },
+    {
+      when: "a record states there is no backup",
+      records: [absent],
+      state: "none-configured",
+      next: "Set up backups",
+    },
+    {
+      when: "a schedule exists and no copy does",
+      // The exact shape that used to read green: an active timer, no file.
+      records: [plan("off-site")],
+      state: "scheduled-no-copy",
+      tone: "warning",
+      limit: /A schedule is not a copy/,
+    },
+    {
+      when: "every copy is on the application's own server",
+      records: [plan("same-server"), copy("same-server")],
+      state: "local-only",
+      tone: "warning",
+      limit: /does not survive losing the server/,
+      next: "Add an off-server destination",
+    },
+    {
+      when: "a copy is off-server and nothing has opened it",
+      records: [plan("off-site"), copy("off-site")],
+      state: "offsite-untested",
+      tone: "warning",
+      limit: /nobody has restored/,
+      next: "Test a restore",
+    },
+    {
+      when: "a restore of that copy ran",
+      records: [plan("off-site"), copy("off-site"), restore()],
+      state: "restore-verified",
+      tone: "verified",
+      limit: null,
+    },
+    {
+      when: "the restored copy was on the same host",
+      // Both things are true and the page owes the reader both: the data can
+      // be recovered, and it does not survive the machine.
+      records: [plan("same-server"), copy("same-server"), restore()],
+      tone: "verified",
+      limit: /not that it survives losing the machine/,
+      next: "Add an off-server destination",
+    },
+    {
+      when: "the newest copy is older than the schedule promises",
+      records: [plan("off-site"), copy("off-site")],
+      now: MUCH_LATER,
+      state: "backup-overdue",
+      tone: "warning",
+    },
+    {
+      when: "nothing is being copied and the proof has also lapsed",
+      // Both are true; being copied at all is the more urgent one.
+      records: [plan("off-site"), copy("off-site"), restore()],
+      now: A_MONTH_ON,
+      state: "backup-overdue",
+    },
+    {
+      when: "the proof has lapsed and nothing is overdue",
+      // No schedule, so nothing is overdue, and the newest copy is the one
+      // that was restored. What is left is a five-week-old proof, which says
+      // little about the destination today. With a daily schedule this state
+      // is unreachable: a copy old enough for the proof to lapse is overdue.
+      records: [
+        copy("off-site", older, "proved"),
+        restore(newer, "verified", "proved"),
+      ],
+      now: A_MONTH_ON,
+      state: "evidence-stale",
+      tone: "warning",
+      next: "Test a restore again",
+    },
+    {
+      when: "a copy failed, whatever the copies before it did",
+      records: [
+        plan("off-site"),
+        copy("off-site", older, "good"),
+        copy("off-site", newer, "bad", "failed"),
+      ],
+      state: "backup-failed",
+      tone: "failed",
+    },
+    {
+      when: "a restore failed, which outranks everything",
+      records: [plan("off-site"), copy("off-site"), restore(AT, "failed")],
+      state: "restore-failed",
+      tone: "failed",
+      limit: /unproven/,
+    },
+  ])("$when", ({ records, now, state, tone, says, limit, next }) => {
+    const said = verdict(records, now ?? NOW);
+    if (state) expect(said.state).toBe(state);
+    if (tone) expect(said.tone).toBe(tone);
+    if (says) expect(said.says).toMatch(says);
+    if (limit !== undefined)
+      limit === null
+        ? expect(said.limit).toBeNull()
+        : expect(said.limit).toMatch(limit);
+    if (next) expect(said.next?.label).toBe(next);
   });
 
-  it("an established absence says there is no backup", () => {
-    const said = verdict([
-      record({
-        id: "none",
-        ref: { kind: "backup-plan", id: "daily" },
-        presence: "absent",
-        title: "Nothing backs this up",
-      }),
-    ]);
-    expect(said.state).toBe("none-configured");
-    expect(said.next?.label).toBe("Set up backups");
-  });
-
-  it("a schedule with no copy is not protection", () => {
-    // The exact shape that used to read green: an active timer and no file.
-    const said = verdict([plan("off-site")]);
-    expect(said.state).toBe("scheduled-no-copy");
-    expect(said.tone).toBe("warning");
-    expect(said.limit).toContain("A schedule is not a copy");
-  });
-
-  it("copies that are all on the application's own server say so", () => {
-    const said = verdict([plan("same-server"), copy("same-server")]);
-    expect(said.state).toBe("local-only");
-    expect(said.tone).toBe("warning");
-    expect(said.limit).toContain("does not survive losing the server");
-    expect(said.next?.label).toBe("Add an off-server destination");
-  });
-
-  it("a copy off-server with no restore is still untested", () => {
-    const said = verdict([plan("off-site"), copy("off-site")]);
-    expect(said.state).toBe("offsite-untested");
-    expect(said.tone).toBe("warning");
-    expect(said.limit).toContain("nobody has restored");
-    expect(said.next?.label).toBe("Test a restore");
-  });
-
-  it("only a restore that ran earns the verified tone", () => {
-    const said = verdict([plan("off-site"), copy("off-site"), restore()]);
-    expect(said.state).toBe("restore-verified");
-    expect(said.tone).toBe("verified");
-    expect(said.limit).toBeNull();
-  });
-
-  it("a restore of a same-host copy is verified recovery and not off-server safety", () => {
-    // Both things are true and the page has to say both: the data can be
-    // recovered, and it does not survive the machine.
-    const said = verdict([plan("same-server"), copy("same-server"), restore()]);
-    expect(said.tone).toBe("verified");
-    expect(said.limit).toContain("not that it survives losing the machine");
-    expect(said.next?.label).toBe("Add an off-server destination");
-  });
-
-  it("a failed copy outranks the copies that worked", () => {
-    const said = verdict([
-      plan("off-site"),
-      copy("off-site", AT, "good"),
-      copy("off-site", "2026-09-15T10:30:00.000Z", "bad", "failed"),
-    ]);
-    expect(said.state).toBe("backup-failed");
-    expect(said.tone).toBe("failed");
-  });
-
-  it("a failed restore outranks a failed copy and everything else", () => {
-    const said = verdict([
-      plan("off-site"),
-      copy("off-site"),
-      restore(AT, "failed"),
-    ]);
-    expect(said.state).toBe("restore-failed");
-    expect(said.tone).toBe("failed");
-    expect(said.limit).toContain("unproven");
-  });
-
-  it("a failed copy is not counted as a copy", () => {
+  it("does not count a failed copy as a copy", () => {
     const protection = protectionFromRecords(
       [plan("off-site"), copy("off-site", AT, "bad", "failed")],
       NOW,
     );
     expect(protection.copies).toHaveLength(0);
     expect(protection.failures.copy?.id).toBe("bad");
-  });
-
-  it("a daily schedule whose newest copy is older than that is overdue", () => {
-    const said = verdict([plan("off-site"), copy("off-site")], MUCH_LATER);
-    expect(said.state).toBe("backup-overdue");
-    expect(said.tone).toBe("warning");
-  });
-
-  it("a restore proved long ago stops vouching for the copy it proved", () => {
-    // No schedule, so nothing is overdue; the newest copy *was* the one
-    // restored, so nothing newer is untested. What is left is that the proof
-    // itself is five weeks old, which says little about the destination
-    // today. Deliberately without a plan: with a daily schedule this state is
-    // unreachable, because a copy old enough for the proof to lapse is also a
-    // copy old enough to be overdue, and that is the more urgent thing.
-    const said = verdict(
-      [
-        copy("off-site", "2026-09-15T10:00:00.000Z", "proved"),
-        restore("2026-09-15T10:30:00.000Z", "verified", "proved"),
-      ],
-      A_MONTH_ON,
-    );
-    expect(said.state).toBe("evidence-stale");
-    expect(said.tone).toBe("warning");
-    expect(said.next?.label).toBe("Test a restore again");
-  });
-
-  it("an overdue backup outranks stale restore evidence", () => {
-    // Both are true and this is the more urgent one: nothing is being copied
-    // at all, which matters more than the age of the last restore test.
-    const said = verdict(
-      [plan("off-site"), copy("off-site"), restore()],
-      A_MONTH_ON,
-    );
-    expect(said.state).toBe("backup-overdue");
   });
 });
 
@@ -304,27 +312,6 @@ describe("where the copies go", () => {
 });
 
 describe("which copy a restore actually proved", () => {
-  it("does not let an older proof vouch for a newer copy", () => {
-    // The shape the 15 September run produced: a same-server archive that was
-    // restored, then a fresh copy pulled to the controller that never was.
-    // "Recovery proved" over that newer, untested file is an overclaim.
-    const proved = copy("same-server", "2026-09-15T10:00:00.000Z", "proved");
-    const fresh = copy("controller", "2026-09-15T10:45:00.000Z", "fresh");
-    const said = verdict(
-      [
-        plan("controller"),
-        proved,
-        restore("2026-09-15T10:10:00.000Z", "verified", "proved"),
-        fresh,
-      ],
-      NOW,
-    );
-    expect(said.state).toBe("offsite-untested");
-    expect(said.tone).toBe("warning");
-    expect(said.limit).toContain("worked at least once");
-    expect(said.next?.label).toBe("Test a restore of the newest copy");
-  });
-
   it("reads verified when the restore is of the newest copy", () => {
     const said = verdict(
       [
@@ -352,6 +339,7 @@ describe("which copy a restore actually proved", () => {
     expect(said.state).toBe("offsite-untested");
     expect(said.tone).toBe("warning");
     expect(said.limit).toContain("worked at least once");
+    expect(said.next?.label).toBe("Test a restore of the newest copy");
   });
 
   it("a restore naming no copy says so, rather than vouching for the newest", () => {

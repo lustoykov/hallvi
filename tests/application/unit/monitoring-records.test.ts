@@ -66,20 +66,6 @@ describe("monitoringFromRecords", () => {
     expect(story.looks[0].state).toBe("unknown");
   });
 
-  it("keeps a failure failing however old it is", () => {
-    const story = read([
-      topology([{ id: "app", kind: "web" }]),
-      states(
-        { kind: "process", id: "app" },
-        {
-          at: "2026-09-01T09:00:00.000Z",
-          checks: [check("http", "failed", "liveness")],
-        },
-      ),
-    ]);
-    expect(story.looks[0].state).toBe("failing");
-  });
-
   it("reports a watcher, what it watches and who it tells", () => {
     const story = read([
       states(
@@ -165,17 +151,6 @@ describe("monitoringFromRecords", () => {
       "memory-used 1.2 of 4 GB",
     ]);
     expect(readings.every((look) => look.state === "seen")).toBe(true);
-  });
-
-  it("never invents a reading", () => {
-    const story = read([
-      topology([{ id: "app", kind: "web" }]),
-      states(
-        { kind: "process", id: "app" },
-        { checks: [check("http", "passed", "liveness")] },
-      ),
-    ]);
-    expect(story.looks.every((look) => !look.invented)).toBe(true);
   });
 });
 

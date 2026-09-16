@@ -206,57 +206,8 @@ describe("processesFromRecords", () => {
     expect(story.processes[1].image).toBe("Not recorded");
   });
 
-  it("ages a passed check into unwatched, never into unhealthy", () => {
-    const stale = "2026-09-13T09:00:00.000Z"; // three hours ago
-    const story = processesFromRecords({
-      records: [
-        topology([{ id: "app", kind: "web", name: "App" }]),
-        process("app", {
-          at: stale,
-          checks: [
-            {
-              key: "http",
-              label: "Answered on 3000",
-              status: "passed",
-              claim: "liveness",
-              basis: "observed",
-            },
-          ],
-        }),
-      ],
-      applicationId: APP,
-      now,
-    });
-    expect(story.state).toBe("unknown");
-    expect(story.tone).toBe("stale");
-    expect(story.word).toBe("Needs a check");
-  });
-
-  it("reads a failed check as failed, whatever the clock has done", () => {
-    const story = processesFromRecords({
-      records: [
-        topology([{ id: "app", kind: "web", name: "App" }]),
-        process("app", {
-          at: "2026-09-10T09:00:00.000Z",
-          status: "failed",
-          checks: [
-            {
-              key: "http",
-              label: "Did not answer",
-              status: "failed",
-              claim: "liveness",
-              basis: "observed",
-            },
-          ],
-        }),
-      ],
-      applicationId: APP,
-      now,
-    });
-    expect(story.tone).toBe("failed");
-    expect(story.word).toBe("A check failed");
-  });
-
+  // How a stale reading and a failed one read, on this same projection, is
+  // proved against the clock in unit/state-matrix.test.ts.
   it("draws a process with no checks rather than hiding it", () => {
     const story = processesFromRecords({
       records: [
@@ -482,27 +433,8 @@ describe("a process whose only check failed", () => {
     basis: "observed",
   });
 
-  const failing = (extra: object = {}) =>
-    processesFromRecords({
-      records: [
-        topology([{ id: "app", kind: "web", name: "App" }]),
-        process("app", {
-          status: "failed",
-          checks: [check("http", "failed", "liveness")],
-          ...extra,
-        }),
-      ],
-      applicationId: APP,
-      now,
-    });
-
-  it("is not running", () => {
-    // "One process is running" over a red tag is the page arguing with
-    // itself.
-    expect(failing().state).toBe("failed");
-    expect(failing().tone).toBe("failed");
-  });
-
+  // That it reads failed, and keeps reading failed however old the check is,
+  // is proved in unit/state-matrix.test.ts.
   it("is still running when something else about it passed", () => {
     const story = processesFromRecords({
       records: [

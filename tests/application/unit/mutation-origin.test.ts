@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { assertSameOrigin } from "@/server/schemas";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const effects = vi.hoisted(() => ({
@@ -102,50 +103,76 @@ const routes = [
 
 beforeEach(() => vi.clearAllMocks());
 
-describe.each(routes)(
-  "$name mutation Origin boundary",
-  ({ method, handler, body }) => {
-    it.each(["https://untrusted.example", "null", "http://127.0.0.1:3999"])(
-      "rejects %s before any side effect",
-      async (origin) => {
-        const request = new NextRequest("http://localhost:3000/api/test", {
-          method,
-          body: body === undefined ? undefined : JSON.stringify(body),
-          headers: {
-            origin,
-            host: "127.0.0.1:3000",
-            "content-type": "text/plain",
-            "x-forwarded-host": "untrusted.example",
-          },
-        });
-        const response = await handler(request, context);
-        expect(response.status).toBe(400);
-        expect(await response.json()).toEqual({
-          error: "Cross-origin requests are not allowed.",
-        });
-        for (const effect of Object.values(effects))
-          expect(effect).not.toHaveBeenCalled();
-      },
+// The rule itself lives in one function, so it is proved here once, against
+// the request shapes a browser or a page on another site can actually send.
+describe("the same-origin guard", () => {
+  const guard = (headers: Record<string, string>) => () =>
+    assertSameOrigin(
+      new Request("http://localhost:3000/api/test", {
+        method: "POST",
+        headers,
+      }),
+    );
+  const local = { host: "127.0.0.1:3000" };
+
+  it.each([
+    ["another site", "https://untrusted.example"],
+    ["an opaque origin", "null"],
+    ["the same host on another port", "http://127.0.0.1:3999"],
+    ["http where the page is https", "https://127.0.0.1:3000"],
+  ])("refuses %s", (_label, origin) => {
+    expect(guard({ ...local, origin })).toThrow(
+      "Cross-origin requests are not allowed.",
+    );
+  });
+
+  it("allows the page it served, and a local client that sends no Origin", () => {
+    expect(guard({ ...local, origin: "http://127.0.0.1:3000" })).not.toThrow();
+    expect(guard(local)).not.toThrow();
+  });
+
+  it("reads the browser's own Host and never X-Forwarded-Host", () => {
+    // Trusting the forwarded header would let any proxy name itself the
+    // destination and make every Origin match.
+    expect(
+      guard({
+        ...local,
+        origin: "http://untrusted.example",
+        "x-forwarded-host": "untrusted.example",
+      }),
+    ).toThrow("Cross-origin requests are not allowed.");
+    expect(guard({ host: "untrusted.example" })).toThrow(
+      "This controller only accepts loopback hosts.",
+    );
+  });
+});
+
+// And every mutation route is behind it: one hostile request each, because a
+// route that forgot the guard is the failure this catches.
+describe.each(routes)("$name", ({ method, handler, body }) => {
+  const send = (headers: Record<string, string>) =>
+    handler(
+      new NextRequest("http://localhost:3000/api/test", {
+        method,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { host: "127.0.0.1:3000", ...headers },
+      }),
+      context,
     );
 
-    it.each(["http://127.0.0.1:3000", undefined])(
-      "accepts matching Origin or an Origin-less local client: %s",
-      async (origin) => {
-        const request = new NextRequest("http://localhost:3000/api/test", {
-          method,
-          body: body === undefined ? undefined : JSON.stringify(body),
-          headers: {
-            ...(origin ? { origin } : {}),
-            host: "127.0.0.1:3000",
-            "content-type": "application/json",
-          },
-        });
-        const response = await handler(request, context);
-        expect(response.status).toBeLessThan(300);
-        expect(
-          Object.values(effects).some((effect) => effect.mock.calls.length),
-        ).toBe(true);
-      },
-    );
-  },
-);
+  it("refuses another site's request before any side effect", async () => {
+    const refused = await send({
+      origin: "https://untrusted.example",
+      // text/plain is the form that needs no preflight, so it is the one a
+      // hostile page would use.
+      "content-type": "text/plain",
+      "x-forwarded-host": "untrusted.example",
+    });
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({
+      error: "Cross-origin requests are not allowed.",
+    });
+    for (const effect of Object.values(effects))
+      expect(effect).not.toHaveBeenCalled();
+  });
+});

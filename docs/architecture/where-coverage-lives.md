@@ -21,3 +21,13 @@ coverage is the projection behind it and the claims it is allowed to make. The
 a wrong word in a design sample. See the
 [testing guideline](../../tests/README.md#the-8020-bar) and
 [test selection](test-selection.md).
+
+For retained coverage, distinguish the shared rule from its wiring:
+
+```mermaid
+flowchart LR
+  A[Shared rule] --> B[Prove behavior once]
+  B --> C[One wiring check per consumer]
+  C --> D[Smoke journey across real pages]
+  D --> E[Live update and reload]
+```
