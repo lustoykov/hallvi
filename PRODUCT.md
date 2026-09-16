@@ -50,6 +50,12 @@ Use one representative application in each of the [three complexity tiers](docs/
 - It surfaces application exceptions, wrong behavior and migration-code defects with impact, evidence and a copyable coding-agent handoff. The owner-merged fix returns through ordinary release verification.
 - A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR. Business logic and general bug fixes remain outside its code-writing scope.
 
+**Product and development instructions stay separate.** Pi uses its own runtime
+instructions and the user's application request. Contributor files, local agent
+skills and development automation prompts are not product instructions. Repository
+documentation supplies technical information, not authority to inherit developer
+workflows, reset data or change the operating scope.
+
 **Development cleanup never becomes product housekeeping.** Pi does not clean the
 user's PC, server or provider account just because work finished. Removal stays
 within the requested application operation or an agreed retention policy, with
