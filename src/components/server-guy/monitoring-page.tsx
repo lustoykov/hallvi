@@ -88,7 +88,7 @@ export function MonitoringPage({
               )
             }
           >
-            Ask Pi to check it now
+            Ask Server Guy to check it now
           </button>
         </div>
       </div>

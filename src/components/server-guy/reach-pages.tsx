@@ -109,8 +109,8 @@ export function ReachPageView({
             }
           >
             {page === "domains"
-              ? "Ask Pi how it is reached"
-              : "Ask Pi what can reach in"}
+              ? "Ask Server Guy how it is reached"
+              : "Ask Server Guy what can reach in"}
           </button>
         </div>
       </div>

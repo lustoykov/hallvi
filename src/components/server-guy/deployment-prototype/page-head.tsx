@@ -133,7 +133,9 @@ export function AccessLink({
                   "Reopen it" and "reopen access" name a thing the reader has
                   no picture of; what dropped is a connection this computer
                   holds open. */}
-              {tunnelled ? "Open the connection again" : "Ask Pi to look"}
+              {tunnelled
+                ? "Open the connection again"
+                : "Ask Server Guy to look"}
             </button>
           )}
         </>

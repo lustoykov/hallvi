@@ -85,7 +85,7 @@ export function ArchitecturePage({
                 )
               }
             >
-              Ask Pi to map this application
+              Ask Server Guy to map this application
             </button>
           </div>
         </div>

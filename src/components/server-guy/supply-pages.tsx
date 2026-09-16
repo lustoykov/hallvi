@@ -145,7 +145,7 @@ function Nothing({
           all.
         </>
       ),
-      button: "Ask Pi what it queues",
+      button: "Ask Server Guy what it queues",
       draft: `Does ${name} use a cache or a queue? If it does, say what is in it right now; if it does not, say so plainly.`,
     },
     jobs: {
@@ -158,7 +158,7 @@ function Nothing({
           that there is nothing to check.
         </>
       ),
-      button: "Ask Pi what runs on a schedule",
+      button: "Ask Server Guy what runs on a schedule",
       draft: `What does ${name} run on a schedule — cron jobs, timers, anything recurring — and did each one last succeed?`,
     },
     variables: {
@@ -171,7 +171,7 @@ function Nothing({
           reach.
         </>
       ),
-      button: "Ask Pi what it needs to run",
+      button: "Ask Server Guy what it needs to run",
       draft: `What configuration does ${name} need to build and run, and where does each value come from?`,
     },
     cdn: { title: "", body: null, button: "", draft: "" },
