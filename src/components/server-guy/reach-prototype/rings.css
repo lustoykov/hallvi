@@ -193,8 +193,11 @@
   font-size: 12px;
   font-style: italic;
 }
+/* Both dimensions. A width alone leaves the height to whatever is inside,
+   and what is inside is a canvas that takes its height from here. */
 .axri-guy {
   width: 42px;
+  height: 42px;
   margin: -6px 0 -6px auto;
 }
 
