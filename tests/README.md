@@ -77,6 +77,17 @@ record is on the page at all. This fixture does not establish a reachable applic
 loopback address is refused as a public target — so this journey checks closed access. It does not prove that a reader can open
 a deployed application; that still needs verification against a running host.
 
+`npm run scenarios -- <port>` builds an isolated scenario database from
+`tests/fixtures/scenario-records.ts` and serves the real application against
+it, so the states a real journey never produces — a failure forty days old, an
+established absence, a withdrawn record, a release that failed while the one
+before it still serves, a way in that has closed while the application is fine
+— are read through the shipping pages rather than through a second set of
+layouts. It builds its own database under `tests/results/scenarios` every run,
+never reads `SERVER_GUY_DB_PATH`, and carries no credentials. It prints one
+address per scenario; each destination is a fragment on that address. Add a
+state to the fixture file rather than starting a second scenario system.
+
 The `/prototype/app` reference shell, and the `views/*-view.tsx` layouts that
 only it renders, carry no tests. A real application's destinations are the
 `*-page.tsx` components, and what they may claim is settled by the record

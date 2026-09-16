@@ -12,12 +12,32 @@ import type { Ref, SavedInformation } from "@/server/operator-data";
 
 type Presentation = NonNullable<SavedInformation["presentation"]>;
 
+/**
+ * Command output, which Logs is built from.
+ *
+ * Logs is the one destination that reads nothing from saved information: it
+ * shows what Server Guy's own commands printed. A scenario with no captured
+ * output leaves that page empty, which says "nothing has run" rather than
+ * showing the page doing its job.
+ */
+export interface ScenarioExecution {
+  tool: string;
+  target: string;
+  input: string;
+  output: string;
+  status: "succeeded" | "failed";
+  exitCode?: number;
+  /** How long ago it finished, in milliseconds. */
+  ago: number;
+}
+
 export interface Scenario {
   id: string;
   name: string;
   /** What this application exists to show. */
   shows: string;
   records: SavedInformation[];
+  executions?: ScenarioExecution[];
 }
 
 let counter = 0;
@@ -111,6 +131,8 @@ export function scenarios(): Scenario[] {
   const withdrawn = "aaaaaaaa-0000-4000-8000-000000000005";
   const rich = "aaaaaaaa-0000-4000-8000-000000000006";
   const overclaimed = "aaaaaaaa-0000-4000-8000-000000000007";
+  const notes = "aaaaaaaa-0000-4000-8000-000000000008";
+  const serving = "aaaaaaaa-0000-4000-8000-000000000009";
 
   return [
     {
@@ -326,6 +348,22 @@ export function scenarios(): Scenario[] {
       shows:
         "The shape that broke the map: three backing services, four data locations, and the names an upstream Compose file actually uses.",
       records: paperlessRecords("cccccccc-0000-4000-8000-000000000001"),
+    },
+    {
+      id: notes,
+      name: "Scenario · Notes",
+      shows:
+        "The smallest real application: one process, one volume, one release — and a way in that has closed while everything else is fine.",
+      records: notesRecords(notes),
+      executions: notesExecutions(),
+    },
+    {
+      id: serving,
+      name: "Scenario · older release serving",
+      shows:
+        "The newest release failed and was not retried, so what answers the address is the release before it.",
+      records: servingRecords(serving),
+      executions: servingExecutions(),
     },
     {
       id: overclaimed,
@@ -1234,5 +1272,285 @@ function releaseRecords(id: string): SavedInformation[] {
         remotePort: 8000,
       },
     }),
+  ];
+}
+
+/**
+ * The smallest application anybody actually runs.
+ *
+ * Every other scenario here is a shape of doubt or a shape of density. This
+ * one is the ordinary case, and it is the hardest for a page to get right:
+ * with one process, one volume and one release, a destination has nothing to
+ * fill itself with and must still read as an answer rather than as a page
+ * that failed to load. Its way in is closed while everything else passes, so
+ * a reader can see the product refuse to offer a dead link beside a green
+ * process.
+ */
+function notesRecords(id: string): SavedInformation[] {
+  return [
+    states(
+      id,
+      { kind: "host", id: "notes-host" },
+      {
+        at: ago(2 * HOUR),
+        title: "The server",
+        views: ["overview", "architecture"],
+        facts: [
+          fact("address", "203.0.113.41"),
+          fact("region", "Nuremberg", "configuration", "reported"),
+          fact("size", "CX22", "configuration", "reported"),
+          fact("disk-used", "1.2 of 40 GB used", "contents"),
+        ],
+        checks: [check("ssh", "passed")],
+      },
+    ),
+    states(
+      id,
+      { kind: "process", id: "notes" },
+      {
+        at: ago(6 * MINUTE),
+        title: "Notes is answering",
+        views: ["overview", "processes"],
+        facts: [
+          fact("product", "Standard Notes", "identity", "reported"),
+          fact("role", "web", "configuration"),
+          fact("port", "3000"),
+          fact("image", "ghcr.io/qa/notes:1.14.2", "identity", "reported"),
+          fact("revision", "e9a71c4", "identity", "reported"),
+          fact("memory-used", "180 of 512 MB", "contents"),
+        ],
+        checks: [
+          check("http", "passed", "liveness", { detail: "200 in 31 ms" }),
+          check("container", "passed", "liveness"),
+        ],
+      },
+    ),
+    states(
+      id,
+      { kind: "volume", id: "notes-data" },
+      {
+        at: ago(2 * HOUR),
+        title: "The notes survive a container replacement",
+        views: ["storage", "architecture"],
+        facts: [
+          fact("path", "/var/lib/notes"),
+          fact("size", "94 MB", "contents"),
+        ],
+        checks: [check("persistence", "passed", "configuration")],
+      },
+    ),
+    record(id, {
+      at: ago(2 * HOUR),
+      title: "Released e9a71c4",
+      views: ["deployment", "history"],
+      role: "outcome",
+      about: [{ kind: "application", id }],
+      checks: [
+        check("started", "passed", "liveness"),
+        check("http", "passed", "reachability"),
+      ],
+      content: {
+        kind: "deployment",
+        repositoryUrl: "https://github.com/qa/notes",
+        revision: "e9a71c4f8b2d6a05c31e7d9b4a6f8021c5e3d7b9",
+        image: "ghcr.io/qa/notes:1.14.2",
+        server: "notes-host",
+        changes: ["First release"],
+      },
+    }),
+    // Nothing listens on this port, so the product asks and finds it closed.
+    // The application is fine; the way in is not, and the page must not
+    // offer a link it already knows will fail.
+    record(id, {
+      at: ago(2 * HOUR),
+      title: "It is reachable from this PC",
+      views: ["deployment", "overview"],
+      role: "status",
+      about: [{ kind: "application", id }],
+      url: "http://127.0.0.1:18321",
+      content: {
+        kind: "application-access",
+        mode: "private",
+        server: "notes-host",
+        localPort: 18321,
+        remotePort: 3000,
+      },
+    }),
+    states(
+      id,
+      { kind: "access", id: "notes-access" },
+      {
+        at: ago(11 * MINUTE),
+        status: "failed",
+        title: "The private way in stopped answering",
+        views: ["history"],
+        body: "The connection dropped when this computer slept. Nothing on the server changed.",
+        checks: [check("reachable", "failed", "reachability")],
+      },
+    ),
+  ];
+}
+
+function notesExecutions(): ScenarioExecution[] {
+  return [
+    {
+      tool: "server_bash",
+      target: "notes-host",
+      input: "docker compose ps",
+      output:
+        "NAME    IMAGE                      STATUS        PORTS\n" +
+        "notes   ghcr.io/qa/notes:1.14.2    Up 2 hours    127.0.0.1:3000->3000/tcp\n",
+      status: "succeeded",
+      exitCode: 0,
+      ago: 6 * MINUTE,
+    },
+    {
+      tool: "server_bash",
+      target: "notes-host",
+      input: "curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/",
+      output: "200\n",
+      status: "succeeded",
+      exitCode: 0,
+      ago: 6 * MINUTE,
+    },
+    {
+      tool: "open_server_port",
+      target: "notes-host",
+      input: "3000 → 18321",
+      output: "curl: (7) Failed to connect to 127.0.0.1 port 18321\n",
+      status: "failed",
+      exitCode: 7,
+      ago: 11 * MINUTE,
+    },
+  ];
+}
+
+/**
+ * The newest release failed, and the one before it is still serving.
+ *
+ * This is the state a deployment page is most easily wrong about. The last
+ * thing that happened failed, and the application is up: a page that reads
+ * the newest record says the application is down, and a page that reads the
+ * newest success says everything shipped. What is true is that release four
+ * did not start and release three is answering, and both have to be on the
+ * page at once.
+ */
+function servingRecords(id: string): SavedInformation[] {
+  const release = (
+    key: string,
+    at: number,
+    revision: string,
+    changes: string[],
+    failed = false,
+  ) =>
+    states(
+      id,
+      { kind: "application", id: `release-${key}` },
+      {
+        at: ago(at),
+        status: failed ? "failed" : "verified",
+        title: failed
+          ? `Update to ${revision.slice(0, 7)} did not start`
+          : `Released ${revision.slice(0, 7)}`,
+        views: ["deployment", "history"],
+        body: failed
+          ? "The image built and pushed. The container exited on boot: the new release reads a variable nothing sets on this server. The release before it was left running and is still serving."
+          : "",
+        content: {
+          kind: "deployment",
+          repositoryUrl: "https://github.com/qa/shopfront",
+          revision,
+          image: `ghcr.io/qa/shopfront:${revision.slice(0, 7)}`,
+          server: "shopfront-host",
+          changes,
+        },
+        checks: failed
+          ? [check("started", "failed", "liveness")]
+          : [
+              check("started", "passed", "liveness"),
+              check("http", "passed", "reachability"),
+            ],
+      },
+    );
+  return [
+    states(
+      id,
+      { kind: "host", id: "shopfront-host" },
+      {
+        at: ago(30 * MINUTE),
+        title: "The server",
+        views: ["overview", "architecture"],
+        facts: [
+          fact("address", "203.0.113.77"),
+          fact("region", "Falkenstein", "configuration", "reported"),
+          fact("disk-used", "9.4 of 80 GB used", "contents"),
+        ],
+        checks: [check("ssh", "passed")],
+      },
+    ),
+    release("1", 12 * DAY, "10a7c3e9d5b18f2604ac7e3d95b1f8206a4c7e3d", [
+      "First release",
+    ]),
+    release("2", 3 * DAY, "2b8d4f0a6c92e7315bd8f4a06c92e7315bd8f4a0", [
+      "Add the checkout summary",
+    ]),
+    release(
+      "3",
+      95 * MINUTE,
+      "3c9e5a1b7d03f8426ce9a5b17d03f8426ce9a5b1",
+      ["Read the pricing tier from the environment"],
+      true,
+    ),
+    // What is actually answering, recorded against the release before the
+    // failure. Without this the page could only say something failed.
+    states(
+      id,
+      { kind: "process", id: "shopfront" },
+      {
+        at: ago(4 * MINUTE),
+        title: "The previous release is still serving",
+        views: ["overview", "processes"],
+        facts: [
+          fact("role", "web", "configuration"),
+          fact("port", "8080"),
+          fact("image", "ghcr.io/qa/shopfront:2b8d4f0", "identity", "reported"),
+          fact("revision", "2b8d4f0", "identity", "reported"),
+          fact("restarts", "0", "contents"),
+        ],
+        checks: [
+          check("http", "passed", "liveness", { detail: "200 in 62 ms" }),
+          check("container", "passed", "liveness"),
+        ],
+      },
+    ),
+  ];
+}
+
+function servingExecutions(): ScenarioExecution[] {
+  return [
+    {
+      tool: "server_bash",
+      target: "shopfront-host",
+      input: "docker compose up -d shopfront",
+      output:
+        "shopfront  Pulling\n" +
+        "shopfront  Pulled\n" +
+        "shopfront  Starting\n" +
+        "shopfront  Error: PRICING_TIER is not set\n" +
+        "dependency failed to start: container shopfront exited (1)\n",
+      status: "failed",
+      exitCode: 1,
+      ago: 95 * MINUTE,
+    },
+    {
+      tool: "server_bash",
+      target: "shopfront-host",
+      input: "docker compose ps --format json",
+      output:
+        '{"Name":"shopfront","Image":"ghcr.io/qa/shopfront:2b8d4f0","State":"running","Status":"Up 3 days"}\n',
+      status: "succeeded",
+      exitCode: 0,
+      ago: 4 * MINUTE,
+    },
   ];
 }
