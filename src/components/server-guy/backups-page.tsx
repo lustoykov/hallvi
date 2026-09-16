@@ -25,7 +25,7 @@ import { useMemo } from "react";
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import { protectionFromRecords, protectionVerdict } from "./backups-records";
 import { BackupStages } from "./backup-stages";
 import { ControllerProtectionBand } from "./controller-protection";

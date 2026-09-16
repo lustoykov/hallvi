@@ -18,7 +18,7 @@ import { useMemo } from "react";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { releasesFromRecords } from "./release-records";
 import { ReleasesPanel } from "./releases-panel";

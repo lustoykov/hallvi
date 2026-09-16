@@ -38,9 +38,21 @@ import {
   type ReactNode,
 } from "react";
 
-import { applicationSections } from "../application-sections";
+import {
+  applicationSections,
+  type ApplicationSection,
+} from "../application-sections";
+import type { PageContext } from "../deployment-prototype/page-head";
+import type { Recheck } from "./use-recheck";
 import { CertaintyTag } from "./bits";
-import type { DirectionProps } from "./index";
+/** What the architecture page hands this journey. */
+export interface DirectionProps {
+  model: ArchitectureModel;
+  recheck: Recheck;
+  onOpenDestination: (destination: ApplicationSection) => void;
+  onAsk: (draft: string) => void;
+  page?: PageContext;
+}
 import {
   ago,
   type ArchitectureModel,

@@ -165,7 +165,6 @@ export function OperatorShell({
   const [deployment] = useState<DeploymentRecord | null>(null);
   // Until the first response arrives a view cannot honestly say a resource
   // is absent, so it shows the shape of the answer instead.
-  const [recordLoaded, setRecordLoaded] = useState(demo);
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
     null,
   );
@@ -299,7 +298,6 @@ export function OperatorShell({
   const selectedChatId = view.selectedChatId;
   const refreshDeployment = useCallback(async () => {
     if (!applicationId || !selectedChatId || demo) return;
-    setRecordLoaded(true);
     {
       const next = await api.view(applicationId, selectedChatId);
       setView((current) =>
@@ -326,7 +324,7 @@ export function OperatorShell({
     );
   useEffect(() => {
     const initial = window.setTimeout(() => {
-      void refreshDeployment().catch(() => setRecordLoaded(true));
+      void refreshDeployment().catch(() => undefined);
     }, 0);
     // Fast while Pi is working, because that is when the page changes under
     // the reader; slow otherwise, because nothing else changes it.
@@ -887,17 +885,12 @@ export function OperatorShell({
               view={view}
               reachable={reachable}
               onReopen={askToReopen}
-              deployment={deployment}
-              stack={stack}
-              operations={operations}
               now={now}
-              loading={!recordLoaded}
               facts={facts}
               onRefresh={refreshDeployment}
               onOpenDestination={selectSection}
               onOpenConversation={openConversation}
               onAsk={askInConversation}
-              onRevealStack={() => setStackRevealed(true)}
               bar={
                 <div className="sg-view-bar">
                   <button

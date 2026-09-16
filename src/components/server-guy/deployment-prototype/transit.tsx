@@ -16,13 +16,37 @@ import {
   User,
   Warning,
 } from "@phosphor-icons/react";
-import { useCallback, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+
+import type { ApplicationSection } from "../application-sections";
 
 import type { MascotMood } from "../home/mascot-scene";
 import { ago, localTime } from "../architecture-prototype/model";
 import { useDismiss } from "../overview-prototype/shared";
-import { took, type Phase, type Tone } from "./deployment-model";
-import type { DirectionProps } from "./index";
+import {
+  took,
+  type DeploymentStory,
+  type Phase,
+  type Tone,
+} from "./deployment-model";
+/** What the Deployment page hands this layout. */
+export interface DirectionProps {
+  story: DeploymentStory;
+  now: number;
+  head: ReactNode;
+  /** Work in progress on this destination, as the shell shows it. */
+  activity: ReactNode;
+  /** The product's panel, for the states that need its actions. */
+  panel: ReactNode;
+  onAsk: (draft: string) => void;
+  onOpenConversation: (chatId: string, messageId: string | null) => void;
+  onOpenDestination: (destination: ApplicationSection) => void;
+}
 import { LittleServer } from "./little-server";
 import { nextStep } from "./next-step";
 import { Tag } from "./tag";
