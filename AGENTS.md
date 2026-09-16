@@ -32,9 +32,13 @@ Work on a branch and open a pull request; never commit directly to `main`.
 Preserve unrelated changes. Include a small decision-oriented diagram under
 `docs/architecture/` in each PR and link it from the description.
 
-Choose checks proportionate to the change; [tests/README.md](tests/README.md)
-owns the commands. Documentation changes need document/link review, not a
-browser suite. Run `npm run format` before finishing. Verify host tools and
+Use an **80/20 testing approach**: keep a small, high-value suite protecting
+core user journeys and concrete risks to data, credentials and truthful status.
+Do not add tests by default for every edit, implementation detail or hypothetical
+edge case. Remove obsolete and redundant coverage; test counts and coverage
+percentages are not goals. [tests/README.md](tests/README.md) owns the selection
+bar and commands. Choose checks proportionate to the change. Documentation
+changes need document/link review, not a browser suite. Run `npm run format` before finishing. Verify host tools and
 provider access before claiming support; unit tests do not prove deployment.
 
 `.server-guy/`, `.next/` and `tests/results/` are local data; never commit them.
