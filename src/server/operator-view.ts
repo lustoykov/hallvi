@@ -1,5 +1,6 @@
 import { controllerProtectionFacts } from "./controller-protection";
 import { listActivity } from "./pi-activity";
+import { workerPresence } from "./worker-presence";
 import { listExecutions } from "./operator-execution";
 import { listSecrets } from "./application-secrets";
 import { listInformation } from "./saved-information";
@@ -47,6 +48,9 @@ export function getOperatorView(
     executions: listExecutions(applicationId),
     piActivity: listActivity(applicationId),
     operations: [],
+    // A queued message is only being worked on if something is reading the
+    // queue. The page says which, rather than spinning either way.
+    worker: workerPresence(),
     chats,
     selectedChatId: selected?.id ?? null,
     messages: selected ? listMessages(selected.id) : [],

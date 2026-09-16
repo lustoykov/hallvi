@@ -1,4 +1,5 @@
 import { listActivity } from "./pi-activity";
+import { workerPresence } from "./worker-presence";
 import { listExecutions } from "./operator-execution";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -59,7 +60,11 @@ export function chatRunSnapshot(
   chatId: string,
 ): ChatRunSnapshot {
   loadChat(applicationId, chatId);
+  // Read outside the transaction: it is a file beside the database, and the
+  // conversation needs it on every frame that shows a message waiting.
+  const worker = workerPresence();
   return withTransaction(() => ({
+    worker,
     messages: listMessages(chatId),
     runs: listMessages(chatId).flatMap((m) => responseRun(m) ?? []),
     executions: listExecutions(applicationId),

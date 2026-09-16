@@ -400,6 +400,7 @@ export function OperatorShell({
               activity: snapshot.activity ?? current.activity,
               information: snapshot.information ?? current.information,
               executions: snapshot.executions ?? current.executions,
+              worker: snapshot.worker ?? current.worker,
               piActivity: snapshot.piActivity ?? current.piActivity,
               operations: snapshot.operations ?? current.operations,
             }
@@ -894,6 +895,7 @@ export function OperatorShell({
               onSend={sendMessage}
               runs={runs.filter((run) => run.chatId === activeChat?.id)}
               reconnecting={reconnecting}
+              workerAlive={view.worker?.alive}
               onRunAction={runAction}
               onNewChat={createChat}
               onReveal={() => selectSection("history")}

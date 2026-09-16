@@ -123,6 +123,8 @@ export interface ActivityEvent {
  */
 export interface ChatRunSnapshot {
   executions?: import("./operator-execution").ExecutionRecord[];
+  /** Whether a Pi worker is alive to read this queue. */
+  worker?: import("./worker-presence").WorkerPresence;
   information?: import("./operator-data").SavedInformation[];
   operations?: import("./operation-record").ApplicationOperation[];
   /** What Pi ran during these runs, in order. */
@@ -135,6 +137,8 @@ export interface ChatRunSnapshot {
 /** The application page: conversations and the shared application records. */
 export interface OperatorView {
   executions?: import("./operator-execution").ExecutionRecord[];
+  /** Whether a Pi worker is alive to read this application's queue. */
+  worker?: import("./worker-presence").WorkerPresence;
   information?: import("./operator-data").SavedInformation[];
   /**
    * What Pi has asked the owner for: names, reasons, and whether a value has

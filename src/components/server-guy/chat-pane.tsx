@@ -187,6 +187,7 @@ export function ChatPane({
   highlight,
   decisionFor,
   reachable,
+  workerAlive,
 }: {
   view: OperatorView;
   activeChat: Chat | null;
@@ -219,6 +220,11 @@ export function ChatPane({
    * record card in the transcript does not offer a link that stopped working.
    */
   reachable?: Reachability;
+  /**
+   * Whether a Pi worker is alive to carry this conversation's queue.
+   * Undefined where it has not been established; nothing is claimed then.
+   */
+  workerAlive?: boolean;
 }) {
   const chatId = activeChat?.id ?? null;
   // Receipts sit under the reply that started the work. One whose reply is
@@ -360,6 +366,7 @@ export function ChatPane({
   const inFlightActivity = runActivity({
     runId: inFlight?.id,
     status: inFlight?.status ?? "",
+    workerAlive,
     startedAt: runs.find((item) => item.assistantMessageId === inFlight?.id)
       ?.startedAt,
     hasDraft: Boolean(inFlight?.body?.trim()),
@@ -463,7 +470,9 @@ export function ChatPane({
           )}
         </header>
       )}
-      {(busy !== null || requestPending) && (
+      {/* The bar means work is moving. With no worker reading the queue it
+          would be an animation over a message nobody has picked up. */}
+      {(busy !== null || (requestPending && workerAlive !== false)) && (
         <div className="sg-busy-bar" aria-hidden="true" />
       )}
 
@@ -555,7 +564,9 @@ export function ChatPane({
                           </MessageResponse>
                         )}
                         <p className="sg-run-status" role="status">
-                          {inProgress && (
+                          {/* A spinner beside "nothing is running" is the
+                              contradiction this change exists to remove. */}
+                          {inProgress && workerAlive !== false && (
                             <SpinnerGap className="spin" aria-hidden="true" />
                           )}
                           {message.status === "queued" ||
@@ -566,6 +577,7 @@ export function ChatPane({
                                 status: message.status,
                                 startedAt: run?.startedAt,
                                 hasDraft: Boolean(message.body?.trim()),
+                                workerAlive,
                                 executions: view.executions ?? [],
                                 activity: view.piActivity ?? [],
                                 now,
@@ -828,7 +840,9 @@ export function ChatPane({
           said so where the typing happens. */}
       {inFlight && inFlightAway && (
         <div className="sg-still-working" role="status">
-          <SpinnerGap className="spin" aria-hidden="true" />
+          {workerAlive !== false && (
+            <SpinnerGap className="spin" aria-hidden="true" />
+          )}
           <span className="sg-still-what">
             {inFlightActivity.says}
             {clockReady && inFlightActivity.since && (
@@ -861,6 +875,23 @@ export function ChatPane({
             This chat is archived and read-only. Choose an active chat or start
             a new one.
           </p>
+        )}
+        {/* Sending puts a message in a queue. If nothing is reading that
+            queue, the message sits there looking exactly like a reply being
+            written, and the only clue is a console the owner is not reading.
+            It is said here, where they are about to type. */}
+        {application && piReady && workerAlive === false && (
+          <div className="sg-pi-required">
+            <WarningCircle weight="bold" />
+            <div>
+              <strong>No worker is running</strong>
+              <p>
+                Messages are saved and stay queued until one starts. Run{" "}
+                <code>npm run dev</code>, which starts it, or{" "}
+                <code>npm run worker</code> in this checkout.
+              </p>
+            </div>
+          </div>
         )}
         {application && !piReady && (
           <div className="sg-pi-required">

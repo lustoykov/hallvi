@@ -90,6 +90,11 @@ export function runActivity(input: {
   startedAt?: string | null;
   /** Whether any reply text has arrived yet. */
   hasDraft?: boolean;
+  /**
+   * Whether a worker is alive to carry this turn. Undefined where it has not
+   * been established; this line never guesses.
+   */
+  workerAlive?: boolean;
   executions: ExecutionRecord[];
   activity: ActivityRecord[];
   now: number;
@@ -98,6 +103,21 @@ export function runActivity(input: {
   const mine = <T extends { runId: string }>(items: T[]) =>
     runId ? items.filter((item) => item.runId === runId) : [];
   const executions = mine(input.executions);
+
+  // Nothing is reading the queue. Whatever the records below would say about
+  // the turn, none of it is happening, and a spinner over an unattended queue
+  // is the one thing this line must never draw.
+  if (input.workerAlive === false) {
+    const seconds = secondsSince(input.startedAt, now);
+    return {
+      says:
+        input.status === "queued"
+          ? "Waiting for a worker to start. Nothing is running."
+          : "The worker stopped before this reply finished.",
+      since: seconds === null ? null : spell(seconds),
+      waitingOnYou: true,
+    };
+  }
 
   if (input.status === "queued")
     return {

@@ -879,6 +879,12 @@
   color: #79563b;
   font-size: 12px;
 }
+.sg-pi-required code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f4e3cd;
+  font-size: 11px;
+}
 .sg-pi-required a {
   margin-left: auto;
   color: #784112;
