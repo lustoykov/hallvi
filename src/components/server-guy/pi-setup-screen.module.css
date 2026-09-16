@@ -451,3 +451,59 @@
   background: #fff4e9;
   color: #9a4b10;
 }
+
+/* A credential typed on the Connections page itself. The row keeps its place
+   and the form opens under it, so the inventory the reader came for does not
+   go away while they fetch a token. */
+.connectForm {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #d8e0ec;
+  border-radius: 10px;
+  background: #f7f9fc;
+}
+.connectForm > strong {
+  font-weight: 600;
+}
+.connectForm p {
+  margin: 0;
+  color: #536078;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.connectForm p[role="alert"] {
+  color: #9c312a;
+}
+.connectForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+}
+.connectForm input,
+.connectForm select {
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #bdc9dc;
+  border-radius: 6px;
+  color: #192338;
+  background: white;
+  font: inherit;
+  font-weight: 400;
+}
+/* The action keeps its line: a link that names the application it opens is
+   the point of the row, and three wrapped words look like a mistake. */
+.connectionAction {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-align: right;
+}
+.connectActions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}

@@ -66,8 +66,11 @@ export function referenceConnections(state: string): ConnectionItem[] {
         : "Signed in · GPT-5.6 · high reasoning",
       credential: fresh ? null : "Login saved on this controller · 8 Sep",
       usedBy: fresh ? [] : ["every conversation"],
-      href: "/setup/pi",
-      action: fresh ? "Connect ChatGPT" : "Change",
+      action: {
+        kind: "link",
+        href: "/setup/pi",
+        label: fresh ? "Connect ChatGPT" : "Change",
+      },
     },
     {
       id: "github",
@@ -84,8 +87,11 @@ export function referenceConnections(state: string): ConnectionItem[] {
         ? null
         : "Installation token · read access to 2 repositories",
       usedBy: fresh ? [] : ["Document archive", "Status page"],
-      href: "/setup/github",
-      action: fresh ? "Connect GitHub" : expired ? "Sign in again" : "Change",
+      action: {
+        kind: "link",
+        href: "/setup/github",
+        label: fresh ? "Connect GitHub" : expired ? "Sign in again" : "Change",
+      },
     },
     {
       id: "hetzner",
@@ -98,8 +104,11 @@ export function referenceConnections(state: string): ConnectionItem[] {
         : "Project archive-prod · 2 instances managed",
       credential: fresh ? null : "API token with read and write · added 8 Sep",
       usedBy: fresh ? [] : ["Document archive · CX23", "Status page · CX22"],
-      href: "/prototype/settings/connections",
-      action: fresh ? "Connect Hetzner" : "Change",
+      action: {
+        kind: "link",
+        href: "/prototype/settings/connections",
+        label: fresh ? "Connect Hetzner" : "Change",
+      },
     },
     {
       id: "r2",
@@ -114,8 +123,15 @@ export function referenceConnections(state: string): ConnectionItem[] {
           : "2 buckets · last upload 3 min ago",
       credential: fresh ? null : "Per-bucket tokens · object read and write",
       usedBy: fresh ? [] : ["Document archive backups", "Status page backups"],
-      href: "/prototype/settings/connections",
-      action: fresh ? "Connect R2" : expired ? "Provide a new token" : "Change",
+      action: {
+        kind: "link",
+        href: "/prototype/settings/connections",
+        label: fresh
+          ? "Connect R2"
+          : expired
+            ? "Provide a new token"
+            : "Change",
+      },
     },
     {
       id: "s3",
@@ -125,8 +141,11 @@ export function referenceConnections(state: string): ConnectionItem[] {
       state: "not-connected",
       detail:
         "Not connected. R2 is in use; connect S3 only if you want backups there instead.",
-      href: "/prototype/settings/connections",
-      action: "Connect S3",
+      action: {
+        kind: "link",
+        href: "/prototype/settings/connections",
+        label: "Connect S3",
+      },
     },
     {
       id: "cloudflare-dns",
@@ -136,8 +155,11 @@ export function referenceConnections(state: string): ConnectionItem[] {
       state: "not-connected",
       detail:
         "Not connected. Your domains are at another provider; Server Guy tells you the one record to add instead.",
-      href: "/prototype/settings/connections",
-      action: "Connect Cloudflare",
+      action: {
+        kind: "link",
+        href: "/prototype/settings/connections",
+        label: "Connect Cloudflare",
+      },
     },
   ];
 }

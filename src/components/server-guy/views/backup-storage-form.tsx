@@ -8,8 +8,11 @@ import { useState } from "react";
  */
 export function BackupStorageForm({
   onConnected,
+  className = "sg-op-approval",
 }: {
   onConnected?: () => Promise<void>;
+  /** The surrounding surface. Backups and Settings host the same form. */
+  className?: string;
 }) {
   const [values, setValues] = useState({
     provider: "r2",
@@ -37,7 +40,7 @@ export function BackupStorageForm({
   );
   return (
     <form
-      className="sg-op-approval"
+      className={className}
       aria-label="Connect backup storage"
       onSubmit={async (event) => {
         event.preventDefault();

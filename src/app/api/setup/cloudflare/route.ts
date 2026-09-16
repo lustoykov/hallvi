@@ -1,11 +1,15 @@
+import { z } from "zod";
+
 import {
   cloudflareBuckets,
   cloudflareRecords,
   cloudflareZones,
+  connectCloudflare,
   r2UploadGaps,
   verifyCloudflare,
 } from "@/server/cloudflare";
 import { handle } from "@/server/http";
+import { parseJsonRequest } from "@/server/schemas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,5 +39,24 @@ export function GET(request: Request) {
           }
         : {}),
     };
+  });
+}
+
+/**
+ * Saves the management token the owner typed in Settings, after Cloudflare
+ * says it is active. The token arrives in a same-origin JSON body and is
+ * never accepted from a query string; nothing about it is returned.
+ */
+export function POST(request: Request) {
+  return handle(async () => {
+    const input = await parseJsonRequest(
+      request,
+      z.strictObject({
+        token: z.string().min(1).max(200),
+        accountId: z.string().max(64).optional(),
+      }),
+    );
+    const { account } = await connectCloudflare(input);
+    return { connected: true, account };
   });
 }

@@ -4,6 +4,9 @@
 // never leaving the server, the fixed origin, and the one distinction that
 // costs an afternoon when it is missed — managing R2 is not writing to R2.
 
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VERIFY = { success: true, result: { status: "active" } };
@@ -30,6 +33,12 @@ beforeEach(async () => {
   headers = [];
   process.env.CLOUDFLARE_API_TOKEN = "test-token-not-real";
   process.env.CLOUDFLARE_ACCOUNT_ID = ACCOUNT;
+  // A token may now be saved on the controller instead of set in the
+  // environment. Point that directory at an empty one, so these cases cannot
+  // read a developer's real connection and report it as the fixture's.
+  process.env.SERVER_GUY_CONFIG_DIR = mkdtempSync(
+    join(tmpdir(), "cloudflare-test-"),
+  );
   cloudflare = await import("@/server/cloudflare");
 });
 
@@ -74,6 +83,7 @@ describe("verifying", () => {
     expect(connection.connected).toBe(false);
     expect(connection.error).toContain("Invalid token");
     expect(connection.error).toContain("403");
+    expect(connection.configured).toBe(true);
   });
 
   it("says plainly when nothing is configured, without calling out", async () => {
@@ -81,7 +91,10 @@ describe("verifying", () => {
     stub(VERIFY);
     const connection = await cloudflare.verifyCloudflare();
     expect(connection.connected).toBe(false);
-    expect(connection.error).toContain("No CLOUDFLARE_API_TOKEN");
+    // The row above this message offers a form; "not connected" and "the
+    // provider refused it" are different rows, so they are different fields.
+    expect(connection.configured).toBe(false);
+    expect(connection.error).toContain("No Cloudflare token is connected");
     expect(fetched).toEqual([]);
   });
 });
