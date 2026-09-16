@@ -403,7 +403,8 @@ its own subject with its own check.
 
 # 10 · CDN
 
-Contracted in §6 (it shares the supply projection). The one rule worth
+Contracted with Cache & queue (§4), Jobs (§5) and Environment Variables (§6),
+which share one supply projection with it. The one rule worth
 repeating: **no CDN recorded reads "nobody has looked"**, and only a `cdn`
 subject stated `absent` reads "nothing caches in front". The distinction
 matters because the second is a finding and the first is a to-do.
@@ -529,15 +530,23 @@ The 522 carried `private, no-store, no-cache`, so it is not a cached copy of
 anything. **The origin was never exposed**: a private origin behind a proxied
 name is exactly this, and it is the distinction the design exists to draw.
 
-## What has still not been done
+## What had still not been done, when this was written
 
-No DNS record has been created, changed or deleted — the record above was
-already in place. Nothing has been purchased. Proving `serving` rather than
-`unreachable` needs the origin to accept public HTTP, which is a separate
-decision:
+No DNS record had been created, changed or deleted — the record above was
+already in place — and nothing had been purchased. Proving `serving` rather
+than `unreachable` needed the origin to accept public HTTP, which was a
+separate decision:
 
-| what | why it needs you |
+| what | why it needed you |
 |---|---|
 | public ingress on the origin | it makes a deployment reachable from the internet, which is the opposite of the private-by-default rule |
 | a firewall rule for 80/443 | same |
-| DNS writes | still unauthorised, and still not needed for the read path |
+
+**DNS writes have since shipped.** [PR #76](https://github.com/lustoykov/server-guy/pull/76)
+added `set_domain_record`, which writes one exact name of one exact type per
+call, refuses to take a name from whatever already holds it without `replace`,
+and refuses to remove a record whose address is not the one it expects. The
+publishing path it belongs to is described in
+[Architecture](architecture.md#publishing-at-a-domain), and what it was proved
+against is in [that evidence](testing/2026-09-15-publish-custom-domain.md).
+The read path above still needs no writes.

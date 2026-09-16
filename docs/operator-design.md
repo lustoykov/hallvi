@@ -325,7 +325,7 @@ Conversation identity appears in the page header and corresponding navigation en
 
 ### Controller storage versus the deployed application's database
 
-The controller currently uses SQLite and still has legacy `deployments` and `application_operations` tables. The execution checkpoint did not replace that schema. A separate storage checkpoint before provisioning replaces this storage and initializes fresh development application data; there is no requirement to provision a separate hosted database for Server Guy merely to use Hetzner.
+The controller uses SQLite. The storage checkpoint replaced the legacy `deployments` and `application_operations` tables with the four in [Architecture](architecture.md#what-is-stored); neither exists any more. There is no requirement to provision a separate hosted database for Server Guy merely to use Hetzner.
 
 A database needed by the deployed application is a separate concern. Pi determines that requirement from the repository and prepares the appropriate database on the target as part of deployment. A lightweight application may not need one at all.
 

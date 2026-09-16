@@ -404,7 +404,7 @@ bound in a throwaway copy of the repository.
 
 ---
 
-## 6. Refused at the door
+## 9. Refused at the door
 
 `src/server/record-contract.ts` runs at save. Zod settles shape; this settles
 what shape cannot: a check with no claim has no horizon, two facts sharing a
@@ -419,7 +419,7 @@ judgement about prose and is not decided here.
 
 ---
 
-## 6b. Where a copy goes
+## 10. Where a copy goes
 
 `destination-kind` is the one fact that decides what losing a machine costs,
 and it is declared rather than read off prose: `/var/backups/shop` and
@@ -440,7 +440,7 @@ verdict is formed. `failed` and `warning` are judgements and do not age, and a
 same-host plan as a warning is what stops a passing "the timer is active"
 printing green under the word Backups.
 
-## 7. Actions
+## 11. Actions
 
 **Navigate** and **Ask**. Nothing on a designed page executes anything. A
 re-check is a question in the conversation, and the records it produces are

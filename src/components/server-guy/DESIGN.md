@@ -238,13 +238,13 @@ A light, Railway-inspired shell gives application facts and conversation room to
 - Stable application facts before changing deployment progress.
 - Inspectable recorded work with quiet, collapsible detail.
 
-Source authority: `application-shell.css`, `application-navigation.tsx`, `application-overview.tsx`, `deployment-panel.tsx`, and `operator-shell.tsx`; inherited controls and fonts come from `src/app/server-guy.css` and `src/app/globals.css`. Review captures are in project-root `.impeccable/review/`: `conversation-desktop.png`, `desktop.png`, and `mobile.png`. These are visual evidence of the exercised slice, not a promise of current host health.
+Source authority: `application-shell.css`, `application-navigation.tsx`, `operator-shell.tsx` and the `*-page.tsx` destinations; inherited controls and fonts come from `src/app/server-guy.css` and `src/app/globals.css`. Review captures are in project-root `.impeccable/review/`: `conversation-desktop.png`, `desktop.png`, and `mobile.png`. These are visual evidence of the exercised slice, not a promise of current host health.
 
 ## Adopted interaction direction (9 September)
 
 Fable A is the selected experience: conversation first, inline operation receipts and quiet navigation marks, with stable full-page application views. There is no permanent right pane, split mode or floating window. Operations are shared across conversations and application views; completed evidence stays historical while application facts reflect later verified work.
 
-**Built into the shell on 9 September.** `operator-shell.tsx` now renders this design against the real deployment record: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `deployment-decision.tsx` (the real approval and recovery inside the receipt), `destination-activity.tsx` (activity cards and origin lines above a view's facts), `application-overview.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. The development-only `/explore` route remains a simulated interaction reference. See the [integration report](../../../docs/design/screens.md) and [adoption details](../../../docs/design/screens.md).
+**Built into the shell on 9 September.** `operator-shell.tsx` renders this design against real records: `operation-receipt.tsx` (chip, steps, receipt, destination links, reference chips), `destination-activity.tsx` (activity cards and origin lines above a destination's facts), `overview-page.tsx` (condition, needs you, running, recent changes, evidence freshness) and the marks in `application-navigation.tsx`. The record they read is projected in `src/server/operation-record.ts`. `deployment-decision.tsx` and `application-overview.tsx` were the components of the day; the approval now lives in the receipt itself and Overview is a page composed from records. See the [UI reference](../../../docs/design/screens.md).
 
 ## The visual vocabulary (later on 9 September)
 
@@ -285,61 +285,9 @@ destination, or the current conversation — and the active work strip. There
 is one place to switch application. `application-identity.tsx` also carries
 `topbar` and `breadcrumb` placements, compared live in `/prototype/shell`.
 
-## Colors
-
-Blue accents sit on white work surfaces, a cool gray navigation surface, and a slightly tinted context pane. `ink`, `muted`, and `line` are the application shell's local overrides of global variables. Reuse those scoped values for secondary text and separators; global legacy palette comments do not describe this shell.
-
-**The Recorded State Rule.** Green accompanies the record's “Live · verified” state. Readiness without a passing behavior check does not produce a verified deployment label. Errors remain visible with alert semantics and red text.
-
-## Typography
-
-Geist is the inherited interface family; Geist Mono serves code and logs. The compact body and label sizes support a working application rather than a marketing page. The dashboard title is largest, the conversation title next, with small bold section headings beneath. Secondary facts use muted text and generous line height; the progress timestamps now use the same scoped muted color.
-
-## Layout
-
-The desktop shell fills the viewport with a 240px navigation column and 56px header; the navigation head carries the application identity and the header carries the current destination. The conversation fills the rest; there is no context pane. Selecting an application destination shows it full width above a bar that leads back to the conversation, while the conversation stays mounted and parked so its scroll position and draft survive. The legacy repository-preparation step bar is a collapsed disclosure above the transcript, and the preparation Record sits under Deployment. Architecture has a draggable SVG canvas for source, application, host and PostgreSQL when recorded, with node details below.
-
-At 1100px and below, navigation narrows to 224px and the context pane flows below conversation. At 640px and below, application destinations become a horizontally scrolling row above conversations. The architecture canvas scrolls within its own region without widening the page.
-
-## Elevation & Depth
-
-The application overview and navigation are flat: background changes, fine borders, and spacing establish grouping. Architecture cards do not use decorative shadows. Focus is visible through blue outlines; the composer also uses the inherited soft focus ring. Existing overlays may retain global shadows without making shadows the default surface treatment.
-
-## Shapes
-
-Controls and navigation have compact curved corners; architecture cards and the composer use the larger container radius. Host recommendations use the intermediate card radius. Thin borders carry grouping. Line icons accompany labels; text communicates state independently of icon or color.
-
-## Components
-
-- **Navigation:** three groups above the conversations. Application (Overview, Architecture, Deployment) is always present. Stack (Processes, Database, Cache & queue, Jobs, Storage) lists only what the recorded deployment has, so a simple application carries no empty infrastructure rows; a quiet “Show more” row at the bottom of the destinations, above Conversations, reveals the rest as muted rows, each with the reason it is hidden (“not used”, “nothing recorded yet”, “after deployment”), and each revealed view says what Server Guy would do there with one “Ask in the conversation” link. Care (Backups, Logs, Monitoring, Domains, Environment Variables) is always present, with CDN and Security beside Domains once something records them. Delivery is three destinations rather than one: **Domains** (the name, its DNS and the certificate) is always visible, while **CDN** (caching, delivery, clearing the cache) and **Security** (the host firewall, which ports are open and to whom, and administrative access) stay under "Show more" until a CDN caches or the firewall is read back. Combining them recreates the crowded page the split was made to fix. Quiet separators divide the groups. Section selection is addressable through the URL hash and survives reload/back navigation. Selection has a pale blue fill and blue text plus `aria-current`; conversation names truncate. New-conversation controls have accessible names. Marks sit at the right edge with their reason as the row's accessible description. One change often touches five destinations; only the destination the operation names first animates, and the rest are smaller, dimmer and static, so a busy application never flashes five marks at once.
-- **Buttons and fields:** Blue primary actions, white secondary actions, visible labels, and password inputs for credentials. Disabled primary buttons reduce opacity. The deployment panel overrides inherited button padding and radius with the control values above. Focus outlines remain visible.
-- **Architecture:** Recorded facts render as a main canvas or compact conversation context rows. Nodes move with pointer dragging or arrow keys; layout is saved per application in this browser and can be reset. Flowing connectors illustrate topology, never claim measured traffic. Motion can be paused and respects reduced-motion preferences. Revision, host address, PostgreSQL persistence, verification time and HTTP transport stay explicit. The built PostgreSQL state says “Backups not configured”; approval configuration and the recorded conversation disclose that HTTPS is not configured.
-- **Deployment:** The Deployment view keeps the Hetzner connection, the request to deploy, the recorded event history and logs. The priced recommendation, its required inputs, approval, retry and cancel live in the operation receipt inside the conversation that started the deployment; the view's activity card links there. Approval refers to the displayed recommendation; a changed price refreshes the receipt without clearing entered inputs. The configuration disclosure includes exact source identity and executable checks. Cancel setup is offered only before a recorded or uncertain server creation.
-- **Composer:** A white bordered multiline field remains attached to the conversation, with a focus ring and a compact send action.
-
-## Do's and Don'ts
-
-### Do:
-
-- Do keep live activity above a view's confirmed facts, and the facts unchanged until work is verified.
-- Do use the scoped muted color for secondary labels and progress timestamps.
-- Do keep verification scope, transport and unconfigured protection explicit.
-- Do reuse the same overview and deployment records in conversation and dashboard.
-
-### Don't:
-
-- Don't equate a local preview with a deployed release.
-- Don't add a fixed phase ceremony to this deployment path.
-- Don't treat simulated prototype capabilities as implemented UI behavior.
-
-## Stable sections and adaptive progress
-
-The September 9 direction favors predictable built-in views over generated UI. Agent intelligence drives investigation, deployment choices and progress within those views. Missing capabilities show explicit unimplemented states, not simulated healthy metrics. Logs refresh collects a real host snapshot; backups, continuous monitoring, domain configuration and variable editing remain future work. Powerful UI Plugins are a later possibility, not required for the core experience.
-
-
 ## Conversation-first design language from Fable
 
-Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the [UI reference](../../../docs/design/screens.md) under `/prototype` (development only) is the living source: every view, state and dialog built from the product’s own components with invented data, replayable step by step. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/previous-direction/explore-DESIGN.md).
+Imported from commit `017d656`. These interaction and visual rules supersede older context-pane descriptions above. The exploration that produced them is retired; the living source is the product itself: `npm run scenarios -- <port>` serves every state through the shipping pages from the records in `tests/fixtures/scenario-records.ts`. The reference shell that used to hold invented data under `/prototype` has been retired. Reference chips lead to one approval at the originating message. The earlier source is archived in [explore/DESIGN.md](https://github.com/lustoykov/server-guy/blob/0682ab257469bc5cee994572285283ea949bc3c6/docs/archive/previous-direction/explore-DESIGN.md).
 
 ## Colors
 
@@ -477,7 +425,7 @@ Everything that names a state or a place is a pill (999px): state chips, destina
 
 ### Prototype bar
 
-- The reference prototype marks itself once: a bar fixed to the bottom of the viewport with the tag “Prototype · invented data” in waiting amber, the application and step selectors, previous, next, play and reset, the scenario clock in UTC and a link to the index. Nothing inside a view or a receipt says “simulated”; the bar is the label, and product screenshots never include it. Product routes render the same components with real facts or with their honest placeholder states.
+- A scenario database is labelled by what it is rather than by a banner inside the pages: the applications it holds are named “Scenario · …” and say what each exists to show. Nothing inside a destination or a receipt says “simulated”, and product screenshots come from the same components reading real records.
 
 ### Views from facts
 
