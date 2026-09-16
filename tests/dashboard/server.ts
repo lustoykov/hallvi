@@ -8,9 +8,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
   archiveRun,
-  caseKey,
   directory,
-  findCase,
   humanReviewSchema,
   listReports,
   readJson,
@@ -20,16 +18,12 @@ import {
   writeJson,
 } from "./results.ts";
 import { browserJourneys } from "../browser/journeys.ts";
-import { evalCases } from "../evals/cases.ts";
 import { suiteGuides } from "./suite-guides.ts";
 import { guidePage, renderMarkdown } from "./markdown.ts";
 
 // Bumped when the page needs a newer server; the page warns instead of failing
 // quietly against a stale process.
 export const API_VERSION = 6;
-const currentRubrics = Object.fromEntries(
-  evalCases.map((item) => [item.id, item.rubric]),
-);
 export const suites = [
   {
     id: "unit",
@@ -58,43 +52,14 @@ export const suites = [
     ci: `${browserJourneys.filter((journey) => journey.smoke).length} of ${browserJourneys.length} per PR`,
     ciDetail: `All ${browserJourneys.length} on demand`,
   },
-  {
-    id: "live",
-    name: "Live agent evals",
-    command: "npm run eval:pi",
-    scope: `${evalCases.length} selectable cases · real Server Guy agent responses to review`,
-    cost: "Uses subscription",
-    ci: "On demand only",
-    ciDetail: "Local only · never in CI",
-  },
 ] as const;
 const startSchema = z.strictObject({
-  suite: z.enum(["unit", "smoke", "e2e", "live", "judge"]),
-  consent: z.literal(true).optional(),
-  run: z.string().optional(),
-  hash: z.string().optional(),
-  key: z.string().optional(),
-  keys: reviewKeysSchema.optional(),
+  suite: z.enum(["unit", "smoke", "e2e"]),
   journeys: z
     .array(z.enum(browserJourneys.map((item) => item.id)))
     .min(1)
     .max(browserJourneys.length)
     .refine((ids) => new Set(ids).size === ids.length)
-    .optional(),
-  cases: z
-    .array(z.enum(evalCases.map((item) => item.id)))
-    .min(1)
-    .max(evalCases.length)
-    .refine((ids) => new Set(ids).size === ids.length)
-    .optional(),
-  repeats: z.number().int().min(1).max(5).optional(),
-  judgeAfter: z.boolean().optional(),
-  model: z
-    .string()
-    .regex(/^[a-zA-Z0-9_.-]{1,100}$/)
-    .optional(),
-  effort: z
-    .enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"])
     .optional(),
 });
 export type StartRequest = z.infer<typeof startSchema>;
@@ -114,59 +79,7 @@ export function commandFor(request: StartRequest) {
   const input = startSchema.parse(request);
   if (input.suite !== "e2e" && input.journeys)
     throw new Error("Journey selection is for browser tests");
-  if (input.suite !== "live" && (input.cases || input.repeats !== undefined))
-    throw new Error("Case selection is for live evals");
-  if (
-    input.suite !== "judge" &&
-    (input.key || input.keys || input.run || input.hash)
-  )
-    throw new Error("Saved answers are for the judge");
-  if (input.suite !== "live" && input.judgeAfter)
-    throw new Error("Automatic judging follows a live eval run");
-  const commands = {
-    unit: "test",
-    smoke: "test:e2e:smoke",
-    e2e: "test:e2e",
-    live: "eval:pi",
-    judge: "eval:judge",
-  };
-  const env: Record<string, string> = {};
-  if (input.suite === "live" || input.suite === "judge") {
-    if (!input.consent)
-      throw new Error("Confirm subscription usage before starting");
-    if (input.suite === "live") {
-      if (!input.model || !input.effort)
-        throw new Error("Confirm the model and effort before starting");
-      Object.assign(env, {
-        SERVER_GUY_LIVE_EVALS: "1",
-        PI_EVAL_REPEATS: String(input.repeats ?? 1),
-        PI_EVAL_CASES: (input.cases ?? evalCases.map((item) => item.id)).join(
-          ",",
-        ),
-        PI_EVAL_EXPECTED_MODEL: input.model,
-        PI_EVAL_EXPECTED_EFFORT: input.effort,
-      });
-    } else {
-      if (
-        !input.run ||
-        !input.hash ||
-        (!input.key && !input.keys) ||
-        (input.key && input.keys) ||
-        !input.model ||
-        !input.effort
-      )
-        throw new Error("Select saved answers and judge settings");
-      const keys = reviewKeysSchema.parse(input.keys ?? [input.key]);
-      Object.assign(env, {
-        SERVER_GUY_LIVE_JUDGE: "1",
-        PI_JUDGE_RUN: input.run,
-        PI_JUDGE_HASH: input.hash,
-        PI_JUDGE_CASES: JSON.stringify(keys),
-        PI_JUDGE_MODEL: input.model,
-        PI_JUDGE_EFFORT: input.effort,
-      });
-    }
-  }
+  const commands = { unit: "test", smoke: "test:e2e:smoke", e2e: "test:e2e" };
   const args = ["run", commands[input.suite]];
   if (input.journeys)
     args.push(
@@ -174,7 +87,9 @@ export function commandFor(request: StartRequest) {
       "--grep",
       `@journey-(?:${input.journeys.join("|")})(?:\\s|$)`,
     );
-  return { args, env };
+  // Nothing this dashboard starts makes a model call, so there is no run
+  // environment to build and nothing to confirm before starting one.
+  return { args, env: {} as Record<string, string> };
 }
 
 function commandText(command: ReturnType<typeof commandFor>) {
@@ -226,9 +141,6 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     if (active)
       throw new Error("A check is already running. Wait for it to finish.");
     const command = commandFor(input);
-    if (input.suite === "judge")
-      for (const key of input.keys ?? [input.key!])
-        findCase(root, input.run!, input.hash!, key);
     const run: Run = {
       id: randomUUID(),
       suite: input.suite,
@@ -275,16 +187,11 @@ export function createDashboard(root: string, launch: Launch = spawn) {
       throw error;
     }
     const processForRun = child;
-    const paid = input.suite === "live" || input.suite === "judge";
     const log = (data: Buffer) => {
-      // SDK diagnostics may contain secrets. Live runs expose only completion
-      // and saved reports.
-      if (!paid) {
-        run.log = (
-          run.log + data.toString().replace(/\x1b\[[0-9;]*m/g, "")
-        ).slice(-40_000);
-        writeJson(path, run);
-      }
+      run.log = (
+        run.log + data.toString().replace(/\x1b\[[0-9;]*m/g, "")
+      ).slice(-40_000);
+      writeJson(path, run);
     };
     child.stdout?.on("data", log);
     child.stderr?.on("data", log);
@@ -328,83 +235,14 @@ export function createDashboard(root: string, launch: Launch = spawn) {
             : "failed";
       run.exitCode = code;
       run.finishedAt = new Date().toISOString();
-      if (paid) {
-        // Same match as the judge handoff: the report this run wrote starts
-        // after the dashboard run did.
-        const saved = listReports(root).find(
-          (report) => report.startedAt >= run.startedAt,
-        );
-        run.log =
-          code === 0
-            ? "Run completed. Open Eval runs to inspect answers and judgments. Runner completion is not semantic acceptance.\n"
-            : `Run ${run.status}${code === null ? "" : ` (exit code ${code})`}. ${saved ? failureSummary(saved) : "No readable eval report was saved by this run. Setup may have failed before the first turn; this does not prove that no model requests were made."}\nProvider output is hidden because it may contain credentials. Check your saved Server Guy login and model settings. For full diagnostics, run the following command in a terminal from the project directory. Rerunning may use subscription usage; nothing is retried automatically.\n\n${run.command}\n`;
-      }
       writeJson(path, run);
       active = null;
       child = null;
       cancelActive = null;
-      // Saved answers are judged even when the runner exited non-zero: a
-      // failed check or a source change mid-run is not a reason to leave the
-      // answers unjudged. A stopped run is the user's call and stays as is.
-      if (
-        input.suite === "live" &&
-        input.judgeAfter &&
-        run.status !== "cancelled"
-      )
-        judgeAfterRun(run, path, input);
     };
     child.on("error", () => finish(null));
     child.on("close", finish);
     return run;
-  }
-  // What a non-zero exit meant for the answers: the runner's own output is
-  // hidden, so say what was saved, what failed its checks, and whether the
-  // sources changed under it.
-  function failureSummary(report: ReturnType<typeof listReports>[number]) {
-    const planned = report.plannedCases ?? report.results.length;
-    const answered = report.results.filter((record) => record.reply).length;
-    const failed = report.results.filter(
-      (record) =>
-        record.outcome === "checks-failed" || record.outcome === "run-error",
-    ).length;
-    const parts = [
-      `${answered} of ${planned} planned answers were saved`,
-      failed
-        ? `${failed} failed their checks or errored`
-        : answered
-          ? "all of them passed their checks"
-          : "",
-      report.sourcesUnchanged === false
-        ? "source files changed while it ran, so the runner refused to call it a clean baseline"
-        : "",
-    ].filter(Boolean);
-    return `${parts.join("; ")}. The saved answers are reviewable under Eval runs.`;
-  }
-  // The one confirmation for a live run also covers judging its answers with
-  // the same model once they are saved.
-  function judgeAfterRun(run: Run, path: string, input: StartRequest) {
-    try {
-      const report = listReports(root).find(
-        (r) => r.startedAt >= run.startedAt,
-      );
-      const keys =
-        report?.results.filter((c) => c.reply && c.input).map(caseKey) ?? [];
-      if (!report || !keys.length)
-        throw new Error("no saved answers were found for this run");
-      start({
-        suite: "judge",
-        consent: true,
-        run: report.run,
-        hash: report.hash,
-        keys,
-        model: input.model,
-        effort: input.effort,
-      });
-      run.log += `Judging ${keys.length} saved answer${keys.length === 1 ? "" : "s"} automatically.\n`;
-    } catch (error) {
-      run.log += `Automatic judging did not start: ${error instanceof Error ? error.message : "unknown error"}.\n`;
-    }
-    writeJson(path, run);
   }
   const server = createServer(async (request, response) => {
     response.setHeader("Cache-Control", "no-store");
@@ -483,57 +321,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/state") {
-        let defaults = { model: "gpt-5.6-sol", effort: "high" };
-        try {
-          const settings = readJson(
-            join(
-              process.env.SERVER_GUY_CONFIG_DIR ?? join(root, ".server-guy"),
-              "pi-settings.json",
-            ),
-          );
-          defaults = z.object({ model: z.string(), effort: z.string() }).parse({
-            model: settings.modelId,
-            effort: settings.reasoningEffort,
-          });
-        } catch {
-          /* No saved settings: display defaults, not an authenticated claim. */
-        }
-        const reports = listReports(root, currentRubrics);
-        // Archived runs count too. Planned/skipped cases are not attempts.
-        const attempted = new Set(
-          reports.flatMap((report) =>
-            report.results
-              .filter((record) => record.outcome !== "not-run")
-              .map((record) => record.caseId),
-          ),
-        );
-        // The newest attempt of each case, summarised for the picker: its
-        // triage status, when it ran, and whether the rubric wording has
-        // changed since. Reports are newest first.
-        const lastAttempt = (item: (typeof evalCases)[number]) => {
-          for (const report of reports) {
-            const records = report.results.filter(
-              (record) =>
-                record.caseId === item.id && record.outcome !== "not-run",
-            );
-            if (!records.length) continue;
-            const statuses = records.map(
-              (record) => report.triage[caseKey(record)].status,
-            );
-            return {
-              run: report.run,
-              startedAt: report.startedAt,
-              status:
-                ["failures", "needs-review", "needs-judge", "reviewed"].find(
-                  (status) => statuses.includes(status),
-                ) ?? "cleared",
-              rubricChanged: records.some(
-                (record) => record.rubric !== item.rubric,
-              ),
-            };
-          }
-          return null;
-        };
+        // The saved answers stay readable; nothing here can start another
+        // run against them, so no model, effort or case picker is sent.
         json({
           apiVersion: API_VERSION,
           suites: suites.map((suite) => ({
@@ -541,15 +330,9 @@ export function createDashboard(root: string, launch: Launch = spawn) {
             guide: suiteGuides[suite.id],
           })),
           journeys: browserJourneys,
-          evalCases: evalCases.map((item) => ({
-            ...item,
-            hasRun: attempted.has(item.id),
-            last: lastAttempt(item),
-          })),
           active,
           history: history(),
-          reports,
-          defaults,
+          reports: listReports(root),
         });
         return;
       }
@@ -664,7 +447,7 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const root = process.cwd();
-  if (!existsSync(join(root, "tests/evals", "cases.ts")))
+  if (!existsSync(join(root, "tests/browser", "journeys.ts")))
     throw new Error("Run from the Server Guy repository");
   const dashboard = createDashboard(root);
   dashboard.server.listen(4317, "127.0.0.1", () =>
