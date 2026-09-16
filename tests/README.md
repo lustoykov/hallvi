@@ -1,6 +1,58 @@
 # Testing Server Guy
 
-For the schema 15 checkpoint, run `npm test`, then `npm run test:e2e:smoke`. Tests use disposable databases and synthetic provider/model responses. The shared-information browser case covers rich cards in chat and Deployment after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
+## The 80/20 bar
+
+We are discovering and polishing the product. Tests should help us change it
+confidently without turning every change into a hardening project. Optimize for
+useful failures caught versus authoring, maintenance, runtime and review cost.
+There is no target test count, coverage percentage or deletion quota.
+
+Keep or add a test when it protects a current, important behavior and catches a
+realistic failure that existing coverage would miss. Prioritize:
+
+- The main journey: deploy, open the application, return after a refresh, and
+  continue the conversation after a turn completes.
+- Concrete risks to data or credentials, such as an incomplete recovery archive
+  or discarding the working password after a partially successful change.
+- Consequential boundaries and claims: approval before execution when required,
+  acting on the intended application/server, and backup or deployment success
+  supported by the relevant result.
+
+A small regression test for a serious observed bug can be valuable even if that
+bug is uncommon. This does not justify testing every imagined variation.
+
+Delete or consolidate tests for retired behavior, duplicated scenarios, trivial
+wrappers, internal call sequences, or exact wording/markup with no meaningful
+user contract. Keep wording assertions where the wording itself carries an
+important warning or claim. Do not remove a useful test merely because it fails;
+first distinguish a product bug from an obsolete expectation or broken fixture.
+
+Use the cheapest check that gives useful confidence. Prefer one representative
+integration or journey test over many mocks that repeat the implementation; use
+focused unit tests for consequential logic when they give a clearer signal.
+For prototypes, spacing and copy edits, inspect the rendered UI and exercise the
+changed interaction. Do not build permanent test suites around designs awaiting
+selection, or write tests that merely assert the CSS you just added.
+
+Run relevant checks once; broaden or repeat them only for a new change, failure
+or concrete unresolved concern. Documentation-only edits need document/link
+review. Real provider claims need representative real verification, but that
+proof need not become a recurring test for unrelated edits. A pruning pass should
+run the retained default suite once to catch broken fixtures and imports.
+
+When pruning, explain removals by group and name the important behavior still
+covered. No scoring framework, exhaustive audit spreadsheet, mandatory
+counterfactual run for every test, or new test harness is needed. If a decision
+would remove the only coverage of an important behavior and its value is unclear,
+ask the owner with that concrete example; continue the unambiguous cleanup.
+
+## Commands and limits
+
+`npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser
+smoke subset. Select checks relevant to the change rather than running both by
+default. Tests use disposable databases and synthetic provider/model responses.
+The shared-information browser case covers rich cards in chat and Deployment
+after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
 
 The non-smoke browser suite also retains History/Decision and native-session cases whose synthetic prompts call retired decision tools. Those cases are historical, not acceptance gates for the operator model. Current transcript regression coverage is `tests/browser/pi-transcript.spec.ts`; run it together with the smoke suite after transcript changes.
 
