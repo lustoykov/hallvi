@@ -45,6 +45,7 @@ export function listApplicationItems(): ApplicationListItem[] {
       attention: records.filter(
         (r) => r.presentation?.role === "recommendation",
       ).length,
+      address: addressOf(records),
     };
   });
 }
@@ -65,6 +66,7 @@ function conditionOf(
   applicationId: string,
   now: number,
 ): ApplicationListItem["condition"] {
+  if (!records.length) return { tone: "muted", text: "New application" };
   const refs: Ref[] = [
     { kind: "application", id: applicationId },
     ...SUBJECT_KINDS.flatMap((kind) => subjectsMentioned(records, kind)),
@@ -79,6 +81,18 @@ function conditionOf(
   if (readings.includes("verified"))
     return { tone: "live", text: "Checks held" };
   return { tone: "muted", text: "Recorded, not established" };
+}
+
+/**
+ * Where the application is reached, from the saved access record. A record
+ * says where, never that anything answers; the condition beside it does.
+ */
+function addressOf(records: SavedInformation[]) {
+  const url = records.find(
+    (record) => record.presentation?.content?.kind === "application-access",
+  )?.presentation?.url;
+  if (!url || !URL.canParse(url)) return null;
+  return ["http:", "https:"].includes(new URL(url).protocol) ? url : null;
 }
 
 /** What it runs, counted rather than described. */

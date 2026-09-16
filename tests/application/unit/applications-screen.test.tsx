@@ -76,9 +76,28 @@ describe("application navigation", () => {
     expect(html).toContain("two/todo");
     expect(html).toContain("Not deployed");
     expect(html).toContain("Recommendation waiting for you");
-    expect(html).toContain("1 needs you");
-    expect(html).toContain("Nothing needs you");
+    expect(html).toContain("Needs me");
     expect(html).not.toContain("Launch Brief");
+  });
+
+  it("keeps stale checks distinct from attention and preserves the private URL", () => {
+    const html = renderToStaticMarkup(
+      <ApplicationsScreen
+        piReady
+        applications={[
+          {
+            ...listItem(application, null),
+            condition: { tone: "warn", text: "Checked a while ago" },
+            attention: 0,
+            address: "http://127.0.0.1:18000",
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain('href="http://127.0.0.1:18000"');
+    expect(html).toContain("Not checked");
+    expect(html).not.toContain("Needs me");
+    expect(html).not.toContain("deployed yet");
   });
 
   it("does not accept form edits before hydration can retain them", () => {

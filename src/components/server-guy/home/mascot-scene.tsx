@@ -12,7 +12,8 @@ export type MascotMood =
   | "celebrating"
   | "waving"
   | "pointing"
-  | "resting";
+  | "resting"
+  | "carrying";
 export type MascotDance =
   "shuffle" | "robot" | "floss" | "backflip" | "cartwheel";
 import { mascotColors } from "./mascot-palette";
@@ -28,7 +29,8 @@ export function MascotScene({
   dance = "shuffle",
   danceRequest = 0,
 }: {
-  color?: number;
+  /** A palette index, or a hex colour of the caller's own. */
+  color?: number | string;
   mood?: MascotMood;
   paused?: boolean;
   gesture?: number;
@@ -92,7 +94,9 @@ export function MascotScene({
     scene.add(body);
     const geometries: THREE.BufferGeometry[] = [];
     const materials: THREE.Material[] = [];
-    const paint = new THREE.Color(mascotColors[color]);
+    const paint = new THREE.Color(
+      typeof color === "string" ? color : mascotColors[color],
+    );
     const mesh = (
       w: number,
       h: number,
@@ -307,6 +311,66 @@ export function MascotScene({
     // The gap of the open end faces up.
     jaw.rotation.z = Math.PI * 0.775;
     wrench.add(jaw);
+    // A mug for a quiet day, held in the left mitten.
+    // Attached to the body and kept upright at the mitten each frame, so it
+    // never tilts with the arm.
+    const mug = new THREE.Group();
+    body.add(mug);
+    const mittenAt = new THREE.Vector3();
+    const mugBodyGeo = new THREE.CylinderGeometry(0.17, 0.15, 0.3, 20);
+    geometries.push(mugBodyGeo);
+    const mugMat = new THREE.MeshStandardMaterial({
+      color: 0xf7f9fc,
+      roughness: 0.5,
+    });
+    materials.push(mugMat);
+    const mugBody = new THREE.Mesh(mugBodyGeo, mugMat);
+    mugBody.castShadow = true;
+    mug.add(mugBody);
+    const coffeeGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.02, 20);
+    geometries.push(coffeeGeo);
+    const coffeeMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c });
+    materials.push(coffeeMat);
+    const coffee = new THREE.Mesh(coffeeGeo, coffeeMat);
+    coffee.position.y = 0.145;
+    mug.add(coffee);
+    const handleGeo = new THREE.TorusGeometry(0.09, 0.026, 8, 16, Math.PI);
+    geometries.push(handleGeo);
+    const handle = new THREE.Mesh(handleGeo, mugMat);
+    handle.position.set(-0.17, 0, 0);
+    handle.rotation.z = Math.PI / 2;
+    mug.add(handle);
+    mug.add(mesh(0.24, 0.035, 0.02, 0.01, 0x285ad8, 0, 0.02, 0.165));
+    // A magnifier for when something was found, held up in the right mitten.
+    const magnifier = new THREE.Group();
+    arms[1].wrist.add(magnifier);
+    magnifier.position.set(0.02, 0.06, 0.16);
+    magnifier.rotation.z = -0.5;
+    const rimGeo = new THREE.TorusGeometry(0.2, 0.036, 10, 28);
+    geometries.push(rimGeo);
+    const rim = new THREE.Mesh(rimGeo, shankMaterial);
+    rim.castShadow = true;
+    rim.position.y = 0.36;
+    magnifier.add(rim);
+    const glassGeo = new THREE.CircleGeometry(0.18, 28);
+    geometries.push(glassGeo);
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xcfe0ff,
+      transparent: true,
+      opacity: 0.45,
+    });
+    materials.push(glassMat);
+    const glass = new THREE.Mesh(glassGeo, glassMat);
+    glass.position.y = 0.36;
+    magnifier.add(glass);
+    magnifier.add(mesh(0.08, 0.36, 0.06, 0.03, 0x192338, 0, 0.02));
+    // A box to carry in, for an application that is not deployed yet.
+    const box = new THREE.Group();
+    body.add(box);
+    box.position.set(0, 0.86, 0.92);
+    box.add(mesh(0.62, 0.46, 0.5, 0.03, 0xd9b98a));
+    box.add(mesh(0.64, 0.08, 0.52, 0.01, 0xc4a06e, 0, 0.16));
+    box.add(mesh(0.14, 0.47, 0.51, 0.01, 0xefe3cf, 0, 0));
     const floorGeo = new THREE.PlaneGeometry(200, 200);
     const floorMat = new THREE.ShadowMaterial({ opacity: 0.14 });
     geometries.push(floorGeo);
@@ -408,6 +472,7 @@ export function MascotScene({
         checking = current === "checking";
       const attention = current === "attention",
         resting = current === "resting";
+      const carrying = current === "carrying";
       const dancing = current === "dancing";
       const happy =
         current === "celebrating" || current === "waving" || dancing;
@@ -521,21 +586,35 @@ export function MascotScene({
         eye.position.x =
           (i === 0 ? -eyeGap : eyeGap) + (checking ? -0.025 : 0) + reach * 0.06;
         eye.position.y = faceY - reach * 0.04;
-        eye.rotation.z = attention ? (i === 0 ? -0.12 : 0.12) : 0;
-        (eye.material as THREE.MeshStandardMaterial).color.set(
-          attention ? 0xf0c37b : 0xedf3ff,
-        );
+        eye.rotation.z = attention ? (i === 0 ? 0.1 : -0.1) : 0;
+        (eye.material as THREE.MeshStandardMaterial).color.set(0xedf3ff);
         happyEyes[i].visible = happy;
         brows[i].visible = checking || attention || reach > 0.3;
-        brows[i].position.y = faceY + 0.19 + reach * 0.035;
+        brows[i].position.y =
+          faceY + 0.19 + reach * 0.035 + (attention ? 0.05 : 0);
         brows[i].rotation.z = attention
           ? i === 0
-            ? -0.22
-            : 0.22
+            ? 0.28
+            : -0.28
           : (i === 0 ? 0.15 : -0.08) * (1 - reach);
       });
       clipboard.visible = checking;
       wrench.visible = working;
+      magnifier.visible = attention;
+      box.visible = carrying;
+      // The mug is for quiet moments, not for dancing or acrobatics.
+      mug.visible =
+        (current === "ready" || waving || resting) && !dancing && reach < 0.05;
+      if (mug.visible) {
+        arms[0].wrist.getWorldPosition(mittenAt);
+        body.worldToLocal(mittenAt);
+        mug.position.set(
+          mittenAt.x - 0.02,
+          mittenAt.y + 0.05,
+          mittenAt.z + 0.16,
+        );
+        mug.rotation.set(0, 0, 0);
+      }
       finger.visible = reach > 0.05;
       antennas.forEach((antenna, i) => {
         const side = i === 0 ? -1 : 1;
@@ -617,7 +696,23 @@ export function MascotScene({
             arm.wrist.rotation.z = side * open * 0.3;
           }
         }
+        // Worried: the free hand comes up, the magnifier is held out and up.
         if (attention && i === 0) angle = -0.7;
+        if (attention && i === 1) {
+          angle = 1.0 + (!still ? Math.sin(t * 0.003) * 0.05 : 0);
+          elbow = 0.15;
+        }
+        // The box is carried in both arms, in front.
+        if (carrying) {
+          angle = side * 0.2;
+          arm.shoulder.rotation.x = -1.15;
+          elbow = -0.35;
+        }
+        // A mug is held a little forward and level.
+        if (mug.visible && i === 0 && !waving) {
+          angle = -0.65;
+          elbow = -0.25;
+        }
         // The right arm reaches out, then taps down toward the log below
         // him, set directly so the tap lands at 820 ms, with the label.
         const reaching = i === 1 && reach > 0.001;

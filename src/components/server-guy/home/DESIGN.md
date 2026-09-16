@@ -1,41 +1,52 @@
 # Applications home
 
-This records the existing visual direction. The [operator design](../../../../docs/operator-design.md) governs conversation ownership and shared-record presentation; adapt the home-to-deployment journey as needed without treating the current data contract as permanent.
+This records the visual direction of the applications homepage. The [operator design](../../../../docs/operator-design.md) governs conversation ownership and shared-record presentation; the [product](../../../../PRODUCT.md) owns the rule that most first users run something small.
 
-The selected D / Together composition comes from `codex/homepage-exploration` at
-`896337dc4f8acd7eb4ff959a6f0b57d85330a14e`. It is integrated into the real
-`/applications` route on `codex/single-instance-runtime`.
+## In good company (16 September 2026)
 
-## Design decisions
+Chosen by the owner after three prototype rounds on `prototype/homepage-directions`
+(`docs/prototypes/homepage-directions/README.md` on that branch has the six,
+then three, then one direction and the feedback on each). The composition is
+the one the page had at `5426bbc`, kept where it was right and fixed where it
+was not.
 
-- Use the existing application blue/slate theme and Geist typography throughout.
-  The user explicitly rejected the prototype's Instrument Serif heading.
-- Typography: heading 36px / 700 with -0.03em tracking, 32px on small screens;
-  body 15px; app names 16px desktop and 18px mobile; secondary labels 12–14px.
-  Miniature interface artwork uses 7–14px labels because it is an illustration,
-  not the product's readable operational interface.
-- Keep Little Server's original box silhouette. Slate, silver-blue, periwinkle, and cornflower
-  palettes distinguish caretakers and their associated app illustrations.
-  Navy faces, ice-blue expressions, and cool neutral hardware match the app's
-  ink and blue-soft colors; neutral lighting preserves the cooler palette.
-  These colors identify applications, not health or operational state.
-- Keep the mascot above the complete miniature application. Three columns on
-  wide screens, two on medium screens, one on phones. Real names can wrap.
-- Use native buttons and links. Selecting a caretaker scopes the chat action;
-  the selected application name appears beneath that action. Opening an app
-  leads to its existing production workspace and chat.
-- Ambient greetings are short and staggered. Backflips and cartwheels require
-  a button press. Pause and reduced-motion preferences suppress animation;
-  offscreen and hidden-page canvases skip rendering. WebGL failure leaves a
-  static face and working application navigation.
+Kept:
+
+- **One 3D caretaker per application**, above its card, at the same size as
+  before. They wave and dance in turn and greet when clicked. Paint is the
+  application's own colour softened halfway toward the shell's slate blue
+  (`caretakerPaint`), so a dozen still read as one family. Paint is identity;
+  the face and the prop are the state.
+- **A drawn screen of the application** in a tilted window that settles on
+  hover, and the parts of the screen wake up once.
+- **The heading**: "Your apps are in good company."
+
+Changed:
+
+- **The screen is the application's own layout**, drawn per kind of software
+  in `interface-previews.tsx` (twelve kinds and a generic screen), never a
+  generic browser window and never a screenshot. The window bar says
+  "Illustration".
+- **The caretaker's face and hands say the state.** Fine: a mug of coffee,
+  smiling, and it dances. Working: the wrench. Not looked at lately: the
+  clipboard. Something waiting: a magnifier held up and a worried face,
+  never an angry one. Not deployed yet: a cardboard box in both arms. A
+  caretaker whose application needs something does not dance.
+- **The card has a hierarchy**: name and purpose with one word of state at the
+  right ("Fine", "Working", "Needs me", "Not checked", "New"); the screen; the
+  condition in one line; what runs, as chips; the address as the link; More.
+- **No offer at the top of the page.** Talking to Server Guy starts inside the
+  application. Search appears only past four applications.
+- **The page opens with two sentences about the collection**, not an action,
+  and nothing on the card mentions protection. Most first users run
+  something small; a card that says "Not backed up" on day one teaches them
+  to ignore it. Protection lives on the application's own pages, and a nudge
+  on the card is for the day the data has grown enough to deserve one.
 
 ## Data boundaries
 
-Application names, repositories, condition, stack, attention, and protection
-come from existing saved application records. Miniature previews are explicitly
-labeled “Interface illustration”; their graphs and task phrases are decorative.
-The protection notice derives from records and links to the existing Backups
-section. It neither promises a backup nor performs one.
-
-The source prototype remains available for design exploration. Its fake records,
-chat, operations, alternate page variants, and galleries are not production data.
+Name, repository, condition, stack, attention count and address come from
+saved records (`listApplicationItems`). Kind and purpose are read from the
+repository name (`application-kind.ts`); unknown software gets the generic
+screen and its repository as the purpose. The screens are drawings; their
+lines and numbers are decorative and never read from the host.
