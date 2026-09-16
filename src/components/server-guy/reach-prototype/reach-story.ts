@@ -18,6 +18,18 @@ export interface Door {
   detail: string;
   /** Nobody has checked this one. */
   unasked?: boolean;
+  /**
+   * What established this door, for this door alone.
+   *
+   * `answered` and `refused` come from a check that opened a TCP connection
+   * from outside and recorded what happened. `configured` means the port and
+   * its sources are on record and nothing has connected to it. The
+   * application-wide firewall read is never evidence about a single port, so
+   * it is not one of these.
+   */
+  established?: "answered" | "refused" | "looked" | "configured" | "unasked";
+  /** When that check ran. Null when nothing checked this door. */
+  at?: string | null;
 }
 
 export interface Guard {

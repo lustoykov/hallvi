@@ -149,6 +149,18 @@ export function reachFromRecords({
           [...checks.values()][0]?.value.label ??
           "Nobody has checked this port.",
         unasked: checks.size === 0 || undefined,
+        // Per door, and only from this door's own checks. `open` and
+        // `refused` are written by the port probe, which connects from
+        // outside; everything else is the deployment's configuration.
+        established:
+          checks.size === 0
+            ? "unasked"
+            : open?.value.status === "passed"
+              ? "answered"
+              : refused?.value.status === "passed"
+                ? "refused"
+                : "looked",
+        at: (open ?? refused ?? [...checks.values()][0])?.record.establishedAt,
       });
 
       // A refusal that passed is a guard, not a failure.
@@ -216,6 +228,7 @@ export function reachFromRecords({
       reach: "closed",
       sources: [],
       concern: null,
+      established: "configured",
       detail:
         firewallFacts?.get("default")?.value.value ??
         "Denied unless a rule names it.",

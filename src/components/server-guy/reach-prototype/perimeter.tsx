@@ -11,18 +11,20 @@
 // records, so three things it drew are not available here and are said
 // differently rather than filled in.
 //
-// It marked a service "checked", as though somebody had connected to it.
-// Nothing in the product does that. What exists is the provider's own
-// firewall rules, read back, and what the deployment asked for — so a door
-// says which of those it came from, and when, and to which networks.
+// It marked every service "checked", as though somebody had connected to all
+// of them. Some ports have been connected to: the port probe opens a TCP
+// connection from outside and records `open` or `refused` on that port. Most
+// have not. So each door says what established it, from its own record and
+// never from the application-wide firewall read, which is evidence about the
+// provider's rules and about no single port.
 //
 // It inferred a route. A route is not on record either, so the middle of the
 // connection says only what the record supports: a published port, a rule
 // held to one network, or no published port at all.
 //
-// And it had a tidy notion of "unexpected". Here that is `concern`, which Pi
-// wrote about this particular door. A public website and an SSH port are not
-// incidents; a port nothing asked for is.
+// And it had a tidy notion of "unexpected". A port nobody has looked at is
+// uncertainty, not an opening someone left behind, and it is drawn as the
+// first and coloured as neither.
 
 import { useState } from "react";
 
@@ -31,10 +33,15 @@ import type { Door, ReachProps } from "./reach-story";
 
 import "./perimeter.css";
 
-/** Where a door sits: the outer ring, the inner one, or off the map. */
-type Place = "outside" | "restricted" | "inside" | "unplaced";
+/**
+ * Where a door sits. A refused port is its own place: it is a way in that
+ * stops at the boundary, and putting it on the inner ring would draw it as a
+ * service waiting for someone already inside.
+ */
+type Place = "outside" | "restricted" | "inside" | "refused" | "unplaced";
 
 function placeOf(door: Door): Place {
+  if (door.reach === "closed") return "refused";
   if (door.unasked) return "unplaced";
   if (door.reach === "internet") return "outside";
   if (door.reach === "restricted") return "restricted";
@@ -42,26 +49,29 @@ function placeOf(door: Door): Place {
 }
 
 /**
- * What a reader needs to know about the strength of the claim.
+ * What established this one door, in words.
  *
- * Deliberately not "checked": nothing here connected to the service. The
- * provider's rules being read back is the strongest thing on this page, and
- * it is still a statement about what is allowed rather than about what
- * answered.
+ * Only the first two are observations: the port probe connected from outside
+ * and wrote down what happened. The rest are configuration, and say so. The
+ * firewall read is not here on purpose — it establishes what the provider
+ * allows, which is not a reading of any particular port.
  */
-type Basis = "provider" | "plan" | "process" | "unasked";
+type Basis = NonNullable<Door["established"]>;
 
 const BASIS_WORD: Record<Basis, string> = {
-  provider: "From the provider's own rules",
-  plan: "From what the deployment asked for",
-  process: "From what is running on the server",
-  unasked: "Nobody has looked",
+  answered: "A check connected to it from outside",
+  // "Refused" in the record covers a refusal and a dropped connection
+  // alike, and the detail underneath often says which. Do not narrow it
+  // here: a line that says "refused" over a detail that says "timed out"
+  // contradicts itself.
+  refused: "A check from outside got nothing through",
+  looked: "A check ran without settling it",
+  configured: "From the deployment's own configuration",
+  unasked: "Nobody has connected to it",
 };
 
-function basisOf(door: Door, read: boolean): Basis {
-  if (door.unasked) return "unasked";
-  if (door.reach === "private") return "process";
-  return read ? "provider" : "plan";
+function basisOf(door: Door): Basis {
+  return door.established ?? (door.unasked ? "unasked" : "configured");
 }
 
 /** One ring of nodes, placed evenly. Positions are computed, never drawn. */
@@ -86,9 +96,7 @@ function ring(
       <g
         key={door.id}
         className="pm-node"
-        data-warn={
-          door.reach === "internet" && door.unasked ? "yes" : undefined
-        }
+        data-open={door.established === "answered" || undefined}
         data-picked={door.id === picked || undefined}
         role="button"
         tabIndex={0}
@@ -128,14 +136,12 @@ export function PerimeterDirection({
   const outside = ways.filter((door) => placeOf(door) === "outside");
   const restricted = ways.filter((door) => placeOf(door) === "restricted");
   const inside = ways.filter((door) => placeOf(door) === "inside");
+  const refused = ways.filter((door) => placeOf(door) === "refused");
   const unplaced = ways.filter((door) => placeOf(door) === "unplaced");
-  // Deliberately not door.concern: the projection writes the same sentence
-  // on every internet-reachable port, so counting those would report a public
-  // website and an SSH port as things needing attention. What is actually
-  // worth a look is a way in that answers the world and nobody has checked.
-  const worth = ways.filter(
-    (door) => door.reach === "internet" && door.unasked,
-  );
+  // How many of the ways in have actually been connected to. The rest are on
+  // record because the deployment configured them, which is a weaker thing
+  // and is never written as though someone had looked.
+  const answered = outside.filter((door) => door.established === "answered");
 
   const within = [...restricted, ...inside];
   const innerR = radiusFor(within.length, 86);
@@ -144,7 +150,9 @@ export function PerimeterDirection({
   // The projection files three kinds under holes. A port being open to
   // everyone is established, and the map above says it better than a list.
   const unknowns = story.holes.filter((hole) => !hole.id.startsWith("open:"));
-  const [picked, setPicked] = useState(() => worth[0]?.id ?? ways[0]?.id ?? "");
+  const [picked, setPicked] = useState(
+    () => outside[0]?.id ?? ways[0]?.id ?? "",
+  );
   const door = ways.find((one) => one.id === picked) ?? ways[0] ?? null;
 
   return (
@@ -153,127 +161,158 @@ export function PerimeterDirection({
       <div className="sg-section-content">
         <header className="pm-head">
           <div>
-            <h2>What answers, and from where.</h2>
+            <h2>What is let in, and from where.</h2>
             <p>
-              The outer ring is reachable from the internet. The inner ring
-              needs to be on the server or inside the application&rsquo;s own
-              network first.
+              {ways.length === 0
+                ? "No record names a port on this server. What has been established about the way in is below."
+                : "The outer ring is open to the internet. The inner ring needs to be on the server or inside the application\u2019s own network first. Most of this is what the deployment configured, not what anyone has connected to; each way in says which it is."}
             </p>
           </div>
-          <span className="pm-count">
-            {outside.length} {outside.length === 1 ? "answers" : "answer"} from
-            the internet
-            {unplaced.length > 0 && ` · ${unplaced.length} nobody has checked`}
-          </span>
+          {ways.length > 0 && (
+            <span className="pm-count">
+              {outside.length} open to the internet
+              {answered.length > 0 &&
+                ` · ${answered.length} answered when checked`}
+              {unplaced.length > 0 &&
+                ` · ${unplaced.length} nobody has checked`}
+            </span>
+          )}
         </header>
 
-        <div className="pm-layout">
-          <div className="pm-map">
-            <svg
-              viewBox={`${250 - size / 2} ${232 - size / 2} ${size} ${size}`}
-              aria-label="What can reach in"
-            >
-              <circle className="pm-ring-outer" cx="250" cy="232" r={outerR} />
-              <circle className="pm-ring-inner" cx="250" cy="232" r={innerR} />
-              <circle className="pm-core" cx="250" cy="232" r="46" />
-              <text className="pm-ring-caption" x="250" y={232 - outerR - 26}>
-                ANSWERS FROM THE INTERNET
-              </text>
-              <text className="pm-core-label" x="250" y="228">
-                {story.name}
-              </text>
-              <text className="pm-core-note" x="250" y="245">
-                {inside.length || restricted.length
-                  ? "needs to be let in first"
-                  : "nothing else on record"}
-              </text>
-              {ring(outside, outerR, -90, picked, setPicked)}
-              {ring(within, innerR, -50, picked, setPicked)}
-            </svg>
+        {/* Two empty rings around a name are decoration. With nothing to
+            place, the page is the paragraph above and what is below it. */}
+        {ways.length > 0 && (
+          <div className="pm-layout">
+            <div className="pm-map">
+              <svg
+                viewBox={`${250 - size / 2} ${232 - size / 2} ${size} ${size}`}
+                aria-label="What can reach in"
+              >
+                <circle
+                  className="pm-ring-outer"
+                  cx="250"
+                  cy="232"
+                  r={outerR}
+                />
+                <circle
+                  className="pm-ring-inner"
+                  cx="250"
+                  cy="232"
+                  r={innerR}
+                />
+                <circle className="pm-core" cx="250" cy="232" r="46" />
+                <text className="pm-ring-caption" x="250" y={232 - outerR - 26}>
+                  OPEN TO THE INTERNET
+                </text>
+                <text className="pm-core-label" x="250" y="228">
+                  {story.name}
+                </text>
+                <text className="pm-core-note" x="250" y="245">
+                  {inside.length || restricted.length
+                    ? "needs to be let in first"
+                    : "nothing else on record"}
+                </text>
+                {ring(outside, outerR, -90, picked, setPicked)}
+                {ring(within, innerR, -50, picked, setPicked)}
+              </svg>
 
-            <ul className="pm-key">
-              <li data-tone="outside">
-                <i aria-hidden="true" /> Answers from the internet
-              </li>
-              <li data-tone="inside">
-                <i aria-hidden="true" /> Needs to be let in first
-              </li>
-              {worth.length > 0 && (
-                <li data-tone="warn">
-                  <i aria-hidden="true" /> Answers the world, and nobody has
-                  checked it
+              <ul className="pm-key">
+                <li data-tone="outside">
+                  <i aria-hidden="true" /> Open to the internet
                 </li>
-              )}
-            </ul>
-
-            <ol className="pm-list">
-              {[
-                ["Answers from the internet", outside] as const,
-                ["Needs to be let in first", within] as const,
-              ]
-                .filter(([, list]) => list.length)
-                .map(([heading, list]) => (
-                  <li key={heading}>
-                    <h4>{heading}</h4>
-                    <div>
-                      {list.map((one) => (
-                        <button
-                          key={one.id}
-                          type="button"
-                          aria-pressed={one.id === picked}
-                          data-picked={one.id === picked || undefined}
-                          data-warn={
-                            one.reach === "internet" && one.unasked
-                              ? "yes"
-                              : undefined
-                          }
-                          onClick={() => setPicked(one.id)}
-                        >
-                          <code>{one.port}</code>
-                          {one.title}
-                        </button>
-                      ))}
-                    </div>
+                <li data-tone="inside">
+                  <i aria-hidden="true" /> Needs to be let in first
+                </li>
+                {answered.length > 0 && (
+                  <li data-tone="open">
+                    <i aria-hidden="true" /> A check connected to it
                   </li>
-                ))}
-            </ol>
+                )}
+              </ul>
 
-            {unplaced.length > 0 && (
-              <div className="pm-unplaced">
-                <span>Not on the map: nobody has looked at these</span>
-                <div>
-                  {unplaced.map((one) => (
-                    <button
-                      key={one.id}
-                      type="button"
-                      aria-pressed={one.id === picked}
-                      data-picked={one.id === picked || undefined}
-                      onClick={() => setPicked(one.id)}
-                    >
-                      {one.title}
-                      {one.port && <code>{one.port}</code>}
-                    </button>
+              <ol className="pm-list">
+                {[
+                  ["Open to the internet", outside] as const,
+                  ["Needs to be let in first", within] as const,
+                ]
+                  .filter(([, list]) => list.length)
+                  .map(([heading, list]) => (
+                    <li key={heading}>
+                      <h4>{heading}</h4>
+                      <div>
+                        {list.map((one) => (
+                          <button
+                            key={one.id}
+                            type="button"
+                            aria-pressed={one.id === picked}
+                            data-picked={one.id === picked || undefined}
+                            data-open={
+                              one.established === "answered" || undefined
+                            }
+                            onClick={() => setPicked(one.id)}
+                          >
+                            <code>{one.port}</code>
+                            {one.title}
+                          </button>
+                        ))}
+                      </div>
+                    </li>
                   ))}
+              </ol>
+
+              {refused.length > 0 && (
+                <div className="pm-unplaced" data-kind="refused">
+                  <span>
+                    Stopped at the boundary: a check from outside got nothing
+                    through on{" "}
+                    {refused.length === 1 ? "this port" : "these ports"}
+                  </span>
+                  <div>
+                    {refused.map((one) => (
+                      <button
+                        key={one.id}
+                        type="button"
+                        aria-pressed={one.id === picked}
+                        data-picked={one.id === picked || undefined}
+                        onClick={() => setPicked(one.id)}
+                      >
+                        {one.title}
+                        {one.port && <code>{one.port}</code>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <p className="pm-caption">
-              A ring is what it takes to reach something, not where the software
-              runs. {rest?.detail ?? ""}
-            </p>
-          </div>
+              {unplaced.length > 0 && (
+                <div className="pm-unplaced">
+                  <span>Not on the map: nobody has looked at these</span>
+                  <div>
+                    {unplaced.map((one) => (
+                      <button
+                        key={one.id}
+                        type="button"
+                        aria-pressed={one.id === picked}
+                        data-picked={one.id === picked || undefined}
+                        onClick={() => setPicked(one.id)}
+                      >
+                        {one.title}
+                        {one.port && <code>{one.port}</code>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {door ? (
-            <Connection door={door} read={read} story={story} now={now} />
-          ) : (
-            <section className="pm-detail">
               <p className="pm-caption">
-                No port, rule or process is on record for this application yet.
+                A ring is what it takes to reach something, not where the
+                software runs.
               </p>
-            </section>
-          )}
-        </div>
+            </div>
+
+            {door && <Connection door={door} story={story} now={now} />}
+          </div>
+        )}
 
         {panel}
 
@@ -357,21 +396,19 @@ export function PerimeterDirection({
 /** One connection: where it starts, what it crosses, and what that rests on. */
 function Connection({
   door,
-  read,
   story,
   now,
 }: {
   door: Door;
-  read: boolean;
   story: ReachProps["story"];
   now: number;
 }) {
   const [more, setMore] = useState(false);
-  const basis = basisOf(door, read);
+  const basis = basisOf(door);
   const place = placeOf(door);
 
   const start =
-    place === "outside"
+    place === "outside" || place === "refused"
       ? "Anyone on the internet"
       : place === "restricted"
         ? "Only the networks named below"
@@ -380,17 +417,18 @@ function Connection({
           : "Something already on the server";
 
   // The middle says only what a record can support. No route is on record, so
-  // this never draws hops it does not have.
+  // this never draws hops it does not have, and the firewall read is never
+  // borrowed as evidence about this port.
   const middle =
-    place === "unplaced"
-      ? "Nothing has looked"
-      : place === "outside"
-        ? read
-          ? "A rule on the provider's firewall allows it"
-          : "The deployment asked for this port to be open"
-        : place === "restricted"
-          ? "Held to those networks at the provider"
-          : "No port is published for it";
+    place === "refused"
+      ? "Nothing got through from outside"
+      : place === "unplaced"
+        ? "Nothing has looked"
+        : place === "outside"
+          ? "This port is open to everyone"
+          : place === "restricted"
+            ? "Held to those networks"
+            : "No port is published for it";
 
   return (
     <section className="pm-detail" aria-label={`${door.title}, in detail`}>
@@ -412,12 +450,19 @@ function Connection({
         </li>
         <li>
           <b>{door.title}</b>
-          <small>on {story.name}&rsquo;s server</small>
+          <small>
+            {place === "refused"
+              ? `never reached on ${story.name}’s server`
+              : `on ${story.name}’s server`}
+          </small>
         </li>
       </ol>
 
-      {door.concern && <p className="pm-concern">{door.concern}</p>}
-
+      {/* door.concern is not rendered. The projection writes one sentence,
+          "Anyone on the internet can reach this port", on every internet door
+          and nothing else ever. The route above already says that, and saying
+          it again in a coloured panel turns a public website into an
+          incident. */}
       <div className="pm-rests">
         <span className="pm-eyebrow">What that rests on</span>
         <p>{door.detail}</p>
@@ -426,23 +471,24 @@ function Connection({
             Allowed to <code>{door.sources.join(", ")}</code>
           </p>
         )}
-        {basis === "provider" && (
+        {(basis === "unasked" || basis === "configured") && (
           <p className="pm-when">
-            The rules were read from {story.firewall.provider}{" "}
-            {ago(story.firewall.at, now)}. That is what the provider allows, not
-            a check that this service answered.
+            The port and who it is open to are on record because the deployment
+            set them; nothing has connected to it to find out what happens. That
+            is not a claim either way.
           </p>
         )}
-        {basis === "plan" && (
+        {basis === "looked" && (
           <p className="pm-when">
-            Nobody has read the provider&rsquo;s rules back, so this is what was
-            asked for rather than what is in place.
+            A check ran on this port and did not settle whether it answers.
           </p>
         )}
-        {basis === "unasked" && (
+        {(basis === "answered" || basis === "refused") && (
           <p className="pm-when">
-            Nothing has established whether this answers, or to whom. That is
-            not a claim either way.
+            {basis === "answered"
+              ? "Something accepted a connection on this port from outside"
+              : "Nothing got through to this port from outside"}
+            , {ago(door.at ?? null, now)}.
           </p>
         )}
       </div>

@@ -104,9 +104,12 @@
   stroke: rgba(25, 35, 56, 0.28);
   stroke-width: 1.3;
 }
-.pm-node[data-warn] circle {
-  fill: rgba(184, 129, 31, 0.1);
-  stroke: #b8811f;
+/* A port something connected to is drawn heavier than one that is only
+   configured. No colour: being open to the internet is what a website is
+   for, and amber would read as a fault on every one of them. */
+.pm-node[data-open] circle {
+  fill: rgba(25, 35, 56, 0.06);
+  stroke: rgba(25, 35, 56, 0.55);
   stroke-width: 1.8;
 }
 .pm-node[data-picked] circle {
@@ -166,8 +169,8 @@
   border-color: #192338;
   box-shadow: inset 0 0 0 1px #192338;
 }
-.pm-list button[data-warn] {
-  border-color: #b8811f;
+.pm-list button[data-open] {
+  border-color: rgba(25, 35, 56, 0.4);
 }
 .pm-list code {
   font-size: 11.5px;
@@ -199,11 +202,14 @@
 .pm-key li[data-tone="inside"] i {
   background: rgba(25, 35, 56, 0.1);
 }
-.pm-key li[data-tone="warn"] i {
-  border-color: #b8811f;
-  background: rgba(184, 129, 31, 0.15);
+.pm-key li[data-tone="open"] i {
+  border-color: rgba(25, 35, 56, 0.55);
+  border-width: 1.8px;
+  background: rgba(25, 35, 56, 0.06);
 }
 
+/* Dashed for what nobody has looked at, solid for what a check settled.
+   The difference is certainty, and it is drawn as certainty. */
 .pm-unplaced {
   display: grid;
   gap: 8px;
@@ -211,6 +217,12 @@
   padding: 12px 14px;
   border: 1px dashed rgba(25, 35, 56, 0.22);
   border-radius: 10px;
+}
+.pm-unplaced[data-kind="refused"] {
+  border-style: solid;
+}
+.pm-unplaced[data-kind="refused"] code {
+  text-decoration: line-through;
 }
 .pm-unplaced > span {
   color: var(--ax-muted, #59667b);
@@ -354,17 +366,6 @@
   border-radius: 5px;
   font-size: 11.5px;
   color: #33405a;
-}
-
-.pm-concern {
-  margin: 0;
-  padding: 11px 13px;
-  border-left: 2px solid #b8811f;
-  border-radius: 0 8px 8px 0;
-  background: rgba(184, 129, 31, 0.08);
-  color: #6f4e10;
-  font-size: 12.5px;
-  line-height: 1.6;
 }
 
 .pm-rests {
