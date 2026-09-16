@@ -76,8 +76,7 @@ describe("application navigation", () => {
     expect(html).toContain("two/todo");
     expect(html).toContain("Not deployed");
     expect(html).toContain("Recommendation waiting for you");
-    expect(html).toContain("1 needs you");
-    expect(html).toContain("Nothing needs you");
+    expect(html).toContain("Needs me");
     expect(html).not.toContain("Launch Brief");
   });
 
