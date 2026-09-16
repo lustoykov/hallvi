@@ -547,6 +547,10 @@ describe("evidence belongs to the copy that carries it", () => {
     expect(said.tone).toBe("warning");
     expect(said.limit).toContain("Customer uploads");
     expect(said.next?.label).toBe("Cover the rest");
+    // The headline carries it too. "The newest copy was restored and checked"
+    // in the page's largest type, over a smaller line saying the uploads did
+    // not come back, is the page overclaiming where a reader always looks.
+    expect(said.says).toContain("Customer uploads");
   });
 
   it("says coverage is unrecorded, whether the plan is older or newer", () => {

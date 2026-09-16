@@ -1,15 +1,27 @@
 "use client";
 
-// Backups, as the chain it actually is.
+// Backups, as the chain it actually is, with the things themselves inside it.
 //
-// Being backed up is not one fact. It is three, in order: something is set up
-// to copy this, a copy exists, and somebody has opened one. The page that
-// merged any two of them is the page this review kept finding — a schedule
-// reported as protection, a copy reported as a recovery.
+// The selected design (C inside F). Being backed up is not one fact. It is
+// three, in order: something is set up to copy this, a copy exists, and
+// somebody has opened one. The page that merged any two of them is the page
+// this review kept finding — a schedule reported as protection, a copy
+// reported as a recovery. So they are three stages with three states, which
+// makes merging them structurally impossible rather than a thing to be
+// careful about.
 //
-// So they are three stages with three states, which makes merging them
-// structurally impossible rather than a thing to be careful about. What a
-// reader gets from a glance is which link is weak.
+// C asked the other question: what actually comes back. Its answer was a list
+// of the real things on disk, with sizes and paths, and it belongs inside the
+// stages rather than beside them — running both would make a reader read the
+// same facts twice in two shapes. So Set up opens on what this application
+// keeps and what copies it, Latest backup opens on one particular copy, and
+// Last restore test opens on what that restore found.
+//
+// Every line in here is a record or an absence. Where the prototype could
+// invent a file listing inside an object or a per-item restore result, this
+// says which record answered — the copy's own, the restore that opened it, or
+// nothing at all — because "nobody wrote down what is in there" is a third
+// answer and not a weaker version of the other two.
 //
 // Server Guy's own recovery is a second track, not a fourth stage. It is the
 // same three questions about a different subject, and the whole confusion
@@ -19,8 +31,10 @@ import { useState } from "react";
 
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 
+import type { Piece, Vol } from "./backup-prototype/protect-story";
 import {
   CLASS_MEANING,
+  type BackupCopy,
   type Protection,
   type ProtectionVerdict,
 } from "./backups-records";
@@ -63,16 +77,354 @@ interface Stage {
   action: { label: string; draft: string } | null;
 }
 
+/** A path or an object name, next to the one thing a reader wants to do. */
+function Copyable({ value, label }: { value: string; label: string }) {
+  const [said, setSaid] = useState(false);
+  return (
+    <span className="bs-copy">
+      <code>{value}</code>
+      <button
+        type="button"
+        aria-label={`Copy ${label}`}
+        onClick={() => {
+          void navigator.clipboard?.writeText(value).then(
+            () => setSaid(true),
+            () => setSaid(false),
+          );
+          setTimeout(() => setSaid(false), 1400);
+        }}
+      >
+        {said ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
+}
+
+/** How big it is, in the words the record used. */
+function sizeOf(volume: Vol | undefined) {
+  if (!volume) return null;
+  if (volume.sizeText) return volume.sizeText;
+  return volume.sizeGb === null ? null : `${volume.sizeGb} GB`;
+}
+
+/**
+ * Whether the newest copy holds one particular thing, and which record says
+ * so.
+ *
+ * Three answers, never two. A restore that opened the copy and looked is the
+ * strongest; the copy's own record of what it captured is next; nothing at
+ * all is the third, and it is not a quieter version of "missing".
+ */
+function inNewestCopy(protection: Protection, id: string) {
+  const { basis, missing } = protection.newestCopyCoverage;
+  if (basis === "unrecorded")
+    return {
+      held: null,
+      says: "No record says whether the latest copy holds this.",
+    };
+  const gone = missing.some((item) => item.id === id);
+  return {
+    held: !gone,
+    says: gone
+      ? basis === "restore"
+        ? "A restore opened the latest copy and did not find this."
+        : "The latest copy's own record does not list this."
+      : basis === "restore"
+        ? "A restore opened the latest copy and brought this back."
+        : "The latest copy's own record lists this.",
+  };
+}
+
+/**
+ * What this application keeps, one row each, and what happens to it.
+ *
+ * C's question, answered from records alone: the volumes Pi has written down,
+ * their size and mount as it measured them, the plan that copies each one in
+ * the plan's own words, and whether the latest copy holds it. A volume nobody
+ * has written down is not a row here — an invented gap would be worse than a
+ * short list.
+ */
+function Inventory({
+  protection,
+  volumes,
+  pieces,
+}: {
+  protection: Protection;
+  volumes: Vol[];
+  pieces: Piece[];
+}) {
+  const byId = new Map(volumes.map((volume) => [volume.name, volume]));
+  if (!pieces.length)
+    return (
+      <p className="bs-unknown">
+        Nothing has established what this application keeps on disk, so there is
+        nothing yet to say a plan would cover.
+      </p>
+    );
+  return (
+    <ul className="bs-inv">
+      {pieces.map((piece) => {
+        const volume = byId.get(piece.volume);
+        const size = sizeOf(volume);
+        const held = inNewestCopy(protection, piece.volume);
+        return (
+          <li key={piece.key} data-state={piece.method ? "kept" : "gap"}>
+            <div className="bs-inv-head">
+              <b>{piece.label}</b>
+              {size && <span className="bs-size">{size}</span>}
+            </div>
+            {volume && volume.mount !== "Not recorded" && (
+              <p className="bs-where">
+                At <Copyable value={volume.mount} label="the path" />
+                {volume.docker ? ` in ${volume.docker}` : ""}
+              </p>
+            )}
+            {piece.method ? (
+              // The plan's own words, which may be a destination or a
+              // schedule. Printing the bare value left "s3://shop-backups"
+              // sitting under a volume with nothing saying what it was.
+              <p className="bs-note" data-kind="kept">
+                Copied by the plan: {piece.method}
+              </p>
+            ) : (
+              <p className="bs-note" data-kind="gap">
+                No plan on record copies this. Losing the server loses it.
+              </p>
+            )}
+            <p
+              className="bs-note"
+              data-kind={
+                held.held === null ? "unknown" : held.held ? "kept" : "gap"
+              }
+            >
+              {held.says}
+            </p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The copies on record, newest first, each saying where it went. */
+function CopiesKept({
+  copies,
+  protection,
+  now,
+}: {
+  copies: BackupCopy[];
+  protection: Protection;
+  now: number;
+}) {
+  return (
+    <ul className="bs-kept">
+      {copies.map((copy) => {
+        const proved = protection.verifiedCopies.get(copy.id);
+        return (
+          <li key={copy.id} data-newest={copy === copies[0] || undefined}>
+            <b>
+              {ago(copy.at, now)} · {CLASS_MEANING[copy.kind].word}
+            </b>
+            <small>
+              {copy.destination ?? "Destination not recorded"}
+              {copy.covers.length
+                ? ` · holds ${list(copy.covers.map((id) => protection.names.get(id) ?? id))}`
+                : " · no record says what went into it"}
+            </small>
+            <small>
+              {proved
+                ? `Opened by a restore ${ago(proved.at, now)}.`
+                : "Nobody has opened this one."}
+            </small>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * What it would take to get this application back, from one copy.
+ *
+ * Closed until asked for, because it is a question a reader has on one day
+ * and not on the others. What it needs is named and never shown; the values
+ * are Server Guy's to ask for when it runs, and no page of this product
+ * reveals one.
+ */
+function HowToRecover({
+  protection,
+  applicationName,
+  now,
+  onAsk,
+}: {
+  protection: Protection;
+  applicationName: string;
+  now: number;
+  onAsk: (draft: string) => void;
+}) {
+  const copies = protection.copies;
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState(copies[0]?.id ?? "");
+  const [mode, setMode] = useState<"isolated" | "replace">("isolated");
+  const copy = copies.find((one) => one.id === picked) ?? copies[0] ?? null;
+  const proved = copy ? protection.verifiedCopies.get(copy.id) : undefined;
+
+  const needs = copy
+    ? [
+        copy.kind === "off-site"
+          ? `Access to the storage that holds it${copy.destination ? `, ${copy.destination}` : ""}`
+          : copy.kind === "controller"
+            ? "This computer, where the copy is"
+            : copy.kind === "provider"
+              ? "The provider account that holds the snapshot"
+              : copy.kind === "same-server"
+                ? "The application's server, which this copy is on"
+                : "Wherever this copy went, which no record classifies",
+        "A place to put it: a fresh instance, or the running one",
+      ]
+    : [];
+
+  return (
+    <section className="bs-recover" data-open={open || undefined}>
+      <button
+        type="button"
+        className="bs-recover-head"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <b>How to recover {applicationName}</b>
+        <small>What it would take, and what it would change</small>
+        <span className="bs-chev" aria-hidden="true">
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open && (
+        <div className="bs-recover-body">
+          {!copy ? (
+            <p className="bs-unknown">
+              There is no copy on record to recover from. A plan is not a copy,
+              and neither is a page saying so.
+            </p>
+          ) : (
+            <>
+              {copies.length > 1 && (
+                <label className="bs-pick">
+                  <span>Which copy</span>
+                  <select
+                    value={picked}
+                    onChange={(event) => setPicked(event.target.value)}
+                  >
+                    {copies.map((one) => (
+                      <option key={one.id} value={one.id}>
+                        {ago(one.at, now)} · {CLASS_MEANING[one.kind].word}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <dl>
+                <div>
+                  <dt>What comes back</dt>
+                  <dd>
+                    {copy.covers.length
+                      ? list(
+                          copy.covers.map(
+                            (id) => protection.names.get(id) ?? id,
+                          ),
+                        )
+                      : "No record says what went into this copy."}
+                    <small>
+                      {proved
+                        ? `A restore opened this copy ${ago(proved.at, now)}, so this is what came back rather than what was meant to.`
+                        : "Nobody has opened this copy, so this is what its own record claims."}
+                    </small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>What it needs</dt>
+                  <dd>
+                    <ul className="bs-needs">
+                      {needs.map((need) => (
+                        <li key={need}>{need}</li>
+                      ))}
+                    </ul>
+                    <small>
+                      Named, never shown. Server Guy asks for anything else when
+                      it runs this, and no page here reveals a value.
+                    </small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Where it goes</dt>
+                  <dd>
+                    <div
+                      className="bs-modes"
+                      role="group"
+                      aria-label="Where to restore"
+                    >
+                      <button
+                        type="button"
+                        data-picked={mode === "isolated" || undefined}
+                        onClick={() => setMode("isolated")}
+                      >
+                        Into an isolated copy
+                      </button>
+                      <button
+                        type="button"
+                        data-picked={mode === "replace" || undefined}
+                        onClick={() => setMode("replace")}
+                      >
+                        Over the running application
+                      </button>
+                    </div>
+                    <small>
+                      {mode === "isolated"
+                        ? `A separate instance with no way in from outside. ${applicationName} keeps serving, and you find out whether the copy is good before anything depends on the answer.`
+                        : `${applicationName} stops, its data is replaced by this copy, and anything written since it was taken is gone. Server Guy will say that back to you before it starts.`}
+                    </small>
+                  </dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="bs-action"
+                onClick={() =>
+                  onAsk(
+                    mode === "isolated"
+                      ? `Restore the backup copy taken ${ago(copy.at, now)} into an isolated copy of ${applicationName}, check the data is actually there, and tell me what you found. Do not touch the running application.`
+                      : `Restore the backup copy taken ${ago(copy.at, now)} over the running ${applicationName}. Tell me exactly what would be lost before you start, and wait for me to say yes.`,
+                  )
+                }
+              >
+                Ask Server Guy to do this
+                <em>asks Server Guy</em>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function BackupStages({
   protection,
   verdict,
   now,
+  applicationName,
+  volumes,
+  pieces,
   controller,
   onAsk,
 }: {
   protection: Protection;
   verdict: ProtectionVerdict;
   now: number;
+  applicationName: string;
+  /** What Storage read off the same records: size, mount, what holds it. */
+  volumes: Vol[];
+  /** One per thing on disk, carrying how the plan copies it, in its words. */
+  pieces: Piece[];
   controller?: ControllerProtectionFacts;
   onAsk: (draft: string) => void;
 }) {
@@ -114,60 +466,50 @@ export function BackupStages({
           ? "failed"
           : "waiting",
       detail: (
-        <dl>
-          <div>
-            <dt>What it copies</dt>
-            <dd>
-              {protection.requiredData.length ? (
-                <ul className="bs-covers">
-                  {protection.requiredData.map((item) => (
-                    <li
-                      key={item.id}
-                      data-in={
-                        protection.uncovered.some((gap) => gap.id === item.id)
-                          ? undefined
-                          : "yes"
-                      }
-                    >
-                      {item.label}
-                    </li>
-                  ))}
-                </ul>
-              ) : protection.coverLabels.length ? (
-                <ul className="bs-covers">
-                  {protection.coverLabels.map((label) => (
-                    <li key={label} data-in="yes">
-                      {label}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="bs-unknown">
-                  Nothing has established what this application keeps on disk.
-                </span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Where to</dt>
-            <dd>
-              {protection.plannedDestinations.length
-                ? protection.plannedDestinations
-                    .map((kind) => CLASS_MEANING[kind].word)
-                    .join(", ")
-                : "Not recorded"}
-            </dd>
-          </div>
-          <div>
-            <dt>How many kept</dt>
-            <dd>
-              {protection.keepText ??
-                (protection.summary.keep
-                  ? `${protection.summary.keep} copies`
-                  : "Not recorded")}
-            </dd>
-          </div>
-        </dl>
+        <>
+          <dl>
+            <div>
+              <dt>On its own schedule</dt>
+              <dd>
+                {protection.summary.schedule?.words ?? "Not recorded"}
+                {protection.nextRunAt && (
+                  <small>
+                    Next run{" "}
+                    <LocalTime value={protection.nextRunAt} variant="compact" />
+                  </small>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Where to</dt>
+              <dd>
+                {protection.plannedDestinations.length
+                  ? protection.plannedDestinations
+                      .map((kind) => CLASS_MEANING[kind].word)
+                      .join(", ")
+                  : "Not recorded"}
+              </dd>
+            </div>
+            <div>
+              <dt>How many kept</dt>
+              <dd>
+                {protection.keepText ??
+                  (protection.summary.keep
+                    ? `${protection.summary.keep} copies`
+                    : "Not recorded")}
+              </dd>
+            </div>
+          </dl>
+          {/* The things themselves. A reader who wants to know whether their
+            uploads come back is asking about one row of this, not about the
+            plan in the abstract. */}
+          <h4 className="bs-sub">What this application keeps</h4>
+          <Inventory
+            protection={protection}
+            volumes={volumes}
+            pieces={pieces}
+          />
+        </>
       ),
       action: planned
         ? {
@@ -213,36 +555,41 @@ export function BackupStages({
             : "attention"
           : "waiting",
       detail: newest ? (
-        <dl>
-          <div>
-            <dt>Where it went</dt>
-            <dd>
-              {newest.destination ?? "Not recorded"}
-              <small>{CLASS_MEANING[newest.kind].means}</small>
-            </dd>
-          </div>
-          <div>
-            <dt>What is in it</dt>
-            <dd>
-              {newest.covers.length
-                ? list(
-                    newest.covers.map((id) => protection.names.get(id) ?? id),
-                  )
-                : "No record says what went into it."}
-            </dd>
-          </div>
-          <div>
-            <dt>Earlier copies</dt>
-            <dd>
-              {protection.copies.length > 1
-                ? `${protection.copies.length - 1} more on record, oldest ${ago(
-                    protection.copies.at(-1)!.at,
-                    now,
-                  )}`
-                : "None"}
-            </dd>
-          </div>
-        </dl>
+        <>
+          <dl>
+            <div>
+              <dt>Where it went</dt>
+              <dd>
+                {newest.destination ?? "Not recorded"}
+                <small>{CLASS_MEANING[newest.kind].word}</small>
+              </dd>
+            </div>
+            <div>
+              <dt>What is in it</dt>
+              <dd>
+                {newest.covers.length
+                  ? list(
+                      newest.covers.map((id) => protection.names.get(id) ?? id),
+                    )
+                  : "No record says what went into it."}
+              </dd>
+            </div>
+            <div>
+              <dt>What it means</dt>
+              <dd>{CLASS_MEANING[newest.kind].means}</dd>
+            </div>
+          </dl>
+          {protection.copies.length > 1 && (
+            <>
+              <h4 className="bs-sub">Copies kept</h4>
+              <CopiesKept
+                copies={protection.copies}
+                protection={protection}
+                now={now}
+              />
+            </>
+          )}
+        </>
       ) : (
         <p className="bs-unknown">
           A schedule is not a copy. Nothing has been written anywhere yet.
@@ -277,36 +624,63 @@ export function BackupStages({
             ? "attention"
             : "waiting",
       detail: (
-        <dl>
-          <div>
-            <dt>What it proved</dt>
-            <dd>
-              {proved && newest
-                ? `The copy taken ${ago(newest.at, now)} opens, and its data is there.`
-                : protection.restores[0]
-                  ? "Recovery has worked at least once, on a copy that is no longer the latest."
-                  : "Nothing. A copy nobody has restored is a file nobody has opened."}
-              {coverage.basis === "unrecorded" && newest && (
-                <small>No record says what that copy contains.</small>
-              )}
-              {missing.length > 0 && (
-                <small>
-                  {coverage.basis === "restore"
-                    ? `The restore did not bring back ${list(missing)}.`
-                    : `The newest copy does not include ${list(missing)}.`}
-                </small>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Failed attempts</dt>
-            <dd>
-              {protection.failures.restore
-                ? `A restore failed ${ago(protection.failures.restore.at, now)} and no later success replaces it.`
-                : "None on record"}
-            </dd>
-          </div>
-        </dl>
+        <>
+          <dl>
+            <div>
+              <dt>What it proved</dt>
+              <dd>
+                {proved && newest
+                  ? `The copy taken ${ago(newest.at, now)} opens, and its data is there.`
+                  : protection.restores[0]
+                    ? "Recovery has worked at least once, on a copy that is no longer the latest."
+                    : "Nothing. A copy nobody has restored is a file nobody has opened."}
+                {coverage.basis === "unrecorded" && newest && (
+                  <small>No record says what that copy contains.</small>
+                )}
+                {missing.length > 0 && (
+                  <small>
+                    {coverage.basis === "restore"
+                      ? `The restore did not bring back ${list(missing)}.`
+                      : `The newest copy does not include ${list(missing)}.`}
+                  </small>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>Failed attempts</dt>
+              <dd>
+                {protection.failures.restore
+                  ? `A restore failed ${ago(protection.failures.restore.at, now)} and no later success replaces it.`
+                  : "None on record"}
+              </dd>
+            </div>
+          </dl>
+          {/* Item by item, and only where a restore actually looked. Reading
+            this off the plan would turn an intention into a finding. */}
+          {coverage.basis === "restore" &&
+            protection.requiredData.length > 0 && (
+              <>
+                <h4 className="bs-sub">What it found</h4>
+                <ul className="bs-found">
+                  {protection.requiredData.map((item) => {
+                    const gone = coverage.missing.some(
+                      (one) => one.id === item.id,
+                    );
+                    return (
+                      <li key={item.id} data-ok={!gone || undefined}>
+                        <b>{item.label}</b>
+                        <small>
+                          {gone
+                            ? "The restore did not bring this back."
+                            : "Came back in the restored copy."}
+                        </small>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+        </>
       ),
       action: {
         label: "Test restore",
@@ -330,16 +704,34 @@ export function BackupStages({
     },
     {
       title: "Copied",
-      says: copiedItself ? (
-        <>
-          <LocalTime value={controller!.lastCopyAt!} variant="compact" />
-          {" · after each piece of work, at most hourly, and once a day · "}
-          keeping the last {controller!.keep}
-        </>
-      ) : (
-        "never"
-      ),
-      state: copiedItself ? "done" : "waiting",
+      // A row that says when it last copied, while the latest attempt failed,
+      // is a tick over a failure. The band under this asks the owner to do
+      // something about it; the row has to be the thing that says it broke.
+      says:
+        controller?.state === "failing" ? (
+          copiedItself ? (
+            <>
+              the last attempt failed · last copy{" "}
+              <LocalTime value={controller!.lastCopyAt!} variant="compact" />
+            </>
+          ) : (
+            "the last attempt failed, and nothing has been copied yet"
+          )
+        ) : copiedItself ? (
+          <>
+            <LocalTime value={controller!.lastCopyAt!} variant="compact" />
+            {" · after each piece of work, at most hourly, and once a day · "}
+            keeping the last {controller!.keep}
+          </>
+        ) : (
+          "never"
+        ),
+      state:
+        controller?.state === "failing"
+          ? "failed"
+          : copiedItself
+            ? "done"
+            : "waiting",
     },
     {
       title: "Recovery kit saved",
@@ -410,6 +802,17 @@ export function BackupStages({
           </li>
         ))}
       </ol>
+
+      {/* Only where there is something to recover from. "How to recover" over
+          "there is no copy on record" is a door onto a wall. */}
+      {protection.copies.length > 0 && (
+        <HowToRecover
+          protection={protection}
+          applicationName={applicationName}
+          now={now}
+          onAsk={onAsk}
+        />
+      )}
 
       {/* A second track, not a fourth stage. The same three questions about a
           different subject, and reading the two as one is the confusion this

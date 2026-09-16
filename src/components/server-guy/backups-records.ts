@@ -464,6 +464,18 @@ export function protectionFromRecords(
 
   const uncovered = stated ? missingFrom([...covers.keys()]) : [];
   const names = namesFor(live);
+  // A database nobody named, whose files live in a volume somebody did, is
+  // that volume's contents. Without this the same thing appeared twice on one
+  // page under two names: "PostgreSQL's data" where the volume answered, and
+  // `shop-postgres` where the copy's own record did.
+  for (const item of required)
+    for (const edge of map?.edges ?? [])
+      if (
+        edge.network === "disk" &&
+        edge.to === item.id &&
+        !names.has(edge.from)
+      )
+        names.set(edge.from, item.label);
   const say = (id: string) => names.get(id) ?? id;
   const coverLabels = [...covers.keys()].map(say);
 
@@ -764,6 +776,15 @@ export function protectionVerdict(
       ? {
           ...said,
           tone: said.tone === "verified" ? "warning" : said.tone,
+          // Where the verdict was a success, the hole belongs in the sentence
+          // and not only in the line under it. "The newest copy was restored
+          // and checked" in the page's largest type, over a smaller line
+          // saying the uploads did not come back, is the page overclaiming in
+          // the one place a reader always reads.
+          says:
+            said.tone === "verified"
+              ? `${said.says.replace(/\.$/, "")}, except for ${names}, which it did not bring back.`
+              : said.says,
           limit: [said.limit, missingData.says].filter(Boolean).join(" "),
           next: said.next ?? missingData.next,
         }

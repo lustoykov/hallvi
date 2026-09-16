@@ -9,6 +9,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { storageFromRecords } from "@/components/server-guy/storage-records";
 import { BackupStages } from "@/components/server-guy/backup-stages";
 import {
   protectionFromRecords,
@@ -130,11 +131,15 @@ function draw(
   controller?: Parameters<typeof BackupStages>[0]["controller"],
 ) {
   const protection = protectionFromRecords(records, NOW, APP);
+  const story = storageFromRecords({ records, applicationId: APP, now: NOW });
   return renderToStaticMarkup(
     <BackupStages
       protection={protection}
       verdict={protectionVerdict(protection, NOW)}
       now={NOW}
+      applicationName="Shop"
+      volumes={story.volumes}
+      pieces={story.pieces}
       controller={controller}
       onAsk={() => undefined}
     />,
