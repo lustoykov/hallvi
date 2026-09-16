@@ -49,7 +49,9 @@ describe("offering a way in", () => {
       onReopen: () => undefined,
       onAsk: () => undefined,
     });
-    expect(html).toContain("Reopen access");
+    // Not "Reopen access": the owner asked what that meant, and the honest
+    // answer is that a connection this Mac holds open has dropped.
+    expect(html).toContain("Open the connection again");
     expect(html).toContain("The tunnel is closed");
     // Never a link to an address that has just been found not to answer.
     expect(html).not.toContain('href="http://127.0.0.1:18000"');
