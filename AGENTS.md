@@ -10,6 +10,12 @@ Read [README.md](README.md), [PRODUCT.md](PRODUCT.md),
 Development runs locally on the owner's MacBook, not on the Mac mini.
 Before creating or retiring development resources, read and follow
 [development resource ownership and cleanup](docs/development-resources.md).
+This file is for agents developing Server Guy, never the product operator Pi.
+Pi has separate runtime instructions; do not inject contributor instructions,
+local agent skills or development automation prompts into product sessions.
+Cleanup is limited to exact Server Guy development resources with verified
+ownership and disposable contents; a project folder is not blanket permission
+to remove user data. Never extend cleanup to unrelated folders or resources.
 Record ownership and retention outside worktrees. Task completion includes
 verified cleanup or an explicit retained-resource handoff. The local daily
 Dev Cleanup task is the fallback; it also owns shared cloud cleanup.
