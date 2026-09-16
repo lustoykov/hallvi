@@ -25,37 +25,8 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Pi setup choice route", () => {
-  it("does not overwrite saved preferences through an untrusted-Origin text/plain POST", async () => {
-    await POST(
-      new Request("http://localhost/api/pi/setup", {
-        method: "POST",
-        body: JSON.stringify({ mode: "separate" }),
-      }),
-    );
-    await PATCH(
-      new Request("http://localhost/api/pi/setup", {
-        method: "PATCH",
-        body: JSON.stringify({
-          modelId: "gpt-5.6-luna",
-          reasoningEffort: "max",
-        }),
-      }),
-    );
-    const before = readPiConfiguration();
-    const response = await POST(
-      new Request("http://localhost/api/pi/setup", {
-        method: "POST",
-        headers: {
-          origin: "https://untrusted.example",
-          "content-type": "text/plain",
-        },
-        body: JSON.stringify({ mode: "separate" }),
-      }),
-    );
-    expect(response.status).toBe(400);
-    expect(readPiConfiguration()).toEqual(before);
-  });
-
+  // The cross-origin boundary on this route is covered for every mutation
+  // route at once in unit/mutation-origin.test.ts.
   it("passes only validated draft preferences to the login coordinator", async () => {
     const preferences = { modelId: "gpt-5.6-sol", reasoningEffort: "high" };
     const response = await LOGIN(
