@@ -629,8 +629,11 @@ export type ProtectionState =
 
 export interface ProtectionVerdict {
   state: ProtectionState;
-  /** Verified, limited, failed, or nobody has looked. */
-  tone: "verified" | "warning" | "failed" | "unknown";
+  /**
+   * Verified, limited, failed, nobody has looked, or quiet: an established
+   * absence on an application small enough that it is not yet a problem.
+   */
+  tone: "verified" | "warning" | "failed" | "unknown" | "quiet";
   /** The headline, as the page prints it. */
   says: string;
   /** What it does not cover, when that is the point. */
@@ -663,7 +666,10 @@ export function protectionVerdict(
       ? {
           ...said,
           // A warning never upgrades anything and never overrides a failure.
-          tone: said.tone === "verified" ? "warning" : said.tone,
+          tone:
+            said.tone === "verified" || said.tone === "quiet"
+              ? "warning"
+              : said.tone,
           // Pi's own words about the limit always reach the reader: it is the
           // only place they learn *what* the limit is.
           limit: [said.limit, protection.judged].filter(Boolean).join(" "),
@@ -786,18 +792,24 @@ export function protectionVerdict(
       },
     };
 
+  // An established absence, calmly. Most first applications are small, and a
+  // page that greets their owner with an amber "no backup" teaches them to
+  // ignore the page. The fact is stated, the consequence is stated once in
+  // plain words, and the offer is a sentence, not an alarm. When the data has
+  // grown to deserve more, Pi raises the record's own status and this page
+  // follows it (PRODUCT.md, "Most first users run something small").
   if (protection.declaredAbsent && !schedules.length && !copies.length)
-    return {
+    return temper({
       state: "none-configured",
-      tone: "warning",
-      says: "Nothing is copying this application's data. Server Guy checked, and there is no backup.",
-      limit: "Losing the server would lose the data.",
+      tone: "quiet",
+      says: "Nothing copies this application's data yet. Server Guy checked.",
+      limit: "If the server were lost, this data would be lost with it.",
       next: {
         label: "Set up backups",
         draft:
           "Set up backups for this application: work out what needs copying, recommend a destination and a schedule, and tell me the trade-offs before you change anything.",
       },
-    };
+    });
 
   if (failures.restore)
     return {

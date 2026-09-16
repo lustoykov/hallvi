@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Proportionate care: when an absence becomes a warning</title>
+<style>
+  body { font: 14px/1.5 Geist, system-ui, sans-serif; color: #192338; background: #f7f9fc; margin: 0; padding: 32px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { max-width: 72ch; color: #3e4a60; }
+  svg { display: block; max-width: 960px; margin-top: 20px; }
+  text { font-family: inherit; }
+</style>
+<h1>Proportionate care: when an absence becomes a warning</h1>
+<p>The decision behind the September 2026 tone change. Pi records the stakes and sets a record's status from them; the pages render that status and add no alarm of their own. Something that existed and broke is always attention. Something that was never asked for is a fact until the data or the traffic earns more.</p>
+<svg viewBox="0 0 960 400" role="img" aria-label="Decision flow from an observation to the tone it is shown in">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5 0 10z" fill="#647089"/></marker></defs>
+  <g font-size="13" fill="#192338">
+    <rect x="30" y="160" width="190" height="64" rx="12" fill="#fff" stroke="#d8e0ec"/>
+    <text x="125" y="188" text-anchor="middle" font-weight="600">Pi observes something</text>
+    <text x="125" y="206" text-anchor="middle" fill="#647089" font-size="12">no copy · no monitor · expired · failed</text>
+
+    <line x1="220" y1="192" x2="290" y2="192" stroke="#647089" marker-end="url(#a)"/>
+    <rect x="292" y="150" width="200" height="84" rx="12" fill="#fff" stroke="#d8e0ec"/>
+    <text x="392" y="182" text-anchor="middle" font-weight="600">Did it exist and stop?</text>
+    <text x="392" y="200" text-anchor="middle" fill="#647089" font-size="12">copy failed · cert expired</text>
+    <text x="392" y="216" text-anchor="middle" fill="#647089" font-size="12">check failed · process died</text>
+
+    <line x1="492" y1="170" x2="600" y2="90" stroke="#647089" marker-end="url(#a)"/>
+    <text x="530" y="120" fill="#647089" font-size="12">yes</text>
+    <rect x="602" y="56" width="320" height="64" rx="12" fill="#fff4e9" stroke="#ecd6b8"/>
+    <text x="762" y="84" text-anchor="middle" font-weight="600" fill="#9a4b10">warning or failed · Needs attention</text>
+    <text x="762" y="102" text-anchor="middle" fill="#9a4b10" font-size="12">amber or red, a failed check, a next step</text>
+
+    <line x1="492" y1="214" x2="600" y2="290" stroke="#647089" marker-end="url(#a)"/>
+    <text x="530" y="268" fill="#647089" font-size="12">no: it was never asked for</text>
+    <rect x="602" y="258" width="320" height="84" rx="12" fill="#fff" stroke="#d8e0ec"/>
+    <text x="762" y="284" text-anchor="middle" font-weight="600">Has the data earned it?</text>
+    <text x="762" y="302" text-anchor="middle" fill="#647089" font-size="12">large or growing · real users or traffic</text>
+    <text x="762" y="318" text-anchor="middle" fill="#647089" font-size="12">owner said it matters</text>
+
+    <line x1="922" y1="300" x2="940" y2="300" stroke="none"/>
+    <line x1="762" y1="258" x2="762" y2="130" stroke="#647089" marker-end="url(#a)"/>
+    <text x="772" y="200" fill="#647089" font-size="12">yes → the same amber, once</text>
+
+    <line x1="602" y1="330" x2="520" y2="360" stroke="#647089" marker-end="url(#a)"/>
+    <rect x="200" y="330" width="320" height="60" rx="12" fill="#f3f5f9" stroke="#d8e0ec"/>
+    <text x="360" y="356" text-anchor="middle" font-weight="600" fill="#3e4a60">info · quiet · grey</text>
+    <text x="360" y="374" text-anchor="middle" fill="#647089" font-size="12">a fact in plain words, an offer in a sentence, no next step</text>
+  </g>
+</svg>

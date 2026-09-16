@@ -369,6 +369,8 @@ The workspace palette, plus a small fixed set of state tints. Each state owns on
 
 **The Not-Applied Rule.** A proposal wears amber and the words “not applied”. The facts beneath it stay exactly as they were. Nothing in a view may preview the desired outcome.
 
+**The Proportion Rule.** Amber and red are for something that broke or for a decision the owner must make now. An established absence on a small application (no backup, no monitor, no restore test) is grey: a fact, in plain words, with an offer in a sentence and no next step. The stakes decide the tone, and Pi records the stakes; a component never turns "nothing here yet" into a warning on its own. See [proportionate care](../../../docs/operator-design.md#proportionate-care).
+
 **The One Tint Per State Rule.** Each state uses its own pair and nothing else. Do not mix a green chip with an amber border, and do not invent a sixth state colour; a new state is a product decision, not a colour choice.
 
 ## Typography

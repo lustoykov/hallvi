@@ -148,8 +148,13 @@ describe("what the page says, state by state", () => {
     },
     {
       when: "a record states there is no backup",
+      // An established absence on a small application is a fact and an
+      // offer, in grey, never amber: most first users run something small,
+      // and a page that greets them with a warning teaches them to ignore it.
       records: [absent],
       state: "none-configured",
+      tone: "quiet",
+      says: /Nothing copies this application's data yet/,
       next: "Set up backups",
     },
     {
@@ -716,7 +721,10 @@ describe("a failed check on a plan is not a failed backup attempt", () => {
     // is the more specific thing to say than that a check failed.
     const said = verdict([brokenPlan]);
     expect(said.says).not.toContain("attempt failed");
-    expect(said.says).toContain("there is no backup");
+    expect(said.says).toContain("Nothing copies this application's data yet");
+    // Calm defaults must not suppress an explicit concern recorded by Pi.
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain(brokenPlan.title);
   });
 
   it("a plan that exists and whose check failed says the plan is broken", () => {
