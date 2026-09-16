@@ -1,0 +1,496 @@
+/* Security: the perimeter, and one connection beside it. */
+
+.pm .sg-section-content {
+  display: grid;
+  gap: 22px;
+  max-width: 1080px;
+}
+
+.pm-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.pm-head h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--ax-ink, #192338);
+}
+.pm-head p {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ax-muted, #59667b);
+  font-size: 13px;
+  line-height: 1.6;
+}
+/* A count, not a verdict. Neither figure is a judgement about the server. */
+.pm-count {
+  flex: none;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: rgba(25, 35, 56, 0.05);
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.pm-layout {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 1120px) {
+  .pm-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- The map ---------- */
+
+.pm-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.pm-ring-outer,
+.pm-ring-inner {
+  fill: none;
+  stroke: rgba(25, 35, 56, 0.16);
+}
+.pm-ring-inner {
+  fill: rgba(25, 35, 56, 0.022);
+}
+.pm-core {
+  fill: #fff;
+  stroke: rgba(25, 35, 56, 0.22);
+}
+.pm-ring-caption,
+.pm-core-label,
+.pm-core-note {
+  text-anchor: middle;
+  paint-order: stroke fill;
+  stroke: #fff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.pm-ring-caption {
+  fill: #8792a6;
+  font:
+    500 10px/1 "Geist Mono",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.12em;
+}
+.pm-core-label {
+  fill: #192338;
+  font: 600 13px/1 var(--font-geist-sans, system-ui);
+}
+.pm-core-note {
+  fill: #8792a6;
+  font: 400 10.5px/1 var(--font-geist-sans, system-ui);
+}
+
+.pm-node {
+  cursor: pointer;
+}
+.pm-node circle {
+  fill: #fff;
+  stroke: rgba(25, 35, 56, 0.28);
+  stroke-width: 1.3;
+}
+/* A port something connected to is drawn heavier than one that is only
+   configured. No colour: being open to the internet is what a website is
+   for, and amber would read as a fault on every one of them. */
+.pm-node[data-open] circle {
+  fill: rgba(25, 35, 56, 0.06);
+  stroke: rgba(25, 35, 56, 0.55);
+  stroke-width: 1.8;
+}
+.pm-node[data-picked] circle {
+  stroke: #192338;
+  stroke-width: 2.2;
+}
+.pm-node:focus-visible circle {
+  stroke: #285ad8;
+  stroke-width: 2.4;
+}
+.pm-node-port {
+  fill: #33405a;
+  font:
+    500 12px/1 "Geist Mono",
+    ui-monospace,
+    monospace;
+  text-anchor: middle;
+}
+/* The names live under the map, where they can wrap. Round a ring they
+   collide at any radius worth drawing, and a real title is a sentence. */
+.pm-list {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pm-list h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ax-muted, #59667b);
+}
+.pm-list div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pm-list button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 12px;
+  border: 1px solid rgba(25, 35, 56, 0.16);
+  border-radius: 999px;
+  background: #fff;
+  font: 500 12.5px/1.4 inherit;
+  color: #33405a;
+  cursor: pointer;
+}
+.pm-list button:hover {
+  background: rgba(25, 35, 56, 0.03);
+}
+.pm-list button[data-picked] {
+  border-color: #192338;
+  box-shadow: inset 0 0 0 1px #192338;
+}
+.pm-list button[data-open] {
+  border-color: rgba(25, 35, 56, 0.4);
+}
+.pm-list code {
+  font-size: 11.5px;
+  color: #59667b;
+}
+
+.pm-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pm-key li {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--ax-muted, #59667b);
+  font-size: 12px;
+}
+.pm-key i {
+  width: 11px;
+  height: 11px;
+  border: 1.3px solid rgba(25, 35, 56, 0.3);
+  border-radius: 999px;
+  background: #fff;
+}
+.pm-key li[data-tone="inside"] i {
+  background: rgba(25, 35, 56, 0.1);
+}
+.pm-key li[data-tone="open"] i {
+  border-color: rgba(25, 35, 56, 0.55);
+  border-width: 1.8px;
+  background: rgba(25, 35, 56, 0.06);
+}
+
+/* Dashed for what nobody has looked at, solid for what a check settled.
+   The difference is certainty, and it is drawn as certainty. */
+.pm-unplaced {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(25, 35, 56, 0.22);
+  border-radius: 10px;
+}
+.pm-unplaced[data-kind="refused"] {
+  border-style: solid;
+}
+.pm-unplaced[data-kind="refused"] code {
+  text-decoration: line-through;
+}
+.pm-unplaced > span {
+  color: var(--ax-muted, #59667b);
+  font-size: 12px;
+}
+.pm-unplaced div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pm-unplaced button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 11px;
+  border: 1px solid rgba(25, 35, 56, 0.18);
+  border-radius: 8px;
+  background: #fff;
+  font: 500 12.5px/1.3 inherit;
+  color: #33405a;
+  cursor: pointer;
+}
+.pm-unplaced button[data-picked] {
+  border-color: #192338;
+}
+.pm-unplaced code {
+  font-size: 11.5px;
+  color: #59667b;
+}
+
+.pm-caption {
+  margin: 12px 0 0;
+  max-width: 62ch;
+  color: #8792a6;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ---------- One connection ---------- */
+
+.pm-detail {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  border: 1px solid rgba(25, 35, 56, 0.14);
+  border-radius: 12px;
+  background: #fff;
+}
+.pm-detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.pm-eyebrow {
+  color: var(--ax-muted, #59667b);
+  font:
+    500 10.5px/1.4 "Geist Mono",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pm-detail-top code {
+  font-size: 13px;
+  color: #33405a;
+}
+.pm-detail h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.pm-serves {
+  margin: -6px 0 0;
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+}
+
+.pm-route {
+  display: grid;
+  gap: 0;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pm-route > li {
+  display: grid;
+  gap: 3px;
+  padding: 12px 0 12px 26px;
+  position: relative;
+}
+.pm-route > li::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #8792a6;
+}
+.pm-route > li + li::after {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 7px;
+  width: 1px;
+  height: 30px;
+  background: rgba(25, 35, 56, 0.18);
+}
+.pm-route[data-unasked] > li + li::after {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(25, 35, 56, 0.3) 0 3px,
+    transparent 3px 6px
+  );
+}
+.pm-route b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.pm-route small {
+  color: var(--ax-muted, #59667b);
+  font-size: 12px;
+}
+.pm-route-cross {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.pm-route-cross span {
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.pm-route-cross code {
+  padding: 1px 7px;
+  border: 1px solid rgba(25, 35, 56, 0.2);
+  border-radius: 5px;
+  font-size: 11.5px;
+  color: #33405a;
+}
+
+.pm-rests {
+  display: grid;
+  gap: 6px;
+}
+.pm-rests p {
+  margin: 0;
+  max-width: 70ch;
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.pm-sources code {
+  font-size: 11.5px;
+  color: #33405a;
+}
+.pm-when {
+  color: #8792a6 !important;
+  font-size: 12px !important;
+}
+
+.pm-more {
+  justify-self: start;
+  padding: 6px 12px;
+  border: 1px solid rgba(25, 35, 56, 0.18);
+  border-radius: 8px;
+  background: #fff;
+  font: 500 12.5px/1.3 inherit;
+  color: #33405a;
+  cursor: pointer;
+}
+.pm-more-facts {
+  display: grid;
+  gap: 12px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 0;
+}
+.pm-more-facts dt {
+  margin-bottom: 3px;
+  color: var(--ax-muted, #59667b);
+  font:
+    500 10.5px/1 "Geist Mono",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pm-more-facts dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ---------- Around the way in ---------- */
+
+.pm-around h3,
+.pm-holes h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ax-muted, #59667b);
+}
+.pm-around dl {
+  display: grid;
+  gap: 16px 28px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin: 0;
+}
+.pm-around dt {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pm-around dd {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.pm-around dd span {
+  color: #8792a6;
+}
+.pm-around dd small {
+  color: #8792a6;
+  font-size: 11.5px;
+}
+
+.pm-holes ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pm-holes li {
+  display: grid;
+  gap: 3px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: rgba(25, 35, 56, 0.035);
+}
+.pm-holes b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.pm-holes small {
+  max-width: 74ch;
+  color: var(--ax-muted, #59667b);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.pm-ask {
+  justify-self: start;
+  padding: 9px 17px;
+  border: 1px solid #192338;
+  border-radius: 9px;
+  background: #192338;
+  font: 600 13px/1.3 inherit;
+  color: #fff;
+  cursor: pointer;
+}

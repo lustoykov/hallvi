@@ -18,10 +18,16 @@ async function firstApplication(page: Page, base: string) {
   await page.goto(`${base}/applications`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => {});
   return page.evaluate(() => {
-    const link = document.querySelector<HTMLAnchorElement>(
+    // The first such link is "/applications/new", which carries no id. Taking
+    // it returned null and skipped every journey in this file silently.
+    const links = document.querySelectorAll<HTMLAnchorElement>(
       "a[href*='/applications/']",
     );
-    return link?.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0] ?? null;
+    for (const link of links) {
+      const id = link.getAttribute("href")?.match(/[0-9a-f-]{36}/)?.[0];
+      if (id) return id;
+    }
+    return null;
   });
 }
 
@@ -71,6 +77,11 @@ test.describe("operating the destinations", () => {
 
       // The sidebar is buttons, not links: it changes the hash itself. It also
       // holds the conversation list, which is not a destination.
+      // History and command output live inside the Activity group, which is
+      // closed until something opens it. Open it, or two destinations are
+      // unreachable by clicking and the page below says so.
+      await sidebar.getByRole("button", { name: /^Activity/ }).click();
+
       const DESTINATIONS = [
         "Overview",
         "Architecture",
@@ -82,7 +93,7 @@ test.describe("operating the destinations", () => {
         "Jobs",
         "Storage",
         "Backups",
-        "Logs",
+        "Command output",
         "Monitoring",
         "Domains",
         "Environment Variables",
@@ -227,8 +238,12 @@ test.describe("the logs filter", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
 
       const box = page.getByPlaceholder(/filter captured lines/i);
+      // The box is always there; what decides whether this journey has
+      // anything to search is whether any run printed something.
       test.skip(
-        !(await box.isVisible().catch(() => false)),
+        (await page.locator("main").innerText()).includes(
+          "No output has been captured yet",
+        ),
         "nothing captured",
       );
       const before = await page.locator(".sg-logs-output").count();

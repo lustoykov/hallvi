@@ -110,8 +110,15 @@ export function reachFromRecords({
       const fact = (key: string) => facts.get(key)?.value.value ?? null;
       const sources = listOf(fact("sources"));
 
-      const refused = checks.get("refused");
-      const open = checks.get("open");
+      // currentChecks is newest first, but keeps open/refused as separate
+      // keys. Use one observation for the map, detail and timestamp when a
+      // port has changed its behavior between checks.
+      const observation = [...checks.entries()].find(
+        ([key]) => key === "open" || key === "refused",
+      );
+      const refused =
+        observation?.[0] === "refused" ? observation[1] : undefined;
+      const open = observation?.[0] === "open" ? observation[1] : undefined;
       const shut = refused?.value.status === "passed";
       const reach: Reach = shut
         ? "closed"
@@ -149,6 +156,18 @@ export function reachFromRecords({
           [...checks.values()][0]?.value.label ??
           "Nobody has checked this port.",
         unasked: checks.size === 0 || undefined,
+        // Only this door's checks establish a connection result. Its detail
+        // carries the checking location; the key alone does not imply an
+        // external probe (Pi can also record a check made on the host).
+        established:
+          checks.size === 0
+            ? "unasked"
+            : open?.value.status === "passed"
+              ? "answered"
+              : refused?.value.status === "passed"
+                ? "refused"
+                : "looked",
+        at: (open ?? refused ?? [...checks.values()][0])?.record.establishedAt,
       });
 
       // A refusal that passed is a guard, not a failure.
@@ -216,6 +235,7 @@ export function reachFromRecords({
       reach: "closed",
       sources: [],
       concern: null,
+      established: "configured",
       detail:
         firewallFacts?.get("default")?.value.value ??
         "Denied unless a rule names it.",

@@ -54,9 +54,12 @@ test.describe("what the pages must never stop saying", () => {
     async ({ page }) => {
       test.skip(!(await up(page, SCENARIOS)), "no scenario server");
       const backups = await open(page, SCENARIOS, SCENARIO.absent, "backups");
-      expect(backups).toMatch(/no copy off the server is on record/i);
+      // The wording is the real pages', not the prototypes' these assertions
+      // were written against; what must hold is that an absence somebody
+      // established reads as an absence rather than as "nobody looked".
+      expect(backups).toMatch(/nothing copies this application's data yet/i);
       const security = await open(page, SCENARIOS, SCENARIO.absent, "security");
-      expect(security).toMatch(/nothing stands between the internet/i);
+      expect(security).toMatch(/no firewall in front of this server/i);
       expect(security).toMatch(/established as absent/i);
     },
   );
