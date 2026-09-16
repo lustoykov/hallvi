@@ -252,8 +252,9 @@ happened when one was.
 | isolated scenarios | `http://127.0.0.1:3411` — six applications, one per shape of doubt |
 | the rig's own controller | `http://127.0.0.1:3430` |
 
-The scenario database is built by `node --import tsx scripts/load-scenarios.mjs
-<dir>` and holds states a real journey never produces: a failure forty days
+The scenario database was built by `scripts/load-scenarios.mjs`, which needed a
+rig database to copy; `npm run scenarios -- <port>` replaced it and builds its
+own. The database holds states a real journey never produces: a failure forty days
 old, claims just past every horizon, four established absences beside things
 nobody looked at, a recovery, a withdrawal, and one application with every
 destination populated using awkward values — Unicode names, a registry with a
@@ -398,8 +399,12 @@ been left alone throughout.
 ## Rebuilding the scenarios
 
 ```bash
-node --import tsx scripts/load-scenarios.mjs /private/tmp/sg-scenarios
+npm run scenarios -- 3190
 ```
+
+This dated record used `scripts/load-scenarios.mjs`, which has been replaced by
+the command above: it builds the isolated database and serves the real
+application against it in one step.
 
 Their readings age from the moment they are written, which is the point — a
 fifteen-minute liveness claim is meant to go stale — and also means the
