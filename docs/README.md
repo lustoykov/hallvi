@@ -1,11 +1,11 @@
 # Documentation
 
-Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-design.md) for the agreed redesign and open questions, and [Roadmap](../ROADMAP.md) for reviewable delivery stages. [Architecture](architecture.md) describes the existing schema-14 implementation, not restrictions the redesign must preserve.
+Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-design.md) for the agreed redesign and open questions, and [Roadmap](../ROADMAP.md) for reviewable delivery stages. [Architecture](architecture.md) describes what is implemented today, at schema 15, rather than restrictions the redesign must preserve.
 
 | Reference | Purpose |
 | --- | --- |
 | [Operator design](operator-design.md) | Agreed direction, draft deployment journey, sequencing boundary, complexity tiers and unresolved design details. |
-| [Architecture](architecture.md) | The current system, execution loop, records, protection/rollback and limits. |
+| [Architecture](architecture.md) | What is stored, what Pi can do, the permission boundary, how a record becomes a page, and current limits. |
 | [Required outcomes](requirements.md) | User-facing behavior and acceptance, without prescribing Pi's workflow. |
 | [Presentation contract](presentation-contract.md) | How a record becomes a designed page: what Pi writes, how it is read, and what Architecture needs. Later destinations' vocabulary is kept separate under Deferred. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
