@@ -59,12 +59,12 @@ function placeOf(door: Door): Place {
 type Basis = NonNullable<Door["established"]>;
 
 const BASIS_WORD: Record<Basis, string> = {
-  answered: "A check connected to it from outside",
+  answered: "A connection check answered",
   // "Refused" in the record covers a refusal and a dropped connection
   // alike, and the detail underneath often says which. Do not narrow it
   // here: a line that says "refused" over a detail that says "timed out"
   // contradicts itself.
-  refused: "A check from outside got nothing through",
+  refused: "A connection check did not get through",
   looked: "A check ran without settling it",
   configured: "From the deployment's own configuration",
   unasked: "Nobody has connected to it",
@@ -263,8 +263,7 @@ export function PerimeterDirection({
               {refused.length > 0 && (
                 <div className="pm-unplaced" data-kind="refused">
                   <span>
-                    Stopped at the boundary: a check from outside got nothing
-                    through on{" "}
+                    No connection was established during the check on{" "}
                     {refused.length === 1 ? "this port" : "these ports"}
                   </span>
                   <div>
@@ -408,20 +407,22 @@ function Connection({
   const place = placeOf(door);
 
   const start =
-    place === "outside" || place === "refused"
+    place === "outside"
       ? "Anyone on the internet"
-      : place === "restricted"
-        ? "Only the networks named below"
-        : place === "unplaced"
-          ? "Not established"
-          : "Something already on the server";
+      : place === "refused"
+        ? "The recorded connection check"
+        : place === "restricted"
+          ? "Only the networks named below"
+          : place === "unplaced"
+            ? "Not established"
+            : "Something already on the server";
 
   // The middle says only what a record can support. No route is on record, so
   // this never draws hops it does not have, and the firewall read is never
   // borrowed as evidence about this port.
   const middle =
     place === "refused"
-      ? "Nothing got through from outside"
+      ? "The check did not connect"
       : place === "unplaced"
         ? "Nothing has looked"
         : place === "outside"
@@ -452,7 +453,7 @@ function Connection({
           <b>{door.title}</b>
           <small>
             {place === "refused"
-              ? `never reached on ${story.name}’s server`
+              ? `did not answer this check on ${story.name}’s server`
               : `on ${story.name}’s server`}
           </small>
         </li>
@@ -486,8 +487,8 @@ function Connection({
         {(basis === "answered" || basis === "refused") && (
           <p className="pm-when">
             {basis === "answered"
-              ? "Something accepted a connection on this port from outside"
-              : "Nothing got through to this port from outside"}
+              ? "Something accepted the recorded connection check on this port"
+              : "The recorded connection check did not get through to this port"}
             , {ago(door.at ?? null, now)}.
           </p>
         )}
@@ -518,7 +519,7 @@ function Connection({
                     ? "The networks named above"
                     : door.reach === "private"
                       ? "Inside the server only"
-                      : "Nothing"}
+                      : "Did not answer the recorded check"}
             </dd>
           </div>
           <div>

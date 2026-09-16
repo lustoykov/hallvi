@@ -156,9 +156,9 @@ export function reachFromRecords({
           [...checks.values()][0]?.value.label ??
           "Nobody has checked this port.",
         unasked: checks.size === 0 || undefined,
-        // Per door, and only from this door's own checks. `open` and
-        // `refused` are written by the port probe, which connects from
-        // outside; everything else is the deployment's configuration.
+        // Only this door's checks establish a connection result. Its detail
+        // carries the checking location; the key alone does not imply an
+        // external probe (Pi can also record a check made on the host).
         established:
           checks.size === 0
             ? "unasked"
