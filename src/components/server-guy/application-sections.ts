@@ -24,7 +24,13 @@ import type { SavedInformation } from "@/server/operator-data";
  * The stable destinations. The application group is always there; the
  * stack group shows only the resources this application's deployment
  * records, so a simple application never carries empty infrastructure
- * controls; the care group covers protection, evidence and delivery.
+ * controls; the care group covers protection and delivery.
+ *
+ * The activity group is History and command output, and it is drawn apart
+ * from the rest: they are the record of what has been done, not parts of the
+ * application, and as rows beside Backups and Domains they read as two more
+ * things needing attention. The sidebar closes them into one heading and
+ * opens it again whenever a link lands on either.
  *
  * `hideable` says a destination drops under "Show more" until something
  * records it. `available` says whether any backend can record it today.
@@ -49,15 +55,10 @@ export const applicationSections = [
     group: "application",
   },
   {
-    // Placement is part of the navigation decision still open, and `hideable`
-    // is not the lever for it: it means "hide until something records this",
-    // so a populated History is promoted back to primary by design. Making
-    // History permanently secondary wants a flag that means that, and it is
-    // not worth adding one before the arrangement is chosen.
     id: "history",
     label: "History",
     icon: ClockCounterClockwise,
-    group: "application",
+    group: "activity",
   },
   {
     id: "processes",
@@ -103,13 +104,12 @@ export const applicationSections = [
   {
     // Not "Logs". Nothing in this product retrieves an application's own
     // logs — no tool does it — and this page has only ever held Server Guy's
-    // command output, which History now carries as evidence on the event that
-    // produced it. Named for what it holds; whether it keeps a door of its
-    // own is the navigation decision still open.
+    // command output, which History carries as evidence on the event that
+    // produced it. Named for what it holds.
     id: "logs",
     label: "Command output",
     icon: TerminalWindow,
-    group: "care",
+    group: "activity",
   },
   { id: "monitoring", label: "Monitoring", icon: Pulse, group: "care" },
   { id: "domains", label: "Domains", icon: Globe, group: "care" },

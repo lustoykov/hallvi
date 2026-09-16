@@ -158,6 +158,9 @@ test(
     await expect(
       nav.getByRole("button", { name: "Database", exact: true }),
     ).toHaveAttribute("aria-current", "page");
+    // Command output is inside Activity now, which is shut when you arrive.
+    // Opening it is part of reaching the page, so the journey opens it.
+    await nav.getByRole("button", { name: "Activity", exact: true }).click();
     for (const section of [
       "Architecture",
       "Deployment",
