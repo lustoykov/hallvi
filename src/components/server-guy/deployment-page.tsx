@@ -55,21 +55,31 @@ export function DeploymentPage({
   const restricted =
     content?.kind === "application-access" ? content.mode === "private" : false;
 
+  // Only while something is actually in flight. `running` and
+  // `awaiting-approval` are the two states where the conversation has more to
+  // say than the record does.
+  const waiting = executions.some(
+    (execution) =>
+      execution.status === "running" ||
+      execution.status === "awaiting-approval",
+  );
+
   // The design's "nothing deployed" branch draws the product's own panel in
   // the middle of the page. In the records path there is no form to put
   // there, so this is what belongs: what is true, and the one thing to do.
-  const nothing = (
+  const nothing = waiting ? (
     <div className="sg-deploy-none">
-      <h2>Nothing has been deployed yet.</h2>
+      <h2>Work is in progress.</h2>
       <p>
-        No release is on record for this application. That is not a claim it
-        cannot be deployed — only that Server Guy has not done it, or has not
-        written down what it did.
+        Follow the current work in the conversation. Recorded releases will
+        appear here.
       </p>
+    </div>
+  ) : (
+    <div className="sg-deploy-none">
+      <h2>No deployment is on record.</h2>
       <p>
-        Ask in the conversation. You will be shown what it intends to do before
-        anything is bought or changed, and the release, its checks and the way
-        in are all recorded here.
+        Deployment details will appear here when Server Guy records a release.
       </p>
       <button
         type="button"
@@ -80,21 +90,13 @@ export function DeploymentPage({
           )
         }
       >
-        Ask Pi to deploy this application
+        Ask Server Guy to deploy this application
       </button>
     </div>
   );
 
   const releases = useMemo(() => releasesFromRecords(records, ""), [records]);
   const hasReleases = releases.all.length > 0;
-  // Only while something is actually in flight. `running` and
-  // `awaiting-approval` are the two states where the conversation has more to
-  // say than the record does.
-  const waiting = executions.some(
-    (execution) =>
-      execution.status === "running" ||
-      execution.status === "awaiting-approval",
-  );
 
   return (
     <div className="ax-root" data-variant="spine">

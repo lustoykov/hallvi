@@ -65,19 +65,14 @@ const OUTCOME_WORD: Record<Release["outcome"], string> = {
  */
 function took(seconds: number | null, outcome?: ReleaseStep["outcome"]) {
   if (seconds === null)
-    return outcome === "running" || outcome === "awaiting-approval"
-      ? "still running"
-      : "no end time recorded";
+    return outcome === "awaiting-approval"
+      ? "waiting for approval"
+      : outcome === "running"
+        ? "still running"
+        : "no end time recorded";
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
-
-const WHERE_WORD: Record<ReleaseStep["where"], string> = {
-  server: "on the server",
-  here: "on this Mac",
-  provider: "at the provider",
-  you: "with you",
-};
 
 const STEP_STATE: Record<ExecutionRecord["status"], string> = {
   "awaiting-approval": "waiting for you",
@@ -119,7 +114,8 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
                 <code>{one.caption}</code>
               </span>
               <small>
-                {WHERE_WORD[one.where]} · {took(one.seconds, one.outcome)}
+                {one.where ? `${one.where} · ` : ""}
+                {took(one.seconds, one.outcome)}
               </small>
             </button>
             <button
@@ -156,8 +152,7 @@ function Work({ steps }: { steps: ReleaseStep[] }) {
         )}
         {step?.outcome === "running" && (
           <p className="rp-quiet">
-            Nothing new has printed since. That is what is on record; it is not
-            a claim about how far along it is.
+            Command still running. Output updates as it arrives.
           </p>
         )}
       </div>

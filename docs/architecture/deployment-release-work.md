@@ -7,7 +7,11 @@ produced it. Two rules decide what may appear there.
 ```mermaid
 flowchart TD
   L[Release record] --> E{Does it cite its own commands?}
-  E -->|"message run or execution ids"| W[Show that run, in order]
+  E -->|"message run"| W[Show that run, in order]
+  E -->|"execution ids"| I[Show only those commands, in order]
+  I --> M
+  I --> O
+  I --> F
   E -->|"nothing cited"| N[Say no command is linked. Never fall back to the newest run]
   W --> M[Machine is a fact on each command, never a filter over the page]
   W --> O[One output pane per release, for whichever step is picked]

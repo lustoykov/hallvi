@@ -14,6 +14,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { workFor } from "@/components/server-guy/release-records";
+import { DeploymentPage } from "@/components/server-guy/deployment-page";
 import { deploymentFromRecords } from "@/components/server-guy/deployment-records";
 import { ReleasesPanel } from "@/components/server-guy/releases-panel";
 import type {
@@ -192,5 +194,45 @@ describe("a command that failed inside a release that holds", () => {
       />,
     );
     expect(html).not.toContain("a command in it failed");
+  });
+});
+
+describe("deployment evidence and active work", () => {
+  it("keeps an execution citation narrower than a conversation-turn citation", () => {
+    const executions = [call("cited", "/servers"), call("other", "/pricing")];
+    const records = [
+      { id: "release", evidence: [{ type: "execution", id: "cited" }] },
+    ] as Parameters<typeof workFor>[1];
+    expect(
+      workFor({ id: "release" }, records, executions).map((step) => step.id),
+    ).toEqual(["cited"]);
+    records[0].evidence = [{ type: "message", id: "run" }];
+    expect(
+      workFor({ id: "release" }, records, executions).map((step) => step.id),
+    ).toEqual(["cited", "other"]);
+  });
+
+  it("does not offer a second deployment while work is active without a release record", () => {
+    const execution = {
+      ...call("active", "/servers"),
+      status: "running" as const,
+    };
+    const html = renderToStaticMarkup(
+      <DeploymentPage
+        records={[]}
+        executions={[execution]}
+        applicationName="Shop"
+        now={NOW}
+        chrome={
+          { bar: null, activity: <p>Creating the server</p> } as Parameters<
+            typeof DeploymentPage
+          >[0]["chrome"]
+        }
+        onAsk={() => undefined}
+      />,
+    );
+    expect(html).toContain("Work is in progress");
+    expect(html).toContain("Creating the server");
+    expect(html).not.toContain("Ask Server Guy to deploy");
   });
 });

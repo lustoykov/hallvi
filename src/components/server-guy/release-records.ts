@@ -23,7 +23,13 @@
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 
-import { clip, commandOf, essence } from "./execution-text";
+import {
+  clip,
+  commandOf,
+  essence,
+  placeOf,
+  whereItRan,
+} from "./execution-text";
 
 type Content = NonNullable<
   NonNullable<SavedInformation["presentation"]>["content"]
@@ -67,7 +73,7 @@ export interface ReleaseStep {
   caption: string;
   /** The whole thing, for whoever wants it. */
   command: string;
-  where: "server" | "here" | "provider" | "you";
+  where: string | null;
   /** How long it took. Null while it is still running. */
   seconds: number | null;
   outcome: ExecutionRecord["status"];
@@ -169,15 +175,6 @@ export function releasesFromRecords(
   };
 }
 
-const WHERE_OF: Record<string, ReleaseStep["where"]> = {
-  server_bash: "server",
-  bash: "here",
-  powershell: "here",
-  hetzner_request: "provider",
-  request_approval: "you",
-  open_server_port: "here",
-};
-
 const TITLE_OF: Record<string, string> = {
   server_bash: "On the server",
   bash: "In the repository copy",
@@ -209,14 +206,16 @@ export function workFor(
     if (item.type === "message" && "id" in item) runs.add(item.id);
     if (item.type === "execution") ids.add(item.id);
   }
-  for (const execution of executions)
-    if (ids.has(execution.id)) runs.add(execution.runId);
-  if (!runs.size) return [];
+  if (!runs.size && !ids.size) return [];
   return executions
-    .filter((execution) => runs.has(execution.runId))
+    .filter((execution) => ids.has(execution.id) || runs.has(execution.runId))
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .map((execution) => {
       const full = commandOf(execution.input);
+      const place = whereItRan({
+        ...execution,
+        target: execution.target ?? "",
+      });
       const finished = execution.finishedAt
         ? Date.parse(execution.finishedAt) - Date.parse(execution.createdAt)
         : null;
@@ -225,7 +224,9 @@ export function workFor(
         title: TITLE_OF[execution.tool] ?? execution.tool.replaceAll("_", " "),
         caption: clip(essence(full), 120),
         command: full,
-        where: WHERE_OF[execution.tool] ?? "here",
+        where: place
+          ? [place.said, place.detail].filter(Boolean).join(" · ")
+          : placeOf(execution.tool),
         seconds:
           finished === null || !Number.isFinite(finished)
             ? null
