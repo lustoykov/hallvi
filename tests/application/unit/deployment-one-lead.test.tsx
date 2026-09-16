@@ -49,7 +49,7 @@ const view = (running: Release, latest: Release): ReleaseView => ({
 });
 
 describe("one current-release lead", () => {
-  it("says nothing when the story below already names the release", () => {
+  it("names the running release once, as the lead over its own list", () => {
     const only = release("r1", "9cea081");
     const html = renderToStaticMarkup(
       <ReleasesPanel
@@ -58,7 +58,12 @@ describe("one current-release lead", () => {
         onAsk={() => undefined}
       />,
     );
-    expect(html).not.toContain("Running 9cea081");
+    // The Transit story that used to name the release below this panel is
+    // gone, so the lead is the one place the page says what is serving.
+    expect(html).toContain("Running 9cea081");
+    expect(html.split("Running 9cea081")).toHaveLength(2);
+    // Its row in the list is marked rather than carrying a second headline.
+    expect(html).toContain("serving now");
   });
 
   it("leads when the running release is not the latest attempt", () => {
@@ -128,5 +133,64 @@ describe("a provider request in the story", () => {
     expect(story([call("a", "/load_balancers")]).phases[0].detail).toBe(
       "load balancers",
     );
+  });
+});
+
+describe("a command that failed inside a release that holds", () => {
+  const step = (id: string, status: ExecutionRecord["status"]) =>
+    ({
+      id,
+      applicationId: "app",
+      chatId: "chat",
+      runId: "run",
+      tool: "server_bash",
+      target: null,
+      input: JSON.stringify({ command: "node ./scripts/migrate.mjs" }),
+      mode: "ask",
+      status,
+      output: "Error: column already exists",
+      exitCode: 1,
+      createdAt: AT,
+      finishedAt: AT,
+    }) as unknown as ExecutionRecord;
+
+  it("is on the row, not only inside it", () => {
+    const only = release("r1", "9cea081");
+    // The release's checks passed, and one of the commands that produced it
+    // did not. A row saying only "Deployed · serving now" keeps that from a
+    // reader who never opens it.
+    const records = [
+      {
+        id: "r1",
+        evidence: [{ type: "execution" as const, id: "e1" }],
+      },
+    ] as unknown as Parameters<typeof ReleasesPanel>[0]["records"];
+    const html = renderToStaticMarkup(
+      <ReleasesPanel
+        view={view(only, only)}
+        records={records}
+        executions={[step("e1", "failed")]}
+        now={NOW}
+        onAsk={() => undefined}
+      />,
+    );
+    expect(html).toContain("a command in it failed");
+  });
+
+  it("says nothing of the sort when every command finished", () => {
+    const only = release("r1", "9cea081");
+    const records = [
+      { id: "r1", evidence: [{ type: "execution" as const, id: "e1" }] },
+    ] as unknown as Parameters<typeof ReleasesPanel>[0]["records"];
+    const html = renderToStaticMarkup(
+      <ReleasesPanel
+        view={view(only, only)}
+        records={records}
+        executions={[step("e1", "succeeded")]}
+        now={NOW}
+        onAsk={() => undefined}
+      />,
+    );
+    expect(html).not.toContain("a command in it failed");
   });
 });

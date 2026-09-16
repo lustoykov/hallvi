@@ -20,7 +20,10 @@
 // container that was replaced by something that did not start is not still
 // running the old image.
 
+import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
+
+import { clip, commandOf, essence } from "./execution-text";
 
 type Content = NonNullable<
   NonNullable<SavedInformation["presentation"]>["content"]
@@ -47,6 +50,28 @@ export interface Release {
    */
   outcome: "deployed" | "failed" | "attempted";
   checks: { label: string; passed: boolean }[];
+}
+
+/**
+ * One command that went into a release.
+ *
+ * `where` is provenance on the step and never a filter above the list: the
+ * application is on the server always, and only some of the commands ran
+ * anywhere else. Narrowing a whole page by machine answers a question nobody
+ * arrives at Deployment with.
+ */
+export interface ReleaseStep {
+  id: string;
+  title: string;
+  /** The command, short enough to read in a row. */
+  caption: string;
+  /** The whole thing, for whoever wants it. */
+  command: string;
+  where: "server" | "here" | "provider" | "you";
+  /** How long it took. Null while it is still running. */
+  seconds: number | null;
+  outcome: ExecutionRecord["status"];
+  output: string;
 }
 
 export interface ReleaseView {
@@ -142,6 +167,73 @@ export function releasesFromRecords(
           }
         : null,
   };
+}
+
+const WHERE_OF: Record<string, ReleaseStep["where"]> = {
+  server_bash: "server",
+  bash: "here",
+  powershell: "here",
+  hetzner_request: "provider",
+  request_approval: "you",
+  open_server_port: "here",
+};
+
+const TITLE_OF: Record<string, string> = {
+  server_bash: "On the server",
+  bash: "In the repository copy",
+  powershell: "In the repository copy",
+  hetzner_request: "With the provider",
+  request_approval: "Your decision",
+  open_server_port: "Opening the tunnel",
+};
+
+/**
+ * The commands that produced one release, from that release's own evidence.
+ *
+ * Only its own. The story of the latest attempt could fall back to the newest
+ * run when a record cited nothing, because there was one story and it was
+ * about the newest thing that happened. A list of releases cannot: the same
+ * fallback would hang the same commands under every release that cited none,
+ * which is a page inventing work that a release did not do.
+ */
+export function workFor(
+  release: Pick<Release, "id">,
+  records: SavedInformation[],
+  executions: ExecutionRecord[],
+): ReleaseStep[] {
+  const record = records.find((one) => one.id === release.id);
+  if (!record) return [];
+  const runs = new Set<string>();
+  const ids = new Set<string>();
+  for (const item of record.evidence ?? []) {
+    if (item.type === "message" && "id" in item) runs.add(item.id);
+    if (item.type === "execution") ids.add(item.id);
+  }
+  for (const execution of executions)
+    if (ids.has(execution.id)) runs.add(execution.runId);
+  if (!runs.size) return [];
+  return executions
+    .filter((execution) => runs.has(execution.runId))
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .map((execution) => {
+      const full = commandOf(execution.input);
+      const finished = execution.finishedAt
+        ? Date.parse(execution.finishedAt) - Date.parse(execution.createdAt)
+        : null;
+      return {
+        id: execution.id,
+        title: TITLE_OF[execution.tool] ?? execution.tool.replaceAll("_", " "),
+        caption: clip(essence(full), 120),
+        command: full,
+        where: WHERE_OF[execution.tool] ?? "here",
+        seconds:
+          finished === null || !Number.isFinite(finished)
+            ? null
+            : Math.max(0, Math.round(finished / 1000)),
+        outcome: execution.status,
+        output: execution.output ?? "",
+      };
+    });
 }
 
 /**
