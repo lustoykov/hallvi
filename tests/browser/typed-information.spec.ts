@@ -189,21 +189,33 @@ test("records render in chat and their views, survive refresh, and update by rec
     // The destination is not a list of the cards from the conversation: it is
     // a page composed from the same records. What it owes the reader is the
     // release that is running and an honest account of the way in.
+    //
+    // It says so in its own words rather than by reprinting the record's
+    // title: the lead names the revision that is serving, and the line under
+    // it names the source and the machine.
+    await expect(view.getByText("Running abcdef0.")).toBeVisible();
     await expect(
-      view.getByRole("heading", { name: "Application deployed" }),
+      view.getByText(/abcdef012345 on fixture-server/),
     ).toBeVisible();
     await expect(
-      view.getByRole("button", { name: /candidate fixture-server/ }),
+      view.getByRole("button", { name: /Added container packaging/ }),
     ).toBeVisible();
-    await expect(view.getByText("Data survived restart")).toBeVisible();
     // The address is named, and named as not answering, rather than offered.
     await expect(view.getByText(/The tunnel is closed, so/)).toBeVisible();
     await expect(
-      view.getByRole("button", { name: "Reopen access" }),
+      view.getByRole("button", { name: "Open the connection again" }),
     ).toBeVisible();
     await expect(
       view.getByRole("link", { name: "Open application" }),
     ).toHaveCount(0);
+    // What was checked belongs to the release that was checked, so it is
+    // inside that release rather than loose on the page. It still has to be
+    // reachable, and it still has to be the record's own words.
+    await view
+      .getByRole("button", { name: /Added container packaging/ })
+      .click();
+    await expect(view.getByText("Data survived restart")).toBeVisible();
+    await expect(view.getByText("app:candidate")).toBeVisible();
 
     // A record changes by its own id, and the page it feeds changes with it.
     database
@@ -225,15 +237,21 @@ test("records render in chat and their views, survive refresh, and update by rec
     // The idle page polls every 15 seconds. Observe the update without
     // a reload.
     await expect(
-      view.getByRole("button", { name: /rebuilt fixture-server/ }),
+      view.getByRole("button", { name: /Rebuilt from the same source/ }),
     ).toBeVisible({ timeout: 20_000 });
     await page.reload();
+    const rebuilt = view.getByRole("button", {
+      name: /Rebuilt from the same source/,
+    });
+    await expect(rebuilt).toBeVisible();
     await expect(
-      view.getByRole("button", { name: /rebuilt fixture-server/ }),
-    ).toBeVisible();
-    await expect(
-      view.getByRole("button", { name: /candidate fixture-server/ }),
+      view.getByRole("button", { name: /Added container packaging/ }),
     ).toHaveCount(0);
+    // The record changed by its id, so the release opens on the new image
+    // rather than on the one it replaced.
+    await rebuilt.click();
+    await expect(view.getByText("app:rebuilt")).toBeVisible();
+    await expect(view.getByText("app:candidate")).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
       path: "tests/results/typed-information-mobile.png",
