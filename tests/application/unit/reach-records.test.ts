@@ -356,7 +356,7 @@ describe("what a way in is called when its ports are in the content", () => {
     expect(story.doors[0].port).toBe("8080 → 3000");
   });
 
-  it("uses the check's own label when Pi wrote no detail", () => {
+  it("does not pass a bare check name off as something somebody found out", () => {
     const story = read([
       states(
         { kind: "door", id: "app" },
@@ -367,8 +367,35 @@ describe("what a way in is called when its ports are in the content", () => {
       ),
     ]);
     // "Checked, with no detail recorded" told a reader about our bookkeeping
-    // rather than about their server.
-    expect(story.doors[0].detail).toBe("open");
+    // rather than about their server. So did the word "open" on its own under
+    // "What that rests on", which is the check's name and not a finding.
+    // Whether the port answered is said by the basis line; this is where a
+    // sentence goes when Pi wrote one, and nothing goes when it did not.
+    expect(story.doors[0].detail).toBe("");
+  });
+
+  it("says nobody has checked only when nobody has", () => {
+    const story = read([
+      states({ kind: "door", id: "app" }, { facts: [fact("port", "3000")] }),
+    ]);
+    expect(story.doors[0].detail).toBe("Nobody has checked this port.");
+  });
+
+  it("keeps a label that is an actual sentence", () => {
+    const story = read([
+      states(
+        { kind: "door", id: "app" },
+        {
+          facts: [fact("port", "3000")],
+          checks: [
+            check("open", "passed", "reachability", {
+              label: "The port answered from outside",
+            }),
+          ],
+        },
+      ),
+    ]);
+    expect(story.doors[0].detail).toBe("The port answered from outside");
   });
 });
 

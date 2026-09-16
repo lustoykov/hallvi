@@ -143,7 +143,8 @@ describe("what the header says when the way in has stopped working", () => {
   it("calls a loopback address a tunnel, on a page that says nothing about reach", () => {
     const html = head("http://127.0.0.1:38123", false);
     expect(html).toContain("The tunnel is closed");
-    expect(html).toContain("Ask Pi to reopen it");
+    // The same words the release band uses for the same action.
+    expect(html).toContain("Open the connection again");
   });
 
   it("calls a published address an address", () => {
