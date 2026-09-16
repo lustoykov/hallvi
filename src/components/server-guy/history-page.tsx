@@ -12,7 +12,7 @@ import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 import type { ChatSummary } from "@/server/types";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import type { ApplicationSection } from "./application-sections";
 import { PageHead } from "./deployment-prototype/page-head";
 import { historyFromRecords } from "./history-records";
@@ -65,10 +65,6 @@ export function HistoryPage({
             restricted={false}
           />
         }
-        // Requirements and separate application events are not part of this
-        // slice; the events here are the records and the commands.
-        decisions={[]}
-        activity={[]}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
       />

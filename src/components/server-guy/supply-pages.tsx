@@ -12,7 +12,7 @@ import { useMemo, type ReactNode } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import type { ApplicationSection } from "./application-sections";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import type { SecretRequest } from "./secret-request";

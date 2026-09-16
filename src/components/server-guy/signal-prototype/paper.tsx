@@ -9,7 +9,7 @@
 // when picked; nothing moves on arrival.
 
 import { ChatCircleText, MagnifyingGlass } from "@phosphor-icons/react";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { useReducedMotion } from "../architecture-prototype/motion";
 import type { Tone } from "../deployment-prototype/deployment-model";
@@ -17,7 +17,16 @@ import { LittleServer } from "../deployment-prototype/little-server";
 import { Tag } from "../deployment-prototype/tag";
 import { lasting, listed } from "../backup-prototype/model";
 import { ago, when } from "../stack-prototype/stack-model";
-import type { SignalDirectionProps } from "./index";
+import type { SignalStory } from "./signal-model";
+/** What the Monitoring page hands this layout. */
+export interface SignalDirectionProps {
+  story: SignalStory;
+  now: number;
+  head: ReactNode;
+  /** Work in progress on this destination, as the shell shows it. */
+  activity: ReactNode;
+  onAsk: (draft: string) => void;
+}
 import { CAP, toneOf, type LogLine } from "./signal-model";
 import "./paper.css";
 

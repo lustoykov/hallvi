@@ -1493,3 +1493,9 @@
   color: var(--blue-text);
   font-weight: 600;
 }
+
+.sg-section-reading {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}

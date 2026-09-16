@@ -3,7 +3,7 @@
 // (header, the map in miniature, recent work, ideas).
 
 import type { ApplicationSection } from "../application-sections";
-import type { PageContext } from "../architecture-prototype";
+import type { PageContext } from "../deployment-prototype/page-head";
 import type {
   ArchitectureModel,
   LiveRecord,

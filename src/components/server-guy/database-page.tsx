@@ -10,7 +10,7 @@ import { useMemo } from "react";
 
 import type { SavedInformation } from "@/server/operator-data";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import type { ApplicationSection } from "./application-sections";
 import { databaseAssessed, databaseFromRecords } from "./database-records";
 import { TimelineDirection } from "./data-prototype/timeline";

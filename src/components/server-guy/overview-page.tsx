@@ -14,7 +14,7 @@ import type { SavedInformation } from "@/server/operator-data";
 import type { ApplicationRecord, ChatSummary } from "@/server/types";
 
 import { architectureFromRecords } from "./architecture-records";
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import type { LiveRecord } from "./architecture-prototype/model";
 import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";

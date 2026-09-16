@@ -17,7 +17,7 @@ import type { SavedInformation } from "@/server/operator-data";
 
 import { architectureFromRecords } from "./architecture-records";
 import { JourneyDirection } from "./architecture-prototype/journey-v2";
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import type { Recheck } from "./architecture-prototype/use-recheck";
 import type { ApplicationSection } from "./application-sections";
 import "./architecture-prototype/prototype.css";

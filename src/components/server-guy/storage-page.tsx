@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { SavedInformation } from "@/server/operator-data";
 import { currentFacts, subjectsOfKind } from "@/server/record-projection";
 
-import type { PageChrome } from "./architecture-prototype/index";
+import type { PageChrome } from "./deployment-prototype/page-head";
 import { FlowDirection } from "./backup-prototype/flow";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
 import { storageFromRecords } from "./storage-records";

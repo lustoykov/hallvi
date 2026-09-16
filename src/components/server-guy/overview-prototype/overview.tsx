@@ -12,7 +12,7 @@ import type { ApplicationOperation } from "@/server/operation-record";
 import type { ChatSummary } from "@/server/types";
 
 import type { ApplicationSection } from "../application-sections";
-import type { PageContext } from "../architecture-prototype";
+import type { PageContext } from "../deployment-prototype/page-head";
 import { ARCHITECTURE_FOCUS } from "../architecture-prototype/journey-v2";
 import type {
   ArchitectureModel,

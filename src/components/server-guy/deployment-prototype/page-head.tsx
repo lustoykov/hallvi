@@ -26,6 +26,48 @@ import type { ReactNode } from "react";
  * `checking` is the honest state before anything is known, and it claims
  * nothing.
  */
+/**
+ * The page around a destination, as the shell draws it.
+ *
+ * It lives beside PageHead because PageHead is what draws it: every
+ * destination page takes this and hands the pieces to the head. It used to
+ * live in a chooser that let a reviewer flip between candidate layouts, which
+ * is a thing the product no longer has.
+ */
+export interface PageChrome {
+  /** The way back to the conversation. */
+  bar: ReactNode;
+  /** The destination's title, description and "Open application". */
+  header: ReactNode;
+  /** Unsettled work, then the last settled operation and earlier work. */
+  activity: ReactNode;
+}
+
+/** What a page that draws its own header needs from the record. */
+export interface PageContext {
+  chrome: PageChrome;
+  /** Where the application answers, while it is serving. */
+  openUrl: string | null;
+  /**
+   * Whether the way in still works. A private URL lives inside a tunnel this
+   * controller holds, so the record naming it outlives the way to reach it.
+   */
+  reachable?: Reachability;
+  /** Asks Pi to reopen private access. Absent hides the offer. */
+  onReopen?: () => void;
+  /** Work is unsettled: the shipped activity is shown as it is. */
+  busy: boolean;
+  /** The last settled operation that touched this destination. */
+  last: {
+    title: string;
+    at: string;
+    conversation: string | null;
+    open: (() => void) | null;
+  } | null;
+  /** Settled operations before the last one. */
+  earlier: number;
+}
+
 export type Reachability = "checking" | "open" | "closed";
 
 export function PageHead({
