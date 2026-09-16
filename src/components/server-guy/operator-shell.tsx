@@ -7,8 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Reachability } from "./deployment-prototype/page-head";
 
-import { applicationOperations } from "@/server/operation-record";
-import { stackOf } from "@/server/application-stack";
 import type { ApplicationFacts } from "@/server/application-facts";
 
 import type { PiSetupStatus } from "@/server/pi-setup";
@@ -35,7 +33,6 @@ import {
   type ApplicationSection,
 } from "./application-sections";
 import { ApplicationNavigation } from "./application-navigation";
-import type { DeploymentRecord } from "@/server/deployment-types";
 import "./application-shell.css";
 import "./views.css";
 import { OperatorConsole } from "./operator-console";
@@ -162,7 +159,6 @@ export function OperatorShell({
   identityVariant?: IdentityVariant;
 }) {
   const router = useRouter();
-  const [deployment] = useState<DeploymentRecord | null>(null);
   // Until the first response arrives a view cannot honestly say a resource
   // is absent, so it shows the shape of the answer instead.
   const [activeSection, setActiveSection] = useState<ApplicationSection | null>(
@@ -338,14 +334,10 @@ export function OperatorShell({
     };
   }, [refreshDeployment, working]);
   const references = recordReferences(view);
-  const operations = useMemo(
-    () => view.operations ?? applicationOperations(deployment),
-    [deployment, view.operations],
-  );
-  const stack = useMemo(() => stackOf(deployment), [deployment]);
-  // Which hideable destinations the records establish. The stack model above
-  // is no longer written to, so without this every one of them stays dark
-  // however much Pi records.
+  // Operations are projected from saved records; the deployment model that
+  // used to produce them is gone, and so is the empty list it produced.
+  const operations = view.operations ?? [];
+  // Which hideable destinations the records establish.
   // Whether the tunnel behind a private access record is still open. The
   // record is a claim about a moment; the tunnel is a process, and it dies
   // with a restart.
@@ -858,20 +850,8 @@ export function OperatorShell({
           onCreate={createChat}
           indicators={indicators}
           chatMarks={chatMarks}
-          sections={visibleSections(
-            stack,
-            activeSection,
-            facts,
-            Boolean(deployment?.serverId),
-            recordedHere,
-          )}
-          hidden={hiddenSections(
-            stack,
-            activeSection,
-            facts,
-            Boolean(deployment?.serverId),
-            recordedHere,
-          )}
+          sections={visibleSections(activeSection, recordedHere)}
+          hidden={hiddenSections(activeSection, recordedHere)}
           revealed={stackRevealed}
           onReveal={setStackRevealed}
         />

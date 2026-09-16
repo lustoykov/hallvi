@@ -131,12 +131,7 @@ export function OverviewPage({
       )?.presentation?.url ?? null;
 
   if (model) {
-    const live: LiveRecord = {
-      application,
-      deployment: null,
-      facts: {},
-      operations: [],
-    };
+    const live: LiveRecord = { application };
     return (
       <div className="sg-section-page sg-section-overview">
         <OverviewDirection

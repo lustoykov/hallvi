@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { ProviderTokenForm } from "./provider-token-form";
 import { SettingsNav } from "./settings-nav";
-import { BackupStorageForm } from "./views/backup-storage-form";
+import { BackupStorageForm } from "./backup-storage-form";
 import s from "./pi-setup-screen.module.css";
 
 /** A credential this page can take, on this page, in a field. */

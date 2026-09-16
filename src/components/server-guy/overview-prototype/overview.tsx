@@ -61,9 +61,8 @@ export function OverviewDirection({
   onAsk: (draft: string) => void;
 }) {
   const fallback = useMemo(
-    () =>
-      buildOverview({ model, record, operations, chats, onOpenConversation }),
-    [model, record, operations, chats, onOpenConversation],
+    () => buildOverview({ model, operations, chats, onOpenConversation }),
+    [model, operations, chats, onOpenConversation],
   );
   const overview = built ?? fallback;
   const [pointed, setPointed] = useState<string | null>(null);
