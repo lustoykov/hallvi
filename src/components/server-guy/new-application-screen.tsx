@@ -10,19 +10,12 @@ import s from "./applications.module.css";
 
 export function NewApplicationScreen({
   githubLogin = null,
-  preview = false,
 }: {
   githubLogin?: string | null;
-  /** Reference-only: keep drafts separate and never create a real record. */
-  preview?: boolean;
 }) {
   const router = useRouter();
-  const draftKey = preview
-    ? "server-guy:reference-add:v1"
-    : "server-guy:add-application:v1";
-  const applicationsHref = preview
-    ? "/prototype/applications"
-    : "/applications";
+  const draftKey = "server-guy:add-application:v1";
+  const applicationsHref = "/applications";
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [name, setName] = useState("");
   const creationRequest = useRef<{ key: string; settings: string } | null>(
@@ -81,10 +74,6 @@ export function NewApplicationScreen({
 
   async function createApplication() {
     if (busy) return;
-    if (preview) {
-      router.push("/prototype/app?scenario=simple&step=0");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -139,9 +128,8 @@ export function NewApplicationScreen({
           <div>
             <h1 id="new-application-heading">Add application</h1>
             <p>
-              {preview
-                ? "Prototype · invented data. Adding an application opens the scripted scenario."
-                : "Each application has its own conversations, configuration and history."}
+              Each application has its own conversations, configuration and
+              history.
             </p>
           </div>
         </div>
@@ -163,14 +151,7 @@ export function NewApplicationScreen({
                   : "Public repositories are read without one. Connect a login for private repositories."}
               </p>
             </div>
-            <Link
-              href={
-                preview
-                  ? "/prototype/settings/connections"
-                  : "/setup/github?from=add"
-              }
-              onClick={keepDraft}
-            >
+            <Link href="/setup/github?from=add" onClick={keepDraft}>
               {githubLogin ? "Change" : "Connect GitHub"}
             </Link>
           </div>

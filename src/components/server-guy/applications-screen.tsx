@@ -24,22 +24,17 @@ export interface ApplicationListItem {
 export function ApplicationsScreen({
   applications,
   piReady,
-  preview = false,
-  hrefFor = (id) => `/applications/${id}`,
 }: {
   applications: ApplicationListItem[];
   piReady: boolean;
-  preview?: boolean;
-  hrefFor?: (id: string) => string;
 }) {
   return (
     <ApplicationsHome
       applications={applications.map((item) => ({
         ...item,
-        href: hrefFor(item.id),
+        href: `/applications/${item.id}`,
       }))}
       piReady={piReady}
-      preview={preview}
     />
   );
 }
