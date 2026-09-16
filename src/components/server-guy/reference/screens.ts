@@ -22,6 +22,7 @@ export function referenceApplicationItems(): ApplicationListItem[] {
       condition: { tone: "live", text: "Running · all checks passing" },
       attention: 0,
       protection: "Nightly to R2 · restore tested",
+      address: "archive.example.test",
     },
     {
       ...listItem(
@@ -31,6 +32,7 @@ export function referenceApplicationItems(): ApplicationListItem[] {
       ),
       condition: { tone: "live", text: "Running · all checks passing" },
       protection: "Not backed up",
+      address: "status.example.test",
     },
     {
       ...listItem(

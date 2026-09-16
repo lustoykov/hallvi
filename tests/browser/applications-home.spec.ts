@@ -5,11 +5,13 @@ import { journey } from "./journeys";
 // disposable app rather than one that earlier journeys have populated.
 test.use({ isolatedApp: true });
 
-// Selecting used to mean pressing a caretaker figure above each card. The
-// figures are gone — three 250px mascots with the real facts underneath them —
-// and an application is now its own card. What has to keep working is the same
-// thing: the reader picks one, the page offers that one, and search never
-// leaves them on a card that opens something else.
+// The page is the caretakers over their applications: one card each, with
+// the drawn screen, one word of state and what runs. What has to keep
+// working: the reader recognises an application and opens it from its name,
+// its screen or More; search, once there is enough to search, never leaves
+// them on a card that opens something else; and the empty page offers the
+// one thing to do. There is no offer at the top of the page any more; talking
+// to Server Guy starts inside the application.
 test(
   "home lists applications, follows the selected one, and search preserves navigation",
   journey("application-shell"),
@@ -24,7 +26,14 @@ test(
     ).toHaveAttribute("href", "/applications/new");
 
     const ids: string[] = [];
-    for (const name of ["Home alpha", "Home beta"]) {
+    const names = [
+      "Home alpha",
+      "Home beta",
+      "Home gamma",
+      "Home delta",
+      "Home epsilon",
+    ];
+    for (const name of names) {
       const response = await page.request.post("/api/applications", {
         data: {
           repositoryUrl: `https://github.com/qa/${name.toLowerCase().replaceAll(" ", "-")}`,
@@ -38,33 +47,35 @@ test(
     await page.reload();
 
     const list = page.getByRole("list", { name: "Applications" });
-    await expect(list.getByRole("listitem")).toHaveCount(2);
-    const alpha = list.getByRole("link", { name: /Home alpha/ });
-    await expect(alpha).toHaveAttribute("href", `/applications/${ids[0]}`);
-
-    // The offer at the top of the page follows the selection, so a reader who
-    // takes it opens the application they were looking at.
-    const offer = page.getByRole("link", { name: /^Talk to Server Guy about/ });
-    await alpha.focus();
-    await expect(offer).toHaveAccessibleName(
-      "Talk to Server Guy about Home alpha",
+    await expect(list.getByRole("listitem")).toHaveCount(names.length);
+    const alpha = list.getByRole("listitem").filter({ hasText: "Home alpha" });
+    await expect(
+      alpha.getByRole("link", { name: "Home alpha", exact: true }),
+    ).toHaveAttribute("href", `/applications/${ids[0]}`);
+    await expect(
+      alpha.getByRole("link", { name: "Open Home alpha" }),
+    ).toHaveAttribute("href", `/applications/${ids[0]}`);
+    await expect(alpha.getByRole("link", { name: "More" })).toHaveAttribute(
+      "href",
+      `/applications/${ids[0]}`,
     );
-    await expect(offer).toHaveAttribute("href", `/applications/${ids[0]}`);
+    // A freshly added application says so in one word, and its caretaker
+    // carries the box; nothing on the card warns about protection.
+    await expect(alpha.getByText("New", { exact: true })).toBeVisible();
+    await expect(alpha.getByText(/backed up|backup/i)).toHaveCount(0);
 
     const search = page.getByRole("textbox", { name: "Find an application" });
     await search.fill("home beta");
     await expect(list.getByRole("listitem")).toHaveCount(1);
-    await expect(list.getByRole("link", { name: /Home beta/ })).toHaveAttribute(
-      "href",
-      `/applications/${ids[1]}`,
-    );
+    await expect(
+      list.getByRole("link", { name: "Home beta", exact: true }),
+    ).toHaveAttribute("href", `/applications/${ids[1]}`);
     await search.fill("no-such-app");
     await expect(page.getByText(/No applications match/)).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
-    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await expect(list.getByRole("listitem")).toHaveCount(names.length);
 
-    await alpha.focus();
-    await offer.click();
+    await alpha.getByRole("link", { name: "More" }).click();
     await expect(page).toHaveURL(new RegExp(`/applications/${ids[0]}$`));
     await expect(
       page.getByRole("textbox", { name: "Message Server Guy" }),

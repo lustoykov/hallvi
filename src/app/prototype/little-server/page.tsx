@@ -20,6 +20,7 @@ const moods: { mood: MascotMood; note: string }[] = [
   { mood: "waving", note: "A hello" },
   { mood: "pointing", note: "Reaches out, taps down toward the log" },
   { mood: "resting", note: "Antennas droop, tips dim" },
+  { mood: "carrying", note: "A box, in both arms" },
   { mood: "dancing", note: "Antennas flop with the beat" },
 ];
 

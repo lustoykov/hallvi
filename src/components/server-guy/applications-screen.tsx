@@ -14,6 +14,8 @@ export interface ApplicationListItem {
   stack: string;
   attention: number;
   protection: string;
+  /** The hostname the application is reached at, when a record says so. */
+  address?: string | null;
 }
 
 export function ApplicationsScreen({

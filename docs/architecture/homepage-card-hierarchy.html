@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Homepage card: what carries the state</title>
+<style>
+  body { font: 14px/1.5 Geist, system-ui, sans-serif; color: #192338; background: #f7f9fc; margin: 0; padding: 32px; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { max-width: 70ch; color: #3e4a60; }
+  svg { display: block; max-width: 920px; margin-top: 20px; }
+  text { font-family: inherit; }
+</style>
+<h1>Homepage card: what carries the state</h1>
+<p>The decision behind the September 2026 homepage. Each fact about an application is carried by exactly one part of the card, and protection is not on the card at all until the data has grown enough to deserve a nudge (PRODUCT.md, "Most first users run something small").</p>
+<svg viewBox="0 0 920 420" role="img" aria-label="The card's parts and the fact each one carries">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5 0 10z" fill="#647089"/></marker></defs>
+  <g font-size="12" fill="#647089">
+    <rect x="40" y="30" width="300" height="360" rx="16" fill="#fff" stroke="#d8e0ec"/>
+    <rect x="120" y="44" width="140" height="70" rx="14" fill="#edf3ff"/>
+    <text x="190" y="84" text-anchor="middle" fill="#2852a6" font-weight="600">caretaker</text>
+    <rect x="56" y="126" width="268" height="248" rx="12" fill="#fbfcfe" stroke="#e6ebf3"/>
+    <text x="70" y="150" fill="#192338" font-weight="700" font-size="14">Name</text>
+    <text x="70" y="166">purpose</text>
+    <text x="310" y="150" text-anchor="end" fill="#0f7a4e" font-weight="600">● Fine</text>
+    <rect x="70" y="180" width="240" height="92" rx="8" fill="#dfe7f5"/>
+    <text x="190" y="230" text-anchor="middle">drawn screen</text>
+    <text x="70" y="296" fill="#0f7a4e">condition, one line</text>
+    <rect x="70" y="310" width="42" height="16" rx="8" fill="#f7f9fc" stroke="#e6ebf3"/>
+    <rect x="118" y="310" width="58" height="16" rx="8" fill="#f7f9fc" stroke="#e6ebf3"/>
+    <rect x="182" y="310" width="70" height="16" rx="8" fill="#f7f9fc" stroke="#e6ebf3"/>
+    <text x="70" y="352" fill="#2852a6" font-weight="600">⊕ address ↗</text>
+    <rect x="256" y="338" width="54" height="22" rx="11" fill="#fff" stroke="#d8e0ec"/>
+    <text x="283" y="353" text-anchor="middle" fill="#2852a6" font-weight="600">More</text>
+  </g>
+  <g font-size="13" fill="#3e4a60">
+    <line x1="270" y1="80" x2="440" y2="60" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="64"><tspan font-weight="600" fill="#192338">Face and prop</tspan> = the situation. Mug, wrench, clipboard, magnifier, box.</text>
+    <text x="450" y="82">Paint = identity (the app's colour, softened). Never state.</text>
+    <line x1="320" y1="150" x2="440" y2="120" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="124"><tspan font-weight="600" fill="#192338">One word</tspan>: Fine · Working · Needs me · Not checked · New.</text>
+    <line x1="310" y1="226" x2="440" y2="180" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="184"><tspan font-weight="600" fill="#192338">Recognition</tspan>: the app's own layout, drawn per kind; generic when unknown.</text>
+    <text x="450" y="202">Labelled "Illustration". Opens the application.</text>
+    <line x1="230" y1="296" x2="440" y2="240" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="244"><tspan font-weight="600" fill="#192338">Condition</tspan>: the record's own words, aged by the reader's clock.</text>
+    <line x1="256" y1="318" x2="440" y2="300" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="304"><tspan font-weight="600" fill="#192338">What runs</tspan>, as chips. The fact owners said they read first.</text>
+    <line x1="160" y1="352" x2="440" y2="350" stroke="#647089" marker-end="url(#a)"/>
+    <text x="450" y="354"><tspan font-weight="600" fill="#192338">Address</tspan> is the link. No Open, no Talk to Server Guy on the card.</text>
+    <text x="450" y="396" fill="#9a4b10"><tspan font-weight="600">Not on the card</tspan>: backups. On the app's pages, and a nudge only when the data has earned it.</text>
+  </g>
+</svg>

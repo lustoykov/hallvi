@@ -5,40 +5,131 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   ArrowUpRight,
-  ChatCircle,
   GearSix,
+  Globe,
   MagnifyingGlass,
+  Pause,
+  Play,
   Plus,
-  ShieldCheck,
 } from "@phosphor-icons/react";
 import type { ApplicationListItem } from "../applications-screen";
-import { mascotColors } from "./mascot-palette";
-import { applicationKind, ApplicationSymbol } from "./application-illustration";
+import type { MascotMood } from "./mascot-scene";
+import {
+  applicationKind,
+  caretakerPaint,
+  KIND_ACCENT,
+  type ApplicationKind,
+} from "./application-kind";
+import { PREVIEWS } from "./interface-previews";
 import s from "./home.module.css";
 
 const Mascot = dynamic(
   () => import("./mascot-scene").then((m) => m.MascotScene),
   {
     ssr: false,
-    loading: () => (
-      <div className={s.mascotPlaceholder} aria-hidden="true">
-        <span>• •</span>
-        <i />
-      </div>
-    ),
+    loading: () => <div className={s.mascotPlaceholder} aria-hidden="true" />,
   },
 );
 type HomeApplication = ApplicationListItem & { href: string };
 
-function colorFor(item: HomeApplication) {
-  const kind = applicationKind(item.source, item.name);
-  if (kind === "uptime") return 0;
-  if (kind === "tasks") return 3;
-  if (kind === "metrics") return 2;
-  return (
-    [...item.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) %
-    mascotColors.length
-  );
+/**
+ * The application's situation, read from the list item. Five words the card
+ * can say at its top right, and the caretaker's face and prop follow them:
+ * a mug when all is fine, a wrench while working, a clipboard when nobody
+ * has looked lately, a magnifier and a worried face when something waits,
+ * a box for an application that is not deployed yet.
+ */
+type Situation = "fine" | "working" | "needs" | "stale" | "new";
+
+function situationOf(item: HomeApplication): Situation {
+  const text = item.condition.text;
+  if (item.attention > 0 || item.condition.tone === "bad") return "needs";
+  if (item.condition.tone === "warn") return "needs";
+  if (/deploying|in progress|updating/i.test(text)) return "working";
+  if (/^not deployed|^not checked yet/i.test(text)) return "new";
+  if (item.condition.tone === "muted") return "stale";
+  return "fine";
+}
+
+const WORD: Record<Situation, string> = {
+  fine: "Fine",
+  working: "Working",
+  needs: "Needs me",
+  stale: "Not checked",
+  new: "New",
+};
+
+function moodOf(situation: Situation, active: boolean): MascotMood {
+  if (situation === "needs") return "attention";
+  if (situation === "working") return "working";
+  if (situation === "stale") return "checking";
+  if (situation === "new") return "carrying";
+  return active ? "waving" : "ready";
+}
+
+const COUNT = [
+  "No",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+];
+const names = (items: HomeApplication[]) => {
+  const list = items.map((item) => item.name);
+  return list.length <= 1
+    ? list.join("")
+    : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
+};
+
+/** The collection in two or three sentences: what is so, never what to do. */
+function summary(items: HomeApplication[]) {
+  const by = (situation: Situation) =>
+    items.filter((item) => situationOf(item) === situation);
+  const needs = by("needs"),
+    working = by("working"),
+    stale = by("stale"),
+    fresh = by("new"),
+    fine = by("fine");
+  const n = items.length;
+  const head = `${COUNT[n] ?? n} application${n === 1 ? "" : "s"}.`;
+  const parts = [
+    working.length &&
+      `${names(working)} ${working.length > 1 ? "are" : "is"} being worked on`,
+    needs.length &&
+      `${names(needs)} ${needs.length > 1 ? "have" : "has"} something waiting`,
+    stale.length &&
+      `${names(stale)} ${stale.length > 1 ? "haven't" : "hasn't"} been looked at lately`,
+    fresh.length &&
+      `${names(fresh)} ${fresh.length > 1 ? "aren't" : "isn't"} deployed yet`,
+  ].filter((part): part is string => Boolean(part));
+  const middle = parts.length
+    ? `${parts.slice(0, -1).join(", ")}${parts.length > 1 ? ", and " : ""}${parts.at(-1)}.`
+    : "";
+  const tail =
+    fine.length === n
+      ? n === 1
+        ? "It is fine."
+        : "All of them are fine."
+      : fine.length
+        ? fine.length === 1
+          ? `${fine[0].name} is fine.`
+          : `The other ${COUNT[fine.length]?.toLowerCase() ?? fine.length} are fine.`
+        : "";
+  return [
+    head,
+    middle && middle.charAt(0).toUpperCase() + middle.slice(1),
+    tail,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function ApplicationsHome({
@@ -51,40 +142,19 @@ export function ApplicationsHome({
   preview: boolean;
 }) {
   const [selectedId, setSelectedId] = useState(applications[0]?.id);
+  const [greeting, setGreeting] = useState(0);
+  const [paused, setPaused] = useState(false);
   const [query, setQuery] = useState("");
-  const [paused] = useState(false);
   const visible = applications.filter((item) =>
     `${item.name} ${item.source}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0];
-  // What a return visit is for. Attention only — a recovered failure is not
-  // carried forward, because the condition is read from the current checks.
-  const waiting = applications.filter(
-    (item) => item.attention > 0 || item.condition.tone === "bad",
-  );
   const addHref = preview ? "/prototype/new" : "/applications/new";
-  const unprotected = applications.filter(
-    (item) =>
-      item.protection === "Not backed up" ||
-      item.protection.includes("not scheduled") ||
-      item.protection === "Restore proof did not succeed" ||
-      item.protection === "Restore cleanup needs attention" ||
-      [
-        "Backup cleanup needs attention",
-        "Backup status unavailable",
-        "Backup schedule stopped",
-        "Backup failed",
-        "Retention needs attention",
-        "Backup overdue",
-        "Scheduled · awaiting first backup",
-        "Backed up · restore not tested",
-      ].includes(item.protection),
-  );
-  function greet(id: string) {
+  const greet = (id: string) => {
     setSelectedId(id);
-  }
+    setGreeting((value) => value + 1);
+  };
   return (
     <main className={s.page}>
       <header className={s.header}>
@@ -99,7 +169,6 @@ export function ApplicationsHome({
           </span>
           Server Guy
         </Link>
-        <span className={s.workspaceLabel}>Your workspace</span>
         <Link
           className={s.settings}
           href={preview ? "/prototype/settings/connections" : "/setup/pi"}
@@ -109,217 +178,216 @@ export function ApplicationsHome({
         </Link>
       </header>
       <div className={s.content}>
+        {/* The page opens with what is so, in a sentence or two, and never
+            with a list of things to do. Most first users run something
+            small; the card below says what runs and where, and leaves
+            protection to the application's own pages until the data has
+            earned a nudge. */}
         <section className={s.greeting} aria-labelledby="home-heading">
-          <div>
-            {/* Somebody opening this page has come back to find out whether
-                their software is all right. It used to open with a marketing
-                line and three large caretakers, and the only real facts were
-                below them. The heading answers the question the visit is
-                about, from the records; the personality stays, smaller, and
-                beside it rather than on top of it. */}
-            <h1 id="home-heading">
-              {waiting.length === 0 ? (
-                <>
-                  Nothing needs you
-                  <br />
-                  <em>right now.</em>
-                </>
-              ) : waiting.length === 1 ? (
-                <>
-                  {waiting[0].name}
-                  <br />
-                  <em>needs you.</em>
-                </>
-              ) : (
-                <>
-                  {waiting.length} applications
-                  <br />
-                  <em>need you.</em>
-                </>
-              )}
-            </h1>
-            <p>
-              {waiting.length === 0
-                ? "Nothing on record is waiting. Open an application to see what it has been doing."
-                : `${
-                    waiting.length === 1
-                      ? waiting[0].name
-                      : `${waiting
-                          .slice(0, -1)
-                          .map((item) => item.name)
-                          .join(", ")} and ${waiting.at(-1)!.name}`
-                  }${
-                    waiting.length === 1
-                      ? " has something waiting."
-                      : " have something waiting."
-                  }`}
-            </p>
-          </div>
-          {/* One caretaker, at the size of a thought rather than a poster,
-              and its mood is the page's answer: it is attentive when
-              something is waiting and at rest when nothing is. Personality
-              that carries meaning survives; three identical figures taking a
-              scroll's worth of room did not. */}
-          <div className={s.pageMascot} aria-hidden="true">
-            <Mascot
-              color={0}
-              mood={waiting.length ? "attention" : "resting"}
-              paused={paused}
-              ambient
-              slot={0}
-            />
-          </div>
-          {selected && (
-            <div className={s.conversationAction}>
-              <Link className={s.primary} href={selected.href.split("#")[0]}>
-                Talk to Server Guy <ChatCircle aria-hidden="true" />
-                <span className={s.visuallyHidden}> about {selected.name}</span>
-              </Link>
-              <small>About {selected.name}</small>
-            </div>
-          )}
+          <h1 id="home-heading">
+            Your apps are
+            <br />
+            <em>in good company.</em>
+          </h1>
+          <p>
+            {applications.length
+              ? summary(applications)
+              : "Nothing here yet. Add an application and a caretaker arrives with it."}
+          </p>
         </section>
-        <section aria-labelledby="applications-heading">
+        {applications.length > 0 && (
           <div className={s.collectionHeading}>
             <h2 id="applications-heading">
               Your applications <span>{applications.length}</span>
             </h2>
-            {applications.length > 0 && (
-              <>
-                <label className={s.search}>
-                  <MagnifyingGlass aria-hidden="true" />
-                  <input
-                    aria-label="Find an application"
-                    placeholder="Find an app"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </label>
-                <Link className={s.add} href={addHref}>
-                  <Plus aria-hidden="true" />
-                  Add application
-                </Link>
-              </>
+            {applications.length > 4 && (
+              <label className={s.search}>
+                <MagnifyingGlass aria-hidden="true" />
+                <input
+                  aria-label="Find an application"
+                  placeholder="Find an app"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
             )}
-          </div>
-          {!applications.length ? (
-            <div className={s.empty}>
-              <div className={s.emptyMascot}>
-                <Mascot color={3} mood="ready" paused={paused} />
-              </div>
-              <h2>Add your first application</h2>
-              <p>
-                Start with a GitHub repository. Server Guy inspects it,
-                recommends a server and deploys when you approve.
-              </p>
-              <Link className={s.primary} href={addHref}>
-                <Plus aria-hidden="true" />
-                Add application
-              </Link>
-              <small>Nothing is bought or changed until you approve it.</small>
-            </div>
-          ) : (
-            <>
-              <ul className={s.collection} aria-label="Applications">
-                {visible.map((item) => {
-                  const color = colorFor(item);
-                  const kind = applicationKind(item.source, item.name);
-                  const active = selected?.id === item.id;
-                  return (
-                    <li
-                      key={item.id}
-                      className={`${s.caretaker} ${active ? s.selected : ""}`}
-                      style={
-                        {
-                          "--caretaker-color": mascotColors[color],
-                        } as CSSProperties
-                      }
-                      onFocus={() => {
-                        if (!active) greet(item.id);
-                      }}
-                    >
-                      {/* The caretaker that used to stand above each
-                          card is gone: three identical figures at 250px
-                          each, with the application's own condition
-                          underneath them. Personality moved to the page
-                          head, where it costs nobody a scroll. */}
-                      <Link className={s.application} href={item.href}>
-                        <div className={s.appIdentity}>
-                          <span className={s.appSymbol}>
-                            <ApplicationSymbol kind={kind} />
-                          </span>
-                          <div>
-                            <h3>{item.name}</h3>
-                            <span>{item.source}</span>
-                          </div>
-                          <ArrowUpRight aria-hidden="true" />
-                        </div>
-                        {/* The card used to carry a mock browser window with
-                            an invented heartbeat chart in it. It was the same
-                            on every application, it said nothing about any of
-                            them, it pushed the condition and the attention
-                            count below the fold — and on a product whose
-                            first rule is not to manufacture healthy states, a
-                            decorative heartbeat is the wrong ornament. What
-                            the card is for is underneath it. */}
-                        <div className={s.appFacts}>
-                          <strong className={s[`tone_${item.condition.tone}`]}>
-                            <i aria-hidden="true" />
-                            {item.condition.text}
-                          </strong>
-                          <span>{item.stack}</span>
-                          <div>
-                            <span className={item.attention ? s.attention : ""}>
-                              {item.attention
-                                ? `${item.attention} need${item.attention === 1 ? "s" : ""} you`
-                                : "Nothing needs you"}
-                            </span>
-                            <span
-                              className={
-                                item.protection === "Not backed up"
-                                  ? s.attention
-                                  : ""
-                              }
-                            >
-                              {item.protection}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-              {!visible.length && (
-                <div className={s.noResults}>
-                  <h3>No applications match “{query}”.</h3>
-                  <button onClick={() => setQuery("")}>Clear search</button>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-        {unprotected.length > 0 && (
-          <aside className={s.protection}>
-            <ShieldCheck aria-hidden="true" />
-            <div>
-              <strong>A little peace of mind, next.</strong>
-              <p>
-                {unprotected.length} application
-                {unprotected.length === 1 ? " needs" : "s need"} a backup, a
-                restore test, or a current status check.
-              </p>
-            </div>
-            <Link href={`${unprotected[0].href.split("#")[0]}#backups`}>
-              Review protection
-              <ArrowUpRight aria-hidden="true" />
+            <Link className={s.add} href={addHref}>
+              <Plus aria-hidden="true" />
+              Add application
             </Link>
-          </aside>
+          </div>
+        )}
+        {!applications.length ? (
+          <div className={s.empty}>
+            <div className={s.emptyMascot} aria-hidden="true">
+              <Mascot color="#7a8bd6" mood="waving" paused={paused} />
+            </div>
+            <h2>Add your first application</h2>
+            <p>
+              Start with a GitHub repository. Server Guy inspects it, recommends
+              a server and deploys when you approve.
+            </p>
+            <Link className={s.primary} href={addHref}>
+              <Plus aria-hidden="true" />
+              Add application
+            </Link>
+            <small>Nothing is bought or changed until you approve it.</small>
+          </div>
+        ) : (
+          <>
+            <ul className={s.collection} aria-label="Applications">
+              {visible.map((item, index) => {
+                const { kind, purpose } = applicationKind(
+                  item.source,
+                  item.name,
+                );
+                const situation = situationOf(item);
+                const active = selectedId === item.id;
+                const parts =
+                  item.stack && !/^not deployed/i.test(item.stack)
+                    ? item.stack.split(" · ")
+                    : [];
+                return (
+                  <li
+                    key={item.id}
+                    className={`${s.card} ${active ? s.selected : ""}`}
+                    style={{ "--tint": KIND_ACCENT[kind] } as CSSProperties}
+                  >
+                    <button
+                      type="button"
+                      className={s.caretaker}
+                      aria-label={`Say hello to ${item.name}'s caretaker`}
+                      aria-pressed={active}
+                      onClick={() => greet(item.id)}
+                    >
+                      <Mascot
+                        color={caretakerPaint(kind)}
+                        mood={moodOf(situation, active)}
+                        paused={paused}
+                        gesture={active ? greeting : 0}
+                        ambient={situation === "fine"}
+                        slot={index % 3}
+                        dance={
+                          (["shuffle", "robot", "floss"] as const)[index % 3]
+                        }
+                      />
+                    </button>
+                    <div className={s.body}>
+                      <div className={s.identity}>
+                        <div>
+                          <h3>
+                            <Link href={item.href}>{item.name}</Link>
+                          </h3>
+                          <span>{purpose}</span>
+                        </div>
+                        <span
+                          className={`${s.word} ${s[`tone_${item.condition.tone}`]}`}
+                        >
+                          <i aria-hidden="true" />
+                          {WORD[situation]}
+                        </span>
+                      </div>
+                      <Link
+                        className={s.preview}
+                        href={item.href}
+                        aria-label={`Open ${item.name}`}
+                      >
+                        <Screen
+                          kind={kind}
+                          host={
+                            item.address ??
+                            (situation === "new"
+                              ? "no address yet"
+                              : item.source)
+                          }
+                        />
+                      </Link>
+                      <p
+                        className={`${s.state} ${s[`tone_${item.condition.tone}`]}`}
+                      >
+                        {item.condition.text}
+                      </p>
+                      <div className={s.foot}>
+                        <div>
+                          {parts.length > 0 && (
+                            <ul className={s.chips} aria-label="What it runs">
+                              {parts.map((part) => (
+                                <li key={part}>{part}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {item.address ? (
+                            <a
+                              className={s.address}
+                              href={`https://${item.address}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Globe aria-hidden="true" />
+                              {item.address}
+                              <ArrowUpRight aria-hidden="true" />
+                            </a>
+                          ) : (
+                            <span className={`${s.address} ${s.addressNone}`}>
+                              <Globe aria-hidden="true" />
+                              {situation === "new"
+                                ? "No address yet"
+                                : item.source}
+                            </span>
+                          )}
+                        </div>
+                        <Link className={s.more} href={item.href}>
+                          More
+                        </Link>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {!visible.length && (
+              <div className={s.noResults}>
+                <h3>No applications match “{query}”.</h3>
+                <button onClick={() => setQuery("")}>Clear search</button>
+              </div>
+            )}
+            <div className={s.controls}>
+              <span>Click a caretaker to say hello.</span>
+              <button onClick={() => setPaused((value) => !value)}>
+                {paused ? (
+                  <Play aria-hidden="true" />
+                ) : (
+                  <Pause aria-hidden="true" />
+                )}
+                {paused ? "Resume animations" : "Pause animations"}
+              </button>
+            </div>
+          </>
         )}
         <footer className={s.footer}>
           Software you own. Help when you need it.
         </footer>
       </div>
     </main>
+  );
+}
+
+/** The application's own screen, drawn, in a window frame that says so. */
+function Screen({ kind, host }: { kind: ApplicationKind; host: string }) {
+  return (
+    <div className={s.window} aria-hidden="true">
+      <div className={s.windowBar}>
+        <span>
+          <i />
+          <i />
+          <i />
+        </span>
+        <small>{host}</small>
+        <em>Illustration</em>
+      </div>
+      <svg viewBox="0 0 320 200" className={s.screen}>
+        {PREVIEWS[kind]()}
+      </svg>
+    </div>
   );
 }
