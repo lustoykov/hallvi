@@ -13,7 +13,7 @@
 // last beat is recent. Any of those failing means nobody is reading the queue,
 // which is exactly what the conversation needs to say.
 import { hostname } from "node:os";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 
 import { databasePath } from "./db";
 
@@ -84,8 +84,16 @@ export function announceWorker() {
   const startedAt = new Date().toISOString();
   const write = () => {
     try {
+      // Written beside the file and moved onto it, because a page reads this
+      // every half second while a message is waiting. A reader that caught a
+      // rewrite halfway through would parse nothing and say no worker is
+      // running, which is the one thing this file exists to get right. A
+      // rename within a directory is atomic; the temporary name carries the
+      // pid so two workers cannot collide over it.
+      const path = presencePath();
+      const partial = `${path}.${process.pid}.tmp`;
       writeFileSync(
-        presencePath(),
+        partial,
         JSON.stringify({
           pid: process.pid,
           host: hostname(),
@@ -93,6 +101,7 @@ export function announceWorker() {
           heartbeatAt: new Date().toISOString(),
         }),
       );
+      renameSync(partial, path);
     } catch {
       // A worker that cannot write its beat still works. The conversation
       // will say no worker is running, which is wrong but not dangerous;
@@ -109,6 +118,7 @@ export function announceWorker() {
     if (readBeat()?.pid === process.pid)
       try {
         rmSync(presencePath(), { force: true });
+        rmSync(`${presencePath()}.${process.pid}.tmp`, { force: true });
       } catch {
         // Left behind, it goes stale within one beat window.
       }
