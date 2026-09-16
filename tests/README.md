@@ -55,7 +55,13 @@ ask the owner with that concrete example; continue the unambiguous cleanup.
 ## Commands and limits
 
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser
-smoke subset. Select checks relevant to the change rather than running both by
+smoke subset; `npm run test:operator` runs the Python checks for the host-side
+scripts under `scripts/` — the scheduled-backup runner's bounded failures,
+receipts and recovery path, and the SQLite backup proof. They need only
+`python3` and take under a second, and nothing invoked them before this
+command existed. Nothing in `src/` currently installs
+`scripts/scheduled-backups/runner.py`; its coverage stays until that is
+decided rather than being dropped on the way past. Select checks relevant to the change rather than running both by
 default. Tests use disposable databases and synthetic provider/model responses.
 The shared-information browser case covers rich cards in chat and Deployment
 after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
