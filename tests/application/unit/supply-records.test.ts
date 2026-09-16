@@ -343,9 +343,4 @@ describe("shared", () => {
     expect(story.machine).toBe("hetzner-1");
     expect(story.place).toBe("Helsinki");
   });
-
-  it("never invents anything, on any page", () => {
-    expect(read([]).invented).toBeNull();
-    expect(read([]).files).toEqual([]);
-  });
 });

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { test, expect } from "./fixtures";
 
-test("typed results render in chat and views and update by record ID @journey-shared-information @smoke", async ({
+test("records render in chat and their views, survive refresh, and update by record ID @journey-shared-information @smoke", async ({
   page,
   fixture,
 }) => {
@@ -24,7 +24,8 @@ test("typed results render in chat and views and update by record ID @journey-sh
     .get(appId) as { id: string };
   const now = new Date().toISOString();
   const deployment = randomUUID(),
-    access = randomUUID();
+    access = randomUUID(),
+    failed = randomUUID();
   const accessPresentation = {
     views: ["overview", "deployment"],
     role: "status",
@@ -45,37 +46,51 @@ test("typed results render in chat and views and update by record ID @journey-sh
       remotePort: 80,
     },
   };
+  const deploymentPresentation = {
+    views: ["overview", "deployment"],
+    role: "outcome",
+    status: "verified",
+    checks: [
+      {
+        label: "Data survived restart",
+        status: "passed",
+        subject: "application",
+      },
+    ],
+    content: {
+      kind: "deployment",
+      repositoryUrl: "https://github.com/qa/app",
+      revision: "abcdef0123456789",
+      image: "app:candidate",
+      server: "fixture-server",
+      changes: ["Added container packaging"],
+    },
+  };
   const rows = [
     [
       deployment,
       "Application deployed",
       "Source and runtime are recorded.",
-      {
-        views: ["overview", "deployment"],
-        role: "outcome",
-        status: "verified",
-        checks: [
-          {
-            label: "Data survived restart",
-            status: "passed",
-            subject: "application",
-          },
-        ],
-        content: {
-          kind: "deployment",
-          repositoryUrl: "https://github.com/qa/app",
-          revision: "abcdef0123456789",
-          image: "app:candidate",
-          server: "fixture-server",
-          changes: ["Added container packaging"],
-        },
-      },
+      deploymentPresentation,
     ],
     [
       access,
       "Private access ready",
       "Open the application on this PC.",
       accessPresentation,
+    ],
+    // An outcome with no typed content, so the plain card is in the run too.
+    [
+      failed,
+      "Earlier check failed",
+      "The application did not respond during this check.",
+      {
+        views: ["overview", "deployment"],
+        role: "outcome",
+        status: "failed",
+        checks: [{ label: "Public HTTP check", status: "failed" }],
+        nextStep: "Inspect application logs.",
+      },
     ],
   ];
   try {
@@ -105,17 +120,32 @@ test("typed results render in chat and views and update by record ID @journey-sh
         JSON.stringify([
           { type: "saved-information", id: deployment },
           { type: "saved-information", id: access },
+          { type: "saved-information", id: failed },
         ]),
         now,
         now,
       );
     await page.goto(`/applications/${appId}`);
     const chat = page.locator(".sg-chat-pane");
-    await expect(chat.locator(".sg-record")).toHaveCount(2);
+    const cards = (scope: typeof chat) =>
+      scope.locator("[data-information-id]");
+    await expect(cards(chat)).toHaveCount(3);
+    // Nothing is listening behind the record, and the page says so rather
+    // than offering an address that would fail in the reader's browser.
+    await expect(chat.getByText("Tunnel closed")).toBeVisible();
     await expect(
       chat.getByRole("link", { name: "Open application" }),
-    ).toHaveAttribute("href", "http://127.0.0.1:8080");
-    await chat.getByText("Deployment details", { exact: true }).click();
+    ).toHaveCount(0);
+    await expect(chat.getByText("Inspect application logs.")).toBeVisible();
+    // Reload: the cards are read back from the records, not from the turn.
+    await page.reload();
+    await expect(cards(chat)).toHaveCount(3);
+    // In a transcript a routine record is one line with its content behind a
+    // disclosure; the typed content is what opening it shows.
+    await chat
+      .locator(`[data-information-id="${deployment}"] summary`)
+      .first()
+      .click();
     await expect(
       chat.getByText("app:candidate", { exact: true }),
     ).toBeVisible();
@@ -125,30 +155,27 @@ test("typed results render in chat and views and update by record ID @journey-sh
       .first()
       .click();
     const overview = page.locator(".sg-section-overview");
+    // Overview reads the same records. With nothing establishing that the
+    // application works, every lane has to say which kind of silence it is:
+    // nobody looked, or somebody looked and it is not working.
     await expect(
-      overview.getByRole("heading", {
-        name: "Application deployed",
-        exact: true,
-      }),
+      overview.getByRole("button", { name: /Backups Not checked yet/ }),
     ).toBeVisible();
-    await expect(overview.locator(".axt-lane")).toHaveCount(4);
     await expect(
-      overview.locator(".axt-lane").filter({ hasText: "Backups" }),
-    ).toContainText("Not established");
+      overview.getByRole("button", { name: /Access Tunnel is closed/ }),
+    ).toBeVisible();
     await expect(
       overview.getByRole("link", { name: "Open application" }),
-    ).toHaveAttribute("href", "http://127.0.0.1:8080");
-    await expect(
-      overview.getByRole("button", { name: "Open Architecture", exact: true }),
-    ).toBeVisible();
-    await overview
-      .getByRole("button", { name: /Checks: Application deployed/ })
-      .click();
-    await expect(overview.locator(".sg-overview-detail")).toContainText(
-      "app:candidate",
-    );
-    await overview.getByRole("button", { name: "Close details" }).click();
-    await expect(overview.locator(".sg-overview-detail")).toHaveCount(0);
+    ).toHaveCount(0);
+    // And a map nothing describes is missing, which is not the same as an
+    // application with no parts.
+    await expect(overview.getByText(/missing rather than empty/)).toBeVisible();
+    for (const title of [
+      "Application deployed",
+      "Private access ready",
+      "Earlier check failed",
+    ])
+      await expect(overview.getByText(title, { exact: false })).toBeVisible();
     await page.screenshot({
       path: "tests/results/typed-information-overview.png",
     });
@@ -156,49 +183,53 @@ test("typed results render in chat and views and update by record ID @journey-sh
       .getByRole("button", { name: "Deployment", exact: true })
       .first()
       .click();
-    const view = page.locator(".sg-section-deployment");
+    // The destination's own landmark: the designed pages do not carry the
+    // card-list wrapper the older layouts had.
+    const view = page.getByRole("region", { name: "Deployment" });
+    // The destination is not a list of the cards from the conversation: it is
+    // a page composed from the same records. What it owes the reader is the
+    // release that is running and an honest account of the way in.
     await expect(
-      view.getByText("app:candidate", { exact: true }),
+      view.getByRole("heading", { name: "Application deployed" }),
     ).toBeVisible();
     await expect(
-      view.getByText("Added container packaging", { exact: true }),
+      view.getByRole("button", { name: /candidate fixture-server/ }),
     ).toBeVisible();
+    await expect(view.getByText("Data survived restart")).toBeVisible();
+    // The address is named, and named as not answering, rather than offered.
+    await expect(view.getByText(/The tunnel is closed, so/)).toBeVisible();
+    await expect(
+      view.getByRole("button", { name: "Reopen access" }),
+    ).toBeVisible();
+    await expect(
+      view.getByRole("link", { name: "Open application" }),
+    ).toHaveCount(0);
+
+    // A record changes by its own id, and the page it feeds changes with it.
     database
       .prepare(
         "UPDATE saved_information SET presentation=?,updated_at=? WHERE id=?",
       )
       .run(
         JSON.stringify({
-          ...accessPresentation,
-          url: "http://127.0.0.1:8081",
-          content: { ...accessPresentation.content, localPort: 8081 },
+          ...deploymentPresentation,
+          content: {
+            ...deploymentPresentation.content,
+            image: "app:rebuilt",
+            changes: ["Rebuilt from the same source"],
+          },
         }),
         new Date().toISOString(),
-        access,
+        deployment,
       );
-    await expect(
-      view.getByRole("link", { name: "Open application" }),
-    ).toHaveAttribute("href", "http://127.0.0.1:8081");
-    await expect(view.locator(`[data-information-id="${access}"]`)).toHaveCount(
-      1,
-    );
     await page.reload();
     await expect(
-      view.getByRole("link", { name: "Open application" }),
-    ).toHaveAttribute("href", "http://127.0.0.1:8081");
-    await page
-      .getByRole("button", { name: "Overview", exact: true })
-      .first()
-      .click();
+      view.getByRole("button", { name: /rebuilt fixture-server/ }),
+    ).toBeVisible();
     await expect(
-      overview.getByRole("link", { name: "Open application" }),
-    ).toHaveAttribute("href", "http://127.0.0.1:8081");
+      view.getByRole("button", { name: /candidate fixture-server/ }),
+    ).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
-    await overview
-      .getByRole("heading", { name: "Overview", exact: true })
-      .scrollIntoViewIfNeeded();
-    const heroBounds = await overview.locator(".axt").boundingBox();
-    expect(heroBounds!.x + heroBounds!.width).toBeLessThanOrEqual(390);
     await page.screenshot({
       path: "tests/results/typed-information-mobile.png",
     });

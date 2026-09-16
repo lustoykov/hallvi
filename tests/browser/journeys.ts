@@ -19,7 +19,7 @@ export const browserJourneys = [
     id: "shared-information",
     name: "Shared outcome cards",
     description:
-      "Render rich records in chat and their selected views, including after refresh.",
+      "Render records in chat and the destination they feed, after a refresh and after a record changes, and name a way in that is not answering rather than offering it.",
     smoke: true,
   },
   {

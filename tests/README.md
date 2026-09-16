@@ -34,6 +34,12 @@ For prototypes, spacing and copy edits, inspect the rendered UI and exercise the
 changed interaction. Do not build permanent test suites around designs awaiting
 selection, or write tests that merely assert the CSS you just added.
 
+A shared rule is proved once, against the thing that implements it, and each
+page that reads it keeps one small check that it does. The clock rules live in
+`unit/state-matrix.test.ts`, the same-origin rule in `unit/mutation-origin.test.ts`,
+and the size parser in `unit/parsers.test.ts`; re-asserting them through another
+projection buys nothing and doubles what a change has to update.
+
 Run relevant checks once; broaden or repeat them only for a new change, failure
 or concrete unresolved concern. Documentation-only edits need document/link
 review. Real provider claims need representative real verification, but that
@@ -55,6 +61,16 @@ The shared-information browser case covers rich cards in chat and Deployment
 after refresh. `npx tsc --noEmit` and `npm run build` check the application bundle.
 
 The native-session cases, whose synthetic prompts called retired decision tools, are gone; `tests/application/unit/chat-recovery.test.tsx` keeps the recovery they covered. Current transcript regression coverage is `tests/browser/pi-transcript.spec.ts`; run it together with the smoke suite after transcript changes.
+
+A browser case asserts what the product says, not what a past layout said. Scope
+by landmark and accessible name rather than by layout class: a routine record is
+one compact line in a transcript and its content is behind a disclosure, and a
+destination is a page composed from records rather than a list of the cards from
+the conversation. `[data-information-id]` is the stable way to ask whether a
+record is on the page at all. Nothing in the browser fixture can make a way in
+read as reachable — a private one is proved by a live SSH control socket, and a
+loopback address is refused as a public target — so a journey there asserts the
+closed reading, which is the claim that matters anyway.
 
 The `/prototype/app` reference shell, and the `views/*-view.tsx` layouts that
 only it renders, carry no tests. A real application's destinations are the

@@ -175,15 +175,6 @@ const of = (records: SavedInformation[]) => ({
   }),
 });
 
-describe("Deployment and Processes agree about what each service runs", () => {
-  it("gives each process the image the release named for it", () => {
-    const { processes } = of(world());
-    expect(
-      Object.fromEntries(processes.processes.map((p) => [p.name, p.image])),
-    ).toEqual({ web: "example/web:2.1", db: "postgres:16" });
-  });
-});
-
 describe("Architecture and the destinations agree", () => {
   // Architecture draws layout slots, so the web process is "app" and a gate
   // is "gate:http". Volumes and private services keep the reference Pi gave

@@ -162,7 +162,7 @@ test(
       "Architecture",
       "Deployment",
       "Backups",
-      "Logs",
+      "Command output",
       "Monitoring",
       "Domains",
     ]) {

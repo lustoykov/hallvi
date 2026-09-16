@@ -79,24 +79,18 @@ describe("the first line that acts", () => {
 });
 
 describe("clipping", () => {
-  it("cuts at a word boundary and says it was cut", () => {
-    const said = clip("the quick brown fox jumps over the lazy dog", 20);
-    expect(said.endsWith("…")).toBe(true);
-    expect(said).not.toMatch(/\s…$/);
-    expect(said.length).toBeLessThanOrEqual(21);
-  });
-
-  it("leaves a short line alone", () => {
+  it("cuts to fit, at a word boundary where there is one, and says it cut", () => {
+    const sentence = clip("the quick brown fox jumps over the lazy dog", 20);
+    expect(sentence.endsWith("…")).toBe(true);
+    expect(sentence).not.toMatch(/\s…$/);
+    expect(sentence.length).toBeLessThanOrEqual(21);
+    // A single long token has no boundary to cut at, and returning nothing
+    // would lose the line altogether.
+    const token = clip("a".repeat(120), 20);
+    expect(token.length).toBeLessThanOrEqual(21);
+    expect(token.endsWith("…")).toBe(true);
     expect(clip("docker ps", 40)).toBe("docker ps");
-  });
-
-  it("cuts a single long token rather than returning nothing", () => {
-    const said = clip("a".repeat(120), 20);
-    expect(said.length).toBeLessThanOrEqual(21);
-    expect(said.endsWith("…")).toBe(true);
-  });
-
-  it("flattens newlines so a title stays one line", () => {
+    // A title is one line, whatever the command was.
     expect(clip("one\ntwo", 40)).toBe("one two");
   });
 });

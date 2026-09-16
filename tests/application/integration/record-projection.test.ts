@@ -497,29 +497,6 @@ describe("what a reading never does", () => {
     );
   });
 
-  it("never ages a failure into doubt", () => {
-    const failed = record({
-      id: "rec-failed",
-      at,
-      status: "failed",
-      checks: [
-        {
-          key: "http",
-          label: "Answered",
-          status: "failed",
-          claim: "reachability",
-          basis: "observed",
-        },
-      ],
-    });
-    expect(
-      checkAsNow(failed.presentation!.checks[0], failed, ONE_HOUR_ON),
-    ).toBe("failed");
-    expect(tagFor(failed, failed.presentation!.checks, ONE_HOUR_ON)).toBe(
-      "failed",
-    );
-  });
-
   it("will not let an unknown key decide what the map says", () => {
     const odd = record({
       id: "rec-odd",

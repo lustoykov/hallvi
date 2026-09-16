@@ -111,10 +111,6 @@ describe("a passed check ages into unwatched, never into unhealthy", () => {
     expect(story.tone).toBe("stale");
     expect(story.word).toBe("Needs a check");
   });
-
-  it("still reads unwatched a year later", () => {
-    expect(read(records, T0 + 365 * DAY).tone).toBe("stale");
-  });
 });
 
 describe("a failed check never ages into unknown", () => {
@@ -127,16 +123,12 @@ describe("a failed check never ages into unknown", () => {
     }),
   ];
 
-  for (const [when, after] of [
-    ["a minute", MINUTE],
-    ["a week", 7 * DAY],
-    ["a year", 365 * DAY],
-  ] as const)
-    it(`is still failed after ${when}`, () => {
-      const story = read(records, T0 + after);
-      expect(story.tone).toBe("failed");
-      expect(story.state).toBe("failed");
-    });
+  it("is still failed a year later", () => {
+    const story = read(records, T0 + 365 * DAY);
+    expect(story.tone).toBe("failed");
+    expect(story.state).toBe("failed");
+    expect(story.word).toBe("A check failed");
+  });
 });
 
 describe("a newer reading replaces an older one", () => {

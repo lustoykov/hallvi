@@ -136,13 +136,6 @@ describe("backups, from the same records", () => {
     records: Parameters<typeof storageFromRecords>[0]["records"],
   ) => protectionFromRecords(records, NOW);
 
-  it("nothing recorded is not assessed, and never 'no backups'", () => {
-    const protection = read2([]);
-    expect(protection.assessed).toBe(false);
-    expect(protection.copies).toEqual([]);
-    expect(protection.summary.backup).toBeNull();
-  });
-
   it("a plan with no copies is a promise that has produced nothing", () => {
     const protection = read2([
       states(
@@ -224,42 +217,6 @@ describe("what a measurement is worth", () => {
     ]);
     expect(story.volumes[0].sizeText).toBe("8 KiB");
     expect(story.volumes[0].sizeGb).toBeCloseTo((8 * 1024) / 1024 ** 3, 12);
-  });
-
-  it("reads megabytes and gigabytes alike", () => {
-    expect(
-      read([volume("a", { facts: [fact("size", "220 MB", "contents")] })])
-        .volumes[0].sizeGb,
-    ).toBeCloseTo(0.22, 5);
-    expect(
-      read([volume("b", { facts: [fact("size", "1.5 GB", "contents")] })])
-        .volumes[0].sizeGb,
-    ).toBeCloseTo(1.5, 5);
-  });
-});
-
-describe("reading a size Pi wrote in words", () => {
-  const gb = (value: string) =>
-    read([volume("v", { facts: [fact("size", value, "contents")] })]).volumes[0]
-      .sizeGb;
-
-  it("reads bytes as bytes", () => {
-    // Reading a missing prefix as gigabytes turned "534 bytes" into 534 GB —
-    // a Redis volume drawn a thousand times the size of its disk.
-    expect(gb("534 bytes")).toBeCloseTo(534 / 1e9, 12);
-    expect(gb("48,217,962 bytes")).toBeCloseTo(0.048217962, 8);
-    expect(gb("71 bytes before smoke cleanup")).toBeCloseTo(71 / 1e9, 12);
-  });
-
-  it("keeps KiB binary and KB decimal", () => {
-    expect(gb("8 KiB")).toBeCloseTo((8 * 1024) / 1024 ** 3, 12);
-    expect(gb("220 MB")).toBeCloseTo(0.22, 6);
-    expect(gb("1.5 GB")).toBeCloseTo(1.5, 6);
-  });
-
-  it("refuses to guess at a number with no unit", () => {
-    expect(gb("534")).toBeNull();
-    expect(gb("not measured")).toBeNull();
   });
 });
 

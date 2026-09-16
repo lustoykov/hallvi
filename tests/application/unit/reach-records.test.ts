@@ -495,15 +495,6 @@ describe("a name, and whether anything answers on it", () => {
     expect(story.domain?.detail).toMatch(/last checked/);
   });
 
-  it("a failure survives ageing, and stays a failure", () => {
-    const story = named(
-      [check("resolves", "passed"), check("serves", "failed")],
-      [],
-      "2026-08-01T12:00:00.000Z",
-    );
-    expect(story.domain?.state).toBe("unreachable");
-  });
-
   it("a name that does not resolve says so, above everything else", () => {
     const story = named([
       check("configured", "passed", "configuration"),
@@ -586,27 +577,22 @@ describe("a name, and whether anything answers on it", () => {
   // A proxied name is served over the provider's certificate. Nothing here
   // has read it, and saying "there is no certificate" from that silence is
   // the same mistake as calling an unchecked server dead.
-  it("no certificate record means nobody looked, not that there is none", () => {
-    const story = named([check("resolves", "passed")]);
-    expect(story.tls.state).toBe("unknown");
-    expect(story.tls.detail).toMatch(/Nothing has checked/);
-  });
-
-  it("a certificate subject with no check is also unknown", () => {
-    const story = read([
+  it("keeps an unread certificate unknown, and only a written absence absent", () => {
+    // No record at all, and a subject nobody checked, are the same silence.
+    const nothing = named([check("resolves", "passed")]);
+    expect(nothing.tls.state).toBe("unknown");
+    expect(nothing.tls.detail).toMatch(/Nothing has checked/);
+    const unchecked = read([
       states(
         { kind: "certificate", id: "c" },
         { facts: [fact("issuer", "R10")] },
       ),
     ]);
-    expect(story.tls.state).toBe("unknown");
-  });
-
-  it("only a written absence says there is no certificate", () => {
-    const story = read([
+    expect(unchecked.tls.state).toBe("unknown");
+    const absent = read([
       states({ kind: "certificate", id: "c" }, { presence: "absent" }),
     ]);
-    expect(story.tls.state).toBe("not-configured");
+    expect(absent.tls.state).toBe("not-configured");
   });
 
   it("an absent domain is an absence, and a missing one is nobody looking", () => {
@@ -700,7 +686,7 @@ describe("when the published name stops answering", () => {
       },
     );
 
-  it("does not leave the address claiming to answer", () => {
+  it("says it does not answer, and still calls it the address", () => {
     const caller = read([publicAccess(), domain("failed")]).callers.find(
       (item) => item.id === "access",
     );
@@ -709,12 +695,7 @@ describe("when the published name stops answering", () => {
     expect(caller?.detail).toBe("The proxy answered with 502.");
     // The failure is what was checked, so the row is dated by that check.
     expect(caller?.at).toBe("2026-09-13T11:58:00.000Z");
-  });
-
-  it("still calls it the address, rather than dropping the way in", () => {
-    const caller = read([publicAccess(), domain("failed")]).callers.find(
-      (item) => item.id === "access",
-    );
+    // Dropping the way in would leave a reader with nothing to try.
     expect(caller?.typed).toBe("https://shop.example.com");
     expect(caller?.secure).toBe(true);
   });
@@ -792,7 +773,7 @@ describe("a published name whose reading has aged", () => {
       },
     );
 
-  it("says when it last answered, rather than that nothing looked", () => {
+  it("says when it last answered, and offers another look rather than finishing a finished job", () => {
     const story = read([served(AGED)]);
     expect(story.domain?.lastServedAt).toBe(AGED);
     const caller = story.callers.find((item) => item.id === "domain");
@@ -802,10 +783,7 @@ describe("a published name whose reading has aged", () => {
     // What was seen is what the window draws; the row carries the date.
     expect(caller?.outcome).toBe("loads");
     expect(caller?.at).toBe(AGED);
-  });
-
-  it("offers another look rather than finishing a finished job", () => {
-    const offer = publishOffer(read([served(AGED)]));
+    const offer = publishOffer(story);
     expect(offer.label).toBe("Check it from outside");
     expect(offer.draft).toContain("answered when it was last checked");
     expect(offer.draft).not.toContain("is not serving");
@@ -818,35 +796,24 @@ describe("a published name whose reading has aged", () => {
     expect(publishOffer(story).label).toBe("Make it private again");
   });
 
-  // Only a check that passed and then aged. A failure is not a working past.
-  it("never reads a working past out of a failed check", () => {
+  // A working past is only a check that passed and then aged. Neither a
+  // failure nor a silence is one, and both still leave the job unfinished.
+  it.each([
+    [
+      "a check that failed",
+      [check("resolves", "passed"), check("serves", "failed")],
+      "unreachable",
+    ],
+    ["no check at all", [check("resolves", "passed")], "resolving"],
+  ])("reads no working past out of %s", (_when, checks, state) => {
     const story = read([
       states(
         { kind: "domain", id: "shop-example-com" },
-        {
-          at: AGED,
-          facts: [fact("name", "shop.example.com")],
-          checks: [check("resolves", "passed"), check("serves", "failed")],
-        },
+        { at: AGED, facts: [fact("name", "shop.example.com")], checks },
       ),
     ]);
     expect(story.domain?.lastServedAt).toBeNull();
-    expect(story.domain?.state).toBe("unreachable");
-    expect(publishOffer(story).label).toBe("Finish publishing it");
-  });
-
-  it("still offers finishing when nothing ever checked what answers", () => {
-    const story = read([
-      states(
-        { kind: "domain", id: "shop-example-com" },
-        {
-          at: AGED,
-          facts: [fact("name", "shop.example.com")],
-          checks: [check("resolves", "passed")],
-        },
-      ),
-    ]);
-    expect(story.domain?.lastServedAt).toBeNull();
+    expect(story.domain?.state).toBe(state);
     expect(publishOffer(story).label).toBe("Finish publishing it");
   });
 });
