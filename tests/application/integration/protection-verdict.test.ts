@@ -155,7 +155,7 @@ describe("what the page says, state by state", () => {
       state: "none-configured",
       tone: "quiet",
       says: /Nothing copies this application's data yet/,
-      next: "Set up a nightly copy",
+      next: "Set up backups",
     },
     {
       when: "a schedule exists and no copy does",
@@ -722,6 +722,9 @@ describe("a failed check on a plan is not a failed backup attempt", () => {
     const said = verdict([brokenPlan]);
     expect(said.says).not.toContain("attempt failed");
     expect(said.says).toContain("Nothing copies this application's data yet");
+    // Calm defaults must not suppress an explicit concern recorded by Pi.
+    expect(said.tone).toBe("warning");
+    expect(said.limit).toContain(brokenPlan.title);
   });
 
   it("a plan that exists and whose check failed says the plan is broken", () => {

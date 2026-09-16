@@ -666,7 +666,10 @@ export function protectionVerdict(
       ? {
           ...said,
           // A warning never upgrades anything and never overrides a failure.
-          tone: said.tone === "verified" ? "warning" : said.tone,
+          tone:
+            said.tone === "verified" || said.tone === "quiet"
+              ? "warning"
+              : said.tone,
           // Pi's own words about the limit always reach the reader: it is the
           // only place they learn *what* the limit is.
           limit: [said.limit, protection.judged].filter(Boolean).join(" "),
@@ -796,18 +799,17 @@ export function protectionVerdict(
   // grown to deserve more, Pi raises the record's own status and this page
   // follows it (PRODUCT.md, "Most first users run something small").
   if (protection.declaredAbsent && !schedules.length && !copies.length)
-    return {
+    return temper({
       state: "none-configured",
       tone: "quiet",
       says: "Nothing copies this application's data yet. Server Guy checked.",
-      limit:
-        "For a small application that is a reasonable place to start. A copy becomes worth having as the data grows, and if the server were lost the data would go with it.",
+      limit: "If the server were lost, this data would be lost with it.",
       next: {
-        label: "Set up a nightly copy",
+        label: "Set up backups",
         draft:
           "Set up backups for this application: work out what needs copying, recommend a destination and a schedule, and tell me the trade-offs before you change anything.",
       },
-    };
+    });
 
   if (failures.restore)
     return {
