@@ -248,7 +248,7 @@ describe("each stage reports its own result", () => {
     // invented a backup run out of a check on a schedule.
     const html = draw([brokenPlan]);
     expect(html).not.toContain("The attempt");
-    expect(html).toContain("No copy has been written");
+    expect(html).toContain("No copy is on record");
     expect(marks(html)[0]).toBe("failed");
     expect(marks(html)[1]).toBe("waiting");
   });

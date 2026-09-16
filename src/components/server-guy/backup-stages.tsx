@@ -268,6 +268,8 @@ function HowToRecover({
   const [mode, setMode] = useState<"isolated" | "replace">("isolated");
   const copy = copies.find((one) => one.id === picked) ?? copies[0] ?? null;
   const proved = copy ? protection.verifiedCopies.get(copy.id) : undefined;
+  const recovered = proved?.covers;
+  const contents = recovered?.length ? recovered : (copy?.covers ?? []);
 
   const needs = copy
     ? [
@@ -302,8 +304,7 @@ function HowToRecover({
         <div className="bs-recover-body">
           {!copy ? (
             <p className="bs-unknown">
-              There is no copy on record to recover from. A plan is not a copy,
-              and neither is a page saying so.
+              There is no copy on record to recover from.
             </p>
           ) : (
             <>
@@ -326,17 +327,17 @@ function HowToRecover({
                 <div>
                   <dt>What comes back</dt>
                   <dd>
-                    {copy.covers.length
+                    {contents.length
                       ? list(
-                          copy.covers.map(
-                            (id) => protection.names.get(id) ?? id,
-                          ),
+                          contents.map((id) => protection.names.get(id) ?? id),
                         )
                       : "No record says what went into this copy."}
                     <small>
-                      {proved
-                        ? `A restore opened this copy ${ago(proved.at, now)}, so this is what came back rather than what was meant to.`
-                        : "Nobody has opened this copy, so this is what its own record claims."}
+                      {proved?.covers.length
+                        ? `The restore test recovered these items ${ago(proved.at, now)}.`
+                        : proved
+                          ? "A restore opened this copy but did not list what it recovered. Any contents listed here come from the backup record."
+                          : "No restore test is on record for this copy. Any contents listed here come from the backup record."}
                     </small>
                   </dd>
                 </div>
@@ -391,8 +392,8 @@ function HowToRecover({
                 onClick={() =>
                   onAsk(
                     mode === "isolated"
-                      ? `Restore the backup copy taken ${ago(copy.at, now)} into an isolated copy of ${applicationName}, check the data is actually there, and tell me what you found. Do not touch the running application.`
-                      : `Restore the backup copy taken ${ago(copy.at, now)} over the running ${applicationName}. Tell me exactly what would be lost before you start, and wait for me to say yes.`,
+                      ? `Restore backup copy ${copy.id}, taken at ${copy.at}, into an isolated copy of ${applicationName}, check the data is actually there, and tell me what you found. Do not touch the running application.`
+                      : `Restore backup copy ${copy.id}, taken at ${copy.at}, over the running ${applicationName}. Tell me exactly what would be lost before you start, and wait for me to say yes.`,
                   )
                 }
               >
@@ -541,7 +542,7 @@ export function BackupStages({
             ]
               .filter(Boolean)
               .join(", ")
-          : "No copy has been written",
+          : "No copy is on record",
       // A copy that landed beside the application, or that a record says
       // left something out, is not a copy in good standing. The gap is only
       // this stage's when a record of the copy itself names it; if nothing
@@ -591,9 +592,7 @@ export function BackupStages({
           )}
         </>
       ) : (
-        <p className="bs-unknown">
-          A schedule is not a copy. Nothing has been written anywhere yet.
-        </p>
+        <p className="bs-unknown">No backup copy is on record yet.</p>
       ),
       action: {
         label: "Back up now",
@@ -610,7 +609,7 @@ export function BackupStages({
           : `${ago(proved.at, now)} · opened the latest copy`
         : protection.restores[0]
           ? `${ago(protection.restores[0].at, now)} · opened an earlier copy`
-          : "No copy has ever been opened",
+          : "No restore test is on record",
       // Opening the copy and finding everything are two results. A restore
       // that came back without one of the volumes proved recovery works and
       // proved this copy is not enough, and a tick would say only the first.
@@ -630,7 +629,7 @@ export function BackupStages({
               <dt>What it proved</dt>
               <dd>
                 {proved && newest
-                  ? `The copy taken ${ago(newest.at, now)} opens, and its data is there.`
+                  ? `The copy taken ${ago(newest.at, now)} was opened in a restore test.`
                   : protection.restores[0]
                     ? "Recovery has worked at least once, on a copy that is no longer the latest."
                     : "Nothing. A copy nobody has restored is a file nobody has opened."}

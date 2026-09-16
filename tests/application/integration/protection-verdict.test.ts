@@ -584,18 +584,26 @@ describe("evidence belongs to the copy that carries it", () => {
   it("prefers what the restore brought back to what the plan intends", () => {
     // A restore that says what it recovered is the strongest evidence there
     // is about a copy's contents, and outranks the copy's own claim.
-    const said = covered([
-      planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
-      held(
-        "claims-both",
-        "2026-09-15T09:00:00.000Z",
-        "off-site",
-        "shop-db, shop-uploads",
-      ),
-      restoreOf("claims-both", "2026-09-15T09:30:00.000Z", "shop-db"),
-      volume("shop-db", "PostgreSQL's data"),
-      volume("shop-uploads", "Customer uploads"),
+    const protection = protectionFromRecords(
+      [
+        planCovering("shop-db, shop-uploads", "2026-09-15T08:00:00.000Z"),
+        held(
+          "claims-both",
+          "2026-09-15T09:00:00.000Z",
+          "off-site",
+          "shop-db, shop-uploads",
+        ),
+        restoreOf("claims-both", "2026-09-15T09:30:00.000Z", "shop-db"),
+        volume("shop-db", "PostgreSQL's data"),
+        volume("shop-uploads", "Customer uploads"),
+      ],
+      NOW,
+      APP,
+    );
+    expect(protection.verifiedCopies.get("claims-both")?.covers).toEqual([
+      "shop-db",
     ]);
+    const said = protectionVerdict(protection, NOW);
     expect(said.limit).toContain("The restore did not bring back");
     expect(said.limit).toContain("Customer uploads");
   });

@@ -115,7 +115,7 @@ export interface Protection {
    * copy, and a page comparing the two timestamps calls B verified when
    * nothing has ever opened it. A restore proves the copy it restored.
    */
-  verifiedCopies: Map<string, Dated>;
+  verifiedCopies: Map<string, Dated & { covers: string[] }>;
   /** What is on record as being on this application's disk, with its label. */
   requiredData: { id: string; label: string }[];
   /**
@@ -379,8 +379,7 @@ export function protectionFromRecords(
   // ---- The restore tests, and what each one proved.
   const restores: Dated[] = [];
   const checks: Check[] = [];
-  const verifiedCopies = new Map<string, Dated>();
-  const restoredCoverage = new Map<string, string[]>();
+  const verifiedCopies = new Map<string, Dated & { covers: string[] }>();
   for (const ref of subjectsOfKind(live, "restore-test")) {
     const presence = presenceOf(live, ref);
     if (presence.known && presence.presence === "absent") continue;
@@ -398,6 +397,7 @@ export function protectionFromRecords(
       id: ref.id,
       at,
       detail: restoreFacts.get("covers")?.value.value ?? presence.record.title,
+      covers: idList(restoreFacts.get("covers")?.value.value),
     };
     restores.push(dated);
     // Which copy it opened. A restore test that does not say proves recovery
@@ -406,12 +406,6 @@ export function protectionFromRecords(
     if (restored) {
       const held = verifiedCopies.get(restored);
       if (!held || at > held.at) verifiedCopies.set(restored, dated);
-      // What the restore actually brought back, which outranks what the copy
-      // claimed to hold: one of them was opened and looked at.
-      restoredCoverage.set(
-        restored,
-        idList(restoreFacts.get("covers")?.value.value),
-      );
     }
     for (const held of currentChecks(live, ref).values())
       checks.push({
@@ -483,7 +477,9 @@ export function protectionFromRecords(
   // from what the plan intends to copy next time. A plan widened this morning
   // cannot reach back and put uploads into an archive written last night.
   const newest = copies[0] ?? null;
-  const provedCoverage = newest ? restoredCoverage.get(newest.id) : undefined;
+  const provedCoverage = newest
+    ? verifiedCopies.get(newest.id)?.covers
+    : undefined;
   const newestCopyCoverage: Protection["newestCopyCoverage"] =
     provedCoverage?.length
       ? { missing: missingFrom(provedCoverage), basis: "restore" }
