@@ -13,11 +13,17 @@
 // connected token is not a working backup destination, and the UI says so.
 
 import { isIPv4, isIPv6 } from "node:net";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { piConfigDir } from "./pi-configuration";
 
 const BASE = "https://api.cloudflare.com/client/v4";
 
 export interface CloudflareConnection {
   connected: boolean;
+  /** Whether a token exists at all, before asking whether it works. */
+  configured: boolean;
   /** What the token may do, as Cloudflare itself reports it. */
   status: string | null;
   /** Whether an account id is configured alongside it. */
@@ -25,14 +31,89 @@ export interface CloudflareConnection {
   error: string | null;
 }
 
+function connectionPath() {
+  return join(piConfigDir(), "cloudflare-connection.json");
+}
+
+/**
+ * The token the owner typed into Settings, if they typed one. It is read
+ * here and nowhere else; the environment variable still works for a
+ * controller configured that way, and a saved connection wins over it.
+ */
+function saved(): { token: string; accountId: string | null } | null {
+  try {
+    const value = JSON.parse(readFileSync(connectionPath(), "utf8"));
+    return typeof value?.token === "string" && value.token
+      ? {
+          token: value.token,
+          accountId:
+            typeof value.accountId === "string" && value.accountId
+              ? value.accountId
+              : null,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function token() {
-  const value = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const value = saved()?.token ?? process.env.CLOUDFLARE_API_TOKEN?.trim();
   return value || null;
 }
 
 function accountId() {
-  const value = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const value = saved()?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   return value || null;
+}
+
+/** Whether a token was typed here rather than set in the environment. */
+export function cloudflareTokenSource(): "settings" | "environment" | null {
+  if (saved()) return "settings";
+  return process.env.CLOUDFLARE_API_TOKEN?.trim() ? "environment" : null;
+}
+
+/**
+ * Saves a Cloudflare API token after Cloudflare itself says it is active.
+ * The account id is what R2 is addressed per; when the token may read the
+ * account list and there is exactly one account, it is taken from there
+ * rather than asked for.
+ */
+export async function connectCloudflare(input: {
+  token: string;
+  accountId?: string | null;
+}) {
+  const value = input.token.trim();
+  if (!/^[A-Za-z0-9_-]{30,200}$/.test(value))
+    throw new Error("Enter a valid Cloudflare API token.");
+  const given = input.accountId?.trim() || null;
+  if (given && !/^[a-f0-9]{32}$/.test(given))
+    throw new Error("A Cloudflare account id is 32 hexadecimal characters.");
+  const verified = await callWith<{ status: string }>(
+    value,
+    "/user/tokens/verify",
+  );
+  if (verified.status !== "active")
+    throw new Error(`The token is ${verified.status}, so it cannot be used.`);
+  const discovered = given
+    ? null
+    : await callWith<{ id: string }[]>(value, "/accounts?per_page=2").catch(
+        () => null,
+      );
+  const chosen =
+    given ?? (discovered?.length === 1 ? (discovered[0]?.id ?? null) : null);
+  mkdirSync(piConfigDir(), { recursive: true, mode: 0o700 });
+  const temporary = join(piConfigDir(), `cloudflare-${randomUUID()}.tmp`);
+  writeFileSync(
+    temporary,
+    JSON.stringify({ token: value, accountId: chosen }),
+    {
+      mode: 0o600,
+      flag: "wx",
+    },
+  );
+  renameSync(temporary, connectionPath());
+  return { account: chosen };
 }
 
 interface CloudflareBody<T> {
@@ -48,8 +129,21 @@ async function call<T>(
   const held = token();
   if (!held)
     throw new Error(
-      "No Cloudflare token is configured. Set CLOUDFLARE_API_TOKEN in the controller's environment.",
+      "Connect Cloudflare in Settings › Connections, or set CLOUDFLARE_API_TOKEN in the controller's environment.",
     );
+  return callWith<T>(held, path, options);
+}
+
+/**
+ * The same request with the credential named, so a token can be checked
+ * before it is saved. The token stays an argument; it is never read from a
+ * URL and never returned to a caller.
+ */
+async function callWith<T>(
+  held: string,
+  path: string,
+  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+): Promise<T> {
   // A fixed origin and a relative path, the same rule the Hetzner client
   // keeps: a caller cannot redirect the credential somewhere else.
   if (!/^\/[a-z0-9_]+(?:\/[^\\\s#?]*)?(?:\?[^\\\s#]*)?$/i.test(path))
@@ -88,14 +182,16 @@ export async function verifyCloudflare(): Promise<CloudflareConnection> {
   if (!token())
     return {
       connected: false,
+      configured: false,
       status: null,
       account: accountId(),
-      error: "No CLOUDFLARE_API_TOKEN is set on the controller.",
+      error: "No Cloudflare token is connected on this controller.",
     };
   try {
     const result = await call<{ status: string }>("/user/tokens/verify");
     return {
       connected: result.status === "active",
+      configured: true,
       status: result.status,
       account: accountId(),
       error:
@@ -106,6 +202,7 @@ export async function verifyCloudflare(): Promise<CloudflareConnection> {
   } catch (problem) {
     return {
       connected: false,
+      configured: true,
       status: null,
       account: accountId(),
       error: problem instanceof Error ? problem.message : String(problem),

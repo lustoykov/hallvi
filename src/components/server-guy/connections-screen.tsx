@@ -2,10 +2,26 @@
 
 import { ArrowLeft, Check, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ProviderTokenForm } from "./provider-token-form";
 import { SettingsNav } from "./settings-nav";
+import { BackupStorageForm } from "./views/backup-storage-form";
 import s from "./pi-setup-screen.module.css";
+
+/** A credential this page can take, on this page, in a field. */
+export type ConnectionForm = "hetzner" | "cloudflare" | "backup-storage";
+
+/**
+ * The one thing a row offers: a form here, or a place that does the work.
+ * A row never links somewhere that sends the reader back here, and never
+ * picks an application on their behalf — when a destination needs one, the
+ * link says which application it opens, or offers the list.
+ */
+export type ConnectionAction =
+  | { kind: "form"; form: ConnectionForm; label: string }
+  | { kind: "link"; href: string; label: string };
 
 /**
  * One provider connection as Settings shows it: what it is used for, its
@@ -21,8 +37,10 @@ export interface ConnectionItem {
   /** "Token scoped to one bucket · added 9 Sep". Never the credential. */
   credential?: string | null;
   usedBy?: string[];
-  href: string;
-  action: string;
+  /** What the reader has to know before the action, such as that there is
+   * no application yet for a conversation to happen in. */
+  note?: string;
+  action: ConnectionAction;
 }
 
 /**
@@ -116,9 +134,17 @@ export function ConnectionsScreen({
   recoveryKit?: { confirmedAt: string | null; bucket: string; host: string };
   prototype?: boolean;
 }) {
+  const router = useRouter();
+  // The credential the reader is typing, if any. One at a time, on this page,
+  // so the inventory they came for stays where it was.
+  const [open, setOpen] = useState<ConnectionForm | null>(null);
   const needing = connections.filter(
     (item) => item.state === "expired" || item.state === "failed",
   );
+  const connected = () => {
+    setOpen(null);
+    router.refresh();
+  };
   return (
     <main className={`sg-setup-shell ${s.root}`}>
       <header className="sg-setup-topbar">
@@ -194,16 +220,53 @@ export function ConnectionsScreen({
                   {item.usedBy && item.usedBy.length > 0 && (
                     <p className={s.hint}>Used by {item.usedBy.join(", ")}</p>
                   )}
+                  {item.note && <p className={s.hint}>{item.note}</p>}
                 </div>
-                <Link
-                  className={
-                    item.state === "connected" ? s.textButton : s.primary
-                  }
-                  href={item.href}
-                >
-                  {item.action}
-                </Link>
+                {item.action.kind === "link" ? (
+                  <Link
+                    className={`${
+                      item.state === "connected" ? s.textButton : s.primary
+                    } ${s.connectionAction}`}
+                    href={item.action.href}
+                  >
+                    {item.action.label}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className={`${
+                      item.state === "connected" ? s.textButton : s.primary
+                    } ${s.connectionAction}`}
+                    aria-expanded={open === item.action.form}
+                    onClick={() =>
+                      setOpen((current) =>
+                        item.action.kind === "form" &&
+                        current === item.action.form
+                          ? null
+                          : item.action.kind === "form"
+                            ? item.action.form
+                            : null,
+                      )
+                    }
+                  >
+                    {item.action.label}
+                  </button>
+                )}
               </div>
+              {item.action.kind === "form" &&
+                open === item.action.form &&
+                (item.action.form === "backup-storage" ? (
+                  <BackupStorageForm
+                    className={s.connectForm}
+                    onConnected={async () => connected()}
+                  />
+                ) : (
+                  <ProviderTokenForm
+                    provider={item.action.form}
+                    onConnected={connected}
+                    onCancel={() => setOpen(null)}
+                  />
+                ))}
             </section>
           ))}
         </section>

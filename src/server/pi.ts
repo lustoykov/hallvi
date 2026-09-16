@@ -377,7 +377,7 @@ export async function askPi(
             label: "Hetzner Cloud request",
             executionMode: "sequential",
             description:
-              "Call the connected Hetzner Cloud REST API. Supply method, relative path including query parameters, and optional JSON body. No token/header arguments. Inspect live catalogs/pricing and resources, then choose API calls yourself. Provider requests use the application's normal permission mode and execution log. No automatic retries. Never supply secrets in the body; register server_public_key and supply that SSH key ID when creating servers. Connect Hetzner in Settings if needed.",
+              "Call the connected Hetzner Cloud REST API. Supply method, relative path including query parameters, and optional JSON body. No token/header arguments. Inspect live catalogs/pricing and resources, then choose API calls yourself. Provider requests use the application's normal permission mode and execution log. No automatic retries. Never supply secrets in the body; register server_public_key and supply that SSH key ID when creating servers. Connect Hetzner Cloud in Settings › Connections if needed.",
             parameters: Type.Object({
               method: Type.Union([
                 Type.Literal("GET"),
