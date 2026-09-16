@@ -136,11 +136,9 @@ function summary(items: HomeApplication[]) {
 export function ApplicationsHome({
   applications,
   piReady,
-  preview,
 }: {
   applications: HomeApplication[];
   piReady: boolean;
-  preview: boolean;
 }) {
   const [selectedId, setSelectedId] = useState(applications[0]?.id);
   const [greeting, setGreeting] = useState(0);
@@ -151,7 +149,6 @@ export function ApplicationsHome({
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
-  const addHref = preview ? "/prototype/new" : "/applications/new";
   const greet = (id: string) => {
     setSelectedId(id);
     setGreeting((value) => value + 1);
@@ -159,10 +156,7 @@ export function ApplicationsHome({
   return (
     <main className={s.page}>
       <header className={s.header}>
-        <Link
-          className={s.brand}
-          href={preview ? "/prototype/applications" : "/applications"}
-        >
+        <Link className={s.brand} href="/applications">
           <span className={s.brandMark} aria-hidden="true">
             <i />
             <i />
@@ -170,10 +164,7 @@ export function ApplicationsHome({
           </span>
           Server Guy
         </Link>
-        <Link
-          className={s.settings}
-          href={preview ? "/prototype/settings/connections" : "/setup/pi"}
-        >
+        <Link className={s.settings} href="/setup/pi">
           <GearSix aria-hidden="true" />
           <span>{piReady ? "Settings" : "Settings · Connect ChatGPT"}</span>
         </Link>
@@ -212,7 +203,7 @@ export function ApplicationsHome({
                 />
               </label>
             )}
-            <Link className={s.add} href={addHref}>
+            <Link className={s.add} href={"/applications/new"}>
               <Plus aria-hidden="true" />
               Add application
             </Link>
@@ -228,7 +219,7 @@ export function ApplicationsHome({
               Start with a GitHub repository. Server Guy inspects it, recommends
               a server and deploys when you approve.
             </p>
-            <Link className={s.primary} href={addHref}>
+            <Link className={s.primary} href={"/applications/new"}>
               <Plus aria-hidden="true" />
               Add application
             </Link>
