@@ -35,8 +35,11 @@ worktrees.
 
 Use Node.js 22 and locked dependencies: `npm ci`, never latest-version installs.
 Work on a branch and open a pull request; never commit directly to `main`.
-Preserve unrelated changes. Include a small decision-oriented diagram under
-`docs/architecture/` in each PR and link it from the description.
+Preserve unrelated changes. Draw a diagram when a boundary or a flow changes:
+a Mermaid block in the pull request explains the change to its reviewer, and a
+diagram worth keeping lives in, or is linked from, the document that owns the
+decision it explains. A trivial change does not manufacture an artifact.
+[Diagrams](docs/architecture/README.md) indexes the ones that exist.
 
 Use an **80/20 testing approach**: keep a small, high-value suite protecting
 core user journeys and concrete risks to data, credentials and truthful status.

@@ -16,7 +16,31 @@ web
 
 One persistent application operator owns operational work through the main conversation. Pi has general tools, including server shell execution, and chooses how to deploy, investigate, verify and recover. Side conversations are read-only. Queue and steer use Pi's native session capabilities.
 
-Permissions govern execution independently of workflows: **Always ask** requires UI approval for every code execution; **Pi decides** lets Pi judge when to ask; **Bypass** executes without approval prompts. The tool boundary implements the selected mode with a simple pending-call approval interaction: wait for the UI decision, then continue or decline. There are no provider/spending exceptions to Bypass and no required durable approval-resume subsystem. A release or backup proposal is not a prerequisite for executing an authorized task.
+### Permission modes
+
+This is the rule; everywhere else links here rather than restating it.
+
+| Mode | Behavior |
+| --- | --- |
+| **Always ask** | Every code execution waits for approval through the UI. |
+| **Pi decides** | Pi judges when permission is needed and asks through a tool. |
+| **Bypass** | Commands execute without approval prompts. |
+
+Exactly three modes, governing execution independently of workflows. The tool
+boundary implements the selected mode with a pending-call interaction: wait for
+the UI decision, then continue or decline. There are no provider or spending
+exceptions to Bypass, and no durable approval-resume subsystem is required — a
+worker restart does not replay a pending call. A release or backup proposal is
+not a prerequisite for executing an authorized task, and the selected mode must
+actually prevent an unapproved call from executing.
+
+### Empty means unassessed, never healthy
+
+A destination with no records says nobody has looked. That is not a claim that
+there is nothing to find, and it is never drawn as working backups, an absent
+firewall or a healthy application. An established absence is a separate thing
+and has to be written: silence and "there is none" are different answers, and
+the product must not print the second when it has the first.
 
 The product's differentiation is the experience around that operator: understandable work, carefully designed interactions and animations, ongoing care and useful recommendations. Improved models should improve the operator without requiring more application-specific rules. Always-on care and access for other agents are directions; automated application-error detection is deferred.
 
@@ -97,7 +121,7 @@ There is an exploratory commercial opportunity for managed tool-action review an
 
 **Design and prove the main deployment journey first.** Implement in reviewable stages: main operator interaction, general execution and permissions, a lightweight deployment, then medium and more complicated examples. Once deployment works, review every sidebar view individually; scope its capabilities then. Broad security hardening is deferred until after beta; beta users receive practical guidance and clear communication of current risks. The [operator design](docs/operator-design.md#beta-security-and-later-hardening) owns this security direction.
 
-Verify real behavior throughout development with focused checks and representative runs. Fix concrete failures and record material limitations. Delete unnecessary code, tests, gates and obsolete hardening cases instead of preserving old policy through tests. The user has authorized discarding the current development data: start the new schema empty and delete legacy migrations, readers and recovery machinery. Pi handles operational problems through general tools. Do not build exhaustive case matrices or speculative resilience infrastructure while the design may change. The [roadmap](ROADMAP.md) owns review checkpoints and sequencing.
+Verify real behavior throughout development with focused checks and representative runs. Fix concrete failures and record material limitations. Delete unnecessary code, tests, gates and obsolete hardening cases instead of preserving old policy through tests. Development data may be discarded rather than migrated; [discarding development data](docs/development-resources.md#discarding-development-data) owns that authorization and its boundary. Pi handles operational problems through general tools. Do not build exhaustive case matrices or speculative resilience infrastructure while the design may change. The [roadmap](ROADMAP.md) owns review checkpoints and sequencing.
 
 ## Reliability and limits
 

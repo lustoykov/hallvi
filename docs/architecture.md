@@ -98,10 +98,8 @@ and the tools are the only things that can reach outside.
 call that reaches a server or a provider passes through it and is recorded
 with its mode, its input and its outcome, whatever the answer.
 
-The three modes are defined once, in
-[Product](../PRODUCT.md): **Always ask** pauses every command,
-**Pi decides** lets ordinary work run and leaves `request_approval` for what
-Pi judges consequential, and **Bypass** does not prompt. A call awaiting
+The three modes are defined in
+[Product](../PRODUCT.md#permission-modes). A call awaiting
 approval is a durable record: the page reads pending calls, the owner decides,
 and the tool continues or declines. A worker restart does not replay a call.
 
@@ -119,8 +117,8 @@ that answers questions about records: what subjects exist, what is currently
 true about one, how fresh that is, and whether an absence was established or
 simply never looked at. Freshness is a property of the claim, not of the
 record: identity never ages, configuration ages in days, liveness in minutes.
-**Empty means unassessed, never healthy** — a destination with no records says
-nobody has looked.
+[**Empty means unassessed, never healthy**](../PRODUCT.md#empty-means-unassessed-never-healthy)
+— a destination with no records says nobody has looked.
 
 Each destination has a `*-records.ts` beside the projection that turns those
 answers into what its page needs, and a `*-page.tsx` that draws it. The

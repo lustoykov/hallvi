@@ -52,6 +52,9 @@ counterfactual run for every test, or new test harness is needed. If a decision
 would remove the only coverage of an important behavior and its value is unclear,
 ask the owner with that concrete example; continue the unambiguous cleanup.
 
+Two pictures of this bar: [how a check is selected](../docs/architecture/test-selection.md)
+and [where a check belongs, and where it does not](../docs/architecture/where-coverage-lives.md).
+
 ## Commands and limits
 
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser

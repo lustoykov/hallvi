@@ -36,10 +36,11 @@ If there are no material findings, say so directly.
 - Expect one main operator, general tools, independent permission modes and
   shared knowledge with optional presentation. Reuse Pi's native capabilities.
 - Welcome deletion of obsolete code, tests, migrations and recovery machinery.
-  Existing development data is explicitly disposable; do not demand compatibility
-  adapters or durable approval replay. Pi handles operational repair through general tools.
-- Use exactly three permission modes with no provider exception to Bypass.
-  Approval is a pending call awaiting the UI decision.
+  Development data is disposable — see [discarding development data](docs/development-resources.md#discarding-development-data)
+  — so do not demand compatibility adapters or durable approval replay. Pi
+  handles operational repair through general tools.
+- Use the three [permission modes](PRODUCT.md#permission-modes) as they are
+  defined there, with no provider exception to Bypass.
 - Welcome deletion of obsolete hardening cases. Report a
   removed check only when the behavior it protected is still required.
 - Prove the deployment path before defining all sidebar capabilities. Avoid
@@ -60,7 +61,9 @@ If there are no material findings, say so directly.
 
 - The PR states the concrete requirement and where reviewers should focus.
 - The PR reviews `ROADMAP.md` and includes needed sprint status, scope or sequencing updates, or explains why none are needed. Local work must not be presented as already merged.
-- Architecture or control-flow changes are explained with a diagram.
+- A change to a boundary or a flow is explained with a diagram, in the PR or
+  in the document that owns the decision. A change that alters neither needs
+  no diagram.
 - Verification is proportionate to the risk and supports the claims being made.
 - The change does not include unrelated refactors or preparatory machinery.
 

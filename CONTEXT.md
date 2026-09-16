@@ -20,7 +20,7 @@ Definitions used by the [product](PRODUCT.md), [architecture](docs/architecture.
 
 **Presentation / placement**: Optional information assigning a saved record to one or more existing views, with an appropriate summary or role. Exact fields remain a design proposal.
 
-**Permission mode**: Always ask (approval for every code execution), Pi decides (the model judges when to ask), or Bypass (no approval prompts). Independent of operational workflow types.
+**Permission mode**: One of the three modes defined in [Product](PRODUCT.md#permission-modes), independent of operational workflow types.
 
 **Wakeup**: A user message, scheduled trigger or incoming signal that brings work to the application operator. Detailed background care is deferred.
 

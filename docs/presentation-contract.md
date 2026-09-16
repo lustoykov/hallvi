@@ -440,6 +440,10 @@ verdict is formed. `failed` and `warning` are judgements and do not age, and a
 same-host plan as a warning is what stops a passing "the timer is active"
 printing green under the word Backups.
 
+Three pictures of the same rule: [what a record is allowed to claim](architecture/recovery-claims.html),
+[wording that outruns its record](architecture/wording-and-records.html), and
+[what a page may print, and where](architecture/page-evidence-and-labels.md).
+
 ## 11. Actions
 
 **Navigate** and **Ask**. Nothing on a designed page executes anything. A

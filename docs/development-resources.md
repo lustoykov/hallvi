@@ -33,6 +33,22 @@ and its runtime prompt. Automatic disposal of isolated Pi workspaces and agreed
 backup retention are separate, narrowly scoped product behavior; they do not
 inherit this development policy.
 
+## Discarding development data
+
+The owner explicitly authorized discarding existing Server Guy **development**
+data along with its code and tests. Start a new schema empty; do not build
+migrations, legacy readers, archive or import features, or compatibility
+adapters to carry the old application forward. Remove obsolete workflows and
+their recovery machinery outright as the new path replaces them. Git retains
+source history, and keeping old runtime data is not an acceptance requirement.
+
+The authorization covers this development installation and nothing else. It is
+not a default operational policy for the applications Pi manages through the
+product, and it does not reach the user files, product databases, credentials,
+conversation history or retained evidence the rest of this document protects.
+[Cleanup scope](architecture/cleanup-scope.md) draws the same line as a
+picture.
+
 ## Development host and cleanup owner
 
 Development runs locally on the owner's MacBook. The Mac mini is a retired
