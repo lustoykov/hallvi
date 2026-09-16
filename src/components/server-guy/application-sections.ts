@@ -16,8 +16,6 @@ import {
   StackSimple,
   SlidersHorizontal,
 } from "@phosphor-icons/react";
-import type { ApplicationFacts } from "@/server/application-facts";
-import type { ApplicationStack } from "@/server/application-stack";
 import type { SavedInformation } from "@/server/operator-data";
 
 /**
@@ -149,20 +147,16 @@ export function sectionFromHash(hash: string): ApplicationSection | null {
 }
 
 /**
- * What the records establish, for destinations that hide until something is
- * there. The stack model this used to read is no longer populated, so every
- * hideable destination stayed dark however much Pi recorded.
+ * What the records establish, plus whether anything has been deployed at all.
  *
  * A destination lights up when a record *speaks for* one of its subjects. The
  * map alone is not enough for most of them: it draws shapes, and a shape is
  * not a thing that exists. Processes and Storage are the exception, because a
  * planned map is worth navigating to before anything runs — and both pages
  * say plainly that nothing has been looked at yet.
- */
-/**
- * What the records establish, plus whether anything has been deployed at all.
- * The second is not a destination; it is what tells a hidden row apart from a
- * row that is hidden because nothing has happened yet.
+ *
+ * `deployed` is not a destination. It is what tells a row hidden because
+ * nothing names it apart from one hidden because nothing has happened yet.
  */
 export type Recorded = Partial<Record<ApplicationSection, boolean>> & {
   deployed?: boolean;
@@ -207,53 +201,28 @@ export function recordedSections(
   };
 }
 
-/** Whether a hideable destination has anything recorded to show. */
+/**
+ * Whether a destination has anything recorded to show.
+ *
+ * Only the records answer this now. There used to be a second answer behind
+ * them, read off a deployment model the product stopped writing to, and a
+ * fallback that can only ever say "nothing" is worse than no fallback: it
+ * reads like an answer.
+ */
 export function sectionRecorded(
   section: ApplicationSection,
-  stack: ApplicationStack,
-  facts: ApplicationFacts = {},
-  hasHost = false,
-  /** What the records establish; preferred over the retired stack model. */
   recorded: Recorded = {},
 ) {
-  if (recorded[section] !== undefined) return recorded[section];
-  switch (section) {
-    case "processes":
-      return stack.recorded;
-    case "database":
-      return stack.databases.length > 0;
-    case "cache":
-      return stack.services.length > 0 || stack.queues.length > 0;
-    case "jobs":
-      return stack.jobs.length > 0;
-    case "storage":
-      return stack.volumes.length > 0;
-    // Delivery through a CDN is only a destination once one is caching.
-    case "cdn":
-      return (
-        facts.domains?.cdn.state === "active" ||
-        facts.domains?.cdn.state === "partial"
-      );
-    // A provisioned host can be inspected even before its first firewall read.
-    case "security":
-      return hasHost || Boolean(facts.security);
-    default:
-      return true;
-  }
+  return recorded[section] ?? true;
 }
 
 /** The destinations to list: every recorded one, plus the one being viewed. */
 export function visibleSections(
-  stack: ApplicationStack,
   active: ApplicationSection | null,
-  facts: ApplicationFacts = {},
-  hasHost = false,
   recorded: Recorded = {},
 ) {
   return applicationSections.filter(
-    (section) =>
-      section.id === active ||
-      sectionRecorded(section.id, stack, facts, hasHost, recorded),
+    (section) => section.id === active || sectionRecorded(section.id, recorded),
   );
 }
 
@@ -263,10 +232,7 @@ export function visibleSections(
  * it yet, or it is known only after the first deployment.
  */
 export function hiddenSections(
-  stack: ApplicationStack,
   active: ApplicationSection | null,
-  facts: ApplicationFacts = {},
-  hasHost = false,
   recorded: Recorded = {},
 ) {
   return applicationSections
@@ -275,7 +241,7 @@ export function hiddenSections(
         "hideable" in section &&
         section.hideable &&
         section.id !== active &&
-        !sectionRecorded(section.id, stack, facts, hasHost, recorded),
+        !sectionRecorded(section.id, recorded),
     )
     .map((section) => ({
       ...section,

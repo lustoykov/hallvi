@@ -17,7 +17,6 @@ import {
   type ArchitectureModel,
   type Certainty,
   type Fact,
-  type LiveRecord,
 } from "../architecture-prototype/model";
 
 const DAY = 86_400_000;
@@ -84,40 +83,13 @@ const word: Record<Certainty, string> = {
   absent: "Not set up",
 };
 
-function money(value: number, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency.toUpperCase(),
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
-}
-
-/** The next scheduled copy: the host's own answer, or the policy's time. */
-export function nextCopy(record: LiveRecord, now: number) {
-  const protection = record.facts.protection;
-  const recorded = protection?.observation?.nextAt;
-  if (recorded && Date.parse(recorded) > now) return recorded;
-  const match = protection?.policy?.schedule.match(/(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  const next = new Date(now);
-  next.setHours(Number(match[1]), Number(match[2]), 0, 0);
-  if (next.getTime() <= now) next.setDate(next.getDate() + 1);
-  return next.toISOString();
-}
-
 export function buildOverview({
   model,
-  record,
   operations,
   chats,
   onOpenConversation,
 }: {
   model: ArchitectureModel;
-  record: LiveRecord;
   operations: ApplicationOperation[];
   chats: ChatSummary[];
   onOpenConversation: (chatId: string, messageId: string | null) => void;
@@ -179,21 +151,6 @@ export function buildOverview({
             },
       });
     }
-    const copy = record.facts.protection?.lastAttempt;
-    if (copy?.outcome === "failed")
-      needs.push({
-        id: "backup",
-        tone: "failed",
-        title: "Last night's copy failed",
-        detail:
-          copy.reason ??
-          "The nightly copy didn't finish, so the newest data isn't off the server.",
-        primary: {
-          label: "Ask Server Guy to look into it",
-          draft: "Find out why the last backup failed and fix it.",
-        },
-        secondary: { label: "Open Backups", destination: "backups" },
-      });
   }
 
   // ---- Ideas: optional, phrased as what you would gain.
@@ -259,8 +216,6 @@ export function buildOverview({
   const host = model.byId.host;
   const offsite = model.byId.offsite;
   const gate = model.byId["gate:http"];
-  const protection = record.facts.protection;
-  const offer = record.deployment?.offer ?? null;
   const checked = [app, service].filter(
     (part): part is NonNullable<typeof part> => Boolean(part),
   );
@@ -300,16 +255,12 @@ export function buildOverview({
       label: "Backups",
       value: planned
         ? "After deployment"
-        : protection?.lastAttempt
-          ? ago(protection.lastAttempt.at, now)
-          : word[offsite?.evidence.certainty ?? "absent"],
+        : word[offsite?.evidence.certainty ?? "absent"],
       status: {
         certainty: offsite?.evidence.certainty ?? "absent",
         text:
           offsite?.evidence.certainty === "verified"
-            ? protection?.lastAttempt?.outcome === "failed"
-              ? "Last copy failed"
-              : "Copy verified"
+            ? "Copy verified"
             : word[offsite?.evidence.certainty ?? "absent"],
       },
       lines: planned
@@ -319,28 +270,9 @@ export function buildOverview({
               ? `Restore tested ${ago(model.restoreAt, now)}`
               : "Restore never tested",
           ],
-      countdownTo: planned ? null : nextCopy(record, now),
       plain:
         "Every night Server Guy copies the data off the server and checks the copy by size and checksum. A restore test proves a copy comes back.",
-      facts: [
-        protection?.policy && {
-          label: "Schedule",
-          value: `${protection.policy.schedule}, ${protection.policy.timezone}`,
-        },
-        protection?.policy && {
-          label: "Keeps",
-          value: protection.policy.retention,
-        },
-        protection?.destination && {
-          label: "Where",
-          value: `${protection.destination.provider.toUpperCase()} · ${protection.destination.bucket}`,
-          mono: true,
-        },
-        protection?.lastAttempt?.size && {
-          label: "Last copy",
-          value: protection.lastAttempt.size,
-        },
-      ].filter((fact): fact is Fact => Boolean(fact)),
+      facts: [],
       destination: "backups",
       ask: "Tell me how the backups are doing.",
     },
@@ -354,24 +286,9 @@ export function buildOverview({
           ? "Checking…"
           : (host?.evidence.short ?? "Planned"),
       },
-      lines: [
-        offer
-          ? `${offer.cores} vCPU · ${offer.memory} GB · ${model.region?.split(",")[0] ?? offer.location}`
-          : (model.region ?? ""),
-        offer ? `${money(offer.monthly, offer.currency)} a month` : "",
-      ].filter(Boolean),
+      lines: [model.region ?? ""].filter(Boolean),
       plain: host?.plain ?? "",
-      facts: [
-        ...(host?.facts.slice(0, 4) ?? []),
-        ...(offer
-          ? [
-              {
-                label: "Price",
-                value: `${money(offer.monthly, offer.currency)} a month`,
-              },
-            ]
-          : []),
-      ],
+      facts: host?.facts.slice(0, 4) ?? [],
       destination: host?.destination ?? "deployment",
       ask: `Tell me about the server ${model.headline} runs on.`,
     },
@@ -393,7 +310,6 @@ export function buildOverview({
         model.byId.tls?.evidence.certainty === "absent"
           ? "HTTP · no HTTPS yet"
           : "HTTPS",
-        record.deployment?.address ? `At ${record.deployment.address}` : "",
       ].filter(Boolean),
       plain: gate?.plain ?? "",
       facts: gate?.facts.slice(0, 4) ?? [],

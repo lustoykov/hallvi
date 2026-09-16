@@ -7,10 +7,9 @@
 import type {
   ArchitectureModel,
   CheckMark,
-  LiveRecord,
   LogLine,
 } from "../architecture-prototype/model";
-import { nextCopy, type Vital } from "./overview-model";
+import type { Vital } from "./overview-model";
 
 export type LaneId = Vital["id"];
 export type EventTone = "pass" | "fail" | "info" | "planned" | "checking";
@@ -132,12 +131,10 @@ function gather(lane: LaneId, moments: Moment[]): TimeEvent[] {
 
 export function buildTimeline({
   model,
-  record,
   live,
   marks,
 }: {
   model: ArchitectureModel;
-  record: LiveRecord;
   live: LogLine[];
   marks: Record<string, CheckMark>;
 }): Timeline {
@@ -181,66 +178,6 @@ export function buildTimeline({
   };
 
   if (model.status === "live") {
-    (record.deployment?.events ?? []).forEach((event, i) => {
-      const message = event.message;
-      if (/^Passed: |^Verified private /.test(message))
-        add("checks", event.at, "pass", message, `event:${i}`);
-      else if (/timed out|failed/i.test(message))
-        add("checks", event.at, "fail", message, `event:${i}`);
-      else if (message.startsWith("HTTP restricted"))
-        add("access", event.at, "pass", message, `event:${i}`);
-    });
-    add(
-      "server",
-      record.deployment?.verifiedAt,
-      "pass",
-      "The server answered during the deployment",
-      "deploy:host",
-    );
-
-    const protection = record.facts.protection;
-    const seen = protection?.observation;
-    if (seen?.at)
-      add(
-        "server",
-        seen.at,
-        seen.reachable ? "pass" : "fail",
-        seen.reachable
-          ? `Reached the server and read the backup timer${seen.timerActive ? ": active" : ""}`
-          : "Couldn't reach the server",
-        "observation",
-      );
-    for (const entry of protection?.history ?? []) {
-      const name =
-        entry.kind === "backup"
-          ? "Copy"
-          : entry.kind === "restore-test"
-            ? "Restore test"
-            : entry.kind === "policy"
-              ? "Schedule"
-              : "Upload";
-      add(
-        "backups",
-        entry.at,
-        entry.outcome === "succeeded"
-          ? "pass"
-          : entry.outcome === "failed"
-            ? "fail"
-            : "info",
-        `${name}: ${entry.detail}`,
-        `protection:${entry.id}`,
-      );
-    }
-    const next = nextCopy(record, now);
-    if (next && protection?.policy)
-      add(
-        "backups",
-        next,
-        "planned",
-        `Scheduled: ${protection.policy.schedule} (${protection.policy.timezone})`,
-        "next",
-      );
-
     // The firewall, as Hetzner reported it on this visit.
     const gate = model.byId["gate:http"];
     if (

@@ -296,9 +296,8 @@ export function TimelineHero({
   const [guy, mascot] = useServerGuy(model, recheck, { narrate: true });
   const appId = record.application.id;
   const fallback = useMemo(
-    () =>
-      buildTimeline({ model, record, live: guy.live, marks: recheck.marks }),
-    [model, record, guy.live, recheck.marks],
+    () => buildTimeline({ model, live: guy.live, marks: recheck.marks }),
+    [model, guy.live, recheck.marks],
   );
   const timeline = given ?? fallback;
   const [open, setOpen] = useState<string | null>(null);
