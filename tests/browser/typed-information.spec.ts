@@ -222,6 +222,10 @@ test("records render in chat and their views, survive refresh, and update by rec
         new Date().toISOString(),
         deployment,
       );
+    // The idle page polls every 15 seconds; observe the update without a reload.
+    await expect(
+      view.getByRole("button", { name: /rebuilt fixture-server/ }),
+    ).toBeVisible({ timeout: 20_000 });
     await page.reload();
     await expect(
       view.getByRole("button", { name: /rebuilt fixture-server/ }),
