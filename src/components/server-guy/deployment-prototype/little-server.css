@@ -10,7 +10,15 @@
   width: 100%;
   height: 100%;
 }
+/* Out of flow, so the canvas can never size the box that sizes the canvas.
+   The renderer's own ResizeObserver measures this host and calls setSize,
+   which writes the drawing buffer onto the element. While the canvas was in
+   flow, a host with no height of its own took that height back from it, and
+   the next measurement was larger than the last: a 42px mascot on the
+   Security page reached 1,050px in four frames and the page kept growing. */
 .axls .mascot-scene canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100% !important;
   height: 100% !important;

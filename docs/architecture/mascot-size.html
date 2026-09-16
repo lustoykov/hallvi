@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bounded mascot sizing</title>
+<style>body{font:16px/1.5 system-ui;max-width:760px;margin:48px auto;padding:0 24px;color:#192338}svg{width:100%;height:auto}text{font:14px system-ui;fill:#192338}</style>
+<h1>Let the host size the mascot</h1><p>The canvas follows a bounded host. Its drawing buffer must not determine the height of that same host.</p>
+<svg viewBox="0 0 720 240" role="img" aria-label="Before, an in-flow canvas and auto-height host resize each other. After, a bounded host sizes an absolutely positioned canvas in one direction.">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="#365bd7"/></marker></defs>
+<text x="16" y="26">Before: feedback loop</text><rect x="16" y="44" width="235" height="54" rx="8" fill="#fff0e8"/><text x="32" y="76">Auto-height host</text><rect x="460" y="44" width="244" height="54" rx="8" fill="#fff0e8"/><text x="476" y="76">Canvas contributes height</text><path d="M260 60 H448 M450 87 H264" stroke="#365bd7" fill="none" marker-end="url(#arrow)"/>
+<text x="16" y="148">After: one-way sizing</text><rect x="16" y="167" width="235" height="54" rx="8" fill="#eaf5ef"/><text x="32" y="199">Host has width and height</text><rect x="460" y="167" width="244" height="54" rx="8" fill="#eaf5ef"/><text x="476" y="199">Absolute canvas fills host</text><path d="M260 194 H448" stroke="#365bd7" fill="none" marker-end="url(#arrow)"/>
+</svg><p>The existing ResizeObserver still measures the host; the Security mascot hosts now declare both dimensions.</p></html>

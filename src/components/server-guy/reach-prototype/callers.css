@@ -316,9 +316,11 @@
   padding-top: 16px;
   border-top: 1px solid var(--ax-line);
 }
+/* Both dimensions, for the reason rings.css gives. */
 .axca-guy {
   flex: none;
   width: 46px;
+  height: 46px;
 }
 .axca-foot p {
   margin: 0;
