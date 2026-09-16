@@ -1,7 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { removeTemporaryRoot } from "../temporary-root.mjs";
 
@@ -10,15 +10,31 @@ import { removeTemporaryRoot } from "../temporary-root.mjs";
 // `isolatedApp`: a different worker option gets a worker, and app, of its own.
 export const test = base.extend<
   Record<never, never>,
-  { fixture: { url: string; state: string }; isolatedApp: boolean }
+  {
+    fixture: { url: string; state: string };
+    isolatedApp: boolean;
+    /** Start with ChatGPT not yet connected, the way a first run is. */
+    freshSetup: boolean;
+  }
 >({
   isolatedApp: [false, { scope: "worker", option: true }],
+  freshSetup: [false, { scope: "worker", option: true }],
   fixture: [
-    async ({}, provide, workerInfo) => {
-      const port = 3180 + workerInfo.workerIndex;
+    async ({ freshSetup }, provide, workerInfo) => {
+      // 3180 by default. Another checkout of this repository may already be
+      // running its own fixtures there, so a run can be moved out of the way
+      // with SERVER_GUY_E2E_PORT rather than waiting for the port back.
+      const port =
+        Number(process.env.SERVER_GUY_E2E_PORT || 3180) +
+        workerInfo.workerIndex;
       const child = spawn(
         process.execPath,
-        ["tests/browser/qa-fixture.mjs", String(port), "success", "ready"],
+        [
+          "tests/browser/qa-fixture.mjs",
+          String(port),
+          "success",
+          freshSetup ? "fresh" : "ready",
+        ],
         {
           detached: true,
           stdio: ["ignore", "pipe", "pipe"],
@@ -104,9 +120,11 @@ export const test = base.extend<
     // Restore synthetic preferences after settings tests, without touching user
     // state.
     const path = join(fixture.state, "pi-settings.json");
-    const settings = readFileSync(path, "utf8");
+    const settings = existsSync(path) ? readFileSync(path, "utf8") : null;
     const githubPath = join(fixture.state, "github-connection.json");
-    const githubSettings = readFileSync(githubPath, "utf8");
+    const githubSettings = existsSync(githubPath)
+      ? readFileSync(githubPath, "utf8")
+      : null;
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.context().route("**/*", (route) => {
@@ -116,8 +134,11 @@ export const test = base.extend<
     try {
       await provide(page);
     } finally {
-      writeFileSync(path, settings, { mode: 0o600 });
-      writeFileSync(githubPath, githubSettings, { mode: 0o600 });
+      // A fresh fixture starts with neither file; connecting is the journey,
+      // so there is nothing to put back.
+      if (settings !== null) writeFileSync(path, settings, { mode: 0o600 });
+      if (githubSettings !== null)
+        writeFileSync(githubPath, githubSettings, { mode: 0o600 });
       writeFileSync(join(fixture.state, "github-scenario.json"), "{}", {
         mode: 0o600,
       });

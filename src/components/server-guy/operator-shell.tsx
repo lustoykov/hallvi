@@ -91,6 +91,34 @@ function readSeen(applicationId: string | undefined) {
   }
 }
 
+/**
+ * An unsent draft, kept per conversation in this browser.
+ *
+ * A composer that cannot send yet points at Settings, and going there used to
+ * throw the message away — the reader came back to an empty box and had to
+ * remember what they were about to ask. The text stays in this tab's storage
+ * under the conversation it belongs to; it is never put in a URL and never
+ * sent anywhere, and it is dropped the moment the message goes.
+ */
+function draftKey(chatId: string) {
+  return `sg-draft:${chatId}`;
+}
+function readDraft(chatId: string) {
+  try {
+    return sessionStorage.getItem(draftKey(chatId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+function writeDraft(chatId: string, value: string) {
+  try {
+    if (value) sessionStorage.setItem(draftKey(chatId), value);
+    else sessionStorage.removeItem(draftKey(chatId));
+  } catch {
+    /* a browser without storage simply forgets an unsent draft */
+  }
+}
+
 function readSubmission(chatId: string) {
   try {
     const value = JSON.parse(
@@ -203,7 +231,52 @@ export function OperatorShell({
     };
   }, []);
   const [view, setView] = useState(initialView);
+  /**
+   * Whether a message can be sent at all. This arrives with the page, but
+   * the reader may have just connected ChatGPT — in this tab or another one
+   * — and the composer should not stay disabled until they think to reload.
+   * Asking once when the tab comes back into view is enough.
+   */
+  const [connectedSince, setConnectedSince] = useState(false);
+  const piReady = initialPiSetup.ready || connectedSince;
+  useEffect(() => {
+    if (piReady) return;
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const status = await (
+          await fetch("/api/pi/setup", { cache: "no-store" })
+        ).json();
+        if (!status?.ready) return;
+        setConnectedSince(true);
+        router.refresh();
+      } catch {
+        /* still disabled, and the page says why */
+      }
+    };
+    void check();
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, [piReady, router]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // What this browser kept while the reader was away — connecting ChatGPT,
+  // for instance. Anything typed since wins over it.
+  const chatIds = view.chats.map((chat) => chat.id).join(" ");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const kept: Record<string, string> = {};
+      for (const id of chatIds.split(" ").filter(Boolean)) {
+        const draft = readDraft(id);
+        if (draft) kept[id] = draft;
+      }
+      setDrafts((current) => ({ ...kept, ...current }));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [chatIds]);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [runs, setRuns] = useState<PiRun[]>([]);
   const [terminal, setTerminal] = useState({
@@ -413,17 +486,17 @@ export function OperatorShell({
           // Retire the optimistic copy as soon as durable intent is visible.
           setPendingMessage(null);
           sessionStorage.removeItem(`pi-submission:${selectedChatId}`);
-          setDrafts((current) =>
-            current[selectedChatId] === pending.message
-              ? { ...current, [selectedChatId]: "" }
-              : current,
-          );
+          setDrafts((current) => {
+            if (current[selectedChatId] !== pending.message) return current;
+            writeDraft(selectedChatId, "");
+            return { ...current, [selectedChatId]: "" };
+          });
         } else if (submittingChat.current !== selectedChatId) {
-          setDrafts((current) =>
-            current[selectedChatId]
-              ? current
-              : { ...current, [selectedChatId]: pending.message },
-          );
+          setDrafts((current) => {
+            if (current[selectedChatId]) return current;
+            writeDraft(selectedChatId, pending.message);
+            return { ...current, [selectedChatId]: pending.message };
+          });
         }
       }
       const nextVersion = snapshot.runs
@@ -459,6 +532,7 @@ export function OperatorShell({
   function setComposer(value: string) {
     if (!activeChat) return;
     setDrafts((current) => ({ ...current, [activeChat.id]: value }));
+    writeDraft(activeChat.id, value);
   }
 
   function applyView(next: OperatorView) {
@@ -576,7 +650,10 @@ export function OperatorShell({
       void run("chat", async () => {
         const next = await api.createChat(application.id);
         const started = next.selectedChatId;
-        if (started) setDrafts((current) => ({ ...current, [started]: draft }));
+        if (started) {
+          setDrafts((current) => ({ ...current, [started]: draft }));
+          writeDraft(started, draft);
+        }
         return next;
       });
       closeSection();
@@ -584,6 +661,7 @@ export function OperatorShell({
       return;
     }
     setDrafts((current) => ({ ...current, [target]: draft }));
+    writeDraft(target, draft);
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));
     closeSection();
@@ -596,10 +674,11 @@ export function OperatorShell({
     if (!target) return;
     setDrafts((current) => {
       const existing = current[target] ?? "";
-      return {
-        ...current,
-        [target]: existing.trim() ? `${existing.trimEnd()}\n\n${block}` : block,
-      };
+      const next = existing.trim()
+        ? `${existing.trimEnd()}\n\n${block}`
+        : block;
+      writeDraft(target, next);
+      return { ...current, [target]: next };
     });
     if (application && target !== view.selectedChatId)
       void run("chat", () => api.view(application.id, target));
@@ -613,14 +692,7 @@ export function OperatorShell({
 
   function sendMessage() {
     const message = composer.trim();
-    if (
-      busy ||
-      !initialPiSetup.ready ||
-      !application ||
-      !activeChat ||
-      !message
-    )
-      return;
+    if (busy || !piReady || !application || !activeChat || !message) return;
     setPendingMessage(message);
     submittingChat.current = activeChat.id;
     setComposer("");
@@ -654,10 +726,11 @@ export function OperatorShell({
           sessionStorage.removeItem(`pi-submission:${activeChat.id}`);
           setError("Your message was saved. Reconnecting to its progress…");
         } else
-          setDrafts((current) => ({
-            ...current,
-            [activeChat.id]: current[activeChat.id] || message,
-          }));
+          setDrafts((current) => {
+            const next = current[activeChat.id] || message;
+            writeDraft(activeChat.id, next);
+            return { ...current, [activeChat.id]: next };
+          });
         const refreshed = await api
           .view(application.id, activeChat.id)
           .catch(() => null);
@@ -889,7 +962,7 @@ export function OperatorShell({
               composer={composer}
               error={error}
               pendingMessage={pendingMessage}
-              piReady={initialPiSetup.ready}
+              piReady={piReady}
               onArchive={archiveActiveChat}
               onComposerChange={setComposer}
               onSend={sendMessage}
