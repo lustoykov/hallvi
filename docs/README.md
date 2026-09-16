@@ -8,6 +8,7 @@ Read [Product](../PRODUCT.md) for product direction, [Operator design](operator-
 | [Architecture](architecture.md) | What is stored, what Pi can do, the permission boundary, how a record becomes a page, and current limits. |
 | [Required outcomes](requirements.md) | User-facing behavior and acceptance, without prescribing Pi's workflow. |
 | [Presentation contract](presentation-contract.md) | How a record becomes a designed page: what Pi writes, how it is read, and what Architecture needs. Later destinations' vocabulary is kept separate under Deferred. |
+| [Diagrams](architecture/README.md) | Every diagram under `docs/architecture/`, which document owns each one, and which are historical. |
 | [Browser terminal](browser-terminal.md) | Implemented application-server terminal contract, session lifecycle and acceptance. |
 | [UI reference](design/screens.md) | Interaction principles and how to inspect real versus simulated screens. |
 | [Settings design](design/settings.md) | Existing settings layout/typography; the component design file owns overall visual language. |

@@ -60,9 +60,8 @@ Record what was actually verified and material limitations. Defer broad edge-cas
 
 Explicitly prefer a minimal implementation. Remove unnecessary code, tests, validators, workflow branches and hardening cases when their purpose no longer belongs in the agreed architecture. Existing code and test coverage are not reasons to preserve an obsolete product constraint. Do not retain parallel old and new execution paths or compatibility machinery without a concrete need.
 
-Deletion is part of the redesign. The user explicitly authorized discarding existing Server Guy development data as well as code and tests. Start the new schema empty; do not build migrations, legacy readers, archive/import features or compatibility adapters to carry the old application forward. Remove obsolete workflows and their recovery machinery outright as the new path replaces them. Git retains source history; keeping old runtime data is not an acceptance requirement.
-
-This authorization concerns the current Server Guy development installation. It does not turn deletion into a default operational policy for applications Pi will manage through the new product.
+Deletion is part of the redesign, under the authorization and the boundary in
+[discarding development data](development-resources.md#discarding-development-data).
 
 ### Three application complexity tiers
 
@@ -135,17 +134,13 @@ Source for this check: installed `dist/core/agent-session.d.ts`, `dist/core/agen
 
 Pi should have general tools for working on the application server, including shell execution. A request such as “fix this application” authorizes ordinary operational work within that request; Pi should choose individual commands without mandatory command-by-command approval except when the selected mode requires it.
 
-| Mode | Behavior |
-| --- | --- |
-| Always ask | Every code execution requires approval through the UI. |
-| Pi decides | Pi judges when permission is needed and asks through a tool. |
-| Bypass | Commands execute without approval prompts. |
+The three modes are defined in [Product](../PRODUCT.md#permission-modes).
 
 Permissions govern execution independently of deployment, backup or other workflow categories. Workspace execution must be accounted for alongside server execution. An important published record is not automatically an approval request, and permission does not require manufacturing a release proposal.
 
 The executor runs tools, handles credentials and records execution output and known outcomes. Errors and incomplete results return to Pi, which investigates and corrects through the same general tools. Do not add dedicated recovery tools, reconciliation workflows, cleanup journals or a framework of pending-effect holds. A lost connection is reported honestly; Pi can inspect the host to determine what happened.
 
-Use a simple Codex-style approval interaction: a pending tool call asks the UI, waits asynchronously for a decision, and continues or declines within the active turn. Keep exactly three modes, with no special provider/spending exception to Bypass. Do not require an approval table, ending/restarting a turn, replay logic or restoration of pending approval after a worker restart. The chosen permission mode must still actually prevent an unapproved call from executing.
+Use a simple Codex-style approval interaction: a pending tool call asks the UI, waits asynchronously for a decision, and continues or declines within the active turn. Do not require an approval table, ending or restarting a turn, replay logic, or restoration of a pending approval after a worker restart.
 
 Read-only side conversations require an appropriate tool boundary; unrestricted server shell access cannot be made read-only merely by naming the conversation that way. The exact inspection capabilities remain open.
 

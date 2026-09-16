@@ -4,7 +4,7 @@
 
 ## Design and review
 
-<!-- Explain the material decisions and link the owning design doc. A small Mermaid diagram is useful if it clarifies a changed boundary or data flow; no separate diagram artifact is required. Omit this section for trivial changes. -->
+<!-- Explain the material decisions and link the owning design doc. Include a small Mermaid diagram when this change alters a boundary or a data flow; a diagram worth keeping afterwards goes in the document that owns the decision, indexed in docs/architecture/README.md. No separate artifact is required otherwise. Omit this section for trivial changes. -->
 
 <!-- Identify consequential obsolete code, workflow gates or tests removed, and why their behavior is no longer required. -->
 

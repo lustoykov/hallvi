@@ -214,7 +214,7 @@ Pi decides what a view says. This decides how it is said, so a destination nobod
 
 **Attention first.** Views sort with `rank`: failed, then needs attention, then what is simply true, then what Pi suggests, then retired. No group headings — with two or three records they weigh more than the records do.
 
-**Empty means unestablished, never healthy.** “Nothing has been established here yet”, and a sentence saying that is not a claim that there is nothing to find. Never an empty state that implies working backups, an absent firewall or a healthy application.
+**[Empty means unassessed, never healthy.](../../../PRODUCT.md#empty-means-unassessed-never-healthy)** “Nothing has been established here yet”, and a sentence saying that is not a claim that there is nothing to find. Never an empty state that implies working backups, an absent firewall or a healthy application.
 
 **Motion is for state, not arrival.** `--fast` for the press of a control, `--base` for a state changing, nothing on page entrance. Every transition has a reduced-motion answer in the same file.
 

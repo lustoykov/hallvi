@@ -10,7 +10,7 @@ The target is Docker Compose on one instance, with PostgreSQL or SQLite, require
 
 The first [operator redesign](docs/operator-design.md) checkpoint is implemented: the main conversation has general server Bash, three permission modes, inline approval and recorded command output. Other conversations have read-only tools. The execution backend has been verified with a temporary SSH target; server selection will arrive with deployment setup. The four-table controller model and shared-information cards are implemented locally; see [storage verification](docs/testing/2026-09-12-operator-storage.md). Review this checkpoint before Hetzner provisioning, then a verified lightweight deployment. Queue/steer and further side-chat work are deferred until that experience is established.
 
-Prove the deployment journey in reviewable stages using lightweight, medium and more complicated applications. Then review each sidebar view's capabilities. Verify real behavior with focused checks and delete obsolete code/tests; broad hardening and application-error monitoring are deferred. [Roadmap](ROADMAP.md) owns the checkpoints.
+[Design and prove the main deployment journey first](PRODUCT.md#development-priority), in reviewable stages from lightweight to more complicated applications; [Roadmap](ROADMAP.md) owns the checkpoints.
 
 ## Documentation
 
@@ -24,7 +24,7 @@ Server Guy can execute commands on your application server with the connected ac
 
 - Use the most capable supported model available to you. No model is immune to prompt injection, and general intelligence alone does not establish security.
 - Prefer a dedicated test server and non-sensitive data during beta. Keep unrelated systems and credentials outside its reach, and scope connected accounts to the resources you intend Server Guy to manage.
-- Use **Always ask** when you want to inspect commands before execution. **Pi decides** relies on the model's judgment about asking; **Bypass** runs without approval prompts. Review matters even for reads that could disclose private data.
+- Use **Always ask** when you want to inspect commands before execution; the other two [permission modes](PRODUCT.md#permission-modes) ask less. Review matters even for reads that could disclose private data.
 - Keep tested recovery copies that the managed server and its credentials cannot delete. Backups help recovery; they cannot undo data theft. Avoid exposing sensitive production data unless you accept the current access risks.
 
 ## Implementation status
