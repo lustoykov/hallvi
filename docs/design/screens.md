@@ -22,12 +22,11 @@ Reuse useful components and omit irrelevant controls. A prototype action complet
 
 From the repository, run the documented [development setup](../../README.md#run), choosing an available port, for example `npm run dev -- --port 3300`. No particular local server is guaranteed to be running.
 
-- `/prototype` indexes development-only scenarios; production returns 404 for these routes.
-- `/prototype/app?scenario=simple|rich&step=N&section=<view>&chat=<id>` selects a replayable application scenario. The prototype bar advances or resets its invented state.
-- `/prototype/applications`, `/prototype/new` and `/prototype/settings/connections` show synthetic list, intake and connection states.
+- `npm run scenarios -- <port>` serves every scenario state through the real pages, from the records in `tests/fixtures/scenario-records.ts`. It prints one address per scenario, and each destination is a fragment on that address.
+- `/prototype` indexes what is left that has no records behind it; production returns 404 for these routes.
 - `/applications` and `/applications/[id]` use real application records.
 - `/setup/pi` and `/setup/github` are real controller settings, not isolated demo accounts.
 
-The [reference shell](../../src/components/server-guy/reference/reference-shell.tsx) uses the product's components with replayed scenario state and an in-memory interaction overlay. Prototype commands do not establish real backups, monitoring, deployments or provider effects. Keep synthetic facts off real application routes.
+The reference shell that replayed invented scenario state has been retired: a state that renders only in a layout the product does not ship proves nothing about the page an owner opens. Scenario records are the replacement, and they are read by the same components a real application uses. Keep synthetic records out of a real application's database — the scenarios command builds its own.
 
 The [browser capture script](../../tests/browser/reference.capture.mjs) accepts a base URL and writes screenshots under ignored test results. Use fresh browser verification for UI changes; old screenshots and capture counts are not current acceptance evidence.
