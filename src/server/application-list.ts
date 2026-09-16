@@ -66,6 +66,7 @@ function conditionOf(
   applicationId: string,
   now: number,
 ): ApplicationListItem["condition"] {
+  if (!records.length) return { tone: "muted", text: "New application" };
   const refs: Ref[] = [
     { kind: "application", id: applicationId },
     ...SUBJECT_KINDS.flatMap((kind) => subjectsMentioned(records, kind)),
@@ -90,7 +91,8 @@ function addressOf(records: SavedInformation[]) {
   const url = records.find(
     (record) => record.presentation?.content?.kind === "application-access",
   )?.presentation?.url;
-  return url && URL.canParse(url) ? new URL(url).hostname : null;
+  if (!url || !URL.canParse(url)) return null;
+  return ["http:", "https:"].includes(new URL(url).protocol) ? url : null;
 }
 
 /** What it runs, counted rather than described. */

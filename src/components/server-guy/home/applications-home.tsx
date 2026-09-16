@@ -44,9 +44,10 @@ type Situation = "fine" | "working" | "needs" | "stale" | "new";
 function situationOf(item: HomeApplication): Situation {
   const text = item.condition.text;
   if (item.attention > 0 || item.condition.tone === "bad") return "needs";
+  if (text === "Checked a while ago") return "stale";
   if (item.condition.tone === "warn") return "needs";
   if (/deploying|in progress|updating/i.test(text)) return "working";
-  if (/^not deployed|^not checked yet/i.test(text)) return "new";
+  if (/^not deployed|^new application/i.test(text)) return "new";
   if (item.condition.tone === "muted") return "stale";
   return "fine";
 }
@@ -108,7 +109,7 @@ function summary(items: HomeApplication[]) {
     stale.length &&
       `${names(stale)} ${stale.length > 1 ? "haven't" : "hasn't"} been looked at lately`,
     fresh.length &&
-      `${names(fresh)} ${fresh.length > 1 ? "aren't" : "isn't"} deployed yet`,
+      `${names(fresh)} ${fresh.length > 1 ? "are" : "is"} new to Server Guy`,
   ].filter((part): part is string => Boolean(part));
   const middle = parts.length
     ? `${parts.slice(0, -1).join(", ")}${parts.length > 1 ? ", and " : ""}${parts.at(-1)}.`
@@ -243,6 +244,15 @@ export function ApplicationsHome({
                 );
                 const situation = situationOf(item);
                 const active = selectedId === item.id;
+                const addressUrl = item.address
+                  ? /^https?:\/\//i.test(item.address)
+                    ? item.address
+                    : `https://${item.address}`
+                  : null;
+                const addressLabel =
+                  addressUrl && URL.canParse(addressUrl)
+                    ? new URL(addressUrl).host
+                    : item.address;
                 const parts =
                   item.stack && !/^not deployed/i.test(item.stack)
                     ? item.stack.split(" · ")
@@ -295,7 +305,7 @@ export function ApplicationsHome({
                         <Screen
                           kind={kind}
                           host={
-                            item.address ??
+                            addressLabel ??
                             (situation === "new"
                               ? "no address yet"
                               : item.source)
@@ -319,12 +329,12 @@ export function ApplicationsHome({
                           {item.address ? (
                             <a
                               className={s.address}
-                              href={`https://${item.address}`}
+                              href={addressUrl!}
                               target="_blank"
                               rel="noreferrer"
                             >
                               <Globe aria-hidden="true" />
-                              {item.address}
+                              {addressLabel}
                               <ArrowUpRight aria-hidden="true" />
                             </a>
                           ) : (
