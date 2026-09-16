@@ -6,6 +6,33 @@ data and real Hetzner fixtures. It does not make product users' deployments
 disposable. The [cleanup decision flow](architecture/development-cleanup-decision.html)
 summarizes the gates; the resource-specific rules below also apply.
 
+## Scope: development resources, not user systems
+
+This policy applies to agents developing Server Guy and its development cleanup
+task. It grants no housekeeping authority to Pi operating a user's application,
+whether Server Guy was launched with a development or production command.
+User deployments and local product data are not development fixtures.
+
+Local cleanup starts from exact Server Guy-owned paths in the inventory and
+registered worktrees. Do not scan the user's home directory, Desktop, Documents,
+Downloads, other repositories or shared temporary/cache roots for things to
+remove. An individually registered disposable fixture may live outside the
+repository; that authorizes only that exact fixture, not its parent or siblings.
+Resolve symlinks and inspect mounts before deletion; ownership of a directory
+entry does not establish ownership of its target or mounted contents.
+
+Even inside Server Guy folders, preserve user files, product databases, backup
+copies, credentials, conversation history and retained evidence. Creating or
+managing a resource does not make its data disposable. Shared Docker and cloud
+accounts are not project cleanup scopes: use exact, verified resource IDs and
+keep the ownership, dependency and retention checks below. Uncertain targets
+remain untouched.
+
+Pi's operational boundary is defined in [Product](../PRODUCT.md#operating-boundary)
+and its runtime prompt. Automatic disposal of isolated Pi workspaces and agreed
+backup retention are separate, narrowly scoped product behavior; they do not
+inherit this development policy.
+
 ## Development host and cleanup owner
 
 Development runs locally on the owner's MacBook. The Mac mini is a retired

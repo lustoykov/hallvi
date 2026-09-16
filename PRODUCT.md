@@ -50,6 +50,17 @@ Use one representative application in each of the [three complexity tiers](docs/
 - It surfaces application exceptions, wrong behavior and migration-code defects with impact, evidence and a copyable coding-agent handoff. The owner-merged fix returns through ordinary release verification.
 - A missing health endpoint, environment-driven port or start entrypoint can be proposed in a small operability PR. Business logic and general bug fixes remain outside its code-writing scope.
 
+**Development cleanup never becomes product housekeeping.** Pi does not clean the
+user's PC, server or provider account just because work finished. Removal stays
+within the requested application operation or an agreed retention policy, with
+exact ownership, retained-data and dependency checks. Disposable artifacts from
+that operation and isolated workspaces may be removed; application data,
+credentials, history and unrelated resources remain. A Server Guy folder or
+label alone is not disposal permission. Permission modes change approval prompts,
+not the scope of the user's request. The runtime does not auto-load contributor
+instructions; general server shell access still relies on Pi following this
+boundary, rather than a filesystem sandbox on the remote host.
+
 Pi determines what to inspect, recommend and execute within the user's request and selected permission mode. Return native tool errors so it can correct and continue. The executor handles access, credentials and automatic execution facts, including uncertain outcomes. General privileged shell execution relies on Pi's judgment; a wrapper cannot prove that every command preserves data. A successful command is not proof of a working application.
 
 ## Experience
