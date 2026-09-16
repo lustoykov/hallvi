@@ -14,7 +14,7 @@ export interface ApplicationListItem {
   stack: string;
   attention: number;
   protection: string;
-  /** The hostname the application is reached at, when a record says so. */
+  /** The recorded access URL, including its protocol and port. Reference data may use a hostname. */
   address?: string | null;
 }
 

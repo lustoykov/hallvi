@@ -80,6 +80,26 @@ describe("application navigation", () => {
     expect(html).not.toContain("Launch Brief");
   });
 
+  it("keeps stale checks distinct from attention and preserves the private URL", () => {
+    const html = renderToStaticMarkup(
+      <ApplicationsScreen
+        piReady
+        applications={[
+          {
+            ...listItem(application, null),
+            condition: { tone: "warn", text: "Checked a while ago" },
+            attention: 0,
+            address: "http://127.0.0.1:18000",
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain('href="http://127.0.0.1:18000"');
+    expect(html).toContain("Not checked");
+    expect(html).not.toContain("Needs me");
+    expect(html).not.toContain("deployed yet");
+  });
+
   it("does not accept form edits before hydration can retain them", () => {
     const html = renderToStaticMarkup(
       <NewApplicationScreen githubLogin="qa-user" />,
