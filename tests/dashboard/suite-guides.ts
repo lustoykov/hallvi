@@ -63,22 +63,4 @@ export const suiteGuides = {
     purpose:
       "Choose a subset or run every desktop journey. Browser smoke is part of this suite, not a different kind of test.",
   },
-  live: {
-    purpose:
-      "Review retained model answers. The old decision/workflow eval runner is retired during the operator redesign.",
-    execution:
-      "New live evals are deferred until the deployment tools are ready; eval:pi reports this explicitly.",
-    real: "Retained answers are dated model evidence.",
-    mocked: "No new model call is made by the retired runner.",
-    isolation: "Historical answer files remain separate from application data.",
-    checks:
-      "Use the focused operator storage/execution tests for the current checkpoint.",
-    limits: "Historical answers do not verify the redesigned operator.",
-    artifacts:
-      "Retained answers and reviews remain under tests/results/evals/.",
-    sources: [
-      "tests/evals/judge.ts",
-      "tests/application/integration/operator-storage.test.ts",
-    ],
-  },
 };
