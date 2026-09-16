@@ -200,6 +200,17 @@ Views read saved information from the database immediately. Opening a section sh
 
 Timestamps and evidence distinguish “last established” from “checked just now.” Automatic execution facts remain distinguishable from Pi's interpretations: a command's exit status is recorded automatically; whether it establishes a successful upgrade or warrants user attention is Pi's judgment.
 
+### Proportionate care
+
+Most first applications are small: a personal tool, a test, a site with a handful of visitors and little data. Their owners want to get the application running and go back to building it. The product's care must be sized to what there is to lose, and grow with it.
+
+- **Absence is a fact, not a failure.** "Nothing copies this data yet" is recorded as information, in calm words, with no failed check and no next step. Only something that existed and stopped working is a failure: a copy that did not complete, a certificate that expired, a check that did not pass, a process that died.
+- **Nudge once, then wait for the data to earn more.** The option of a backup, a monitor or a firewall change is mentioned at most once, in one sentence, when the owner is not in the middle of something. It becomes a warning only when the data is large or clearly growing, the application has real users or traffic, the owner said the data matters, or the thing broke.
+- **The homepage never warns about protection.** The card says what runs and where. Protection lives on the application's own pages, and a nudge on the card is for the day the data has grown enough to deserve one.
+- **Every view follows the record's own status.** Pi sets `status` from the evidence and the stakes; the pages render that and do not add alarm of their own. The Backups page's "quiet" verdict is the visible form of this rule: an established absence on a small application reads as a fact and an offer, in grey, not amber.
+
+This is the operating form of the product rule "Most first users run something small" in [PRODUCT.md](../PRODUCT.md#experience). Broader hardening stays deferred as described under beta security above.
+
 ### Always-on care and visible commitments
 
 The following captures the longer-term direction. The application-error monitoring scenarios are exploratory and deferred, not requirements for the initial deployment journey. Specific care features will be revisited view by view after the main path is established.

@@ -40,6 +40,7 @@ const icon = {
   warning: <WarningCircle weight="fill" aria-hidden="true" />,
   failed: <XCircle weight="fill" aria-hidden="true" />,
   unknown: <CircleDashed weight="bold" aria-hidden="true" />,
+  quiet: <CircleDashed weight="bold" aria-hidden="true" />,
 } as const;
 
 /** The word on the tag. Never "Protected" unless a restore proved it. */
@@ -48,6 +49,7 @@ const word = {
   warning: "Limited",
   failed: "Failed",
   unknown: "Not assessed",
+  quiet: "No copies yet",
 } as const;
 
 const destinationWord: Record<DestinationKind, string> = {

@@ -47,6 +47,9 @@
 .sg-protect[data-tone="failed"] .sg-protect-mark {
   color: #a6312b;
 }
+/* quiet: an established absence that is not yet a problem; the same calm
+   greys as "not assessed", never amber. */
+.sg-protect[data-tone="quiet"] .sg-protect-mark,
 .sg-protect[data-tone="unknown"] .sg-protect-mark {
   color: var(--sg-muted, #667389);
 }

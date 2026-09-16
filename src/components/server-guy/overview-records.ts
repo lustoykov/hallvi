@@ -94,10 +94,12 @@ function when(at: string, now: number) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-/** The verdict's four tones in the lane's own vocabulary. */
+/** The verdict's tones in the lane's own vocabulary. */
 const verdictCertainty: Record<ProtectionVerdict["tone"], Certainty> = {
   verified: "verified",
   warning: "warning",
+  // An established absence on a small application: a fact, not a warning.
+  quiet: "absent",
   failed: "failed",
   unknown: "unknown",
 };
