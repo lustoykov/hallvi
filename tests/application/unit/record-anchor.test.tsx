@@ -46,10 +46,16 @@ const anchor = (markup: string) => markup.match(/id="(record-[^"]+)"/)?.[1];
 const link = (markup: string) => markup.match(/href="#(record-[^"]+)"/)?.[1];
 
 describe("the anchor a repeated record points at", () => {
-  it("is carried by a compact first appearance", () => {
-    const markup = renderToStaticMarkup(<InformationCard record={routine()} />);
-    expect(markup).toContain("sg-result");
-    expect(anchor(markup)).toBe(`record-${ID}`);
+  it("is carried by a compact first appearance, and the repeat links to it", () => {
+    const first = renderToStaticMarkup(<InformationCard record={routine()} />);
+    expect(first).toContain("sg-result");
+    expect(anchor(first)).toBe(`record-${ID}`);
+    const again = renderToStaticMarkup(
+      <InformationCard record={routine()} superseded />,
+    );
+    // The repeat claims no anchor of its own; it would link to itself.
+    expect(anchor(again)).toBeUndefined();
+    expect(link(again)).toBe(anchor(first));
   });
 
   it("is carried by a full first appearance too", () => {
@@ -57,21 +63,5 @@ describe("the anchor a repeated record points at", () => {
     record.presentation!.nextStep = "Cover the other two volumes.";
     const markup = renderToStaticMarkup(<InformationCard record={record} />);
     expect(anchor(markup)).toBe(`record-${ID}`);
-  });
-
-  it("is not claimed by the repeat, which would link to itself", () => {
-    const markup = renderToStaticMarkup(
-      <InformationCard record={routine()} superseded />,
-    );
-    expect(anchor(markup)).toBeUndefined();
-    expect(link(markup)).toBe(`record-${ID}`);
-  });
-
-  it("matches what the repeat links to, so the link resolves", () => {
-    const first = renderToStaticMarkup(<InformationCard record={routine()} />);
-    const again = renderToStaticMarkup(
-      <InformationCard record={routine()} superseded />,
-    );
-    expect(link(again)).toBe(anchor(first));
   });
 });

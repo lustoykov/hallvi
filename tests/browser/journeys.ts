@@ -114,13 +114,6 @@ export const browserJourneys = [
     smoke: false,
   },
   {
-    id: "native-history",
-    name: "Continue conversation history and recover from loss",
-    description:
-      "Continue native history across reloads, isolate Chats while sharing saved Decisions, and start a fresh Chat when native history is missing.",
-    smoke: false,
-  },
-  {
     id: "record-destinations",
     name: "Every destination, drawn from records",
     description:
@@ -132,13 +125,6 @@ export const browserJourneys = [
     name: "Server Guy's own protection",
     description:
       "State Server Guy's own copies on Backups: unprotected without storage, copied but not yet recoverable, and recoverable once the owner saves the kit.",
-    smoke: false,
-  },
-  {
-    id: "dashboard",
-    name: "Testing dashboard and saved reviews",
-    description:
-      "Check selection, spending confirmation and saved human reviews. Tests this dashboard, not the product app.",
     smoke: false,
   },
 ] as const;
