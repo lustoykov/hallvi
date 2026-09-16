@@ -165,7 +165,7 @@ export function PerimeterDirection({
             <p>
               {ways.length === 0
                 ? "No record names a port on this server. What has been established about the way in is below."
-                : "The outer ring is open to the internet. The inner ring needs to be on the server or inside the application\u2019s own network first. Most of this is what the deployment configured, not what anyone has connected to; each way in says which it is."}
+                : "The outer ring is open to the internet. The inner ring limits access to specific sources or the server itself. Select a port to see what is configured and what has been checked."}
             </p>
           </div>
           {ways.length > 0 && (

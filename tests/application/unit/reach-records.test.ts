@@ -81,6 +81,37 @@ describe("security", () => {
     expect(story.holes.some((hole) => hole.id.startsWith("open:"))).toBe(false);
   });
 
+  it("keeps the map and detail on the latest port observation", () => {
+    const older = "2026-09-13T11:40:00.000Z";
+    const newer = "2026-09-13T11:50:00.000Z";
+    for (const latest of ["open", "refused"] as const) {
+      const previous = latest === "open" ? "refused" : "open";
+      const door = { kind: "door" as const, id: "http" };
+      const story = read([
+        states(door, {
+          at: older,
+          facts: [fact("port", "80"), fact("sources", "0.0.0.0/0")],
+          checks: [
+            check(previous, "passed", "reachability", { detail: previous }),
+          ],
+        }),
+        states(door, {
+          at: newer,
+          checks: [check(latest, "passed", "reachability", { detail: latest })],
+        }),
+      ]);
+      expect(story.doors[0]).toMatchObject({
+        reach: latest === "open" ? "internet" : "closed",
+        established: latest === "open" ? "answered" : "refused",
+        detail: latest,
+        at: newer,
+      });
+      expect(story.guards.some((guard) => guard.id === "refused:http")).toBe(
+        latest === "refused",
+      );
+    }
+  });
+
   it("calls a port open to everyone a hole", () => {
     const story = read([
       states(

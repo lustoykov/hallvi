@@ -110,8 +110,15 @@ export function reachFromRecords({
       const fact = (key: string) => facts.get(key)?.value.value ?? null;
       const sources = listOf(fact("sources"));
 
-      const refused = checks.get("refused");
-      const open = checks.get("open");
+      // currentChecks is newest first, but keeps open/refused as separate
+      // keys. Use one observation for the map, detail and timestamp when a
+      // port has changed its behavior between checks.
+      const observation = [...checks.entries()].find(
+        ([key]) => key === "open" || key === "refused",
+      );
+      const refused =
+        observation?.[0] === "refused" ? observation[1] : undefined;
+      const open = observation?.[0] === "open" ? observation[1] : undefined;
       const shut = refused?.value.status === "passed";
       const reach: Reach = shut
         ? "closed"
