@@ -10,7 +10,7 @@ import type { Ref, SavedInformation } from "@/server/operator-data";
 import {
   applicationCondition,
   overviewFromRecords,
-} from "@/components/server-guy/overview-records";
+} from "@/components/haldur/overview-records";
 import { lane } from "@/server/record-projection";
 
 const APP = "11111111-2222-4333-8444-555555555555";
@@ -494,7 +494,7 @@ describe("a backup plan that is set up and protects less than its name implies",
       },
       facts: [
         { key: "destination-kind", value: "off-site" },
-        { key: "destination", value: "the computer running Server Guy" },
+        { key: "destination", value: "the computer running Haldur" },
       ],
     });
     const restore = record({

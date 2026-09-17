@@ -12,7 +12,7 @@ import type { Ref, SavedInformation } from "@/server/operator-data";
 import {
   protectionFromRecords,
   protectionVerdict,
-} from "@/components/server-guy/backups-records";
+} from "@/components/haldur/backups-records";
 
 const APP = "11111111-2222-4333-8444-555555555555";
 const AT = "2026-09-15T10:00:00.000Z";
@@ -645,7 +645,7 @@ describe("a plan that is on record, and a record saying there is none", () => {
   it("does not count an established absence as a plan", () => {
     // `plans` is every subject a record speaks about, which includes one
     // whose whole content is "there is no plan". Counting those meant an
-    // application Server Guy had checked and found unprotected read as
+    // application Haldur had checked and found unprotected read as
     // planned — latent in the verdict and live the moment anything else
     // asked the question.
     const absent = record({

@@ -11,7 +11,7 @@ import {
   purposeOf,
   secretRequestPoint,
   type SecretRequest,
-} from "@/components/server-guy/secret-request";
+} from "@/components/haldur/secret-request";
 
 const messages = [
   { id: "m1", createdAt: "2026-09-13T10:00:00.000Z" },

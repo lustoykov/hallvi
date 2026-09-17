@@ -42,13 +42,13 @@ let app: string;
 let chat: string;
 function reopen() {
   store.db().$client.close();
-  delete globalThis.__serverGuyDb;
+  delete globalThis.__haldurDb;
 }
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "sg-storage-"));
-  vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "test.db"));
-  vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "config"));
-  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+  vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
+  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
+  pushTestDatabase(process.env.HALDUR_DB_PATH!);
 });
 beforeEach(async () => {
   store.db().$client.exec("DELETE FROM applications");

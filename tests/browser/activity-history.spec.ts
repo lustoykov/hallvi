@@ -23,7 +23,7 @@ async function send(
   answer = `[QA fixture reply] ${message}`,
 ) {
   await openConversation(page);
-  await page.getByRole("textbox", { name: "Message Server Guy" }).fill(message);
+  await page.getByRole("textbox", { name: "Message Haldur" }).fill(message);
   await openConversation(page);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText(answer, { exact: true })).toBeVisible();
@@ -46,7 +46,7 @@ test(
     try {
       await openConversation(page);
       await page
-        .getByRole("textbox", { name: "Message Server Guy" })
+        .getByRole("textbox", { name: "Message Haldur" })
         .fill("Acceptance race");
       await openConversation(page);
       await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -139,7 +139,7 @@ test(
     // Cancellation is recorded with that attempt, never in Activity.
     await openConversation(page);
     await page
-      .getByRole("textbox", { name: "Message Server Guy" })
+      .getByRole("textbox", { name: "Message Haldur" })
       .fill("[slow-cancel] hello");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();

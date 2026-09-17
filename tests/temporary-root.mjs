@@ -1,22 +1,20 @@
 // Scratch directories for browser fixtures and live evals: always
-// /tmp/server-guy-<kind>-<random>,
+// /tmp/haldur-<kind>-<random>,
 // created here and deleted here, and nothing else is ever deleted. Saved
 // results live under tests/results/,
 // which is never inside one of these roots.
 import { mkdtempSync, rmSync } from "node:fs";
 
-const prefixShape = /^\/tmp\/server-guy-[a-z0-9-]+-$/;
-const rootShape = /^\/tmp\/server-guy-[a-z0-9-]+-[A-Za-z0-9]{6}$/;
+const prefixShape = /^\/tmp\/haldur-[a-z0-9-]+-$/;
+const rootShape = /^\/tmp\/haldur-[a-z0-9-]+-[A-Za-z0-9]{6}$/;
 
 /**
  * Creates a fresh scratch root, e.g.
- * createTemporaryRoot("/tmp/server-guy-e2e-").
+ * createTemporaryRoot("/tmp/haldur-e2e-").
  */
 export function createTemporaryRoot(prefix) {
   if (!prefixShape.test(prefix))
-    throw new Error(
-      `Scratch roots live under /tmp/server-guy-*, not ${prefix}`,
-    );
+    throw new Error(`Scratch roots live under /tmp/haldur-*, not ${prefix}`);
   return mkdtempSync(prefix);
 }
 
@@ -28,9 +26,7 @@ export function createTemporaryRoot(prefix) {
  */
 export function removeTemporaryRoot(root) {
   if (!rootShape.test(root))
-    throw new Error(
-      `Refusing to delete ${root}: not a Server Guy scratch root`,
-    );
+    throw new Error(`Refusing to delete ${root}: not a Haldur scratch root`);
   try {
     rmSync(root, { recursive: true, force: false });
     return true;

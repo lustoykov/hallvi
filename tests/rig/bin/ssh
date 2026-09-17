@@ -71,7 +71,7 @@ let command = container
   ? original
   : original
       .replace(
-        /\/opt\/server-guy\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
+        /\/opt\/haldur\/(?=[0-9a-f]{8}-[0-9a-f]{4}-)/g,
         `${root}/opt/server-guy/`,
       )
       .replaceAll("/run/lock/", `${root}/run/lock/`);

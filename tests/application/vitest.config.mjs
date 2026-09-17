@@ -6,9 +6,9 @@ export default defineConfig({
   test: {
     // Test subprocesses inherit only synthetic diagnostic destinations.
     env: {
-      SERVER_GUY_PI_CONFIG_DIR: "",
-      SERVER_GUY_LOG_DIR: "",
-      SERVER_GUY_TRACING: "0",
+      HALDUR_PI_CONFIG_DIR: "",
+      HALDUR_LOG_DIR: "",
+      HALDUR_TRACING: "0",
       OTEL_EXPORTER_OTLP_ENDPOINT: "",
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "",
       OTEL_EXPORTER_OTLP_HEADERS: "",

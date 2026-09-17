@@ -60,7 +60,7 @@ export function getOperatorView(
     ),
     secrets: listSecrets(application.id),
     activity: [],
-    // Server Guy's own protection is the same fact for every application:
+    // Haldur's own protection is the same fact for every application:
     // read from the controller's records, not from this application's.
     facts: { controllerProtection: controllerProtectionFacts() },
   };

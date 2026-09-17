@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { PiSetupScreen } from "../../../src/components/server-guy/pi-setup-screen";
+import { PiSetupScreen } from "../../../src/components/haldur/pi-setup-screen";
 import type { PiSetupStatus } from "../../../src/server/pi-setup";
 
 vi.mock("next/navigation", () => ({
@@ -29,7 +29,7 @@ const initialStatus: PiSetupStatus = {
       reasoningEfforts: ["high"],
     },
   ],
-  separateAuthPath: "/server-guy/pi-auth.json",
+  separateAuthPath: "/haldur/pi-auth.json",
   diagnosticLogPath: "/custom/logs/replies.ndjson",
   localTracePath: "/custom/logs/spans.ndjson",
   traceExport: { mode: "off", destination: null },
@@ -40,7 +40,7 @@ const initialStatus: PiSetupStatus = {
   authentication: {
     configured: false,
     label: "Not connected",
-    source: "/server-guy/pi-auth.json",
+    source: "/haldur/pi-auth.json",
   },
   selection,
   issue: null,
@@ -64,7 +64,7 @@ describe("account-first setup and progressive disclosure", () => {
     const { html, defaultView } = render();
     expect(defaultView).toContain("Settings");
     expect(defaultView).toContain("ChatGPT account and model preferences.");
-    expect(defaultView).not.toContain("Login stored where Server Guy runs.");
+    expect(defaultView).not.toContain("Login stored where Haldur runs.");
     expect(defaultView).toContain("Connect ChatGPT");
     expect(defaultView).not.toContain(initialStatus.separateAuthPath);
     expect(defaultView).not.toContain("Bundled Pi SDK");
@@ -79,11 +79,11 @@ describe("account-first setup and progressive disclosure", () => {
       "Other software running as that same user can read them",
     );
     expect(defaultView).not.toContain("Check for a saved login");
-    expect(html).toContain("/server-guy/pi-auth-&lt;login-id&gt;.json");
+    expect(html).toContain("/haldur/pi-auth-&lt;login-id&gt;.json");
     expect(html.match(/<aside\b/g)).toHaveLength(1);
     expect(html).not.toContain("Demo state");
     expect(defaultView).toMatch(/<button[^>]*disabled[^>]*>View applications/);
-    for (const role of ["Server Guy", "Pi", "ChatGPT"]) {
+    for (const role of ["Haldur", "Pi", "ChatGPT"]) {
       expect(html).toContain(`<dt>${role}</dt>`);
     }
   });

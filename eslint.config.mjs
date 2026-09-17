@@ -29,6 +29,7 @@ export default defineConfig([
   globalIgnores([
     ".claude/**",
     "dist/**",
+    ".haldur/**",
     ".server-guy/**",
     // Local runtime state and the throwaway review scripts for this branch.
     ".state/**",

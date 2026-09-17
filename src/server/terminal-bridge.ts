@@ -89,10 +89,10 @@ async function start(): Promise<Bridge> {
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    // An installation fixes this port so an owner reaching Server Guy over
+    // An installation fixes this port so an owner reaching Haldur over
     // SSH can forward it; development takes whichever is free.
     server.listen(
-      Number(process.env.SERVER_GUY_TERMINAL_PORT) || 0,
+      Number(process.env.HALDUR_TERMINAL_PORT) || 0,
       "127.0.0.1",
       resolve,
     );

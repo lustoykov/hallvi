@@ -23,10 +23,9 @@ export const test = base.extend<
     async ({ freshSetup }, provide, workerInfo) => {
       // 3180 by default. Another checkout of this repository may already be
       // running its own fixtures there, so a run can be moved out of the way
-      // with SERVER_GUY_E2E_PORT rather than waiting for the port back.
+      // with HALDUR_E2E_PORT rather than waiting for the port back.
       const port =
-        Number(process.env.SERVER_GUY_E2E_PORT || 3180) +
-        workerInfo.workerIndex;
+        Number(process.env.HALDUR_E2E_PORT || 3180) + workerInfo.workerIndex;
       const child = spawn(
         process.execPath,
         [

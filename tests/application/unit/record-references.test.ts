@@ -2,7 +2,7 @@
 // transcript can point at it without a second set of controls.
 import { describe, expect, it } from "vitest";
 
-import { recordReferences } from "../../../src/components/server-guy/record-references";
+import { recordReferences } from "../../../src/components/haldur/record-references";
 import type {
   ChatMessage,
   Decision,

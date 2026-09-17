@@ -51,7 +51,7 @@ const native = {
           ...(rich
             ? {
                 DATABASE_URL:
-                  "postgresql://serverguy:${SERVER_GUY_DATABASE_PASSWORD}@postgres:5432/application",
+                  "postgresql://haldur:${HALDUR_DATABASE_PASSWORD}@postgres:5432/application",
               }
             : {}),
         },
@@ -290,7 +290,7 @@ await page
   .click();
 await page.waitForURL(/\/applications\/[\da-f-]{36}$/, { timeout: 30000 });
 const nav = page.getByRole("navigation", { name: "Application workspace" });
-const composer = page.getByRole("textbox", { name: "Message Server Guy" });
+const composer = page.getByRole("textbox", { name: "Message Haldur" });
 await composer.fill("Deploy this repository on a small server, please.");
 await page.getByRole("button", { name: "Send", exact: true }).click();
 await page.getByText("[QA fixture reply]").first().waitFor({ timeout: 30000 });

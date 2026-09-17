@@ -11,7 +11,7 @@
 // shell renders proves nothing about the page an owner opens.
 //
 // The database is built here, from scratch, every time. It never reads
-// `SERVER_GUY_DB_PATH`, never opens `.server-guy`, and holds no credentials:
+// `HALDUR_DB_PATH`, never opens `.haldur`, and holds no credentials:
 // a scenario record mixed into a real application is a lie that outlives the
 // command that wrote it.
 import Database from "better-sqlite3";
@@ -33,19 +33,19 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535)
 // rather than derived from the environment: this command has exactly one
 // database, and the owner's is not reachable from here by any setting.
 const state = resolve("tests/results/scenarios");
-const database = join(state, "server-guy.db");
+const database = join(state, "haldur.db");
 rmSync(state, { recursive: true, force: true });
 mkdirSync(state, { recursive: true });
 
 const environment = {
   ...process.env,
-  SERVER_GUY_DB_PATH: database,
-  SERVER_GUY_CONFIG_DIR: state,
+  HALDUR_DB_PATH: database,
+  HALDUR_CONFIG_DIR: state,
   // Isolated too: this command must not read, refresh or disturb the
   // ChatGPT connection the owner's checkouts share.
-  SERVER_GUY_PI_CONFIG_DIR: state,
-  SERVER_GUY_LOG_DIR: join(state, "diagnostics"),
-  SERVER_GUY_TRACING: "0",
+  HALDUR_PI_CONFIG_DIR: state,
+  HALDUR_LOG_DIR: join(state, "diagnostics"),
+  HALDUR_TRACING: "0",
 };
 
 // The product refuses to run against a database it did not stamp, so the
@@ -69,7 +69,7 @@ const conversation = db.prepare(
 );
 const message = db.prepare(
   `insert into messages (id, conversation_id, role, body, blocks, source, status, created_at, updated_at)
-   values (?, ?, 'assistant', ?, '[]', 'server-guy', 'completed', ?, ?)`,
+   values (?, ?, 'assistant', ?, '[]', 'haldur', 'completed', ?, ?)`,
 );
 const information = db.prepare(
   `insert into saved_information (id, application_id, title, body, evidence, established_at, presentation, created_at, updated_at, retired_at)

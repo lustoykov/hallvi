@@ -268,7 +268,7 @@ export function establishSecret(
   if (!value) throw new Error("A secret cannot be empty.");
   if (value.length < MINIMUM_LENGTH)
     throw new Error(
-      `Server Guy holds secrets of at least ${MINIMUM_LENGTH} characters. ` +
+      `Haldur holds secrets of at least ${MINIMUM_LENGTH} characters. ` +
         `Shorter values cannot be kept out of command output reliably — they ` +
         `occur in ordinary text — and it would be dishonest to accept one and ` +
         `imply it is hidden.`,
@@ -385,7 +385,7 @@ export function revealSecret(applicationId: string, name: string) {
   if (!found?.sealed) throw new Error(`No value is held for ${name}.`);
   if ((found.origin ?? "owner") !== "generated")
     throw new Error(
-      `${name} is the value you supplied, so Server Guy will not read it ` +
+      `${name} is the value you supplied, so Haldur will not read it ` +
         `back. Only credentials it generated itself can be revealed.`,
     );
   return {
@@ -432,7 +432,7 @@ export function beginChange(
     );
   if (supplied !== undefined && supplied.length < MINIMUM_LENGTH)
     throw new Error(
-      `Server Guy holds secrets of at least ${MINIMUM_LENGTH} characters.`,
+      `Haldur holds secrets of at least ${MINIMUM_LENGTH} characters.`,
     );
   const next = supplied ?? randomBytes(GENERATED_BYTES).toString("base64url");
   const current = unseal(found.sealed);

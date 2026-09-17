@@ -38,7 +38,7 @@ export const suites = [
     id: "smoke",
     name: "Browser smoke",
     command: "npm run test:e2e:smoke",
-    scope: "2 desktop journeys through Server Guy",
+    scope: "2 desktop journeys through Haldur",
     cost: "No AI calls",
     ci: "Every PR",
     ciDetail: "",
@@ -166,8 +166,8 @@ export function createDashboard(root: string, launch: Launch = spawn) {
     // runs.
     const env = {
       ...process.env,
-      SERVER_GUY_LIVE_EVALS: "",
-      SERVER_GUY_LIVE_JUDGE: "",
+      HALDUR_LIVE_EVALS: "",
+      HALDUR_LIVE_JUDGE: "",
       ...command.env,
       FORCE_COLOR: "0",
     };
@@ -448,11 +448,11 @@ if (
 ) {
   const root = process.cwd();
   if (!existsSync(join(root, "tests/browser", "journeys.ts")))
-    throw new Error("Run from the Server Guy repository");
+    throw new Error("Run from the Haldur repository");
   const dashboard = createDashboard(root);
   dashboard.server.listen(4317, "127.0.0.1", () =>
     console.log(
-      "Server Guy Testing: http://127.0.0.1:4317 (local only; no checks start automatically)",
+      "Haldur Testing: http://127.0.0.1:4317 (local only; no checks start automatically)",
     ),
   );
   dashboard.server.on("error", (error) => {

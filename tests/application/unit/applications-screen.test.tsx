@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import Home from "../../../src/app/page";
-import { ApplicationsScreen } from "../../../src/components/server-guy/applications-screen";
-import { NewApplicationScreen } from "../../../src/components/server-guy/new-application-screen";
-import type { ApplicationListItem } from "../../../src/components/server-guy/applications-screen";
+import { ApplicationsScreen } from "../../../src/components/haldur/applications-screen";
+import { NewApplicationScreen } from "../../../src/components/haldur/new-application-screen";
+import type { ApplicationListItem } from "../../../src/components/haldur/applications-screen";
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -111,11 +111,7 @@ describe("application navigation", () => {
     expect(html).toContain('value=""');
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Add application/);
     expect(html).not.toContain("todo-fastapi");
-    for (const retired of [
-      "Always ask",
-      "Let Server Guy decide",
-      "Full autonomy",
-    ])
+    for (const retired of ["Always ask", "Let Haldur decide", "Full autonomy"])
       expect(html).not.toContain(retired);
     expect(html).toContain('href="/applications"');
   });

@@ -1,11 +1,15 @@
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { defineConfig } from "drizzle-kit";
+import {
+  adoptLegacyEnvironment,
+  stateLocation,
+} from "./scripts/legacy-names.mjs";
 
 const databasePath =
-  process.env.SERVER_GUY_DB_PATH ??
-  join(process.cwd(), ".server-guy", "server-guy.db");
+  adoptLegacyEnvironment().HALDUR_DB_PATH ??
+  stateLocation(process.cwd(), { hidden: true }).database;
 mkdirSync(dirname(databasePath), { recursive: true });
 
 export default defineConfig({

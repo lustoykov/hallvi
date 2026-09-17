@@ -25,7 +25,7 @@ type Cloud = {
   firewalls: Labelled[];
 };
 
-const file = () => join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.json");
+const file = () => join(process.env.HALDUR_CONFIG_DIR!, "rig-cloud.json");
 function load(): Cloud {
   return existsSync(file())
     ? JSON.parse(readFileSync(file(), "utf8"))
@@ -38,7 +38,7 @@ function save(cloud: Cloud) {
 }
 function log(entry: Record<string, unknown>) {
   appendFileSync(
-    join(process.env.SERVER_GUY_CONFIG_DIR!, "rig-cloud.log"),
+    join(process.env.HALDUR_CONFIG_DIR!, "rig-cloud.log"),
     JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n",
   );
 }

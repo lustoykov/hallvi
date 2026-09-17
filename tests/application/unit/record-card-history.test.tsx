@@ -16,7 +16,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { InformationCard } from "../../../src/components/server-guy/information-card";
+import { InformationCard } from "../../../src/components/haldur/information-card";
 import type { SavedInformation } from "../../../src/server/operator-data";
 
 const ID = "bcb57ff6-2d1e-4a1b-9c74-0f2f7a4ad2e1";

@@ -1,9 +1,10 @@
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
+import { adoptLegacyEnvironment, stateLocation } from "./legacy-names.mjs";
 const path =
-  process.env.SERVER_GUY_DB_PATH ??
-  join(process.cwd(), ".server-guy", "server-guy.db");
+  adoptLegacyEnvironment().HALDUR_DB_PATH ??
+  stateLocation(process.cwd(), { hidden: true }).database;
 const { version } = JSON.parse(
   readFileSync(
     new URL("../src/server/schema-version.json", import.meta.url),

@@ -1,6 +1,6 @@
 # Backups: inspect a copy before recovery
 
-The Backups page keeps the application’s data separate from Server Guy’s own
+The Backups page keeps the application’s data separate from Haldur’s own
 recovery. Expand a stage to inspect the inventory, destination and retained
 copies; expand recovery to choose a copy and draft a request.
 
@@ -13,7 +13,7 @@ flowchart TD
   R --> D
   D --> Q[Editable request in conversation]
   Q --> X[Replacing running data requires the requested confirmation]
-  S[Server Guy recovery] --> K[Separate records, credentials and recovery kit]
+  S[Haldur recovery] --> K[Separate records, credentials and recovery kit]
 ```
 
 Restore results take precedence over a copy’s claimed contents. A restore

@@ -28,7 +28,7 @@ export async function handle(work: () => unknown): Promise<Response> {
         error:
           error instanceof Error
             ? error.message
-            : "Server Guy could not complete that request.",
+            : "Haldur could not complete that request.",
       },
       { status: statusFor(error) },
     );

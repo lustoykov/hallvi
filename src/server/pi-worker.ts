@@ -241,7 +241,7 @@ export async function executePiRun(
             ? "The model service could not be reached. Check your connection and retry."
             : failure.category === "storage"
               ? "The reply could not be saved. Check local storage, then retry."
-              : "Server Guy could not finish this attempt. Check Settings or retry.";
+              : "Haldur could not finish this attempt. Check Settings or retry.";
     finishPiRun(
       run.id,
       "failed",
@@ -266,7 +266,7 @@ export async function executePiRun(
 }
 
 /**
- * Server Guy's own records are copied off this machine by the worker, not by
+ * Haldur's own records are copied off this machine by the worker, not by
  * Pi and not by the owner remembering to. A copy that cannot be taken is
  * recorded where the Backups view reads it; it never stops the worker.
  */
@@ -275,7 +275,7 @@ async function keepControllerCopy(trigger: "after-change" | "daily") {
     if (copyDue(trigger)) await protectController(trigger);
   } catch (error) {
     console.warn(
-      `Server Guy could not copy its own records: ${error instanceof Error ? error.message : "unknown reason"}`,
+      `Haldur could not copy its own records: ${error instanceof Error ? error.message : "unknown reason"}`,
     );
   }
 }

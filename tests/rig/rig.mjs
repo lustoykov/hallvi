@@ -1,4 +1,4 @@
-// Local real-Pi rig: Server Guy's own web app, worker, SQLite records, Pi
+// Local real-Pi rig: Haldur's own web app, worker, SQLite records, Pi
 // runtime, workspace, Compose resolver, registry pinning and executor, run from
 // a copy of this checkout with stand-ins at external boundaries only:
 //   - GitHub API (stand-ins/github-api.ts): exact mirrors of public
@@ -147,7 +147,7 @@ if (!existsSync(join(state, "github-connection.json")))
       id: "00000000-0000-4000-8000-00000000a0d1",
       mode: "app",
       clientId: "Iv1.rig",
-      slug: "rig-server-guy",
+      slug: "rig-haldur",
       token: "ghu_RIG-SYNTHETIC",
       expiresAt: null,
       account: { id: 42, login: "rig-owner" },
@@ -164,14 +164,14 @@ if (!existsSync(join(state, "pi-settings.json"))) {
 
 const env = {
   ...process.env,
-  SERVER_GUY_DB_PATH: join(state, "server-guy.db"),
-  SERVER_GUY_LOG_DIR: join(state, "diagnostics"),
-  SERVER_GUY_CONFIG_DIR: state,
+  HALDUR_DB_PATH: join(state, "haldur.db"),
+  HALDUR_LOG_DIR: join(state, "diagnostics"),
+  HALDUR_CONFIG_DIR: state,
   PI_CODING_AGENT_DIR: agent,
-  SERVER_GUY_GITHUB_CLIENT_ID: "Iv1.rig",
-  SERVER_GUY_GITHUB_APP_SLUG: "rig-server-guy",
+  HALDUR_GITHUB_CLIENT_ID: "Iv1.rig",
+  HALDUR_GITHUB_APP_SLUG: "rig-haldur",
   NEXT_TELEMETRY_DISABLED: "1",
-  SERVER_GUY_TRACING: "0",
+  HALDUR_TRACING: "0",
   SG_RIG_MIRROR_DIR: join(results, "upstream"),
   SG_RIG_HOST_ROOT: host,
   // With a real sshd published by host/ssh.mjs, the shims stop emulating SSH

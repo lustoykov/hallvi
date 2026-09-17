@@ -14,12 +14,12 @@ let directory: string;
 
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), "sg-activity-"));
-  process.env.SERVER_GUY_CONFIG_DIR = directory;
+  process.env.HALDUR_CONFIG_DIR = directory;
   store = await import("@/server/pi-activity");
 });
 
 afterAll(() => {
-  delete process.env.SERVER_GUY_CONFIG_DIR;
+  delete process.env.HALDUR_CONFIG_DIR;
   rmSync(directory, { recursive: true, force: true });
 });
 

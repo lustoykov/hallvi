@@ -2,7 +2,7 @@
 export function traceExportConfiguration() {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
   const mode =
-    process.env.SERVER_GUY_TRACING !== "1"
+    process.env.HALDUR_TRACING !== "1"
       ? "off"
       : endpoint
         ? "otlp"

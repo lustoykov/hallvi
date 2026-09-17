@@ -202,7 +202,7 @@ private behind a wall.
 | "2 of 3 checks" | count over those checks | — | — | derived |
 | probe time | the record's `establishedAt` | — | — | derived |
 | "Recent changes" | records `about` this process, newest five | — | — | derived |
-| the ghosts | a fixed list of what Server Guy cannot do yet | — | — | derived, and never presented as a reading |
+| the ghosts | a fixed list of what Haldur cannot do yet | — | — | derived, and never presented as a reading |
 
 **Empty and partial.** No `process` subject at all → the page says nobody has
 looked, and offers the one question that would change that. A process stated
@@ -338,7 +338,7 @@ test are files nobody has opened.
 | "kept through a replacement" | `volume` check `persistence` | observed | `configuration` | recorded |
 
 **Empty and partial.** Nothing at all → "Not assessed", and specifically *not*
-"no backups": Server Guy not having looked is not the same as there being
+"no backups": Haldur not having looked is not the same as there being
 none. A plan and no copies → the plan is drawn with an empty calendar and the
 page says the promise has not produced anything yet. Copies and no restore
 test → the copies are drawn and the restore tick is explicitly untested, which
@@ -364,9 +364,9 @@ it, a day of traffic and server load.
 | how often | `monitor` fact `interval` | reported | `configuration` | recorded |
 | who hears about it | `monitor` fact `notifies` | reported | `configuration` | recorded |
 | CPU / memory / disk | `host` facts `cpu-used` `memory-used` `disk-used` | observed | `contents` | recorded |
-| traffic over a day | newest `usage` content: requests, 5xx, p95 and top paths per bucket, read from the proxy's access log | observed | when Server Guy reads it | recorded |
-| CPU / memory over a day | the same `usage` record's `host` series, read from the host's own samples | observed | when Server Guy reads it | recorded |
-| the unwatched gaps | parts with no live check, plus a fixed list of what Server Guy cannot watch | — | — | derived |
+| traffic over a day | newest `usage` content: requests, 5xx, p95 and top paths per bucket, read from the proxy's access log | observed | when Haldur reads it | recorded |
+| CPU / memory over a day | the same `usage` record's `host` series, read from the host's own samples | observed | when Haldur reads it | recorded |
+| the unwatched gaps | parts with no live check, plus a fixed list of what Haldur cannot watch | — | — | derived |
 
 **The distinction this page exists to make.** A check that ran once and passed
 is not monitoring. Without a `monitor` subject stating something is watching,
@@ -521,7 +521,7 @@ has read; `not-configured` needs a written absence.
 
 `server-guy-getting-started-b2184a72.accountant-agent.com`, an `A` record to
 `46.62.253.6`, proxied — created by the owner, read but never written by
-Server Guy. Pi checked it from the application's own server:
+Haldur. Pi checked it from the application's own server:
 
 ```
 configured  passed   the provider reports a proxied A record
@@ -546,7 +546,7 @@ separate decision:
 | public ingress on the origin | it makes a deployment reachable from the internet, which is the opposite of the private-by-default rule |
 | a firewall rule for 80/443 | same |
 
-**DNS writes have since shipped.** [PR #76](https://github.com/lustoykov/server-guy/pull/76)
+**DNS writes have since shipped.** [PR #76](https://github.com/lustoykov/haldur/pull/76)
 added `set_domain_record`, which writes one exact name of one exact type per
 call, refuses to take a name from whatever already holds it without `replace`,
 and refuses to remove a record whose address is not the one it expects. The

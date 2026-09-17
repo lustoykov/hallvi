@@ -6,8 +6,8 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { supplyFromRecords } from "@/components/server-guy/supply-records";
-import type { SecretRequest } from "@/components/server-guy/secret-request";
+import { supplyFromRecords } from "@/components/haldur/supply-records";
+import type { SecretRequest } from "@/components/haldur/secret-request";
 import {
   APP,
   NOW,

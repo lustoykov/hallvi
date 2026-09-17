@@ -1,4 +1,4 @@
-// The `server-guy` command of an installation: start, stop and inspect the
+// The `haldur` command of an installation: start, stop and inspect the
 // background service, and say how to reach it from another machine.
 //
 // One rule keeps it understandable: `start` means running now and after every
@@ -23,22 +23,31 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedPorts, installedPorts } from "./installed-ports.mjs";
+import {
+  adoptLegacyEnvironment,
+  piAccountLocation,
+  stateFiles,
+  stateLocation,
+} from "./legacy-names.mjs";
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homedir();
-const data = resolve(
-  process.env.SERVER_GUY_DATA_DIR?.trim() ||
-    join(home, ".local", "share", "server-guy"),
-);
+adoptLegacyEnvironment();
+// An installation from before the rename keeps ~/.local/share/server-guy.
+const chosen = process.env.HALDUR_DATA_DIR?.trim();
+const state = chosen
+  ? stateFiles(resolve(chosen))
+  : stateLocation(join(home, ".local", "share"));
+const data = state.directory;
 const mac = process.platform === "darwin";
-const LABEL = "com.server-guy";
-const UNIT = "server-guy.service";
+const LABEL = "com.haldur";
+const UNIT = "haldur.service";
 const plist = join(home, "Library", "LaunchAgents", `${LABEL}.plist`);
 const unit = join(home, ".config", "systemd", "user", UNIT);
 const log = join(data, "logs", "service.log");
 const domain = `gui/${userInfo().uid}`;
 
-// A service does not inherit a shell's PATH, and Server Guy runs ssh, git and
+// A service does not inherit a shell's PATH, and Haldur runs ssh, git and
 // docker. The person's PATH at `start` is kept, ahead of the usual places.
 const path = [
   ...new Set([
@@ -52,12 +61,12 @@ const path = [
   ]),
 ].join(":");
 
-const environment = { PATH: path, SERVER_GUY_DATA_DIR: data };
+const environment = { PATH: path, HALDUR_DATA_DIR: data };
 
 // The installation's own settings, the port among them. The service reads the
 // same file, so this command and the service cannot disagree about the port.
-const settings = join(data, "server-guy.env");
-if (existsSync(settings)) process.loadEnvFile(settings);
+if (existsSync(state.settings)) process.loadEnvFile(state.settings);
+adoptLegacyEnvironment();
 
 function run(command, args, { quiet = false } = {}) {
   const result = spawnSync(command, args, { encoding: "utf8" });
@@ -102,7 +111,7 @@ function launchdDefinition() {
 function systemdDefinition() {
   const quoted = (value) => `"${value.replace(/(["\\])/g, "\\$1")}"`;
   return `[Unit]
-Description=Server Guy
+Description=Haldur
 
 [Service]
 ExecStart=${quoted(process.execPath)} ${quoted(join(app, "scripts", "serve.mjs"))}
@@ -142,7 +151,7 @@ function unload() {
   run("launchctl", ["bootout", `${domain}/${LABEL}`], { quiet: true });
   for (let wait = 0; loaded() && wait < 100; wait++)
     spawnSync("sleep", ["0.2"]);
-  if (loaded()) throw new Error("launchd did not stop Server Guy in time.");
+  if (loaded()) throw new Error("launchd did not stop Haldur in time.");
 }
 
 function start() {
@@ -166,7 +175,7 @@ function start() {
     if (!lingering())
       run("loginctl", ["enable-linger", userInfo().username], { quiet: true });
   }
-  console.log("Server Guy is starting, and will start with this machine.");
+  console.log("Haldur is starting, and will start with this machine.");
   return status();
 }
 
@@ -177,9 +186,7 @@ function stop() {
   } else if (existsSync(unit)) {
     run("systemctl", ["--user", "disable", "--now", UNIT], { quiet: true });
   }
-  console.log(
-    "Server Guy is stopped, and stays stopped until: server-guy start",
-  );
+  console.log("Haldur is stopped, and stays stopped until: haldur start");
 }
 
 async function answers(url) {
@@ -206,7 +213,7 @@ function workerAlive() {
   try {
     const beat = JSON.parse(
       readFileSync(
-        `${process.env.SERVER_GUY_DB_PATH ?? join(data, "server-guy.db")}.worker-status`,
+        `${process.env.HALDUR_DB_PATH ?? state.database}.worker-status`,
         "utf8",
       ),
     );
@@ -224,9 +231,7 @@ async function status() {
   const release = JSON.parse(
     readFileSync(join(app, "dist", "release.json"), "utf8"),
   );
-  console.log(
-    `Server Guy ${release.version} (${release.revision.slice(0, 7)})`,
-  );
+  console.log(`Haldur ${release.version} (${release.revision.slice(0, 7)})`);
   if (!running) {
     console.log("  service    stopped; it does not start with this machine");
     console.log(`  state      ${data}`);
@@ -246,8 +251,8 @@ async function status() {
   );
   console.log(`  Pi worker  ${workerAlive() ? "running" : "not running yet"}`);
   console.log(`  state      ${data}`);
-  console.log(`  logs       server-guy logs`);
-  if (!up) console.log("Look at `server-guy logs` for the reason.");
+  console.log(`  logs       haldur logs`);
+  if (!up) console.log("Look at `haldur logs` for the reason.");
   return up ? 0 : 1;
 }
 
@@ -278,7 +283,7 @@ function logs() {
 }
 
 /**
- * What to put on the machine with the browser when Server Guy is on another.
+ * What to put on the machine with the browser when Haldur is on another.
  * Every port is forwarded to the same number because pages name them: the
  * terminal connects to 127.0.0.1 on its port, and a private application link
  * is http://127.0.0.1 on the port it was opened on.
@@ -291,7 +296,7 @@ function remote() {
   const ports = installedPorts();
   console.log(`# Add to ~/.ssh/config on the machine with your browser:
 
-Host server-guy
+Host haldur
   HostName ${address}
   User ${user}
   ExitOnForwardFailure yes
@@ -300,12 +305,12 @@ ${forwardedPorts(ports)
   .map((port) => `  LocalForward ${port} 127.0.0.1:${port}`)
   .join("\n")}
 
-# Then keep this running while you use Server Guy:
-#   ssh -N server-guy
+# Then keep this running while you use Haldur:
+#   ssh -N haldur
 # and open http://127.0.0.1:${ports.web}
 #
 # ${ports.web} is the interface, ${ports.terminal} the browser terminal, and ${ports.privateFirst}-${ports.privateLast} are
-# where private application links open. Server Guy listens on this machine's
+# where private application links open. Haldur listens on this machine's
 # loopback only; this SSH connection is the only way in.`);
 }
 
@@ -313,7 +318,7 @@ function uninstall() {
   // This removes the directory above the program, so be certain that is an
   // installation: run from an unpacked archive or a checkout it would
   // otherwise delete whatever happens to contain them.
-  const installed = join(home, ".local", "lib", "server-guy");
+  const installed = join(home, ".local", "lib", "haldur");
   if (app !== join(installed, "app"))
     throw new Error(
       `This is not the installed copy (${join(installed, "app")}); nothing was removed.`,
@@ -323,12 +328,12 @@ function uninstall() {
     rmSync(unit, { force: true });
     run("systemctl", ["--user", "daemon-reload"], { quiet: true });
   }
-  rmSync(join(home, ".local", "bin", "server-guy"), { force: true });
+  rmSync(join(home, ".local", "bin", "haldur"), { force: true });
   // This file is inside what it removes; Node has already read it.
   rmSync(installed, { recursive: true, force: true });
-  console.log(`Server Guy is removed. Everything it knew is kept:
+  console.log(`Haldur is removed. Everything it knew is kept:
   ${data}
-  ${join(home, ".config", "server-guy")}
+  ${dirname(piAccountLocation(home))}
 Installing again picks it all up. To discard it, delete those two directories.`);
 }
 
@@ -350,7 +355,7 @@ if (Object.hasOwn(commands, command)) {
     process.exitCode = 1;
   }
 } else {
-  console.log(`Usage: server-guy <command>
+  console.log(`Usage: haldur <command>
 
   start      run in the background now, and whenever this machine starts
   stop       stop, and stay stopped until the next start

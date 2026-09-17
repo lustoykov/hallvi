@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   releaseHeadline,
   releasesFromRecords,
-} from "@/components/server-guy/release-records";
+} from "@/components/haldur/release-records";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APP = "11111111-2222-4333-8444-555555555555";

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { runActivity, runFailure } from "@/components/server-guy/run-activity";
+import { runActivity, runFailure } from "@/components/haldur/run-activity";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { ActivityRecord } from "@/server/pi-activity";
 
@@ -108,7 +108,7 @@ describe("what a turn in flight says it is doing", () => {
 
   it("reports work that has no execution card of its own", () => {
     const said = ask({ activity: [call({})] });
-    expect(said.says).toBe("Working in Server Guy's records");
+    expect(said.says).toBe("Working in Haldur's records");
     expect(said.since).toBe("4s");
   });
 

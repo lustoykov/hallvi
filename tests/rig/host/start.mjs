@@ -106,7 +106,7 @@ cd /etc/rig-minio/certs
 # A container started before these existed leaves directories in their place.
 for file in private.key public.crt; do [ ! -d "$file" ] || rmdir "$file"; done
 if [ ! -f public.crt ]; then
-  openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=Server Guy rig CA" -keyout ca.key -out ca.crt
+  openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=Haldur rig CA" -keyout ca.key -out ca.crt
   openssl req -newkey rsa:2048 -nodes -subj "/CN=s3.rig.amazonaws.com" -keyout private.key -out host.csr
   printf 'subjectAltName=DNS:s3.rig.amazonaws.com\\n' > san.cnf
   openssl x509 -req -in host.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 30 -extfile san.cnf -out public.crt

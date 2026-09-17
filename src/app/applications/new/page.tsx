@@ -1,4 +1,4 @@
-import { NewApplicationScreen } from "@/components/server-guy/new-application-screen";
+import { NewApplicationScreen } from "@/components/haldur/new-application-screen";
 import {
   currentGithubConnectionId,
   readGithubConnection,

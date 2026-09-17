@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { adoptLegacyEnvironment, stateLocation } from "./legacy-names.mjs";
 
 const { version } = JSON.parse(
   readFileSync(
@@ -10,8 +10,8 @@ const { version } = JSON.parse(
 );
 const STAMPABLE_VERSIONS = [0, version];
 const databasePath =
-  process.env.SERVER_GUY_DB_PATH ??
-  join(process.cwd(), ".server-guy", "server-guy.db");
+  adoptLegacyEnvironment().HALDUR_DB_PATH ??
+  stateLocation(process.cwd(), { hidden: true }).database;
 const database = new Database(databasePath);
 try {
   const current = database.pragma("user_version", { simple: true });

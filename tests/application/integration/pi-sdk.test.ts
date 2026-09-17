@@ -23,7 +23,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 let root: string;
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "server-guy-sdk-regression-"));
+  root = mkdtempSync(join(tmpdir(), "haldur-sdk-regression-"));
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
@@ -61,8 +61,8 @@ async function syntheticSession(compact: boolean) {
     refreshOnCreate: false,
     allowModelNetwork: false,
   });
-  modelRuntime.registerProvider("server-guy-sdk-test", {
-    api: "server-guy-sdk-test",
+  modelRuntime.registerProvider("haldur-sdk-test", {
+    api: "haldur-sdk-test",
     apiKey: "SYNTHETIC-NO-NETWORK",
     baseUrl: "https://invalid.test",
     streamSimple: (model, context: Context) => {
@@ -95,7 +95,7 @@ async function syntheticSession(compact: boolean) {
       },
     ],
   });
-  const model = modelRuntime.getModel("server-guy-sdk-test", "synthetic")!;
+  const model = modelRuntime.getModel("haldur-sdk-test", "synthetic")!;
   const sessionPath = join(root, "chat.jsonl");
   writeFileSync(sessionPath, "", { mode: 0o600 });
   const manager = SessionManager.open(sessionPath, root, root);
@@ -179,7 +179,7 @@ it("restores orphaned tool calls and aborted messages through actual SDK/provide
     stopReason: "error",
   });
   manager.appendCustomMessageEntry(
-    "server-guy-run",
+    "haldur-run",
     "Previous attempt: interrupted. Its proposals were pending, not saved; none were committed.",
     false,
   );
@@ -250,7 +250,7 @@ it("persists custom Run context before real auto-compaction and keeps updated ou
   });
   try {
     await session.sendCustomMessage(
-      { customType: "server-guy-run", content: latest, display: false },
+      { customType: "haldur-run", content: latest, display: false },
       { triggerTurn: false },
     );
     expect(requests).toHaveLength(0);

@@ -6,8 +6,8 @@
 
 import { describe, expect, it, beforeEach } from "vitest";
 
-import { protectionFromRecords } from "@/components/server-guy/backups-records";
-import { storageFromRecords } from "@/components/server-guy/storage-records";
+import { protectionFromRecords } from "@/components/haldur/backups-records";
+import { storageFromRecords } from "@/components/haldur/storage-records";
 import {
   APP,
   NOW,

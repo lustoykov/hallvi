@@ -1,4 +1,4 @@
-import { GithubSetupScreen } from "@/components/server-guy/github-setup-screen";
+import { GithubSetupScreen } from "@/components/haldur/github-setup-screen";
 import { getGithubSetupStatus } from "@/server/github-setup";
 
 export const dynamic = "force-dynamic";

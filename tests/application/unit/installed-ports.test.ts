@@ -12,6 +12,6 @@ it("derives every loopback port from one number, without overlap", () => {
   expect(new Set(all).size).toBe(all.length);
   expect(all).toContain(ports.terminal);
   expect(all).toContain(ports.privateLast);
-  expect(installedPorts({ SERVER_GUY_PORT: "5100" }).terminal).toBe(5101);
-  expect(() => installedPorts({ SERVER_GUY_PORT: "80" })).toThrow();
+  expect(installedPorts({ HALDUR_PORT: "5100" }).terminal).toBe(5101);
+  expect(() => installedPorts({ HALDUR_PORT: "80" })).toThrow();
 });

@@ -1,4 +1,4 @@
-# Testing Server Guy
+# Testing Haldur
 
 ## The 80/20 bar
 
@@ -93,7 +93,7 @@ established absence, a withdrawn record, a release that failed while the one
 before it still serves, a way in that has closed while the application is fine
 — are read through the shipping pages rather than through a second set of
 layouts. It builds its own database under `tests/results/scenarios` every run,
-never reads `SERVER_GUY_DB_PATH`, and carries no credentials. It prints one
+never reads `HALDUR_DB_PATH`, and carries no credentials. It prints one
 address per scenario; each destination is a fragment on that address. Add a
 state to the fixture file rather than starting a second scenario system.
 

@@ -9,7 +9,7 @@ import { useState } from "react";
 import {
   MascotScene,
   type MascotMood,
-} from "../../../components/server-guy/home/mascot-scene";
+} from "../../../components/haldur/home/mascot-scene";
 
 const moods: { mood: MascotMood; note: string }[] = [
   { mood: "ready", note: "Antennas sway a little" },

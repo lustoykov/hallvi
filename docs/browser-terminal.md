@@ -4,7 +4,7 @@ Status: implemented in PR #58, with integration corrections in PR #60, 12 Septem
 
 ## Outcome and boundary
 
-From an application in Server Guy, the owner clicks **Terminal** and gets a real interactive shell on that application's connected server, without copying SSH commands or leaving the browser. For Docker Getting Started, that means the saved Hetzner host, using the controller's existing SSH identity. Resolve the current host at connection time; never hardcode the example server or IP.
+From an application in Haldur, the owner clicks **Terminal** and gets a real interactive shell on that application's connected server, without copying SSH commands or leaving the browser. For Docker Getting Started, that means the saved Hetzner host, using the controller's existing SSH identity. Resolve the current host at connection time; never hardcode the example server or IP.
 
 This is the owner's separate shell. It is not attachment to Pi's current command, Pi's local repository workspace, or an application container. The header must say **Application server** and show the saved `user@address:port`. If Pi executes on that server too, the files and services are shared, but the shell sessions are separate. Pi's existing execution stream remains in chat.
 
@@ -95,7 +95,7 @@ Suggested transport events:
 | Browser → controller | authenticate/attach, input bytes, resize `{cols, rows}`, disconnect |
 | Controller → browser | connection state, ordered output bytes, shell exit `{code, signal}`, classified error |
 
-Use a persistent runtime that actually supports transport upgrades and PTY ownership. Do not assume an ordinary Next.js route handler owns a durable WebSocket. If a small local bridge process is required, wire it into documented development and production startup/shutdown so the owner still starts Server Guy normally. Keep it independent of Pi worker restarts. Do not require the user to start a second helper manually.
+Use a persistent runtime that actually supports transport upgrades and PTY ownership. Do not assume an ordinary Next.js route handler owns a durable WebSocket. If a small local bridge process is required, wire it into documented development and production startup/shutdown so the owner still starts Haldur normally. Keep it independent of Pi worker restarts. Do not require the user to start a second helper manually.
 
 All terminal creation and attachment must retain the existing loopback-host and origin boundary. Validate the exact permitted browser origin on WebSocket upgrade; CORS alone does not protect WebSockets. Use a short-lived, one-use attachment capability issued by the application endpoint and bound to its session, application, target and origin. Do not put it in URLs or logs. No SSH process may spawn before attachment is authorized. Bound frames and queues, propagate backpressure, and handle split UTF-8 sequences without corrupting output. Render terminal output as untrusted terminal data, never HTML. Do not enable remote-triggered clipboard writes, arbitrary URL opening or title changes to the application's trusted target label. These requirements follow the concrete integration risks in the [xterm.js security guide](https://xtermjs.org/docs/guides/security/).
 
