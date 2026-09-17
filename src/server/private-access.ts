@@ -52,7 +52,11 @@ function controlSocket(
   return join(`/tmp/server-guy-ssh-${process.getuid!()}`, identity);
 }
 
-async function masterAlive(socket: string, target: string) {
+async function masterAlive(
+  socket: string,
+  target: string,
+  signal?: AbortSignal,
+) {
   try {
     await exec(
       "ssh",
@@ -67,7 +71,7 @@ async function masterAlive(socket: string, target: string) {
         "check",
         target,
       ],
-      { timeout: 5000 },
+      { timeout: 5000, signal },
     );
     return true;
   } catch {
@@ -104,12 +108,20 @@ export async function openServerPort(
       );
     if (parsed.localPort === undefined) {
       // The link this application already has comes first, then a free port.
+      // A master holds its port, so only occupied ports are worth asking ssh.
       let chosen: number | undefined;
       let open: number | undefined;
       for (let port = first; port <= last && chosen === undefined; port++) {
-        const socket = controlSocket(applicationId, host, remotePort, port);
-        if (await masterAlive(socket, target)) chosen = port;
-        else if (open === undefined && (await free(port))) open = port;
+        signal?.throwIfAborted();
+        if (await free(port)) open ??= port;
+        else if (
+          await masterAlive(
+            controlSocket(applicationId, host, remotePort, port),
+            target,
+            signal,
+          )
+        )
+          chosen = port;
       }
       chosen ??= open;
       if (chosen === undefined)

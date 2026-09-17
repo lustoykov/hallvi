@@ -1,3 +1,4 @@
+import { createServer } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ exec: vi.fn(), settings: vi.fn() }));
 vi.mock("node:child_process", async () => {
@@ -94,10 +95,7 @@ describe("on an installation with fixed private ports", () => {
   beforeEach(() => vi.stubEnv("SERVER_GUY_PRIVATE_PORTS", "47570-47572"));
   afterEach(() => vi.unstubAllEnvs());
 
-  it("chooses a port inside the range when Pi names none", async () => {
-    mocks.exec.mockRejectedValueOnce(new Error("no master on 47570"));
-    mocks.exec.mockRejectedValueOnce(new Error("no master on 47571"));
-    mocks.exec.mockRejectedValueOnce(new Error("no master on 47572"));
+  it("chooses a free port inside the range when Pi names none", async () => {
     mocks.exec.mockRejectedValueOnce(new Error("no control master"));
     mocks.exec.mockResolvedValueOnce({ stdout: "", stderr: "" });
     const result = await openServerPort("app-test", { remotePort: 80 });
@@ -106,12 +104,17 @@ describe("on an installation with fixed private ports", () => {
   });
 
   it("returns the link the application already has", async () => {
-    mocks.exec.mockRejectedValueOnce(new Error("no master on 47570"));
-    mocks.exec.mockResolvedValue({ stdout: "", stderr: "" });
-    expect(await openServerPort("app-test", { remotePort: 80 })).toMatchObject({
-      url: "http://127.0.0.1:47571",
-      reused: true,
-    });
+    // A live master holds its port; only an occupied port is asked about.
+    const held = createServer();
+    await new Promise<void>((done) => held.listen(47571, "127.0.0.1", done));
+    try {
+      mocks.exec.mockResolvedValue({ stdout: "", stderr: "" });
+      expect(
+        await openServerPort("app-test", { remotePort: 80 }),
+      ).toMatchObject({ url: "http://127.0.0.1:47571", reused: true });
+    } finally {
+      await new Promise((done) => held.close(done));
+    }
   });
 
   it("refuses a port the owner does not forward", async () => {

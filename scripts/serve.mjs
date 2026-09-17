@@ -38,13 +38,26 @@ mkdirSync(data, { recursive: true, mode: 0o700 });
 const settings = join(data, "server-guy.env");
 if (existsSync(settings)) process.loadEnvFile(settings);
 
+// The model account stays where development keeps it, so a machine that
+// already connected ChatGPT does not connect again. An owner who moves the
+// configuration directory moves the account with it, as in development.
+const moved =
+  process.env.SERVER_GUY_PI_CONFIG_DIR?.trim() ||
+  process.env.SERVER_GUY_CONFIG_DIR;
 const resolved = resolveEnvironment(
   {
     SERVER_GUY_DB_PATH: join(data, "server-guy.db"),
     SERVER_GUY_CONFIG_DIR: join(data, "config"),
-    // The model account stays where development keeps it, so a machine that
-    // already connected ChatGPT does not have to connect again.
-    SERVER_GUY_PI_CONFIG_DIR: join(homedir(), ".config", "server-guy", "pi"),
+    ...(moved
+      ? {}
+      : {
+          SERVER_GUY_PI_CONFIG_DIR: join(
+            homedir(),
+            ".config",
+            "server-guy",
+            "pi",
+          ),
+        }),
     ...process.env,
   },
   data,
@@ -118,6 +131,11 @@ function stop(signal, code) {
 }
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => stop(signal, 0));
+// However this process ends, it does not leave the pair behind holding the
+// ports and the worker lock in front of the service manager's next attempt.
+process.on("exit", () => {
+  for (const child of children) child.kill("SIGKILL");
+});
 
 console.log(
   `Server Guy on http://127.0.0.1:${ports.web}, keeping its state in ${data}`,
@@ -133,7 +151,7 @@ const web = start([
 ]);
 web.on("exit", (code) => {
   if (!stopping) console.error(`The interface stopped with code ${code}.`);
-  stop("SIGTERM", code ?? 1);
+  stop("SIGTERM", code || 1);
 });
 
 const worker = start([join(program, "dist", "worker.mjs")]);

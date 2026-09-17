@@ -103,7 +103,12 @@ async function start(): Promise<Bridge> {
 }
 
 function bridge() {
-  store.__sgTerminal ??= start();
+  // A fixed port can be taken. Forget the failure so the next request tries
+  // again instead of every terminal failing until the service restarts.
+  store.__sgTerminal ??= start().catch((error) => {
+    store.__sgTerminal = undefined;
+    throw error;
+  });
   return store.__sgTerminal;
 }
 
