@@ -55,6 +55,12 @@ ask the owner with that concrete example; continue the unambiguous cleanup.
 Two pictures of this bar: [how a check is selected](../docs/architecture/test-selection.md)
 and [where a check belongs, and where it does not](../docs/architecture/where-coverage-lives.md).
 
+## Candidate experiment: Jev transcript evaluation
+
+[TypeSafe's Jev](https://docs.typesafe.ai/introduction) is a viable candidate to test as an offline evaluator of Pi's claims against recorded execution evidence. For example, flag "the application is working" when the evidence establishes only that a container started, or flag a reply that overlooks an unresolved tool failure. This is the suggested first Jev experiment; no integration or evaluation result exists yet.
+
+Use a small representative set of redacted transcripts and execution records, with human-reviewed judgments. Compare missed unsupported claims, false alarms, latency and cost before deciding whether it adds value. Typed answers and probabilities are judgments, not proof of deployment, backup or restore success. Keep the experiment advisory and separate from live execution or a required test gate; the [operator design](../docs/operator-design.md#general-tools-and-independent-permissions) describes the operational candidates, with heartbeat and command review remaining deferred.
+
 ## Commands and limits
 
 `npm test` runs the application tests; `npm run test:e2e:smoke` runs the browser

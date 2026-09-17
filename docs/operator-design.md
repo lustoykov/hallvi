@@ -140,6 +140,8 @@ Permissions govern execution independently of deployment, backup or other workfl
 
 The executor runs tools, handles credentials and records execution output and known outcomes. Errors and incomplete results return to Pi, which investigates and corrects through the same general tools. Do not add dedicated recovery tools, reconciliation workflows, cleanup journals or a framework of pending-effect holds. A lost connection is reported honestly; Pi can inspect the host to determine what happened.
 
+[Jev](https://docs.typesafe.ai/introduction), TypeSafe's model for typed choices, scores and probabilities, is a viable candidate to test for failure triage: classify a bounded, redacted error excerpt as likely DNS, credentials, storage, application failure or insufficient evidence. Compare whether this helps Pi investigate faster than using the native error directly. These are provisional interpretations; Pi still verifies the cause. Jev has not been evaluated or selected for Server Guy, and typed outputs do not guarantee correct judgments.
+
 Use a simple Codex-style approval interaction: a pending tool call asks the UI, waits asynchronously for a decision, and continues or declines within the active turn. Do not require an approval table, ending or restarting a turn, replay logic, or restoration of a pending approval after a worker restart.
 
 Read-only side conversations require an appropriate tool boundary; unrestricted server shell access cannot be made read-only merely by naming the conversation that way. The exact inspection capabilities remain open.
@@ -149,6 +151,8 @@ Read-only side conversations require an appropriate tool boundary; unrestricted 
 During beta, prioritize the application's deployment experience and communicate the risks of the current general tools. Recommend the most capable supported model, but never describe any model as immune to prompt injection: logs, repository content and other tool results can carry attacker-controlled instructions. Model capability and user guidance reduce risk; they do not establish an enforced security boundary. The [beta guidance](../README.md#beta-safety) owns practical user precautions, and the [roadmap](../ROADMAP.md) owns delivery timing. Existing permission behavior and fixes for concrete failures remain required.
 
 After beta, revisit the execution boundary as the product matures: useful host diagnostics and disposable testing, restricted access to secrets and production data, network controls, destructive operations and independently protected backups. A separate LLM judge could review proposed tool calls before execution; treat this as a candidate additional check, not proof that two agents cannot be injected. No sandbox library, policy engine, reviewer architecture or new permission mode is selected by this note. Keep the work deferred rather than expanding the current sprint into a security platform.
+
+Jev is a viable candidate to test alongside that command-review use case: flag possible data deletion, credential exposure or effects outside the requested application. Evaluate missed risks and false alarms against representative attacks and legitimate repairs. Its verdict cannot establish safety, grant authority or replace the existing permission boundary; this experiment remains part of deferred hardening.
 
 ### Stable navigation, model-curated content
 
@@ -206,6 +210,8 @@ Most first applications are small: a personal tool, a test, a site with a handfu
 
 This is the operating form of the product rule "Most first users run something small" in [PRODUCT.md](../PRODUCT.md#experience). Broader hardening stays deferred as described under beta security above.
 
+For future care prioritization, Jev is a viable candidate to test whether an ambiguous combination of data growth, traffic, owner-stated importance and protection evidence warrants attention. Keep straightforward thresholds deterministic and compare its judgments against human review. Any result would inform Pi's recommendation, not independently change a record's status or add warnings in the UI.
+
 ### Always-on care and visible commitments
 
 The following captures the longer-term direction. The application-error monitoring scenarios are exploratory and deferred, not requirements for the initial deployment journey. Specific care features will be revisited view by view after the main path is established.
@@ -215,6 +221,8 @@ Agreed wakeup sources are user messages, scheduled wakeups and incoming signals.
 **Deferred Pi heartbeat for state synchronization (owner request, 12 September 2026).** A periodic review should keep recorded application knowledge reasonably up to date between user conversations. Start with the concrete observations required by each designed view: what to inspect, how to collect it, and when it needs refreshing. Small deterministic checks can record observations directly; the heartbeat can wake Pi to investigate a change, obtain missing evidence, or interpret a result. This updates the shared records from which the UI renders, not React's local interaction state.
 
 Synchronization means refreshing our knowledge of the application. It does not mean automatically changing the server to match an old record or plan; corrective actions follow the owner's intent and existing permission mode. If a check cannot run, retain the last successful observation and show the failed check or freshness gap. Do not turn inability to inspect into a claim that the application stopped or disappeared. Cadence, checks and wakeup policy remain to be designed after the current simple deployment UI/UX checkpoint; this note does not start a heartbeat now.
+
+Jev is a viable candidate to test when designing this heartbeat: use recent probe results and bounded, redacted log excerpts to assess whether an ambiguous signal deserves Pi's investigation or repeats an already-known issue. Deterministic checks still record observations directly; model uncertainty or failure must not silently suppress a known failure or monitoring gap. Test missed incidents, unnecessary wakeups, latency and cost before allowing classifications to influence live routing. This remains a deferred experiment, not an implemented heartbeat or a selected model.
 
 Whenever Pi establishes or changes ongoing care, surface that commitment in the relevant views: what is watched or scheduled, its cadence, the last established result and the next expected check. Quiet care means avoiding repetitive attention demands, not hiding the automation. Important changes, failures, decisions and useful recommendations deserve prominence; routine results can update existing information.
 
