@@ -6,6 +6,7 @@ data/
 node_modules
 .next/
 out/
+dist/
 coverage/
 tests/results/
 .impeccable/

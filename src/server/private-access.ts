@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
@@ -9,8 +10,70 @@ import { operatorSettings } from "./operator-execution";
 const exec = promisify(execFile);
 const optionsSchema = z.object({
   remotePort: z.number().int().min(1).max(65535),
-  localPort: z.number().int().min(1024).max(65535).default(8080),
+  localPort: z.number().int().min(1024).max(65535).optional(),
 });
+
+/**
+ * The ports an installation opens private links on, when it fixes them.
+ *
+ * An installed Server Guy may be on a virtual machine, with its owner's
+ * browser on another machine reaching it over SSH. A link on a port nobody
+ * forwarded opens nothing there, so the installation names a small range in
+ * advance, the owner forwards exactly that range, and links stay inside it.
+ * Development leaves this unset and keeps choosing freely.
+ */
+function privateRange() {
+  const match = /^(\d+)-(\d+)$/.exec(
+    process.env.SERVER_GUY_PRIVATE_PORTS?.trim() ?? "",
+  );
+  return match ? { first: Number(match[1]), last: Number(match[2]) } : null;
+}
+
+function free(port: number) {
+  return new Promise<boolean>((resolve) => {
+    const probe = createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, "127.0.0.1");
+  });
+}
+
+function controlSocket(
+  applicationId: string,
+  host: unknown,
+  remotePort: number,
+  localPort: number,
+) {
+  const identity = createHash("sha256")
+    .update(JSON.stringify([applicationId, host, remotePort, localPort]))
+    .digest("hex")
+    .slice(0, 24);
+  // Keep control socket paths short enough for macOS Unix sockets.
+  return join(`/tmp/server-guy-ssh-${process.getuid!()}`, identity);
+}
+
+async function masterAlive(socket: string, target: string) {
+  try {
+    await exec(
+      "ssh",
+      [
+        "-F",
+        "/dev/null",
+        "-S",
+        socket,
+        "-o",
+        "BatchMode=yes",
+        "-O",
+        "check",
+        target,
+      ],
+      { timeout: 5000 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Local forwarding only; neither end can bind a public interface. */
 export async function openServerPort(
@@ -18,19 +81,45 @@ export async function openServerPort(
   options: z.input<typeof optionsSchema>,
   signal?: AbortSignal,
 ) {
-  const { remotePort, localPort } = optionsSchema.parse(options);
+  const parsed = optionsSchema.parse(options);
+  const { remotePort } = parsed;
   const host = operatorSettings(applicationId).host;
   if (!host) throw new Error("Connect a server before opening private access.");
   signal?.throwIfAborted();
-  // Keep control socket paths short enough for macOS Unix sockets.
-  const directory = `/tmp/server-guy-ssh-${process.getuid!()}`;
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const identity = createHash("sha256")
-    .update(JSON.stringify([applicationId, host, remotePort, localPort]))
-    .digest("hex")
-    .slice(0, 24);
-  const socket = join(directory, identity);
+  mkdirSync(`/tmp/server-guy-ssh-${process.getuid!()}`, {
+    recursive: true,
+    mode: 0o700,
+  });
   const target = `${host.user}@${host.address}`;
+  const range = privateRange();
+  let localPort = parsed.localPort ?? 8080;
+  if (range) {
+    const { first, last } = range;
+    if (
+      parsed.localPort !== undefined &&
+      (parsed.localPort < first || parsed.localPort > last)
+    )
+      throw new Error(
+        `This installation opens private links on ports ${first}-${last} only, because those are the ports its owner forwards to their browser. Omit localPort and one is chosen.`,
+      );
+    if (parsed.localPort === undefined) {
+      // The link this application already has comes first, then a free port.
+      let chosen: number | undefined;
+      let open: number | undefined;
+      for (let port = first; port <= last && chosen === undefined; port++) {
+        const socket = controlSocket(applicationId, host, remotePort, port);
+        if (await masterAlive(socket, target)) chosen = port;
+        else if (open === undefined && (await free(port))) open = port;
+      }
+      chosen ??= open;
+      if (chosen === undefined)
+        throw new Error(
+          `Every private link port (${first}-${last}) is in use on the machine running Server Guy.`,
+        );
+      localPort = chosen;
+    }
+  }
+  const socket = controlSocket(applicationId, host, remotePort, localPort);
   const connection = [
     "-F",
     "/dev/null",
@@ -101,8 +190,9 @@ export async function openServerPort(
     remotePort,
     localPort,
     reused,
-    access:
-      "Only on the PC running Server Guy, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
+    access: range
+      ? "On the machine running Server Guy, while its SSH tunnel is alive, and in the owner's browser on another machine when they forward this installation's ports to it. This does not change server listeners or firewalls; verify those separately."
+      : "Only on the PC running Server Guy, while its SSH tunnel is alive. This does not change server listeners or firewalls; verify those separately.",
     // 127.0.0.1 means a different machine in each of the three places this
     // operator works, and the workspace is the one that looks most like the
     // controller and is least like it. Saying so here costs nothing; finding
@@ -133,29 +223,8 @@ export async function privateAccessOpen(
 ) {
   const host = operatorSettings(applicationId).host;
   if (!host) return false;
-  const identity = createHash("sha256")
-    .update(JSON.stringify([applicationId, host, remotePort, localPort]))
-    .digest("hex")
-    .slice(0, 24);
-  const socket = join(`/tmp/server-guy-ssh-${process.getuid!()}`, identity);
-  try {
-    await exec(
-      "ssh",
-      [
-        "-F",
-        "/dev/null",
-        "-S",
-        socket,
-        "-o",
-        "BatchMode=yes",
-        "-O",
-        "check",
-        `${host.user}@${host.address}`,
-      ],
-      { timeout: 5000 },
-    );
-    return true;
-  } catch {
-    return false;
-  }
+  return masterAlive(
+    controlSocket(applicationId, host, remotePort, localPort),
+    `${host.user}@${host.address}`,
+  );
 }

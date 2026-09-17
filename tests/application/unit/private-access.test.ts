@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ exec: vi.fn(), settings: vi.fn() }));
 vi.mock("node:child_process", async () => {
   const { promisify } = await import("node:util");
@@ -86,4 +86,38 @@ it("rejects invalid ports, missing connections and cancellation before starting 
     "Connect a server",
   );
   expect(mocks.exec).not.toHaveBeenCalled();
+});
+
+// An installation's owner may be on another machine, forwarding a fixed set of
+// ports to their browser. A link outside that set opens nothing for them.
+describe("on an installation with fixed private ports", () => {
+  beforeEach(() => vi.stubEnv("SERVER_GUY_PRIVATE_PORTS", "47570-47572"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("chooses a port inside the range when Pi names none", async () => {
+    mocks.exec.mockRejectedValueOnce(new Error("no master on 47570"));
+    mocks.exec.mockRejectedValueOnce(new Error("no master on 47571"));
+    mocks.exec.mockRejectedValueOnce(new Error("no master on 47572"));
+    mocks.exec.mockRejectedValueOnce(new Error("no control master"));
+    mocks.exec.mockResolvedValueOnce({ stdout: "", stderr: "" });
+    const result = await openServerPort("app-test", { remotePort: 80 });
+    expect(result.url).toBe("http://127.0.0.1:47570");
+    expect(result.access).toContain("forward");
+  });
+
+  it("returns the link the application already has", async () => {
+    mocks.exec.mockRejectedValueOnce(new Error("no master on 47570"));
+    mocks.exec.mockResolvedValue({ stdout: "", stderr: "" });
+    expect(await openServerPort("app-test", { remotePort: 80 })).toMatchObject({
+      url: "http://127.0.0.1:47571",
+      reused: true,
+    });
+  });
+
+  it("refuses a port the owner does not forward", async () => {
+    await expect(
+      openServerPort("app-test", { remotePort: 80, localPort: 8080 }),
+    ).rejects.toThrow("47570-47572");
+    expect(mocks.exec).not.toHaveBeenCalled();
+  });
 });
