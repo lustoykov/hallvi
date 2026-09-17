@@ -249,6 +249,15 @@ export type Freshness =
   | { kind: "fresh"; at: string }
   | { kind: "stale"; at: string };
 
+/** How long one claim is believed, in ms; null when nothing says. */
+export function horizonOf(item: { claim?: Claim; freshFor?: number }) {
+  return item.freshFor
+    ? item.freshFor * 1000
+    : item.claim
+      ? expiry[item.claim]
+      : null;
+}
+
 /**
  * Freshness of one claim, asked for by the component drawing it. The same
  * host record is fresh in Deployment's identity row and stale in Overview's
@@ -261,11 +270,7 @@ export function freshnessOf(
 ): Freshness {
   if (!record.establishedAt) return { kind: "never-established" };
   const at = record.establishedAt;
-  const horizon = item.freshFor
-    ? item.freshFor * 1000
-    : item.claim
-      ? expiry[item.claim]
-      : null;
+  const horizon = horizonOf(item);
   if (horizon === null) return { kind: "unknowable", at };
   return now - Date.parse(at) < horizon
     ? { kind: "fresh", at }

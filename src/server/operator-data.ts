@@ -200,6 +200,53 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
       .max(48)
       .default([]),
   }),
+  z.strictObject({
+    kind: z.literal("usage"),
+    /**
+     * A window of readings Server Guy took from the server when it looked:
+     * the proxy's access log for traffic, the host's own samples (sysstat)
+     * for CPU and memory. Nothing collects between looks, so the record's
+     * `establishedAt` is when the window ends, not a live feed.
+     *
+     * Every series shares one clock: bucket `i` starts at
+     * `start + i * stepMinutes`.
+     */
+    start: z.iso.datetime(),
+    stepMinutes: z.number().int().min(1).max(1440),
+    traffic: z
+      .strictObject({
+        /** Where the lines were read, in words: "Caddy access log". */
+        source: z.string().trim().min(1).max(120),
+        requests: z.array(z.number().int().min(0)).max(2016),
+        /** 5xx responses: the application failing, not the visitor. */
+        serverErrors: z.array(z.number().int().min(0)).max(2016),
+        /** Distinct client addresses across the whole window. */
+        visitors: z.number().int().min(0).optional(),
+        /** The 95th percentile response time per bucket, in milliseconds. */
+        p95Ms: z.array(z.number().min(0)).max(2016).optional(),
+        paths: z
+          .array(
+            z.strictObject({
+              path: z.string().min(1).max(300),
+              requests: z.number().int().min(0),
+              serverErrors: z.number().int().min(0).default(0),
+            }),
+          )
+          .max(10)
+          .default([]),
+      })
+      .optional(),
+    host: z
+      .strictObject({
+        source: z.string().trim().min(1).max(120),
+        /** Percent of all cores, per bucket. */
+        cpu: z.array(z.number().min(0).max(100)).max(2016),
+        /** Percent of memory in use, per bucket. */
+        memory: z.array(z.number().min(0).max(100)).max(2016),
+        memoryTotal: z.string().trim().min(1).max(40).optional(),
+      })
+      .optional(),
+  }),
 ]);
 export type InformationContent = z.infer<typeof informationContentSchema>;
 export const informationInputSchema = z.object({

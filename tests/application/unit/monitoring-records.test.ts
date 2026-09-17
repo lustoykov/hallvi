@@ -6,7 +6,10 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { monitoringFromRecords } from "@/components/server-guy/monitoring-records";
+import {
+  monitoringFromRecords,
+  watchingFromRecords,
+} from "@/components/server-guy/monitoring-records";
 import {
   APP,
   NOW,
@@ -81,7 +84,7 @@ describe("monitoringFromRecords", () => {
       ),
     ]);
     expect(story.watcher?.state).toBe("running");
-    expect(story.watcher?.detail).toContain("Watches https://shop.example");
+    expect(story.watcher?.detail).toContain("Watches shop.example");
     expect(story.watcher?.detail).toContain("tells lyubomir@example.com");
   });
 
@@ -176,5 +179,68 @@ describe("capacity is not a reading", () => {
       now: NOW,
     });
     expect(story.looks.filter((look) => look.kind === "output")).toEqual([]);
+  });
+});
+
+describe("watchingFromRecords", () => {
+  const watch = (records: Parameters<typeof read>[0]) =>
+    watchingFromRecords(records, APP, read(records), NOW);
+
+  it("names a part and words its checks, with how long a pass counts", () => {
+    const { parts, counts } = watch([
+      topology([{ id: "c-1f9", kind: "web", name: "Shop" }]),
+      states(
+        { kind: "process", id: "c-1f9" },
+        { checks: [check("http", "passed", "liveness")] },
+      ),
+    ]);
+    expect(parts[0]).toMatchObject({
+      name: "Shop",
+      kindWord: "Web app",
+      state: "counts",
+      watched: false,
+    });
+    expect(parts[0].looks[0]).toMatchObject({
+      title: "Answers web requests",
+      state: "counts",
+      // Checked five minutes ago, and liveness counts for fifteen.
+      left: 10 * 60_000,
+    });
+    expect(counts).toEqual({ counts: 1, expired: 0, failed: 0 });
+  });
+
+  it("expires a pass rather than failing it, and ghosts what nobody stated", () => {
+    const { parts, ghosts, counts } = watch([
+      topology([
+        { id: "app", kind: "web" },
+        { id: "files", kind: "volume" },
+      ]),
+      states(
+        { kind: "process", id: "app" },
+        {
+          at: "2026-09-13T09:00:00.000Z",
+          checks: [check("http", "passed", "liveness")],
+        },
+      ),
+    ]);
+    expect(parts[0].state).toBe("expired");
+    expect(counts).toEqual({ counts: 0, expired: 1, failed: 0 });
+    expect(ghosts.map((gap) => gap.id)).toEqual(["unstated:files"]);
+  });
+
+  it("marks the web part watched only while a watcher is running", () => {
+    const records = [
+      topology([{ id: "app", kind: "web" }]),
+      states(
+        { kind: "process", id: "app" },
+        { checks: [check("http", "failed", "liveness")] },
+      ),
+      states(
+        { kind: "monitor", id: "uptime" },
+        { checks: [check("answering", "passed", "liveness")] },
+      ),
+    ];
+    const { parts } = watch(records);
+    expect(parts[0]).toMatchObject({ state: "failed", watched: true });
   });
 });

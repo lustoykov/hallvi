@@ -969,7 +969,119 @@ function richRecords(id: string): SavedInformation[] {
         remotePort: 8443,
       },
     }),
+    usageRecord(id),
   ];
+}
+
+/**
+ * A day of traffic and server load, shaped like a real one: quiet overnight,
+ * busy through the afternoon, a nightly backup at 03:00, and one bad half
+ * hour where an export endpoint failed and pinned the CPU. Seeded, so every
+ * run draws the same day.
+ */
+function usageRecord(id: string): SavedInformation {
+  const step = 15;
+  const buckets = 96;
+  const end = Math.floor(Date.now() / (step * MINUTE)) * step * MINUTE;
+  const start = end - buckets * step * MINUTE;
+  let seed = 11;
+  const noise = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const incident = buckets - 26;
+  const bad = (i: number) => i >= incident && i < incident + 3;
+
+  const requests: number[] = [];
+  const serverErrors: number[] = [];
+  const p95Ms: number[] = [];
+  const cpu: number[] = [];
+  const memory: number[] = [];
+  for (let i = 0; i < buckets; i++) {
+    const time = new Date(start + i * step * MINUTE);
+    const hour = time.getHours() + time.getMinutes() / 60;
+    const day = Math.max(0, Math.sin((Math.PI * (hour - 6)) / 17));
+    const count = Math.round(18 + 360 * day ** 1.4 + noise() * 40);
+    const backup = hour >= 3 && hour < 3.5;
+    requests.push(count);
+    serverErrors.push(
+      bad(i) ? 18 + Math.round(noise() * 24) : noise() < 0.05 ? 1 : 0,
+    );
+    p95Ms.push(
+      Math.round(
+        bad(i) ? 1900 + noise() * 900 : 150 + count * 0.25 + noise() * 60,
+      ),
+    );
+    cpu.push(
+      Math.round(
+        bad(i)
+          ? 86 + noise() * 10
+          : backup
+            ? 42 + noise() * 8
+            : 3 + count / 14 + noise() * 4,
+      ),
+    );
+    memory.push(
+      Math.round(
+        bad(i)
+          ? 58 + noise() * 6
+          : i > incident
+            ? 41 + noise() * 2
+            : 36 + noise() * 2,
+      ),
+    );
+  }
+  const total = requests.reduce((a, b) => a + b, 0);
+
+  return record(id, {
+    at: new Date(end).toISOString(),
+    title: "A day of traffic and server load was read",
+    views: ["monitoring"],
+    role: "status",
+    status: "info",
+    about: [
+      { kind: "application", id },
+      { kind: "host", id: "hetzner-999999" },
+    ],
+    content: {
+      kind: "usage",
+      start: new Date(start).toISOString(),
+      stepMinutes: step,
+      traffic: {
+        source: "Caddy access log",
+        requests,
+        serverErrors,
+        visitors: Math.round(total / 17),
+        p95Ms,
+        paths: [
+          { path: "/", requests: Math.round(total * 0.34), serverErrors: 0 },
+          {
+            path: "/api/items",
+            requests: Math.round(total * 0.27),
+            serverErrors: 2,
+          },
+          {
+            path: "/static/app.js",
+            requests: Math.round(total * 0.16),
+            serverErrors: 0,
+          },
+          {
+            path: "/login",
+            requests: Math.round(total * 0.08),
+            serverErrors: 0,
+          },
+          {
+            path: "/api/export?format=csv&include=attachments",
+            requests: Math.round(total * 0.03),
+            serverErrors: serverErrors.reduce((a, b) => a + b, 0) - 2,
+          },
+        ],
+      },
+      host: {
+        source: "sysstat samples",
+        cpu,
+        memory,
+        memoryTotal: "4 GB",
+      },
+    },
+  });
 }
 
 /**

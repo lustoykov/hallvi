@@ -13,9 +13,14 @@
 // is to say whether you would be told about a problem must never imply you
 // would be.
 
-import type { Ref, SavedInformation } from "@/server/operator-data";
+import type {
+  InformationContent,
+  Ref,
+  SavedInformation,
+} from "@/server/operator-data";
 import {
   checkAsNow,
+  horizonOf,
   currentChecks,
   currentFacts,
   presenceOf,
@@ -25,12 +30,45 @@ import {
   type SubjectKindOf,
 } from "@/server/record-projection";
 
-import type {
-  Look,
-  TunerView,
-  Unwatched,
-  Watcher,
-} from "./signal-prototype/signal-story";
+export interface Look {
+  id: string;
+  /** The part of the map it is about. */
+  part: string;
+  name: string;
+  short: string;
+  how: string;
+  kind: "check" | "output";
+  at: string | null;
+  state: "passing" | "failing" | "unknown" | "seen";
+  detail: string | null;
+}
+
+export interface Unwatched {
+  id: string;
+  /** The part it would belong to, or null for the whole application. */
+  part: string | null;
+  title: string;
+  short: string;
+  detail: string;
+}
+
+export interface Watcher {
+  state: "running" | "stale" | "not-running";
+  lastObservationAt?: string | null;
+  hostReachable: boolean | null;
+  detail: string;
+}
+
+export interface MonitoringStory {
+  name: string;
+  /** Every part something was observed about, in the order the map draws. */
+  parts: string[];
+  processes: { product: string; roleWords: string }[];
+  looks: Look[];
+  lastCheckAt: string | null;
+  watcher: Watcher | null;
+  unwatched: Unwatched[];
+}
 
 /** Map part kinds to the subject kinds their records live under. */
 const subjects: Record<string, SubjectKindOf[]> = {
@@ -53,7 +91,7 @@ export function monitoringFromRecords({
   applicationId: string;
   applicationName: string;
   now: number;
-}): TunerView {
+}): MonitoringStory {
   const live = records.filter((record) => !record.retiredAt);
   const map = topologyOf(live, applicationId)?.value ?? null;
 
@@ -92,7 +130,7 @@ export function monitoringFromRecords({
         short: held.value.label,
         // What was checked, when Pi said. Falling back to the label printed
         // the same words twice, one above the other.
-        how: held.value.detail ?? "No detail was recorded.",
+        how: held.value.detail ?? "",
         kind: "check",
         at,
         // Ageing never turns a pass into a failure. A reading past its
@@ -106,10 +144,6 @@ export function monitoringFromRecords({
                 ? "seen"
                 : "unknown",
         detail: held.value.detail ?? null,
-        evidence: at
-          ? [{ at, text: held.value.detail ?? held.record.title }]
-          : [],
-        invented: false,
       });
     }
 
@@ -144,7 +178,7 @@ export function monitoringFromRecords({
         read === "failed" ? false : read === "verified" ? true : null,
       detail: [
         facts.get("target")?.value.value
-          ? `Watches ${facts.get("target")!.value.value}`
+          ? `Watches ${facts.get("target")!.value.value.replace(/^https?:\/\//, "")}`
           : null,
         facts.get("interval")?.value.value
           ? `every ${facts.get("interval")!.value.value}`
@@ -208,10 +242,6 @@ export function monitoringFromRecords({
       at: held.record.establishedAt,
       state: "seen",
       detail: null,
-      evidence: held.record.establishedAt
-        ? [{ at: held.record.establishedAt, text: held.value.value }]
-        : [],
-      invented: false,
     });
   }
 
@@ -246,4 +276,206 @@ export function monitoringAssessed(
 /** The series of readings for one subject, when a station is opened. */
 export function readingsFor(records: SavedInformation[], ref: Ref) {
   return seriesFor(records, ref);
+}
+
+export type Usage = Extract<InformationContent, { kind: "usage" }> & {
+  /** When Server Guy read the window: its last bucket ends here. */
+  at: string | null;
+  /** The host's `disk-used` fact, which changes too slowly to chart. */
+  disk: string | null;
+};
+
+/** The newest window of traffic and host readings, when one was read. */
+export function usageFromRecords(
+  records: SavedInformation[],
+  applicationId: string,
+): Usage | null {
+  const live = records.filter((record) => !record.retiredAt);
+  const newest = live
+    .filter(
+      (record) =>
+        record.applicationId === applicationId &&
+        record.presentation?.content?.kind === "usage",
+    )
+    .sort((a, b) =>
+      (b.establishedAt ?? "").localeCompare(a.establishedAt ?? ""),
+    )[0];
+  if (newest?.presentation?.content?.kind !== "usage") return null;
+  const host = subjectsOfKind(live, "host")[0];
+  return {
+    ...newest.presentation.content,
+    at: newest.establishedAt,
+    disk: host
+      ? (currentFacts(live, host).get("disk-used")?.value.value ?? null)
+      : null,
+  };
+}
+
+// ---- The parts, as the Watching map draws them.
+//
+// What a list of check keys never said: a part has a name and a kind, a
+// check is a sentence, and a pass counts for a window and then expires.
+
+/** What a check key means, in words an owner would use. */
+const checkWords: Record<string, [title: string, means: string]> = {
+  http: ["Answers web requests", "A request to it got a good response."],
+  "release-http": [
+    "Answers web requests",
+    "A request to it got a good response.",
+  ],
+  container: ["Its container is running", "Docker reports it as up."],
+  reachable: ["Can be reached", "Another part could connect to it."],
+  persistence: [
+    "Data survives a restart",
+    "Its files live outside the container.",
+  ],
+  ssh: ["Server accepts connections", "Server Guy could log in over SSH."],
+  answering: ["Database answers", "A test query came back."],
+  connects: ["Database answers", "A test query came back."],
+};
+const readingWords: Record<string, string> = {
+  "cpu-used": "CPU in use",
+  "memory-used": "Memory in use",
+  "disk-used": "Disk in use",
+};
+const kindWords: Record<string, string> = {
+  web: "Web app",
+  private: "Background process",
+  process: "Process",
+  volume: "Storage",
+  host: "The machine it runs on",
+  database: "Database",
+  door: "Way in",
+  certificate: "Certificate",
+};
+
+export interface PartLook {
+  id: string;
+  title: string;
+  means: string;
+  at: string | null;
+  /** `expired` worked once, too long ago to count. Never a failure. */
+  state: "counts" | "expired" | "failed" | "read";
+  /** Why it failed, or the value that was read. */
+  detail: string | null;
+  /** How much longer a pass counts, in ms; null when it never expires. */
+  left: number | null;
+}
+export interface WatchedPart {
+  id: string;
+  name: string;
+  kind: string;
+  kindWord: string;
+  looks: PartLook[];
+  lastAt: string | null;
+  state: "failed" | "counts" | "expired" | "never";
+  /** Whether the running watcher covers it. */
+  watched: boolean;
+}
+export interface Watching {
+  parts: WatchedPart[];
+  /** Parts the map draws that no record states: ghosts. */
+  ghosts: Unwatched[];
+  counts: { counts: number; expired: number; failed: number };
+}
+
+export function watchingFromRecords(
+  records: SavedInformation[],
+  applicationId: string,
+  story: MonitoringStory,
+  now: number,
+): Watching {
+  const live = records.filter((record) => !record.retiredAt);
+  const map = topologyOf(live, applicationId)?.value;
+  const watching = story.watcher?.state === "running";
+
+  const parts = story.parts.map((id): WatchedPart => {
+    const drawn = map?.parts.find((part) => part.id === id);
+    const ref = (
+      ["process", "host", "volume", "database", "door", "certificate"] as const
+    )
+      .map((kind): Ref => ({ kind, id }))
+      .find((candidate) => presenceOf(live, candidate).known);
+    const kind = drawn?.kind ?? ref?.kind ?? "process";
+
+    const looks: PartLook[] = ref
+      ? [...currentChecks(live, ref)].map(([key, held]) => {
+          const read = checkAsNow(held.value, held.record, now);
+          const horizon = horizonOf(held.value);
+          const at = held.record.establishedAt;
+          return {
+            id: `${id}:${key}`,
+            title: checkWords[key]?.[0] ?? held.value.label,
+            means: checkWords[key]?.[1] ?? "",
+            at,
+            state:
+              read === "failed"
+                ? "failed"
+                : // A note, or a pass with no claim to age it by: on record,
+                  // and not a statement about now.
+                  read === "noted" || read === "recorded"
+                  ? "read"
+                  : read === "verified"
+                    ? "counts"
+                    : "expired",
+            detail: held.value.detail ?? null,
+            left:
+              at && horizon !== null && Number.isFinite(horizon)
+                ? Date.parse(at) + horizon - now
+                : null,
+          };
+        })
+      : [];
+    for (const look of story.looks)
+      if (look.part === id && look.kind === "output")
+        looks.push({
+          id: look.id,
+          title: readingWords[look.name] ?? look.name,
+          means: "",
+          at: look.at,
+          state: "read",
+          detail: look.how,
+          left: null,
+        });
+
+    const judged = looks.filter((look) => look.state !== "read");
+    return {
+      id,
+      name:
+        drawn?.name ??
+        (ref ? currentFacts(live, ref).get("product")?.value.value : null) ??
+        (kind === "host" ? "Server" : id),
+      kind,
+      kindWord: kindWords[kind] ?? "Part",
+      looks,
+      lastAt:
+        looks
+          .map((look) => look.at)
+          .filter((at): at is string => Boolean(at))
+          .sort()
+          .at(-1) ?? null,
+      state: judged.some((look) => look.state === "failed")
+        ? "failed"
+        : !judged.length
+          ? "never"
+          : judged.some((look) => look.state === "counts")
+            ? "counts"
+            : "expired",
+      // All a watcher's record says it watches is a web address.
+      watched: watching && kind === "web",
+    };
+  });
+
+  const judged = parts.flatMap((part) =>
+    part.looks.filter((look) => look.state !== "read"),
+  );
+  return {
+    parts,
+    ghosts: story.unwatched.filter((gap) => gap.id.startsWith("unstated:")),
+    counts: {
+      counts: judged.filter((look) => look.state === "counts").length,
+      expired: judged.filter((look) => look.state === "expired").length,
+      failed: judged.filter((look) => look.state === "failed").length,
+    },
+  };
 }

@@ -349,30 +349,34 @@ its absence is drawn as an absence rather than left out.
 
 # 8 · Monitoring
 
-The Tuner design: one station per part, each showing what is watched there and
-what is not.
+The Watching map: the server as a frame, one card per part inside it, and the
+watcher as a card outside with a wire in (a ghost when there is none). Above
+it, a day of traffic and server load.
 
 | field in the design | supplies it | basis | refreshed by | derived / recorded |
 |---|---|---|---|---|
-| a station | one part of the map that has a subject | — | — | derived |
-| what is watched there | every check on that part's subject | observed | the check's own claim | recorded |
+| a part card | one part of the map that has a subject | — | — | derived |
+| its checks, as sentences | every check on that part's subject, worded by key | observed | the check's own claim | recorded |
 | when it was last looked at | that check's record `establishedAt` | — | — | derived |
-| pass / fail / unknown | the check's status, aged by its claim | observed | per claim | derived from both |
+| worked / too old to count / failed, and how much longer a pass counts | the check's status, aged by its claim's horizon | observed | per claim | derived from both |
 | the watcher | `monitor:<id>` presence + check `answering` | observed | `liveness` | recorded |
 | what it watches | `monitor` fact `target` | reported | `configuration` | recorded |
 | how often | `monitor` fact `interval` | reported | `configuration` | recorded |
 | who hears about it | `monitor` fact `notifies` | reported | `configuration` | recorded |
 | CPU / memory / disk | `host` facts `cpu-used` `memory-used` `disk-used` | observed | `contents` | recorded |
+| traffic over a day | newest `usage` content: requests, 5xx, p95 and top paths per bucket, read from the proxy's access log | observed | when Server Guy reads it | recorded |
+| CPU / memory over a day | the same `usage` record's `host` series, read from the host's own samples | observed | when Server Guy reads it | recorded |
 | the unwatched gaps | parts with no live check, plus a fixed list of what Server Guy cannot watch | — | — | derived |
 
 **The distinction this page exists to make.** A check that ran once and passed
 is not monitoring. Without a `monitor` subject stating something is watching,
-every station reads "looked at once, not watched" however green its last
-result was — because that is the truth, and the page whose job is to say
+the watcher is drawn as a ghost and the lede says nothing is watching, however
+green the last results were — because that is the truth, and the page whose job is to say
 whether you would hear about a problem must not imply you would.
 
-**Never inferred.** That anything is being watched continuously. `invented` is
-always null on records; it exists only in the isolated visual reference.
+**Never inferred.** That anything is being watched continuously. A part reads
+"Watched" only while a `monitor` is running, and only the web part, because a
+web address is all a watcher's record says it watches.
 
 # 9 · Domains
 
