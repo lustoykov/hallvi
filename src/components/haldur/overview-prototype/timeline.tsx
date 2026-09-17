@@ -54,7 +54,7 @@ import { LaneRails } from "../lane-rails";
 const laneWords: Record<Lane["id"], [question: string, plain: string]> = {
   checks: [
     "Is the app working?",
-    "Server Guy opens the app the way a visitor would and confirms it responds.",
+    "Haldur opens the app the way a visitor would and confirms it responds.",
   ],
   backups: [
     "Is the data safe if the server dies?",
@@ -62,7 +62,7 @@ const laneWords: Record<Lane["id"], [question: string, plain: string]> = {
   ],
   server: [
     "Is the server up?",
-    "The rented machine everything runs on. Server Guy logs in to confirm it is there.",
+    "The rented machine everything runs on. Haldur logs in to confirm it is there.",
   ],
   access: [
     "Is the way in working?",

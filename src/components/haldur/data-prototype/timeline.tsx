@@ -42,7 +42,7 @@ function lasting(ms: number) {
 const laneWords: Record<string, [question: string, plain: string]> = {
   health: [
     "Does the database answer?",
-    "Server Guy connects to it and runs a tiny test query.",
+    "Haldur connects to it and runs a tiny test query.",
   ],
   copies: [
     "Is there a copy off the server?",
