@@ -1,0 +1,430 @@
+/* Rails. Prefix: axlr-. Deliberately quiet: hairline rails, small rings, ink
+   and slate; colour only on the stretch from the last stop to now, and the
+   one moving thing is the light on a lane whose answer still stands. */
+
+.axlr {
+  --axlr-rail: #c5cede;
+  --axlr-ring: #8fa0c4;
+  position: relative;
+  display: grid;
+  margin-top: 18px;
+  border: 1px solid var(--ax-line);
+  border-radius: 16px;
+  background: #ffffff;
+}
+.axlr-mascot {
+  position: absolute;
+  top: -40px;
+  right: 22px;
+  z-index: 2;
+}
+.axlr-lane {
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--ax-line);
+  transition: background var(--ax-base);
+}
+.axlr-lane:last-child {
+  border-bottom: 0;
+}
+.axlr-lane.is-pointed {
+  background: var(--ax-context);
+}
+
+/* ---------- The lane, as a question ---------- */
+.axlr-title {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.axlr-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.axlr-name:disabled {
+  cursor: default;
+}
+.axlr-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 9px;
+  background: var(--ax-context);
+  color: var(--ax-ink-2);
+}
+.axlr-name > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+.axlr-name small {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ax-faint);
+}
+.axlr-name b {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  color: var(--ax-ink);
+}
+.axlr-name:not(:disabled):hover b {
+  color: var(--ax-link);
+}
+.axlr-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ax-muted);
+}
+.axlr-answer em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ax-ink-2);
+}
+.axlr-answer em::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #aab4c4;
+}
+[data-c="verified"] .axlr-answer em,
+[data-c="fact"] .axlr-answer em {
+  color: var(--ax-verified-text);
+}
+[data-c="verified"] .axlr-answer em::before,
+[data-c="fact"] .axlr-answer em::before {
+  background: var(--ax-verified);
+}
+[data-c="stale"] .axlr-answer em {
+  color: var(--ax-waiting-text);
+}
+[data-c="stale"] .axlr-answer em::before {
+  background: var(--ax-amber);
+}
+[data-c="failed"] .axlr-answer em {
+  color: var(--ax-failed);
+}
+[data-c="failed"] .axlr-answer em::before {
+  background: var(--ax-failed);
+}
+.axlr-plain {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ax-faint);
+}
+
+/* ---------- The rail ---------- */
+.axlr-rail {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  padding-top: 14px;
+}
+.axlr-stop {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-start;
+  min-width: 0;
+}
+.axlr-end {
+  flex: 0.7 1 0;
+}
+.axlr-leg {
+  position: relative;
+  flex: 1 1 16px;
+  min-width: 16px;
+  height: 2px;
+  margin-top: 10px;
+  background: var(--axlr-rail);
+}
+/* A long quiet is drawn as one: the rail breaks up. */
+.axlr-leg[data-long] {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--axlr-rail) 0 6px,
+    transparent 6px 11px
+  );
+}
+.axlr-leg em {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--ax-faint);
+  white-space: nowrap;
+}
+/* From the last stop to now: the only stretch that wears the state. */
+.axlr-since {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--axlr-rail) 0 3px,
+    transparent 3px 8px
+  );
+}
+[data-c="verified"] .axlr-since,
+[data-c="fact"] .axlr-since {
+  background: var(--ax-verified);
+}
+[data-c="failed"] .axlr-since {
+  background: var(--ax-failed);
+}
+.axlr-since i {
+  display: none;
+}
+[data-c="verified"] .axlr-since i {
+  position: absolute;
+  top: -2px;
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ax-verified);
+  box-shadow: 0 0 0 3px rgb(20 148 95 / 16%);
+  animation: axlr-run 3.2s var(--ax-ease-in-out) infinite;
+}
+@keyframes axlr-run {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 6px);
+    opacity: 0;
+  }
+}
+.axlr-future {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ax-working-line) 0 3px,
+    transparent 3px 8px
+  );
+}
+.axlr-station {
+  display: grid;
+  flex: none;
+  justify-items: center;
+  gap: 1px;
+  width: 112px;
+  margin: 0 -45px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.axlr-ring {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 5px;
+  border: 1.5px solid var(--axlr-ring);
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--axlr-ring);
+  transition:
+    border-color var(--ax-fast),
+    color var(--ax-fast),
+    box-shadow var(--ax-fast);
+}
+.axlr-ring svg {
+  width: 10px;
+  height: 10px;
+}
+.axlr-station:hover .axlr-ring,
+.axlr-station[aria-expanded="true"] .axlr-ring {
+  border-color: var(--ax-blue);
+  color: var(--ax-blue);
+  box-shadow: 0 0 0 3px rgb(40 90 216 / 10%);
+}
+.axlr-station[data-tone="fail"] .axlr-ring {
+  border-color: var(--ax-failed);
+  background: var(--ax-failed-bg);
+  color: var(--ax-failed);
+}
+.axlr-station[data-tone="info"] .axlr-ring {
+  border-color: var(--axlr-rail);
+  color: var(--ax-faint);
+}
+.axlr-station b {
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.3;
+  color: var(--ax-ink-2);
+}
+.axlr-station small {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ax-faint);
+}
+.axlr-planned {
+  cursor: default;
+}
+.axlr-planned .axlr-ring {
+  border-style: dashed;
+  border-color: var(--ax-working-line);
+}
+.axlr-now {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  padding-left: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axlr-now::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ax-ink);
+}
+.axlr-none {
+  margin-top: 1px;
+  padding: 2px 12px;
+  border: 1px dashed var(--ax-line-2);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ax-muted);
+}
+.axlr-page {
+  display: grid;
+  flex: none;
+  justify-items: center;
+  gap: 2px;
+  width: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ax-muted);
+  cursor: pointer;
+}
+.axlr-page svg {
+  width: 22px;
+  height: 22px;
+  padding: 5px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 50%;
+  background: #ffffff;
+}
+.axlr-page:hover svg {
+  border-color: var(--ax-blue);
+  color: var(--ax-blue);
+}
+.axlr-page:disabled {
+  visibility: hidden;
+}
+.axlr-page small {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+/* ---------- What opens ---------- */
+.axlr-pop {
+  position: absolute;
+  z-index: 5;
+  top: 62px;
+  right: -90px;
+  width: 300px;
+}
+.axlr-pop.is-lane {
+  top: 40px;
+  right: auto;
+  left: 0;
+  width: 340px;
+}
+.axlr-card {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--ax-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px -12px rgb(23 34 56 / 30%);
+  text-align: left;
+}
+.axlr-card b {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ax-ink);
+}
+.axlr-card small {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ax-muted);
+}
+.axlr-card p {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ax-ink-2);
+}
+.axlr-card button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ax-link);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .axlr-lane {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .axlr-rail {
+    overflow-x: auto;
+    padding-inline: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-c="verified"] .axlr-since i {
+    animation: none;
+  }
+}

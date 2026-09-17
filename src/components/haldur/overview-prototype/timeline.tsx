@@ -36,7 +36,6 @@ import {
   NeedCard,
   span,
   useCountdown,
-  useDismiss,
   VitalPop,
   vitalIcon,
   whenWords,
@@ -50,6 +49,26 @@ import {
 } from "./timeline-model";
 import { Mascot, useHaldur } from "./use-haldur";
 import "./timeline.css";
+import { LaneRails } from "../lane-rails";
+/** Each lane as the question an owner would ask, and what it covers. */
+const laneWords: Record<Lane["id"], [question: string, plain: string]> = {
+  checks: [
+    "Is the app working?",
+    "Server Guy opens the app the way a visitor would and confirms it responds.",
+  ],
+  backups: [
+    "Is the data safe if the server dies?",
+    "Copies of the app's data, kept somewhere other than the server.",
+  ],
+  server: [
+    "Is the server up?",
+    "The rented machine everything runs on. Server Guy logs in to confirm it is there.",
+  ],
+  access: [
+    "Is the way in working?",
+    "How you reach the app: your private connection, the web address and the firewall.",
+  ],
+};
 
 const HOUR = 3_600_000;
 const WEEK = 7 * 86_400_000;
@@ -80,22 +99,6 @@ function dayName(at: number, now: number) {
   if (days === 1) return "Tomorrow";
   return new Date(at).toLocaleDateString(undefined, { weekday: "long" });
 }
-
-/** What the stretch since the last look is called, per lane. */
-const since: Record<Lane["id"], string> = {
-  checks: "No check for",
-  backups: "No copy for",
-  server: "Not reached for",
-  access: "Not read for",
-};
-
-/** When the lane holds nothing at all, which is not a duration. */
-const nothing: Record<Lane["id"], string> = {
-  checks: "No check on record",
-  backups: "Never looked",
-  server: "Never reached",
-  access: "Never read",
-};
 
 /**
  * The page's verdict, and the evidence behind it.
@@ -300,11 +303,6 @@ export function TimelineHero({
     [model, guy.live, recheck.marks],
   );
   const timeline = given ?? fallback;
-  const [open, setOpen] = useState<string | null>(null);
-  const close = useCallback(() => setOpen(null), []);
-  useDismiss(Boolean(open), ".axt-pop, .axt-ev, .axt-lane-name", close);
-  const toggle = (id: string) =>
-    setOpen((current) => (current === id ? null : id));
   // This visit, read once from what the browser remembers of the last: how
   // the log was left, and when you last looked, so what landed since stays
   // new all visit. The hero only renders on the client, once the model
@@ -347,23 +345,9 @@ export function TimelineHero({
   const vitals = Object.fromEntries(
     overview.vitals.map((vital) => [vital.id, vital]),
   ) as Record<Vital["id"], Vital>;
-  const { start, end, now } = timeline;
-  const x = (at: number) => ((at - start) / (end - start)) * 100;
-  const nowX = x(now);
+  const { now } = timeline;
   const nextIn = useCountdown(vitals.backups?.countdownTo, offset);
   const pointedLane = pointed ? laneOf(pointed) : null;
-
-  // Hours every six, and the days they belong to.
-  const ticks: number[] = [];
-  const first = new Date(start);
-  first.setMinutes(0, 0, 0);
-  while (first.getHours() % 6 !== 0 || first.getTime() < start)
-    first.setTime(first.getTime() + HOUR);
-  for (let at = first.getTime(); at <= end; at += 6 * HOUR) ticks.push(at);
-  const midnights = ticks.filter((at) => new Date(at).getHours() === 0);
-  const days = [start, ...midnights]
-    .map((at, i, all) => ({ at, width: x(all[i + 1] ?? end) - x(at) }))
-    .filter((day) => day.width > 9);
 
   // Attention first. The condition sentence is scoped to the application's
   // own record, so it can honestly say every check held while a domain check
@@ -697,175 +681,72 @@ export function TimelineHero({
         </div>
       )}
 
-      <div className="axt-time" style={{ ["--now" as string]: `${nowX}%` }}>
-        <div className="axt-field" aria-hidden="true">
-          {ticks.map((at) => (
-            <i
-              key={at}
-              className={`axt-grid${new Date(at).getHours() === 0 ? " is-midnight" : ""}`}
-              style={{ left: `${x(at)}%` }}
-            />
-          ))}
-          {days.map((day) => (
-            <span
-              key={day.at}
-              className="axt-day"
-              style={{ left: `${x(day.at)}%` }}
-            >
-              {dayName(day.at, now)}
-            </span>
-          ))}
-          <div className="axt-future" />
-          <div className="axt-now" />
-        </div>
-        <div className="axt-over">
-          {/* Little Server stands at "now", which is the right-hand edge of
-              the field — and it is centred on that point, so half of it hung
-              off the side of the window. Clamped to half its own width from
-              either edge it still stands at now, and all of it shows. */}
-          <div
-            className="axt-stand"
-            style={{ left: `clamp(46px, ${nowX}%, calc(100% - 46px))` }}
-          >
-            <Mascot
-              guy={guy}
-              mascotRef={mascot}
-              className={`axt-mascot${guy.mood === "pointing" ? " is-pointing" : ""}`}
-            />
-          </div>
-        </div>
-
-        {timeline.lanes.map((lane) => {
+      <LaneRails
+        now={now}
+        mascot={
+          <Mascot
+            guy={guy}
+            mascotRef={mascot}
+            className={`axt-mascot${guy.mood === "pointing" ? " is-pointing" : ""}`}
+          />
+        }
+        onLit={setLit}
+        lanes={timeline.lanes.flatMap((lane) => {
           const vital = vitals[lane.id];
-          if (!vital) return null;
+          if (!vital) return [];
           const certainty = vital.status.certainty;
-          const gapFrom =
-            lane.lastAt !== null ? Math.max(start, lane.lastAt) : start;
-          const gap =
-            !planned &&
-            (certainty === "stale" || certainty === "unknown") &&
-            now - (lane.lastAt ?? start) > HOUR;
-          return (
-            <div
-              key={lane.id}
-              className={`axt-lane${pointedLane === lane.id ? " is-pointed" : ""}`}
-              data-c={certainty}
-            >
-              <div className="axt-lane-head">
-                <button
-                  type="button"
-                  className="axt-lane-name"
-                  aria-expanded={open === `lane:${lane.id}`}
-                  onClick={() => toggle(`lane:${lane.id}`)}
-                >
-                  <span className="axt-lane-icon" aria-hidden="true">
-                    {vitalIcon[lane.id]}
-                  </span>
-                  <span className="axt-lane-text">
-                    <b>{vital.label}</b>
-                    <small>
-                      <i aria-hidden="true" />
-                      <span>{vital.status.text}</span>
-                    </small>
-                  </span>
-                </button>
-                {open === `lane:${lane.id}` && (
-                  <div className="axt-pop is-lane">
-                    <VitalPop
-                      vital={vital}
-                      onClose={close}
-                      onOpenDestination={onOpenDestination}
-                      onAsk={onAsk}
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="axt-track">
-                {gap && (
-                  <div
-                    className="axt-gap"
-                    data-c={certainty}
-                    style={{
-                      left: `${x(gapFrom)}%`,
-                      width: `${nowX - x(gapFrom)}%`,
-                    }}
-                  >
-                    {nowX - x(gapFrom) > 14 && (
-                      <span>
-                        {/* A lane with nothing on record has no stretch to
-                            measure: borrowing the window's edge would report
-                            a duration nobody observed. */}
-                        {lane.lastAt === null
-                          ? nothing[lane.id]
-                          : `${since[lane.id]} ${span(now - lane.lastAt)}`}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {planned && <span className="axt-empty">After deployment</span>}
-                {lane.events.map((event) => {
-                  const id = `event:${event.id}`;
-                  const at = x(event.at);
-                  return (
-                    <div key={event.id}>
-                      <button
-                        type="button"
-                        className={`axt-ev${open === id ? " is-open" : ""}${lit === event.id ? " is-lit" : ""}${event.lines.some((line) => line.id.startsWith("live:")) ? " is-new" : ""}`}
-                        data-tone={event.tone}
-                        style={{ left: `${at}%` }}
-                        aria-label={`${event.title}, ${whenWords(event.at, now)}`}
-                        onClick={() => toggle(id)}
-                        onPointerEnter={() => setLit(event.id)}
-                        onPointerLeave={() => setLit(null)}
-                      >
-                        {event.lines.length > 1 && <b>{event.lines.length}</b>}
-                      </button>
-                      {event.tone === "planned" && nextIn && (
-                        <span className="axt-next" style={{ left: `${at}%` }}>
-                          in {nextIn}
-                        </span>
-                      )}
-                      {open === id && (
-                        <div
-                          className="axt-pop"
-                          data-align={
-                            at > 62 ? "end" : at < 22 ? "start" : "middle"
-                          }
-                          style={{ left: `${at}%` }}
-                        >
-                          <EventPop
-                            event={event}
-                            vital={vital}
-                            now={now}
-                            onClose={close}
-                            onOpenDestination={onOpenDestination}
-                            onAsk={onAsk}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
+          return [
+            {
+              id: lane.id,
+              icon: vitalIcon[lane.id],
+              name: vital.label,
+              question: laneWords[lane.id][0],
+              plain: laneWords[lane.id][1],
+              status: vital.status.text,
+              tone:
+                certainty === "verified" ||
+                certainty === "stale" ||
+                certainty === "failed"
+                  ? certainty
+                  : ("absent" as const),
+              ghost: planned ? "After deployment" : null,
+              nextIn: lane.id === "backups" ? nextIn : null,
+              pointed: pointedLane === lane.id,
+              events: lane.events.map((event) => ({
+                id: event.id,
+                at: event.at,
+                tone:
+                  event.tone === "checking" ? ("info" as const) : event.tone,
+                title: event.title,
+                detail: event.lines.map((line) => line.text).join(" · "),
+              })),
+            },
+          ];
         })}
-
-        <div className="axt-axis" aria-hidden="true">
-          <div className="axt-ticks">
-            {ticks
-              .filter((at) => Math.abs(x(at) - nowX) > 7)
-              .map((at) => (
-                <span key={at} style={{ left: `${x(at)}%` }}>
-                  {clock(at)}
-                </span>
-              ))}
-            <span className="axt-now-label" style={{ left: `${nowX}%` }}>
-              Now · {clock(now)}
-            </span>
-          </div>
-        </div>
-      </div>
+        lanePop={(laneId, close) => (
+          <VitalPop
+            vital={vitals[laneId as Lane["id"]]}
+            onClose={close}
+            onOpenDestination={onOpenDestination}
+            onAsk={onAsk}
+          />
+        )}
+        eventPop={(laneId, eventId, close) => {
+          const event = timeline.lanes
+            .find((lane) => lane.id === laneId)
+            ?.events.find((item) => item.id === eventId);
+          return event ? (
+            <EventPop
+              event={event}
+              vital={vitals[laneId as Lane["id"]]}
+              now={now}
+              onClose={close}
+              onOpenDestination={onOpenDestination}
+              onAsk={onAsk}
+            />
+          ) : null;
+        }}
+      />
 
       <div className="axt-sign" data-state={state}>
         <span className="axt-sign-by">Little Server, from your network</span>
