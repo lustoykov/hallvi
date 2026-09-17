@@ -67,7 +67,11 @@ const path = [
   ]),
 ].join(":");
 
-const environment = { PATH: path, HALDUR_DATA_DIR: data };
+const environment = {
+  PATH: path,
+  HALDUR_DATA_DIR: data,
+  HALDUR_MANAGED_SERVICE: "1",
+};
 
 // The installation's own settings, the port among them. The service reads the
 // same file, so this command and the service cannot disagree about the port.
@@ -106,7 +110,10 @@ function launchdDefinition() {
       ${variables}
     </dict>
     <key>RunAtLoad</key><true/>
-    <key>KeepAlive</key><true/>
+    <key>KeepAlive</key>
+    <dict>
+      <key>SuccessfulExit</key><false/>
+    </dict>
     <key>StandardOutPath</key><string>${xml(log)}</string>
     <key>StandardErrorPath</key><string>${xml(log)}</string>
   </dict>
@@ -125,7 +132,7 @@ WorkingDirectory=${app}
 ${Object.entries(environment)
   .map(([key, value]) => `Environment=${quoted(`${key}=${value}`)}`)
   .join("\n")}
-Restart=always
+Restart=on-failure
 RestartSec=5
 
 [Install]
@@ -190,7 +197,13 @@ function stop() {
     unload();
     rmSync(plist, { force: true });
   } else if (existsSync(unit)) {
-    run("systemctl", ["--user", "disable", "--now", UNIT], { quiet: true });
+    run("systemctl", ["--user", "disable", "--now", UNIT]);
+    if (
+      run("systemctl", ["--user", "is-active", "--quiet", UNIT], {
+        quiet: true,
+      }).status === 0
+    )
+      throw new Error("systemd did not stop Haldur; nothing was removed.");
   }
   console.log("Haldur is stopped, and stays stopped until: haldur start");
 }
@@ -308,7 +321,7 @@ Host haldur
   ExitOnForwardFailure yes
   ServerAliveInterval 30
 ${forwardedPorts(ports)
-  .map((port) => `  LocalForward ${port} 127.0.0.1:${port}`)
+  .map((port) => `  LocalForward 127.0.0.1:${port} 127.0.0.1:${port}`)
   .join("\n")}
 
 # Then keep this running while you use Haldur:

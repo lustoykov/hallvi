@@ -59,18 +59,37 @@ fi
 [ -f "$source_dir/scripts/serve.mjs" ] ||
   fail "run this from the unpacked Haldur archive."
 
+is_installation() {
+  [ -x "$1/node/bin/node" ] &&
+    [ -f "$1/app/scripts/cli.mjs" ] &&
+    [ -f "$1/app/dist/release.json" ]
+}
+
+require_installation() {
+  path=$1
+  name=$2
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    [ -d "$path" ] && is_installation "$path" ||
+      fail "$path is not a $name installation; nothing was replaced."
+  fi
+}
+
 # Ask the service manager, not the old command: a command that cannot run
 # would otherwise read as "not running" and lose its program while serving.
 legacy_home="$HOME/.local/lib/server-guy"
+require_installation "$home" "Haldur"
+require_installation "$legacy_home" "Server Guy"
 if [ "$os" = darwin ]; then
   launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 &&
     running=yes || running=no
   launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 &&
     legacy_running=yes || legacy_running=no
 else
-  systemctl --user is-enabled haldur.service >/dev/null 2>&1 &&
+  { systemctl --user is-enabled haldur.service >/dev/null 2>&1 ||
+    systemctl --user is-active --quiet haldur.service; } &&
     running=yes || running=no
-  systemctl --user is-enabled server-guy.service >/dev/null 2>&1 &&
+  { systemctl --user is-enabled server-guy.service >/dev/null 2>&1 ||
+    systemctl --user is-active --quiet server-guy.service; } &&
     legacy_running=yes || legacy_running=no
 fi
 was_running=$running
@@ -78,9 +97,14 @@ was_running=$running
 upgrade=no
 if [ -d "$home" ] || [ -d "$legacy_home" ]; then upgrade=yes; fi
 
-staging="$home.installing"
-rm -rf "$staging"
-mkdir -p "$staging/app" "$bin"
+mkdir -p "$HOME/.local/lib" "$bin"
+staging=$(mktemp -d "$HOME/.local/lib/haldur.installing.XXXXXX")
+cleanup_staging() {
+  [ -z "${staging:-}" ] || rm -rf "$staging"
+}
+trap cleanup_staging EXIT
+trap 'exit 1' HUP INT TERM
+mkdir -p "$staging/app"
 
 say "Downloading Node.js $NODE_MAJOR for $os-$arch"
 base="https://nodejs.org/dist/latest-v$NODE_MAJOR.x"
@@ -111,22 +135,38 @@ say "Installing dependencies (this compiles two native modules)"
     --loglevel=error
 )
 
+# Refuse an incompatible archive while the current version is still intact and
+# serving. The check only reads an existing database; a new installation has
+# nothing to check yet.
+say "Checking the controller database"
+"$staging/node/bin/node" "$staging/app/scripts/serve.mjs" --check-installed
+
 # Everything that can fail has happened. Only now does a running service stop,
 # so a failed upgrade leaves the old one serving. Its state is elsewhere and is
 # not touched.
 if [ "$running" = yes ]; then
   "$bin/haldur" stop || {
     if [ "$os" = darwin ]; then
-      launchctl bootout "gui/$(id -u)/com.haldur" || true
+      launchctl bootout "gui/$(id -u)/com.haldur" ||
+        fail "Haldur could not be stopped; nothing was replaced."
     else
-      systemctl --user disable --now haldur.service || true
+      systemctl --user disable --now haldur.service ||
+        fail "Haldur could not be stopped; nothing was replaced."
     fi
   }
+  if [ "$os" = darwin ]; then
+    ! launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 ||
+      fail "Haldur is still running; nothing was replaced."
+  else
+    ! systemctl --user is-active --quiet haldur.service ||
+      fail "Haldur is still running; nothing was replaced."
+  fi
 fi
 # The same program under its former name. Its state is not touched.
 if [ "$legacy_running" = yes ]; then
   if [ "$os" = darwin ]; then
-    launchctl bootout "gui/$(id -u)/com.server-guy" || true
+    launchctl bootout "gui/$(id -u)/com.server-guy" ||
+      fail "Server Guy could not be stopped; nothing was replaced."
     # bootout returns before the job is gone, and the old worker still holds
     # the database lock the new one needs.
     for _ in $(seq 100); do
@@ -136,7 +176,10 @@ if [ "$legacy_running" = yes ]; then
     ! launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 ||
       fail "Server Guy did not stop in time and was not replaced. Run install.sh again, then: haldur start"
   else
-    systemctl --user disable --now server-guy.service || true
+    systemctl --user disable --now server-guy.service ||
+      fail "Server Guy could not be stopped; nothing was replaced."
+    ! systemctl --user is-active --quiet server-guy.service ||
+      fail "Server Guy is still running; nothing was replaced."
   fi
 fi
 rm -f "$HOME/Library/LaunchAgents/com.server-guy.plist" \
@@ -146,6 +189,7 @@ rm -rf "$legacy_home"
 
 rm -rf "$home"
 mv "$staging" "$home"
+staging=""
 
 cat >"$bin/haldur" <<EOF
 #!/bin/sh
