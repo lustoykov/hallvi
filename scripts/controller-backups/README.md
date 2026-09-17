@@ -1,6 +1,6 @@
 # Controller recovery
 
-Server Guy's own records and access configuration — the keys, history and
+Haldur's own records and access configuration — the keys, history and
 decisions recovery depends on. Application data backups are separate and
 continue on their host timers.
 
@@ -95,7 +95,7 @@ activation is deliberately manual:
    read-only host access before requesting any change.
 
 The database and config directories inside a copy carry `RECOVERY_QUARANTINE`
-markers, and Server Guy refuses to open a marked directory as its runtime
+markers, and Haldur refuses to open a marked directory as its runtime
 database or configuration — the schema preparation, Drizzle configuration and
 schema-stamping entry points enforce the same guard. The restored `.env` files
 are disabled. Treat the whole restored directory as secret.

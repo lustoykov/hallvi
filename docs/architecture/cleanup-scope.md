@@ -6,7 +6,7 @@ folder name, resource label or idle process is never enough to permit deletion.
 ```mermaid
 flowchart TD
     A[Resource considered for removal] --> B{Who is acting?}
-    B -->|Development agent| C[Exact registered Server Guy development resource]
+    B -->|Development agent| C[Exact registered Haldur development resource]
     B -->|Product Pi| D[Requested application operation or agreed retention]
     C --> E{Verified ownership, disposable contents, no retained dependency?}
     D --> E

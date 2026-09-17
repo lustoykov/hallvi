@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChatPane } from "../../../src/components/server-guy/chat-pane";
+import { ChatPane } from "../../../src/components/haldur/chat-pane";
 import type { Chat, OperatorView, PiRun } from "../../../src/server/types";
 
 const failedAt = "2026-09-05T10:00:00.000Z";
@@ -153,7 +153,7 @@ describe("conversation recovery and assistant branding", () => {
     expect(unavailable).toContain("Start a new chat</button>");
     expect(unavailable).not.toContain("Retry reply</button>");
     const ordinary = render({
-      error: "Server Guy could not finish this attempt.",
+      error: "Haldur could not finish this attempt.",
     });
     // "Try again" now, because the control follows what failed: with no
     // command output to read, trying again is the honest offer.
@@ -170,8 +170,8 @@ describe("conversation recovery and assistant branding", () => {
 
   it("uses one assistant name and a matching composer accessible label", () => {
     const html = render();
-    expect(html).toContain("<strong>Server Guy</strong>");
-    expect(html).toContain('aria-label="Message Server Guy"');
+    expect(html).toContain("<strong>Haldur</strong>");
+    expect(html).toContain('aria-label="Message Haldur"');
     expect(html).not.toContain("<strong>Pi</strong>");
   });
 });

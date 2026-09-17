@@ -37,7 +37,7 @@ export async function callNativeToolsThroughSdk(
   const sdk = await vi.importActual<
     typeof import("@earendil-works/pi-coding-agent")
   >("@earendil-works/pi-coding-agent");
-  const root = mkdtempSync(join(tmpdir(), "server-guy-native-tools-"));
+  const root = mkdtempSync(join(tmpdir(), "haldur-native-tools-"));
   const cwd = join(root, "cwd");
   const agentDir = join(root, "agent");
   mkdirSync(cwd);

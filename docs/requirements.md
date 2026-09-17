@@ -21,7 +21,7 @@ Keep the existing sidebar as the starting structure. It guides users on what des
 
 Permissions are independent of workflow categories; the three modes are defined in [Product](../PRODUCT.md#permission-modes). Credentials and automatically recorded outcomes belong at the tool boundary. A lost connection does not prove an action stopped. Approval uses a pending call that waits for the UI decision and continues or declines. Cross-process restoration of pending approvals is not required, and Bypass has no special provider/spending exception.
 
-The existing Server Guy development data may be discarded; use a fresh schema without legacy migration or history readers. Do not add dedicated recovery tools: return errors and execution evidence to Pi so it can inspect and correct through general tools. Distinguish recorded observations from Pi's interpretations and from claims about current health. User-supplied private values need an appropriate input experience rather than inclusion in public records.
+The existing Haldur development data may be discarded; use a fresh schema without legacy migration or history readers. Do not add dedicated recovery tools: return errors and execution evidence to Pi so it can inspect and correct through general tools. Distinguish recorded observations from Pi's interpretations and from claims about current health. User-supplied private values need an appropriate input experience rather than inclusion in public records.
 
 ## Proving reuse
 

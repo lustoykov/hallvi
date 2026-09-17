@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { OperatorShell } from "@/components/server-guy/operator-shell";
+import { OperatorShell } from "@/components/haldur/operator-shell";
 import { NotFoundError } from "@/server/applications";
 import { listApplications, getMessage } from "@/server/db";
 import { getOperatorView } from "@/server/operator-view";
@@ -41,7 +41,7 @@ export default async function ApplicationPage({
       key={applicationId}
       // Only the QA fixture runs under a fixture root: its repositories are
       // synthetic, so GitHub links are shown but never followed.
-      demo={Boolean(process.env.SERVER_GUY_QA_ROOT)}
+      demo={Boolean(process.env.HALDUR_QA_ROOT)}
       applications={listApplications().map(
         ({ id, repositoryOwner, repositoryName }) => ({
           id,
@@ -51,7 +51,7 @@ export default async function ApplicationPage({
       )}
       // `npm run dev` starts a Drizzle Studio on this database and names its
       // port here, so the Database link cannot point at another checkout's.
-      studioPort={Number(process.env.SERVER_GUY_STUDIO_PORT) || undefined}
+      studioPort={Number(process.env.HALDUR_STUDIO_PORT) || undefined}
       initialView={view}
       initialPiSetup={await getPiSetupStatus()}
     />

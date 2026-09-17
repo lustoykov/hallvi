@@ -5,7 +5,7 @@
 // It is a shape and nothing else now. The builders that made one out of a
 // deployment record are gone with that model; what produces operations today
 // is `historyFromRecords`, out of the records Pi saves.
-import type { ApplicationSection } from "@/components/server-guy/application-sections";
+import type { ApplicationSection } from "@/components/haldur/application-sections";
 
 /**
  * An inspection goes working → inspected. A change goes proposed → queued

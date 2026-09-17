@@ -1,4 +1,4 @@
-"""Host-side scheduled backup engine for one Server Guy deployment.
+"""Host-side scheduled backup engine for one Haldur deployment.
 
 Installed by the controller next to capture_sqlite_stack.py and driven by a
 systemd timer. One process per run, guarded by the deployment lock the

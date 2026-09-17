@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { historyFromRecords } from "@/components/server-guy/history-records";
+import { historyFromRecords } from "@/components/haldur/history-records";
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
 

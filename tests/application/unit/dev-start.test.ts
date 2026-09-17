@@ -4,7 +4,7 @@
 // processes use, and the second decides whether a waiting message is being
 // worked on or sitting there.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
+import { homedir, hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 
@@ -13,6 +13,10 @@ import {
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "../../../scripts/dev-environment.mjs";
+import {
+  piAccountLocation,
+  stateLocation,
+} from "../../../scripts/legacy-names.mjs";
 import { databasePath } from "../../../src/server/db";
 import { diagnosticLogPath } from "../../../src/server/diagnostics";
 import {
@@ -23,17 +27,17 @@ import { WORKER_BUSY_EXIT as workerBusyExit } from "../../../src/server/pi-worke
 import { workerPresence } from "../../../src/server/worker-presence";
 
 const keys = [
-  "SERVER_GUY_DB_PATH",
-  "SERVER_GUY_CONFIG_DIR",
-  "SERVER_GUY_PI_CONFIG_DIR",
-  "SERVER_GUY_LOG_DIR",
+  "HALDUR_DB_PATH",
+  "HALDUR_CONFIG_DIR",
+  "HALDUR_PI_CONFIG_DIR",
+  "HALDUR_LOG_DIR",
 ] as const;
 let saved: Record<string, string | undefined>;
 let root: string;
 
 beforeEach(() => {
   saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  root = mkdtempSync(join(tmpdir(), "server-guy-dev-start-"));
+  root = mkdtempSync(join(tmpdir(), "haldur-dev-start-"));
 });
 afterEach(() => {
   for (const key of keys)
@@ -61,13 +65,17 @@ function asChild(environment: Record<string, string> = {}) {
 // isolate the owner's ChatGPT connection and ask them to sign in again.
 it("hands every child the directories the application would have chosen", () => {
   const plain = asChild();
-  expect(plain.database).toBe(join(process.cwd(), ".server-guy/server-guy.db"));
+  // `.haldur` and ~/.config/haldur/pi, or their Server Guy names where those
+  // are what this machine already has.
+  expect(plain.database).toBe(
+    stateLocation(process.cwd(), { hidden: true }).database,
+  );
   expect(plain.piAccount).not.toBe(plain.config);
-  expect(plain.piAccount).toMatch(/\.config\/server-guy\/pi$/);
+  expect(plain.piAccount).toBe(piAccountLocation(homedir()));
 
   const moved = asChild({
-    SERVER_GUY_DB_PATH: join(root, "moved.db"),
-    SERVER_GUY_CONFIG_DIR: join(root, "state"),
+    HALDUR_DB_PATH: join(root, "moved.db"),
+    HALDUR_CONFIG_DIR: join(root, "state"),
   });
   expect(moved.database).toBe(join(root, "moved.db"));
   expect(moved.config).toBe(join(root, "state"));
@@ -76,9 +84,9 @@ it("hands every child the directories the application would have chosen", () => 
   expect(moved.piAccount).toBe(join(root, "state"));
 
   const split = asChild({
-    SERVER_GUY_CONFIG_DIR: join(root, "state"),
-    SERVER_GUY_PI_CONFIG_DIR: join(root, "account"),
-    SERVER_GUY_LOG_DIR: join(root, "logs"),
+    HALDUR_CONFIG_DIR: join(root, "state"),
+    HALDUR_PI_CONFIG_DIR: join(root, "account"),
+    HALDUR_LOG_DIR: join(root, "logs"),
   });
   expect(split.piAccount).toBe(join(root, "account"));
   expect(split.logs).toBe(join(root, "logs"));
@@ -93,7 +101,7 @@ it("says which exit code means another worker already holds the database", () =>
 // reply being written.
 it("believes a live worker only on evidence a worker is alive", () => {
   const database = join(root, "presence.db");
-  process.env.SERVER_GUY_DB_PATH = database;
+  process.env.HALDUR_DB_PATH = database;
   const beat = (value: Record<string, unknown>) =>
     writeFileSync(`${database}.worker-status`, JSON.stringify(value));
 

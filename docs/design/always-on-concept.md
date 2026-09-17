@@ -1,12 +1,12 @@
-# Always-on Server Guy: a ladder of placements
+# Always-on Haldur: a ladder of placements
 
 A concept note, updated 17 September 2026 to the owner's decision that
-morning. It describes where Server Guy itself runs — the web interface, the Pi
+morning. It describes where Haldur itself runs — the web interface, the Pi
 worker, and the records, credentials and native sessions they keep — and what
 each place means for care that continues when nobody is looking.
 
 Rungs 1 and 2 are implemented as an installed background service;
-[Installing Server Guy](../installation.md) is the practical account and the
+[Installing Haldur](../installation.md) is the practical account and the
 owner of every path, port and command. Rung 3 and the workspace change under
 Packaging are not implemented. Nothing here adds monitoring, scheduled care or
 public access: an always-on installation is where such work could later run,
@@ -17,7 +17,7 @@ adds a use case and removes none of the earlier ones.
 
 Two different things are reached, and they must not be confused:
 
-- **Reaching Server Guy**: opening its interface and talking to Pi.
+- **Reaching Haldur**: opening its interface and talking to Pi.
 - **Reaching a private application**: the application is bound to loopback on
   its host and reached through an SSH tunnel that Pi opens
   (`open_server_port`). That tunnel ends on the machine running the
@@ -49,7 +49,7 @@ flowchart LR
 
 Its honest limit is that care runs while the machine is awake. A closed lid
 pauses scheduled work and drops tunnels until the machine wakes, and losing the
-machine means rebuilding Server Guy from its recovery kit while the
+machine means rebuilding Haldur from its recovery kit while the
 applications keep serving.
 
 ## Rung 2: a virtual machine the user provides
@@ -79,7 +79,7 @@ link ends on the virtual machine, and a page names it as
 `http://127.0.0.1:<port>`, so forwarding the interface alone opens nothing. An
 installation therefore keeps every loopback port a page can name fixed — the
 interface, the browser terminal and a small range for private links — and
-`server-guy remote` prints the SSH configuration that forwards them all to the
+`haldur remote` prints the SSH configuration that forwards them all to the
 same numbers. One connection the user opens carries everything, and links work
 in the user's browser as written. Signing in to ChatGPT and GitHub uses device
 codes, so neither needs a port of its own. Keeping that machine updated and
@@ -93,7 +93,7 @@ and records — so it comes after them, not instead of them.
 
 ```mermaid
 flowchart LR
-  B[Browser anywhere] -- authenticated HTTPS --> S[Hosted Server Guy]
+  B[Browser anywhere] -- authenticated HTTPS --> S[Hosted Haldur]
   S -- SSH --> H[The user's application host]
   S -- encrypted copies --> R[(Recovery storage)]
 ```
@@ -103,8 +103,8 @@ flowchart LR
 Nothing stops a user placing the installation on the same host as the
 application it manages, and it saves a machine. It couples the two failures
 the recovery work exists to separate: losing that host loses the application,
-Server Guy and the credentials at once, leaving the recovery kit as the only
-way back. It also makes reaching Server Guy a public login problem immediately,
+Haldur and the credentials at once, leaving the recovery kit as the only
+way back. It also makes reaching Haldur a public login problem immediately,
 and puts a compromised application one hop from the credentials that manage
 it. This is a caution to explain to the user, not a rule to enforce.
 
@@ -114,9 +114,9 @@ it. This is a caution to explain to the user, not a rule to enforce.
 | --- | --- | --- | --- | --- |
 | User's laptop sleeps | Care pauses; tunnels drop | Unaffected | Unaffected | Unaffected |
 | Connection lost mid-command | Unknown outcome; Pi reads the host later | Unknown outcome; Pi reads the host later | Unknown outcome; Pi reads the host later | Local; unaffected |
-| Application host lost | App down; Server Guy intact and recovers it | App down; Server Guy intact and recovers it | App down; Server Guy intact and recovers it | App, Server Guy and credentials lost together |
-| Machine running Server Guy lost | Rebuild from kit; apps keep serving | Rebuild from kit; apps keep serving | Our incident; apps keep serving | Same host as the app |
-| Reaching Server Guy | Same machine, no login | The user's own tunnel | Login we must build | Public login needed at once |
+| Application host lost | App down; Haldur intact and recovers it | App down; Haldur intact and recovers it | App down; Haldur intact and recovers it | App, Haldur and credentials lost together |
+| Machine running Haldur lost | Rebuild from kit; apps keep serving | Rebuild from kit; apps keep serving | Our incident; apps keep serving | Same host as the app |
+| Reaching Haldur | Same machine, no login | The user's own tunnel | Login we must build | Public login needed at once |
 | Reaching a private app | Tunnel ends on the Mac or PC | Tunnel ends on the VM; the user's SSH connection forwards the fixed link ports | Needs a design of its own | Direct on the host |
 
 ## Packaging
@@ -149,12 +149,12 @@ Still open:
 - how the decided workspace change lands. Pi's repository workspace is a local
   Docker container today. The owner decided it runs directly on the user's
   machine by default, in a scratch folder holding the repository copy, under
-  two hygiene rules that are not a sandbox: Server Guy's own tokens are
+  two hygiene rules that are not a sandbox: Haldur's own tokens are
   stripped from the environment of anything Pi runs, and Pi's file tools refuse
-  to read Server Guy's configuration and credential files. Docker becomes an
+  to read Haldur's configuration and credential files. Docker becomes an
   optional sandbox for people deploying software they do not trust. When it is
   configured and unavailable, the workspace tools are withdrawn with a plain
-  reason, never a silent fallback. Server Guy itself never runs inside that
+  reason, never a silent fallback. Haldur itself never runs inside that
   sandbox; a container image stays a packaging format for the virtual machine
   rung.
 

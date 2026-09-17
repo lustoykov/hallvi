@@ -1,4 +1,4 @@
-// Starts everything a development Server Guy needs: the application, the Pi
+// Starts everything a development Haldur needs: the application, the Pi
 // worker that carries its conversations, and a Drizzle Studio on the same
 // database.
 //
@@ -26,10 +26,12 @@ import {
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
+import { adoptLegacyEnvironment } from "./legacy-names.mjs";
 
+adoptLegacyEnvironment();
 const resolved = resolveEnvironment();
 const shared = environmentVariables(resolved);
-const preferred = Number(process.env.SERVER_GUY_STUDIO_PORT ?? 4983);
+const preferred = Number(process.env.HALDUR_STUDIO_PORT ?? 4983);
 
 function available(port) {
   return new Promise((resolve) => {
@@ -85,7 +87,7 @@ const next = start(
     ...process.argv.slice(2),
   ],
   // The Database link addresses the studio started above, or is absent.
-  { SERVER_GUY_STUDIO_PORT: port ? String(port) : "" },
+  { HALDUR_STUDIO_PORT: port ? String(port) : "" },
 );
 next.on("exit", (code) => {
   stop("SIGTERM");

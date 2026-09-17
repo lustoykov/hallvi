@@ -8,8 +8,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ReleasesPanel } from "@/components/server-guy/releases-panel";
-import type { ReleaseView } from "@/components/server-guy/release-records";
+import { ReleasesPanel } from "@/components/haldur/releases-panel";
+import type { ReleaseView } from "@/components/haldur/release-records";
 
 const AT = "2026-09-15T10:00:00.000Z";
 const NOW = Date.parse("2026-09-15T12:00:00.000Z");

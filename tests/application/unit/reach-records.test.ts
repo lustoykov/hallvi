@@ -7,8 +7,8 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { reachFromRecords } from "@/components/server-guy/reach-records";
-import { publishOffer } from "@/components/server-guy/reach-prototype/reach-story";
+import { reachFromRecords } from "@/components/haldur/reach-records";
+import { publishOffer } from "@/components/haldur/reach-prototype/reach-story";
 import {
   APP,
   NOW,

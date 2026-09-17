@@ -1,19 +1,19 @@
-# Working on Server Guy
+# Working on Haldur
 
 Read [README.md](README.md), [PRODUCT.md](PRODUCT.md),
 [operator design](docs/operator-design.md) and [ROADMAP.md](ROADMAP.md).
 [CONTEXT.md](CONTEXT.md) owns terminology; the
-[component design](src/components/server-guy/DESIGN.md) owns the visual language.
+[component design](src/components/haldur/DESIGN.md) owns the visual language.
 
 ## Development and cleanup
 
 Development runs locally on the owner's MacBook, not on the Mac mini.
 Before creating or retiring development resources, read and follow
 [development resource ownership and cleanup](docs/development-resources.md).
-This file is for agents developing Server Guy, never the product operator Pi.
+This file is for agents developing Haldur, never the product operator Pi.
 Pi has separate runtime instructions; do not inject contributor instructions,
 local agent skills or development automation prompts into product sessions.
-Cleanup is limited to exact Server Guy development resources with verified
+Cleanup is limited to exact Haldur development resources with verified
 ownership and disposable contents; a project folder is not blanket permission
 to remove user data. Never extend cleanup to unrelated folders or resources.
 Record ownership and retention outside worktrees. Task completion includes
@@ -50,7 +50,8 @@ bar and commands. Choose checks proportionate to the change. Documentation
 changes need document/link review, not a browser suite. Run `npm run format` before finishing. Verify host tools and
 provider access before claiming support; unit tests do not prove deployment.
 
-`.server-guy/`, `.next/` and `tests/results/` are local data; never commit them.
+`.haldur/` (`.server-guy/` in a checkout from before the rename), `.next/` and
+`tests/results/` are local data; never commit them.
 Keep decisions in their owning documents and update current wording instead
 of appending handoffs. Documentation does not establish shipped support.
 

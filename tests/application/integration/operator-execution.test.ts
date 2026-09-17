@@ -21,9 +21,9 @@ let root: string;
 let run: PiRun;
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "sg-operator-"));
-  vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "test.db"));
-  vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "config"));
-  pushTestDatabase(process.env.SERVER_GUY_DB_PATH!);
+  vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
+  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
+  pushTestDatabase(process.env.HALDUR_DB_PATH!);
 });
 beforeEach(() => {
   store.db().$client.exec("DELETE FROM applications");
@@ -38,8 +38,8 @@ beforeEach(() => {
   run = claimNextPiRun()!;
 });
 afterAll(() => {
-  globalThis.__serverGuyDb?.$client.close();
-  delete globalThis.__serverGuyDb;
+  globalThis.__haldurDb?.$client.close();
+  delete globalThis.__haldurDb;
   vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
@@ -59,7 +59,7 @@ it("pauses the actual call until approved, then records its output and failure c
   expect(work).not.toHaveBeenCalled();
   expect(store.getChat(run.chatId)?.status).toBe("awaiting-approval");
   store.db().$client.close();
-  delete globalThis.__serverGuyDb;
+  delete globalThis.__haldurDb;
   expect(listExecutions(run.applicationId)[0].id).toBe(receipt.id);
   decideExecution(run.applicationId, receipt.id, true);
   expect(await pending).toEqual({ output: "missing service", exitCode: 3 });

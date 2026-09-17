@@ -1,5 +1,5 @@
 // Pi's real built-in implementations in the real per-run workspace container.
-// Opt in with SERVER_GUY_DOCKER_TESTS=1 on a host with a reachable Docker
+// Opt in with HALDUR_DOCKER_TESTS=1 on a host with a reachable Docker
 // Engine. The first run builds the workspace image, which needs network.
 import * as sdk from "@earendil-works/pi-coding-agent";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -20,9 +20,9 @@ import {
   piWorkspaceTools,
 } from "../../../src/server/pi-workspace";
 
-const variables = ["SERVER_GUY_DB_PATH", "SERVER_GUY_PROBE_TOKEN"] as const;
+const variables = ["HALDUR_DB_PATH", "HALDUR_PROBE_TOKEN"] as const;
 
-describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
+describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
   "Pi built-ins in the real workspace container",
   () => {
     const saved = Object.fromEntries(
@@ -30,10 +30,10 @@ describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
     );
     let root = "";
     beforeAll(() => {
-      root = createTemporaryRoot("/tmp/server-guy-pi-docker-");
+      root = createTemporaryRoot("/tmp/haldur-pi-docker-");
       // Workspace ownership labels and event logs belong to this root.
-      process.env.SERVER_GUY_DB_PATH = join(root, "server-guy.db");
-      process.env.SERVER_GUY_PROBE_TOKEN = "controller-only-credential";
+      process.env.HALDUR_DB_PATH = join(root, "haldur.db");
+      process.env.HALDUR_PROBE_TOKEN = "controller-only-credential";
     });
     afterAll(async () => {
       await cleanupPiWorkspaces().catch(() => undefined);
@@ -92,7 +92,7 @@ describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
           expect.soft(listing).toContain("src/");
           expect.soft(listing).not.toContain(".env");
           expect
-            .soft(await run("read", { path: ".server-guy-source.txt" }))
+            .soft(await run("read", { path: ".haldur-source.txt" }))
             .toContain("qa/example@abc123");
           expect
             .soft(await run("read", { path: "README.md" }))
@@ -136,7 +136,7 @@ describe.skipIf(process.env.SERVER_GUY_DOCKER_TESTS !== "1")(
 
           // Not the controller: no host files, credentials, socket or network.
           const isolation = await run("bash", {
-            command: `test ! -e ${controllerFile} && test ! -e /var/run/docker.sock && echo isolated; env | grep -q SERVER_GUY_PROBE_TOKEN || echo no-credentials; node -e 'process.exit(Object.values(require("node:os").networkInterfaces()).flat().some(a => !a.internal) ? 1 : 0)' && echo no-external-address`,
+            command: `test ! -e ${controllerFile} && test ! -e /var/run/docker.sock && echo isolated; env | grep -q HALDUR_PROBE_TOKEN || echo no-credentials; node -e 'process.exit(Object.values(require("node:os").networkInterfaces()).flat().some(a => !a.internal) ? 1 : 0)' && echo no-external-address`,
           });
           expect
             .soft(isolation.trim())

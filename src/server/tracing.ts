@@ -69,18 +69,18 @@ function tracer() {
               flushInterval: 2,
               mediaUploadEnabled: false,
               shouldExportSpan: ({ otelSpan }) =>
-                otelSpan.instrumentationScope.name === "server-guy",
+                otelSpan.instrumentationScope.name === "haldur",
             })
           : undefined,
     );
     provider = new NodeTracerProvider({
-      resource: resourceFromAttributes({ "service.name": "server-guy" }),
+      resource: resourceFromAttributes({ "service.name": "haldur" }),
       spanProcessors: remote ? [local, remote] : [local],
     });
   }
   // Explicit parent contexts: no global provider, auto-instrumentation, or
   // captured HTTP headers. The only spans exported are created below.
-  return provider.getTracer("server-guy");
+  return provider.getTracer("haldur");
 }
 
 function optionalTelemetry<T>(work: () => T): T | undefined {
@@ -98,13 +98,13 @@ export function beginRunDiagnostics(run: PiRun) {
       {
         startTime: new Date(run.createdAt),
         attributes: {
-          "server_guy.run.id": run.id,
-          "server_guy.application.id": run.applicationId,
+          "haldur.run.id": run.id,
+          "haldur.application.id": run.applicationId,
           "langfuse.session.id": run.chatId,
-          "server_guy.retry_of": run.retryOfId ?? "",
-          "langfuse.trace.name": "Server Guy reply",
-          "server_guy.payload_policy": "Content omitted; metadata only",
-          "server_guy.cost_basis":
+          "haldur.retry_of": run.retryOfId ?? "",
+          "langfuse.trace.name": "Haldur reply",
+          "haldur.payload_policy": "Content omitted; metadata only",
+          "haldur.cost_basis":
             "API price estimates are not subscription charges",
         },
       },
@@ -160,11 +160,11 @@ export function beginRunDiagnostics(run: PiRun) {
       const span = step.span;
       if (!span) return;
       const attrs: Record<string, string | number | boolean> = {
-        "server_guy.outcome": outcome,
+        "haldur.outcome": outcome,
       };
-      if (outcome === "incomplete") attrs["server_guy.incomplete"] = true;
+      if (outcome === "incomplete") attrs["haldur.incomplete"] = true;
       for (const [key, value] of Object.entries(metadata))
-        attrs[`server_guy.${key}`] = value;
+        attrs[`haldur.${key}`] = value;
       if (metadata.model) attrs["gen_ai.request.model"] = metadata.model;
       if (metadata.provider) attrs["gen_ai.provider.name"] = metadata.provider;
       if (typeof metadata.inputTokens === "number")
@@ -237,7 +237,7 @@ export function beginRunDiagnostics(run: PiRun) {
       if (omitted)
         logDiagnostic("execution.omitted", run, { omitted, traceId });
       optionalTelemetry(() => {
-        root?.setAttribute("server_guy.outcome", status);
+        root?.setAttribute("haldur.outcome", status);
         root?.setStatus({
           code:
             status === "succeeded" ? SpanStatusCode.OK : SpanStatusCode.ERROR,

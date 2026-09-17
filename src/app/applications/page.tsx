@@ -1,4 +1,4 @@
-import { ApplicationsScreen } from "@/components/server-guy/applications-screen";
+import { ApplicationsScreen } from "@/components/haldur/applications-screen";
 import { listApplicationItems } from "@/server/application-list";
 import { getPiSetupStatus } from "@/server/pi-setup";
 

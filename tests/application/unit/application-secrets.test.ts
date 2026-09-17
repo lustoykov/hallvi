@@ -19,7 +19,7 @@ let secrets: typeof import("@/server/application-secrets");
 
 beforeEach(async () => {
   directory = mkdtempSync(join(tmpdir(), "sg-secrets-"));
-  process.env.SERVER_GUY_CONFIG_DIR = directory;
+  process.env.HALDUR_CONFIG_DIR = directory;
   // The module reads the directory lazily, but a fresh import per test keeps
   // any future caching from leaking a value between them.
   secrets = await import("@/server/application-secrets");
@@ -31,7 +31,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  delete process.env.SERVER_GUY_CONFIG_DIR;
+  delete process.env.HALDUR_CONFIG_DIR;
 });
 
 describe("asking", () => {

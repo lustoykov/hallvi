@@ -33,7 +33,7 @@ import { piAccountDir, piConfigDir } from "./pi-configuration";
 import { readTar, writeTar } from "./tar";
 
 /**
- * Server Guy's own records and keys, copied to the destination the owner
+ * Haldur's own records and keys, copied to the destination the owner
  * already connected. This is a worker job, not a conversation: Pi may read
  * the result and talk about it, and never runs it.
  *
@@ -181,7 +181,7 @@ function walk(directory: string, prefix: string, entries: TarFile[]) {
 }
 
 /**
- * Which revision of Server Guy this copy came from, so recovery can install
+ * Which revision of Haldur this copy came from, so recovery can install
  * the code that matches its records. A controller running from something
  * other than a checkout says so rather than guessing.
  */
@@ -236,7 +236,7 @@ export async function captureControllerPayload(): Promise<{
   const database = databasePath();
   const staging = mkdtempSync(join(tmpdir(), "sg-controller-copy-"));
   try {
-    const target = join(staging, "server-guy.db");
+    const target = join(staging, "haldur.db");
     const reader = new Database(database, { readonly: true });
     try {
       await reader.backup(target);
@@ -340,6 +340,8 @@ export async function captureControllerPayload(): Promise<{
   for (const [name, path] of [
     [".env", join(process.cwd(), ".env")],
     [".env.local", join(process.cwd(), ".env.local")],
+    ["haldur.env", join(dirname(database), "haldur.env")],
+    // An installation from before the rename keeps its settings by that name.
     ["server-guy.env", join(dirname(database), "server-guy.env")],
   ])
     if (existsSync(path))
@@ -395,7 +397,7 @@ export function encryptArchive(archive: Buffer, secret: string) {
 
 export function decryptArchive(encrypted: Buffer, secret: string) {
   if (!encrypted.subarray(0, MAGIC.length).equals(MAGIC))
-    throw new Error("This file is not a Server Guy controller copy.");
+    throw new Error("This file is not a Haldur controller copy.");
   let offset = MAGIC.length;
   const salt = encrypted.subarray(offset, (offset += 16));
   const iv = encrypted.subarray(offset, (offset += 12));
@@ -583,7 +585,7 @@ export async function protectController(
   options: { access?: DestinationAccess } = {},
 ): Promise<ControllerCopy | null> {
   const access = options.access ?? backupDestinationAccess();
-  // Nothing is connected: the view already says Server Guy is not protected,
+  // Nothing is connected: the view already says Haldur is not protected,
   // and a record of "could not" every few minutes would say nothing more.
   if (!access) return null;
   const state = controllerProtectionState();
@@ -699,7 +701,7 @@ function size(bytes: number | null) {
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-/** Server Guy's own protection, as the Backups view states it. */
+/** Haldur's own protection, as the Backups view states it. */
 export function controllerProtectionFacts(): ControllerProtectionFacts {
   const destination = backupDestinationAccess();
   const state = controllerProtectionState();

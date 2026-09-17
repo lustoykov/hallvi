@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pulse } from "../../../src/components/server-guy/streaming-output";
+import { pulse } from "../../../src/components/haldur/streaming-output";
 import type { ExecutionRecord } from "../../../src/server/operator-execution";
 
 const at = (iso: string) => Date.parse(iso);

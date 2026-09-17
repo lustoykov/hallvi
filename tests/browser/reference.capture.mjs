@@ -176,7 +176,7 @@ await shot("30-interaction-run-job-started");
 await page.waitForTimeout(6500);
 await shot("30-interaction-run-job-done", { fullPage: true });
 await open("scenario=rich&step=13");
-const composer = page.getByRole("textbox", { name: "Message Server Guy" });
+const composer = page.getByRole("textbox", { name: "Message Haldur" });
 await composer.fill("Is my data backed up?");
 await page.getByRole("button", { name: "Send", exact: true }).click();
 await page.getByText("Refers to", { exact: true }).waitFor();

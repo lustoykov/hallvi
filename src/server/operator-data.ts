@@ -203,7 +203,7 @@ export const informationContentSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("usage"),
     /**
-     * A window of readings Server Guy took from the server when it looked:
+     * A window of readings Haldur took from the server when it looked:
      * the proxy's access log for traffic, the host's own samples (sysstat)
      * for CPU and memory. Nothing collects between looks, so the record's
      * `establishedAt` is when the window ends, not a live feed.

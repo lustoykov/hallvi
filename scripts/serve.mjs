@@ -1,4 +1,4 @@
-// Runs an installed Server Guy: the built interface and the bundled Pi worker,
+// Runs an installed Haldur: the built interface and the bundled Pi worker,
 // as one foreground process an operating-system service can own.
 //
 // `scripts/dev.mjs` is the development counterpart and the differences are the
@@ -25,38 +25,47 @@ import {
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
 import { installedPorts } from "./installed-ports.mjs";
+import {
+  adoptLegacyEnvironment,
+  piAccountLocation,
+  stateFiles,
+  stateLocation,
+} from "./legacy-names.mjs";
 
 const program = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const data = resolve(
-  process.env.SERVER_GUY_DATA_DIR?.trim() ||
-    join(homedir(), ".local", "share", "server-guy"),
-);
+adoptLegacyEnvironment();
+let state;
+try {
+  // An installation from before the rename keeps ~/.local/share/server-guy.
+  const chosen = process.env.HALDUR_DATA_DIR?.trim();
+  state = chosen
+    ? stateFiles(resolve(chosen))
+    : stateLocation(join(homedir(), ".local", "share"));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+const data = state.directory;
 mkdirSync(data, { recursive: true, mode: 0o700 });
 
 // Settings an installation keeps for itself, such as the GitHub App's client
 // ID. Values already in the environment win, as they do for `--env-file`.
-const settings = join(data, "server-guy.env");
-if (existsSync(settings)) process.loadEnvFile(settings);
+if (existsSync(state.settings)) process.loadEnvFile(state.settings);
+adoptLegacyEnvironment();
 
 // The model account stays where development keeps it, so a machine that
 // already connected ChatGPT does not connect again. An owner who moves the
 // configuration directory moves the account with it, as in development.
 const moved =
-  process.env.SERVER_GUY_PI_CONFIG_DIR?.trim() ||
-  process.env.SERVER_GUY_CONFIG_DIR;
+  process.env.HALDUR_PI_CONFIG_DIR?.trim() || process.env.HALDUR_CONFIG_DIR;
 const resolved = resolveEnvironment(
   {
-    SERVER_GUY_DB_PATH: join(data, "server-guy.db"),
-    SERVER_GUY_CONFIG_DIR: join(data, "config"),
+    HALDUR_DB_PATH: state.database,
+    HALDUR_CONFIG_DIR: join(data, "config"),
     ...(moved
       ? {}
       : {
-          SERVER_GUY_PI_CONFIG_DIR: join(
-            homedir(),
-            ".config",
-            "server-guy",
-            "pi",
-          ),
+          HALDUR_PI_CONFIG_DIR: piAccountLocation(homedir()),
         }),
     ...process.env,
   },
@@ -89,7 +98,7 @@ function prepareDatabase() {
     const current = database.pragma("user_version", { simple: true });
     if (current !== version)
       throw new Error(
-        `${resolved.database} holds schema ${current} and this Server Guy needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
+        `${resolved.database} holds schema ${current} and this Haldur needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
       );
   } finally {
     database.close();
@@ -114,8 +123,8 @@ function start(args) {
       ...process.env,
       ...environmentVariables(resolved),
       NODE_ENV: "production",
-      SERVER_GUY_TERMINAL_PORT: String(ports.terminal),
-      SERVER_GUY_PRIVATE_PORTS: `${ports.privateFirst}-${ports.privateLast}`,
+      HALDUR_TERMINAL_PORT: String(ports.terminal),
+      HALDUR_PRIVATE_PORTS: `${ports.privateFirst}-${ports.privateLast}`,
     },
   });
   children.add(child);
@@ -138,7 +147,7 @@ process.on("exit", () => {
 });
 
 console.log(
-  `Server Guy on http://127.0.0.1:${ports.web}, keeping its state in ${data}`,
+  `Haldur on http://127.0.0.1:${ports.web}, keeping its state in ${data}`,
 );
 
 const web = start([

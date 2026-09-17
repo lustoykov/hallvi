@@ -17,24 +17,21 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { piAccountLocation, stateLocation } from "./legacy-names.mjs";
+
 export function resolveEnvironment(env = process.env, cwd = process.cwd()) {
-  const database = resolve(
-    cwd,
-    env.SERVER_GUY_DB_PATH ?? join(cwd, ".server-guy", "server-guy.db"),
-  );
-  const config = resolve(
-    cwd,
-    env.SERVER_GUY_CONFIG_DIR ?? join(cwd, ".server-guy"),
-  );
+  const state = () => stateLocation(cwd, { hidden: true });
+  const database = resolve(cwd, env.HALDUR_DB_PATH ?? state().database);
+  const config = resolve(cwd, env.HALDUR_CONFIG_DIR ?? state().directory);
   const piAccount = resolve(
     cwd,
-    env.SERVER_GUY_PI_CONFIG_DIR?.trim() ||
-      env.SERVER_GUY_CONFIG_DIR ||
-      join(homedir(), ".config", "server-guy", "pi"),
+    env.HALDUR_PI_CONFIG_DIR?.trim() ||
+      env.HALDUR_CONFIG_DIR ||
+      piAccountLocation(homedir()),
   );
   const logs = resolve(
     cwd,
-    env.SERVER_GUY_LOG_DIR?.trim() || join(dirname(database), "diagnostics"),
+    env.HALDUR_LOG_DIR?.trim() || join(dirname(database), "diagnostics"),
   );
   return { database, config, piAccount, logs };
 }
@@ -42,10 +39,10 @@ export function resolveEnvironment(env = process.env, cwd = process.cwd()) {
 /** The same values as the environment every child is given. */
 export function environmentVariables(resolved) {
   return {
-    SERVER_GUY_DB_PATH: resolved.database,
-    SERVER_GUY_CONFIG_DIR: resolved.config,
-    SERVER_GUY_PI_CONFIG_DIR: resolved.piAccount,
-    SERVER_GUY_LOG_DIR: resolved.logs,
+    HALDUR_DB_PATH: resolved.database,
+    HALDUR_CONFIG_DIR: resolved.config,
+    HALDUR_PI_CONFIG_DIR: resolved.piAccount,
+    HALDUR_LOG_DIR: resolved.logs,
   };
 }
 

@@ -8,12 +8,12 @@ summarizes the gates; the resource-specific rules below also apply.
 
 ## Scope: development resources, not user systems
 
-This policy applies to agents developing Server Guy and its development cleanup
+This policy applies to agents developing Haldur and its development cleanup
 task. It grants no housekeeping authority to Pi operating a user's application,
-whether Server Guy was launched with a development or production command.
+whether Haldur was launched with a development or production command.
 User deployments and local product data are not development fixtures.
 
-Local cleanup starts from exact Server Guy-owned paths in the inventory and
+Local cleanup starts from exact Haldur-owned paths in the inventory and
 registered worktrees. Do not scan the user's home directory, Desktop, Documents,
 Downloads, other repositories or shared temporary/cache roots for things to
 remove. An individually registered disposable fixture may live outside the
@@ -21,7 +21,7 @@ repository; that authorizes only that exact fixture, not its parent or siblings.
 Resolve symlinks and inspect mounts before deletion; ownership of a directory
 entry does not establish ownership of its target or mounted contents.
 
-Even inside Server Guy folders, preserve user files, product databases, backup
+Even inside Haldur folders, preserve user files, product databases, backup
 copies, credentials, conversation history and retained evidence. Creating or
 managing a resource does not make its data disposable. Shared Docker and cloud
 accounts are not project cleanup scopes: use exact, verified resource IDs and
@@ -35,7 +35,7 @@ inherit this development policy.
 
 ## Discarding development data
 
-The owner explicitly authorized discarding existing Server Guy **development**
+The owner explicitly authorized discarding existing Haldur **development**
 data along with its code and tests. Start a new schema empty; do not build
 migrations, legacy readers, archive or import features, or compatibility
 adapters to carry the old application forward. Remove obsolete workflows and
@@ -57,7 +57,7 @@ services there. Retiring that host does not make its files or servers disposable
 Audit its remaining work once, preserve unique work and configuration, stop only
 verified obsolete development processes, and record unresolved resources locally.
 
-The local **Dev Cleanup** scheduled task owns recurring Server Guy cleanup,
+The local **Dev Cleanup** scheduled task owns recurring Haldur cleanup,
 including GitHub branches and authorized Hetzner development resources. Do not
 rely on a cloud audit on another machine or create a second cloud cleanup owner.
 The separate **Disk Audit** remains read-only and covers the wider Mac. Local
@@ -82,7 +82,8 @@ access before any provider mutation. Inaccessible resources are a coverage gap.
 ## Ownership and durable records
 
 Keep one inventory and dated audit records outside all worktrees at
-`~/Library/Application Support/Server Guy/development-cleanup/` on the local Mac.
+`~/Library/Application Support/Server Guy/development-cleanup/` on the local Mac
+(named before the rename to Haldur; the Dev Cleanup task reads it there).
 Use owner-only permissions (directory 0700, files 0600), with no secret values.
 Record resource identity, machine/project, task UUID/link, exact branch and tip,
 worktree, purpose, lifetime, retention decision and verification evidence.
@@ -176,7 +177,7 @@ stay quiet when findings are unchanged and non-actionable.
 
 ## Local development resources
 
-The daily audit also covers Server Guy worktrees, local and GitHub branches, Docker
+The daily audit also covers Haldur worktrees, local and GitHub branches, Docker
 containers/images/networks/volumes/build cache, development databases, build
 outputs, logs and temporary artifacts. Scope is this project's resources on
 the local development Mac and explicitly scoped retirement audits, not arbitrary
@@ -204,7 +205,7 @@ active work. Completion cleanup precedes worktree and branch removal.
   protected and unmerged branches. Use `git branch -d`; do not force-delete.
   A squash merge needs explicit preservation verification;
   if normal deletion refuses, report it.
-- GitHub branches: scope deletion to the verified Server Guy repository remote and
+- GitHub branches: scope deletion to the verified Haldur repository remote and
   task-owned development branches. Require confirmed task completion, no active
   task/worktree or open pull request using the branch (as head or base), and proof
   the current tip is preserved in the intended integration branch. For squash or

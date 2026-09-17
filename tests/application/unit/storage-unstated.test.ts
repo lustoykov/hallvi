@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { storageFromRecords } from "@/components/server-guy/storage-records";
+import { storageFromRecords } from "@/components/haldur/storage-records";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";

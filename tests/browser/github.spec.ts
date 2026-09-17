@@ -199,7 +199,7 @@ test(
     scenario({ login: "success" });
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
-      page.getByText("Separate login for Server Guy", { exact: true }),
+      page.getByText("Separate login for Haldur", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("status").filter({ hasText: "Repository checks passed." }),
@@ -238,7 +238,7 @@ test(
     await page.getByRole("button", { name: "Change", exact: true }).click();
     await page.getByRole("button", { name: "Connect GitHub" }).click();
     await expect(
-      page.getByText("Separate login for Server Guy", { exact: true }),
+      page.getByText("Separate login for Haldur", { exact: true }),
     ).toBeVisible();
     writeFileSync(
       join(fixture.state, "github-scenario.json"),
@@ -270,9 +270,7 @@ test(
         exact: true,
       }),
     });
-    await expect(repositoryResult).toContainText(
-      "Grant Server Guy read access",
-    );
+    await expect(repositoryResult).toContainText("Grant Haldur read access");
     await expect(repositoryResult).toContainText("choose Check again");
     const afterReconnect = await (await page.request.get(`/api${path}`)).json();
     await page.reload();

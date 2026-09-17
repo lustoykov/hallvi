@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
+import { adoptLegacyEnvironment, stateLocation } from "./legacy-names.mjs";
 import { exportFromFile } from "../node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/index.js";
 
 const { values } = parseArgs({
@@ -27,14 +28,15 @@ for (const id of [values.application, values.chat].filter(Boolean))
 const port = Number(values.port);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid port.");
+const state = () => stateLocation(process.cwd(), { hidden: true });
 const databasePath = resolve(
-  process.env.SERVER_GUY_DB_PATH ?? ".server-guy/server-guy.db",
+  adoptLegacyEnvironment().HALDUR_DB_PATH ?? state().database,
 );
 const database = new Database(databasePath, {
   readonly: true,
   fileMustExist: true,
 });
-const configRoot = resolve(process.env.SERVER_GUY_CONFIG_DIR ?? ".server-guy");
+const configRoot = resolve(process.env.HALDUR_CONFIG_DIR ?? state().directory);
 const assets = join(dirname(fileURLToPath(import.meta.url)), "inspection");
 const output = join(
   mkdtempSync(join(tmpdir(), "sg-live-inspection-")),

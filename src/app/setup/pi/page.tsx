@@ -1,4 +1,4 @@
-import { PiSetupScreen } from "@/components/server-guy/pi-setup-screen";
+import { PiSetupScreen } from "@/components/haldur/pi-setup-screen";
 import { getPiSetupStatus } from "@/server/pi-setup";
 import { setupReturnDestination } from "@/server/setup-return";
 

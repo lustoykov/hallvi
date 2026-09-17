@@ -174,7 +174,7 @@ def setup(run, ssh, deployment_id, proof, directory, fixture):
         )
     dashboard = {
         "uid": fixture["uid"],
-        "title": "Server Guy restore verification",
+        "title": "Haldur restore verification",
         "tags": ["server-guy-restore-proof"],
         "schemaVersion": 40,
         "panels": panels,

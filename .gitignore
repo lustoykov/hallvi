@@ -1,6 +1,8 @@
 .DS_Store
 .claude/
 .env
+.haldur/
+# State from before the rename to Haldur, still in use where it exists.
 .server-guy/
 data/
 node_modules

@@ -182,7 +182,7 @@ export async function fetchBackupCopy(
     covers,
     // The words a record should use, so the page can classify it without
     // reading prose.
-    destination: `${name} on the computer running Server Guy`,
+    destination: `${name} on the computer running Haldur`,
     destinationKind: "controller" as const,
     caveat:
       "This survives losing the application's server and depends on this computer. It is not object storage.",

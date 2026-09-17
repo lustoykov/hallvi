@@ -11,8 +11,8 @@ export class GithubAccessError extends Error {
   constructor(message: string, public readonly kind: "auth" | "access" | "unavailable" = "unavailable") { super(message); }
 }
 function scenario() {
-  if (!process.env.SERVER_GUY_QA_ROOT) throw new Error("QA root required");
-  try { return JSON.parse(readFileSync(join(process.env.SERVER_GUY_CONFIG_DIR!, "github-scenario.json"), "utf8")); }
+  if (!process.env.HALDUR_QA_ROOT) throw new Error("QA root required");
+  try { return JSON.parse(readFileSync(join(process.env.HALDUR_CONFIG_DIR!, "github-scenario.json"), "utf8")); }
   catch { return {}; }
 }
 export async function readGithubCliCredential() {

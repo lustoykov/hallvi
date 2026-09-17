@@ -1,5 +1,5 @@
 ---
-name: Server Guy testing dashboard
+name: Haldur testing dashboard
 description: Desktop-only local developer checks and a review queue for saved live eval answers.
 colors:
   blue: "#285ad8"
@@ -37,11 +37,11 @@ components:
   chip: { rounded: "{rounded.chip}", padding: "1px 7px" }
 ---
 
-# Design System: Server Guy testing dashboard
+# Design System: Haldur testing dashboard
 
 ## Overview
 
-This document applies only to the loopback developer dashboard in `tests/dashboard/`, not the Server Guy product UI. It is an Operate surface: an engineer runs fixed checks and grades saved answers, so scanability and a fast review loop outrank expression. Implementation authority: [styles](dashboard.css), [markup](dashboard.html), and [behavior](dashboard.js).
+This document applies only to the loopback developer dashboard in `tests/dashboard/`, not the Haldur product UI. It is an Operate surface: an engineer runs fixed checks and grades saved answers, so scanability and a fast review loop outrank expression. Implementation authority: [styles](dashboard.css), [markup](dashboard.html), and [behavior](dashboard.js).
 
 ## Colors
 
@@ -57,7 +57,7 @@ Desktop only: a 56px navy topbar: the brand as a home link with a small uppercas
 
 ## Elevation & Depth
 
-Flat surfaces: borders and tonal fills, no shadows, except a faint offset shadow on Server Guy's reply bubble in the conversation. Dialogs use a dim navy backdrop.
+Flat surfaces: borders and tonal fills, no shadows, except a faint offset shadow on Haldur's reply bubble in the conversation. Dialogs use a dim navy backdrop.
 
 ## Shapes
 
@@ -72,7 +72,7 @@ Cards, the answer card and dialogs use 12px radii; controls 7px; chips 5px; queu
 - Run cards: date, model/effort, answer count, then an amber "N need attention" or green "Nothing needs attention" segment followed by the LLM-cleared and human-reviewed counts, so runs compare at a glance; while the judge works through a run, its first segment reads "Judging now". A live run in progress appears first as a dashed "Running now" card with its scope and elapsed time; its answers exist only when the runner finishes. No automatic clearance is labeled as human approval. The open run is tinted blue. Archived runs stay in a collapsed disclosure with Archive/Restore in the open run's header.
 - Run header: "Run from <date>", the saved plan (cases × repetitions = planned, answers saved, commit, local-changes flag), one Judge action (labeled with what it will judge: the unjudged answers, or everything again) and Archive/Restore run, then one bar of the run's triage (red failures, amber needs review, gray not judged, light-green LLM-cleared, green human pass) with a text line (“N need attention · N LLM-cleared · N of M human-reviewed · judge agreed A of B”); while a judge run is grading this run the line leads with “Judging now · N of M judged” and unjudged answers say they are still queued. A run whose fingerprinted sources changed mid-run carries a notice that the runner's failure says nothing about the answers. The Judge button is primary only while unjudged answers remain; afterwards it is a secondary "Judge these N again…" for the current filter's answers, or "Judge run again…" for the whole run under All. When a run has more than one repetition the header explains that each case was answered N times from a fresh application.
 - Answer queue: one row button per answer that opens it; the open row is tinted. Runs with several repetitions group rows under the case name and label rows "Repetition n"; single-repetition runs list case names directly. Rows show the derived triage status: not judged is a quiet hollow dot, every other status (Needs review, Failed checks, LLM fail, Human fail/pass, LLM-cleared) a labeled chip; an outlined "LLM" chip marks advice that did not clear the answer. Filter counts apply to the current run; there are no checkboxes or bulk actions.
-- Answer card: title, a meta line with the case id, model/effort and "Run case again…", and Previous/Next with "n of N"; one status line (triage chip plus its reason); the rubric in a panel (today's casebook wording, with the wording saved at run time behind a "Wording changed since this run" disclosure when they differ); the conversation as an inset chat area on the paper tone, the engineer's turn in a blue-tinted bubble and Server Guy's in a white bordered one, each labeled by speaker; then a separate evidence section with proposed decisions rendered as kind chips plus values (and what they replace) and collapsed automatic checks and recorded state; then LLM advice; then the verdict form. Decisions recorded before the message appear in an amber context panel.
+- Answer card: title, a meta line with the case id, model/effort and "Run case again…", and Previous/Next with "n of N"; one status line (triage chip plus its reason); the rubric in a panel (today's casebook wording, with the wording saved at run time behind a "Wording changed since this run" disclosure when they differ); the conversation as an inset chat area on the paper tone, the engineer's turn in a blue-tinted bubble and Haldur's in a white bordered one, each labeled by speaker; then a separate evidence section with proposed decisions rendered as kind chips plus values (and what they replace) and collapsed automatic checks and recorded state; then LLM advice; then the verdict form. Decisions recorded before the message appear in an amber context panel.
 - Verdict: one row with three one-click buttons, Pass / Fail / Discuss, each showing its shortcut key (P / F / D) and an "LLM" tag on the button that matches the saved judgment. A click saves immediately (no name, no reason) and advances to the next row of the queue; the saved verdict stays pressed with "Saved · <time>". "Add a note" reveals an optional note saved with the next click; notes survive switching answers until saved. J/K move through the queue.
 - Judge-first triage: sidebar filters Attention (default), Failed, Cleared, Reviewed, All, each with a count on one line. Attention includes not judged, uncertain and failed answers. Landing on a run with nothing needing attention shows All with a one-line note instead of an empty queue; a manually chosen filter with no matches offers "Show all answers". Current-policy clearance requires recorded checks to pass. The triage label/reason is distinct from the human verdict; the header text counts human reviews separately from clearance. Spot-checking is just opening Cleared. Calibration guidance is collapsed under "How triage works" at the bottom of the sidebar.
 - LLM judgment: verdict chip, an amber "Older rubric wording" chip when the casebook wording has changed since, model/effort/time, the reason's first sentence in bold with the rest behind a "Full reasoning" disclosure that stays open per answer, and one small secondary button at the right, "Judge this answer…" or "Judge again…", for this repetition. The run header's Judge button is the only run-wide control and counts only queued answers without a current judgment. Judgments never fill or change the human verdict.

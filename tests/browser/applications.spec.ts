@@ -22,7 +22,7 @@ async function view(page: Page) {
   return (await page.request.get(`/api${new URL(page.url()).pathname}`)).json();
 }
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox", { name: "Message Server Guy" }).fill(message);
+  await page.getByRole("textbox", { name: "Message Haldur" }).fill(message);
   const applicationUrl = new URL(page.url());
   // First-use dev compilation belongs to HTTP acceptance, not the reply budget.
   const [accepted] = await Promise.all([
@@ -87,7 +87,7 @@ test(
     ).toHaveCount(1);
 
     await page
-      .getByRole("textbox", { name: "Message Server Guy" })
+      .getByRole("textbox", { name: "Message Haldur" })
       .fill("Cancel **me** [slow-cancel]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -98,7 +98,7 @@ test(
     );
     // The HTTP acceptance has finished, but the saved run is still active.
     await expect(
-      page.getByRole("textbox", { name: "Message Server Guy" }),
+      page.getByRole("textbox", { name: "Message Haldur" }),
     ).toBeEnabled();
     await expect(page.locator(".sg-busy-bar")).toBeVisible();
     await page.screenshot({
@@ -241,7 +241,7 @@ test(
     await addApplication(page, "failure-app");
     const before = await view(page);
     await page
-      .getByRole("textbox", { name: "Message Server Guy" })
+      .getByRole("textbox", { name: "Message Haldur" })
       .fill("Hello [fail-once]");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -251,7 +251,7 @@ test(
       page.getByText("Something went wrong. Please retry.", { exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("textbox", { name: "Message Server Guy" }),
+      page.getByRole("textbox", { name: "Message Haldur" }),
     ).toHaveValue("");
     await openConversation(page);
     await expect(
@@ -288,11 +288,11 @@ test(
     await openConversation(page);
     await send(page, "priority: First app only");
     await page
-      .getByRole("textbox", { name: "Message Server Guy" })
+      .getByRole("textbox", { name: "Message Haldur" })
       .fill("Unsent draft");
     await addApplication(page, "isolation-second");
     await expect(
-      page.getByRole("textbox", { name: "Message Server Guy" }),
+      page.getByRole("textbox", { name: "Message Haldur" }),
     ).toHaveValue("");
     expect((await view(page)).decisions).toEqual([]);
     await page.goto(first);
@@ -315,7 +315,7 @@ test(
     expect(revised.decisions[0].id).not.toBe(oldId);
     expect(revised.decisions[0].value).toBe("Fast recovery");
     await page
-      .getByRole("textbox", { name: "Message Server Guy" })
+      .getByRole("textbox", { name: "Message Haldur" })
       .fill("invalid-replacement: reject this");
     await openConversation(page);
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -383,7 +383,7 @@ test(
     ).toBeDisabled();
     await page.goto(path);
     await expect(
-      page.getByRole("textbox", { name: "Message Server Guy" }),
+      page.getByRole("textbox", { name: "Message Haldur" }),
     ).toBeDisabled();
     expect((await view(page)).messages).toEqual(before.messages);
   },
@@ -395,7 +395,7 @@ test(
   async ({ page }, testInfo) => {
     await addApplication(page, "slow-send-app");
     const before = await view(page);
-    const composer = page.getByRole("textbox", { name: "Message Server Guy" });
+    const composer = page.getByRole("textbox", { name: "Message Haldur" });
     let release!: () => void;
     let requests = 0;
     const held = new Promise<void>((resolve) => {

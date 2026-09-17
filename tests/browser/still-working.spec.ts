@@ -2,7 +2,7 @@
 //
 // The owner read a finished-looking answer, typed the next thing, and met
 // that sentence as a red bar under the composer. The guard was right — a
-// backup request Server Guy had started for itself was genuinely running —
+// backup request Haldur had started for itself was genuinely running —
 // but the conversation never said so anywhere the typing happens, and the
 // answer they had just read said nothing about it either.
 //
@@ -54,7 +54,7 @@ test(
     const userId = randomUUID();
     const runId = randomUUID();
     const executionId = randomUUID();
-    // A request Server Guy started for itself, which is the shape that
+    // A request Haldur started for itself, which is the shape that
     // surprised the owner: nothing they typed is on screen above it.
     database
       .prepare(
@@ -156,7 +156,7 @@ test(
     await expect(bar).toHaveCount(0);
 
     // The conversation now takes the next message, which is the whole point.
-    const composer = page.getByRole("textbox", { name: "Message Server Guy" });
+    const composer = page.getByRole("textbox", { name: "Message Haldur" });
     await composer.fill("Now deploy the new revision.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(

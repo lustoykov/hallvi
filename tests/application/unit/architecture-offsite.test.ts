@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { architectureFromRecords } from "@/components/server-guy/architecture-records";
+import { architectureFromRecords } from "@/components/haldur/architecture-records";
 import type { SavedInformation } from "@/server/operator-data";
 
 const APPLICATION = "26820a4b-a4c2-49f8-8002-678503aeb385";

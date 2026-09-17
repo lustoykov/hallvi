@@ -1,4 +1,4 @@
-// The loopback ports an installed Server Guy uses, all derived from one number.
+// The loopback ports an installed Haldur uses, all derived from one number.
 //
 // They are fixed rather than found because a browser on another machine has to
 // know them in advance. On a virtual machine the owner forwards these ports
@@ -6,9 +6,9 @@
 // picked for an application — would be a port nobody forwarded. Forwarding the
 // interface alone reaches the interface and nothing behind it.
 export function installedPorts(env = process.env) {
-  const web = Number(env.SERVER_GUY_PORT?.trim() || 4747);
+  const web = Number(env.HALDUR_PORT?.trim() || 4747);
   if (!Number.isInteger(web) || web < 1024 || web > 65000)
-    throw new Error("SERVER_GUY_PORT must be a port from 1024 to 65000.");
+    throw new Error("HALDUR_PORT must be a port from 1024 to 65000.");
   return {
     web,
     /** The browser terminal's WebSocket. */

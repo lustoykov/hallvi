@@ -6,10 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  firstAppearances,
-  stopOutcome,
-} from "@/components/server-guy/chat-pane";
+import { firstAppearances, stopOutcome } from "@/components/haldur/chat-pane";
 
 const run = "run-1";
 const other = "run-2";

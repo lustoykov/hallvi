@@ -1,6 +1,11 @@
 import { defineConfig } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
+import { adoptLegacyEnvironment } from "../../scripts/legacy-names.mjs";
+
+// SERVER_GUY_E2E_PORT, among others, still moves a run off a busy port.
+adoptLegacyEnvironment();
+
 export default defineConfig({
   testDir: ".",
   fullyParallel: false,

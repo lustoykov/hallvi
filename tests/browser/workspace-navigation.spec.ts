@@ -17,7 +17,7 @@ test(
       timeout: 30_000,
     });
     const composer = page.getByRole("textbox", {
-      name: "Message Server Guy",
+      name: "Message Haldur",
       exact: true,
     });
     await openConversation(page);
@@ -109,7 +109,7 @@ test(
     });
     const message = `priority: ${"reliability-".repeat(24)}`;
     const composer = page.getByRole("textbox", {
-      name: "Message Server Guy",
+      name: "Message Haldur",
       exact: true,
     });
     await openConversation(page);

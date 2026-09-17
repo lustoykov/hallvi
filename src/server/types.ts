@@ -39,8 +39,9 @@ export interface ChatMessage {
   blocks?: import("./operator-data").MessageBlock[];
   /**
    * `user` is the engineer's own message. `server-guy` marks a recorded
-   * event or a request Server Guy started itself; it is never presented as
-   * the engineer's words.
+   * event or a request Haldur started itself; it is never presented as
+   * the engineer's words. The stored value keeps the product's former name
+   * so messages already saved under it read the same way.
    */
   source: "user" | "pi" | "server-guy";
   createdAt: string;

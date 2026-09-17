@@ -39,9 +39,9 @@ const run = {
 beforeEach(() => {
   mocks.failWrites = false;
   mocks.failRotation = false;
-  root = fs.mkdtempSync(join(tmpdir(), "server-guy-log-"));
-  vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "synthetic.db"));
-  vi.stubEnv("SERVER_GUY_LOG_DIR", "");
+  root = fs.mkdtempSync(join(tmpdir(), "haldur-log-"));
+  vi.stubEnv("HALDUR_DB_PATH", join(root, "synthetic.db"));
+  vi.stubEnv("HALDUR_LOG_DIR", "");
 });
 afterEach(() => {
   vi.restoreAllMocks();

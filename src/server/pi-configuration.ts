@@ -11,6 +11,11 @@ import { homedir } from "node:os";
 import { z } from "zod";
 
 import {
+  piAccountLocation,
+  stateLocation,
+} from "../../scripts/legacy-names.mjs";
+
+import {
   PI_MODEL_ID,
   PI_PROVIDER_ID,
   PI_REASONING_EFFORT,
@@ -60,8 +65,8 @@ export const updatePiPreferencesSchema = z.strictObject({
 export function piConfigDir() {
   // Runtime-owned local state, never an input to the deployed code bundle.
   return resolve(
-    /* turbopackIgnore: true */ process.env.SERVER_GUY_CONFIG_DIR ??
-      join(process.cwd(), ".server-guy"),
+    /* turbopackIgnore: true */ process.env.HALDUR_CONFIG_DIR ??
+      stateLocation(process.cwd(), { hidden: true }).directory,
   );
 }
 
@@ -71,9 +76,9 @@ export function piConfigDir() {
  */
 export function piAccountDir() {
   return resolve(
-    /* turbopackIgnore: true */ process.env.SERVER_GUY_PI_CONFIG_DIR?.trim() ||
-      process.env.SERVER_GUY_CONFIG_DIR ||
-      join(homedir(), ".config", "server-guy", "pi"),
+    /* turbopackIgnore: true */ process.env.HALDUR_PI_CONFIG_DIR?.trim() ||
+      process.env.HALDUR_CONFIG_DIR ||
+      piAccountLocation(homedir()),
   );
 }
 
@@ -95,7 +100,7 @@ export function readPiConfiguration(): PiConfiguration | null {
   const result = configurationSchema.safeParse(value);
   if (!result.success)
     throw new Error(
-      "Server Guy’s saved Pi configuration is invalid. Choose a setup again.",
+      "Haldur’s saved Pi configuration is invalid. Choose a setup again.",
     );
   return result.data;
 }
@@ -111,7 +116,7 @@ export function savePiConfiguration(configuration: PiConfiguration) {
 }
 
 /**
- * Forget Server Guy's consent/selection, never delete a shared or separate
+ * Forget Haldur's consent/selection, never delete a shared or separate
  * credential file.
  */
 export function forgetPiConfiguration() {

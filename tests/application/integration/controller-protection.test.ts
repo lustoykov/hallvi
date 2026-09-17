@@ -48,11 +48,11 @@ function entries(archive: Buffer) {
 
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), "sg-controller-protection-"));
-  vi.stubEnv("SERVER_GUY_DB_PATH", join(root, "state", "server-guy.db"));
-  vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "state"));
-  vi.stubEnv("SERVER_GUY_PI_CONFIG_DIR", join(root, "state"));
+  vi.stubEnv("HALDUR_DB_PATH", join(root, "state", "haldur.db"));
+  vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "state"));
+  vi.stubEnv("HALDUR_PI_CONFIG_DIR", join(root, "state"));
   mkdirSync(join(root, "state"), { recursive: true });
-  pushTestDatabase(join(root, "state", "server-guy.db"));
+  pushTestDatabase(join(root, "state", "haldur.db"));
   // A stand-in for the owner's bucket: it records what was signed and keeps
   // the bytes, so a copy can be opened again the way recovery would.
   storage = createServer((request, response) => {
@@ -380,7 +380,7 @@ it("carries the application secret store, and the values resolve after restore",
   // A controller reading only the restored directory resolves both values.
   // Compared, never printed: the assertion is that they match, and a failure
   // message must not become the place a password appears.
-  vi.stubEnv("SERVER_GUY_CONFIG_DIR", restoredConfig);
+  vi.stubEnv("HALDUR_CONFIG_DIR", restoredConfig);
   try {
     const environment = secrets.secretEnvironment(app.id, [
       generatedName,
@@ -406,7 +406,7 @@ it("carries the application secret store, and the values resolve after restore",
       ),
     ).toBe(true);
   } finally {
-    vi.stubEnv("SERVER_GUY_CONFIG_DIR", join(root, "state"));
+    vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "state"));
   }
 
   // The passphrase stays outside the thing it opens.

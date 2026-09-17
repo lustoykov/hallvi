@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   monitoringFromRecords,
   watchingFromRecords,
-} from "@/components/server-guy/monitoring-records";
+} from "@/components/haldur/monitoring-records";
 import {
   APP,
   NOW,

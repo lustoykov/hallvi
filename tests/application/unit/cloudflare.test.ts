@@ -36,7 +36,7 @@ beforeEach(async () => {
   // A token may now be saved on the controller instead of set in the
   // environment. Point that directory at an empty one, so these cases cannot
   // read a developer's real connection and report it as the fixture's.
-  process.env.SERVER_GUY_CONFIG_DIR = mkdtempSync(
+  process.env.HALDUR_CONFIG_DIR = mkdtempSync(
     join(tmpdir(), "cloudflare-test-"),
   );
   cloudflare = await import("@/server/cloudflare");

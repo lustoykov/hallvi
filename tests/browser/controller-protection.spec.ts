@@ -6,12 +6,12 @@ import { test, expect } from "./fixtures";
 import { journey } from "./journeys";
 
 /**
- * The owner's glance at Backups has to answer whether Server Guy itself would
+ * The owner's glance at Backups has to answer whether Haldur itself would
  * survive losing this machine. Three states, in the order they actually
  * happen: nothing connected, the first copy taken, and the kit saved.
  */
 test(
-  "Backups states Server Guy's own protection in every state",
+  "Backups states Haldur's own protection in every state",
   journey("controller-protection"),
   async ({ page, fixture }) => {
     test.setTimeout(180_000);
@@ -36,9 +36,9 @@ test(
         await button.click();
     };
     await openBackups();
-    const panel = page.getByRole("region", { name: "Server Guy itself" });
+    const panel = page.getByRole("region", { name: "Haldur itself" });
 
-    // 1. No destination: Server Guy is stated as unprotected beside the data,
+    // 1. No destination: Haldur is stated as unprotected beside the data,
     //    and the single action that fixes both is on the page.
     await expect(panel).toBeVisible({ timeout: 30_000 });
     await expect(panel.getByText("Not copied", { exact: true })).toBeVisible();
@@ -46,7 +46,7 @@ test(
       page.getByRole("form", { name: "Connect backup storage" }),
     ).toBeVisible();
     await expect(panel).toContainText(
-      "Connecting off-host storage protects your application\u2019s data and Server Guy together",
+      "Connecting off-host storage protects your application\u2019s data and Haldur together",
     );
 
     // 2. A copy has reached storage, but the owner has not saved the kit.
@@ -141,7 +141,7 @@ test(
     // Settings shows it again only when the owner deliberately asks.
     await page.goto("/setup/connections");
     const settings = page.getByRole("region", {
-      name: "Server Guy recovery kit",
+      name: "Haldur recovery kit",
     });
     await expect(settings).toContainText("saved outside this machine");
     await expect(settings.locator("[data-recovery-passphrase]")).toHaveCount(0);

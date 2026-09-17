@@ -3,31 +3,34 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
+
+import { stateLocation } from "../../scripts/legacy-names.mjs";
 
 import { applications, chats, messages, savedInformation } from "./db-schema";
 import schemaVersion from "./schema-version.json";
 import type { ApplicationRecord, ChatMessage, Observation } from "./types";
 
 const schema = { applications, chats, messages, savedInformation };
-type ServerGuyDatabase = ReturnType<typeof drizzle<typeof schema>>;
+type HaldurDatabase = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
-  var __serverGuyDb: ServerGuyDatabase | undefined;
+  var __haldurDb: HaldurDatabase | undefined;
 }
 
 export function databasePath() {
   const path =
-    process.env.SERVER_GUY_DB_PATH ??
-    join(process.cwd(), ".server-guy", "server-guy.db");
+    process.env.HALDUR_DB_PATH ??
+    stateLocation(/* turbopackIgnore: true */ process.cwd(), { hidden: true })
+      .database;
   return path;
 }
 
-export function db(): ServerGuyDatabase {
-  return (globalThis.__serverGuyDb ??= createDatabase());
+export function db(): HaldurDatabase {
+  return (globalThis.__haldurDb ??= createDatabase());
 }
 
-function createDatabase(): ServerGuyDatabase {
+function createDatabase(): HaldurDatabase {
   const path = databasePath();
   mkdirSync(dirname(path), { recursive: true });
   const client = new Database(path);

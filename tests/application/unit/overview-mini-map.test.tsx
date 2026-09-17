@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { architectureFromRecords } from "@/components/server-guy/architecture-records";
-import { MiniMap } from "@/components/server-guy/overview-prototype/mini-map";
+import { architectureFromRecords } from "@/components/haldur/architecture-records";
+import { MiniMap } from "@/components/haldur/overview-prototype/mini-map";
 import { scenarios } from "../../fixtures/scenario-records";
 
 describe("the Overview architecture miniature", () => {

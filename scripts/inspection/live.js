@@ -7,7 +7,7 @@
   const chatPick = document.getElementById("pick-chat");
   const viewing = document.body.dataset;
   // Reading position belongs to a conversation, not to the viewer.
-  const key = `server-guy-live-view:${viewing.chat}`;
+  const key = `haldur-live-view:${viewing.chat}`;
   const remembered = JSON.parse(sessionStorage.getItem(key) || "null");
   let paused = remembered?.paused ?? false;
   follow.checked = remembered?.follow ?? true;

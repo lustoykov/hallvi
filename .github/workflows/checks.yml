@@ -1,4 +1,4 @@
-name: Server Guy checks
+name: Haldur checks
 on:
   pull_request:
   push:

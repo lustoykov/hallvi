@@ -1,5 +1,5 @@
 ---
-name: Server Guy settings
+name: Haldur settings
 description: Observed conventions inherited from the approved Pi setup prototype A.
 colors:
   canvas: "#f5f7fb"
@@ -26,9 +26,9 @@ This documents the existing settings surface. The [operator redesign](../operato
 
 ## Overview
 
-GitHub settings extends the approved Pi setup layout. This is an Operate surface: make the current account, next action, and repository-access implications easy to inspect. This is a settings-specific implementation reference, originally observed on 4 September 2026 and checked against the shared settings CSS on 11 September. It is not a separate product color system. The [application design reference](../../src/components/server-guy/DESIGN.md) owns overall visual language; this document records the settings surface's existing differences.
+GitHub settings extends the approved Pi setup layout. This is an Operate surface: make the current account, next action, and repository-access implications easy to inspect. This is a settings-specific implementation reference, originally observed on 4 September 2026 and checked against the shared settings CSS on 11 September. It is not a separate product color system. The [application design reference](../../src/components/haldur/DESIGN.md) owns overall visual language; this document records the settings surface's existing differences.
 
-The implementation remains the source of truth: [shared settings styles](../../src/components/server-guy/pi-setup-screen.module.css), [Pi screen](../../src/components/server-guy/pi-setup-screen.tsx), [GitHub screen](../../src/components/server-guy/github-setup-screen.tsx), and [shared page shell](../../src/app/server-guy.css). Recheck them before extending this reference.
+The implementation remains the source of truth: [shared settings styles](../../src/components/haldur/pi-setup-screen.module.css), [Pi screen](../../src/components/haldur/pi-setup-screen.tsx), [GitHub screen](../../src/components/haldur/github-setup-screen.tsx), and [shared page shell](../../src/app/haldur.css). Recheck them before extending this reference.
 
 ## Colors
 
@@ -52,7 +52,7 @@ Retain the shared card, primary-button, and help-panel radii above. Controls use
 
 ## Components
 
-- **Navigation:** reuse [SettingsNav](../../src/components/server-guy/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
+- **Navigation:** reuse [SettingsNav](../../src/components/haldur/settings-nav.tsx): “ChatGPT & model” and “GitHub”, with an underline and `aria-current="page"` for the active route.
 - **Actions:** primary controls have a 44px minimum height, 12px by 20px padding, and a darker blue hover. Secondary actions remain text buttons. Preserve the visible focus outline (2px in the primary blue, offset 3px, shared by every screen) and disabled treatment.
 - **Account choice:** distinguish a detected login from an accepted connection. Show the account and credential source, explicit reuse, an alternative login when available, and a way to retain the current connection.
 - **Device sign-in:** show the code, copy feedback, provider link, stable waiting announcement, expiry, and cancel action. While replacing an account, name the account still in use. Keep the changing countdown outside the live announcement.

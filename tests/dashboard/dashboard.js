@@ -1054,7 +1054,7 @@ function renderPage() {
     if (id === link) $(id).setAttribute("aria-current", "page");
     else $(id).removeAttribute("aria-current");
   }
-  document.title = `${title} · Server Guy Testing`;
+  document.title = `${title} · Haldur Testing`;
 }
 document.addEventListener("click", (event) => {
   const link = event.target.closest("a[data-route]");

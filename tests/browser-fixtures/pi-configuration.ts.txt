@@ -70,7 +70,7 @@ function streamSynthetic(
   };
   void (async () => {
     try {
-      const root = process.env.SERVER_GUY_QA_ROOT;
+      const root = process.env.HALDUR_QA_ROOT;
       if (!root)
         throw new Error("Synthetic provider requires an isolated QA root.");
       options?.signal?.throwIfAborted();
@@ -260,7 +260,7 @@ function streamSynthetic(
 }
 
 export async function configuredPiRuntime(sdk: PiSdk) {
-  const root = process.env.SERVER_GUY_QA_ROOT;
+  const root = process.env.HALDUR_QA_ROOT;
   if (!root)
     throw new Error("Synthetic provider requires an isolated QA root.");
   const configuration = readPiConfiguration();
@@ -278,8 +278,8 @@ export async function configuredPiRuntime(sdk: PiSdk) {
   });
   // A separate provider ID and synthetic credential ensure the runtime cannot
   // fall back to a real account or a network provider adapter.
-  modelRuntime.registerProvider("server-guy-qa", {
-    api: "server-guy-qa",
+  modelRuntime.registerProvider("haldur-qa", {
+    api: "haldur-qa",
     apiKey: "QA-NO-NETWORK",
     baseUrl: "https://qa.invalid",
     streamSimple: streamSynthetic,
@@ -295,6 +295,6 @@ export async function configuredPiRuntime(sdk: PiSdk) {
       },
     ],
   });
-  const model = modelRuntime.getModel("server-guy-qa", configuration.modelId)!;
+  const model = modelRuntime.getModel("haldur-qa", configuration.modelId)!;
   return { configuration, modelRuntime, model };
 }

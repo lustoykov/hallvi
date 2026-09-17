@@ -1,5 +1,7 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+import { stateLocation } from "../../scripts/legacy-names.mjs";
 import type { PiRun } from "./types";
 
 export const MAX_DIAGNOSTIC_STEPS = 128;
@@ -161,12 +163,13 @@ export function diagnosticLogPath(
   filename: "replies.ndjson" | "spans.ndjson" = "replies.ndjson",
 ) {
   const dbPath =
-    process.env.SERVER_GUY_DB_PATH ??
-    join(process.cwd(), ".server-guy", "server-guy.db");
+    process.env.HALDUR_DB_PATH ??
+    stateLocation(/* turbopackIgnore: true */ process.cwd(), { hidden: true })
+      .database;
   // Runtime output files must not be included in the application build.
   return join(
     /* turbopackIgnore: true */
-    (process.env.SERVER_GUY_LOG_DIR?.trim() || undefined) ??
+    (process.env.HALDUR_LOG_DIR?.trim() || undefined) ??
       join(dirname(dbPath), "diagnostics"),
     filename,
   );
