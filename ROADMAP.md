@@ -45,6 +45,8 @@ After the simple deployment UI/UX is accepted, expand application complexity in 
 
 ## Later milestone: Pi heartbeat and state synchronization
 
+Jev is a viable candidate to test for ambiguous-signal triage and wakeup recommendations within this deferred milestone; see the [use case and evaluation limits](docs/operator-design.md#always-on-care-and-visible-commitments). The suggested first experiment is [offline transcript evaluation](tests/README.md#candidate-experiment-jev-transcript-evaluation). This records an option to evaluate, not a selected dependency or a change to delivery order.
+
 - [ ] **Pi heartbeat — deferred until after the simple deployment UI/UX checkpoint.** Periodically review whether saved application observations still match reality, refresh the evidence each view needs, and wake Pi for interpretation or follow-up when appropriate. Define checks and refresh needs view by view; deterministic checks can save their results without a model call. Keep last-checked times and failed checks visible, and surface meaningful changes rather than repetitive status messages. Cadence and scheduling details remain open. See [operator design](docs/operator-design.md#always-on-care-and-visible-commitments).
 
 ## Integrated terminal and Pi activity
