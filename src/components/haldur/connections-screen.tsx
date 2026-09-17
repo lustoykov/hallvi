@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ProviderTokenForm } from "./provider-token-form";
+import type { SetupReturn } from "@/server/setup-return";
 import { SettingsNav } from "./settings-nav";
 import { BackupStorageForm } from "./backup-storage-form";
 import s from "./pi-setup-screen.module.css";
@@ -128,8 +129,10 @@ function RecoveryKit({
 export function ConnectionsScreen({
   connections,
   recoveryKit,
+  returnTo,
   prototype = false,
 }: {
+  returnTo?: SetupReturn;
   connections: ConnectionItem[];
   recoveryKit?: { confirmedAt: string | null; bucket: string; host: string };
   prototype?: boolean;
@@ -152,12 +155,16 @@ export function ConnectionsScreen({
           <span className="sg-app-mark">H</span>
           <span>Haldur</span>
         </Link>
-        <Link className="sg-setup-back" href="/applications">
-          <ArrowLeft aria-hidden="true" /> All applications
+        <Link
+          className="sg-setup-back"
+          href={returnTo?.href ?? "/applications"}
+        >
+          <ArrowLeft aria-hidden="true" />{" "}
+          {returnTo?.label ?? "All applications"}
         </Link>
       </header>
       <div className={s.page}>
-        <SettingsNav current="connections" />
+        <SettingsNav current="connections" returnTo={returnTo} />
         <header className={s.heading}>
           <h1>Settings</h1>
           <p>
