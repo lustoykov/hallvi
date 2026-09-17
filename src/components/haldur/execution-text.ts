@@ -81,15 +81,15 @@ export function clip(text: string, limit: number): string {
  * Four different places, and the console called three of them nothing and one
  * of them "your server". They are not alike: a command on the application's
  * host can break the application, one in the workspace container touches a
- * copy of the repository on this Mac, one against a provider's API spends
- * money, and opening a tunnel changes only what this Mac can reach. A reader
+ * copy of the repository on this PC, one against a provider's API spends
+ * money, and opening a tunnel changes only what this PC can reach. A reader
  * deciding whether to approve something needs to know which of those it is.
  *
  * `request_approval` is absent on purpose. It runs nowhere; it is a question.
  */
 const WORKSPACE = {
   said: "In the repository copy",
-  detail: "an isolated container on this Mac",
+  detail: "an isolated container on this PC",
 };
 const PLACES: Record<string, { said: string; detail?: string }> = {
   server_bash: { said: "On the server" },
@@ -119,13 +119,13 @@ const PLACES: Record<string, { said: string; detail?: string }> = {
   get_application_status: { said: "In Haldur's records" },
   hetzner_request: { said: "At Hetzner" },
   set_domain_record: { said: "At the DNS provider" },
-  // Each of these runs here and reaches outward: a tunnel this Mac holds
-  // open, a key this Mac keeps, an SSH check this Mac makes, a request this
+  // Each of these runs here and reaches outward: a tunnel this PC holds
+  // open, a key this PC keeps, an SSH check this PC makes, a request this
   // Mac sends. None of them changes anything on the application's server.
-  open_server_port: { said: "On this Mac" },
-  server_public_key: { said: "On this Mac" },
-  connect_server: { said: "On this Mac" },
-  check_public_access: { said: "On this Mac" },
+  open_server_port: { said: "On this PC" },
+  server_public_key: { said: "On this PC" },
+  connect_server: { said: "On this PC" },
+  check_public_access: { said: "On this PC" },
 };
 
 /** Where a tool ran, in the reader's words. Null when we cannot say. */
