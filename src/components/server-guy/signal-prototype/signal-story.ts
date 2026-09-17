@@ -52,4 +52,8 @@ export interface TunerProps {
   /** Work in progress on this destination, as the shell shows it. */
   activity: import("react").ReactNode;
   onAsk: (draft: string) => void;
+  /** Traffic and server load, drawn between the lede and the dial. */
+  usage?: import("react").ReactNode;
+  /** A sentence from outside the dial the lede should carry. */
+  aside?: string | null;
 }

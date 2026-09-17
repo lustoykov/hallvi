@@ -4,9 +4,9 @@
 //
 // No analytics service: the proxy's access log says who asked for what and
 // how it went, and the host's own samples say how hard the machine worked.
-// Server Guy reads a window of both when it looks, so the cards say when that
-// was — a chart that looks live but stopped at the last read would be the
-// Monitoring page implying a watch that does not exist.
+// Server Guy reads a window of both when it looks, so the section says when
+// that was — a chart that looks live but stopped at the last read would be
+// the Monitoring page implying a watch that does not exist.
 
 import { ChatCircleText } from "@phosphor-icons/react";
 import { useState, type PointerEvent, type ReactNode } from "react";
@@ -37,8 +37,8 @@ const ceiling = (max: number) => {
   return Math.ceil(max / step) * step;
 };
 
-/** Bucket `index` as a clock time, and the hour ticks under a chart. */
-function useClock(usage: Usage) {
+/** Bucket `index` as a clock time, and the six-hour ticks under a chart. */
+function clockOf(usage: Usage) {
   const startMs = Date.parse(usage.start);
   const stepMs = usage.stepMinutes * 60_000;
   const at = (index: number) =>
@@ -65,16 +65,7 @@ function useHover(length: number) {
   };
 }
 
-function Tip({
-  index,
-  length,
-  children,
-}: {
-  index: number;
-  length: number;
-  children: ReactNode;
-}) {
-  const left = ((index + 0.5) / length) * 100;
+function Tip({ left, children }: { left: number; children: ReactNode }) {
   return (
     <div
       className="axmu-tip"
@@ -88,17 +79,17 @@ function Tip({
 
 function Axis({
   ticks,
-  length,
+  place,
   label,
 }: {
   ticks: number[];
-  length: number;
+  place: (index: number) => number;
   label: (index: number) => string;
 }) {
   return (
     <div className="axmu-axis" aria-hidden="true">
       {ticks.map((index) => (
-        <span key={index} style={{ left: `${(index / length) * 100}%` }}>
+        <span key={index} style={{ left: `${place(index)}%` }}>
           {label(index)}
         </span>
       ))}
@@ -109,8 +100,6 @@ function Axis({
 function Card({
   title,
   source,
-  at,
-  now,
   say,
   children,
   ask,
@@ -118,31 +107,21 @@ function Card({
 }: {
   title: string;
   source: string;
-  at: string | null;
-  now: number;
   say: string;
   children: ReactNode;
-  ask: { label: string; draft: string };
+  /** Offered only when the readings raise a question worth asking. */
+  ask: { label: string; draft: string } | null;
   onAsk: (draft: string) => void;
 }) {
   return (
     <article className="axmu-card" aria-label={title}>
       <header className="axmu-head">
-        <div>
-          <h3>{title}</h3>
-          <p>From the {source} · last 24 hours</p>
-        </div>
-        <Tag tone={toneOf(at, now)}>
-          {at ? `Read ${ago(at, now)}` : "Never read"}
-        </Tag>
+        <h3>{title}</h3>
+        <span>{source}</span>
       </header>
       <p className="axmu-say">{say}</p>
       {children}
-      <footer className="axmu-foot">
-        <small>
-          Read when Server Guy looks{at ? `, last at ${clock(at)}` : ""}.
-          Nothing is collected in between.
-        </small>
+      {ask && (
         <button
           type="button"
           className="axtu-ask-small"
@@ -151,8 +130,25 @@ function Card({
           <ChatCircleText weight="bold" />
           {ask.label}
         </button>
-      </footer>
+      )}
     </article>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  bad,
+}: {
+  label: string;
+  value: string;
+  bad?: boolean;
+}) {
+  return (
+    <div data-bad={bad || undefined}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
   );
 }
 
@@ -160,18 +156,16 @@ function Traffic({
   usage,
   traffic,
   name,
-  now,
   onAsk,
 }: {
   usage: Usage;
   traffic: NonNullable<Usage["traffic"]>;
   name: string;
-  now: number;
   onAsk: (draft: string) => void;
 }) {
   const { requests, serverErrors, p95Ms } = traffic;
   const length = requests.length;
-  const { at, ticks } = useClock(usage);
+  const { at, ticks } = clockOf(usage);
   const { hover, handlers } = useHover(length);
   const total = sum(requests);
   const failed = sum(serverErrors);
@@ -188,7 +182,7 @@ function Traffic({
     traffic.visitors !== undefined
       ? ` from about ${count(traffic.visitors)} visitors`
       : "",
-    `, busiest at ${clock(at(busiest))}.`,
+    `, busiest around ${clock(at(busiest))}.`,
     failed
       ? ` ${count(failed)} failed on the server, most of them around ${clock(at(worst))}.`
       : " None failed on the server.",
@@ -198,8 +192,6 @@ function Traffic({
     <Card
       title="Traffic"
       source={traffic.source}
-      at={usage.at}
-      now={now}
       say={say}
       onAsk={onAsk}
       ask={
@@ -208,36 +200,25 @@ function Traffic({
               label: `Ask why ${count(failed)} failed`,
               draft: `${count(failed)} requests to ${name} failed with a server error in the last 24 hours, most around ${clock(at(worst))}. Read the application's output from then and tell me what went wrong.`,
             }
-          : {
-              label: "Read the latest traffic",
-              draft: `Read the last 24 hours of ${name}'s access log and tell me anything unusual.`,
-            }
+          : null
       }
     >
       <dl className="axmu-stats">
-        <div>
-          <dt>Requests</dt>
-          <dd>{count(total)}</dd>
-        </div>
+        <Stat label="Requests" value={count(total)} />
         {traffic.visitors !== undefined && (
-          <div>
-            <dt>Visitors</dt>
-            <dd>{count(traffic.visitors)}</dd>
-          </div>
+          <Stat label="Visitors" value={count(traffic.visitors)} />
         )}
-        <div data-bad={rate >= 1 || undefined}>
-          <dt>Server errors</dt>
-          <dd>{rate < 0.1 && failed ? "<0.1" : rate.toFixed(1)}%</dd>
-        </div>
+        <Stat
+          label="Server errors"
+          value={`${rate < 0.1 && failed ? "<0.1" : rate.toFixed(1)}%`}
+          bad={rate >= 1}
+        />
         {typical !== null && (
-          <div>
-            <dt>Response, p95</dt>
-            <dd>{duration(typical)}</dd>
-          </div>
+          <Stat label="Response, p95" value={duration(typical)} />
         )}
       </dl>
 
-      <div className="axmu-chart">
+      <figure className="axmu-chart">
         <span className="axmu-grid" aria-hidden="true">
           {count(top)}
         </span>
@@ -257,17 +238,13 @@ function Traffic({
               >
                 <i style={{ height: `${((value - errors) / top) * 100}%` }} />
                 {errors > 0 && (
-                  <b
-                    style={{
-                      height: `max(2px, ${(errors / top) * 100}%)`,
-                    }}
-                  />
+                  <b style={{ height: `max(2px, ${(errors / top) * 100}%)` }} />
                 )}
               </span>
             );
           })}
           {hover !== null && (
-            <Tip index={hover} length={length}>
+            <Tip left={((hover + 0.5) / length) * 100}>
               <time>
                 {clock(at(hover))}–{clock(at(hover + 1))}
               </time>
@@ -280,72 +257,90 @@ function Traffic({
                 {count(serverErrors[hover] ?? 0)} server errors
               </span>
               {p95Ms?.[hover] !== undefined && (
-                <span>p95 {duration(p95Ms[hover])}</span>
+                <span className="axmu-tip-quiet">
+                  p95 {duration(p95Ms[hover])}
+                </span>
               )}
             </Tip>
           )}
         </div>
         <Axis
           ticks={ticks(length)}
-          length={length}
-          label={(i) => clock(at(i))}
+          place={(index) => (index / length) * 100}
+          label={(index) => clock(at(index))}
         />
-      </div>
-      <ul className="axmu-legend">
-        <li>
-          <i data-series="requests" />
-          Requests per {usage.stepMinutes} min
-        </li>
-        <li>
-          <i data-series="errors" />
-          Server errors (5xx)
-        </li>
-      </ul>
+        <figcaption className="axmu-legend">
+          <span>
+            <i data-series="requests" />
+            Requests per {usage.stepMinutes} min
+          </span>
+          <span>
+            <i data-series="errors" />
+            Server errors
+          </span>
+        </figcaption>
+      </figure>
 
       {paths.length > 0 && (
-        <ol className="axmu-paths" aria-label="Most requested">
-          {paths.map((path) => (
-            <li key={path.path}>
-              <code title={path.path}>{path.path}</code>
-              <span className="axmu-share" aria-hidden="true">
-                <i style={{ width: `${(path.requests / pathTop) * 100}%` }} />
-              </span>
-              <span>{count(path.requests)}</span>
-              {path.serverErrors > 0 && (
-                <em>{count(path.serverErrors)} failed</em>
-              )}
-            </li>
-          ))}
-        </ol>
+        <div className="axmu-paths">
+          <h4>Most requested</h4>
+          <ol>
+            {paths.map((path) => (
+              <li key={path.path}>
+                <code title={path.path}>{path.path}</code>
+                <span className="axmu-share" aria-hidden="true">
+                  <i style={{ width: `${(path.requests / pathTop) * 100}%` }} />
+                </span>
+                <span>{count(path.requests)}</span>
+                <em>
+                  {path.serverErrors > 0
+                    ? `${count(path.serverErrors)} failed`
+                    : ""}
+                </em>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </Card>
   );
+}
+
+/** "12.4 of 40 GB used" as a share, when it reads as one. */
+function diskOf(words: string) {
+  const match = /([\d.]+)\s*(?:\w+\s*)?of\s*([\d.]+)\s*(\w+)/.exec(words);
+  if (!match) return null;
+  const used = Number(match[1]);
+  const total = Number(match[2]);
+  if (!total || used > total) return null;
+  return { used, total, unit: match[3], share: (used / total) * 100 };
 }
 
 function Host({
   usage,
   host,
   name,
-  now,
   onAsk,
 }: {
   usage: Usage;
   host: NonNullable<Usage["host"]>;
   name: string;
-  now: number;
   onAsk: (draft: string) => void;
 }) {
   const { cpu, memory } = host;
   const length = cpu.length;
-  const { at, ticks } = useClock(usage);
+  const { at, ticks } = clockOf(usage);
   const { hover, handlers } = useHover(length);
   const cpuPeak = peakOf(cpu);
   const cpuAverage = sum(cpu) / Math.max(1, length);
+  const cpuNow = cpu.at(-1) ?? 0;
   const memoryNow = memory.at(-1) ?? 0;
   const memoryPeak = Math.max(...memory);
-  const line = (values: number[]) =>
+  const disk = usage.disk ? diskOf(usage.disk) : null;
+  const span = Math.max(1, length - 1);
+  const x = (index: number) => (index / span) * 100;
+  const points = (values: number[]) =>
     values.map((value, index) => `${index},${100 - value}`).join(" ");
-  const x = (index: number) => `${(index / Math.max(1, length - 1)) * 100}%`;
 
   const say = `CPU averaged ${Math.round(cpuAverage)}% and peaked at ${Math.round(cpu[cpuPeak])}% around ${clock(at(cpuPeak))}. Memory ${
     memoryPeak - Math.min(...memory) < 10 ? "held steady near" : "is now at"
@@ -356,8 +351,6 @@ function Host({
     <Card
       title="Server"
       source={host.source}
-      at={usage.at}
-      now={now}
       say={say}
       onAsk={onAsk}
       ask={
@@ -366,30 +359,23 @@ function Host({
               label: "Ask whether it needs more room",
               draft: `${name}'s server peaked at ${Math.round(cpu[cpuPeak])}% CPU and ${Math.round(memoryPeak)}% memory in the last 24 hours. Is it undersized, and what would you change?`,
             }
-          : {
-              label: "Measure it now",
-              draft: `Measure ${name}'s server now: its CPU, memory and disk.`,
-            }
+          : null
       }
     >
       <dl className="axmu-stats">
-        <div data-bad={(cpu.at(-1) ?? 0) >= 80 || undefined}>
-          <dt>CPU now</dt>
-          <dd>{Math.round(cpu.at(-1) ?? 0)}%</dd>
-        </div>
-        <div data-bad={memoryNow >= 90 || undefined}>
-          <dt>Memory now</dt>
-          <dd>{Math.round(memoryNow)}%</dd>
-        </div>
-        {usage.disk && (
-          <div>
-            <dt>Disk</dt>
-            <dd className="axmu-small">{usage.disk}</dd>
-          </div>
-        )}
+        <Stat
+          label="CPU now"
+          value={`${Math.round(cpuNow)}%`}
+          bad={cpuNow >= 80}
+        />
+        <Stat
+          label="Memory now"
+          value={`${Math.round(memoryNow)}%`}
+          bad={memoryNow >= 90}
+        />
       </dl>
 
-      <div className="axmu-chart">
+      <figure className="axmu-chart">
         <span className="axmu-grid" aria-hidden="true">
           100%
         </span>
@@ -403,27 +389,31 @@ function Host({
           {...handlers}
         >
           <svg
-            viewBox={`0 0 ${Math.max(1, length - 1)} 100`}
+            viewBox={`0 0 ${span} 100`}
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <polyline data-series="memory" points={line(memory)} />
-            <polyline data-series="cpu" points={line(cpu)} />
+            <polygon
+              data-series="cpu"
+              points={`0,100 ${points(cpu)} ${span},100`}
+            />
+            <polyline data-series="memory" points={points(memory)} />
+            <polyline data-series="cpu" points={points(cpu)} />
           </svg>
           {hover !== null && (
             <>
-              <span className="axmu-cross" style={{ left: x(hover) }} />
+              <span className="axmu-cross" style={{ left: `${x(hover)}%` }} />
               <span
                 className="axmu-dot"
                 data-series="memory"
-                style={{ left: x(hover), top: `${100 - memory[hover]}%` }}
+                style={{ left: `${x(hover)}%`, top: `${100 - memory[hover]}%` }}
               />
               <span
                 className="axmu-dot"
                 data-series="cpu"
-                style={{ left: x(hover), top: `${100 - cpu[hover]}%` }}
+                style={{ left: `${x(hover)}%`, top: `${100 - cpu[hover]}%` }}
               />
-              <Tip index={hover} length={length}>
+              <Tip left={x(hover)}>
                 <time>{clock(at(hover))}</time>
                 <span>
                   <i data-series="cpu" />
@@ -439,21 +429,46 @@ function Host({
         </div>
         <Axis
           ticks={ticks(length)}
-          length={length}
-          label={(i) => clock(at(i))}
+          place={x}
+          label={(index) => clock(at(index))}
         />
-      </div>
-      <ul className="axmu-legend">
-        <li>
-          <i data-series="cpu" />
-          CPU
-        </li>
-        <li>
-          <i data-series="memory" />
-          Memory
-          {host.memoryTotal ? ` of ${host.memoryTotal}` : ""}
-        </li>
-      </ul>
+        <figcaption className="axmu-legend">
+          <span>
+            <i data-series="cpu" />
+            CPU
+          </span>
+          <span>
+            <i data-series="memory" />
+            Memory{host.memoryTotal ? ` of ${host.memoryTotal}` : ""}
+          </span>
+        </figcaption>
+      </figure>
+
+      {usage.disk && (
+        <div className="axmu-disk">
+          <h4>Disk</h4>
+          {disk ? (
+            <>
+              <span
+                className="axmu-meter"
+                role="meter"
+                aria-valuemin={0}
+                aria-valuemax={disk.total}
+                aria-valuenow={disk.used}
+                aria-label={`Disk: ${usage.disk}`}
+                data-bad={disk.share >= 90 || undefined}
+              >
+                <i style={{ width: `${disk.share}%` }} />
+              </span>
+              <span>
+                {disk.used} of {disk.total} {disk.unit}
+              </span>
+            </>
+          ) : (
+            <span>{usage.disk}</span>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
@@ -469,52 +484,69 @@ export function UsagePanel({
   now: number;
   onAsk: (draft: string) => void;
 }) {
+  const read = `Read the last 24 hours of ${name}'s access log and its server's CPU and memory, and tell me anything unusual.`;
+
   if (!usage?.traffic && !usage?.host)
     return (
-      <section className="axmu" aria-label="Traffic and server load">
-        <article className="axmu-card axmu-ghost">
-          <h3>Traffic and server load</h3>
-          <p>
-            Nothing has been read yet. The server already keeps what this needs
-            — the proxy&apos;s access log and the machine&apos;s own CPU and
-            memory samples — so there is no analytics service to install.
-          </p>
+      <section className="axmu" aria-label="Traffic and load">
+        <div className="axmu-ghost">
+          <div>
+            <h2>Traffic and load</h2>
+            <p>
+              Nothing has been read yet. The server already keeps what this
+              needs — the proxy&apos;s access log and the machine&apos;s own
+              samples — so there is nothing to install.
+            </p>
+          </div>
           <button
             type="button"
             className="axtu-ask-small"
-            onClick={() =>
-              onAsk(
-                `Read the last 24 hours of ${name}'s access log and its server's CPU and memory, and show me the traffic and load.`,
-              )
-            }
+            onClick={() => onAsk(read)}
           >
             <ChatCircleText weight="bold" />
             Ask Server Guy to read it
           </button>
-        </article>
+        </div>
       </section>
     );
 
+  const fresh = toneOf(usage.at, now) === "verified";
   return (
-    <section className="axmu" aria-label="Traffic and server load">
-      {usage.traffic && (
-        <Traffic
-          usage={usage}
-          traffic={usage.traffic}
-          name={name}
-          now={now}
-          onAsk={onAsk}
-        />
-      )}
-      {usage.host && (
-        <Host
-          usage={usage}
-          host={usage.host}
-          name={name}
-          now={now}
-          onAsk={onAsk}
-        />
-      )}
+    <section className="axmu" aria-labelledby="axmu-title">
+      <header className="axtu-section-head">
+        <div>
+          <h2 id="axmu-title">Traffic and load</h2>
+          <p>
+            The last 24 hours, read from the server
+            {usage.at && fresh ? ` ${ago(usage.at, now)}` : ""}. Nothing is
+            collected between reads.
+          </p>
+        </div>
+        {usage.at && !fresh && (
+          <Tag tone="stale">Read {ago(usage.at, now)}</Tag>
+        )}
+        <button
+          type="button"
+          className="axtu-ask-small"
+          onClick={() => onAsk(read)}
+        >
+          <ChatCircleText weight="bold" />
+          Read it again
+        </button>
+      </header>
+      <div className="axmu-cards">
+        {usage.traffic && (
+          <Traffic
+            usage={usage}
+            traffic={usage.traffic}
+            name={name}
+            onAsk={onAsk}
+          />
+        )}
+        {usage.host && (
+          <Host usage={usage} host={usage.host} name={name} onAsk={onAsk} />
+        )}
+      </div>
     </section>
   );
 }

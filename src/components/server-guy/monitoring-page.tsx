@@ -49,7 +49,7 @@ export function MonitoringPage({
     [records, applicationId],
   );
 
-  const top = (
+  const head = (
     <PageHead
       bar={chrome.bar}
       title="Monitoring"
@@ -60,19 +60,16 @@ export function MonitoringPage({
       onReopen={onReopen}
     />
   );
-  // How much it is used comes first: it is what an owner opens this page
-  // for, and it stands whether or not anything is watching.
-  const head = (
-    <>
-      {top}
-      <UsagePanel
-        usage={usage}
-        name={applicationName}
-        now={now}
-        onAsk={onAsk}
-      />
-    </>
+  // How much it is used sits under the lede: it is what an owner opens this
+  // page for, and it stands whether or not anything is watching.
+  const panel = (
+    <UsagePanel usage={usage} name={applicationName} now={now} onAsk={onAsk} />
   );
+  // A check can pass while visitors get errors; the lede says both.
+  const failed = usage?.traffic?.serverErrors.reduce((a, b) => a + b, 0) ?? 0;
+  const aside = failed
+    ? `In the last 24 hours the access log shows ${failed.toLocaleString("en-US")} ${failed === 1 ? "request" : "requests"} failing on the server.`
+    : null;
 
   // The Tuner draws stations, and a station is a part something was observed
   // about. A record can establish that nothing is watching without anything
@@ -82,6 +79,7 @@ export function MonitoringPage({
     return (
       <div className="ax-root" data-variant="tuner">
         {head}
+        {panel}
         <div className="sg-deploy-none">
           <h2>
             {story.watcher
@@ -120,6 +118,8 @@ export function MonitoringPage({
         head={head}
         activity={null}
         onAsk={onAsk}
+        usage={panel}
+        aside={aside}
       />
     </div>
   );

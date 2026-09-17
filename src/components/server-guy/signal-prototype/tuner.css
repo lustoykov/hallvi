@@ -7,8 +7,39 @@
   --axtu-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16 0 0 0 0 0.2 0 0 0 0 0.3 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 22px;
+  gap: 28px;
   padding-top: 10px;
+}
+
+/* The two halves of the page, Traffic and load then Watching, open with
+   the same header so they read as sections of one page. */
+.axtu-listen {
+  display: grid;
+  gap: 14px;
+}
+.axtu-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+.axtu-section-head > div {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.axtu-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ax-ink);
+}
+.axtu-section-head p {
+  max-width: 68ch;
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ax-muted);
 }
 .axtu-lede {
   display: flex;
@@ -54,19 +85,20 @@
 
 /* ---------- The radio ---------- */
 
+.axtu-set {
+  overflow: hidden;
+  border: 1px solid var(--ax-line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
+}
 .axtu-radio {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   align-items: stretch;
-  gap: 18px;
-  padding: 16px;
-  border: 1px solid var(--ax-line-2);
-  border-radius: 24px;
-  background: linear-gradient(180deg, #f8f9fb 0%, #eceff4 100%);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 1px 2px rgb(23 34 56 / 5%),
-    0 26px 50px -38px rgb(23 34 56 / 40%);
+  gap: 16px;
+  padding: 14px;
+  background: var(--ax-context);
 }
 .axtu-face {
   display: grid;
@@ -108,17 +140,22 @@
   box-shadow: 0 0 0 3px rgb(40 90 216 / 18%);
 }
 .axtu-face small {
-  max-width: 22ch;
+  display: -webkit-box;
+  max-width: 24ch;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--ax-muted);
+  text-wrap: balance;
 }
 
 .axtu-glass {
   position: relative;
   min-height: 132px;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 12px;
   background:
     radial-gradient(120% 90% at 50% 0%, rgb(159 180 245 / 10%), transparent),
     linear-gradient(180deg, #1d2639 0%, #121826 100%);
@@ -289,17 +326,12 @@
 .axtu-transcript {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--ax-line);
-  border-radius: 22px;
-  background: #ffffff;
-  box-shadow:
-    0 1px 2px rgb(23 34 56 / 4%),
-    0 30px 60px -44px rgb(23 34 56 / 34%);
+  border-top: 1px solid var(--ax-line);
 }
 .axtu-tuned {
   display: grid;
-  gap: 16px;
-  padding: 22px 24px 24px;
+  gap: 14px;
+  padding: 20px 22px 22px;
 }
 .axtu-tuned[data-fade] {
   animation: axtu-in 260ms var(--ax-ease-out) both;
@@ -342,23 +374,31 @@
 }
 .axtu-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px 20px;
 }
+.axtu-head > div {
+  min-width: 0;
+}
 .axtu-head h3 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -0.018em;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
   color: var(--ax-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .axtu-head p {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   font-size: 13px;
   line-height: 1.45;
   color: var(--ax-muted);
+}
+.axtu-head .ax-tag {
+  flex: none;
 }
 
 /* Monitoring: what was heard, then the silence. */
@@ -366,25 +406,26 @@
   display: grid;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--ax-line);
   list-style: none;
 }
 .axtu-heard li {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr) auto;
+  grid-template-columns: 104px minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 14px;
-  padding: 11px 2px;
+  gap: 16px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--ax-line);
 }
 .axtu-heard time {
-  font-family: var(--ax-mono);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ax-muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .axtu-heard div {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 .axtu-heard b {
@@ -393,65 +434,73 @@
   color: var(--ax-ink);
 }
 .axtu-heard span {
-  font-family: var(--ax-mono);
-  font-size: 12px;
-  color: var(--ax-ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ax-muted);
   overflow-wrap: anywhere;
 }
 .axtu-heard small {
   font-size: 12.5px;
   color: var(--ax-failed);
 }
-.axtu-heard em {
+/* One tint per state, with its icon, so the result survives a colour-blind
+   reading. "Out of date" is never the green of a check that held. */
+.axtu-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12.5px;
   font-style: normal;
-  font-weight: 650;
+  font-weight: 600;
+  white-space: nowrap;
   color: var(--ax-verified-text);
 }
-.axtu-heard [data-state="seen"] em {
-  color: var(--ax-working-text);
+.axtu-result svg {
+  width: 13px;
+  height: 13px;
 }
-/* A reading whose window has closed is not a passing one. The default here
-   is the verified green with overrides for "seen" and "failing" only, so
-   "Out of date" came out in exactly the colour that means a check held — the
-   one substitution the Recorded State Rule exists to prevent. */
-.axtu-heard [data-state="unknown"] em {
-  color: var(--ax-waiting-text, #9a4b10);
+.axtu-heard [data-state="seen"] .axtu-result {
+  color: var(--ax-muted);
 }
-.axtu-heard [data-state="failing"] em {
+.axtu-heard [data-state="unknown"] .axtu-result {
+  color: var(--ax-waiting-text);
+}
+.axtu-heard [data-state="failing"] .axtu-result {
   color: var(--ax-failed);
 }
-.axtu-silence {
-  margin: 0;
-  padding: 16px 18px;
-  border-radius: 14px;
-  background: var(--axtu-noise), #eef1f6;
-  font-size: 13.5px;
-  font-weight: 560;
-  color: var(--ax-ink-2);
-}
-.axtu-silence[data-live] {
-  background: var(--ax-working-bg);
-  color: var(--ax-working-text);
-}
+
+/* The silence after the last thing heard: a gap, drawn as one. */
+.axtu-silence,
 .axtu-nosignal {
   display: grid;
-  gap: 3px;
-  padding: 14px 16px;
-  border: 1.5px dashed #c9d1de;
-  border-radius: 14px;
-  background: var(--axtu-noise), #f7f8fb;
+  gap: 2px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--ax-line-2);
+  border-radius: 12px;
+  background: var(--ax-context);
 }
+.axtu-silence b,
 .axtu-nosignal b {
   font-size: 13.5px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ax-ink);
 }
+.axtu-silence span,
 .axtu-nosignal p {
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--ax-ink-2);
+  color: var(--ax-muted);
+}
+.axtu-silence[data-live] {
+  border-style: solid;
+  border-color: var(--ax-working-line);
+  background: var(--ax-working-bg);
+}
+.axtu-silence[data-live] b,
+.axtu-silence[data-live] span {
+  color: var(--ax-working-text);
 }
 .axtu-ask-small {
   display: inline-flex;

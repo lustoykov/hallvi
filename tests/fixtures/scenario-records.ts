@@ -1075,7 +1075,7 @@ function usageRecord(id: string): SavedInformation {
         ],
       },
       host: {
-        source: "server's own samples (sysstat)",
+        source: "sysstat samples",
         cpu,
         memory,
         memoryTotal: "4 GB",

@@ -9,7 +9,13 @@
 // when, then the silence since. The lamp lights only while something
 // listens. Nothing moves on arrival.
 
-import { ChatCircleText } from "@phosphor-icons/react";
+import {
+  ChatCircleText,
+  Check,
+  Eye,
+  Hourglass,
+  Warning,
+} from "@phosphor-icons/react";
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import type { MascotMood } from "../home/mascot-scene";
@@ -43,6 +49,12 @@ const barsOf = (at: string | null, now: number) => {
   return hours < 1 ? 5 : hours < 6 ? 4 : hours < 24 ? 3 : hours < 72 ? 2 : 1;
 };
 const signalWords = ["No signal", "Faint", "Weak", "Fair", "Good", "Strong"];
+const resultIcon: Record<Look["state"], ReactNode> = {
+  passing: <Check weight="bold" />,
+  failing: <Warning weight="bold" />,
+  unknown: <Hourglass weight="bold" />,
+  seen: <Eye weight="bold" />,
+};
 const resultWord: Record<Look["state"], string> = {
   passing: "Passed",
   failing: "Failed",
@@ -122,7 +134,7 @@ function Radio({
               ? "Gone quiet"
               : "Not listening"}
         </span>
-        <small>{note}</small>
+        <small title={note}>{note}</small>
       </div>
       <div
         ref={glass}
@@ -277,6 +289,8 @@ export function TunerDirection({
   head,
   activity,
   onAsk,
+  usage,
+  aside,
 }: TunerProps) {
   const failing = story.looks.find((look) => look.state === "failing") ?? null;
   const watching = story.watcher?.state === "running";
@@ -381,7 +395,10 @@ export function TunerDirection({
         say: `${failing.name} is failing.`,
         tone: "failed" as Tone,
         word: `Failing · ${ago(failing.at!, now)}`,
-        sub: `${failing.detail}. ${story.watcher?.detail ?? ""}.`,
+        sub: [failing.detail, story.watcher?.detail]
+          .filter(Boolean)
+          .map((sentence) => `${sentence}.`)
+          .join(" "),
         ask: {
           label: "Ask Server Guy to look into it",
           draft: `${failing.name} is failing: ${failing.detail}. Find out why and tell me what you would change.`,
@@ -400,12 +417,24 @@ export function TunerDirection({
           ? `Last heard ${ago(story.lastCheckAt, now)}`
           : "Never heard",
         sub: story.lastCheckAt
-          ? `The last thing heard was at its deployment, ${when(story.lastCheckAt)}, when ${countWord(passedThen).toLowerCase()} ${passedThen === 1 ? "check" : "checks"} passed. Tune in to hear what each part said.`
-          : "The deployment recorded no check that heard from it.",
-        ask: {
-          label: "Ask Server Guy to set up a health watch",
-          draft: `Set up a health watch for ${story.name}: check each process every minute, restart one that stops, and tell me when something fails.`,
-        },
+          ? `The last thing heard was at its deployment, ${when(story.lastCheckAt)}, when ${countWord(passedThen).toLowerCase()} ${passedThen === 1 ? "check" : "checks"} passed.${aside ? ` ${aside}` : ""}`
+          : `The deployment recorded no check that heard from it.${aside ? ` ${aside}` : ""}`,
+        // Offering to set up a watch that is already running read as if the
+        // page had not noticed it.
+        ask: watching
+          ? {
+              label: "Ask Server Guy to check it now",
+              draft: `Check every part of ${story.name} now and tell me whether anything has changed since the last check.`,
+            }
+          : quiet
+            ? {
+                label: "Ask why the watch went quiet",
+                draft: `The health watch on ${story.name} has stopped reporting. Find out why, get it reporting again, and tell me what you changed.`,
+              }
+            : {
+                label: "Ask Server Guy to set up a health watch",
+                draft: `Set up a health watch for ${story.name}: check each process every minute, restart one that stops, and tell me when something fails.`,
+              },
       };
 
   return (
@@ -413,122 +442,160 @@ export function TunerDirection({
       {head}
       {activity}
       <Lede {...lede} onAsk={onAsk} />
-      <Radio
-        stations={stations}
-        tuned={tuned}
-        onTune={tune}
-        drag={drag}
-        onDrag={setDrag}
-        now={now}
-        mood={
-          failing
-            ? "attention"
-            : watching
-              ? "checking"
-              : toneOf(story.lastCheckAt, now) === "verified"
-                ? "ready"
-                : "resting"
-        }
-        // null is "there is one and it has gone quiet", which is neither.
-        live={watching ? true : quiet ? null : false}
-        note={
-          // What the watcher says about itself, when there is one. The
-          // sentence this replaced was the reference scenario's, and carried
-          // the word "invented" onto a page drawn from records.
-          watching || quiet
-            ? (story.watcher?.detail ?? "Something is watching")
-            : nobody
-              ? "Nothing listens between deployments"
-              : "Nothing listens between deployments"
-        }
-      />
-      <Transcript
-        between={between}
-        fade={fade}
-        label={`${station.name}: what was heard`}
-      >
-        <header className="axtu-head">
+      {usage}
+      <section className="axtu-listen" aria-labelledby="axtu-listen-title">
+        <header className="axtu-section-head">
           <div>
-            <h3>{station.name}</h3>
-            <p>{station.sub}</p>
+            <h2 id="axtu-listen-title">Watching</h2>
+            <p>
+              Each part of {story.name} is a station. Tune in to hear what it
+              last said.
+            </p>
           </div>
-          <Tag
-            tone={
-              station.state === "failing"
-                ? "failed"
-                : station.state === "static"
-                  ? "planned"
-                  : // A station whose readings are all out of window is not
-                    // verified, however recently the last one arrived.
-                    station.state === "stale"
-                    ? "stale"
-                    : toneOf(station.at, now)
-            }
-          >
-            {station.state === "failing"
-              ? "Failing"
-              : station.at
-                ? `Last heard ${ago(station.at, now)}`
-                : "No signal"}
-          </Tag>
         </header>
-        {heard.length > 0 && (
-          <ol className="axtu-heard">
-            {heard.map((item, index) => (
-              <li key={index} data-state={item.look.state}>
-                <time>{when(item.at)}</time>
-                <div>
-                  <b>
-                    {item.look.short}
-                    {item.look.invented ? " · invented" : ""}
-                  </b>
-                  <span>
-                    {item.look.kind === "output" ? item.text : item.look.how}
-                  </span>
-                  {item.look.state === "failing" && item.look.detail && (
-                    <small>{item.look.detail}</small>
-                  )}
-                </div>
-                <em>{resultWord[item.look.state]}</em>
-              </li>
+        <div className="axtu-set">
+          <Radio
+            stations={stations}
+            tuned={tuned}
+            onTune={tune}
+            drag={drag}
+            onDrag={setDrag}
+            now={now}
+            mood={
+              failing
+                ? "attention"
+                : watching
+                  ? "checking"
+                  : toneOf(story.lastCheckAt, now) === "verified"
+                    ? "ready"
+                    : "resting"
+            }
+            // null is "there is one and it has gone quiet", which is neither.
+            live={watching ? true : quiet ? null : false}
+            note={
+              // Short, because what the watcher says about itself is printed
+              // in full under the tuned station and said twice was noise.
+              watching
+                ? "Something checks on its own between deployments"
+                : quiet
+                  ? "It has stopped reporting"
+                  : "Nothing listens between deployments"
+            }
+          />
+          <Transcript
+            between={between}
+            fade={fade}
+            label={`${station.name}: what was heard`}
+          >
+            <header className="axtu-head">
+              <div>
+                <h3 title={station.name}>{station.name}</h3>
+                {station.sub && <p>{station.sub}</p>}
+              </div>
+              <Tag
+                tone={
+                  station.state === "failing"
+                    ? "failed"
+                    : station.state === "static"
+                      ? "planned"
+                      : // A station whose readings are all out of window is not
+                        // verified, however recently the last one arrived.
+                        station.state === "stale"
+                        ? "stale"
+                        : toneOf(station.at, now)
+                }
+              >
+                {station.state === "failing"
+                  ? "Failing"
+                  : station.at
+                    ? `Last heard ${ago(station.at, now)}`
+                    : "No signal"}
+              </Tag>
+            </header>
+            {heard.length > 0 && (
+              <ol className="axtu-heard">
+                {heard.map((item, index) => (
+                  <li key={index} data-state={item.look.state}>
+                    <time>{when(item.at)}</time>
+                    <div>
+                      {/* A reading is its name over its value; a check
+                          is its name over how it was checked, and a failing
+                          one says why once, in red, not twice. */}
+                      <b>
+                        {item.look.kind === "output"
+                          ? item.look.name
+                          : item.look.short}
+                        {item.look.invented ? " · invented" : ""}
+                      </b>
+                      {item.look.state === "failing" && item.look.detail ? (
+                        <small>{item.look.detail}</small>
+                      ) : (
+                        (item.look.kind === "output"
+                          ? item.text
+                          : item.look.how) && (
+                          <span>
+                            {item.look.kind === "output"
+                              ? item.text
+                              : item.look.how}
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <em className="axtu-result">
+                      {resultIcon[item.look.state]}
+                      {resultWord[item.look.state]}
+                    </em>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {heard.length > 0 && (
+              <p className="axtu-silence" data-live={watching || undefined}>
+                {watching ? (
+                  <>
+                    <b>Something is listening</b>
+                    <span>
+                      {story.watcher?.detail ??
+                        "It reports on its own schedule"}
+                      .
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <b>Silent for {lasting(now - Date.parse(last!))}</b>
+                    <span>
+                      since {when(last!)}
+                      {quiet
+                        ? ". Whatever was watching has not reported since."
+                        : ", with nothing listening."}
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
+            {gaps.map((gap) => (
+              <div key={gap.id} className="axtu-nosignal">
+                <b>{gap.title}</b>
+                <p>{gap.detail}</p>
+              </div>
             ))}
-          </ol>
-        )}
-        {heard.length > 0 && (
-          <p className="axtu-silence" data-live={watching || undefined}>
-            {/* "(invented)" was the reference scenario's word and reached a
-                page drawn from records. And "with nothing listening" is
-                false when something is listening and has gone quiet. */}
-            {watching
-              ? `Something is listening: ${story.watcher?.detail ?? "it reports on its own schedule"}.`
-              : `Silence since ${when(last!)}: ${lasting(now - Date.parse(last!))} ${
-                  quiet
-                    ? "since the watcher last said anything."
-                    : "with nothing listening."
-                }`}
-          </p>
-        )}
-        {gaps.map((gap) => (
-          <div key={gap.id} className="axtu-nosignal">
-            <b>{gap.title}</b>
-            <p>{gap.detail}</p>
-          </div>
-        ))}
-        {!heard.length && !gaps.length && (
-          <div className="axtu-nosignal">
-            <b>No signal</b>
-            <p>{health?.detail ?? "Nothing has heard from it."}</p>
-          </div>
-        )}
-        <button
-          type="button"
-          className="axtu-ask-small"
-          onClick={() => onAsk(stationAsk)}
-        >
-          <ChatCircleText weight="bold" />
-          Ask in the conversation
-        </button>
-      </Transcript>
+            {!heard.length && !gaps.length && (
+              <div className="axtu-nosignal">
+                <b>No signal</b>
+                <p>{health?.detail ?? "Nothing has heard from it."}</p>
+              </div>
+            )}
+            <button
+              type="button"
+              className="axtu-ask-small"
+              onClick={() => onAsk(stationAsk)}
+            >
+              <ChatCircleText weight="bold" />
+              Ask in the conversation
+            </button>
+          </Transcript>
+        </div>
+      </section>
     </section>
   );
 }

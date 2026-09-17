@@ -81,7 +81,7 @@ describe("monitoringFromRecords", () => {
       ),
     ]);
     expect(story.watcher?.state).toBe("running");
-    expect(story.watcher?.detail).toContain("Watches https://shop.example");
+    expect(story.watcher?.detail).toContain("Watches shop.example");
     expect(story.watcher?.detail).toContain("tells lyubomir@example.com");
   });
 

@@ -1,6 +1,7 @@
-/* Traffic and server load on Monitoring. Prefix: axmu-.
-   Two quiet cards above the Tuner. Nothing animates in; the only motion is
-   the hover layer following the pointer. */
+/* Traffic and load on Monitoring. Prefix: axmu-.
+   A section header shared with Watching (.axtu-section-head, tuner.css),
+   then two flat cards. Nothing animates in; the only motion is the hover
+   layer following the pointer. */
 
 .axmu {
   --axmu-requests: #285ad8;
@@ -8,45 +9,53 @@
   --axmu-cpu: #285ad8;
   --axmu-memory: #eb6834;
   display: grid;
+  gap: 14px;
+}
+.axmu-cards {
+  display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 16px;
 }
 .axmu-card {
-  display: grid;
-  align-content: start;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
-  padding: 20px 22px;
+  padding: 20px 22px 22px;
   border: 1px solid var(--ax-line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: #ffffff;
-  box-shadow:
-    0 1px 2px rgb(23 34 56 / 4%),
-    0 30px 60px -44px rgb(23 34 56 / 34%);
+  box-shadow: 0 1px 2px rgb(23 34 56 / 4%);
+}
+.axmu-card > .axtu-ask-small {
+  align-self: flex-start;
+  margin-top: auto;
 }
 .axmu-head {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
 }
 .axmu-head h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.012em;
   color: var(--ax-ink);
 }
-.axmu-head p {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--ax-muted);
+.axmu-head span {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ax-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .axmu-say {
-  margin: 0;
-  max-width: 70ch;
+  margin: -8px 0 0;
+  max-width: 68ch;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--ax-ink-2);
   text-wrap: pretty;
 }
@@ -54,17 +63,20 @@
 .axmu-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 28px;
+  gap: 8px 32px;
   margin: 0;
 }
 .axmu-stats div {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
-.axmu-stats dt {
-  font-size: 11.5px;
+.axmu-stats dt,
+.axmu-paths h4,
+.axmu-disk h4 {
+  margin: 0;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ax-faint);
 }
@@ -72,15 +84,10 @@
   margin: 0;
   font-size: 22px;
   font-weight: 600;
+  line-height: 1.1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ax-ink);
-}
-.axmu-stats dd.axmu-small {
-  padding-top: 5px;
-  font-size: 14px;
-  font-weight: 560;
-  letter-spacing: 0;
 }
 .axmu-stats [data-bad] dd {
   color: var(--ax-failed);
@@ -90,23 +97,24 @@
 
 .axmu-chart {
   position: relative;
-  padding: 10px 0 22px;
+  margin: 0;
+  padding: 12px 0 0;
 }
 .axmu-grid {
   position: absolute;
-  top: 10px;
+  top: 12px;
   right: 0;
   left: 0;
+  padding-top: 3px;
   border-top: 1px dashed var(--ax-line-2);
   font-size: 10.5px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--ax-faint);
-  padding-top: 3px;
   pointer-events: none;
 }
 .axmu-grid[data-half] {
-  top: 85px;
+  top: 87px;
 }
 .axmu-plot {
   position: relative;
@@ -132,22 +140,22 @@
 .axmu-bar b {
   display: block;
   flex: none;
-  border-radius: 2px 2px 0 0;
 }
 .axmu-bar i {
+  border-radius: 2px 2px 0 0;
   background: var(--axmu-requests);
-  opacity: 0.78;
+  opacity: 0.72;
+  transition: opacity var(--ax-fast);
 }
 .axmu-bar b {
   order: -1;
-  border-radius: 0;
   background: var(--axmu-errors);
 }
 .axmu-bars:hover .axmu-bar i {
-  opacity: 0.45;
+  opacity: 0.4;
 }
-.axmu-bar[data-hover] i {
-  opacity: 1 !important;
+.axmu-bars .axmu-bar[data-hover] i {
+  opacity: 1;
 }
 
 .axmu-lines svg {
@@ -164,6 +172,10 @@
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
+.axmu-lines polygon {
+  fill: var(--axmu-cpu);
+  opacity: 0.07;
+}
 .axmu-lines polyline[data-series="cpu"] {
   stroke: var(--axmu-cpu);
 }
@@ -176,14 +188,14 @@
   bottom: 0;
   width: 1px;
   background: var(--ax-ink);
-  opacity: 0.25;
+  opacity: 0.2;
   pointer-events: none;
 }
 .axmu-dot {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
   border: 2px solid #ffffff;
   border-radius: 50%;
   pointer-events: none;
@@ -196,15 +208,12 @@
 }
 
 .axmu-axis {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 18px;
+  position: relative;
+  height: 20px;
 }
 .axmu-axis span {
   position: absolute;
-  top: 4px;
+  top: 5px;
   transform: translateX(-50%);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
@@ -215,15 +224,15 @@
 .axmu-tip {
   position: absolute;
   z-index: 2;
-  top: 6px;
+  top: 8px;
   display: grid;
   gap: 3px;
-  min-width: 140px;
+  min-width: 132px;
   padding: 8px 10px;
   border: 1px solid var(--ax-line);
   border-radius: 10px;
   background: #ffffff;
-  box-shadow: 0 10px 30px -12px rgb(23 34 56 / 35%);
+  box-shadow: 0 8px 24px -12px rgb(23 34 56 / 30%);
   font-size: 12px;
   color: var(--ax-ink);
   pointer-events: none;
@@ -246,57 +255,61 @@
   color: var(--ax-ink-2);
   font-variant-numeric: tabular-nums;
 }
+.axmu-tip .axmu-tip-quiet {
+  padding-left: 16px;
+  color: var(--ax-muted);
+}
 
 .axmu-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
-  margin: -6px 0 0;
-  padding: 0;
-  list-style: none;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--ax-muted);
 }
-.axmu-legend li {
+.axmu-legend span {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-[data-series] {
-  flex: none;
-}
 .axmu-legend i,
 .axmu-tip i {
+  flex: none;
   width: 10px;
   height: 10px;
   border-radius: 3px;
 }
-i[data-series="requests"] {
+.axmu i[data-series="requests"] {
   background: var(--axmu-requests);
 }
-i[data-series="errors"] {
+.axmu i[data-series="errors"] {
   background: var(--axmu-errors);
 }
-i[data-series="cpu"] {
+.axmu i[data-series="cpu"] {
   background: var(--axmu-cpu);
 }
-i[data-series="memory"] {
+.axmu i[data-series="memory"] {
   background: var(--axmu-memory);
 }
 
-/* ---------- Most requested ---------- */
+/* ---------- Most requested, and the disk ---------- */
 
-.axmu-paths {
-  display: grid;
-  gap: 6px;
-  margin: 2px 0 0;
-  padding: 12px 0 0;
+.axmu-paths,
+.axmu-disk {
+  padding-top: 16px;
   border-top: 1px solid var(--ax-line);
+}
+.axmu-paths ol {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
   list-style: none;
 }
 .axmu-paths li {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(40px, 1fr) 6ch 8ch;
+  grid-template-columns: minmax(0, 1.5fr) minmax(40px, 1fr) 6ch 8ch;
   align-items: center;
   gap: 12px;
   font-size: 12.5px;
@@ -314,12 +327,16 @@ i[data-series="memory"] {
 .axmu-paths li > span:nth-of-type(2) {
   text-align: right;
 }
-.axmu-share {
+.axmu-share,
+.axmu-meter {
+  display: block;
   height: 6px;
+  overflow: hidden;
   border-radius: 3px;
   background: var(--ax-unknown-bg);
 }
-.axmu-share i {
+.axmu-share i,
+.axmu-meter i {
   display: block;
   height: 100%;
   border-radius: 3px;
@@ -332,43 +349,49 @@ i[data-series="memory"] {
   color: var(--ax-failed);
 }
 
-.axmu-foot {
+.axmu-disk {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ax-ink-2);
+}
+.axmu-meter[data-bad] i {
+  background: var(--ax-failed);
+  opacity: 1;
+}
+
+/* ---------- Nothing read yet ---------- */
+
+.axmu-ghost {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
-}
-.axmu-foot small {
-  font-size: 12px;
-  color: var(--ax-faint);
-}
-
-.axmu-ghost {
-  grid-column: 1 / -1;
-  border-style: dashed;
+  gap: 12px 24px;
+  padding: 18px 22px;
+  border: 1px dashed var(--ax-line-2);
+  border-radius: 18px;
   background: var(--ax-context);
-  box-shadow: none;
 }
-.axmu-ghost h3 {
+.axmu-ghost h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: var(--ax-ink);
 }
 .axmu-ghost p {
-  max-width: 70ch;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
+  max-width: 68ch;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
   color: var(--ax-ink-2);
-}
-.axmu-ghost button {
-  justify-self: start;
 }
 
 @media (max-width: 1100px) {
-  .axmu {
+  .axmu-cards {
     grid-template-columns: minmax(0, 1fr);
   }
 }

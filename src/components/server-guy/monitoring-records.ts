@@ -96,7 +96,7 @@ export function monitoringFromRecords({
         short: held.value.label,
         // What was checked, when Pi said. Falling back to the label printed
         // the same words twice, one above the other.
-        how: held.value.detail ?? "No detail was recorded.",
+        how: held.value.detail ?? "",
         kind: "check",
         at,
         // Ageing never turns a pass into a failure. A reading past its
@@ -148,7 +148,7 @@ export function monitoringFromRecords({
         read === "failed" ? false : read === "verified" ? true : null,
       detail: [
         facts.get("target")?.value.value
-          ? `Watches ${facts.get("target")!.value.value}`
+          ? `Watches ${facts.get("target")!.value.value.replace(/^https?:\/\//, "")}`
           : null,
         facts.get("interval")?.value.value
           ? `every ${facts.get("interval")!.value.value}`
