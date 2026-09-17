@@ -7,7 +7,7 @@
 // credentials and conversations. So finding it stops the process and says
 // what to move (docs/installation.md, "Moving from Server Guy").
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 const unmoved = (found, target) =>
   new Error(
@@ -16,6 +16,14 @@ const unmoved = (found, target) =>
 
 /** The database and settings file in a state directory. */
 export function stateFiles(directory) {
+  // A directory named for Server Guy, from a setting or a service definition
+  // written before the move, would otherwise be recreated empty.
+  const name = basename(directory);
+  if (name === "server-guy" || name === ".server-guy")
+    throw unmoved(
+      directory,
+      join(dirname(directory), name.replace("server-guy", "haldur")),
+    );
   const database = join(directory, "haldur.db");
   const settings = join(directory, "haldur.env");
   for (const [old, target] of [

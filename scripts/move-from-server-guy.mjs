@@ -74,9 +74,12 @@ function rewrite(value, from, to) {
   return value.startsWith(`${from}/`) ? to + value.slice(from.length) : value;
 }
 
+/** Any process with a file open under `path`. Without lsof, nothing is certain. */
 function inUse(path) {
-  const found = spawnSync("lsof", ["-t", "--", path], { encoding: "utf8" });
-  return found.status === 0 && found.stdout.trim() !== "";
+  const found = spawnSync("lsof", ["-t", "+D", path], { encoding: "utf8" });
+  if (found.error)
+    throw new Error("lsof is needed to check that nothing uses this state.");
+  return found.stdout.trim() !== "";
 }
 
 const changes = [];
@@ -89,28 +92,20 @@ for (const [from, to] of moves()) {
     throw new Error(
       `${to} already exists. Nothing was moved; decide which to keep.`,
     );
-
-  const renames = readdirSync(from)
-    .filter((name) => name.startsWith("server-guy."))
-    .map((name) => [name, `haldur.${name.slice("server-guy.".length)}`]);
-  const database = join(from, "server-guy.db");
-  if (existsSync(database) && inUse(database))
+  if (inUse(from))
     throw new Error(
-      `${database} is open in another process. Stop Haldur first.`,
+      `A process has files open in ${from}. Stop Haldur, development servers and workers first; nothing was moved.`,
     );
-
   changes.push(`${from} -> ${to}`);
-  for (const [a, b] of renames) changes.push(`  ${a} -> ${b}`);
-  if (dryRun) continue;
 
-  renameSync(from, to);
-  for (const [a, b] of renames) renameSync(join(to, a), join(to, b));
-
-  const moved = join(to, "haldur.db");
-  if (existsSync(moved)) {
-    const db = new Database(moved);
+  // Stored paths are rewritten before anything is renamed. They then name the
+  // destination, so a failure at any point leaves a move that can be run
+  // again: the rewrite finds nothing more to change and the rename follows.
+  const database = join(from, "server-guy.db");
+  if (existsSync(database)) {
+    const db = new Database(database, { readonly: dryRun });
     try {
-      db.transaction(() => {
+      const update = db.transaction(() => {
         for (const { id, host } of db
           .prepare("SELECT id, host FROM applications WHERE host IS NOT NULL")
           .all()) {
@@ -118,45 +113,60 @@ for (const [from, to] of moves()) {
           const next = Object.fromEntries(
             Object.entries(parsed).map(([k, v]) => [k, rewrite(v, from, to)]),
           );
-          if (JSON.stringify(next) !== JSON.stringify(parsed)) {
+          if (JSON.stringify(next) === JSON.stringify(parsed)) continue;
+          for (const [k, v] of Object.entries(next))
+            if (v !== parsed[k])
+              changes.push(`  applications ${id} ${k}: ${v}`);
+          if (!dryRun)
             db.prepare("UPDATE applications SET host = ? WHERE id = ?").run(
               JSON.stringify(next),
               id,
             );
-            changes.push(`  applications ${id}: SSH key paths`);
-          }
         }
-        const sources = db
+        const count = db
           .prepare(
-            "UPDATE messages SET source = 'haldur' WHERE source = 'server-guy'",
+            "SELECT count(*) AS n FROM messages WHERE source = 'server-guy'",
           )
-          .run().changes;
-        if (sources) changes.push(`  messages: ${sources} recorded events`);
-      })();
+          .get().n;
+        if (count) changes.push(`  messages: ${count} recorded events`);
+        if (count && !dryRun)
+          db.prepare(
+            "UPDATE messages SET source = 'haldur' WHERE source = 'server-guy'",
+          ).run();
+      });
+      update();
     } finally {
       db.close();
     }
   }
 
   for (const settings of [
-    join(to, "pi-settings.json"),
-    join(to, "config", "pi-settings.json"),
-    join(to, "pi", "pi-settings.json"),
+    join(from, "pi-settings.json"),
+    join(from, "config", "pi-settings.json"),
+    join(from, "pi", "pi-settings.json"),
   ]) {
     if (!existsSync(settings)) continue;
     const saved = JSON.parse(readFileSync(settings, "utf8"));
     const authPath = rewrite(saved.authPath, from, to);
     if (authPath === saved.authPath) continue;
-    const mode = statSync(settings).mode & 0o777;
+    changes.push(`  ${settings.slice(from.length + 1)} authPath: ${authPath}`);
+    if (dryRun) continue;
+    const temporary = `${settings}.moving`;
     writeFileSync(
-      settings,
+      temporary,
       `${JSON.stringify({ ...saved, authPath }, null, 2)}\n`,
-      {
-        mode,
-      },
+      { mode: statSync(settings).mode & 0o777 },
     );
-    changes.push(`  ${settings}: model credential path`);
+    renameSync(temporary, settings);
   }
+
+  const renames = readdirSync(from)
+    .filter((name) => name.startsWith("server-guy."))
+    .map((name) => [name, `haldur.${name.slice("server-guy.".length)}`]);
+  for (const [a, b] of renames) changes.push(`  ${a} -> ${b}`);
+  if (dryRun) continue;
+  for (const [a, b] of renames) renameSync(join(from, a), join(from, b));
+  renameSync(from, to);
 }
 console.log(
   changes.length

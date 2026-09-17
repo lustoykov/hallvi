@@ -49,6 +49,10 @@ it("refuses Server Guy state instead of starting empty beside it", () => {
   mkdirSync(join(root, "data"));
   writeFileSync(join(root, "data", "server-guy.db"), "");
   expect(() => stateFiles(join(root, "data"))).toThrow(/nothing was opened/);
+  // A data directory named for Server Guy, even one already moved away.
+  expect(() => stateFiles(join(root, "gone", "server-guy"))).toThrow(
+    /Moving from Server Guy/,
+  );
   expect(existsSync(join(root, ".haldur"))).toBe(false);
 });
 
