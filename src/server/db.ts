@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { stateLocation } from "../../scripts/legacy-names.mjs";
+import { stateLocation } from "../../scripts/state-location.mjs";
 
 import { applications, chats, messages, savedInformation } from "./db-schema";
 import schemaVersion from "./schema-version.json";

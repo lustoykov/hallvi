@@ -9,7 +9,7 @@ import {
 import { join, resolve } from "node:path";
 import { z } from "zod";
 
-import { stateLocation } from "../../scripts/legacy-names.mjs";
+import { stateLocation } from "../../scripts/state-location.mjs";
 
 import {
   GithubAccessError,

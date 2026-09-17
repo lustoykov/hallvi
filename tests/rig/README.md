@@ -10,7 +10,7 @@ Runs Haldur's own web app, worker, records, Pi runtime and executor against loca
 | Model | The configured Pi model. Only `pi-settings.json` is copied; the credential it names is read in place. |
 | GitHub API | [`stand-ins/github-api.ts`](stand-ins/github-api.ts.txt): exact mirrors made by [`mirror.mjs`](mirror.mjs); other public repositories pass through to GitHub unauthenticated and read-only. |
 | Hetzner API | [`stand-ins/hetzner.ts`](stand-ins/hetzner.ts.txt): a fixed small x86 offer; the "server" is 127.0.0.1. |
-| SSH | [`bin/ssh`](bin/ssh) runs each host command with the local shell and Docker engine, mapping `/opt/server-guy` and `/run/lock` into the rig directory. Cloud-init waiting and the metadata guard are skipped, so the event "Metadata access restricted" is not true in this rig. [`bin/flock`](bin/flock) emulates util-linux `flock`. |
+| SSH | [`bin/ssh`](bin/ssh) runs each host command with the local shell and Docker engine, mapping `/opt/haldur` and `/run/lock` into the rig directory. Cloud-init waiting and the metadata guard are skipped, so the event "Metadata access restricted" is not true in this rig. [`bin/flock`](bin/flock) emulates util-linux `flock`. |
 | Published HTTP | [`stand-ins/native-compose.ts`](stand-ins/native-compose.ts.txt) binds executed listeners to loopback; retained snapshots and facts keep what Pi authored. |
 
 On macOS with Docker Desktop, the shell transport cannot run the scheduled-backup installer (systemd) or the runner (it reads volume data from host paths). Backup proofs use Rig B.

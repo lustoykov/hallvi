@@ -121,13 +121,13 @@ describe("R2", () => {
     stub({
       success: true,
       result: {
-        buckets: [{ name: "server-guy-backups", creation_date: "2026-01-01" }],
+        buckets: [{ name: "haldur-backups", creation_date: "2026-01-01" }],
       },
     });
     const buckets = await cloudflare.cloudflareBuckets();
     expect(fetched[0]).toContain(`/accounts/${ACCOUNT}/r2/buckets`);
     expect(buckets).toEqual([
-      { name: "server-guy-backups", createdAt: "2026-01-01" },
+      { name: "haldur-backups", createdAt: "2026-01-01" },
     ]);
   });
 

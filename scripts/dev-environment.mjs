@@ -17,7 +17,7 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { piAccountLocation, stateLocation } from "./legacy-names.mjs";
+import { piAccountLocation, stateLocation } from "./state-location.mjs";
 
 export function resolveEnvironment(env = process.env, cwd = process.cwd()) {
   const state = () => stateLocation(cwd, { hidden: true });

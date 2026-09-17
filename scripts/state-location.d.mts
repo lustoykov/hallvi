@@ -4,9 +4,6 @@ export interface StateLocation {
   database: string;
   settings: string;
 }
-export function adoptLegacyEnvironment(
-  env?: Record<string, string | undefined>,
-): Record<string, string | undefined>;
 export function stateFiles(directory: string): StateLocation;
 export function stateLocation(
   parent: string,

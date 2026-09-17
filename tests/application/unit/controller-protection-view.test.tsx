@@ -24,7 +24,7 @@ function controller(
   return {
     connected: true,
     state: "recoverable",
-    bucket: "server-guy-copies",
+    bucket: "haldur-copies",
     host: "account.r2.cloudflarestorage.com",
     keep: 14,
     lastCopyAt: AT,

@@ -132,7 +132,7 @@ if (initialSetup === "ready") {
       id: "00000000-0000-4000-8000-000000000001",
       mode: "app",
       clientId: "Iv1.qa-fixture",
-      slug: "qa-server-guy",
+      slug: "qa-haldur-app",
       token: "ghu_QA-SYNTHETIC",
       expiresAt: null,
       account: { id: 42, login: "qa-fixture-user" },
@@ -174,7 +174,7 @@ const env = {
   HALDUR_QA_ROOT: root,
   HALDUR_QA_LOGIN_MODE: loginMode,
   HALDUR_GITHUB_CLIENT_ID: "Iv1.qa",
-  HALDUR_GITHUB_APP_SLUG: "qa-server-guy",
+  HALDUR_GITHUB_APP_SLUG: "qa-haldur-app",
   NEXT_TELEMETRY_DISABLED: "1",
   HALDUR_TRACING: "0",
 };

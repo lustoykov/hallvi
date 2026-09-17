@@ -250,7 +250,7 @@ export async function captureControllerPayload(): Promise<{
       copy.close();
     }
     entries.push({
-      path: "payload/database/server-guy.db",
+      path: "payload/database/haldur.db",
       content: readFileSync(target),
       mode: 0o600,
     });
@@ -341,8 +341,6 @@ export async function captureControllerPayload(): Promise<{
     [".env", join(process.cwd(), ".env")],
     [".env.local", join(process.cwd(), ".env.local")],
     ["haldur.env", join(dirname(database), "haldur.env")],
-    // An installation from before the rename keeps its settings by that name.
-    ["server-guy.env", join(dirname(database), "server-guy.env")],
   ])
     if (existsSync(path))
       entries.push({

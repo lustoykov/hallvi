@@ -24,18 +24,15 @@ import { fileURLToPath } from "node:url";
 
 import { forwardedPorts, installedPorts } from "./installed-ports.mjs";
 import {
-  adoptLegacyEnvironment,
   piAccountLocation,
   stateFiles,
   stateLocation,
-} from "./legacy-names.mjs";
+} from "./state-location.mjs";
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homedir();
-adoptLegacyEnvironment();
 let state;
 try {
-  // An installation from before the rename keeps ~/.local/share/server-guy.
   const chosen = process.env.HALDUR_DATA_DIR?.trim();
   state = chosen
     ? stateFiles(resolve(chosen))
@@ -76,7 +73,6 @@ const environment = {
 // The installation's own settings, the port among them. The service reads the
 // same file, so this command and the service cannot disagree about the port.
 if (existsSync(state.settings)) process.loadEnvFile(state.settings);
-adoptLegacyEnvironment();
 
 function run(command, args, { quiet = false } = {}) {
   const result = spawnSync(command, args, { encoding: "utf8" });

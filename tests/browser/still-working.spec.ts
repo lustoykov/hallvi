@@ -58,7 +58,7 @@ test(
     // surprised the owner: nothing they typed is on screen above it.
     database
       .prepare(
-        "INSERT INTO messages (id, conversation_id, role, body, source, created_at, updated_at) VALUES (?, ?, 'user', 'Take a backup now.', 'server-guy', ?, ?)",
+        "INSERT INTO messages (id, conversation_id, role, body, source, created_at, updated_at) VALUES (?, ?, 'user', 'Take a backup now.', 'haldur', ?, ?)",
       )
       .run(userId, chat.id, now, now);
     database

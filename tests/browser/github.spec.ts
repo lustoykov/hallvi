@@ -220,7 +220,7 @@ test(
       page.getByRole("link", { name: "Choose repositories on GitHub" }),
     ).toHaveAttribute(
       "href",
-      "https://github.com/apps/qa-server-guy/installations/new",
+      "https://github.com/apps/qa-haldur-app/installations/new",
     );
     await page.setViewportSize({ width: 1394, height: 1354 });
     await page.screenshot({

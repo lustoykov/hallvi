@@ -26,9 +26,6 @@ import {
   resolveEnvironment,
   WORKER_BUSY_EXIT,
 } from "./dev-environment.mjs";
-import { adoptLegacyEnvironment } from "./legacy-names.mjs";
-
-adoptLegacyEnvironment();
 const resolved = resolveEnvironment();
 const shared = environmentVariables(resolved);
 const preferred = Number(process.env.HALDUR_STUDIO_PORT ?? 4983);

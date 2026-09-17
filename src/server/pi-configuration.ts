@@ -13,7 +13,7 @@ import { z } from "zod";
 import {
   piAccountLocation,
   stateLocation,
-} from "../../scripts/legacy-names.mjs";
+} from "../../scripts/state-location.mjs";
 
 import {
   PI_MODEL_ID,

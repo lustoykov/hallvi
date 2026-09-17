@@ -26,15 +26,13 @@ import {
 } from "./dev-environment.mjs";
 import { installedPorts } from "./installed-ports.mjs";
 import {
-  adoptLegacyEnvironment,
   piAccountLocation,
   stateFiles,
   stateLocation,
-} from "./legacy-names.mjs";
+} from "./state-location.mjs";
 
 const program = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const checkingInstalled = process.argv.includes("--check-installed");
-adoptLegacyEnvironment();
 let state;
 try {
   // A managed installation always supplies HALDUR_DATA_DIR. A foreground
@@ -56,7 +54,6 @@ if (!checkingInstalled) mkdirSync(data, { recursive: true, mode: 0o700 });
 // Settings an installation keeps for itself, such as the GitHub App's client
 // ID. Values already in the environment win, as they do for `--env-file`.
 if (existsSync(state.settings)) process.loadEnvFile(state.settings);
-adoptLegacyEnvironment();
 
 // The model account stays where development keeps it, so a machine that
 // already connected ChatGPT does not connect again. An owner who moves the

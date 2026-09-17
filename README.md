@@ -38,7 +38,7 @@ The old deployment/operation workers, mutation endpoints and approval cards have
 To use Haldur rather than develop it, install it as a background service:
 [Installing Haldur](docs/installation.md). `npm run package` builds the
 archive, and `npm start` runs the same production pair in the foreground against
-this checkout's `.haldur` state (or its retained `.server-guy` predecessor). The
+this checkout's `.haldur` state. The
 rest of this section is development.
 
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.
@@ -56,7 +56,7 @@ npm run db:push
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>. That one command starts three processes: the application, the Pi worker that carries its conversations, and a Drizzle Studio on the same database. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands all three children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `HALDUR_DB_PATH` overrides the default `.haldur/haldur.db`. A checkout from before the rename keeps its `.server-guy/` state, `~/.config/server-guy/pi` account and `SERVER_GUY_*` settings, and Haldur finds them where they are ([Haldur was Server Guy](docs/installation.md#haldur-was-server-guy)). The Studio takes the first free port from 4983 or from `HALDUR_STUDIO_PORT`, and the application is told which port it chose.
+Open <http://127.0.0.1:3000>. That one command starts three processes: the application, the Pi worker that carries its conversations, and a Drizzle Studio on the same database. The launcher loads `.env` and `.env.local`, resolves the database path, controller directory, Pi account directory and diagnostics directory once, and hands all three children the same values, so they cannot disagree about which database and which ChatGPT connection they are using. `HALDUR_DB_PATH` overrides the default `.haldur/haldur.db`. A checkout still holding state from before the rename to Haldur refuses to start until it is moved ([Moving from Server Guy](docs/installation.md#moving-from-server-guy)). The Studio takes the first free port from 4983 or from `HALDUR_STUDIO_PORT`, and the application is told which port it chose.
 
 The worker stays a separate process with its own exclusive lock ([what the launcher does when it stops](docs/architecture/development-start.md)). If it exits unexpectedly, the launcher says so and starts it once more; if it exits again, the launcher stops the children it started and exits non-zero rather than leaving the application in front of a queue nobody reads. A worker that finds another one already serving this database steps aside, and the launcher leaves that running worker alone. For debugging, `npm run worker` still starts one on its own from the same checkout.
 

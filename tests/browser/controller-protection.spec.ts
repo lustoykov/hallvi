@@ -58,7 +58,7 @@ test(
       JSON.stringify({
         provider: "r2",
         endpoint,
-        bucket: "server-guy-copies",
+        bucket: "haldur-copies",
         region: "auto",
         credentialFile: "default-credentials.json",
       }),
@@ -86,7 +86,7 @@ test(
         version: 1,
         kit: {
           createdAt: at,
-          bucket: "server-guy-copies",
+          bucket: "haldur-copies",
           endpoint,
           prefix: "controller/",
           confirmedAt: null,
@@ -123,7 +123,7 @@ test(
       passphrase,
       { timeout: 15_000 },
     );
-    await expect(kit).toContainText("server-guy-copies");
+    await expect(kit).toContainText("haldur-copies");
     await expect(panel).toContainText("Save your recovery kit");
 
     // 3. The owner says they saved it. One button, no form, and the page

@@ -4,7 +4,7 @@
 // 127.0.0.1:80, so Rig A's containers must not hold that port. MinIO runs
 // inside the host's own dockerd as https://s3.rig.amazonaws.com (the
 // product's S3 endpoint rule), with a rig CA that only the host's
-// server-guy-* units trust through a systemd drop-in: the stand-in for a
+// haldur-* units trust through a systemd drop-in: the stand-in for a
 // public certificate authority. Test credentials stay under ignored
 // tests/results/rig/<container>/.
 // Usage: node tests/rig/host/start.mjs [container] [http-port]
@@ -75,7 +75,7 @@ const keys = existsSync(credentials)
   : {
       accessKeyId: `rig${randomBytes(8).toString("hex")}`,
       secretAccessKey: randomBytes(24).toString("hex"),
-      bucket: "server-guy-backups",
+      bucket: "haldur-backups",
     };
 writeFileSync(credentials, JSON.stringify(keys, null, 2), { mode: 0o600 });
 // Test credentials reach the host on standard input, never a command line.
@@ -113,8 +113,8 @@ if [ ! -f public.crt ]; then
   chmod 644 private.key public.crt
 fi
 grep -q s3.rig.amazonaws.com /etc/hosts || echo '127.0.0.1 s3.rig.amazonaws.com' >> /etc/hosts
-mkdir -p /etc/systemd/system/server-guy-.service.d
-printf '[Service]\\nEnvironment=AWS_CA_BUNDLE=/etc/rig-minio/certs/ca.crt\\n' > /etc/systemd/system/server-guy-.service.d/rig-ca.conf
+mkdir -p /etc/systemd/system/haldur-.service.d
+printf '[Service]\\nEnvironment=AWS_CA_BUNDLE=/etc/rig-minio/certs/ca.crt\\n' > /etc/systemd/system/haldur-.service.d/rig-ca.conf
 systemctl daemon-reload
 if ! docker ps --format '{{.Names}}' | grep -qx rig-minio; then
   docker rm -f rig-minio >/dev/null 2>&1 || true

@@ -49,7 +49,7 @@ function controlSocket(
     .digest("hex")
     .slice(0, 24);
   // Keep control socket paths short enough for macOS Unix sockets.
-  return join(`/tmp/server-guy-ssh-${process.getuid!()}`, identity);
+  return join(`/tmp/haldur-ssh-${process.getuid!()}`, identity);
 }
 
 async function masterAlive(
@@ -90,7 +90,7 @@ export async function openServerPort(
   const host = operatorSettings(applicationId).host;
   if (!host) throw new Error("Connect a server before opening private access.");
   signal?.throwIfAborted();
-  mkdirSync(`/tmp/server-guy-ssh-${process.getuid!()}`, {
+  mkdirSync(`/tmp/haldur-ssh-${process.getuid!()}`, {
     recursive: true,
     mode: 0o700,
   });

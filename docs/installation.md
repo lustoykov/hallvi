@@ -151,29 +151,40 @@ reporting the mismatch instead of restarting indefinitely. Until schema
 migrations exist, the choices are to keep or reinstall the version that wrote
 the database, or to move the database aside and start fresh.
 
-## Haldur was Server Guy
+## Moving from Server Guy
 
-Haldur was called Server Guy until 17 September 2026. Installing Haldur over
-a Server Guy installation is an ordinary upgrade: `install.sh` stops the
-`com.server-guy` launchd agent or `server-guy.service` unit, removes it with the
-`server-guy` command and `~/.local/lib/server-guy`, installs `haldur`, and
-returns the service to the state it found.
+Haldur was called Server Guy until 17 September 2026. Haldur does not read
+state left under that name, and it does not start over it either: the
+installer, the service and development commands stop and name what to move.
+Move it once, with nothing running:
 
-Nothing that holds records moves. Haldur uses `~/.local/share/haldur` and
-`~/.config/haldur/pi` when they exist, and otherwise the Server Guy directories
-(`~/.local/share/server-guy`, with its `server-guy.db` and `server-guy.env`, and
-`~/.config/server-guy/pi`), so applications, conversations, credentials and the
-ChatGPT connection are where they were. `SERVER_GUY_*` settings still apply; a
-`HALDUR_*` setting of the same name wins. If both a Haldur and a Server Guy
-database exist, Haldur refuses to start and names both files rather than
-choosing one.
+```sh
+# 1. Stop the service. A Server Guy installation: server-guy stop, then remove
+#    ~/.local/bin/server-guy and ~/.local/lib/server-guy (program only).
+haldur stop
+# 2. Move state and the model account, from an unpacked Haldur archive or a checkout.
+node scripts/move-from-server-guy.mjs installation
+node scripts/move-from-server-guy.mjs account
+# 3. Install or start Haldur.
+haldur start
+```
 
-Some names are written outside this installation and stay as they are, so that
-running servers and earlier copies still match: `server-guy.*` Docker labels
-and the `/opt/server-guy`, `/var/lib/server-guy/backups` and scheduled-backup
-names on application servers, the `server-guy-application` provider label, the
-`/tmp/server-guy-ssh-*` tunnel sockets, and the database's path inside a
-controller copy.
+A development checkout moves its own state with
+`node scripts/move-from-server-guy.mjs checkout <checkout>` while its
+development servers and worker are stopped.
+
+The script renames `~/.local/share/server-guy` to `~/.local/share/haldur`,
+`~/.config/server-guy` to `~/.config/haldur` and a checkout's `.server-guy` to
+`.haldur`, renames `server-guy.db`, `server-guy.env` and their companions to
+`haldur.*`, and rewrites the paths Haldur stored inside them: SSH key paths in
+the database and the model credential path in `pi-settings.json`. It refuses
+to move over an existing Haldur directory or a database another process has
+open, and `--dry-run` lists what it would change. Records of work that already
+ran keep the paths they ran with, and `SERVER_GUY_*` settings are not read:
+rename them to `HALDUR_*`.
+
+Controller copies made before the rename hold `payload/database/server-guy.db`
+and `server-guy.env.disabled`; when restoring one, rename those files as above.
 
 ## Uninstall
 

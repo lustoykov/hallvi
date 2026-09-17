@@ -7,7 +7,7 @@
 //   - Hetzner API (stand-ins/hetzner.ts): a provider that "creates" a server
 //     at 127.0.0.1 and keeps its state in the rig directory.
 //   - SSH (bin/ssh, first on PATH). Rig A runs each host command with this
-//     machine's shell and Docker engine, mapping /opt/server-guy and
+//     machine's shell and Docker engine, mapping /opt/haldur and
 //     /run/lock into the rig directory (bin/flock and bin/timeout emulate
 //     util-linux and coreutils), and stands-ins/native-compose.ts binds
 //     published listeners to loopback, the provider firewall's role. Rig B

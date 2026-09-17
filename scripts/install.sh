@@ -7,10 +7,9 @@
 #   state     ~/.local/share/haldur   never touched by install or uninstall
 #   model     ~/.config/haldur/pi     never touched by install or uninstall
 #
-# Haldur was called Server Guy. Installing over a Server Guy installation stops
-# and replaces its service, command and program; its state and model account
-# stay in ~/.local/share/server-guy and ~/.config/server-guy/pi, where Haldur
-# finds them.
+# Haldur was called Server Guy. A machine that still has a Server Guy
+# installation, state or model account is refused until they are moved; see
+# "Moving from Server Guy" in docs/installation.md.
 #
 # Node.js is downloaded into the program directory rather than taken from the
 # machine: a background service does not see a shell's version manager, and the
@@ -76,26 +75,24 @@ require_installation() {
 
 # Ask the service manager, not the old command: a command that cannot run
 # would otherwise read as "not running" and lose its program while serving.
-legacy_home="$HOME/.local/lib/server-guy"
+for old in "$HOME/.local/lib/server-guy" "$HOME/.local/share/server-guy" \
+  "$HOME/.config/server-guy" "$HOME/Library/LaunchAgents/com.server-guy.plist" \
+  "$HOME/.config/systemd/user/server-guy.service"; do
+  [ ! -e "$old" ] ||
+    fail "$old is from Server Guy. Move it first: see \"Moving from Server Guy\" in docs/installation.md. Nothing was changed."
+done
 require_installation "$home" "Haldur"
-require_installation "$legacy_home" "Server Guy"
 if [ "$os" = darwin ]; then
   launchctl print "gui/$(id -u)/com.haldur" >/dev/null 2>&1 &&
     running=yes || running=no
-  launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 &&
-    legacy_running=yes || legacy_running=no
 else
   { systemctl --user is-enabled haldur.service >/dev/null 2>&1 ||
     systemctl --user is-active --quiet haldur.service; } &&
     running=yes || running=no
-  { systemctl --user is-enabled server-guy.service >/dev/null 2>&1 ||
-    systemctl --user is-active --quiet server-guy.service; } &&
-    legacy_running=yes || legacy_running=no
 fi
 was_running=$running
-[ "$legacy_running" = yes ] && was_running=yes
 upgrade=no
-if [ -d "$home" ] || [ -d "$legacy_home" ]; then upgrade=yes; fi
+[ -d "$home" ] && upgrade=yes
 
 mkdir -p "$HOME/.local/lib" "$bin"
 staging=$(mktemp -d "$HOME/.local/lib/haldur.installing.XXXXXX")
@@ -162,31 +159,6 @@ if [ "$running" = yes ]; then
       fail "Haldur is still running; nothing was replaced."
   fi
 fi
-# The same program under its former name. Its state is not touched.
-if [ "$legacy_running" = yes ]; then
-  if [ "$os" = darwin ]; then
-    launchctl bootout "gui/$(id -u)/com.server-guy" ||
-      fail "Server Guy could not be stopped; nothing was replaced."
-    # bootout returns before the job is gone, and the old worker still holds
-    # the database lock the new one needs.
-    for _ in $(seq 100); do
-      launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 || break
-      sleep 0.2
-    done
-    ! launchctl print "gui/$(id -u)/com.server-guy" >/dev/null 2>&1 ||
-      fail "Server Guy did not stop in time and was not replaced. Run install.sh again, then: haldur start"
-  else
-    systemctl --user disable --now server-guy.service ||
-      fail "Server Guy could not be stopped; nothing was replaced."
-    ! systemctl --user is-active --quiet server-guy.service ||
-      fail "Server Guy is still running; nothing was replaced."
-  fi
-fi
-rm -f "$HOME/Library/LaunchAgents/com.server-guy.plist" \
-  "$HOME/.config/systemd/user/server-guy.service" "$bin/server-guy"
-[ "$os" = linux ] && systemctl --user daemon-reload || true
-rm -rf "$legacy_home"
-
 rm -rf "$home"
 mv "$staging" "$home"
 staging=""
