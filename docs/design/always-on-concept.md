@@ -118,9 +118,17 @@ A packaging spike comes next, and should settle:
 - an installer script, a single binary or a container image;
 - how the two native modules, `node-pty` and `better-sqlite3`, are built or
   shipped for each platform;
-- whether Docker stays a requirement. Pi's repository workspace is a local
-  container today; it could instead move to the application host over the SSH
-  connection Server Guy already holds.
+- how the decided workspace change lands. Pi's repository workspace is a local
+  Docker container today. The owner decided it runs directly on the user's
+  machine by default, in a scratch folder holding the repository copy, under
+  two hygiene rules that are not a sandbox: Server Guy's own tokens are
+  stripped from the environment of anything Pi runs, and Pi's file tools refuse
+  to read Server Guy's configuration and credential files. Docker becomes an
+  optional sandbox for people deploying software they do not trust. When it is
+  configured and unavailable, the workspace tools are withdrawn with a plain
+  reason, never a silent fallback. Server Guy itself never runs inside that
+  sandbox; a container image stays a packaging format for the virtual machine
+  rung.
 
 A desktop wrapper is worth building only if the Mac rung turns out to need
 one.
