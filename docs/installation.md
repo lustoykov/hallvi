@@ -114,7 +114,8 @@ haldur remote you@vm.example.com
 ```
 
 Paste the `Host haldur` block it prints into `~/.ssh/config` on the laptop,
-then:
+then. Every local forward explicitly binds the laptop's `127.0.0.1`, even when
+the laptop's SSH defaults allow forwarded ports on other interfaces:
 
 ```bash
 ssh -N haldur
@@ -138,15 +139,17 @@ note explains why.
 
 Build or obtain the new archive and run its `install.sh`. It prepares the new
 program completely — download, dependencies, native compiles — while the old
-one keeps serving, then stops the service, swaps the program and returns the
-service to the state it found: running if it was running, stopped if you had
-stopped it. A failure before the swap leaves the old installation as it was.
-State is not touched.
+one keeps serving, checks that the new version can open the existing database,
+then stops the service, swaps the program and returns the service to the state
+it found: running if it was running, stopped if you had stopped it. A failed
+check or stop leaves the old installation as it was. State is not touched.
 
-A new version that changes the database schema refuses to start on an older
-database, says which versions are involved and changes nothing. Until schema
-migrations exist, the choices are to reinstall the version that wrote the
-database or to move the database aside and start fresh.
+A new version that changes the database schema is refused before the installed
+program is replaced. It says which versions are involved and changes nothing.
+If a managed service encounters an incompatible database later, it stops after
+reporting the mismatch instead of restarting indefinitely. Until schema
+migrations exist, the choices are to keep or reinstall the version that wrote
+the database, or to move the database aside and start fresh.
 
 ## Haldur was Server Guy
 

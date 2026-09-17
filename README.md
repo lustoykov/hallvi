@@ -37,7 +37,8 @@ The old deployment/operation workers, mutation endpoints and approval cards have
 
 To use Haldur rather than develop it, install it as a background service:
 [Installing Haldur](docs/installation.md). `npm run package` builds the
-archive, and `npm start` runs the same production pair in the foreground. The
+archive, and `npm start` runs the same production pair in the foreground against
+this checkout's `.haldur` state (or its retained `.server-guy` predecessor). The
 rest of this section is development.
 
 Development runs locally on the owner's MacBook; the Mac mini is retired from development.

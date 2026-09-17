@@ -33,20 +33,25 @@ import {
 } from "./legacy-names.mjs";
 
 const program = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const checkingInstalled = process.argv.includes("--check-installed");
 adoptLegacyEnvironment();
 let state;
 try {
-  // An installation from before the rename keeps ~/.local/share/server-guy.
+  // A managed installation always supplies HALDUR_DATA_DIR. A foreground
+  // `npm start` from a checkout stays with that checkout's development state
+  // instead of silently opening the installed controller.
   const chosen = process.env.HALDUR_DATA_DIR?.trim();
   state = chosen
     ? stateFiles(resolve(chosen))
-    : stateLocation(join(homedir(), ".local", "share"));
+    : checkingInstalled
+      ? stateLocation(join(homedir(), ".local", "share"))
+      : stateLocation(program, { hidden: true });
 } catch (error) {
   console.error(error.message);
   process.exit(1);
 }
 const data = state.directory;
-mkdirSync(data, { recursive: true, mode: 0o700 });
+if (!checkingInstalled) mkdirSync(data, { recursive: true, mode: 0o700 });
 
 // Settings an installation keeps for itself, such as the GitHub App's client
 // ID. Values already in the environment win, as they do for `--env-file`.
@@ -78,12 +83,18 @@ const ports = installedPorts(process.env);
  * with. An existing database is never altered: one from another schema version
  * stops the service with the reason, and the file is left exactly as it was.
  */
-function prepareDatabase() {
+class SchemaMismatchError extends Error {}
+
+function prepareDatabase({ initialize = true } = {}) {
   const { version } = JSON.parse(
     readFileSync(join(program, "dist", "schema-version.json"), "utf8"),
   );
+  if (!existsSync(resolved.database) && !initialize) return;
   mkdirSync(dirname(resolved.database), { recursive: true, mode: 0o700 });
-  const database = new Database(resolved.database);
+  const database = new Database(
+    resolved.database,
+    initialize ? undefined : { readonly: true },
+  );
   try {
     const populated = database
       .prepare(
@@ -91,13 +102,14 @@ function prepareDatabase() {
       )
       .get();
     if (!populated) {
+      if (!initialize) return;
       database.exec(readFileSync(join(program, "dist", "schema.sql"), "utf8"));
       database.pragma(`user_version = ${version}`);
       return;
     }
     const current = database.pragma("user_version", { simple: true });
     if (current !== version)
-      throw new Error(
+      throw new SchemaMismatchError(
         `${resolved.database} holds schema ${current} and this Haldur needs schema ${version}. Nothing was changed. Install the version that wrote it, or move the file aside to start fresh.`,
       );
   } finally {
@@ -106,10 +118,26 @@ function prepareDatabase() {
 }
 
 try {
-  prepareDatabase();
+  prepareDatabase({
+    initialize: !checkingInstalled,
+  });
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+  // A schema mismatch is permanent until the owner chooses a version or a
+  // database. A managed service must stop instead of filling its logs forever;
+  // an interactive check still reports failure conventionally.
+  process.exit(
+    error instanceof SchemaMismatchError &&
+      !checkingInstalled &&
+      process.env.HALDUR_MANAGED_SERVICE === "1"
+      ? 0
+      : 1,
+  );
+}
+
+if (checkingInstalled) {
+  console.log("Haldur can open this controller database.");
+  process.exit(0);
 }
 
 const children = new Set();
