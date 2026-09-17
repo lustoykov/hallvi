@@ -133,6 +133,7 @@ export function scenarios(): Scenario[] {
   const overclaimed = "aaaaaaaa-0000-4000-8000-000000000007";
   const notes = "aaaaaaaa-0000-4000-8000-000000000008";
   const serving = "aaaaaaaa-0000-4000-8000-000000000009";
+  const backupFailed = "aaaaaaaa-0000-4000-8000-00000000000a";
 
   return [
     {
@@ -372,6 +373,125 @@ export function scenarios(): Scenario[] {
         "A plan that promises more than the copies deliver: off-site intended, beside the application in fact, and one volume nobody copies.",
       records: overclaimedRecords(overclaimed),
     },
+    {
+      id: backupFailed,
+      name: "Scenario · backup failed",
+      shows:
+        "A healthy older copy followed by an actual failed copy, including the operational reason.",
+      records: failedBackupRecords(backupFailed),
+    },
+  ];
+}
+
+function failedBackupRecords(id: string): SavedInformation[] {
+  return [
+    states(
+      id,
+      { kind: "application", id },
+      {
+        at: ago(2 * HOUR),
+        title: "Orders",
+        views: ["architecture", "overview"],
+        content: {
+          kind: "topology",
+          from: "observed",
+          parts: [
+            {
+              id: "orders-host",
+              kind: "host",
+              name: "orders-hel1",
+              role: "the application server",
+              plain: "the server",
+            },
+            {
+              id: "orders-web",
+              kind: "web",
+              name: "Orders",
+              role: "the application",
+              plain: "the application",
+            },
+            {
+              id: "orders-data",
+              kind: "volume",
+              name: "Order database",
+              role: "orders and customer details",
+              plain: "the application data",
+            },
+          ],
+          edges: [
+            { from: "orders-host", to: "orders-web", network: "private" },
+            { from: "orders-web", to: "orders-data", network: "disk" },
+          ],
+        },
+      },
+    ),
+    states(
+      id,
+      { kind: "volume", id: "orders-data" },
+      {
+        at: ago(2 * HOUR),
+        title: "The order database survives replacement",
+        views: ["storage"],
+        facts: [
+          fact("path", "/srv/orders/data"),
+          fact("holds", "Orders and customer details"),
+          fact("size", "86 MB", "contents"),
+        ],
+        checks: [check("persistence", "passed", "configuration")],
+      },
+    ),
+    states(
+      id,
+      { kind: "backup-plan", id: "nightly" },
+      {
+        at: ago(4 * DAY),
+        title: "Orders are copied nightly",
+        views: ["backups"],
+        facts: [
+          fact("schedule", "Daily at 02:30", "configuration", "planned"),
+          fact(
+            "destination",
+            "R2 · orders-backups",
+            "configuration",
+            "planned",
+          ),
+          fact("destination-kind", "off-site", "configuration", "planned"),
+          fact("keep", "7 daily copies", "configuration", "planned"),
+          fact("covers", "orders-data"),
+        ],
+      },
+    ),
+    states(
+      id,
+      { kind: "backup-copy", id: "orders-copy-yesterday" },
+      {
+        at: ago(30 * HOUR),
+        title: "The previous copy completed",
+        views: ["backups"],
+        facts: [
+          fact("destination", "R2 · orders-backups"),
+          fact("destination-kind", "off-site"),
+          fact("covers", "orders-data"),
+          fact("size", "84 MB", "contents"),
+        ],
+      },
+    ),
+    states(
+      id,
+      { kind: "backup-copy", id: "orders-copy-today" },
+      {
+        at: ago(6 * HOUR),
+        status: "failed",
+        title: "The latest copy did not finish",
+        body: "The archive stopped because /var ran out of space.",
+        views: ["backups"],
+        facts: [
+          fact("destination", "R2 · orders-backups"),
+          fact("destination-kind", "off-site"),
+          fact("covers", "orders-data"),
+        ],
+      },
+    ),
   ];
 }
 

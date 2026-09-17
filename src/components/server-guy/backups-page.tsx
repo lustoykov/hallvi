@@ -2,13 +2,14 @@
 
 // Backups, on real records.
 //
-// The selected design (C inside F) over the same three subjects Storage reads
-// — plan, copy, restore test — because they are the same records and the two
-// pages ask different questions of them. Storage asks "would this survive the
-// container being replaced"; this one asks "would it survive the server".
+// Application-first Backups over the same three subjects Storage reads — plan,
+// copy and restore test — because the pages ask different questions of them.
+// Storage asks "would this survive the container being replaced"; this one
+// asks "would the application's data survive losing the server".
 //
-// The stages are the page. The calendar board that used to sit under them is
-// kept at backup-prototype/calendar.tsx as the alternative it now is: with
+// The application and its data are the page. The calendar board that used to
+// sit under them is kept at backup-prototype/calendar.tsx as the alternative
+// it now is: with
 // the things themselves inside the stages, a board of the same copies by day
 // is the reader meeting the same facts twice. One finding went with it — the
 // board marked a day where a schedule implied a copy and none was on record,
@@ -24,6 +25,11 @@ import { useMemo } from "react";
 
 import type { ControllerProtectionFacts } from "@/server/application-facts";
 import type { SavedInformation } from "@/server/operator-data";
+import {
+  currentFacts,
+  subjectsOfKind,
+  topologyOf,
+} from "@/server/record-projection";
 
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { protectionFromRecords, protectionVerdict } from "./backups-records";
@@ -67,10 +73,21 @@ export function BackupsPage({
     () => protectionFromRecords(records, now, applicationId),
     [records, now, applicationId],
   );
-  const assessed = protection.assessed;
-  // The one verdict the page leads with, and deliberately not a summary of
-  // the stages under it: they say what happened, this says what that adds up
-  // to, which is the question a reader arrives with.
+  const hostName = useMemo(() => {
+    const live = records.filter((record) => !record.retiredAt);
+    const host = topologyOf(live, applicationId)?.value.parts.find(
+      (part) => part.kind === "host",
+    );
+    if (host?.name) return host.name;
+    const hostRef = subjectsOfKind(live, "host")[0];
+    if (!hostRef) return "server not established";
+    return (
+      currentFacts(live, hostRef).get("address")?.value.value ?? hostRef.id
+    );
+  }, [records, applicationId]);
+  // The one verdict the page leads with. Data items say what happened; this
+  // says what those records add up to, which is the question a reader arrives
+  // with.
   const verdict = useMemo(
     () => protectionVerdict(protection, now),
     [protection, now],
@@ -87,70 +104,20 @@ export function BackupsPage({
     />
   );
 
-  if (!assessed)
-    return (
-      <div className="ax-root" data-variant="stages">
-        {head}
-        <div className="sg-deploy-none">
-          <h2>Nothing here has been looked at yet.</h2>
-          <p>
-            No record names a backup plan, a copy or a restore test for{" "}
-            {applicationName}. That is not the same as there being no backups —
-            it means Server Guy has not established either way, and this is the
-            one page where guessing would be worst.
-          </p>
-          <p>
-            {story.volumes.length > 0
-              ? `Something is on disk: ${story.volumes.length === 1 ? "one volume holds" : `${story.volumes.length} volumes hold`} data that would go with the server.`
-              : "Nothing has established what is on disk either, so there is not yet anything to say a plan would cover."}
-          </p>
-          <button
-            type="button"
-            className="sg-primary-button"
-            onClick={() =>
-              onAsk(
-                `Is anything backing up ${applicationName}'s data off this server? If nothing is, say so and recommend the simplest thing that would.`,
-              )
-            }
-          >
-            Check backups
-          </button>
-        </div>
-        {/* Server Guy's own protection is true whether or not anything
-            has looked at this application, and the first copy's recovery
-            kit has to be findable on a controller that has never deployed
-            anything. */}
-        {controller && (
-          <ControllerProtectionBand
-            facts={controller}
-            now={now}
-            onRefresh={onRefresh}
-            standalone
-          />
-        )}
-      </div>
-    );
-
   return (
     <div className="ax-root" data-variant="stages">
       <section className="sg-backups" aria-label="Backups">
         {head}
-        {/* Set up, copied, opened — three stages rather than one verdict with
-            three facts folded into it, and what the application keeps inside
-            the first of them. */}
         <BackupStages
           protection={protection}
           verdict={verdict}
           now={now}
           applicationName={applicationName}
+          hostName={hostName}
           volumes={story.volumes}
           pieces={story.pieces}
-          controller={controller}
           onAsk={onAsk}
         />
-        {/* The track above already names Server Guy's own recovery and says
-            its state, so this stays quiet unless there is something to do
-            about it. */}
         {controller && (
           <ControllerProtectionBand
             facts={controller}

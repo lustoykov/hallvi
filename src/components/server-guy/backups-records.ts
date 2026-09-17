@@ -264,7 +264,11 @@ export function protectionFromRecords(
       brokenPlan = {
         id: record.presentation?.states?.ref?.id ?? record.id,
         at: record.establishedAt ?? record.createdAt,
-        detail: broken?.label ?? record.title,
+        detail:
+          broken?.detail ||
+          record.body?.trim() ||
+          broken?.label ||
+          record.title,
       };
   }
   let nextRunAt: string | null = null;
@@ -369,7 +373,11 @@ export function protectionFromRecords(
     // because an attempt that failed reached nowhere.
     if (presence.record.presentation?.status === "failed") {
       if (!failures.copy || at > failures.copy.at)
-        failures.copy = { ...dated, source: "copy" };
+        failures.copy = {
+          ...dated,
+          detail: presence.record.body?.trim() || presence.record.title,
+          source: "copy",
+        };
       continue;
     }
     destinations.add(kind);
@@ -387,7 +395,11 @@ export function protectionFromRecords(
     const at = presence.record.establishedAt;
     if (!at) continue;
     if (presence.record.presentation?.status === "failed") {
-      const dated = { id: ref.id, at, detail: presence.record.title };
+      const dated = {
+        id: ref.id,
+        at,
+        detail: presence.record.body?.trim() || presence.record.title,
+      };
       if (!failures.restore || at > failures.restore.at)
         failures.restore = dated;
       continue;

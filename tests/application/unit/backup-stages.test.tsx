@@ -1,20 +1,15 @@
-// Being backed up is three facts in order, not one.
-//
-// Every bug this page has had was two of them folded together: a schedule
-// reported as protection, a copy reported as a recovery, a successful restore
-// reported as complete coverage. The three stages exist so that folding them
-// is structurally impossible, which only holds if each stage reports its own
-// result and nobody else's.
+// The Backups view keeps plan, copy and restore truth separate while making
+// the application's tangible data the thing the owner evaluates.
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { storageFromRecords } from "@/components/server-guy/storage-records";
 import { BackupStages } from "@/components/server-guy/backup-stages";
 import {
   protectionFromRecords,
   protectionVerdict,
 } from "@/components/server-guy/backups-records";
+import { storageFromRecords } from "@/components/server-guy/storage-records";
 import type { Ref, SavedInformation } from "@/server/operator-data";
 
 const APP = "11111111-2222-4333-8444-555555555555";
@@ -28,13 +23,14 @@ function record(input: {
   presence?: "present" | "absent";
   status?: "info" | "verified" | "failed" | "warning";
   title?: string;
+  body?: string;
   facts?: { key: string; value: string }[];
 }): SavedInformation {
   return {
     id: input.id,
     applicationId: APP,
     title: input.title ?? input.id,
-    body: "",
+    body: input.body ?? "",
     evidence: [],
     establishedAt: input.at === undefined ? AT : input.at,
     presentation: {
@@ -68,17 +64,14 @@ const plan = record({
   ],
 });
 
-/** A volume, named the way Pi names one: `holds` carries the owner's words. */
-/** A plan record whose own check failed: no timer, so nothing ever ran. */
-const brokenPlan = {
-  ...record({
-    id: "plan",
-    ref: { kind: "backup-plan", id: "daily" },
-    presence: "absent",
-    status: "warning",
-    title: "No off-server backup copies exist",
-  }),
-} as SavedInformation;
+const brokenPlan = record({
+  id: "broken-plan",
+  ref: { kind: "backup-plan", id: "daily" },
+  presence: "absent",
+  status: "warning",
+  title: "No off-server backup copies exist",
+  body: "The nightly timer is disabled.",
+});
 (brokenPlan.presentation as { checks: unknown[] }).checks = [
   {
     key: "configured",
@@ -94,7 +87,11 @@ const volume = (id: string, name: string) =>
     id: `vol-${id}`,
     ref: { kind: "volume", id },
     title: name,
-    facts: [{ key: "holds", value: name }],
+    facts: [
+      { key: "holds", value: name },
+      { key: "size", value: id === "shop-db" ? "4.2 GB" : "860 MB" },
+      { key: "path", value: `/srv/${id}` },
+    ],
   });
 
 const copy = (covers: string | null) =>
@@ -104,18 +101,12 @@ const copy = (covers: string | null) =>
     title: "A copy was written",
     facts: [
       { key: "destination-kind", value: "off-site" },
+      { key: "destination", value: "R2 · shop-backups" },
       ...(covers ? [{ key: "covers", value: covers }] : []),
     ],
   });
 
-const restore = (covers: string) => restoreOf(covers);
-
-/**
- * A restore that opened the newest copy. A `null` covers means the restore
- * recorded nothing about what came back, which is not the same as nothing
- * coming back.
- */
-const restoreOf = (covers: string | null) =>
+const restore = (covers: string | null) =>
   record({
     id: "restore",
     ref: { kind: "restore-test", id: "restore-1" },
@@ -126,10 +117,7 @@ const restoreOf = (covers: string | null) =>
     ],
   });
 
-function draw(
-  records: SavedInformation[],
-  controller?: Parameters<typeof BackupStages>[0]["controller"],
-) {
+function draw(records: SavedInformation[]) {
   const protection = protectionFromRecords(records, NOW, APP);
   const story = storageFromRecords({ records, applicationId: APP, now: NOW });
   return renderToStaticMarkup(
@@ -138,38 +126,16 @@ function draw(
       verdict={protectionVerdict(protection, NOW)}
       now={NOW}
       applicationName="Shop"
+      hostName="shop.example.net"
       volumes={story.volumes}
       pieces={story.pieces}
-      controller={controller}
       onAsk={() => undefined}
     />,
   );
 }
 
-/** The marks on Server Guy's own track, which is the second one. */
-function ownMarks(html: string) {
-  const track = /<ol class="bs-track bs-track-small">(.*?)<\/ol>/s.exec(html);
-  return [
-    ...(track?.[1] ?? "").matchAll(/class="bs-mark" data-state="([a-z]+)"/g),
-  ].map((match) => match[1]);
-}
-
-/**
- * The state mark each of the application's three stages is wearing.
- *
- * Only the first track: Server Guy's own recovery is a second subject on this
- * page, and reading its marks as the application's is the exact confusion the
- * component separates them to prevent.
- */
-function marks(html: string) {
-  const track = /<ol class="bs-track"[^>]*>(.*?)<\/ol>/s.exec(html);
-  return [
-    ...(track?.[1] ?? "").matchAll(/class="bs-mark" data-state="([a-z]+)"/g),
-  ].map((match) => match[1]);
-}
-
-describe("each stage reports its own result", () => {
-  it("shows the newer successful copy after an earlier backup failure", () => {
+describe("application-first backup truth", () => {
+  it("shows the newer successful copy after an earlier failure", () => {
     const html = draw([
       plan,
       record({
@@ -177,16 +143,15 @@ describe("each stage reports its own result", () => {
         ref: { kind: "backup-copy", id: "failed-copy" },
         at: "2026-09-15T09:00:00.000Z",
         status: "failed",
+        body: "Storage refused the older attempt.",
       }),
       copy("shop-db, shop-uploads"),
     ]);
-    expect(marks(html)[1]).toBe("done");
-    expect(html).not.toContain("The attempt 2 h ago failed");
+    expect(html).toContain("R2 · shop-backups");
+    expect(html).not.toContain("Storage refused the older attempt.");
   });
 
-  it("a restore that came back short is not a tick", () => {
-    // It proved recovery works and proved this copy is not enough. A tick
-    // says only the first, and the reader acts on the first.
+  it("makes a short restore visible on the affected data item", () => {
     const html = draw([
       plan,
       volume("shop-db", "PostgreSQL's data"),
@@ -194,11 +159,11 @@ describe("each stage reports its own result", () => {
       copy("shop-db, shop-uploads"),
       restore("shop-db"),
     ]);
-    expect(marks(html)[2]).toBe("attention");
-    expect(html).toContain("without Customer uploads");
+    expect(html).toContain("Missing from the latest copy");
+    expect(html).toContain("The restore did not bring back Customer uploads.");
   });
 
-  it("a restore that brought everything back is a tick", () => {
+  it("shows every restored item as present when the restore was complete", () => {
     const html = draw([
       plan,
       volume("shop-db", "PostgreSQL's data"),
@@ -206,54 +171,67 @@ describe("each stage reports its own result", () => {
       copy("shop-db, shop-uploads"),
       restore("shop-db, shop-uploads"),
     ]);
-    expect(marks(html)[2]).toBe("done");
-    expect(html).not.toContain("without");
+    expect(html.match(/In the latest copy/g)).toHaveLength(2);
+    expect(html).not.toContain("Missing from the latest copy");
   });
 
-  it("an unrecorded copy is not held against the restore", () => {
-    // Nobody wrote down what went into the copy. That is a thing to find
-    // out, not a finding, and it must not turn a successful restore amber.
+  it("keeps unrecorded copy contents unknown", () => {
     const html = draw([
       plan,
       volume("shop-db", "PostgreSQL's data"),
       volume("shop-uploads", "Customer uploads"),
       copy(null),
-      restoreOf(null),
+      restore(null),
     ]);
-    expect(marks(html)[2]).toBe("done");
-    expect(html).toContain("No record says what that copy contains");
+    expect(html.match(/Latest copy contents unknown/g)).toHaveLength(2);
   });
 
-  it("a copy whose own record says it left something out says so", () => {
+  it("does not promote the plan into evidence for a short copy", () => {
     const html = draw([
       plan,
       volume("shop-db", "PostgreSQL's data"),
       volume("shop-uploads", "Customer uploads"),
       copy("shop-db"),
     ]);
-    expect(marks(html)[1]).toBe("attention");
-    expect(html).toContain("without Customer uploads");
+    expect(html).toContain("Customer uploads");
+    expect(html).toContain("Missing from the latest copy");
   });
 
-  it("a schedule alone leaves the later stages waiting, not done", () => {
-    // The original bug on this page: a timer reported as protection.
+  it("says a schedule has produced no completed copy", () => {
     const html = draw([plan]);
-    expect(marks(html)).toEqual(["done", "waiting", "waiting"]);
     expect(html).toContain("A schedule is not a copy");
+    expect(html).toContain("No completed copy");
   });
 
-  it("a failed plan check is not a failed backup attempt", () => {
-    // The owner's own Paperless records: a plan check that failed, and no
-    // backup ever run. The page said "The attempt 5 h ago failed", which
-    // invented a backup run out of a check on a schedule.
+  it("does not invent a missing plan when nobody has checked", () => {
+    const html = draw([volume("shop-db", "PostgreSQL's data")]);
+    expect(html).toContain("Backup status not established");
+    expect(html).not.toContain("Not in the backup plan");
+  });
+
+  it("distinguishes a failed plan check from a failed copy attempt", () => {
     const html = draw([brokenPlan]);
-    expect(html).not.toContain("The attempt");
-    expect(html).toContain("No copy is on record");
-    expect(marks(html)[0]).toBe("failed");
-    expect(marks(html)[1]).toBe("waiting");
+    expect(html).toContain("The nightly timer is disabled.");
+    expect(html).not.toContain("Latest attempt failed");
+    expect(html).toContain("No completed copy");
   });
 
-  it("names the subjects rather than their ids", () => {
+  it("surfaces the real reason for the newest failed copy", () => {
+    const html = draw([
+      plan,
+      record({
+        id: "failed-copy",
+        ref: { kind: "backup-copy", id: "failed-copy" },
+        status: "failed",
+        body: "The archive stopped because /var ran out of space.",
+      }),
+    ]);
+    expect(html).toContain(
+      "The archive stopped because /var ran out of space.",
+    );
+  });
+
+  it("uses owner-facing names instead of subject ids", () => {
     const html = draw([
       plan,
       volume("shop-db", "PostgreSQL's data"),
@@ -261,31 +239,5 @@ describe("each stage reports its own result", () => {
       copy("shop-db"),
     ]);
     expect(html).not.toContain("shop-uploads");
-  });
-});
-
-describe("Server Guy's own recovery", () => {
-  it("does not ask for a passphrase before there is a copy to open", () => {
-    const html = draw([plan], {
-      connected: false,
-      bucket: null,
-      lastCopyAt: null,
-      kitConfirmedAt: null,
-      keep: 14,
-    } as Parameters<typeof BackupStages>[0]["controller"]);
-    expect(ownMarks(html)[2]).toBe("waiting");
-    expect(html).toContain("nothing has been copied for it to open");
-  });
-
-  it("asks for it once copies exist", () => {
-    const html = draw([plan], {
-      connected: true,
-      bucket: "shop-controller",
-      lastCopyAt: AT,
-      kitConfirmedAt: null,
-      keep: 14,
-    } as Parameters<typeof BackupStages>[0]["controller"]);
-    expect(ownMarks(html)[2]).toBe("attention");
-    expect(html).toContain("nobody can open the copies yet");
   });
 });

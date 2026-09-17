@@ -1,9 +1,5 @@
-// Server Guy's own protection, as the Backups page states it.
-//
-// The page has two shapes and the controller fact belongs in both: the board,
-// where it is one more row beside the application's data, and the empty page
-// a controller that has never deployed anything shows — which is exactly when
-// the first copy's recovery kit has to be findable.
+// Server Guy's own protection is a distinct, compact disclosure below the
+// application's backup surface. Its actions never imply application coverage.
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it } from "vitest";
@@ -65,38 +61,26 @@ const draw = (
     />,
   );
 
-it("states Server Guy's own recovery once, on its own track", () => {
+it("keeps recoverable controller protection in one compact disclosure", () => {
   const markup = draw([PLAN()], controller());
-  expect(markup).toContain("Server Guy\u2019s own recovery");
-  // Who holds the key is stated once, on that track. The band under it says
-  // neither the subject nor its state again.
-  expect(markup).toContain("you hold what opens the copies");
-  expect(markup).not.toContain("you hold what opens them");
-  expect(markup.split("you hold what opens")).toHaveLength(2);
-  // Quiet when there is nothing to ask of the owner: the row carries it.
+  expect(markup.split("Server Guy on this Mac")).toHaveLength(3);
+  expect(markup).toContain("recovery kit saved");
+  expect(markup).toContain("It keeps the last 14 copies");
   expect(markup).not.toContain("Save your recovery kit");
 });
 
-it("says so on the track when the copies are not yet the owner's", () => {
+it("offers the recovery kit without rendering a passphrase in the page", () => {
   const markup = draw(
     [PLAN()],
     controller({ state: "copied", kitConfirmedAt: null }),
   );
-  // The track's row names the subject and its state. The band below it asks
-  // for what the owner has to do, and says neither of them again.
-  expect(markup).not.toContain("cpb-head");
-  // The region keeps its accessible name; only the visible repeat goes.
-  expect(markup).toContain('aria-label="Server Guy itself"');
-  // Said once, by the track, and asked for once, by the band.
-  expect(markup).toContain("nobody can open the copies yet");
-  expect(markup).not.toContain("recovery kit is not saved yet");
+  expect(markup).toContain("recovery kit still needs saving");
   expect(markup).toContain("Save your recovery kit");
-  // The passphrase is fetched when the band is shown, never rendered with
-  // the page.
-  expect(markup).toContain("Reading the kit");
+  expect(markup).toContain("Open this section to read the kit.");
+  expect(markup).not.toContain("data-recovery-passphrase");
 });
 
-it("states Server Guy on a page no record has anything to say about", () => {
+it("uses the same truthful surface when application evidence is sparse", () => {
   const markup = draw(
     [],
     controller({
@@ -111,30 +95,21 @@ it("states Server Guy on a page no record has anything to say about", () => {
       host: null,
     }),
   );
-  expect(markup).toContain("Nothing here has been looked at yet.");
-  // Nothing else on this page names the subject, so the band still does.
-  expect(markup).toContain("Server Guy itself");
+  expect(markup).toContain("Nobody has looked at whether this application");
+  expect(markup).toContain("Server Guy on this Mac");
   expect(markup).toContain("Not copied");
   expect(markup).toContain("Connect backup storage");
-  // And the sentence beside that form stands on its own words — about this
-  // machine, which is what this band is for.
-  expect(markup).toContain("would lose Server Guy");
-  // Connecting storage starts the controller's copies. It does not discover,
-  // configure, run and verify a backup of the application's data, and the
-  // band that said it did left owners believing their application was
-  // covered by a form they filled in once.
-  expect(markup).not.toContain("protects your application");
-  expect(markup).toContain("separate job with its own plan");
+  expect(markup).toContain("Application data still needs its own backup plan");
 });
 
-it("keeps stating Server Guy on that page once it is recoverable", () => {
+it("keeps the controller disclosure present on a sparse recoverable page", () => {
   const markup = draw([], controller());
-  expect(markup).toContain("Recoverable");
-  expect(markup).toContain("The last 14 copies are kept");
+  expect(markup).toContain("Server Guy on this Mac");
+  expect(markup).toContain("recovery kit saved");
   expect(markup).not.toContain("Save your recovery kit");
 });
 
-it("reports a failed copy instead of a quiet page", () => {
+it("shows an actual failed controller copy and its reason", () => {
   const markup = draw(
     [PLAN()],
     controller({
@@ -151,13 +126,11 @@ it("reports a failed copy instead of a quiet page", () => {
       ],
     }),
   );
-  // The row itself says it broke. A tick over "last copied 2 h ago" with the
-  // failure only in the band below reads as a page that is fine.
-  expect(markup).toContain("the last attempt failed");
-  expect(markup).toContain('data-state="failed"');
+  expect(markup).toContain("Latest copy failed");
+  expect(markup).toContain('data-state="failing"');
   expect(markup).toContain("refused the request (403)");
 });
 
 it("says nothing about a controller it has no facts for", () => {
-  expect(draw([PLAN()])).not.toContain("Server Guy itself");
+  expect(draw([PLAN()])).not.toContain("Server Guy on this Mac");
 });
