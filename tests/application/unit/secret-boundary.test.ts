@@ -18,7 +18,7 @@ const HANDLE = "{{secret:ADMIN_PASSWORD}}";
 let secrets: typeof import("@/server/application-secrets");
 
 beforeEach(async () => {
-  process.env.HALDUR_CONFIG_DIR = mkdtempSync(join(tmpdir(), "sg-bound-"));
+  process.env.HALDUR_CONFIG_DIR = mkdtempSync(join(tmpdir(), "hd-bound-"));
   secrets = await import("@/server/application-secrets");
   secrets.requestSecret(APP, { name: "ADMIN_PASSWORD", why: "Needed." });
   secrets.establishSecret(APP, "ADMIN_PASSWORD", VALUE);

@@ -34,7 +34,7 @@ import {
   serverPublicKey,
   connectServer,
 } from "../../../src/server/server-access";
-const root = mkdtempSync(join(tmpdir(), "sg-access-"));
+const root = mkdtempSync(join(tmpdir(), "hd-access-"));
 let id: string;
 let publicKey: string;
 let fingerprint: string;

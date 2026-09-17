@@ -106,7 +106,7 @@ export function BackupsPage({
 
   return (
     <div className="ax-root" data-variant="stages">
-      <section className="sg-backups" aria-label="Backups">
+      <section className="hd-backups" aria-label="Backups">
         {head}
         <BackupStages
           protection={protection}

@@ -1,21 +1,21 @@
-.sg-term-lights {
+.hd-term-lights {
   display: inline-flex;
   flex: none;
   gap: 5px;
 }
-.sg-term-lights i {
+.hd-term-lights i {
   width: 10px;
   height: 10px;
   border-radius: 999px;
   background: #ff5f57;
 }
-.sg-term-lights i:nth-child(2) {
+.hd-term-lights i:nth-child(2) {
   background: #febc2e;
 }
-.sg-term-lights i:nth-child(3) {
+.hd-term-lights i:nth-child(3) {
   background: #28c840;
 }
-.sg-term-bar {
+.hd-term-bar {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -26,7 +26,7 @@
   line-height: 1;
   color: #8792a6;
 }
-.sg-term-bar span:last-child {
+.hd-term-bar span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

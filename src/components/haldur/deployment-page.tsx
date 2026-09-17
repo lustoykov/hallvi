@@ -69,7 +69,7 @@ export function DeploymentPage({
   // the middle of the page. In the records path there is no form to put
   // there, so this is what belongs: what is true, and the one thing to do.
   const nothing = waiting ? (
-    <div className="sg-deploy-none">
+    <div className="hd-deploy-none">
       <h2>Work is in progress.</h2>
       <p>
         Follow the current work in the conversation. Recorded releases will
@@ -78,12 +78,12 @@ export function DeploymentPage({
       <EmptySketch kind="flow" />
     </div>
   ) : (
-    <div className="sg-deploy-none">
+    <div className="hd-deploy-none">
       <h2>No deployment is on record.</h2>
       <p>Deployment details will appear here when Haldur records a release.</p>
       <button
         type="button"
-        className="sg-primary-button"
+        className="hd-primary-button"
         onClick={() =>
           onAsk(
             "Work out what this application needs and deploy it, keeping it private to this PC.",
@@ -101,7 +101,7 @@ export function DeploymentPage({
 
   return (
     <div className="ax-root" data-variant="spine">
-      <section className="sg-deployment" aria-label="Deployment">
+      <section className="hd-deployment" aria-label="Deployment">
         <PageHead
           bar={chrome.bar}
           title="Deployment"

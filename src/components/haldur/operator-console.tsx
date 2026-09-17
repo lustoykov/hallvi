@@ -172,14 +172,14 @@ export function OperatorConsole({
     }
   }
   return (
-    <div className="sg-operator-console">
+    <div className="hd-operator-console">
       {settingsOnly && settings && (
         <>
-          <div className="sg-operator-toolbar">
+          <div className="hd-operator-toolbar">
             {main && (
-              <div className="sg-modes">
-                <span id="sg-modes-label">Permissions</span>
-                <div role="radiogroup" aria-labelledby="sg-modes-label">
+              <div className="hd-modes">
+                <span id="hd-modes-label">Permissions</span>
+                <div role="radiogroup" aria-labelledby="hd-modes-label">
                   {modes.map((mode) => (
                     <button
                       key={mode.id}
@@ -196,7 +196,7 @@ export function OperatorConsole({
                   ))}
                 </div>
                 <span
-                  className="sg-modes-means"
+                  className="hd-modes-means"
                   data-loud={settings.permissionMode === "bypass" || undefined}
                 >
                   {settings.permissionMode === "bypass" && (
@@ -224,7 +224,7 @@ export function OperatorConsole({
               <article
                 id={`execution-${item.id}`}
                 key={item.id}
-                className={`sg-execution ${item.status}`}
+                className={`hd-execution ${item.status}`}
               >
                 <header>
                   <strong>
@@ -243,7 +243,7 @@ export function OperatorConsole({
                     the rest. "root@192.0.2.10:22" is a login string, not how
                     anyone refers to a machine; the address is the half a
                     person recognises and the whole of it stays on hover. */}
-                  <span className="sg-execution-where" title={item.target}>
+                  <span className="hd-execution-where" title={item.target}>
                     {where ? where.said : item.target}
                     {where?.detail && ` · ${where.detail}`}
                     {" · "}
@@ -252,7 +252,7 @@ export function OperatorConsole({
                       minute: "2-digit",
                     })}
                   </span>
-                  <span role="status" className="sg-execution-state">
+                  <span role="status" className="hd-execution-state">
                     {states[item.status] ? (
                       <Tag tone={states[item.status]!.tone}>
                         {states[item.status]!.word}
@@ -284,10 +284,10 @@ export function OperatorConsole({
                   </details>
                 )}
                 {item.status === "awaiting-approval" && main && (
-                  <div className="sg-execution-actions">
+                  <div className="hd-execution-actions">
                     <button
                       type="button"
-                      className="sg-primary-button"
+                      className="hd-primary-button"
                       disabled={busy !== null}
                       onClick={() => void decide(item.id, true)}
                     >
@@ -295,7 +295,7 @@ export function OperatorConsole({
                     </button>
                     <button
                       type="button"
-                      className="sg-secondary-button"
+                      className="hd-secondary-button"
                       disabled={busy !== null}
                       onClick={() => void decide(item.id, false)}
                     >

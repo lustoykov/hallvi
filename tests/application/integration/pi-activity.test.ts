@@ -13,7 +13,7 @@ let store: typeof import("@/server/pi-activity");
 let directory: string;
 
 beforeAll(async () => {
-  directory = mkdtempSync(join(tmpdir(), "sg-activity-"));
+  directory = mkdtempSync(join(tmpdir(), "hd-activity-"));
   process.env.HALDUR_CONFIG_DIR = directory;
   store = await import("@/server/pi-activity");
 });

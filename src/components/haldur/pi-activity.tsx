@@ -299,14 +299,14 @@ export function PiActivity({
 
   if (!mine.length && !tail) return null;
   return (
-    <div className="sg-did" aria-label="What Pi did">
+    <div className="hd-did" aria-label="What Pi did">
       {arrange(mine, (id) => cards.has(id)).map((item) =>
         item.type === "said" ? (
-          <div className="sg-did-said" key={item.record.id}>
+          <div className="hd-did-said" key={item.record.id}>
             <Markdown source={item.record.text ?? ""} />
           </div>
         ) : item.type === "card" ? (
-          <div className="sg-did-card" key={item.record.id}>
+          <div className="hd-did-card" key={item.record.id}>
             {renderExecution?.(item.record.executionId as string)}
           </div>
         ) : (
@@ -322,7 +322,7 @@ export function PiActivity({
         ),
       )}
       {tail && (
-        <div className="sg-did-said" data-live="">
+        <div className="hd-did-said" data-live="">
           <Markdown source={tail} />
         </div>
       )}
@@ -372,27 +372,27 @@ function Quiet({
   const failed = count("failed") > 0;
   return (
     <div
-      className="sg-did-quiet"
+      className="hd-did-quiet"
       data-open={open || undefined}
       data-wrong={failed || undefined}
     >
       <button
         type="button"
-        className="sg-did-head"
+        className="hd-did-head"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         <CaretRight weight="bold" aria-hidden="true" />
         <span>{summarise(records)}</span>
         {place && (
-          <span className="sg-did-where">
+          <span className="hd-did-where">
             {place}
             {host && <code>{host}</code>}
           </span>
         )}
         {/* One mark per call, in order. Six green ticks and one red is a
             shape; "7 · 1 failed" is a sentence you have to finish reading. */}
-        <span className="sg-did-marks" aria-hidden="true">
+        <span className="hd-did-marks" aria-hidden="true">
           {records.slice(0, 12).map((record) => (
             <i key={record.id} data-outcome={outcomeOf(record)} />
           ))}
@@ -400,14 +400,14 @@ function Quiet({
         </span>
         {/* Without this the overflow count and the outcome run together:
             "+1" beside "2 failed" reads as twelve failures. */}
-        <span className="sg-did-gap" aria-hidden="true" />
+        <span className="hd-did-gap" aria-hidden="true" />
         <em>
           {working ? (
             <>
               <SpinnerGap
                 weight="bold"
                 aria-hidden="true"
-                className="sg-did-spin"
+                className="hd-did-spin"
               />
               working
             </>
@@ -416,7 +416,7 @@ function Quiet({
             // interruption; neither is an error, and colouring them like one
             // would teach them to distrust the colour.
             <span
-              className="sg-did-wrong"
+              className="hd-did-wrong"
               data-tone={count("failed") ? "failed" : "chosen"}
             >
               {wrong}
@@ -427,7 +427,7 @@ function Quiet({
         </em>
       </button>
       {open && (
-        <ol className="sg-did-rows">
+        <ol className="hd-did-rows">
           {records.map((record) => (
             <Row key={record.id} record={record} />
           ))}
@@ -446,23 +446,23 @@ function Row({ record }: { record: ActivityRecord }) {
   const shown = record.status === "running" ? record.preview : record.result;
   const wrong = ["failed", "declined", "interrupted"].includes(record.status);
   return (
-    <li className="sg-did-item" data-status={record.status}>
+    <li className="hd-did-item" data-status={record.status}>
       <button
         type="button"
-        className="sg-did-row"
+        className="hd-did-row"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         <Icon weight="regular" aria-hidden="true" />
-        <span className="sg-did-verb">{verb}</span>
-        {detail && <span className="sg-did-subject">{detail}</span>}
-        <span className="sg-did-state">
+        <span className="hd-did-verb">{verb}</span>
+        {detail && <span className="hd-did-subject">{detail}</span>}
+        <span className="hd-did-state">
           {record.status === "running" ? (
             <>
               <SpinnerGap
                 weight="bold"
                 aria-hidden="true"
-                className="sg-did-spin"
+                className="hd-did-spin"
               />
               working
             </>
@@ -478,7 +478,7 @@ function Row({ record }: { record: ActivityRecord }) {
         </span>
       </button>
       {open && (
-        <div className="sg-did-detail">
+        <div className="hd-did-detail">
           <pre>{plainText(record.args) || "Nothing recorded."}</pre>
           <pre data-wrong={wrong || undefined}>
             {plainText(shown) ||

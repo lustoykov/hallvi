@@ -1,4 +1,4 @@
-.sg-record {
+.hd-record {
   margin: 20px 0;
   padding: 24px 28px;
   border: 1px solid var(--line);
@@ -8,7 +8,7 @@
   font-size: 13.5px;
   line-height: 1.7;
 }
-.sg-record-head {
+.hd-record-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -16,12 +16,12 @@
   gap: 8px;
   margin-bottom: 12px;
 }
-.sg-record-head > span:last-child {
+.hd-record-head > span:last-child {
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-.sg-record h3 {
+.hd-record h3 {
   margin: 0 0 10px;
   color: var(--ink);
   font-size: 18px;
@@ -29,22 +29,22 @@
   line-height: 1.3;
   letter-spacing: -0.02em;
 }
-.sg-record-body {
+.hd-record-body {
   max-width: 68ch;
 }
-.sg-record-body p {
+.hd-record-body p {
   margin: 0 0 12px;
 }
-.sg-record code {
+.hd-record code {
   font-family: var(--mono);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.sg-record a {
+.hd-record a {
   color: var(--link);
   text-underline-offset: 3px;
 }
-.sg-record-access {
+.hd-record-access {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -53,28 +53,28 @@
   padding: 20px 0;
   border-top: 1px solid var(--line);
 }
-.sg-record-access > span {
+.hd-record-access > span {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   font-weight: 600;
 }
-.sg-record-access > code {
+.hd-record-access > code {
   flex: 1;
 }
-.sg-record-access svg {
+.hd-record-access svg {
   width: 17px;
   height: 17px;
   flex-shrink: 0;
 }
-.sg-record .sg-info-open {
+.hd-record .hd-info-open {
   min-height: 40px;
   color: var(--surface, #fff);
 }
-.sg-record[data-context="overview"][data-kind="application-access"] h3 {
+.hd-record[data-context="overview"][data-kind="application-access"] h3 {
   font-size: 24px;
 }
-.sg-record-route {
+.hd-record-route {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(
       0,
@@ -86,62 +86,62 @@
   background: var(--context);
   border-radius: 8px;
 }
-.sg-record-route div {
+.hd-record-route div {
   min-width: 0;
 }
-.sg-record-route strong {
+.hd-record-route strong {
   display: block;
   color: var(--ink);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-.sg-record-route span {
+.hd-record-route span {
   display: block;
   margin-top: 3px;
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.sg-record-route > svg {
+.hd-record-route > svg {
   color: var(--muted);
 }
-.sg-record-note {
+.hd-record-note {
   color: var(--muted);
   font-size: 12px;
   max-width: 68ch;
   margin: 12px 0 0;
 }
-.sg-record-facts {
+.hd-record-facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px 28px;
   margin: 24px 0;
 }
-.sg-record-facts > div {
+.hd-record-facts > div {
   min-width: 0;
 }
-.sg-record-facts dt {
+.hd-record-facts dt {
   color: var(--muted);
   font-size: 12px;
   margin-bottom: 4px;
 }
-.sg-record-facts dd {
+.hd-record-facts dd {
   margin: 0;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.sg-record-changes h4 {
+.hd-record-changes h4 {
   margin: 20px 0 8px;
   font-size: 13px;
   color: var(--ink);
   font-weight: 600;
 }
-.sg-record-changes ul {
+.hd-record-changes ul {
   margin: 0;
   padding-left: 20px;
   max-width: 68ch;
 }
-.sg-record-checks {
+.hd-record-checks {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 28px;
@@ -150,13 +150,13 @@
   border-top: 1px solid var(--line);
   list-style: none;
 }
-.sg-record-checks li {
+.hd-record-checks li {
   display: flex;
   gap: 9px;
   align-items: baseline;
   min-width: 0;
 }
-.sg-record-checks svg {
+.hd-record-checks svg {
   flex-shrink: 0;
   width: 15px;
   height: 15px;
@@ -164,69 +164,69 @@
   margin-top: 4px;
   color: var(--muted);
 }
-.sg-record-checks [data-status="passed"] svg {
+.hd-record-checks [data-status="passed"] svg {
   color: var(--verified-text);
 }
-.sg-record-checks [data-status="failed"] svg {
+.hd-record-checks [data-status="failed"] svg {
   color: var(--failed);
 }
-.sg-record-next {
+.hd-record-next {
   margin: 20px 0 12px;
   max-width: 68ch;
   color: var(--ink-2);
 }
-.sg-record-evidence,
-.sg-record-details {
+.hd-record-evidence,
+.hd-record-details {
   margin-top: 16px;
 }
-.sg-record summary {
+.hd-record summary {
   cursor: pointer;
   width: fit-content;
   color: var(--link);
   font-size: 12.5px;
   padding: 4px 0;
 }
-.sg-record-evidence ul {
+.hd-record-evidence ul {
   padding-left: 18px;
 }
-.sg-record[data-context="chat"] {
+.hd-record[data-context="chat"] {
   padding: 16px 20px;
 }
-.sg-record[data-context="chat"] h3 {
+.hd-record[data-context="chat"] h3 {
   font-size: 18px;
   letter-spacing: -0.01em;
 }
-.sg-record[data-context="chat"] .sg-record-access {
+.hd-record[data-context="chat"] .hd-record-access {
   padding: 12px 0 0;
   margin-top: 12px;
 }
-.sg-record :focus-visible {
+.hd-record :focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 3px;
 }
-.sg-record ::selection {
+.hd-record ::selection {
   background: var(--selected-bg);
   color: var(--selected-text);
 }
 @media (max-width: 600px) {
-  .sg-record {
+  .hd-record {
     padding: 20px;
   }
-  .sg-record[data-context="overview"][data-kind="application-access"] h3 {
+  .hd-record[data-context="overview"][data-kind="application-access"] h3 {
     font-size: 24px;
   }
-  .sg-record-facts,
-  .sg-record-checks {
+  .hd-record-facts,
+  .hd-record-checks {
     grid-template-columns: 1fr;
   }
-  .sg-record-access > code {
+  .hd-record-access > code {
     flex-basis: 100%;
   }
-  .sg-record-route {
+  .hd-record-route {
     grid-template-columns: 1fr;
     gap: 10px;
   }
-  .sg-record-route > svg {
+  .hd-record-route > svg {
     transform: rotate(90deg);
   }
 }
@@ -242,26 +242,26 @@
    conversation becomes a stack of boxes and the one that needs the reader
    does not stand out. This has a hairline and no tint; anything failed,
    waiting or carrying a next step keeps the full card. */
-.sg-result {
+.hd-result {
   margin: 10px 0;
   padding: 11px 14px 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
 }
-.sg-result-head {
+.hd-result-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
 }
-.sg-result-mark {
+.hd-result-mark {
   flex: none;
   position: relative;
   top: 2px;
   font-size: 13px;
   color: var(--verified, #14945f);
 }
-.sg-result-head h3 {
+.hd-result-head h3 {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
@@ -276,7 +276,7 @@
 }
 /* The way in is the only action on the face, and it is a link, not a slab of
    blue: the outcome is the news, and opening it is what you do about it. */
-.sg-result-open {
+.hd-result-open {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -292,20 +292,20 @@
     border-color 120ms ease,
     background-color 120ms ease;
 }
-.sg-result-open:hover {
+.hd-result-open:hover {
   border-color: #bcc9e4;
   background: var(--working-bg, #edf3ff);
 }
-.sg-result-scope {
+.hd-result-scope {
   margin: 2px 0 0 21px;
   color: var(--ink-2, #3e4a60);
   font-size: 12.5px;
   line-height: 1.5;
 }
-.sg-result-scope:empty {
+.hd-result-scope:empty {
   display: none;
 }
-.sg-result-meta {
+.hd-result-meta {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -314,47 +314,47 @@
   color: var(--muted);
   font-size: 11.5px;
 }
-.sg-result-more > summary {
+.hd-result-more > summary {
   color: var(--muted);
   cursor: pointer;
   list-style: none;
   transition: color 120ms ease;
 }
-.sg-result-more > summary::-webkit-details-marker {
+.hd-result-more > summary::-webkit-details-marker {
   display: none;
 }
-.sg-result-more > summary::after {
+.hd-result-more > summary::after {
   content: " ›";
 }
-.sg-result-more[open] > summary::after {
+.hd-result-more[open] > summary::after {
   content: " ⌄";
 }
-.sg-result-more > summary:hover {
+.hd-result-more > summary:hover {
   color: var(--ink-2, #3e4a60);
 }
-.sg-result-inside {
+.hd-result-inside {
   margin-top: 9px;
   padding-top: 10px;
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
-.sg-result-url code {
+.hd-result-url code {
   font-size: 12px;
   color: var(--ink-2, #3e4a60);
 }
 /* The disclosure spans the card rather than the column it opened in. */
-.sg-result-meta {
+.hd-result-meta {
   position: relative;
   flex-wrap: wrap;
 }
-.sg-result-more {
+.hd-result-more {
   margin-left: auto;
 }
-.sg-result-more[open] {
+.hd-result-more[open] {
   flex: 1 1 100%;
   margin-left: 0;
 }
-.sg-result-more[open] > summary {
+.hd-result-more[open] > summary {
   display: inline-block;
   margin-bottom: 0;
 }
@@ -364,12 +364,12 @@
    that subject carries the current claim, and five full failure cards for two
    distinct problems reads as five problems. The dot keeps the state legible
    at a glance so nothing is disguised as fine. */
-.sg-result[data-quiet] {
+.hd-result[data-quiet] {
   padding: 8px 14px;
   border-color: var(--line);
   background: var(--context, #fafbfc);
 }
-.sg-result-dot {
+.hd-result-dot {
   flex: none;
   position: relative;
   top: 5px;
@@ -378,37 +378,37 @@
   border-radius: 999px;
   background: var(--line-strong, #ccd5e3);
 }
-.sg-result-dot[data-tone="verified"] {
+.hd-result-dot[data-tone="verified"] {
   background: var(--verified, #14945f);
 }
-.sg-result-dot[data-tone="failed"] {
+.hd-result-dot[data-tone="failed"] {
   background: var(--failed, #a6312b);
 }
-.sg-result-dot[data-tone="stale"] {
+.hd-result-dot[data-tone="stale"] {
   background: var(--amber, #b25a16);
 }
-.sg-result[data-quiet] h3 {
+.hd-result[data-quiet] h3 {
   font-size: 13px;
   font-weight: 560;
   color: var(--ink-2, #3e4a60);
 }
-.sg-result-then {
+.hd-result-then {
   flex: none;
   color: var(--faint, #8b95a5);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
-.sg-result-alone {
+.hd-result-alone {
   margin: 3px 0 0 14px;
   font-size: 11.5px;
   color: var(--muted);
 }
-.sg-result-alone > summary {
+.hd-result-alone > summary {
   color: var(--faint, #8b95a5);
 }
 /* The repeat's way to the record in full. It replaced an anchor and has to
    read as the same thing: a line of text you can follow, not a control. */
-.sg-result-elsewhere {
+.hd-result-elsewhere {
   padding: 0;
   border: 0;
   background: none;
@@ -417,54 +417,54 @@
   text-align: left;
   cursor: pointer;
 }
-.sg-result-elsewhere:hover {
+.hd-result-elsewhere:hover {
   text-decoration: underline;
 }
-.sg-result-elsewhere:focus-visible {
+.hd-result-elsewhere:focus-visible {
   outline: 2px solid rgb(40 90 216 / 45%);
   outline-offset: 2px;
   border-radius: 3px;
 }
 /* A retired card carries its tag where the dot would be; the row stays one
    line high. */
-.sg-result-head > .sg-tag {
+.hd-result-head > .hd-tag {
   flex: none;
 }
 
 /* Supporting detail in a transcript folds; on its own destination it does not. */
-.sg-info-more {
+.hd-info-more {
   margin-top: 10px;
   font-size: 12.5px;
 }
-.sg-info-more > summary {
+.hd-info-more > summary {
   color: var(--muted);
   cursor: pointer;
   list-style: none;
 }
-.sg-info-more > summary::-webkit-details-marker {
+.hd-info-more > summary::-webkit-details-marker {
   display: none;
 }
-.sg-info-more > summary::after {
+.hd-info-more > summary::after {
   content: " ›";
 }
-.sg-info-more[open] > summary::after {
+.hd-info-more[open] > summary::after {
   content: " ⌄";
 }
-.sg-info-more > summary:hover {
+.hd-info-more > summary:hover {
   color: var(--ink-2, #3e4a60);
 }
-.sg-info-more[open] > summary {
+.hd-info-more[open] > summary {
   margin-bottom: 8px;
 }
 
 /* An access record whose tunnel has since closed. The record keeps every
    word; only the anchor is withheld, and this says why there is none. */
-.sg-result-shut {
+.hd-result-shut {
   flex: none;
   padding: 3px 9px;
   border-radius: 999px;
-  background: var(--sg-warn-soft, #fdf1e3);
-  color: var(--sg-warn-ink, #8a5a1b);
+  background: var(--hd-warn-soft, #fdf1e3);
+  color: var(--hd-warn-ink, #8a5a1b);
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;

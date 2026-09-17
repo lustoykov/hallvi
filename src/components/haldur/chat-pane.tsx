@@ -157,7 +157,7 @@ function Doing({ activity }: { activity: RunActivity }) {
         {activity.says}
       </span>
       {clock && activity.since && (
-        <small className="sg-run-elapsed">{activity.since}</small>
+        <small className="hd-run-elapsed">{activity.since}</small>
       )}
     </>
   );
@@ -280,9 +280,9 @@ export function ChatPane({
     if (!element) return;
     openedRecord.current = id;
     element.scrollIntoView({ block: "center" });
-    element.classList.add("sg-message-highlight");
+    element.classList.add("hd-message-highlight");
     const timer = window.setTimeout(
-      () => element.classList.remove("sg-message-highlight"),
+      () => element.classList.remove("hd-message-highlight"),
       2600,
     );
     return () => window.clearTimeout(timer);
@@ -299,9 +299,9 @@ export function ChatPane({
       if (!element) return;
       openedRecord.current = id;
       element.scrollIntoView({ block: "center" });
-      element.classList.add("sg-message-highlight");
+      element.classList.add("hd-message-highlight");
       window.setTimeout(
-        () => element.classList.remove("sg-message-highlight"),
+        () => element.classList.remove("hd-message-highlight"),
         2600,
       );
     };
@@ -312,13 +312,13 @@ export function ChatPane({
   useEffect(() => {
     if (!highlight) return;
     const element = document.getElementById(
-      `sg-message-${highlight.messageId}`,
+      `hd-message-${highlight.messageId}`,
     );
     if (!element) return;
     element.scrollIntoView({ block: "center" });
-    element.classList.add("sg-message-highlight");
+    element.classList.add("hd-message-highlight");
     const timer = window.setTimeout(
-      () => element.classList.remove("sg-message-highlight"),
+      () => element.classList.remove("hd-message-highlight"),
       2600,
     );
     return () => window.clearTimeout(timer);
@@ -343,7 +343,7 @@ export function ChatPane({
     const id = new URLSearchParams(window.location.search).get("message");
     if (id)
       document
-        .getElementById(`sg-message-${id}`)
+        .getElementById(`hd-message-${id}`)
         ?.scrollIntoView({ block: "center" });
   }, [view.messages.length]);
   const application = view.application;
@@ -389,7 +389,7 @@ export function ChatPane({
    * message in view this is the same sentence twice, one above the other.
    */
   const inFlightAway = useOffScreen(
-    inFlight ? `sg-message-${inFlight.id}` : null,
+    inFlight ? `hd-message-${inFlight.id}` : null,
     Boolean(inFlight),
   );
   const requestPending = view.messages.some(
@@ -462,15 +462,15 @@ export function ChatPane({
   }, [applicationId, requestPending]);
 
   return (
-    <section className="sg-chat-pane">
+    <section className="hd-chat-pane">
       {activeChat && activeChat.id !== view.chats[0]?.id && (
-        <header className="sg-pane-title sg-chat-title">
+        <header className="hd-pane-title hd-chat-title">
           <span>
             {archived ? "Archived · read-only" : "Read-only side chat"}
           </span>
           {!readOnly && (
             <button
-              className="sg-text-button"
+              className="hd-text-button"
               disabled={busy !== null}
               onClick={onArchive}
               type="button"
@@ -483,7 +483,7 @@ export function ChatPane({
       {/* The bar means work is moving. With no worker reading the queue it
           would be an animation over a message nobody has picked up. */}
       {(busy !== null || (requestPending && workerAlive !== false)) && (
-        <div className="sg-busy-bar" aria-hidden="true" />
+        <div className="hd-busy-bar" aria-hidden="true" />
       )}
 
       {view.application && chatId && view.chats[0]?.id === chatId && (
@@ -495,10 +495,10 @@ export function ChatPane({
           settingsOnly
         />
       )}
-      <Conversation className="sg-conversation">
-        <ConversationContent className="sg-messages">
+      <Conversation className="hd-conversation">
+        <ConversationContent className="hd-messages">
           {reconnecting && (
-            <p className="sg-stream-notice" role="status">
+            <p className="hd-stream-notice" role="status">
               <SpinnerGap className="spin" aria-hidden="true" />
               Reconnecting… accepted messages keep running, and this view
               catches up on its own.
@@ -532,25 +532,25 @@ export function ChatPane({
                   className={
                     provisional
                       ? inProgress
-                        ? "sg-message-live"
-                        : "sg-message-failed"
+                        ? "hd-message-live"
+                        : "hd-message-failed"
                       : message.role === "user" && !engineer
-                        ? "sg-message-request"
+                        ? "hd-message-request"
                         : ""
                   }
                   from={engineer ? "user" : "assistant"}
-                  id={`sg-message-${message.id}`}
+                  id={`hd-message-${message.id}`}
                 >
-                  <div className="sg-message-heading">
+                  <div className="hd-message-heading">
                     <span
-                      className={`sg-avatar ${engineer ? "user" : ""}`}
+                      className={`hd-avatar ${engineer ? "user" : ""}`}
                       aria-hidden="true"
                     >
                       {engineer ? "You" : "H"}
                     </span>
                     <strong>{engineer ? "You" : "Haldur"}</strong>
                     {message.source === "haldur" && (
-                      <span className="sg-source-tag">
+                      <span className="hd-source-tag">
                         {message.role === "user"
                           ? "Started automatically"
                           : "Recorded event"}
@@ -558,7 +558,7 @@ export function ChatPane({
                     )}
                     {provisional && (
                       <span
-                        className={`sg-source-tag ${inProgress ? "live" : "failed"}`}
+                        className={`hd-source-tag ${inProgress ? "live" : "failed"}`}
                       >
                         {ATTEMPT_LABELS[message.status]}
                       </span>
@@ -567,13 +567,13 @@ export function ChatPane({
                   </div>
                   <MessageContent>
                     {provisional ? (
-                      <div className="sg-run-progress">
+                      <div className="hd-run-progress">
                         {message.body && inProgress && !view.piActivity && (
                           <MessageResponse>
                             <Markdown source={message.body} />
                           </MessageResponse>
                         )}
-                        <p className="sg-run-status" role="status">
+                        <p className="hd-run-status" role="status">
                           {/* A spinner beside "nothing is running" is the
                               contradiction this change exists to remove. */}
                           {inProgress && workerAlive !== false && (
@@ -605,7 +605,7 @@ export function ChatPane({
                           )}
                         </p>
                         {message.body && !inProgress && (
-                          <details className="sg-run-draft">
+                          <details className="hd-run-draft">
                             <summary>Show unfinished draft</summary>
                             <MessageResponse>
                               <Markdown source={message.body} />
@@ -616,8 +616,8 @@ export function ChatPane({
                           <button
                             className={
                               inProgress
-                                ? "sg-run-stop"
-                                : "sg-run-action sg-primary-button"
+                                ? "hd-run-stop"
+                                : "hd-run-action hd-primary-button"
                             }
                             disabled={busy !== null}
                             onClick={() => {
@@ -729,11 +729,11 @@ export function ChatPane({
                     return null;
                   })}
                   {references?.get(message.id)?.length ? (
-                    <div className="sg-message-refs">
+                    <div className="hd-message-refs">
                       <span>Saved from this reply</span>
                       {references.get(message.id)!.map((reference) => (
                         <button
-                          className={`sg-message-ref ${reference.tone}`}
+                          className={`hd-message-ref ${reference.tone}`}
                           key={reference.key}
                           onClick={() => onReveal?.()}
                           title="Open in History"
@@ -766,7 +766,7 @@ export function ChatPane({
             );
           })}
           {unanchored.length > 0 && (
-            <div className="sg-message sg-message-assistant sg-message-receipts">
+            <div className="hd-message hd-message-assistant hd-message-receipts">
               {receipts(unanchored)}
             </div>
           )}
@@ -790,12 +790,12 @@ export function ChatPane({
           {pendingMessage !== null && (
             <>
               <Message from="user">
-                <div className="sg-message-heading">
-                  <span className="sg-avatar user" aria-hidden="true">
+                <div className="hd-message-heading">
+                  <span className="hd-avatar user" aria-hidden="true">
                     You
                   </span>
                   <strong>You</strong>
-                  <span className="sg-source-tag">Pending</span>
+                  <span className="hd-source-tag">Pending</span>
                 </div>
                 <MessageContent>
                   <MessageResponse>
@@ -803,7 +803,7 @@ export function ChatPane({
                   </MessageResponse>
                 </MessageContent>
               </Message>
-              <p className="sg-reply-pending" role="status">
+              <p className="hd-reply-pending" role="status">
                 <SpinnerGap className="spin" aria-hidden="true" /> Saving
                 message…
               </p>
@@ -811,7 +811,7 @@ export function ChatPane({
           )}
 
           {error && application && (
-            <div className="sg-error" role="alert">
+            <div className="hd-error" role="alert">
               {error}
             </div>
           )}
@@ -849,11 +849,11 @@ export function ChatPane({
           right and stays; what was missing is that the conversation never
           said so where the typing happens. */}
       {inFlight && inFlightAway && (
-        <div className="sg-still-working" role="status">
+        <div className="hd-still-working" role="status">
           {workerAlive !== false && (
             <SpinnerGap className="spin" aria-hidden="true" />
           )}
-          <span className="sg-still-what">
+          <span className="hd-still-what">
             {inFlightActivity.says}
             {clockReady && inFlightActivity.since && (
               <small>{inFlightActivity.since}</small>
@@ -861,10 +861,10 @@ export function ChatPane({
           </span>
           <button
             type="button"
-            className="sg-still-show"
+            className="hd-still-show"
             onClick={() =>
               document
-                .getElementById(`sg-message-${inFlight.id}`)
+                .getElementById(`hd-message-${inFlight.id}`)
                 ?.scrollIntoView({ block: "center", behavior: "smooth" })
             }
           >
@@ -874,14 +874,14 @@ export function ChatPane({
       )}
 
       <form
-        className="sg-composer"
+        className="hd-composer"
         onSubmit={(event) => {
           event.preventDefault();
           onSend();
         }}
       >
         {archived && (
-          <p className="sg-archived-notice">
+          <p className="hd-archived-notice">
             This chat is archived and read-only. Choose an active chat or start
             a new one.
           </p>
@@ -891,7 +891,7 @@ export function ChatPane({
             written, and the only clue is a console the owner is not reading.
             It is said here, where they are about to type. */}
         {application && piReady && workerAlive === false && (
-          <div className="sg-pi-required">
+          <div className="hd-pi-required">
             <WarningCircle weight="bold" />
             <div>
               <strong>No worker is running</strong>
@@ -904,7 +904,7 @@ export function ChatPane({
           </div>
         )}
         {application && !piReady && (
-          <div className="sg-pi-required">
+          <div className="hd-pi-required">
             <WarningCircle weight="bold" />
             <div>
               <strong>Connect ChatGPT to chat</strong>
@@ -928,7 +928,7 @@ export function ChatPane({
           </div>
         )}
         <div
-          className={`sg-composer-box${composerDisabled ? " disabled" : ""}`}
+          className={`hd-composer-box${composerDisabled ? " disabled" : ""}`}
         >
           <textarea
             disabled={composerDisabled}
@@ -958,12 +958,12 @@ export function ChatPane({
             rows={2}
             value={composer}
           />
-          <div className="sg-composer-bar">
-            <span className="sg-composer-hint">
+          <div className="hd-composer-bar">
+            <span className="hd-composer-hint">
               <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for a new line
             </span>
             <button
-              className="sg-send"
+              className="hd-send"
               disabled={!composer.trim() || sendDisabled || busy !== null}
               type="submit"
             >

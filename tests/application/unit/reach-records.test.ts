@@ -136,7 +136,7 @@ describe("security", () => {
     const at = "2026-09-13T11:45:00.000Z";
     const story = read([
       states(
-        { kind: "firewall", id: "sg-38e37237" },
+        { kind: "firewall", id: "hd-38e37237" },
         {
           at,
           facts: [
@@ -150,7 +150,7 @@ describe("security", () => {
     expect(story.firewall).toEqual({
       state: "read",
       provider: "Hetzner",
-      name: "sg-38e37237",
+      name: "hd-38e37237",
       at,
       detail: "22 from anywhere; everything else denied",
     });

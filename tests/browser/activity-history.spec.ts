@@ -74,7 +74,7 @@ test(
     await addApplication(page, "activity-history");
     const activityTab = page.getByRole("button", { name: /^History/ });
     await openHistory(page);
-    const events = page.locator("#history-activity .sg-history-records > li");
+    const events = page.locator("#history-activity .hd-history-records > li");
     await openHistory(page);
     await expect(events).toHaveCount(2);
     await openHistory(page);
@@ -181,7 +181,7 @@ test(
   async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const path = await addApplication(page, "activity-invalidation");
-    const events = page.locator("#history-activity .sg-history-records > li");
+    const events = page.locator("#history-activity .hd-history-records > li");
     await openHistory(page);
     await expect(events).toHaveCount(2);
 
@@ -224,7 +224,7 @@ test(
     });
     // The check itself is no longer current, without claiming lost access.
     await openConversation(page);
-    await expect(page.locator(".sg-repository-notice")).toContainText(
+    await expect(page.locator(".hd-repository-notice")).toContainText(
       "Connect GitHub, then run the repository check.",
     );
 
@@ -251,6 +251,6 @@ test(
       events.filter({ hasText: "Repository verification invalidated" }),
     ).toHaveCount(1);
     await openConversation(page);
-    await expect(page.locator(".sg-repository-notice")).toHaveCount(0);
+    await expect(page.locator(".hd-repository-notice")).toHaveCount(0);
   },
 );

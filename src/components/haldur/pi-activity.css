@@ -3,7 +3,7 @@
    inside it each call is a line of its own. Everything sits a step dimmer
    than what Pi said, so the reading order stays the conversation's. */
 
-.sg-did {
+.hd-did {
   display: grid;
   /* A one-line command is wide and must not be wrapped, so the track has to
      be told it may be narrower than its contents; without minmax(0, …) the
@@ -13,30 +13,30 @@
   gap: 2px;
   margin: 2px 0 6px;
 }
-.sg-did-quiet,
-.sg-did-rows,
-.sg-did-item {
+.hd-did-quiet,
+.hd-did-rows,
+.hd-did-item {
   min-width: 0;
 }
-.sg-did-said {
+.hd-did-said {
   margin: 6px 0;
   color: var(--ink-2, #3e4a60);
   font-size: 13.5px;
   line-height: 1.7;
 }
-.sg-did-said > :first-child {
+.hd-did-said > :first-child {
   margin-top: 0;
 }
-.sg-did-said > :last-child {
+.hd-did-said > :last-child {
   margin-bottom: 0;
 }
-.sg-did-card {
+.hd-did-card {
   margin: 4px 0;
 }
 
 /* ---------- One line for a run of quiet calls ---------- */
 
-.sg-did-head {
+.hd-did-head {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -51,19 +51,19 @@
   text-align: left;
   cursor: pointer;
 }
-.sg-did-head:hover {
+.hd-did-head:hover {
   color: var(--ink-2, #3e4a60);
 }
-.sg-did-head > svg {
+.hd-did-head > svg {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--faint, #8b95a5);
   transition: transform 120ms ease;
 }
-.sg-did-head[aria-expanded="true"] > svg {
+.hd-did-head[aria-expanded="true"] > svg {
   transform: rotate(90deg);
 }
-.sg-did-head em {
+.hd-did-head em {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -75,20 +75,20 @@
 /* Which machine this was. Two of these look the same on a row — a command in
    the repository copy and a command on the deployed host — so the group says
    it once, plainly, rather than leaving it to the command's contents. */
-.sg-did-where {
+.hd-did-where {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--faint, #8b95a5);
 }
-.sg-did-where code {
+.hd-did-where code {
   margin-left: 5px;
   font-family: var(--mono), ui-monospace, monospace;
   font-size: 11.5px;
 }
-.sg-did-where::before,
-.sg-did-head em::before {
+.hd-did-where::before,
+.hd-did-head em::before {
   margin-right: 5px;
   color: var(--line-2, #d8dee8);
   content: "\00b7";
@@ -96,12 +96,12 @@
 
 /* ---------- A call ---------- */
 
-.sg-did-rows {
+.hd-did-rows {
   margin: 0;
   padding: 1px 0 3px 15px;
   list-style: none;
 }
-.sg-did-row {
+.hd-did-row {
   display: flex;
   align-items: baseline;
   gap: 7px;
@@ -116,20 +116,20 @@
   cursor: pointer;
   color: var(--muted, #687183);
 }
-.sg-did-row:hover .sg-did-subject {
+.hd-did-row:hover .hd-did-subject {
   color: var(--ink-2, #3e4a60);
 }
-.sg-did-row > svg {
+.hd-did-row > svg {
   flex-shrink: 0;
   position: relative;
   top: 2px;
   font-size: 12px;
   color: var(--faint, #8b95a5);
 }
-.sg-did-verb {
+.hd-did-verb {
   flex-shrink: 0;
 }
-.sg-did-subject {
+.hd-did-subject {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -139,7 +139,7 @@
   font-family: var(--mono), ui-monospace, monospace;
   font-size: 12px;
 }
-.sg-did-state {
+.hd-did-state {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -149,26 +149,26 @@
   font-variant-numeric: tabular-nums;
 }
 /* A dot carries the outcome, the way a terminal would say it. */
-.sg-did-item[data-status="failed"] .sg-did-state::before,
-.sg-did-item[data-status="declined"] .sg-did-state::before,
-.sg-did-item[data-status="interrupted"] .sg-did-state::before {
+.hd-did-item[data-status="failed"] .hd-did-state::before,
+.hd-did-item[data-status="declined"] .hd-did-state::before,
+.hd-did-item[data-status="interrupted"] .hd-did-state::before {
   content: "•";
   color: var(--waiting-text, #9a4b10);
   font-weight: 700;
 }
-.sg-did-item[data-status="failed"] .sg-did-state::before {
+.hd-did-item[data-status="failed"] .hd-did-state::before {
   color: var(--failed, #a6312b);
 }
-.sg-did-item[data-status="failed"] .sg-did-state {
+.hd-did-item[data-status="failed"] .hd-did-state {
   color: var(--failed, #a6312b);
 }
 
-.sg-did-spin {
+.hd-did-spin {
   font-size: 11px;
   color: var(--muted, #687183);
-  animation: sg-did-spin 0.9s linear infinite;
+  animation: hd-did-spin 0.9s linear infinite;
 }
-@keyframes sg-did-spin {
+@keyframes hd-did-spin {
   to {
     transform: rotate(360deg);
   }
@@ -176,10 +176,10 @@
 
 /* ---------- What a call actually said ---------- */
 
-.sg-did-detail {
+.hd-did-detail {
   padding: 2px 0 6px 19px;
 }
-.sg-did-detail pre {
+.hd-did-detail pre {
   position: relative;
   margin: 2px 0;
   padding: 0 0 0 14px;
@@ -192,30 +192,30 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.sg-did-detail pre::before {
+.hd-did-detail pre::before {
   position: absolute;
   left: 0;
   top: 0;
   color: var(--line-2, #d8dee8);
   content: "└";
 }
-.sg-did-detail pre[data-wrong] {
+.hd-did-detail pre[data-wrong] {
   color: var(--failed, #a6312b);
 }
-.sg-did-detail p {
+.hd-did-detail p {
   margin: 4px 0 0 14px;
   color: var(--faint, #8b95a5);
   font-size: 11.5px;
 }
-.sg-did-detail .sg-execution {
+.hd-did-detail .hd-execution {
   margin: 4px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sg-did-head > svg {
+  .hd-did-head > svg {
     transition-duration: 1ms;
   }
-  .sg-did-spin {
+  .hd-did-spin {
     animation-duration: 2.4s;
   }
 }
@@ -225,66 +225,66 @@
    reader learned that something had failed only by finishing the row — and
    the row was identical to the five beside it. Marks give the outcome a
    shape: six quiet ticks and one red one is seen, not read. */
-.sg-did-marks {
+.hd-did-marks {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   margin-left: 2px;
 }
-.sg-did-marks i {
+.hd-did-marks i {
   width: 5px;
   height: 5px;
   border-radius: 999px;
   background: var(--line-strong, #ccd5e3);
 }
-.sg-did-marks i[data-outcome="done"] {
+.hd-did-marks i[data-outcome="done"] {
   background: var(--verified-line, #b8e0cc);
 }
-.sg-did-marks i[data-outcome="failed"] {
+.hd-did-marks i[data-outcome="failed"] {
   width: 6px;
   height: 6px;
   background: var(--failed, #a6312b);
 }
-.sg-did-marks i[data-outcome="declined"],
-.sg-did-marks i[data-outcome="stopped"] {
+.hd-did-marks i[data-outcome="declined"],
+.hd-did-marks i[data-outcome="stopped"] {
   background: var(--waiting-line, #ecd6b8);
 }
-.sg-did-marks i[data-outcome="running"] {
+.hd-did-marks i[data-outcome="running"] {
   background: var(--working-text, #2852a6);
-  animation: sg-did-pulse 1.6s ease-in-out infinite;
+  animation: hd-did-pulse 1.6s ease-in-out infinite;
 }
-.sg-did-marks b {
+.hd-did-marks b {
   font-size: 10.5px;
   font-weight: 500;
   color: var(--faint, #8b95a5);
 }
-@keyframes sg-did-pulse {
+@keyframes hd-did-pulse {
   50% {
     opacity: 0.35;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sg-did-marks i[data-outcome="running"] {
+  .hd-did-marks i[data-outcome="running"] {
     animation: none;
   }
 }
 
 /* A failure says so in its own colour, and its group opens itself. A decline
    or a stop is the reader's own decision, so it is marked, not alarmed. */
-.sg-did-wrong {
+.hd-did-wrong {
   font-weight: 600;
   font-style: normal;
 }
-.sg-did-wrong[data-tone="failed"] {
+.hd-did-wrong[data-tone="failed"] {
   color: var(--failed, #a6312b);
 }
-.sg-did-wrong[data-tone="chosen"] {
+.hd-did-wrong[data-tone="chosen"] {
   color: var(--waiting-text, #9a4b10);
 }
-.sg-did-quiet[data-wrong] > .sg-did-head > svg {
+.hd-did-quiet[data-wrong] > .hd-did-head > svg {
   color: var(--failed, #a6312b);
 }
 
-.sg-did-gap {
+.hd-did-gap {
   width: 2px;
 }

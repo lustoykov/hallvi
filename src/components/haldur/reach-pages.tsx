@@ -91,7 +91,7 @@ export function ReachPageView({
     return (
       <div className="ax-root" data-variant={page}>
         {head}
-        <div className="sg-deploy-none">
+        <div className="hd-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
           <p>
             {page === "domains"
@@ -100,7 +100,7 @@ export function ReachPageView({
           </p>
           <button
             type="button"
-            className="sg-primary-button"
+            className="hd-primary-button"
             onClick={() =>
               onAsk(
                 page === "domains"

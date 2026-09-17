@@ -70,7 +70,7 @@ export function ApplicationIdentity({
 
   if (variant === "breadcrumb")
     return (
-      <div className="sg-identity-breadcrumb">
+      <div className="hd-identity-breadcrumb">
         <Link href={listHref}>Applications</Link>
         <span aria-hidden="true">/</span>
         <strong title={nameOf(application)}>{nameOf(application)}</strong>
@@ -79,23 +79,23 @@ export function ApplicationIdentity({
     );
 
   return (
-    <div className={`sg-app-identity sg-identity-${variant}`}>
+    <div className={`hd-app-identity hd-identity-${variant}`}>
       <button
         ref={anchor}
-        className="sg-identity"
+        className="hd-identity"
         type="button"
         popoverTarget={menuId}
         disabled={disabled}
         aria-label={`Switch application: ${nameOf(application)}`}
       >
-        <span className="sg-identity-mark" aria-hidden="true">
+        <span className="hd-identity-mark" aria-hidden="true">
           {initial(application)}
         </span>
         {/* Both of these truncate in a 240px column — which is right — so
             each carries its full value for hover and assistive technology.
             "docker/getting-started-app" was cut to "docker/getting-started-"
             on every page of that application with no way to read the rest. */}
-        <span className="sg-identity-text">
+        <span className="hd-identity-text">
           <strong title={nameOf(application)}>{nameOf(application)}</strong>
           <small title={repository}>{repository}</small>
         </span>
@@ -104,7 +104,7 @@ export function ApplicationIdentity({
       <nav
         id={menuId}
         popover="auto"
-        className="sg-application-menu"
+        className="hd-application-menu"
         aria-label="Applications"
         onBeforeToggle={(event) => {
           if (event.newState !== "open") return;
@@ -121,7 +121,7 @@ export function ApplicationIdentity({
             room > 280 ? "" : `${window.innerHeight - box.top + 6}px`;
         }}
       >
-        <span className="sg-eyebrow sg-application-menu-label">
+        <span className="hd-eyebrow hd-application-menu-label">
           Switch application
         </span>
         {applications.map((item) => (
@@ -136,7 +136,7 @@ export function ApplicationIdentity({
               onSelect?.(item, event);
             }}
           >
-            <span aria-hidden="true" className="sg-application-menu-mark">
+            <span aria-hidden="true" className="hd-application-menu-mark">
               {initial(item)}
             </span>
             <div>
@@ -150,10 +150,10 @@ export function ApplicationIdentity({
             )}
           </Link>
         ))}
-        <Link className="sg-application-menu-action" href={addHref}>
+        <Link className="hd-application-menu-action" href={addHref}>
           <Plus /> Add application
         </Link>
-        <Link className="sg-application-menu-action" href={listHref}>
+        <Link className="hd-application-menu-action" href={listHref}>
           <ArrowLeft /> All applications
         </Link>
         {onRemove && (
@@ -161,7 +161,7 @@ export function ApplicationIdentity({
             <hr />
             <button
               type="button"
-              className="sg-remove-application"
+              className="hd-remove-application"
               disabled={disabled}
               onClick={(event) => {
                 event.currentTarget

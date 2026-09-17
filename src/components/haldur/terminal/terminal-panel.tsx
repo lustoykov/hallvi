@@ -297,21 +297,21 @@ export function TerminalPanel({
 
   return (
     <section
-      className="sg-terminal"
+      className="hd-terminal"
       data-expanded={expanded || undefined}
       data-minimized={minimized || undefined}
       aria-label="Application server terminal"
     >
-      <header className="sg-terminal-bar">
+      <header className="hd-terminal-bar">
         <TerminalLights />
         <strong>Terminal</strong>
-        <span className="sg-terminal-target">
+        <span className="hd-terminal-target">
           Application server · <code>{label}</code>
         </span>
-        <span className="sg-terminal-status" role="status">
+        <span className="hd-terminal-status" role="status">
           {status}
         </span>
-        <div className="sg-terminal-controls">
+        <div className="hd-terminal-controls">
           {selected && !minimized && (
             <button type="button" onClick={askAboutSelection}>
               <ChatCircleText weight="bold" aria-hidden="true" />
@@ -351,20 +351,20 @@ export function TerminalPanel({
         </div>
       </header>
 
-      <div className="sg-terminal-body" hidden={minimized}>
+      <div className="hd-terminal-body" hidden={minimized}>
         {piBusy && phase.name === "connected" && (
-          <p className="sg-terminal-pi" role="status">
+          <p className="hd-terminal-pi" role="status">
             Pi is also working on this application. Your commands run
             independently and are not sent to Pi.
           </p>
         )}
         {notice && (
-          <p className="sg-terminal-notice" role="alert">
+          <p className="hd-terminal-notice" role="alert">
             {notice}
           </p>
         )}
         {phase.name === "no-host" && (
-          <div className="sg-terminal-empty">
+          <div className="hd-terminal-empty">
             <p>Connect an application server to use Terminal.</p>
             <button
               type="button"
@@ -380,7 +380,7 @@ export function TerminalPanel({
           </div>
         )}
         {(phase.name === "failed" || phase.name === "ended") && (
-          <p className="sg-terminal-ended" role="status">
+          <p className="hd-terminal-ended" role="status">
             {phase.detail}{" "}
             <button type="button" onClick={() => setAttempt(attempt + 1)}>
               {phase.name === "failed" ? "Retry" : "Connect again"}
@@ -388,7 +388,7 @@ export function TerminalPanel({
           </p>
         )}
         <div
-          className="sg-terminal-screen"
+          className="hd-terminal-screen"
           ref={mount}
           hidden={phase.name === "no-host"}
         />

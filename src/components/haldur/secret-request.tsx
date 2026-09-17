@@ -34,7 +34,7 @@ import { useEffect, useState } from "react";
 const MINIMUM_LENGTH = 8;
 
 /** The request block's anchor, shared with the chip that returns to it. */
-export const SECRET_REQUEST_ANCHOR = "sg-secret-request";
+export const SECRET_REQUEST_ANCHOR = "hd-secret-request";
 
 import "./secret-request.css";
 import { useOffScreen } from "./use-off-screen";
@@ -128,36 +128,36 @@ export function SecretRequests({
   if (!waiting.length)
     return (
       <section
-        className="sg-secrets"
+        className="hd-secrets"
         id={SECRET_REQUEST_ANCHOR}
         data-done=""
         aria-label="Values supplied to Haldur"
       >
         <Who />
-        <div className="sg-secrets-body">
-          <details className="sg-secrets-receipt">
+        <div className="hd-secrets-body">
+          <details className="hd-secrets-receipt">
             <summary>
               <Check weight="bold" aria-hidden="true" />
               {supplied.length} configuration{" "}
               {supplied.length === 1 ? "value" : "values"} supplied
               <CaretRight
-                className="sg-secrets-caret"
+                className="hd-secrets-caret"
                 weight="bold"
                 aria-hidden="true"
               />
             </summary>
-            <ul className="sg-secrets-given">
+            <ul className="hd-secrets-given">
               {supplied.map((secret) => (
                 <li key={secret.name}>
                   <code>{secret.name}</code>
                   {secret.process && <small>for {secret.process}</small>}
-                  <span className="sg-secrets-when">
+                  <span className="hd-secrets-when">
                     supplied {when(secret.establishedAt!)}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="sg-secret-note">
+            <p className="hd-secret-note">
               <Eye weight="bold" aria-hidden="true" />
               The values themselves are not shown here or anywhere else — they
               are written once and never read back for display.
@@ -166,7 +166,7 @@ export function SecretRequests({
           {justCompleted && onContinue && (
             <button
               type="button"
-              className="sg-secrets-continue"
+              className="hd-secrets-continue"
               onClick={() =>
                 onContinue(
                   `${supplied.map((secret) => secret.name).join(", ")} ${
@@ -185,28 +185,28 @@ export function SecretRequests({
 
   return (
     <section
-      className="sg-secrets"
+      className="hd-secrets"
       id={SECRET_REQUEST_ANCHOR}
       aria-labelledby={`${SECRET_REQUEST_ANCHOR}-said`}
     >
       <Who />
-      <div className="sg-secrets-body">
+      <div className="hd-secrets-body">
         {/* One title and one explanation, for however many fields follow. */}
-        <p className="sg-secrets-said" id={`${SECRET_REQUEST_ANCHOR}-said`}>
+        <p className="hd-secrets-said" id={`${SECRET_REQUEST_ANCHOR}-said`}>
           <Key weight="bold" aria-hidden="true" />
           <span>
             Before I go on I need {waiting.length}{" "}
             {waiting.length === 1 ? "value" : "values"} that should stay out of
             this conversation.
             {supplied.length > 0 && (
-              <em className="sg-secrets-progress">
+              <em className="hd-secrets-progress">
                 {" "}
                 {supplied.length} of {secrets.length} already supplied.
               </em>
             )}
           </span>
         </p>
-        <ul className="sg-secrets-list">
+        <ul className="hd-secrets-list">
           {waiting.map((secret) => (
             <li key={secret.name}>
               <SecretField
@@ -224,10 +224,10 @@ export function SecretRequests({
           ))}
           {/* What is already done, stated as a name and nothing more. */}
           {supplied.map((secret) => (
-            <li key={secret.name} className="sg-secrets-done">
+            <li key={secret.name} className="hd-secrets-done">
               <Check weight="bold" aria-hidden="true" />
               <code>{secret.name}</code>
-              <span className="sg-secrets-when">
+              <span className="hd-secrets-when">
                 supplied {when(secret.establishedAt!)}
               </span>
             </li>
@@ -237,12 +237,12 @@ export function SecretRequests({
             supplying a value here is safe enough for the reader's purpose —
             and the full account is one disclosure for the whole group rather
             than the same security prose repeated under every field. */}
-        <p className="sg-secret-note">
+        <p className="hd-secret-note">
           <Eye weight="bold" aria-hidden="true" />
           Never a message, and never in a saved command — but a command Pi
           writes can still use it.
         </p>
-        <details className="sg-secret-how">
+        <details className="hd-secret-how">
           <summary>
             How Haldur handles these
             <CaretRight weight="bold" aria-hidden="true" />
@@ -275,12 +275,12 @@ export function SecretRequests({
 
 function Who() {
   return (
-    <div className="sg-secrets-who">
-      <span className="sg-secrets-avatar" aria-hidden="true">
+    <div className="hd-secrets-who">
+      <span className="hd-secrets-avatar" aria-hidden="true">
         SG
       </span>
       <strong>Haldur</strong>
-      <span className="sg-secrets-asks">asked for</span>
+      <span className="hd-secrets-asks">asked for</span>
     </div>
   );
 }
@@ -311,16 +311,16 @@ export function SecretRequestsChip({ secrets }: { secrets: SecretRequest[] }) {
   return (
     <button
       type="button"
-      className="sg-secrets-chip"
+      className="hd-secrets-chip"
       onClick={() => {
         const block = document.getElementById(SECRET_REQUEST_ANCHOR);
         if (!block) return;
         block.scrollIntoView({ behavior: "smooth", block: "center" });
         // The same brief highlight a repeated record gets, so the thing you
         // asked to be taken to identifies itself on arrival.
-        block.classList.add("sg-message-highlight");
+        block.classList.add("hd-message-highlight");
         window.setTimeout(
-          () => block.classList.remove("sg-message-highlight"),
+          () => block.classList.remove("hd-message-highlight"),
           2600,
         );
         block
@@ -330,7 +330,7 @@ export function SecretRequestsChip({ secrets }: { secrets: SecretRequest[] }) {
     >
       <Key weight="bold" aria-hidden="true" />
       {waiting} {waiting === 1 ? "value" : "values"} still needed
-      <span className="sg-secrets-chip-go">go to the request ↑</span>
+      <span className="hd-secrets-chip-go">go to the request ↑</span>
     </button>
   );
 }
@@ -378,7 +378,7 @@ function SecretField({
 
   return (
     <form
-      className="sg-secret"
+      className="hd-secret"
       onSubmit={(event) => {
         event.preventDefault();
         if (value.length >= MINIMUM_LENGTH) void send();
@@ -387,11 +387,11 @@ function SecretField({
       <label htmlFor={field}>
         <code>{secret.name}</code>
         {secret.process && <small>for {secret.process}</small>}
-        <span className="sg-secret-why" title={secret.why}>
+        <span className="hd-secret-why" title={secret.why}>
           {purposeOf(secret.why)}
         </span>
       </label>
-      <div className="sg-secret-row">
+      <div className="hd-secret-row">
         <input
           id={field}
           type="password"
@@ -409,12 +409,12 @@ function SecretField({
         </button>
       </div>
       {error && (
-        <p className="sg-secret-error" role="alert">
+        <p className="hd-secret-error" role="alert">
           {error}
         </p>
       )}
       {short && (
-        <p className="sg-secret-error" id={`${field}-short`}>
+        <p className="hd-secret-error" id={`${field}-short`}>
           At least {MINIMUM_LENGTH} characters — shorter values turn up in
           ordinary output too often for exact-value redaction to help.
         </p>

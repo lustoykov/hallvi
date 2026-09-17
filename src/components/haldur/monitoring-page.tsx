@@ -86,7 +86,7 @@ export function MonitoringPage({
         ) : (
           // A record can establish that nothing is watching without anything
           // ever having been checked: an honest state with no map to draw.
-          <div className="sg-deploy-none">
+          <div className="hd-deploy-none">
             <h2>
               {story.watcher
                 ? story.watcher.state === "running"

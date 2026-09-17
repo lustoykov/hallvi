@@ -60,11 +60,11 @@ export function ArchitecturePage({
 
   if (!model)
     return (
-      <div className="ax-root sg-section-page sg-section-architecture">
+      <div className="ax-root hd-section-page hd-section-architecture">
         {chrome.bar}
         {chrome.header}
-        <div className="sg-section-content">
-          <div className="sg-arch-unmapped">
+        <div className="hd-section-content">
+          <div className="hd-arch-unmapped">
             <h2>How this fits together has not been worked out yet.</h2>
             <p>
               Nothing on record says what this application is made of. That is
@@ -78,7 +78,7 @@ export function ArchitecturePage({
             </p>
             <button
               type="button"
-              className="sg-primary-button"
+              className="hd-primary-button"
               onClick={() =>
                 onAsk(
                   "Work out how this application is put together — its pieces, how they connect, and what you can verify about each — and record it.",
@@ -93,7 +93,7 @@ export function ArchitecturePage({
     );
 
   return (
-    <div className="ax-root sg-section-page sg-section-architecture">
+    <div className="ax-root hd-section-page hd-section-architecture">
       <JourneyDirection
         model={model}
         recheck={idle}

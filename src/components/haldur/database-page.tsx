@@ -63,7 +63,7 @@ export function DatabasePage({
     return (
       <div className="ax-root" data-variant="timeline">
         {head}
-        <div className="sg-deploy-none">
+        <div className="hd-deploy-none">
           <h2>Nothing here has been looked at yet.</h2>
           <p>
             No record names a database for {applicationName}. It may not have
@@ -73,7 +73,7 @@ export function DatabasePage({
           </p>
           <button
             type="button"
-            className="sg-primary-button"
+            className="hd-primary-button"
             onClick={() =>
               onAsk(
                 `Does ${applicationName} have a database? If it does, say which engine, where its data lives and whether it answers; if it does not, record that.`,

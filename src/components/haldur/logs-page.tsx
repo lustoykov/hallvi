@@ -96,9 +96,9 @@ export function LogsPage({
   );
 
   return (
-    <div className="ax-root sg-section-page sg-section-logs">
+    <div className="ax-root hd-section-page hd-section-logs">
       {bar}
-      <header className="sg-section-header">
+      <header className="hd-section-header">
         <div>
           <h1>Command output</h1>
           <p>
@@ -109,12 +109,12 @@ export function LogsPage({
           </p>
         </div>
       </header>
-      <div className="sg-section-content">
+      <div className="hd-section-content">
         {streams.length > 0 && (
-          <div className="sg-streams">
+          <div className="hd-streams">
             <button
               type="button"
-              className={`sg-stream${place === null ? " selected" : ""}`}
+              className={`hd-stream${place === null ? " selected" : ""}`}
               onClick={() => setPlace(null)}
             >
               <strong>Everywhere</strong>
@@ -124,7 +124,7 @@ export function LogsPage({
               <button
                 type="button"
                 key={stream.label}
-                className={`sg-stream${place === stream.label ? " selected" : ""}`}
+                className={`hd-stream${place === stream.label ? " selected" : ""}`}
                 onClick={() => setPlace(stream.label)}
               >
                 <strong>{stream.label}</strong>
@@ -132,9 +132,9 @@ export function LogsPage({
                   {stream.lines.toLocaleString()} lines · last{" "}
                   <LocalTime value={stream.lastAt} variant="compact" />
                 </small>
-                <span className="sg-stream-bar" aria-hidden="true">
+                <span className="hd-stream-bar" aria-hidden="true">
                   <span
-                    className="sg-fill-working"
+                    className="hd-fill-working"
                     style={{ width: `${(stream.lines / peak) * 100}%` }}
                   />
                 </span>
@@ -143,7 +143,7 @@ export function LogsPage({
           </div>
         )}
 
-        <div className="sg-log-toolbar">
+        <div className="hd-log-toolbar">
           <label>
             <MagnifyingGlass aria-hidden="true" />
             <input
@@ -166,7 +166,7 @@ export function LogsPage({
         </div>
 
         {shown.length === 0 && (
-          <div className="sg-section-none">
+          <div className="hd-section-none">
             <h2>No output has been captured yet.</h2>
             <p>
               That is not a claim the application is quiet — only that nothing
@@ -181,7 +181,7 @@ export function LogsPage({
             which reads as a page that broke rather than as a search that
             found nothing. */}
         {shown.length > 0 && query && !matched.length && (
-          <div className="sg-section-none">
+          <div className="hd-section-none">
             <h2>Nothing captured contains “{query}”.</h2>
             <p>
               {shown.length} captured run{shown.length === 1 ? "" : "s"}{" "}
@@ -200,7 +200,7 @@ export function LogsPage({
             .filter((line) => line.trim() && matching(line));
           const at = execution.finishedAt ?? execution.createdAt;
           return (
-            <section className="sg-captured" key={execution.id}>
+            <section className="hd-captured" key={execution.id}>
               <header>
                 <strong>{placeOf(execution.tool)}</strong>
                 <code>{clip(essence(commandOf(execution.input)), 96)}</code>
@@ -220,7 +220,7 @@ export function LogsPage({
                   <ArrowUpRight weight="bold" aria-hidden="true" />
                 </button>
               </header>
-              <pre className="sg-logs-output">{lines.join("\n")}</pre>
+              <pre className="hd-logs-output">{lines.join("\n")}</pre>
             </section>
           );
         })}

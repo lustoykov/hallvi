@@ -46,7 +46,7 @@ export function StateChip({
   detail?: string | null;
 }) {
   return (
-    <span className={`sg-op-state sg-op-state-${state}`}>
+    <span className={`hd-op-state hd-op-state-${state}`}>
       {icons[state]}
       {stateLabel[state]}
       {detail ? <em>· {detail}</em> : null}
@@ -61,10 +61,10 @@ export function OperationSteps({
 }) {
   if (!steps?.length) return null;
   return (
-    <ol className="sg-op-steps">
+    <ol className="hd-op-steps">
       {steps.map((step, index) => (
         <li key={`${index}-${step.label}`} className={step.state}>
-          <span className="sg-op-step-mark" aria-hidden="true">
+          <span className="hd-op-step-mark" aria-hidden="true">
             {step.state === "done" ? (
               <Check weight="bold" />
             ) : step.state === "active" ? (
@@ -92,27 +92,27 @@ export function DestinationLinks({
   prefix?: string;
 }) {
   return (
-    <div className="sg-op-links">
-      {prefix && <span className="sg-op-links-label">{prefix}</span>}
+    <div className="hd-op-links">
+      {prefix && <span className="hd-op-links-label">{prefix}</span>}
       {destinations.slice(0, 3).map((destination) => (
         <button
           key={destination}
           type="button"
-          className="sg-op-link"
+          className="hd-op-link"
           onClick={() => onOpen(destination)}
         >
           Open {labelOf(destination)} <ArrowRight aria-hidden="true" />
         </button>
       ))}
       {destinations.length > 3 && (
-        <details className="sg-op-more">
+        <details className="hd-op-more">
           <summary>{destinations.length - 3} more destinations</summary>
-          <div className="sg-op-links">
+          <div className="hd-op-links">
             {destinations.slice(3).map((destination) => (
               <button
                 key={destination}
                 type="button"
-                className="sg-op-link"
+                className="hd-op-link"
                 onClick={() => onOpen(destination)}
               >
                 Open {labelOf(destination)} <ArrowRight aria-hidden="true" />
@@ -152,18 +152,18 @@ export function OperationReceipt({
     operation.steps?.length;
   return (
     <div
-      className={`sg-op-receipt sg-op-receipt-${operation.state}`}
+      className={`hd-op-receipt hd-op-receipt-${operation.state}`}
       data-operation={operation.id}
       role="group"
       aria-label={`${stateLabel[operation.state]}: ${operation.title}`}
     >
-      <div className="sg-op-receipt-head">
+      <div className="hd-op-receipt-head">
         <StateChip
           state={operation.state}
           detail={operation.state === "queued" ? null : stepDetail(operation)}
         />
         <strong>{operation.title}</strong>
-        <span className="sg-op-rel">
+        <span className="hd-op-rel">
           {relativeTime(operation.updatedAt, now)}
         </span>
       </div>
@@ -171,11 +171,11 @@ export function OperationReceipt({
         !(
           operation.evidence === operation.summary &&
           (operation.state === "verified" || operation.state === "inspected")
-        ) && <p className="sg-op-summary">{operation.summary}</p>}
+        ) && <p className="hd-op-summary">{operation.summary}</p>}
       {operation.state === "queued" && operation.waitingForId && (
         <button
           type="button"
-          className="sg-op-ref"
+          className="hd-op-ref"
           onClick={() => {
             if (onOpenOperation && operation.waitingForId)
               return onOpenOperation(operation.waitingForId);
@@ -196,12 +196,12 @@ export function OperationReceipt({
       {showSteps ? <OperationSteps steps={operation.steps} /> : null}
       {operation.evidence &&
         (operation.state === "verified" || operation.state === "inspected") && (
-          <p className="sg-op-evidence">
+          <p className="hd-op-evidence">
             <Check weight="bold" aria-hidden="true" /> {operation.evidence}
           </p>
         )}
       {operation.state === "failed" && operation.next && (
-        <p className="sg-op-next">Next: {operation.next}</p>
+        <p className="hd-op-next">Next: {operation.next}</p>
       )}
       {decision}
       <DestinationLinks
@@ -237,8 +237,8 @@ export function OperationReferences({
 }) {
   if (!operations.length) return null;
   return (
-    <div className="sg-op-refs">
-      <span className="sg-op-links-label">Refers to</span>
+    <div className="hd-op-refs">
+      <span className="hd-op-links-label">Refers to</span>
       {operations.map((operation) => {
         const origin = operation.origin;
         const chat = origin
@@ -248,7 +248,7 @@ export function OperationReferences({
           <button
             key={operation.id}
             type="button"
-            className="sg-op-ref"
+            className="hd-op-ref"
             onClick={() =>
               origin
                 ? onOpenConversation(origin.chatId, origin.messageId)

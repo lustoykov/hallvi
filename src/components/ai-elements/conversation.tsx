@@ -10,7 +10,7 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 export function Conversation({ className = "", ...props }: ConversationProps) {
   return (
     <StickToBottom
-      className={`sg-conversation ${className}`.trim()}
+      className={`hd-conversation ${className}`.trim()}
       initial="smooth"
       resize="smooth"
       role="log"
@@ -38,7 +38,7 @@ export function ConversationScrollButton() {
   return (
     <button
       aria-label="Scroll to the latest message"
-      className="sg-conversation-scroll"
+      className="hd-conversation-scroll"
       onClick={handleClick}
       type="button"
     >

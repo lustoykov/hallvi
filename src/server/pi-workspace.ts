@@ -233,13 +233,13 @@ export class PiWorkspace {
       "haldur.pi-workspace": this.id,
       "haldur.pi-workspace-process": String(process.pid),
     };
-    this.volume = `sg-pi-${this.id}`;
+    this.volume = `hd-pi-${this.id}`;
     await this.docker.createVolume(this.volume, labels, {
       type: "tmpfs",
       device: "tmpfs",
       o: "size=256m,uid=1000,gid=1000,mode=0700",
     });
-    const { Id } = await this.docker.createContainer(`sg-pi-${this.id}`, {
+    const { Id } = await this.docker.createContainer(`hd-pi-${this.id}`, {
       Image: image,
       User: "1000:1000",
       WorkingDir: workspacePath,
@@ -304,7 +304,7 @@ export class PiWorkspace {
       // Docker's archive API refuses even writable mounts on read-only roots.
       // A trusted, networkless helper populates the private volume; it never
       // executes source and is removed before any model tool can run.
-      const seed = await this.docker.createContainer(`sg-pi-${this.id}-seed`, {
+      const seed = await this.docker.createContainer(`hd-pi-${this.id}-seed`, {
         Image: image,
         User: "1000:1000",
         Labels: labels,
@@ -782,7 +782,7 @@ export async function runComposeResolver(
   const image = await ensureImage(docker);
   signal.throwIfAborted();
   const id = randomUUID();
-  const { Id } = await docker.createContainer(`sg-resolve-${id}`, {
+  const { Id } = await docker.createContainer(`hd-resolve-${id}`, {
     Image: image,
     User: "1000:1000",
     WorkingDir: "/tmp/bundle",

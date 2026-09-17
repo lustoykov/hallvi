@@ -6,7 +6,7 @@
    chip, the rail and the red check line. The chip speaks first; the card
    agrees with it quietly. */
 
-.sg-info {
+.hd-info {
   position: relative;
   margin: 16px 0;
   padding: 16px 20px;
@@ -17,35 +17,35 @@
   font-size: 13.5px;
   line-height: 1.75;
 }
-.sg-info[data-tone="failed"] {
+.hd-info[data-tone="failed"] {
   border-color: var(--failed-line);
   background: var(--failed-surface, #fffbfb);
 }
-.sg-info[data-tone="stale"] {
+.hd-info[data-tone="stale"] {
   border-color: var(--waiting-line);
 }
-.sg-info[data-role="recommendation"] {
+.hd-info[data-role="recommendation"] {
   border-color: #cfdcf7;
 }
 /* Retired: still readable, visibly no longer asserted. */
-.sg-info[data-tone="absent"] {
+.hd-info[data-tone="absent"] {
   border-style: dashed;
   color: var(--muted);
 }
 
 /* ---------- Head ---------- */
 
-.sg-info-head {
+.hd-info-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 6px 10px;
   margin-bottom: 7px;
 }
-.sg-info-head .sg-tag {
+.hd-info-head .hd-tag {
   align-self: center;
 }
-.sg-info-head h3 {
+.hd-info-head h3 {
   flex: 1 1 200px;
   margin: 0;
   font-size: 15px;
@@ -54,7 +54,7 @@
   letter-spacing: -0.012em;
   color: var(--ink);
 }
-.sg-info-when {
+.hd-info-when {
   flex-shrink: 0;
   color: var(--faint);
   font-size: 11.5px;
@@ -63,32 +63,32 @@
 
 /* ---------- Body ---------- */
 
-.sg-info-body {
+.hd-info-body {
   max-width: 68ch;
 }
-.sg-info-body[data-folded] {
+.hd-info-body[data-folded] {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   line-clamp: 4;
   overflow: hidden;
 }
-.sg-info-body p {
+.hd-info-body p {
   margin: 0 0 10px;
 }
-.sg-info-body p:last-child {
+.hd-info-body p:last-child {
   margin-bottom: 0;
 }
-.sg-info-body a {
+.hd-info-body a {
   color: var(--link);
   text-underline-offset: 3px;
 }
-.sg-info-body code {
+.hd-info-body code {
   font-family: var(--mono);
   font-size: 12.5px;
   overflow-wrap: anywhere;
 }
-.sg-info-unfold {
+.hd-info-unfold {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -101,14 +101,14 @@
   font-weight: 560;
   cursor: pointer;
 }
-.sg-info-unfold:hover {
+.hd-info-unfold:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.sg-info-unfold svg {
+.hd-info-unfold svg {
   transition: transform var(--base) var(--ease-out);
 }
-.sg-info-unfold[aria-expanded="true"] svg {
+.hd-info-unfold[aria-expanded="true"] svg {
   transform: rotate(180deg);
 }
 
@@ -125,7 +125,7 @@
    be, and an odd count leaves a hole beside a lone pair that reads as a
    missing value. One column puts every label at the same x and every value
    at the same x, which is the whole job of a table like this. */
-.sg-info-facts {
+.hd-info-facts {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   max-width: 68ch;
@@ -133,7 +133,7 @@
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
-.sg-info-facts > div {
+.hd-info-facts > div {
   display: grid;
   grid-template-columns: 124px minmax(0, 1fr);
   gap: 14px;
@@ -141,15 +141,15 @@
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
-.sg-info-facts > div[data-wide] {
+.hd-info-facts > div[data-wide] {
   grid-column: 1 / -1;
 }
-.sg-info-facts dt {
+.hd-info-facts dt {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
-.sg-info-facts dd {
+.hd-info-facts dd {
   margin: 0;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -159,7 +159,7 @@
   text-wrap: pretty;
 }
 /* How we know, said once under the strip rather than beside every value. */
-.sg-info-basis {
+.hd-info-basis {
   max-width: 68ch;
   margin: 8px 0 0;
   color: var(--faint);
@@ -172,7 +172,7 @@
    left-right-then-down, which is not the order they happened in. An odd count
    also stranded the last one alone on a row, where it read as a different
    group rather than the last step. */
-.sg-info-checks {
+.hd-info-checks {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
@@ -183,7 +183,7 @@
   list-style: none;
   font-size: 13px;
 }
-.sg-info-checks li {
+.hd-info-checks li {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 8px;
@@ -191,7 +191,7 @@
   padding: 2px 0;
   color: var(--ink-2);
 }
-.sg-info-checks li span {
+.hd-info-checks li span {
   position: relative;
   top: 1px;
   width: 15px;
@@ -199,7 +199,7 @@
   border-radius: 999px;
   background: var(--unknown-bg);
 }
-.sg-info-checks li span::after {
+.hd-info-checks li span::after {
   position: absolute;
   inset: 0;
   display: grid;
@@ -210,27 +210,27 @@
   color: var(--muted);
   content: "·";
 }
-.sg-info-checks li[data-status="passed"] span {
+.hd-info-checks li[data-status="passed"] span {
   background: var(--verified-bg);
 }
-.sg-info-checks li[data-status="passed"] span::after {
+.hd-info-checks li[data-status="passed"] span::after {
   content: "✓";
   color: var(--verified-text);
 }
-.sg-info-checks li[data-status="failed"] span {
+.hd-info-checks li[data-status="failed"] span {
   background: var(--failed-bg);
 }
-.sg-info-checks li[data-status="failed"] span::after {
+.hd-info-checks li[data-status="failed"] span::after {
   content: "!";
   color: var(--failed);
 }
-.sg-info-checks li[data-status="failed"] {
+.hd-info-checks li[data-status="failed"] {
   color: var(--failed);
 }
 
 /* ---------- What to do about it ---------- */
 
-.sg-info-next {
+.hd-info-next {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -243,33 +243,33 @@
   font-size: 13px;
   color: var(--ink-2);
 }
-.sg-info-next span {
+.hd-info-next span {
   color: var(--faint);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.sg-info[data-role="recommendation"] .sg-info-next {
+.hd-info[data-role="recommendation"] .hd-info-next {
   background: var(--working-bg);
   color: var(--working-text);
 }
-.sg-info[data-role="recommendation"] .sg-info-next span {
+.hd-info[data-role="recommendation"] .hd-info-next span {
   color: var(--working-text);
   opacity: 0.72;
 }
 
 /* ---------- Where to look next ---------- */
 
-.sg-info-foot {
+.hd-info-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 14px;
 }
-.sg-info-open,
-.sg-info-go {
+.hd-info-open,
+.hd-info-go {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -289,31 +289,31 @@
     background-color var(--base),
     border-color var(--base);
 }
-.sg-info-go:hover {
+.hd-info-go:hover {
   border-color: #c3ccdb;
   background: var(--context);
 }
-.sg-info-go:active,
-.sg-info-open:active {
+.hd-info-go:active,
+.hd-info-open:active {
   transform: scale(0.97);
 }
-.sg-info-open {
+.hd-info-open {
   border-color: var(--blue);
   background: var(--blue);
   color: #fff;
 }
-.sg-info-open:hover {
+.hd-info-open:hover {
   background: #2350c4;
   border-color: #2350c4;
 }
 
 /* ---------- Evidence ---------- */
 
-.sg-info-evidence {
+.hd-info-evidence {
   margin-top: 12px;
   font-size: 12.5px;
 }
-.sg-info-evidence > summary {
+.hd-info-evidence > summary {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -322,13 +322,13 @@
   cursor: pointer;
   list-style: none;
 }
-.sg-info-evidence > summary::-webkit-details-marker {
+.hd-info-evidence > summary::-webkit-details-marker {
   display: none;
 }
-.sg-info-evidence > summary:hover {
+.hd-info-evidence > summary:hover {
   color: var(--ink-2);
 }
-.sg-info-evidence > summary em {
+.hd-info-evidence > summary em {
   display: grid;
   place-items: center;
   min-width: 17px;
@@ -341,14 +341,14 @@
   font-style: normal;
   font-weight: 650;
 }
-.sg-info-evidence ul {
+.hd-info-evidence ul {
   margin: 8px 0 0;
   padding: 0 0 0 1px;
   list-style: none;
   display: grid;
   gap: 4px;
 }
-.sg-info-evidence a {
+.hd-info-evidence a {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -356,14 +356,14 @@
   text-decoration: none;
   text-underline-offset: 3px;
 }
-.sg-info-evidence a:hover {
+.hd-info-evidence a:hover {
   text-decoration: underline;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sg-info-unfold svg,
-  .sg-info-open,
-  .sg-info-go {
+  .hd-info-unfold svg,
+  .hd-info-open,
+  .hd-info-go {
     transition-duration: 1ms;
   }
 }

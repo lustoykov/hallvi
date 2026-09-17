@@ -24,7 +24,7 @@ const rich = scenario === "rich";
 // The recommendation's configuration in the native shape the executor runs:
 // one web process, and for the rich application a managed PostgreSQL
 // database, a Valkey broker, a Celery worker and file storage.
-const project = "sg-capture";
+const project = "hd-capture";
 const image = "ghcr.io/paperless-ngx/paperless-ngx:2.13";
 const native = {
   format: 1,

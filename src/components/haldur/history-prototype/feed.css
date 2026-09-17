@@ -245,7 +245,7 @@
   line-height: 1.5;
   color: var(--ax-muted);
 }
-.axh-console > .sg-term-bar {
+.axh-console > .hd-term-bar {
   margin: -2px 0 6px;
   padding: 6px 8px 10px;
 }

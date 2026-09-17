@@ -429,7 +429,7 @@
 }
 
 /* Connections: state in words beside the provider name. */
-.root :global(.sg-connection-state) {
+.root :global(.hd-connection-state) {
   margin-left: 10px;
   font-style: normal;
   font-size: 11px;
@@ -442,12 +442,12 @@
   color: #647089;
   vertical-align: middle;
 }
-.root :global(.sg-connection-state.sg-connection-connected) {
+.root :global(.hd-connection-state.hd-connection-connected) {
   background: #eaf8f1;
   color: #0f7a4e;
 }
-.root :global(.sg-connection-state.sg-connection-expired),
-.root :global(.sg-connection-state.sg-connection-failed) {
+.root :global(.hd-connection-state.hd-connection-expired),
+.root :global(.hd-connection-state.hd-connection-failed) {
   background: #fff4e9;
   color: #9a4b10;
 }

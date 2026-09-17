@@ -149,14 +149,14 @@ export function ConnectionsScreen({
     router.refresh();
   };
   return (
-    <main className={`sg-setup-shell ${s.root}`}>
-      <header className="sg-setup-topbar">
-        <Link className="sg-setup-brand" href="/applications">
-          <span className="sg-app-mark">H</span>
+    <main className={`hd-setup-shell ${s.root}`}>
+      <header className="hd-setup-topbar">
+        <Link className="hd-setup-brand" href="/applications">
+          <span className="hd-app-mark">H</span>
           <span>Haldur</span>
         </Link>
         <Link
-          className="sg-setup-back"
+          className="hd-setup-back"
           href={returnTo?.href ?? "/applications"}
         >
           <ArrowLeft aria-hidden="true" />{" "}
@@ -173,7 +173,7 @@ export function ConnectionsScreen({
           </p>
         </header>
         {prototype && (
-          <p className="sg-reference-banner">
+          <p className="hd-reference-banner">
             Prototype · invented connections. Real ChatGPT, GitHub and Execution
             settings run on the other pages.
           </p>
@@ -190,7 +190,7 @@ export function ConnectionsScreen({
         <section className={s.card} aria-label="Connections">
           {connections.map((item) => (
             <section
-              className={`${s.section} sg-connection sg-connection-${item.state}`}
+              className={`${s.section} hd-connection hd-connection-${item.state}`}
               key={item.id}
               aria-label={item.name}
             >
@@ -206,7 +206,7 @@ export function ConnectionsScreen({
                 </span>
                 {item.name}
                 <em
-                  className={`sg-connection-state sg-connection-${item.state}`}
+                  className={`hd-connection-state hd-connection-${item.state}`}
                 >
                   {item.state === "connected"
                     ? "Connected"

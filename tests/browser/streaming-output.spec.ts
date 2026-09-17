@@ -87,17 +87,17 @@ test("server output streams inline, preserves reading position and stays readabl
     // things, which is the single most confusing thing on this screen.
     // Which machine, said as a machine. "on your server" was printed over
     // every shell command whatever it touched.
-    await expect(card.locator(".sg-execution-where")).toContainText(
+    await expect(card.locator(".hd-execution-where")).toContainText(
       "On the server · fixture-server",
     );
-    await expect(card.locator(".sg-execution-where")).toHaveAttribute(
+    await expect(card.locator(".hd-execution-where")).toHaveAttribute(
       "title",
       "root@fixture-server:22",
     );
-    const ran = card.locator(".sg-stream-ran code");
+    const ran = card.locator(".hd-stream-ran code");
     await expect(ran).toHaveText("docker compose up -d");
     expect(
-      await card.locator(".sg-stream-terminal pre").count(),
+      await card.locator(".hd-stream-terminal pre").count(),
       "one command, one output pane",
     ).toBe(1);
     // This payload carries a timeoutSeconds beside the command, so there is

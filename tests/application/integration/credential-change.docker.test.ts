@@ -69,7 +69,7 @@ describe.skipIf(process.env.HALDUR_DOCKER_TESTS !== "1")(
   "a credential change against a real PostgreSQL",
   () => {
     beforeAll(() => {
-      directory = mkdtempSync(join(tmpdir(), "sg-credential-change-"));
+      directory = mkdtempSync(join(tmpdir(), "hd-credential-change-"));
       saved = process.env.HALDUR_CONFIG_DIR;
       process.env.HALDUR_CONFIG_DIR = directory;
       container = execFileSync(

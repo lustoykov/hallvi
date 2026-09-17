@@ -13,7 +13,7 @@ import { journey } from "./journeys";
 const ACCEPTANCE = process.env.SG_ACCEPTANCE_URL ?? "http://127.0.0.1:3410";
 
 /** Awkward on purpose: a shell would treat most of this as syntax. */
-const VALUE = `p a$s'"; touch /tmp/sg-browser-pwned; echo \`x\` \\ ünï`;
+const VALUE = `p a$s'"; touch /tmp/hd-browser-pwned; echo \`x\` \\ ünï`;
 const NAME = "AUDIT_ONLY_SECRET";
 
 interface Seen {

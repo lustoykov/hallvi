@@ -45,7 +45,7 @@ function reopen() {
   delete globalThis.__haldurDb;
 }
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "sg-storage-"));
+  root = mkdtempSync(join(tmpdir(), "hd-storage-"));
   vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
   vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALDUR_DB_PATH!);

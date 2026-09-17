@@ -20,7 +20,7 @@ import type { PiRun } from "../../../src/server/types";
 let root: string;
 let run: PiRun;
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), "sg-operator-"));
+  root = mkdtempSync(join(tmpdir(), "hd-operator-"));
   vi.stubEnv("HALDUR_DB_PATH", join(root, "test.db"));
   vi.stubEnv("HALDUR_CONFIG_DIR", join(root, "config"));
   pushTestDatabase(process.env.HALDUR_DB_PATH!);

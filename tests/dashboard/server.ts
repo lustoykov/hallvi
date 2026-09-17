@@ -316,7 +316,7 @@ export function createDashboard(root: string, launch: Launch = spawn) {
         }
         return;
       }
-      if (request.headers["x-sg-testing-token"] !== token) {
+      if (request.headers["x-haldur-testing-token"] !== token) {
         json({ error: "Reload the dashboard to reconnect" }, 403);
         return;
       }

@@ -28,7 +28,7 @@ const icons: Record<Tone, ReactNode> = {
 
 export function Tag({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
-    <span className="sg-tag" data-tone={tone}>
+    <span className="hd-tag" data-tone={tone}>
       <span aria-hidden="true" style={{ display: "inline-flex" }}>
         {icons[tone]}
       </span>
@@ -39,9 +39,9 @@ export function Tag({ tone, children }: { tone: Tone; children: ReactNode }) {
 
 export function Working({ children }: { children: ReactNode }) {
   return (
-    <span className="sg-tag" data-tone="unknown">
+    <span className="hd-tag" data-tone="unknown">
       <span aria-hidden="true" style={{ display: "inline-flex" }}>
-        <SpinnerGap weight="bold" className="sg-spin" />
+        <SpinnerGap weight="bold" className="hd-spin" />
       </span>
       {children}
     </span>

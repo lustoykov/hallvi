@@ -118,9 +118,9 @@ export function ApplicationSectionView({
   const information = view.information;
   if (information === undefined)
     return (
-      <div className={`sg-section-page sg-section-${section}`}>
+      <div className={`hd-section-page hd-section-${section}`}>
         {bar}
-        <header className="sg-section-header">
+        <header className="hd-section-header">
           <div>
             <h1>
               {applicationSections.find((item) => item.id === section)?.label}
@@ -128,8 +128,8 @@ export function ApplicationSectionView({
             <p>{descriptions[section]}</p>
           </div>
         </header>
-        <div className="sg-section-content">
-          <p className="sg-section-reading">Reading the recorded facts…</p>
+        <div className="hd-section-content">
+          <p className="hd-section-reading">Reading the recorded facts…</p>
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ export function ApplicationSectionView({
         chrome={{
           bar,
           header: (
-            <header className="sg-section-header">
+            <header className="hd-section-header">
               <div>
                 <h1>Overview</h1>
                 <p>{descriptions.overview}</p>
@@ -319,7 +319,7 @@ export function ApplicationSectionView({
         chrome={{
           bar,
           header: (
-            <header className="sg-section-header">
+            <header className="hd-section-header">
               <div>
                 <h1>Architecture</h1>
                 <p>{descriptions.architecture}</p>
@@ -357,20 +357,20 @@ export function ApplicationSectionView({
     .sort()
     .at(-1);
   return (
-    <div className={`sg-section-page sg-section-${section}`}>
+    <div className={`hd-section-page hd-section-${section}`}>
       {bar}
-      <header className="sg-section-header">
+      <header className="hd-section-header">
         <div>
           <h1>{applicationSections.find((s) => s.id === section)?.label}</h1>
           <p>{descriptions[section]}</p>
         </div>
         {freshest && (
-          <span className="sg-section-fresh">
+          <span className="hd-section-fresh">
             Last established <LocalTime value={freshest} variant="compact" />
           </span>
         )}
       </header>
-      <div className="sg-section-content">
+      <div className="hd-section-content">
         {records.map((record) => (
           <InformationCard
             key={record.id}
@@ -381,7 +381,7 @@ export function ApplicationSectionView({
         ))}
         {/* Logs has its own page and its own empty state now. */}
         {!records.length && (
-          <div className="sg-section-none">
+          <div className="hd-section-none">
             <h2>Nothing has been established here yet.</h2>
             <p>
               That is not a claim that there is nothing to find — only that Pi

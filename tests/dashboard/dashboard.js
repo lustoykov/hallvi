@@ -186,7 +186,7 @@ async function api(path, body) {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     headers: {
-      "X-SG-Testing-Token": token,
+      "X-Haldur-Testing-Token": token,
       "Content-Type": "application/json",
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
