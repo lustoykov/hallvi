@@ -34,6 +34,7 @@ describe("the way back from setup", () => {
     ).toEqual({
       href: `/applications/${APPLICATION}?chat=${CHAT}`,
       label: "Back to the conversation",
+      query: `?application=${APPLICATION}&chat=${CHAT}`,
     });
   });
 

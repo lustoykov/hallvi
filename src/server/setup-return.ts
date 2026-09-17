@@ -13,10 +13,12 @@ import { getApplication, getChat } from "./db";
  * come out of this is a conversation that exists — an address typed into the
  * query string cannot become a redirect off this controller.
  */
+export type SetupReturn = { href: string; label: string; query: string };
+
 export function setupReturnDestination(params: {
   application?: string | string[];
   chat?: string | string[];
-}): { href: string; label: string } | null {
+}): SetupReturn | null {
   const applicationId = single(params.application);
   const chatId = single(params.chat);
   if (!applicationId || !chatId) return null;
@@ -27,6 +29,9 @@ export function setupReturnDestination(params: {
   return {
     href: `/applications/${application.id}?chat=${chat.id}`,
     label: "Back to the conversation",
+    // Carried from one Settings tab to the next, so connecting a second
+    // account does not strand the reader away from their conversation.
+    query: `?application=${application.id}&chat=${chat.id}`,
   };
 }
 
