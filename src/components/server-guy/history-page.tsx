@@ -6,7 +6,7 @@
 // design's and they work on what the projection produces: changes against
 // inspections, work no conversation started, and anything still waiting.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ExecutionRecord } from "@/server/operator-execution";
 import type { SavedInformation } from "@/server/operator-data";
@@ -18,6 +18,10 @@ import { PageHead } from "./deployment-prototype/page-head";
 import { historyFromRecords } from "./history-records";
 import { buildHistory, type Filter } from "./history-prototype/history-model";
 import { TransitHistory } from "./history-prototype/transit";
+import {
+  HistoryLightPrototype,
+  wantedVariant,
+} from "./history-light-prototype";
 import "./history-prototype/transit.css";
 
 export function HistoryPage({
@@ -39,6 +43,18 @@ export function HistoryPage({
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }) {
+  // PROTOTYPE · prototype/history-tasks-2. A valid variant keeps this on the
+  // real History route and swaps only the page body for invented in-memory
+  // facts. Without it, the shipped page remains exactly the default.
+  const [prototype, setPrototype] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setPrototype(Boolean(wantedVariant(window.location.search))),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const [filter, setFilter] = useState<Filter>("All");
   const operations = useMemo(
     () => historyFromRecords({ records, executions }),
@@ -48,6 +64,8 @@ export function HistoryPage({
     () => buildHistory(operations, chats, filter),
     [operations, chats, filter],
   );
+
+  if (prototype) return <HistoryLightPrototype now={now} chrome={chrome} />;
 
   return (
     <div className="ax-root" data-variant="transit">

@@ -31,6 +31,10 @@ export interface HistoryDirectionProps {
   now: number;
   head: ReactNode;
   decisionFor?: (operation: ApplicationOperation) => ReactNode;
+  /** Prototype-only addition above the shipped line. */
+  feedLead?: ReactNode;
+  /** Prototype-only detail rendered inside a row's Evidence disclosure. */
+  expandedDetailFor?: (operation: ApplicationOperation) => ReactNode;
   onOpenConversation: (chatId: string, messageId: string | null) => void;
   onOpenDestination: (destination: ApplicationSection) => void;
 }
@@ -54,6 +58,8 @@ export function TransitHistory({
   now,
   head,
   decisionFor,
+  feedLead,
+  expandedDetailFor,
   onOpenConversation,
   onOpenDestination,
 }: HistoryDirectionProps) {
@@ -139,6 +145,7 @@ export function TransitHistory({
         flash={flash === entry.op.id}
         onJump={jump}
         decisionFor={decisionFor}
+        expandedDetail={expandedDetailFor?.(entry.op)}
         onOpenConversation={onOpenConversation}
         onOpenDestination={onOpenDestination}
         className={thread && lit === thread ? "is-linked" : undefined}
@@ -221,6 +228,7 @@ export function TransitHistory({
               </g>
             ))}
           </svg>
+          {feedLead}
           {history.open.length > 0 && (
             <section
               id="axhm-open"

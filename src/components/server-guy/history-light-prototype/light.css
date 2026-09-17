@@ -1,0 +1,263 @@
+/* PROTOTYPE · prototype/history-tasks-2 · throwaway.
+   Three light additions; the shipped Transit layout remains the frame. */
+
+.h2-root {
+  min-height: 100%;
+}
+
+.h2-lens {
+  display: flex;
+  align-items: center;
+  min-height: 31px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ax-line);
+}
+.h2-lens button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px 3px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ax-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.h2-lens button:hover {
+  background: var(--ax-nav);
+  color: var(--ax-ink);
+}
+.h2-lens button > span {
+  box-sizing: border-box;
+  width: 24px;
+  height: 14px;
+  padding: 2px;
+  border: 1px solid var(--ax-line-2);
+  border-radius: 999px;
+  background: #fff;
+}
+.h2-lens button > span::after {
+  content: "";
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ax-faint);
+  transition: transform var(--ax-fast) var(--ax-ease-out);
+}
+.h2-lens button[aria-pressed="true"] {
+  color: var(--ax-ink);
+}
+.h2-lens button[aria-pressed="true"] > span {
+  border-color: var(--ax-blue);
+  background: var(--ax-working-bg);
+}
+.h2-lens button[aria-pressed="true"] > span::after {
+  transform: translateX(10px);
+  background: var(--ax-blue);
+}
+
+/* A · the original rows, one disclosure level below their Pi run. */
+.h2-task-children {
+  margin-top: 10px;
+  padding: 4px 0 2px;
+  border-top: 1px solid var(--ax-line);
+}
+.axh-expanded-detail {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.axhm .h2-task-children .axh-row {
+  grid-template-columns: 38px 16px minmax(0, 1fr);
+  padding-right: 2px;
+}
+.axhm .h2-task-children .axh-time {
+  grid-row: 1;
+  grid-column: 1;
+  padding-left: 0;
+  padding-right: 0;
+}
+.axhm .h2-task-children .axh-dot {
+  grid-row: 1;
+  grid-column: 2;
+}
+.axhm .h2-task-children .axh-body {
+  grid-row: 1;
+  grid-column: 3;
+}
+.axhm .h2-task-children .axh-actions {
+  grid-row: 2;
+  grid-column: 3;
+  margin-top: 5px;
+}
+.h2-task-children::before {
+  left: 55px;
+  width: 2px;
+  background: var(--ax-line-2);
+}
+.h2-task-children .axh-row:hover {
+  background: var(--ax-context);
+}
+
+/* B · a thin outcome rhythm, not another dashboard. */
+.h2-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--ax-line);
+}
+.h2-week > button {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 4px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ax-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.h2-week > button:hover:not(:disabled) {
+  background: var(--ax-nav);
+  color: var(--ax-ink);
+}
+.h2-week > button:disabled {
+  cursor: default;
+}
+.h2-week > button > span {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.h2-week > button > i {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 10px;
+}
+.h2-week em,
+.h2-week p span::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ax-verified);
+}
+.h2-week em[data-outcome="failed"],
+.h2-week p span[data-outcome="failed"]::before {
+  background: var(--ax-failed);
+}
+.h2-week em[data-outcome="waiting"],
+.h2-week p span[data-outcome="waiting"]::before {
+  background: var(--ax-amber);
+}
+.h2-week em[data-outcome="looked"],
+.h2-week p span[data-outcome="looked"]::before {
+  background: var(--ax-faint);
+}
+.h2-week em[data-outcome="quiet"] {
+  width: 18px;
+  height: 1px;
+  border-radius: 0;
+  background: var(--ax-line-2);
+}
+.h2-week p {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 13px;
+  margin: 1px 4px 0;
+  color: var(--ax-muted);
+  font-size: 10.5px;
+}
+.h2-week p span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.h2-week p span::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+}
+
+/* C · one compact delta, only where a record carries it. */
+.h2-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+  margin: 5px 0 0 !important;
+  color: var(--ax-muted) !important;
+  font-size: 11.5px !important;
+}
+.h2-change > span {
+  color: var(--ax-ink-2);
+  font-weight: 600;
+}
+.h2-change del {
+  color: var(--ax-muted);
+  text-decoration-color: #aeb6c4;
+}
+.h2-change b {
+  color: var(--ax-faint);
+  font-weight: 500;
+}
+.h2-change ins {
+  color: var(--ax-verified-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.h2-change small {
+  color: var(--ax-faint);
+  font-size: 10.5px;
+}
+
+.h2-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 70px;
+  z-index: 79;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(620px, 88vw);
+  margin: 0;
+  padding: 8px 9px 8px 13px;
+  border-radius: 8px;
+  background: #252d3b;
+  color: #f2f5fa;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.h2-notice button {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--ax-muted) 70%, transparent);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.h2-bar .ax-bar-tag {
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .h2-week {
+    margin-top: -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .h2-lens button > span::after {
+    transition: none;
+  }
+}

@@ -97,6 +97,7 @@ export function FeedRow({
   className,
   onPointerEnter,
   onPointerLeave,
+  expandedDetail,
 }: {
   entry: Entry;
   expanded: boolean;
@@ -110,9 +111,11 @@ export function FeedRow({
   className?: string;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
+  /** Optional prototype detail, kept inside the shipped Evidence disclosure. */
+  expandedDetail?: ReactNode;
 }) {
   const op = entry.op;
-  const evidence = Boolean(op.evidence || op.steps?.length);
+  const evidence = Boolean(op.evidence || op.steps?.length || expandedDetail);
   const finished = op.state === "verified" || op.state === "inspected";
   const first = op.destinations.find((item) => item !== "history");
   // Two different things share this timeline: what Pi established, and the
@@ -250,6 +253,9 @@ export function FeedRow({
           )
         )}
       </div>
+      {expandedDetail && expanded && (
+        <div className="axh-expanded-detail">{expandedDetail}</div>
+      )}
     </li>
   );
 }
