@@ -363,6 +363,8 @@ what is not.
 | how often | `monitor` fact `interval` | reported | `configuration` | recorded |
 | who hears about it | `monitor` fact `notifies` | reported | `configuration` | recorded |
 | CPU / memory / disk | `host` facts `cpu-used` `memory-used` `disk-used` | observed | `contents` | recorded |
+| traffic over a day | newest `usage` content: requests, 5xx, p95 and top paths per bucket, read from the proxy's access log | observed | when Server Guy reads it | recorded |
+| CPU / memory over a day | the same `usage` record's `host` series, read from the host's own samples | observed | when Server Guy reads it | recorded |
 | the unwatched gaps | parts with no live check, plus a fixed list of what Server Guy cannot watch | — | — | derived |
 
 **The distinction this page exists to make.** A check that ran once and passed

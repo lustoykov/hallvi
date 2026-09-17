@@ -13,7 +13,8 @@ import type { SavedInformation } from "@/server/operator-data";
 
 import type { PageChrome } from "./deployment-prototype/page-head";
 import { PageHead, type Reachability } from "./deployment-prototype/page-head";
-import { monitoringFromRecords } from "./monitoring-records";
+import { monitoringFromRecords, usageFromRecords } from "./monitoring-records";
+import { UsagePanel } from "./monitoring-usage";
 import { TunerDirection } from "./signal-prototype/tuner";
 import "./signal-prototype/tuner.css";
 
@@ -43,8 +44,12 @@ export function MonitoringPage({
       monitoringFromRecords({ records, applicationId, applicationName, now }),
     [records, applicationId, applicationName, now],
   );
+  const usage = useMemo(
+    () => usageFromRecords(records, applicationId),
+    [records, applicationId],
+  );
 
-  const head = (
+  const top = (
     <PageHead
       bar={chrome.bar}
       title="Monitoring"
@@ -54,6 +59,19 @@ export function MonitoringPage({
       reachable={reachable}
       onReopen={onReopen}
     />
+  );
+  // How much it is used comes first: it is what an owner opens this page
+  // for, and it stands whether or not anything is watching.
+  const head = (
+    <>
+      {top}
+      <UsagePanel
+        usage={usage}
+        name={applicationName}
+        now={now}
+        onAsk={onAsk}
+      />
+    </>
   );
 
   // The Tuner draws stations, and a station is a part something was observed

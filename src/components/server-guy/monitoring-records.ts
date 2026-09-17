@@ -13,7 +13,11 @@
 // is to say whether you would be told about a problem must never imply you
 // would be.
 
-import type { Ref, SavedInformation } from "@/server/operator-data";
+import type {
+  InformationContent,
+  Ref,
+  SavedInformation,
+} from "@/server/operator-data";
 import {
   checkAsNow,
   currentChecks,
@@ -246,4 +250,37 @@ export function monitoringAssessed(
 /** The series of readings for one subject, when a station is opened. */
 export function readingsFor(records: SavedInformation[], ref: Ref) {
   return seriesFor(records, ref);
+}
+
+export type Usage = Extract<InformationContent, { kind: "usage" }> & {
+  /** When Server Guy read the window: its last bucket ends here. */
+  at: string | null;
+  /** The host's `disk-used` fact, which changes too slowly to chart. */
+  disk: string | null;
+};
+
+/** The newest window of traffic and host readings, when one was read. */
+export function usageFromRecords(
+  records: SavedInformation[],
+  applicationId: string,
+): Usage | null {
+  const live = records.filter((record) => !record.retiredAt);
+  const newest = live
+    .filter(
+      (record) =>
+        record.applicationId === applicationId &&
+        record.presentation?.content?.kind === "usage",
+    )
+    .sort((a, b) =>
+      (b.establishedAt ?? "").localeCompare(a.establishedAt ?? ""),
+    )[0];
+  if (newest?.presentation?.content?.kind !== "usage") return null;
+  const host = subjectsOfKind(live, "host")[0];
+  return {
+    ...newest.presentation.content,
+    at: newest.establishedAt,
+    disk: host
+      ? (currentFacts(live, host).get("disk-used")?.value.value ?? null)
+      : null,
+  };
 }
