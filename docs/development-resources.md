@@ -88,6 +88,42 @@ Use owner-only permissions (directory 0700, files 0600), with no secret values.
 Record resource identity, machine/project, task UUID/link, exact branch and tip,
 worktree, purpose, lifetime, retention decision and verification evidence.
 
+### Planned Haldur inventory-path migration
+
+The target canonical path is
+`~/Library/Application Support/Haldur/development-cleanup/`, but the Server Guy
+path above remains authoritative until one coordinated implementation change has
+completed. Do not rename or move the live directory ahead of the scheduled-task
+prompt, and do not merge documentation that calls the Haldur path canonical while
+the task still reads the old path.
+
+That implementation must use one pull request and one bounded maintenance window:
+
+1. Confirm that Dev Cleanup is not running, record its current schedule, status
+   and target task, and inventory the old directory without exposing record
+   contents or credentials.
+2. Copy the directory to a new owner-only staging directory, preserving file
+   metadata. Compare the complete relative-path list, file sizes and hashes, and
+   verify directory mode 0700 and file mode 0600 before promoting the staged copy
+   to the Haldur path. A partial copy is a failure; keep the old directory
+   authoritative.
+3. Update the existing Dev Cleanup automation in place to read and write only the
+   Haldur path. Preserve its schedule, status and target task. Record the prompt
+   change and verification in the same pull request; do not create a replacement
+   automation or competing owner.
+4. Change this section's canonical path in that pull request only after the copied
+   records and updated prompt agree. Run one read-only audit from the existing
+   target task and verify that new audit output lands under the Haldur path.
+5. Keep the old Server Guy directory as a read-only rollback source until the new
+   path has completed a successful scheduled run and all current records and
+   unresolved decisions are present. Retiring the old copy is a separate exact
+   cleanup action requiring fresh ownership, dependency and retention evidence;
+   never delete it merely because the new copy exists.
+
+If validation fails, restore the automation prompt to the old path and leave both
+directories untouched for review. The path change does not authorize renaming any
+product runtime data or compatibility identifiers.
+
 Reconcile any legacy `~/.codex/server-guy-development-resources/` records from
 accessible machines into this inventory by exact resource ID, retaining their
 provenance. Do not erase originals until the transfer is verified. Conflicting
