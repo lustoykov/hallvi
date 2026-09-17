@@ -12,10 +12,11 @@
   border-radius: 16px;
   background: #ffffff;
 }
+/* On the card's top right corner, above the first rail's "Now". */
 .axlr-mascot {
   position: absolute;
-  top: -40px;
-  right: 22px;
+  top: -78px;
+  right: 30px;
   z-index: 2;
 }
 .axlr-lane {
